@@ -148,7 +148,7 @@ def siamese_network():
 
 
 @automm_presets.register()
-def text_match_text():
+def text_similarity():
     return {
         "model.names": ["hf_text"],
         "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",

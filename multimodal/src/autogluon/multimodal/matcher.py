@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import heapq
 import json
 import logging
 import operator
@@ -106,8 +105,8 @@ class MultiModalMatcher:
 
     def __init__(
         self,
-        query: Union[str, List[str]],
-        response: Union[str, List[str]],
+        query: Optional[Union[str, List[str]]] = None,
+        response: Optional[Union[str, List[str]]] = None,
         negative: Optional[Union[str, List[str]]] = None,
         label: Optional[str] = None,
         match_label: Optional[Union[int, str]] = None,
@@ -481,12 +480,14 @@ class MultiModalMatcher:
         column_types: Dict,
         query_config: Optional[DictConfig] = None,
         response_config: Optional[DictConfig] = None,
+        query_columns: Optional[List] = None,
+        response_columns: Optional[List] = None,
     ):
         if self._query_df_preprocessor is None and query_config is not None:
             query_df_preprocessor = init_df_preprocessor(
                 config=query_config,
-                column_types={k: column_types[k] for k in self._query},
-                train_df_x=data[self._query],
+                column_types={k: column_types[k] for k in query_columns},
+                train_df_x=data[query_columns],
             )
         else:  # continuing training
             query_df_preprocessor = self._query_df_preprocessor
@@ -494,8 +495,8 @@ class MultiModalMatcher:
         if self._response_df_preprocessor is None and response_config is not None:
             response_df_preprocessor = init_df_preprocessor(
                 config=response_config,
-                column_types={k: column_types[k] for k in self._response},
-                train_df_x=data[self._response],
+                column_types={k: column_types[k] for k in response_columns},
+                train_df_x=data[response_columns],
             )
         else:  # continuing training
             response_df_preprocessor = self._response_df_preprocessor
@@ -612,10 +613,12 @@ class MultiModalMatcher:
             raise ValueError("Currently only support presets: siamese_network.")
 
         query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._get_matcher_df_preprocessor(
-            query_config=query_config,
-            response_config=response_config,
             data=train_df,
             column_types=self._column_types,
+            query_config=query_config,
+            response_config=response_config,
+            query_columns=self._query,
+            response_columns=self._response,
         )
 
         query_config = select_model(config=query_config, df_preprocessor=query_df_preprocessor)
@@ -975,14 +978,9 @@ class MultiModalMatcher:
         requires_label: bool,
         signature: Optional[str] = None,
     ) -> List[Dict]:
+        assert signature in [QUERY, RESPONSE, None]
 
-        if isinstance(data, list):
-            if signature is None or signature == QUERY:
-                data = {QUERY: data}
-            else:
-                data = {RESPONSE: data}
-
-        data = data_to_df(data=data)
+        data = data_to_df(data=data, header=signature)
 
         if self._column_types is None:
             if signature is None or signature == QUERY:
@@ -1022,27 +1020,41 @@ class MultiModalMatcher:
         else:  # called .fit() or .load()
             column_types = self._column_types
 
+        query_config = None
+        query_model = None
+        response_config = None
+        response_model = None
+        query_columns = None
+        response_columns = None
+
         if signature == QUERY:
             query_config = self._query_config
             query_model = self._query_model
-            response_config = None
-            response_model = None
+            query_columns = self._query if self._query else list(data.columns),
+            if isinstance(query_columns, tuple):
+                query_columns = query_columns[0]
         elif signature == RESPONSE:
             response_config = self._response_config
             response_model = self._response_model
-            query_config = None
-            query_model = None
+            response_columns = self._response if self._response else list(data.columns)
+            if isinstance(response_columns, tuple):
+                response_columns = response_columns[0]
         else:
             query_config = self._query_config
             query_model = self._query_model
             response_config = self._response_config
             response_model = self._response_model
+            assert self._query and self._response
+            query_columns = self._query
+            response_columns = self._response
 
         query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._get_matcher_df_preprocessor(
-            query_config=query_config,
-            response_config=response_config,
             data=data,
             column_types=column_types,
+            query_config=query_config,
+            response_config=response_config,
+            query_columns=query_columns,
+            response_columns=response_columns,
         )
 
         query_processors, response_processors, label_processors = self._get_matcher_data_processors(
@@ -1145,8 +1157,11 @@ class MultiModalMatcher:
         cosine: Optional[bool] = True,
         top_k: Optional[int] = 100,
     ):
-        query_data = data_to_df(data=query_data, header=self._query[0])
-        response_data = data_to_df(data=response_data, header=self._response[0])
+        query_header = self._query[0] if self._query is not None else QUERY
+        query_data = data_to_df(data=query_data, header=query_header)
+        response_header = self._response[0] if self._response else RESPONSE
+        response_data = data_to_df(data=response_data, header=response_header)
+
         qr_relevance = data_to_df(data=qr_relevance)
 
         rank_labels = {}
@@ -1297,96 +1312,6 @@ class MultiModalMatcher:
             )
         else:
             raise ValueError(f"Invalid input.")
-
-    def semantic_search(
-        self,
-        query_data: Union[pd.DataFrame, dict, list],
-        response_data: Union[pd.DataFrame, dict, list],
-        query_chunk_size: int = 100,
-        response_chunk_size: int = 500000,
-        top_k: int = 10,
-        id_mappings: Optional[Dict[str, Dict]] = None,
-        cosine: Optional[bool] = True,
-    ):
-        """
-        Perform a cosine similarity search between query data and response data.
-
-        Parameters
-        ----------
-        query_data
-            The query data.
-        response_data
-            The response data.
-        id_mappings
-            Id-to-content mappings. The contents can be text, image, etc.
-            This is used when the dataframe contains the query/response indexes instead of their contents.
-        return_prob
-            Whether to return the probability.
-        as_pandas
-            Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
-
-        Returns
-        -------
-        Search results.
-        """
-        query_data = data_to_df(query_data, header=self._query[0])
-        response_data = data_to_df(response_data, header=self._response[0])
-        queries_result_list = [[] for _ in range(len(query_data))]
-
-        for query_start_idx in range(0, len(query_data), query_chunk_size):
-            query_embeddings = self.extract_embedding(
-                query_data[query_start_idx : query_start_idx + query_chunk_size],
-                signature=QUERY,
-                id_mappings=id_mappings,
-                as_tensor=True,
-            )
-            # Iterate over chunks of the corpus
-            for response_start_idx in range(0, len(response_data), response_chunk_size):
-                response_embeddings = self.extract_embedding(
-                    response_data[response_start_idx : response_start_idx + response_chunk_size],
-                    signature=RESPONSE,
-                    id_mappings=id_mappings,
-                    as_tensor=True,
-                )
-                # Compute cosine similarities
-                scores = compute_semantic_similarity(
-                    a=query_embeddings,
-                    b=response_embeddings,
-                    cosine=cosine,
-                )
-
-                # Get top-k scores
-                scores_top_k_values, scores_top_k_idx = torch.topk(
-                    scores,
-                    k=min(top_k, len(scores[0])),
-                    dim=1,
-                    largest=True,
-                    sorted=False,
-                )
-                scores_top_k_values = scores_top_k_values.cpu().tolist()
-                scores_top_k_idx = scores_top_k_idx.cpu().tolist()
-
-                for query_itr in range(len(scores)):
-                    for sub_response_id, score in zip(scores_top_k_idx[query_itr], scores_top_k_values[query_itr]):
-                        corpus_id = response_start_idx + sub_response_id
-                        query_id = query_start_idx + query_itr
-                        if len(queries_result_list[query_id]) < top_k:
-                            heapq.heappush(
-                                queries_result_list[query_id], (score, corpus_id)
-                            )  # heaqp tracks the quantity of the first element in the tuple
-                        else:
-                            heapq.heappushpop(queries_result_list[query_id], (score, corpus_id))
-
-        # change the data format and sort
-        for query_id in range(len(queries_result_list)):
-            for doc_itr in range(len(queries_result_list[query_id])):
-                score, corpus_id = queries_result_list[query_id][doc_itr]
-                queries_result_list[query_id][doc_itr] = {"corpus_id": corpus_id, "score": score}
-            queries_result_list[query_id] = sorted(
-                queries_result_list[query_id], key=lambda x: x["score"], reverse=True
-            )
-
-        return queries_result_list
 
     def predict(
         self,

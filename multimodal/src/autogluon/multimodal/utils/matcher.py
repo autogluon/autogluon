@@ -1,14 +1,17 @@
 import copy
 import functools
 import logging
+import heapq
 from typing import Dict, List, Optional, Union
 
 import torch
 from omegaconf import DictConfig
 from torch import nn
+import pandas as pd
 
 from ..constants import AUTOMM, FUSION, QUERY, RESPONSE
 from .model import create_model
+from .data import data_to_df
 
 logger = logging.getLogger(AUTOMM)
 
@@ -299,3 +302,96 @@ def compute_semantic_similarity(a: torch.Tensor, b: torch.Tensor, cosine: Option
         b = torch.nn.functional.normalize(b, p=2, dim=1)
 
     return torch.mm(a, b.transpose(0, 1))
+
+
+def semantic_search(
+    matcher,
+    query_data: Union[pd.DataFrame, dict, list],
+    response_data: Union[pd.DataFrame, dict, list],
+    query_chunk_size: int = 100,
+    response_chunk_size: int = 500000,
+    top_k: int = 10,
+    id_mappings: Optional[Dict[str, Dict]] = None,
+    cosine: Optional[bool] = True,
+):
+    """
+    Perform a cosine similarity search between query data and response data.
+
+    Parameters
+    ----------
+    query_data
+        The query data.
+    response_data
+        The response data.
+    id_mappings
+        Id-to-content mappings. The contents can be text, image, etc.
+        This is used when the dataframe contains the query/response indexes instead of their contents.
+    return_prob
+        Whether to return the probability.
+    as_pandas
+        Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
+
+    Returns
+    -------
+    Search results.
+    """
+    query_header = matcher._query[0] if matcher._query is not None else QUERY
+    query_data = data_to_df(query_data, header=query_header)
+    response_header = matcher._response[0] if matcher._response else RESPONSE
+    response_data = data_to_df(response_data, header=response_header)
+    queries_result_list = [[] for _ in range(len(query_data))]
+
+    for query_start_idx in range(0, len(query_data), query_chunk_size):
+        query_embeddings = matcher.extract_embedding(
+            query_data[query_start_idx : query_start_idx + query_chunk_size],
+            signature=QUERY,
+            id_mappings=id_mappings,
+            as_tensor=True,
+        )
+        # Iterate over chunks of the corpus
+        for response_start_idx in range(0, len(response_data), response_chunk_size):
+            response_embeddings = matcher.extract_embedding(
+                response_data[response_start_idx : response_start_idx + response_chunk_size],
+                signature=RESPONSE,
+                id_mappings=id_mappings,
+                as_tensor=True,
+            )
+            # Compute cosine similarities
+            scores = compute_semantic_similarity(
+                a=query_embeddings,
+                b=response_embeddings,
+                cosine=cosine,
+            )
+
+            # Get top-k scores
+            scores_top_k_values, scores_top_k_idx = torch.topk(
+                scores,
+                k=min(top_k, len(scores[0])),
+                dim=1,
+                largest=True,
+                sorted=False,
+            )
+            scores_top_k_values = scores_top_k_values.cpu().tolist()
+            scores_top_k_idx = scores_top_k_idx.cpu().tolist()
+
+            for query_itr in range(len(scores)):
+                for sub_response_id, score in zip(scores_top_k_idx[query_itr], scores_top_k_values[query_itr]):
+                    corpus_id = response_start_idx + sub_response_id
+                    query_id = query_start_idx + query_itr
+                    if len(queries_result_list[query_id]) < top_k:
+                        heapq.heappush(
+                            queries_result_list[query_id], (score, corpus_id)
+                        )  # heaqp tracks the quantity of the first element in the tuple
+                    else:
+                        heapq.heappushpop(queries_result_list[query_id], (score, corpus_id))
+
+    # change the data format and sort
+    for query_id in range(len(queries_result_list)):
+        for doc_itr in range(len(queries_result_list[query_id])):
+            score, corpus_id = queries_result_list[query_id][doc_itr]
+            queries_result_list[query_id][doc_itr] = {"corpus_id": corpus_id, "score": score}
+        queries_result_list[query_id] = sorted(
+            queries_result_list[query_id], key=lambda x: x["score"], reverse=True
+        )
+
+    return queries_result_list
