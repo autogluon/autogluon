@@ -109,6 +109,7 @@ def object_detection():
         "env.precision": 32,
     }
 
+
 @automm_presets.register()
 def ocr_text():
     return {
@@ -120,6 +121,7 @@ def ocr_text():
         "env.num_gpus": 1,
         "env.precision": 32,
     }
+
 
 @automm_presets.register()
 def feature_extraction():

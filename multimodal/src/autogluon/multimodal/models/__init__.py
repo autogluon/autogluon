@@ -5,8 +5,8 @@ from .clip import CLIPForImageText
 from .fusion import MultimodalFusionMLP, MultimodalFusionTransformer
 from .huggingface_text import HFAutoModelForTextPrediction
 from .mmdet_image import MMDetAutoModelForObjectDetection
-from .ner_text import HFAutoModelForNER
 from .mmocr import MMOCRAutoModel
+from .ner_text import HFAutoModelForNER
 from .numerical_mlp import NumericalMLP
 from .numerical_transformer import NumericalTransformer
 from .t_few import TFewModel

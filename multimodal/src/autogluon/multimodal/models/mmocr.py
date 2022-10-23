@@ -1,6 +1,8 @@
 import logging
 from typing import List, Optional
+
 from mmcv.parallel import collate, scatter
+
 try:
     import mmcv
     from mmcv.parallel import scatter
@@ -10,13 +12,26 @@ try:
     from mmocr.utils.model import revert_sync_batchnorm
 except ImportError:
     mmocr = None
-from torch import nn
 from mmdet.datasets import replace_ImageToTensor
 from mmdet.datasets.pipelines import Compose
-
-from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS, SCORE, TEXT
-from .utils import assign_layer_ids, get_column_features, get_mmocr_config_and_model, get_model_head
 from mmocr.datasets.pipelines.crop import crop_img
+from torch import nn
+
+from ..constants import (
+    AUTOMM,
+    BBOX,
+    COLUMN,
+    COLUMN_FEATURES,
+    FEATURES,
+    IMAGE,
+    IMAGE_VALID_NUM,
+    LABEL,
+    LOGITS,
+    MASKS,
+    SCORE,
+    TEXT,
+)
+from .utils import assign_layer_ids, get_column_features, get_mmocr_config_and_model, get_model_head
 
 logger = logging.getLogger(AUTOMM)
 
@@ -27,13 +42,7 @@ class MMOCRAutoModel(nn.Module):
     Refer to https://github.com/open-mmlab/mmocr
     """
 
-    def __init__(
-        self,
-        prefix: str,
-        det_ckpt_name: str,
-        recog_ckpt_name: str,
-        kie_ckpt_name: str
-    ):
+    def __init__(self, prefix: str, det_ckpt_name: str, recog_ckpt_name: str, kie_ckpt_name: str):
         """
         Load a pretrained ocr text detection detector from MMOCR.
 
@@ -43,7 +52,7 @@ class MMOCRAutoModel(nn.Module):
             The prefix of the MMdetAutoModel model.
         det_ckpt_name
             Name of the text detection checkpoint.
-        recog_ckpt_name 
+        recog_ckpt_name
             Name of the text recognition checkpoint.
         kie_ckpt_name
             Name of the key information extraction checkpoint.
@@ -51,7 +60,7 @@ class MMOCRAutoModel(nn.Module):
         super().__init__()
 
         self.recog_model = None
-        if recog_ckpt_name != 'None':
+        if recog_ckpt_name != "None":
             recog_config, self.recog_model = get_mmocr_config_and_model(recog_ckpt_name)
             self.recog_model = revert_sync_batchnorm(self.recog_model)
             self.recog_model.cfg = recog_config
@@ -59,23 +68,23 @@ class MMOCRAutoModel(nn.Module):
             self.config = recog_config
 
         self.det_model = None
-        if det_ckpt_name != 'None':
+        if det_ckpt_name != "None":
             det_config, self.det_model = get_mmocr_config_and_model(det_ckpt_name)
             self.det_model = revert_sync_batchnorm(self.det_model)
             self.det_model.cfg = det_config
             self.model = self.det_model
             self.config = det_config
-        
-         # TODO
+
+        # TODO
         self.kie_model = None
-        if kie_ckpt_name != 'None':
+        if kie_ckpt_name != "None":
             kie_config, self.kie_model = get_mmocr_config_and_model(kie_ckpt_name)
 
         if self.det_model != None and self.recog_model != None:
-            recog_config.data.test.pipeline[0].type = 'LoadImageFromNdarray'
+            recog_config.data.test.pipeline[0].type = "LoadImageFromNdarray"
             recog_config.data.test.pipeline = replace_ImageToTensor(recog_config.data.test.pipeline)
             self.recog_test_pipeline = Compose(recog_config.data.test.pipeline)
-        
+
         self.prefix = prefix
 
     @property
@@ -98,7 +107,6 @@ class MMOCRAutoModel(nn.Module):
     def image_feature_dim(self):
         return self.model.num_features
 
-   
     def forward(
         self,
         batch: dict,
@@ -114,7 +122,7 @@ class MMOCRAutoModel(nn.Module):
         -------
             A dictionary with bounding boxes.
         """
-        
+
         data = batch[self.image_key]
         # single image
         if isinstance(data["img_metas"], List):
@@ -148,21 +156,19 @@ class MMOCRAutoModel(nn.Module):
 
             bboxes_list = [res for res in det_results]
             end2end_res = []
-            img_e2e_res = {'result':[]}
+            img_e2e_res = {"result": []}
             for bboxes, arr in zip(bboxes_list, arrays):
-                for bbox in bboxes['boundary_result']:
+                for bbox in bboxes["boundary_result"]:
                     box_res = {}
-                    box_res['box'] = [round(x) for x in bbox[:-1]]
-                    box_res['box_score'] = float(bbox[-1])
+                    box_res["box"] = [round(x) for x in bbox[:-1]]
+                    box_res["box_score"] = float(bbox[-1])
                     box = bbox[:8]
                     if len(bbox) > 9:
                         min_x = min(bbox[0:-1:2])
                         min_y = min(bbox[1:-1:2])
                         max_x = max(bbox[0:-1:2])
                         max_y = max(bbox[1:-1:2])
-                        box = [
-                            min_x, min_y, max_x, min_y, max_x, max_y, min_x, max_y
-                        ]
+                        box = [min_x, min_y, max_x, min_y, max_x, max_y, min_x, max_y]
                     box_img = crop_img(arr, box)
 
                     # only single image now
@@ -170,45 +176,42 @@ class MMOCRAutoModel(nn.Module):
                         img=box_img,
                         ann_info=None,
                         img_info=dict(width=box_img.shape[1], height=box_img.shape[0]),
-                        bbox_fields=[])
+                        bbox_fields=[],
+                    )
 
                     data = self.recog_test_pipeline(data)
                     data = [data]
                     data = collate(data, samples_per_gpu=1)
-                    
-                    if isinstance(data['img_metas'], list):
-                        data['img_metas'] = [
-                            img_metas.data[0] for img_metas in data['img_metas']
-                        ]
-                    else:
-                        data['img_metas'] = data['img_metas'].data
 
-                    if isinstance(data['img'], list):
-                        data['img'] = [img.data for img in data['img']]
-                        if isinstance(data['img'][0], list):
-                            data['img'] = [img[0] for img in data['img']]
+                    if isinstance(data["img_metas"], list):
+                        data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
                     else:
-                        data['img'] = data['img'].data
+                        data["img_metas"] = data["img_metas"].data
+
+                    if isinstance(data["img"], list):
+                        data["img"] = [img.data for img in data["img"]]
+                        if isinstance(data["img"][0], list):
+                            data["img"] = [img[0] for img in data["img"]]
+                    else:
+                        data["img"] = data["img"].data
                     if next(self.model.parameters()).is_cuda:
                         # scatter to specified GPU
                         data = scatter(data, [device])[0]
 
                     recog_results = self.recog_model(return_loss=False, rescale=True, **data)
-                    
-                    text = recog_results[0]['text']
-                    text_score = recog_results[0]['score']
+
+                    text = recog_results[0]["text"]
+                    text_score = recog_results[0]["score"]
                     if isinstance(text_score, list):
                         text_score = sum(text_score) / max(1, len(text))
-                    box_res['text'] = text
-                    box_res['text_score'] = text_score
-                    img_e2e_res['result'].append(box_res)
+                    box_res["text"] = text
+                    box_res["text_score"] = text_score
+                    img_e2e_res["result"].append(box_res)
                 end2end_res.append(img_e2e_res)
             final_res = []
             for res in end2end_res:
                 simple_res = {}
-                simple_res['text'] = [
-                    x['text'] for x in res['result']
-                    ]
+                simple_res["text"] = [x["text"] for x in res["result"]]
             final_res.append(simple_res)
 
             # TODO

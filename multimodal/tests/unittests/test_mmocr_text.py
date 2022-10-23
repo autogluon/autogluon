@@ -19,9 +19,7 @@ def download_sample_images():
 
 @pytest.mark.parametrize(
     "det_ckpt_name,recog_ckpt_name",
-    [
-        ("textsnake_r50_fpn_unet_1200e_ctw1500", "abinet_academic")
-    ],
+    [("textsnake_r50_fpn_unet_1200e_ctw1500", "abinet_academic")],
 )
 def test_mmocr_text_recognition_inference(det_ckpt_name, recog_ckpt_name):
     mmocr_image_name = download_sample_images()
