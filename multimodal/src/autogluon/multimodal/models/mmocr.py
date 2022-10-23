@@ -52,27 +52,29 @@ class MMOCRAutoModel(nn.Module):
 
         self.recog_model = None
         if recog_ckpt_name != 'None':
-            self.recog_config, self.recog_model = get_mmocr_config_and_model(recog_ckpt_name)
+            recog_config, self.recog_model = get_mmocr_config_and_model(recog_ckpt_name)
             self.recog_model = revert_sync_batchnorm(self.recog_model)
-            self.recog_model.cfg = self.recog_config
+            self.recog_model.cfg = recog_config
             self.model = self.recog_model
+            self.config = recog_config
 
         self.det_model = None
         if det_ckpt_name != 'None':
-            self.config, self.det_model = get_mmocr_config_and_model(det_ckpt_name)
+            det_config, self.det_model = get_mmocr_config_and_model(det_ckpt_name)
             self.det_model = revert_sync_batchnorm(self.det_model)
-            self.det_model.cfg = self.config
+            self.det_model.cfg = det_config
             self.model = self.det_model
+            self.config = det_config
         
          # TODO
         self.kie_model = None
         if kie_ckpt_name != 'None':
-            self.kie_config, self.kie_model = get_mmocr_config_and_model(kie_ckpt_name)
+            kie_config, self.kie_model = get_mmocr_config_and_model(kie_ckpt_name)
 
         if self.det_model != None and self.recog_model != None:
-            self.recog_config.data.test.pipeline[0].type = 'LoadImageFromNdarray'
-            self.recog_config.data.test.pipeline = replace_ImageToTensor(self.recog_config.data.test.pipeline)
-            self.recog_test_pipeline = Compose(self.recog_config.data.test.pipeline)
+            recog_config.data.test.pipeline[0].type = 'LoadImageFromNdarray'
+            recog_config.data.test.pipeline = replace_ImageToTensor(recog_config.data.test.pipeline)
+            self.recog_test_pipeline = Compose(recog_config.data.test.pipeline)
         
         self.prefix = prefix
 
@@ -211,8 +213,8 @@ class MMOCRAutoModel(nn.Module):
             # TODO
             if self.kie_model != None:
                 return 1
-
-            return {self.prefix: final_res}
+            ret = {TEXT: final_res[0]["text"]}
+            return {self.prefix: ret}
 
     def get_layer_ids(
         self,

@@ -32,9 +32,9 @@ def test_mmocr_text_recognition_inference(checkpoint_name):
 
     predictor = MultiModalPredictor(
         hyperparameters={
-            "model.mmocr_text_recognition.checkpoint_name": checkpoint_name,
+            "model.mmocr_text.recog_ckpt_name": checkpoint_name,
         },
-        pipeline="ocr_text_recognition",
+        pipeline="ocr_text",
     )
 
     pred = predictor.predict({"image": [mmocr_image_name]})
@@ -48,3 +48,6 @@ def test_mmocr_text_recognition_inference(checkpoint_name):
 
     assert pred[0][0] == MMOCR_res[0]["text"]
     assert pred[1][0] == MMOCR_res[0]["score"]
+
+if __name__ == '__main__':
+    test_mmocr_text_recognition_inference("abinet_academic")
