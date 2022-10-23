@@ -15,6 +15,7 @@ from autogluon.timeseries.models.gluonts import (  # MQRNNModel,; TransformerMod
     MQCNNModel,
     ProphetModel,
     SimpleFeedForwardModel,
+    SimpleFeedForwardPyTorchModel,
     TemporalFusionTransformerModel,
 )
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
@@ -37,7 +38,8 @@ MODELS_WITH_STATIC_FEATURES = [
     DeepARModel,
     MQCNNModel,
 ]
-TESTABLE_MODELS = TESTABLE_MX_MODELS + [DeepARPyTorchModel]
+TESTABLE_PYTORCH_MODELS = [DeepARPyTorchModel, SimpleFeedForwardPyTorchModel]
+TESTABLE_MODELS = TESTABLE_MX_MODELS + TESTABLE_PYTORCH_MODELS
 
 # if PROPHET_IS_INSTALLED:
 #     TESTABLE_MODELS += [ProphetModel]

@@ -8,7 +8,11 @@ from .models import (
     TemporalFusionTransformerModel,
     TransformerModel,
 )
-from .pytorch.models import DeepARPyTorchModel
+from .pytorch import (
+    DeepARPyTorchModel,
+    SimpleFeedForwardPyTorchModel
+)
+    
 
 __all__ = [
     "DeepARModel",
@@ -18,6 +22,7 @@ __all__ = [
     "MQRNNModel",
     "ProphetModel",
     "SimpleFeedForwardModel",
+    "SimpleFeedForwardPyTorchModel",
     "TemporalFusionTransformerModel",
     "TransformerModel",
 ]

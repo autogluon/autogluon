@@ -1,3 +1,6 @@
-from .models import DeepARPyTorchModel
+from .models import DeepARPyTorchModel, SimpleFeedForwardPyTorchModel
 
-__all__ = ["DeepARPyTorchModel"]
+__all__ = [
+    "DeepARPyTorchModel",
+    "SimpleFeedForwardPyTorchModel",
+]

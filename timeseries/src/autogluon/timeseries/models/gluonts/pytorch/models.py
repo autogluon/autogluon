@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional, Type
 
 from gluonts.core.component import from_hyperparameters
 from gluonts.torch.model.deepar import DeepAREstimator
+from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
 from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
 from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPredictor
 
@@ -18,10 +19,12 @@ from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTS
 
 from .callback import PLTimeLimitCallback
 
-# TODO: enable in GluonTS v0.10
+# FIXME: introduces cpflows dependency. We exclude this model until a future release.
 # from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
-# from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
 
+# FIXME: DeepNPTS does not implement the GluonTS PyTorch API, and does not use
+# PyTorch Ligthning. We exclude this model until a future release. 
+# from gluonts.torch.model.deep_npts import DeepNPTSEstimator
 
 logger = logging.getLogger(__name__)
 pl_loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict if "pytorch_lightning" in name]
@@ -29,6 +32,17 @@ pl_loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDic
 
 class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator]
+
+    def _get_estimator_init_args(self) -> Dict[str, Any]:
+        """Get GluonTS specific constructor arguments for estimator objects, an alias to
+        `self._get_model_params` for better readability."""
+        init_kwargs = self._get_model_params()
+
+        # GluonTS does not handle context_length=1 well, and sets the context to only prediction_length
+        # we set it to a minimum of 10 here.
+        init_kwargs["context_length"] = max(10, init_kwargs.get("context_length", self.prediction_length))
+
+        return init_kwargs
 
     def _get_estimator(self) -> GluonTSPyTorchLightningEstimator:
         """Return the GluonTS Estimator object for the model"""
@@ -95,13 +109,6 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
 class DeepARPyTorchModel(AbstractGluonTSPyTorchModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DeepAREstimator
 
-    def _get_estimator_init_args(self) -> Dict[str, Any]:
-        """Get GluonTS specific constructor arguments for estimator objects, an alias to
-        `self._get_model_params` for better readability."""
-        init_kwargs = self._get_model_params()
 
-        # GluonTS does not handle context_length=1 well, and sets the context to only prediction_length
-        # we set it to a minimum of 10 here.
-        init_kwargs["context_length"] = max(10, init_kwargs.get("context_length", self.prediction_length))
-
-        return init_kwargs
+class SimpleFeedForwardPyTorchModel(AbstractGluonTSPyTorchModel):
+    gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = SimpleFeedForwardEstimator
