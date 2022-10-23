@@ -162,6 +162,23 @@ model:
     image_size: 224
     max_img_num_per_col: 2
 
+  mmocr_text:
+    det_ckpt_name: "TextSnake"
+    recog_ckpt_name: "ABINet"
+    kie_ckpt_name: None,
+    data_types:
+      - "image"
+    train_transform_types:
+      - "resize_shorter_side"
+      - "center_crop"
+      - "trivial_augment"
+    val_transform_types:
+      - "resize_shorter_side"
+      - "center_crop"
+    image_norm: "imagenet"
+    image_size: 224
+    max_img_num_per_col: 2
+
   clip:
     checkpoint_name: "openai/clip-vit-base-patch32"
     data_types:

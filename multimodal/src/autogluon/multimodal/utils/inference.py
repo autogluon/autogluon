@@ -72,7 +72,7 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         else:
             return [bbox for ele in outputs for bbox in ele[BBOX]]
     elif ret_type == TEXT:
-        return [ele[TEXT] for ele in outputs]  # single image
+        return [ele[0][TEXT] for ele in outputs] 
     elif ret_type == SCORE:
         return [ele[SCORE] for ele in outputs]
     elif ret_type == NER_RET:

@@ -8,6 +8,7 @@ from .mmdet_image import MMDetAutoModelForObjectDetection
 from .mmocr_text_detection import MMOCRAutoModelForTextDetection
 from .mmocr_text_recognition import MMOCRAutoModelForTextRecognition
 from .ner_text import HFAutoModelForNER
+from .mmocr import MMOCRAutoModel
 from .numerical_mlp import NumericalMLP
 from .numerical_transformer import NumericalTransformer
 from .t_few import TFewModel

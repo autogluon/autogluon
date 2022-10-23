@@ -22,6 +22,7 @@ ZERO_SHOT_IMAGE_CLASSIFICATION = "zero_shot_image_classification"
 OBJECT_DETECTION = "object_detection"
 OCR_TEXT_DETECTION = "ocr_text_detection"
 OCR_TEXT_RECOGNITION = "ocr_text_recognition"
+OCR_TEXT = "ocr_text"
 
 # Input keys
 IMAGE = "image"
@@ -169,8 +170,9 @@ MMDET_IMAGE = "mmdet_image"
 MMOCR_TEXT_DET = "mmocr_text_detection"
 MMOCR_TEXT_RECOG = "mmocr_text_recognition"
 NER_TEXT = "ner_text"
+MMOCR_TEXT = "mmocr_text"
 HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT)
-MMLAB_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
+MMLAB_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG, MMOCR_TEXT)
 
 # matcher loss type
 CONTRASTIVE_LOSS = "contrastive_loss"

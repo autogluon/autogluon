@@ -125,12 +125,22 @@ def ocr_text_detection():
 def ocr_text_recognition():
     return {
         "model.names": ["mmocr_text_recognition"],
+        "model.mmocr_text_detection.checkpoint_name": "TextSnake",
         "model.mmocr_text_recognition.checkpoint_name": "ABINet",
         "env.eval_batch_size_ratio": 1,
         "env.num_gpus": 1,
         "env.precision": 32,
     }
 
+@automm_presets.register()
+def ocr_text():
+    return {
+        "model.names": ["mmocr_text"],
+        "model.mmocr_text_recognition.checkpoint_name": "ABINet",
+        "env.eval_batch_size_ratio": 1,
+        "env.num_gpus": 1,
+        "env.precision": 32,
+    }
 
 @automm_presets.register()
 def feature_extraction():

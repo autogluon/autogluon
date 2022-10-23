@@ -61,6 +61,7 @@ from .constants import (
     NER,
     NER_RET,
     OBJECT_DETECTION,
+    OCR_TEXT,
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
     PROBABILITY,
@@ -1908,6 +1909,9 @@ class MultiModalPredictor:
             ret_type = BBOX
         elif self._pipeline == OCR_TEXT_RECOGNITION:
             ret_type = [TEXT, SCORE]
+        # det和recog分别为None的情况，如何输出
+        elif self._pipeline == OCR_TEXT:
+            ret_type = TEXT
         else:
             ret_type = LOGITS
 

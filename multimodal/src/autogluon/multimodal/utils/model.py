@@ -17,6 +17,7 @@ from ..constants import (
     HF_TEXT,
     IMAGE,
     MMDET_IMAGE,
+    MMOCR_TEXT,
     MMOCR_TEXT_DET,
     MMOCR_TEXT_RECOG,
     NER,
@@ -37,6 +38,7 @@ from ..models import (
     MMDetAutoModelForObjectDetection,
     MMOCRAutoModelForTextDetection,
     MMOCRAutoModelForTextRecognition,
+    MMOCRAutoModel,
     MultimodalFusionMLP,
     MultimodalFusionTransformer,
     NumericalMLP,
@@ -284,6 +286,13 @@ def create_model(
             num_classes=num_classes,
             gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
             pretrained=pretrained,
+        )
+    elif model_name.lower().startswith(MMOCR_TEXT):
+        model = MMOCRAutoModel(
+            prefix=model_name,
+            det_ckpt_name=model_config.det_ckpt_name,
+            recog_ckpt_name=model_config.recog_ckpt_name,
+            kie_ckpt_name=model_config.kie_ckpt_name,
         )
     elif model_name.lower().startswith(FUSION_MLP):
         model = functools.partial(
