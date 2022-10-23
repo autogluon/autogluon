@@ -1909,11 +1909,12 @@ class MultiModalPredictor:
             ret_type = BBOX
         elif self._pipeline == OCR_TEXT_RECOGNITION:
             ret_type = [TEXT, SCORE]
-        # det和recog分别为None的情况，如何输出
+      
         elif self._pipeline == OCR_TEXT:
-            ret_type = TEXT
+            ret_type = [BBOX, TEXT, SCORE]
         else:
             ret_type = LOGITS
+            
 
         if self._problem_type == NER:
             ret_type = NER_RET
@@ -1932,7 +1933,13 @@ class MultiModalPredictor:
                 seed=seed,
             )
 
-            if self._pipeline == OCR_TEXT_RECOGNITION:
+            if self._pipeline == OCR_TEXT:
+                logits = []
+                for r_type in ret_type:
+                    if r_type not in outputs[0]:
+                        continue
+                    logits.append(extract_from_output(outputs=outputs, ret_type=r_type))
+            elif self._pipeline == OCR_TEXT_RECOGNITION:
                 logits = []
                 for r_type in ret_type:
                     logits.append(extract_from_output(outputs=outputs, ret_type=r_type))

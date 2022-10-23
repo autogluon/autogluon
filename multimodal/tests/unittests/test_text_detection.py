@@ -21,14 +21,45 @@ def download_sample_images():
     "checkpoint_name",
     ["textsnake_r50_fpn_unet_1200e_ctw1500"],
 )
+# def test_mmocr_text_detection_inference(checkpoint_name):
+#     mmocr_image_name = download_sample_images()
+
+#     predictor = MultiModalPredictor(
+#         hyperparameters={
+#             "model.mmocr_text_detection.checkpoint_name": checkpoint_name,
+#         },
+#         pipeline="ocr_text_detection",
+#     )
+
+#     # two dimensions, (num of text lines, 2 * num of coordinate points)
+#     pred = predictor.predict({"image": [mmocr_image_name]})
+
+#     # original MMOCR model's output
+#     checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
+#     checkpoint = checkpoints[0]
+#     config_file = checkpoint_name + ".py"
+#     ocr = MMOCR(det_ckpt=checkpoint, det_config=config_file, recog=None)
+#     MMOCR_res = ocr.readtext(mmocr_image_name, output=None)
+
+#     # compare the outputs of original model's output and our model
+#     assert len(pred) == len(MMOCR_res[0]["boundary_result"])  # num of text lines
+
+#     for i in range(len(pred)):
+#         p = pred[i]
+#         m = MMOCR_res[0]["boundary_result"][i]
+#         assert len(p) == len(m)  # 2 * num of coordinate points
+
+#         for j in range(len(p)):
+#             assert abs(p[j] - m[j]) <= 1e-6
+
 def test_mmocr_text_detection_inference(checkpoint_name):
     mmocr_image_name = download_sample_images()
 
     predictor = MultiModalPredictor(
         hyperparameters={
-            "model.mmocr_text_detection.checkpoint_name": checkpoint_name,
+            "model.mmocr_text.det_ckpt_name": checkpoint_name,
         },
-        pipeline="ocr_text_detection",
+        pipeline="ocr_text",
     )
 
     # two dimensions, (num of text lines, 2 * num of coordinate points)
@@ -42,10 +73,10 @@ def test_mmocr_text_detection_inference(checkpoint_name):
     MMOCR_res = ocr.readtext(mmocr_image_name, output=None)
 
     # compare the outputs of original model's output and our model
-    assert len(pred) == len(MMOCR_res[0]["boundary_result"])  # num of text lines
+    assert len(pred[0]) == len(MMOCR_res[0]["boundary_result"])  # num of text lines
 
-    for i in range(len(pred)):
-        p = pred[i]
+    for i in range(len(pred[0])):
+        p = pred[0][i]
         m = MMOCR_res[0]["boundary_result"][i]
         assert len(p) == len(m)  # 2 * num of coordinate points
 

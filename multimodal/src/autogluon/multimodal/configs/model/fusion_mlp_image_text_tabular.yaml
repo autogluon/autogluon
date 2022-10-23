@@ -163,9 +163,9 @@ model:
     max_img_num_per_col: 2
 
   mmocr_text:
-    det_ckpt_name: "TextSnake"
-    recog_ckpt_name: "ABINet"
-    kie_ckpt_name: None,
+    det_ckpt_name: None
+    recog_ckpt_name: None
+    kie_ckpt_name: None
     data_types:
       - "image"
     train_transform_types:
