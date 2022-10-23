@@ -18,8 +18,6 @@ from ..constants import (
     IMAGE,
     MMDET_IMAGE,
     MMOCR_TEXT,
-    MMOCR_TEXT_DET,
-    MMOCR_TEXT_RECOG,
     NER,
     NUMERICAL,
     NUMERICAL_MLP,
@@ -36,8 +34,6 @@ from ..models import (
     HFAutoModelForNER,
     HFAutoModelForTextPrediction,
     MMDetAutoModelForObjectDetection,
-    MMOCRAutoModelForTextDetection,
-    MMOCRAutoModelForTextRecognition,
     MMOCRAutoModel,
     MultimodalFusionMLP,
     MultimodalFusionTransformer,
@@ -268,16 +264,6 @@ def create_model(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
             num_classes=num_classes,
-        )
-    elif model_name.lower().startswith(MMOCR_TEXT_DET):
-        model = MMOCRAutoModelForTextDetection(
-            prefix=model_name,
-            checkpoint_name=model_config.checkpoint_name,
-        )
-    elif model_name.lower().startswith(MMOCR_TEXT_RECOG):
-        model = MMOCRAutoModelForTextRecognition(
-            prefix=model_name,
-            checkpoint_name=model_config.checkpoint_name,
         )
     elif model_name.lower().startswith(NER):
         model = HFAutoModelForNER(
