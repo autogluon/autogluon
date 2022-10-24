@@ -1905,12 +1905,11 @@ class MultiModalPredictor:
         """
         if self._pipeline == OBJECT_DETECTION:
             ret_type = BBOX
-      
+
         elif self._pipeline == OCR_TEXT:
             ret_type = [BBOX, TEXT, SCORE]
         else:
             ret_type = LOGITS
-            
 
         if self._problem_type == NER:
             ret_type = NER_RET
