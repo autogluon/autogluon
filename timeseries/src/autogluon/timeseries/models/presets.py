@@ -3,7 +3,7 @@ import logging
 from typing import Any, Dict, List, Union
 
 import autogluon.core as ag
-from autogluon.timeseries.models.gluonts.pytorch.models import DeepARPyTorchModel
+from autogluon.timeseries.models.gluonts.pytorch.models import DeepARPyTorchModel, SimpleFeedForwardPyTorchModel
 
 from .abstract import AbstractTimeSeriesModel
 from .abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
@@ -27,6 +27,7 @@ MODEL_TYPES = dict(
     MQCNN=MQCNNModel,
     MQRNN=MQRNNModel,
     SimpleFeedForward=SimpleFeedForwardModel,
+    SimpleFeedForwardPyTorch=SimpleFeedForwardPyTorchModel,
     DeepAR=DeepARModel,
     DeepARPyTorch=DeepARPyTorchModel,
     Prophet=ProphetModel,
@@ -45,6 +46,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     MQCNN=40,
     MQRNN=40,
     SimpleFeedForward=50,
+    SimpleFeedForwardPyTorch=50,
     Transformer=40,
     TemporalFusionTransformer=45,
     DeepAR=50,

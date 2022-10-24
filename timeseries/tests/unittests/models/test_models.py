@@ -19,7 +19,7 @@ from autogluon.timeseries.models.gluonts import GenericGluonTSModel
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
 from .test_autogluon_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
-from .test_gluonts import TESTABLE_MX_MODELS as GLUONTS_TESTABLE_MODELS
+from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
 from .test_statsmodels import TESTABLE_MODELS as STATSMODELS_TESTABLE_MODELS
 
@@ -117,7 +117,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
 
     hpo_results, _ = model.hyperparameter_tune(
         hyperparameter_tune_kwargs={"num_trials": num_trials, "scheduler": "local", "searcher": "random"},
-        time_limit=100,
+        time_limit=200,
         train_data=DUMMY_TS_DATAFRAME,
         val_data=DUMMY_TS_DATAFRAME,
     )

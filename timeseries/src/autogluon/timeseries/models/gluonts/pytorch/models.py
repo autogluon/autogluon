@@ -3,19 +3,26 @@ Module including wrappers for PyTorch implementations of models in GluonTS
 """
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
+import numpy as np
+import pandas as pd
+import torch
 from gluonts.core.component import from_hyperparameters
+from gluonts.dataset.common import Dataset as GluonTSDataset
+from gluonts.torch.distributions import AffineTransformed
+from gluonts.torch.distributions.distribution_output import NormalOutput
 from gluonts.torch.model.deepar import DeepAREstimator
-from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
 from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
+from gluonts.torch.model.forecast import Forecast, DistributionForecast
 from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPredictor
+from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.utils import warning_filter
-from autogluon.timeseries import TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID, TIMESTAMP
 from autogluon.timeseries.utils.warning_filters import disable_root_logger
-from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
+from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel, SimpleGluonTSDataset
 
 from .callback import PLTimeLimitCallback
 
@@ -112,3 +119,48 @@ class DeepARPyTorchModel(AbstractGluonTSPyTorchModel):
 
 class SimpleFeedForwardPyTorchModel(AbstractGluonTSPyTorchModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = SimpleFeedForwardEstimator
+
+    def _get_estimator_init_args(self) -> Dict[str, Any]:
+        init_kwargs = super()._get_estimator_init_args()
+        init_kwargs.update(dict(
+            distr_output=NormalOutput()
+        ))
+        return init_kwargs
+
+    def _to_gluonts_dataset(self, time_series_df: Optional[TimeSeriesDataFrame]) -> Optional[GluonTSDataset]:
+        return (
+            SimpleGluonTSDataset(time_series_df, target_field_name=self.target, float_dtype=np.float32) 
+            if time_series_df is not None else None
+        )
+    
+    def _gluonts_forecasts_to_data_frame(
+        self, forecasts: List[Forecast], quantile_levels: List[float]
+    ) -> TimeSeriesDataFrame:
+        assert isinstance(forecasts[0], DistributionForecast)
+       
+        result_dfs = []
+        for i, forecast in enumerate(forecasts):
+            item_forecast_dict = dict(mean=forecast.mean)
+            if isinstance(forecast.distribution, AffineTransformed):
+                # FIXME: this is a hack to get around GluonTS not implementing quantiles for
+                # torch AffineTransformed
+                fdist = forecast.distribution
+                q_transformed = (
+                    fdist.scale * fdist.base_dist.icdf(torch.Tensor(quantile_levels)) + fdist.loc
+                ).numpy().tolist()
+                for ix, quantile in enumerate(quantile_levels):
+                    item_forecast_dict[str(quantile)] = q_transformed[ix]
+            else:
+                for quantile in quantile_levels:
+                    item_forecast_dict[str(quantile)] = forecast.quantile(str(quantile))
+
+            df = pd.DataFrame(item_forecast_dict)
+            df[ITEMID] = forecast.item_id
+            df[TIMESTAMP] = pd.date_range(
+                start=forecasts[i].start_date.to_timestamp(how="S"),
+                periods=self.prediction_length,
+                freq=self.freq,
+            )
+            result_dfs.append(df)
+
+        return TimeSeriesDataFrame.from_data_frame(pd.concat(result_dfs))

@@ -43,6 +43,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         target_field_name: str = "target",
         feat_static_cat: Optional[pd.DataFrame] = None,
         feat_static_real: Optional[pd.DataFrame] = None,
+        float_dtype: Type = np.float64,
     ):
         assert time_series_df is not None
         assert time_series_df.freq, "Initializing GluonTS data sets without freq is not allowed"
@@ -55,6 +56,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             self.feat_static_cat = self.feat_static_cat.astype(np.int64)
         if self.feat_static_real is not None:
             self.feat_static_real = self.feat_static_real.astype(np.float64)
+        self.float_dtype = float_dtype
 
     @property
     def freq(self):
@@ -78,7 +80,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             df = self.time_series_df.loc[item_id]
             time_series = {
                 FieldName.ITEM_ID: item_id,
-                FieldName.TARGET: df[self.target_field_name].to_numpy(),
+                FieldName.TARGET: df[self.target_field_name].to_numpy(dtype=self.float_dtype),
                 FieldName.START: pd.Period(df.index[0], freq=self.freq),
             }
             if self.feat_static_cat is not None:
@@ -283,8 +285,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
 
             predicted_targets = self._predict_gluonts_forecasts(data, **kwargs)
-            if not isinstance(predicted_targets[0], (QuantileForecast, SampleForecast)):
-                raise TypeError("DistributionForecast is not supported.")
 
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
@@ -333,6 +333,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     def _gluonts_forecasts_to_data_frame(
         self, forecasts: List[Forecast], quantile_levels: List[float]
     ) -> TimeSeriesDataFrame:
+        if not isinstance(forecasts[0], (QuantileForecast, SampleForecast)):
+            raise TypeError("DistributionForecast is not supported.")
+
         forecast_means = [f.mean for f in forecasts]
 
         # if predictions are gluonts SampleForecasts, convert to quantile forecasts
