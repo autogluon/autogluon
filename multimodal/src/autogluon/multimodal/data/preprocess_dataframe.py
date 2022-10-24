@@ -405,7 +405,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             col_value = df[col_name]
             col_type = self._column_types[col_name]
 
-            if col_name == ROIS:  # TODO: infer ROIS type correctly in evaluation/prediction
+            if col_type == ROIS: 
                 processed_data = df[col_name].tolist()
             elif col_type == IMAGE_PATH or IMAGE:
                 processed_data = col_value.apply(lambda ele: ele.split(";")).tolist()
@@ -521,11 +521,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             y = pd.to_numeric(y_df).to_numpy()
             y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
         elif self.label_type == ROIS:
-            y = y_df  # Do nothing. TODO: Shall we transform this?
+            y = y_df.to_list()
         elif self.label_type == NER_ANNOTATION:
             # TODO: Add transform_multimodal and process_multimodal.py
             text_column_index = 0  # Currently, we only support one text column.
-            x_df = df[self._text_feature_names[text_column_index]]
             y = self._label_generator.transform(y_df)
             x = self.transform_text(df)[0]
             # Labelprocessor needs both ner annotations and text.

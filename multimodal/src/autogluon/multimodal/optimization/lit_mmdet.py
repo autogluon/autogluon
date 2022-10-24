@@ -289,7 +289,7 @@ class MMDetLitModule(pl.LightningModule):
             # TODO: add mAP/mAR_per_class
             mAPs = {"val_" + k: v for k, v in val_result.items()}
             mAPs["val_mAP"] = mAPs["val_map"]
-            self.print(mAPs)
+            self.print("mAPs: %s" % mAPs)
             self.log_dict(mAPs, sync_dist=True)
         self.validation_metric.reset()
 

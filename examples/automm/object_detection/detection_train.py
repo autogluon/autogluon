@@ -3,10 +3,10 @@ The example to train an object detection model in AutoMM.
 
 An example to finetune an MMDetection model on COCO:
     python detection_train.py \
-        --train_path coco17/annotations/instances_train2017.json
-        --test_path coco17/annotations/instances_val2017.json
-        --checkpoint_name yolov3_mobilenetv2_320_300e_coco
-        --num_classes 80
+        --train_path coco17/annotations/instances_train2017.json \
+        --test_path coco17/annotations/instances_val2017.json \
+        --checkpoint_name yolov3_mobilenetv2_320_300e_coco \
+        --num_classes 80 \
         --lr <learning_rate>
         --wd <weight_decay>
         --epochs <epochs>
@@ -42,6 +42,7 @@ def detection_train(
     wd=1e-4,
     epochs=50,
     num_gpus=4,
+    val_metric=None,
 ):
 
     # TODO: add val_path
@@ -56,6 +57,7 @@ def detection_train(
         },
         pipeline="object_detection",
         output_shape=num_classes,
+        val_metric=val_metric
     )
 
     import time
@@ -98,6 +100,7 @@ if __name__ == "__main__":
     parser.add_argument("--wd", default=1e-3, type=float)
     parser.add_argument("--epochs", default=50, type=int)
     parser.add_argument("--num_gpus", default=4, type=int)
+    parser.add_argument("--val_metric", default=None, type=str)
     args = parser.parse_args()
 
     detection_train(
@@ -109,4 +112,5 @@ if __name__ == "__main__":
         wd=args.wd,
         epochs=args.epochs,
         num_gpus=args.num_gpus,
+        val_metric=args.val_metric
     )

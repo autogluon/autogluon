@@ -386,3 +386,19 @@ def tokenize_ner_text(text, tokenizer):
     offset_mapping = np.array(col_tokens.offset_mapping, dtype=np.int32)
     word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
     return col_tokens, token_to_word_mappings, word_offsets
+
+
+def is_rois_input(sample):
+    """
+    check if a sample is rois for object detection
+
+    Parameters
+    ----------
+    sample
+        The sampled data.
+
+    Returns
+    -------
+    bool, whether a sample is rois for object detection
+    """
+    return isinstance(sample, list) and len(sample) and isinstance(sample[0], list) and len(sample[0]) == 5

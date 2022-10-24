@@ -198,7 +198,7 @@ def get_metric(
         return torchmetrics.SpearmanCorrCoef(), None
     elif metric_name == F1:
         return CustomF1Score(num_classes=num_classes, pos_label=pos_label), None
-    elif metric_name == MAP:
+    elif metric_name == MAP.lower():
         return (
             MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False),
             None,

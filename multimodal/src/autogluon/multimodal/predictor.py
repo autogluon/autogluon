@@ -51,6 +51,7 @@ from .constants import (
     LABEL,
     LAST_CHECKPOINT,
     LOGITS,
+    MAP,
     MASKS,
     MAX,
     MIN,
@@ -78,6 +79,7 @@ from .data.infer_types import (
     infer_column_types,
     infer_label_column_type_by_problem_type_and_pipeline,
     infer_problem_type_output_shape,
+    infer_rois_column_type,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
@@ -159,6 +161,7 @@ class MultiModalPredictor:
         label: Optional[str] = None,
         problem_type: Optional[str] = None,
         pipeline: Optional[str] = None,
+        val_metric: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -242,7 +245,7 @@ class MultiModalPredictor:
         self._problem_type = problem_type.lower() if problem_type is not None else None
         self._pipeline = pipeline.lower() if pipeline is not None else None
         self._eval_metric_name = eval_metric
-        self._validation_metric_name = None
+        self._validation_metric_name = val_metric
         self._output_shape = output_shape
         self._save_path = path
         self._ckpt_path = None
@@ -486,9 +489,6 @@ class MultiModalPredictor:
                 stratify=stratify,
                 random_state=np.random.RandomState(seed),
             )
-            if self._pipeline == OBJECT_DETECTION:  # TODO: investigate why we need this and remove it
-                train_data = train_data.reset_index(drop=True)
-                tuning_data = tuning_data.reset_index(drop=True)
 
         column_types = infer_column_types(
             data=train_data,
@@ -558,6 +558,7 @@ class MultiModalPredictor:
                 problem_type=problem_type,
                 pipeline=self._pipeline,
                 eval_metric_name=self._eval_metric_name,
+                validation_metric_name=self._validation_metric_name,
             )
         else:
             validation_metric_name = self._validation_metric_name
@@ -1014,6 +1015,7 @@ class MultiModalPredictor:
         if teacher_data_processors is not None:
             data_processors = [data_processors, teacher_data_processors]
 
+        val_is_train = (self._pipeline == OBJECT_DETECTION) and (validation_metric_name != MAP)
         train_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
@@ -1021,6 +1023,7 @@ class MultiModalPredictor:
             num_workers=config.env.num_workers,
             train_data=train_df,
             val_data=val_df,
+            val_is_train=val_is_train,
         )
         optimization_kwargs = dict(
             optim_type=config.optimization.optim_type,
@@ -1537,6 +1540,11 @@ class MultiModalPredictor:
                     label_columns=self._label_column,
                     problem_type=self._problem_type,
                     pipeline=self._pipeline,
+                    data=data,
+                )
+            if self._pipeline == OBJECT_DETECTION:
+                column_types = infer_rois_column_type(
+                    column_types=column_types,
                     data=data,
                 )
         else:  # called .fit() or .load()

@@ -30,6 +30,7 @@ class BaseDataModule(LightningDataModule):
         test_data: Optional[pd.DataFrame] = None,
         predict_data: Optional[pd.DataFrame] = None,
         id_mappings: Optional[Dict[str, Dict]] = None,
+        val_is_train: bool = False,
     ):
         """
         Parameters
@@ -76,17 +77,20 @@ class BaseDataModule(LightningDataModule):
         self.test_data = test_data
         self.predict_data = predict_data
         self.id_mappings = id_mappings
+        self.val_is_train = val_is_train
 
     def set_dataset(self, split):
         data_split = getattr(self, f"{split}_data")
+        if self.val_is_train:
+            is_training = split in [TRAIN, VAL]
+        else:
+            is_training = split == TRAIN
         dataset = BaseDataset(
             data=data_split,
             preprocessor=self.df_preprocessor,
             processors=self.data_processors,
             id_mappings=self.id_mappings,
-            is_training=(
-                split in [TRAIN, VAL]
-            ),  # TODO: This change for object detection only, need to change before PR
+            is_training=is_training,
         )
 
         setattr(self, f"{split}_dataset", dataset)
