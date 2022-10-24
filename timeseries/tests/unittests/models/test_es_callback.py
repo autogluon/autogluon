@@ -1,7 +1,7 @@
 import pytest
 
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
-from autogluon.timeseries.models.gluonts.callback import (
+from autogluon.timeseries.models.gluonts.mx.callback import (
     GluonTSAdaptiveEarlyStoppingCallback,
     GluonTSEarlyStoppingCallback,
 )

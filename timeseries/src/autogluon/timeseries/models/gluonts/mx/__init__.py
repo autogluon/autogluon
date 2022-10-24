@@ -1,4 +1,4 @@
-from .mx import (
+from .models import (
     DeepARModel,
     GenericGluonTSMXNetModel,
     MQCNNModel,
@@ -8,17 +8,14 @@ from .mx import (
     TemporalFusionTransformerModel,
     TransformerModel,
 )
-from .torch import DeepARPyTorchModel, SimpleFeedForwardPyTorchModel
 
 __all__ = [
     "DeepARModel",
-    "DeepARPyTorchModel",
     "GenericGluonTSMXNetModel",
     "MQCNNModel",
     "MQRNNModel",
     "ProphetModel",
     "SimpleFeedForwardModel",
-    "SimpleFeedForwardPyTorchModel",
     "TemporalFusionTransformerModel",
     "TransformerModel",
 ]

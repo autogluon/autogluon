@@ -3,17 +3,18 @@ import logging
 from typing import Any, Dict, List, Union
 
 import autogluon.core as ag
-from autogluon.timeseries.models.gluonts.pytorch.models import DeepARPyTorchModel, SimpleFeedForwardPyTorchModel
 
 from .abstract import AbstractTimeSeriesModel
 from .abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 from .autogluon_tabular import AutoGluonTabularModel
 from .gluonts import (
     DeepARModel,
+    DeepARPyTorchModel, 
     MQCNNModel,
     MQRNNModel,
     ProphetModel,
     SimpleFeedForwardModel,
+    SimpleFeedForwardPyTorchModel,
     TemporalFusionTransformerModel,
     TransformerModel,
 )

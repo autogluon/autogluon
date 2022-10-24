@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type
 
+import gluonts
 import numpy as np
 import pandas as pd
 import torch
@@ -35,6 +36,7 @@ from .callback import PLTimeLimitCallback
 # from gluonts.torch.model.deep_npts import DeepNPTSEstimator
 
 logger = logging.getLogger(__name__)
+gts_logger = logging.getLogger(gluonts.__name__)
 pl_loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict if "pytorch_lightning" in name]
 
 
@@ -88,6 +90,7 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
     ) -> None:
         verbosity = kwargs.get("verbosity", 2)
         set_logger_verbosity(verbosity, logger=logger)
+        gts_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
         for pl_logger in pl_loggers:
             pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
 

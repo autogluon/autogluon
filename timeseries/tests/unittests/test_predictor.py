@@ -10,7 +10,7 @@ import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel
-from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory, MQRNNEstimator
+from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSModelFactory, MQRNNEstimator
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter
 

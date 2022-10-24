@@ -54,7 +54,7 @@ extras_require = {
 }
 
 all_requires = []
-for extra_package in ["sktime", "torch"]:
+for extra_package in ["sktime"]:
     all_requires += extras_require[extra_package]
 extras_require["all"] = list(set(all_requires))
 

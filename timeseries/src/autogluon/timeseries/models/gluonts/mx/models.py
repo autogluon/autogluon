@@ -1,15 +1,18 @@
 import logging
 import re
-from typing import List, Type
+from typing import List, Type, Optional
 
+import gluonts
 import mxnet as mx
 
+from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.utils import warning_filter
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
+from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
+from autogluon.timeseries.utils.warning_filters import disable_root_logger
 
 with warning_filter():
-    import gluonts.time_feature
     from gluonts.model.estimator import Estimator as GluonTSEstimator, DummyEstimator
     from gluonts.model.prophet import ProphetPredictor
     from gluonts.mx.context import get_mxnet_context
@@ -19,12 +22,48 @@ with warning_filter():
     from gluonts.mx.model.tft import TemporalFusionTransformerEstimator
     from gluonts.mx.model.seq2seq import MQCNNEstimator, MQRNNEstimator
 
-from .abstract_gluonts import AbstractGluonTSModel
+from .callback import GluonTSEarlyStoppingCallback, TimeLimitCallback
 
 logger = logging.getLogger(__name__)
+gts_logger = logging.getLogger(gluonts.__name__)
 
+class AbstractGluonTSMXNetModel(AbstractGluonTSModel):
+    def _fit(
+        self,
+        train_data: TimeSeriesDataFrame,
+        val_data: Optional[TimeSeriesDataFrame] = None,
+        time_limit: int = None,
+        **kwargs,
+    ) -> None:
+        verbosity = kwargs.get("verbosity", 2)
+        set_logger_verbosity(verbosity, logger=logger)
+        gts_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
 
-class DeepARModel(AbstractGluonTSModel):
+        if verbosity > 3:
+            logger.warning(
+                "GluonTS logging is turned on during training. Note that losses reported by GluonTS "
+                "may not correspond to those specified via `eval_metric`."
+            )
+
+        self._check_fit_params()
+
+        callbacks = [TimeLimitCallback(time_limit)]
+
+        early_stopping_patience = self._get_model_params().get("early_stopping_patience", None)
+        if early_stopping_patience:
+            callbacks.append(GluonTSEarlyStoppingCallback(early_stopping_patience))
+
+        # update auxiliary parameters
+        self._deferred_init_params_aux(dataset=train_data, callbacks=callbacks, **kwargs)
+
+        estimator = self._get_estimator()
+        with warning_filter(), disable_root_logger(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
+            self.gts_predictor = estimator.train(
+                self._to_gluonts_dataset(train_data),
+                validation_data=self._to_gluonts_dataset(val_data),
+            )
+
+class DeepARModel(AbstractGluonTSMXNetModel):
     """DeepAR model from GluonTS.
 
     The model consists of an RNN encoder (LSTM or GRU) and a decoder that outputs the
@@ -89,7 +128,7 @@ class DeepARModel(AbstractGluonTSModel):
         return args
 
 
-class AbstractGluonTSSeq2SeqModel(AbstractGluonTSModel):
+class AbstractGluonTSSeq2SeqModel(AbstractGluonTSMXNetModel):
     """Abstract class for MQCNN and MQRNN which require hybridization to be turned off
     when fitting on the GPU.
     """
@@ -228,7 +267,7 @@ class MQRNNModel(AbstractGluonTSSeq2SeqModel):
     gluonts_estimator_class: Type[GluonTSEstimator] = MQRNNEstimator
 
 
-class SimpleFeedForwardModel(AbstractGluonTSModel):
+class SimpleFeedForwardModel(AbstractGluonTSMXNetModel):
     """SimpleFeedForward model from GluonTS.
 
     The model consists of a multilayer perceptron (MLP) that predicts the distribution
@@ -287,7 +326,7 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
             return self.gluonts_estimator_class.from_hyperparameters(**hyperparameters)
 
 
-class TemporalFusionTransformerModel(AbstractGluonTSModel):
+class TemporalFusionTransformerModel(AbstractGluonTSMXNetModel):
     """TemporalFusionTransformer model from GluonTS.
 
     The model combines an LSTM encoder, a transformer decoder, and directly predicts
@@ -348,7 +387,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
         return super().predict(data=data, quantile_levels=quantile_levels, **kwargs)
 
 
-class TransformerModel(AbstractGluonTSModel):
+class TransformerModel(AbstractGluonTSMXNetModel):
     """Autoregressive transformer forecasting model from GluonTS.
 
     The model consists of an Transformer encoder and a decoder that outputs the
@@ -398,7 +437,7 @@ class TransformerModel(AbstractGluonTSModel):
     gluonts_estimator_class: Type[GluonTSEstimator] = TransformerEstimator
 
 
-class GenericGluonTSModel(AbstractGluonTSModel):
+class GenericGluonTSMXNetModel(AbstractGluonTSMXNetModel):
     """Generic wrapper model class for GluonTS models (in GluonTS terminology---
     Estimators). While this class is meant to generally enable fast use of GluonTS
     models in autogluon, specific GluonTS models accessed through this wrapper may
@@ -444,7 +483,7 @@ class GenericGluonTSModelFactory(AbstractTimeSeriesModelFactory):
     def __call__(self, **kwargs):
         model_init_kwargs = self.init_kwargs.copy()
         model_init_kwargs.update(kwargs)
-        return GenericGluonTSModel(
+        return GenericGluonTSMXNetModel(
             gluonts_estimator_class=self.gluonts_estimator_class,
             **model_init_kwargs,
         )
@@ -455,7 +494,7 @@ class _ProphetDummyEstimator(DummyEstimator):
         return self.predictor
 
 
-class ProphetModel(AbstractGluonTSModel):
+class ProphetModel(AbstractGluonTSMXNetModel):
     """Wrapper around `Prophet <https://github.com/facebook/prophet>`_, which wraps the
     library through GluonTS's wrapper.
 

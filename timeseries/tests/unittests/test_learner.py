@@ -13,7 +13,7 @@ import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.models import DeepARModel
-from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
+from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSModelFactory
 
 from .common import (
     DUMMY_TS_DATAFRAME,

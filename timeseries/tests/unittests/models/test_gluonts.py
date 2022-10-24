@@ -11,14 +11,14 @@ import autogluon.core as ag
 from autogluon.timeseries.models.gluonts import (  # MQRNNModel,; TransformerModel,
     DeepARModel,
     DeepARPyTorchModel,
-    GenericGluonTSModel,
+    GenericGluonTSMXNetModel,
     MQCNNModel,
     ProphetModel,
     SimpleFeedForwardModel,
     SimpleFeedForwardPyTorchModel,
     TemporalFusionTransformerModel,
 )
-from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
+from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSModelFactory
 from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 
 from ..common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
@@ -29,7 +29,7 @@ TESTABLE_MX_MODELS = [
     # MQRNNModel,
     SimpleFeedForwardModel,
     # TransformerModel,
-    partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
+    partial(GenericGluonTSMXNetModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
     GenericGluonTSModelFactory(TransformerEstimator),
     TemporalFusionTransformerModel,
 ]

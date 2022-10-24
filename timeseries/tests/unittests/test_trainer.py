@@ -15,8 +15,8 @@ import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesEnsembleWrapper
-from autogluon.timeseries.models.gluonts import GenericGluonTSModel
-from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
+from autogluon.timeseries.models.gluonts import GenericGluonTSMXNetModel
+from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSModelFactory
 from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
 from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
@@ -455,7 +455,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_model_templates_ca
     )
 
     for model in models:
-        if isinstance(model, GenericGluonTSModel):
+        if isinstance(model, GenericGluonTSMXNetModel):
             model_hyperparam = next(
                 hyperparameters[m] for m in hyperparameters if isinstance(m, GenericGluonTSModelFactory)
             )
