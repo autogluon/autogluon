@@ -2,6 +2,8 @@ import logging
 import sagemaker
 
 from abc import ABC, abstractmethod
+from typing import Optional
+
 from ..utils.ag_sagemaker import (
     AutoGluonSagemakerEstimator,
     AutoGluonRepackInferenceModel,
@@ -74,7 +76,7 @@ class SageMakerJob(ABC):
             return False
         return self.get_job_status() == 'Completed'
 
-    def get_job_status(self) -> str:
+    def get_job_status(self) -> Optional[str]:
         """
         Get job status
 
@@ -85,7 +87,10 @@ class SageMakerJob(ABC):
         """
         if not self.job_name:
             return 'NotCreated'
-        return self._get_job_status()
+        if not self._local_mode:
+            return self._get_job_status()
+        logger.warning('Job status not available in local mode. Please check the local log.')
+        return None
 
     def get_output_path(self):
         """
@@ -141,10 +146,7 @@ class SageMakerFitJob(SageMakerJob):
         return info
 
     def _get_job_status(self):
-        if not self._local_mode:
-            return self.session.describe_training_job(self.job_name)['TrainingJobStatus']
-        logger.warning('Job status not available in local mode. Please check the local log.')
-        return None
+        return self.session.describe_training_job(self.job_name)['TrainingJobStatus']
 
     def _get_output_path(self):
         if not self._local_mode:
@@ -226,10 +228,7 @@ class SageMakerBatchTransformationJob(SageMakerJob):
         return info
 
     def _get_job_status(self):
-        if not self._local_mode:
-            return self.session.describe_transform_job(self.job_name)['TransformJobStatus']
-        logger.warning('Job status not available in local mode. Please check the local log.')
-        return None
+        return self.session.describe_transform_job(self.job_name)['TransformJobStatus']
 
     def _get_output_path(self):
         if not self._local_mode:
