@@ -33,12 +33,13 @@ from .hpo import hpo_trial
 from .inference import extract_from_output, infer_batch, use_realtime
 from .load import CustomUnpickler, load_text_tokenizers
 from .log import LogFilter, apply_log_filter, make_exp_dir
+from .map import MeanAveragePrecision
 from .matcher import create_siamese_model
 from .metric import compute_score, get_minmax_mode, infer_metrics
 from .misc import logits_to_prob, tensor_to_ndarray
 from .mmcv import send_datacontainers_to_device, unpack_datacontainers
 from .model import create_fusion_model, create_model, modify_duplicate_model_names, select_model
-from .object_detection import COCODataset, bbox_xyxy_to_xywh, from_coco, from_voc, get_image_name_num, getCOCOCatIDs
+from .object_detection import COCODataset, cocoeval, bbox_xyxy_to_xywh, from_coco, from_voc, get_image_name_num, getCOCOCatIDs
 from .onnx import get_onnx_input
 from .pipeline import init_pretrained
 from .save import process_save_path, save_pretrained_model_configs, save_text_tokenizers

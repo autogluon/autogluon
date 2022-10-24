@@ -102,6 +102,7 @@ from .utils import (
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
+    cocoeval,
     compute_inference_batch_size,
     compute_num_gpus,
     compute_score,
@@ -1462,7 +1463,7 @@ class MultiModalPredictor:
                 **optimization_kwargs,
             )
         elif self._pipeline == OBJECT_DETECTION:
-            task = MMDetLitModule(model=self._model)
+            task = MMDetLitModule(model=self._model, **optimization_kwargs,)
         else:
             task = LitModule(
                 model=self._model,
@@ -1567,9 +1568,6 @@ class MultiModalPredictor:
         anno_file
             The annotation file in COCO format
         """
-        from pycocotools.coco import COCO
-        from pycocotools.cocoeval import COCOeval
-
         if isinstance(anno_file_or_df, str):
             anno_file = anno_file_or_df
             data = from_coco(anno_file)
@@ -1578,53 +1576,21 @@ class MultiModalPredictor:
             anno_file = self.detection_anno_train
             data = anno_file_or_df
 
-        coco_dataset = COCODataset(anno_file)
-
         outputs = self._predict(
             data=data,
             requires_label=True,
         )  # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
 
-        from torchmetrics.detection.mean_ap import MeanAveragePrecision
+        # Cache prediction results as COCO format # TODO: refactor this
+        if not self._save_path:
+            self._save_path = setup_outputdir(
+                path=None,
+                warn_if_exist=self._warn_if_exist,
+            )
+        self._save_path = os.path.abspath(os.path.expanduser(self._save_path))
+        cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
 
-        map_metric = MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False)
-        for output in outputs:  # TODO: refactor here
-            pred_results = output["bbox"]
-            preds = []
-            for img_idx, img_result in enumerate(pred_results):
-                img_result = img_result
-                boxes = []
-                scores = []
-                labels = []
-                for category_idx, category_result in enumerate(img_result):
-                    for item_idx, item_result in enumerate(category_result):
-                        boxes.append(item_result[:4])
-                        scores.append(float(item_result[4]))
-                        labels.append(category_idx)
-                preds.append(
-                    dict(
-                        boxes=torch.tensor(np.array(boxes).astype(float)).float().to("cuda:0"),
-                        scores=torch.tensor(scores).float().to("cuda:0"),
-                        labels=torch.tensor(labels).long().to("cuda:0"),
-                    )
-                )
-
-            target = []
-            gts = output["label"]
-            for gt in gts:
-                img_gt = np.array(gt)
-                boxes = img_gt[:, :4]
-                labels = img_gt[:, 4]
-                target.append(
-                    dict(
-                        boxes=torch.tensor(boxes).float().to("cuda:0"),
-                        labels=torch.tensor(labels).long().to("cuda:0"),
-                    )
-                )
-
-            map_metric.update(preds, target)
-
-        return map_metric.compute()
+        return cocoeval(outputs=outputs, data=data, anno_file=anno_file, cache_path=cache_path, metrics=metrics, tool="pycocotools")
 
     def _process_batch(
         self,
@@ -1698,9 +1664,14 @@ class MultiModalPredictor:
             requires_label=requires_label,
         )
 
-        strategy = "dp"  # default used in inference.
+        strategy = "dp"
 
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
+
+        if self._pipeline == OBJECT_DETECTION:
+            # strategy = "ddp" # TODO: make multigpu inference work
+            num_gpus = 1
+
         if num_gpus == 1:
             strategy = None
 
@@ -2173,6 +2144,7 @@ class MultiModalPredictor:
                     "column_types": self._column_types,
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
+                    "pipeline": self._pipeline,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
@@ -2358,6 +2330,7 @@ class MultiModalPredictor:
 
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]
+        predictor._pipeline = assets["pipeline"]
         predictor._eval_metric_name = assets["eval_metric_name"]
         predictor._verbosity = verbosity
         predictor._resume = resume

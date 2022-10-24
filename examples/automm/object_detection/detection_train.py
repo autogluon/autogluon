@@ -41,6 +41,7 @@ def detection_train(
     lr=1e-3,
     wd=1e-4,
     epochs=50,
+    num_gpus=4,
 ):
 
     # TODO: add val_path
@@ -50,7 +51,8 @@ def detection_train(
         label="rois_label",
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": 1,
+            "env.num_gpus": num_gpus,
+            "env.strategy": "ddp",
         },
         pipeline="object_detection",
         output_shape=num_classes,
@@ -65,14 +67,22 @@ def detection_train(
             "optimization.learning_rate": lr,
             "optimization.weight_decay": wd,
             "optimization.max_epochs": epochs,
-            # "env.per_gpu_batch_size": 4, # decrease it when model is large
+            "optimization.top_k": 1,
+            "optimization.top_k_average_method": "best",
+            "optimization.warmup_steps": 0.,
+            "optimization.patience": 40,
+            "env.per_gpu_batch_size": 3, # decrease it when model is large
         },
     )
     fit_end = time.time()
+    print("time usage for fit: %.2f" % (fit_end - start))
+    predictor.save("./temp_test_ag_model")
+
+    exit()
 
     if test_path is not None:
-        print("time usage for fit: %.2f" % (fit_end - start))
-        predictor.evaluate(test_path)
+        predictor = MultiModalPredictor.load("./temp_test_ag_model")
+        print(predictor.evaluate(test_path))
         print("time usage for eval: %.2f" % (time.time() - fit_end))
 
 
@@ -87,6 +97,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", default=1e-3, type=float)
     parser.add_argument("--wd", default=1e-3, type=float)
     parser.add_argument("--epochs", default=50, type=int)
+    parser.add_argument("--num_gpus", default=4, type=int)
     args = parser.parse_args()
 
     detection_train(
@@ -97,4 +108,5 @@ if __name__ == "__main__":
         lr=args.lr,
         wd=args.wd,
         epochs=args.epochs,
+        num_gpus=args.num_gpus,
     )

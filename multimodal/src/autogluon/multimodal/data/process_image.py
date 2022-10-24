@@ -65,6 +65,13 @@ from .utils import extract_value_from_config
 logger = logging.getLogger(AUTOMM)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
+class CollateMMCV():
+    def __init__(self, samples_per_gpu):
+        self.samples_per_gpu = samples_per_gpu
+    def __call__(self, x):
+        ret = collate(x, samples_per_gpu=self.samples_per_gpu)
+        # print("collate_size: %s" % len(ret["img_metas"][0]))
+        return ret
 
 class ImageProcessor:
     """
@@ -189,7 +196,7 @@ class ImageProcessor:
     def collate_fn(self, image_column_names: Optional[List] = None, per_gpu_batch_size: Optional[int] = None) -> Dict:
         """
         Collate images into a batch. Here it pads images since the image number may
-        vary from sample to sample. Samples with less images will be padded zeros.
+        vary from sample to sample. Sampls with less images will be padded zeros.
         The valid image numbers of samples will be stacked into a vector.
         This function will be used when creating Pytorch DataLoader.
 
@@ -198,6 +205,7 @@ class ImageProcessor:
         A dictionary containing one model's collator function for image data.
         """
         fn = {}
+        # print("samples_per_gpu: %s" % per_gpu_batch_size)
         if self.requires_column_info:
             assert image_column_names, "Empty image column names."
             for col_name in image_column_names:
@@ -207,7 +215,7 @@ class ImageProcessor:
             assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
             fn.update(
                 {
-                    self.image_key: lambda x: collate(x, samples_per_gpu=per_gpu_batch_size),
+                    self.image_key: CollateMMCV(samples_per_gpu=per_gpu_batch_size),
                 }
             )
         else:

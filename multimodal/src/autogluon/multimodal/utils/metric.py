@@ -12,6 +12,7 @@ from ..constants import (
     AUTOMM,
     AVERAGE_PRECISION,
     BINARY,
+    DIRECT_LOSS,
     F1,
     MAP,
     METRIC_MODE_MAP,
@@ -87,7 +88,7 @@ def infer_metrics(
         eval_metric_name = RMSE
     elif problem_type is None:
         if pipeline == OBJECT_DETECTION:
-            eval_metric_name = MAP
+            return DIRECT_LOSS, MAP
         else:
             raise NotImplementedError(f"Problem type: {problem_type}, pipeline: {pipeline} is not supported yet!")
     else:

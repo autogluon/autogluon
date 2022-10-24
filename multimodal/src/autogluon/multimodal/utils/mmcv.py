@@ -20,8 +20,8 @@ def assert_tensor_type(func: Callable) -> Callable:
 
 try:
     from mmcv.parallel import DataContainer
+    from mmcv.parallel import collate
 except ImportError:
-
     class DataContainer:
         """A container for any type of objects.
         Typically tensors will be stacked in the collate function and sliced along
@@ -161,3 +161,10 @@ def datacontainer_to_cuda(container, device: Union[str, torch.device]):
                 ), f"Expected `torch.Tensor` but {container.data[idx]} has \
                     type: {type(container.data[idx])}"
                 container._data[idx] = container.data[idx].to(device)
+
+class CollateMMCV():
+    def __init__(self, samples_per_gpu):
+        self.samples_per_gpu = samples_per_gpu
+    def __call__(self, x):
+        return collate(x, samples_per_gpu=self.samples_per_gpu)
+
