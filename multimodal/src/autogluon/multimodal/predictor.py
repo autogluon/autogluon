@@ -76,7 +76,7 @@ from .constants import (
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
     infer_column_types,
-    infer_label_column_type_by_problem_type,
+    infer_label_column_type_by_problem_type_and_pipeline,
     infer_problem_type_output_shape,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
@@ -163,7 +163,7 @@ class MultiModalPredictor:
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 3,
-        output_shape: Optional[int] = None,
+        output_shape: Optional[int] = None,  # TODO: infer this for detection
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
     ):
@@ -486,8 +486,9 @@ class MultiModalPredictor:
                 stratify=stratify,
                 random_state=np.random.RandomState(seed),
             )
-            train_data = train_data.reset_index(drop=True)
-            tuning_data = tuning_data.reset_index(drop=True)
+            if self._pipeline == OBJECT_DETECTION:  # TODO: investigate why we need this and remove it
+                train_data = train_data.reset_index(drop=True)
+                tuning_data = tuning_data.reset_index(drop=True)
 
         column_types = infer_column_types(
             data=train_data,
@@ -495,7 +496,7 @@ class MultiModalPredictor:
             label_columns=self._label_column,
             provided_column_types=column_types,
         )
-        column_types = infer_label_column_type_by_problem_type(
+        column_types = infer_label_column_type_by_problem_type_and_pipeline(
             column_types=column_types,
             label_columns=self._label_column,
             problem_type=self._problem_type,
@@ -1527,7 +1528,7 @@ class MultiModalPredictor:
                 data=data, allowable_column_types=allowable_dtypes, fallback_column_type=fallback_dtype
             )
             if self._label_column and self._label_column in data.columns:
-                column_types = infer_label_column_type_by_problem_type(
+                column_types = infer_label_column_type_by_problem_type_and_pipeline(
                     column_types=column_types,
                     label_columns=self._label_column,
                     problem_type=self._problem_type,

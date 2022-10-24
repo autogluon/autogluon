@@ -50,7 +50,7 @@ ROIS = "rois"
 SCORE = "score"
 
 # Metric
-MAP = "map"
+MAP = "mAP"
 MEAN_AVERAGE_PRECISION = "mean_average_precision"
 MAX = "max"
 MIN = "min"
@@ -170,7 +170,7 @@ MMOCR_TEXT_DET = "mmocr_text_detection"
 MMOCR_TEXT_RECOG = "mmocr_text_recognition"
 NER_TEXT = "ner_text"
 HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT)
-MMCV_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
+MMLAB_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
 
 # matcher loss type
 CONTRASTIVE_LOSS = "contrastive_loss"

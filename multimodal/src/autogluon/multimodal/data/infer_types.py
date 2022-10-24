@@ -423,7 +423,7 @@ def check_missing_values(
         )
 
 
-def infer_label_column_type_by_problem_type(
+def infer_label_column_type_by_problem_type_and_pipeline(
     column_types: Dict,
     label_columns: Union[str, List[str]],
     problem_type: Optional[str],

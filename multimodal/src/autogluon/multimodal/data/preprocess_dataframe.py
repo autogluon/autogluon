@@ -281,7 +281,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     generator = self._feature_generators[col_name]
                     generator.fit(np.expand_dims(processed_data.to_numpy(), axis=-1))
                     self._numerical_feature_names.append(col_name)
-            elif col_type.startswith(IMAGE) or col_type == ROIS:
+            elif col_type.startswith(IMAGE) or col_type == ROIS:  # TODO: Use transform_multimodal and remove this hack
                 self._image_feature_names.append(col_name)
             else:
                 raise NotImplementedError(
@@ -405,7 +405,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             col_value = df[col_name]
             col_type = self._column_types[col_name]
 
-            if col_name == ROIS: #TODO: remove hardcode
+            if col_name == ROIS:  # TODO: infer ROIS type correctly in evaluation/prediction
                 processed_data = df[col_name].tolist()
             elif col_type == IMAGE_PATH or IMAGE:
                 processed_data = col_value.apply(lambda ele: ele.split(";")).tolist()
