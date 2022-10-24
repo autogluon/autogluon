@@ -11,9 +11,11 @@ from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel, 
 from .statsmodels import ARIMAModel, ETSModel, ThetaModel
 
 __all__ = [
+    "DeepARModel",
     "DeepARMXNetModel",
     "MQCNNMXNetModel",
     "MQRNNMXNetModel",
+    "SimpleFeedForwardModel",
     "SimpleFeedForwardMXNetModel",
     "TemporalFusionTransformerMXNetModel",
     "TransformerMXNetModel",
