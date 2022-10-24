@@ -146,7 +146,7 @@ class SimpleFeedForwardPyTorchModel(AbstractGluonTSPyTorchModel):
                 # torch AffineTransformed
                 fdist = forecast.distribution
                 q_transformed = (
-                    fdist.scale * fdist.base_dist.icdf(torch.Tensor(quantile_levels)) + fdist.loc
+                    fdist.scale * fdist.base_dist.icdf(torch.Tensor(quantile_levels).unsqueeze(1)) + fdist.loc
                 ).numpy().tolist()
                 for ix, quantile in enumerate(quantile_levels):
                     item_forecast_dict[str(quantile)] = q_transformed[ix]
