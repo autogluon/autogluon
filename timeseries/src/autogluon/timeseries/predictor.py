@@ -160,7 +160,6 @@ class TimeSeriesPredictor:
                 target=self.target,
                 prediction_length=self.prediction_length,
                 quantile_levels=self.quantile_levels,
-                # TODO: Should we expose the validation splitter as self.validation_splitter?
                 validation_splitter=splitter,
             )
         )
@@ -170,6 +169,10 @@ class TimeSeriesPredictor:
     @property
     def _trainer(self) -> AbstractTimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
+
+    @property
+    def validation_splitter(self) -> AbstractTimeSeriesSplitter:
+        return self._learner.validation_splitter
 
     def _check_and_prepare_data_frame(self, df: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         """Ensure that TimeSeriesDataFrame has a frequency, or replace its time index with a dummy if
