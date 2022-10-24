@@ -2,6 +2,7 @@
 Module including wrappers for PyTorch implementations of models in GluonTS
 """
 import logging
+import warnings
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type
@@ -130,6 +131,14 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
+
+        # FIXME: PyTorch StudentT does not implement quantile functions
+        if "distr_output" in init_kwargs:
+            warnings.warn(
+                f"distr_output {init_kwargs['distr_output']} specified for SimpleFeedForward, however training"
+                "will default to the Gaussian distribution.",
+                category=UserWarning,
+            )
         init_kwargs.update(dict(distr_output=NormalOutput()))
         return init_kwargs
 
