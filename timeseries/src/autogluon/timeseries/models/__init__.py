@@ -1,8 +1,10 @@
 from .autogluon_tabular import AutoGluonTabularModel
 from .gluonts import (
+    DeepARModel,
     DeepARMXNetModel,
     MQCNNMXNetModel,
     MQRNNMXNetModel,
+    SimpleFeedForwardModel,
     SimpleFeedForwardMXNetModel,
     TemporalFusionTransformerMXNetModel,
     TransformerMXNetModel,
