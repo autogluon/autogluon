@@ -284,7 +284,7 @@ def create_siamese_model(
     return query_model, response_model
 
 
-def compute_semantic_similarity(a: torch.Tensor, b: torch.Tensor, cosine: Optional[bool] = True):
+def compute_semantic_similarity(a: torch.Tensor, b: torch.Tensor, similarity_type: Optional[str] = "cosine"):
     """
     Compute the semantic similarity of each vector in `a` with each vector in `b`.
 
@@ -294,8 +294,8 @@ def compute_semantic_similarity(a: torch.Tensor, b: torch.Tensor, cosine: Option
         A tensor with shape (n, dim).
     b
         A tensor with shape (m, dim).
-    cosine
-        Whether to use cosine similarity. If false, use dot product.
+    similarity_type
+        Use what function (cosine/dot_prod) to score the similarity (default: cosine).
 
     Returns
     -------
@@ -313,9 +313,15 @@ def compute_semantic_similarity(a: torch.Tensor, b: torch.Tensor, cosine: Option
     if len(b.shape) == 1:
         b = b.unsqueeze(0)
 
-    if cosine:
+    if similarity_type == "cosine":
         a = torch.nn.functional.normalize(a, p=2, dim=1)
         b = torch.nn.functional.normalize(b, p=2, dim=1)
+    elif similarity_type == "dot_prod":
+        pass
+    else:
+        raise ValueError(
+            f"Invalid similarity type: {similarity_type}. The supported types are `cosine` and `dot_prod`."
+        )
 
     return torch.mm(a, b.transpose(0, 1))
 
@@ -328,7 +334,7 @@ def semantic_search(
     response_chunk_size: int = 500000,
     top_k: int = 10,
     id_mappings: Optional[Dict[str, Dict]] = None,
-    cosine: Optional[bool] = True,
+    similarity_type: Optional[str] = "cosine",
 ):
     """
     Perform a cosine similarity search between query data and response data.
@@ -348,8 +354,8 @@ def semantic_search(
         Process response data by response_chunk_size each time.
     top_k
         Retrieve top k matching entries.
-    cosine
-        Whether to use cosine similarity in computing the matching score (default True). If False, use the dot product.
+    similarity_type
+        Use what function (cosine/dot_prod) to score the similarity (default: cosine).
 
     Returns
     -------
@@ -380,7 +386,7 @@ def semantic_search(
             scores = compute_semantic_similarity(
                 a=query_embeddings,
                 b=response_embeddings,
-                cosine=cosine,
+                similarity_type=similarity_type,
             )
 
             # Get top-k scores

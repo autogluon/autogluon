@@ -282,7 +282,9 @@ class MultiModalMatcher:
     def fit(
         self,
         train_data: pd.DataFrame,
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[
+            Dict[str, Dict]
+        ] = None,  # TODO rename it to linked_content and support dict of pd.Series.
         presets: Optional[str] = None,
         tuning_data: Optional[pd.DataFrame] = None,
         time_limit: Optional[int] = None,
@@ -300,7 +302,11 @@ class MultiModalMatcher:
         Parameters
         ----------
         train_data
-            A dataframe containing training data.
+            A dataframe, containing the query data, response data, and their relevance. For example,
+            | query_col1  | query_col2 | response_col1 | response_col2 | relevance_score |
+            |-------------|------------|---------------|---------------|-----------------|
+            |             | ....       | ....          | ...           | ...             |
+            |             | ....       | ....          | ...           | ...             |
         id_mappings
              Id-to-content mappings. The contents can be text, image, etc.
              This is used when the dataframe contains the query/response indexes instead of their contents.
@@ -1154,7 +1160,7 @@ class MultiModalMatcher:
         response_data: Union[pd.DataFrame, dict, list],
         id_mappings: Optional[Dict[str, Dict]] = None,
         chunk_size: Optional[int] = 1024,
-        cosine: Optional[bool] = True,
+        similarity_type: Optional[str] = "cosine",
         top_k: Optional[int] = 100,
     ):
         query_header = self._query[0] if self._query is not None else QUERY
@@ -1177,7 +1183,9 @@ class MultiModalMatcher:
             response_embeddings = self.extract_embedding(
                 response_chunk, signature=RESPONSE, id_mappings=id_mappings, as_tensor=True
             )
-            similarity_scores = compute_semantic_similarity(a=query_embeddings, b=response_embeddings, cosine=cosine)
+            similarity_scores = compute_semantic_similarity(
+                a=query_embeddings, b=response_embeddings, similarity_type=similarity_type
+            )
             similarity_scores[torch.isnan(similarity_scores)] = -1
             top_k_scores, top_k_indices = torch.topk(
                 similarity_scores,
@@ -1264,7 +1272,7 @@ class MultiModalMatcher:
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
         chunk_size: Optional[int] = 1024,
-        cosine: Optional[bool] = True,
+        similarity_type: Optional[str] = "cosine",
         top_k: Optional[int] = 100,
     ):
         """
@@ -1273,7 +1281,11 @@ class MultiModalMatcher:
         Parameters
         ----------
         data
-            A dataframe, containing the same columns as the training data.
+            A dataframe, containing the query data, response data, and their relevance. For example,
+            | query_col1  | query_col2 | response_col1 | response_col2 | relevance_score |
+            |-------------|------------|---------------|---------------|-----------------|
+            |             | ....       | ....          | ...           | ...             |
+            |             | ....       | ....          | ...           | ...             |
         query_data
             A list of queries.
         response_data
@@ -1288,8 +1300,8 @@ class MultiModalMatcher:
             Whether to return the prediction result of each row.
         chunk_size
             Scan the response data by chunk_size each time. Increasing the value increases the speed, but requires more memory.
-        cosine
-            Whether to use cosine similarity in computing the matching score (default True). If False, use the dot product.
+        similarity_type
+            Use what function (cosine/dot_prod) to score the similarity (default: cosine).
         top_k
             Retrieve top k matching entries.
 
@@ -1305,7 +1317,7 @@ class MultiModalMatcher:
                 response_data=response_data,
                 id_mappings=id_mappings,
                 chunk_size=chunk_size,
-                cosine=cosine,
+                similarity_type=similarity_type,
                 top_k=top_k,
             )
         elif data is not None:

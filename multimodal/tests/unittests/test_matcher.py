@@ -9,8 +9,9 @@ import pytest
 from unittest_datasets import IDChangeDetectionDataset
 from utils import get_home_dir
 
-from autogluon.multimodal import MultiModalMatcher, semantic_search
+from autogluon.multimodal import MultiModalMatcher
 from autogluon.multimodal.constants import BINARY, MULTICLASS, QUERY, RESPONSE, UNIFORM_SOUP
+from autogluon.multimodal.utils import semantic_search
 
 ALL_DATASETS = {
     "id_change_detection": IDChangeDetectionDataset,
@@ -150,7 +151,6 @@ def test_text_semantic_search():
         query_data=queries,
         response_data=corpus,
         top_k=5,
-        cosine=True,
     )
     hits_gt = [
         [

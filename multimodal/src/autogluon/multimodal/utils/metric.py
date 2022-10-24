@@ -177,8 +177,6 @@ def compute_ranking_score(
     precision_string = "P." + ",".join([str(k) for k in cutoff])
 
     evaluator = pytrec_eval.RelevanceEvaluator(qrel_dict, {map_string, ndcg_string, recall_string, precision_string})
-    # print(f"qrel_dict: {json.dumps(qrel_dict, indent=1)}")
-    # print(f"results: {json.dumps(results, indent=1)}")
     scores = evaluator.evaluate(results)
 
     for query_id in scores.keys():
