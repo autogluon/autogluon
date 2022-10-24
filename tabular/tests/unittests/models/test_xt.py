@@ -26,7 +26,7 @@ def test_xt_regression(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
 
 
-def test_xt_compile_binary(fit_helper):
+def test_xt_binary_compile_onnx(fit_helper):
     fit_args = dict(
         hyperparameters={XTModel: [
             {}, # defaults to native compiler
@@ -37,7 +37,7 @@ def test_xt_compile_binary(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3)
 
 
-def test_xt_compile_multiclass(fit_helper):
+def test_xt_multiclass_compile_onnx(fit_helper):
     fit_args = dict(
         hyperparameters={XTModel: [
             {}, # defaults to native compiler
@@ -48,7 +48,7 @@ def test_xt_compile_multiclass(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3)
 
 
-def test_xt_compile_regression(fit_helper):
+def test_xt_regression_compile_onnx(fit_helper):
     fit_args = dict(
         hyperparameters={XTModel: [
             {}, # defaults to native compiler

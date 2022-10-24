@@ -867,7 +867,12 @@ class AbstractModel:
             transform_func=transform_func, transform_func_kwargs=transform_func_kwargs, silent=silent, **kwargs
         )
 
-    # TODO: Pick up from here, rename to save, implement _get_compiler(), etc.
+    # TODO: PoC, refactor prior to v0.6 release
+    #  Add Documentation
+    #  Define when this should be called
+    #  Is it called during fit? Is it called after fit?
+    #  Can it be called as a post-fit operation on an already fit predictor on a per-model basis?
+    #  Does this call overwrite the existing model or make a new one?
     def compile(self, path: str = None, verbose=True) -> str:
         if path is None:
             path = self.path
@@ -886,8 +891,25 @@ class AbstractModel:
         self.model = _model
         return path
 
-    def _get_compiler(self):
+    def _default_compiler(self):
         return None
+
+    def _get_compiler(self):
+        compiler = self.params_aux.get('compiler', None)
+        compilers = self._valid_compilers()
+        compiler_names = {c.name: c for c in compilers}
+        if compiler is not None and compiler not in compiler_names:
+            raise AssertionError(f'Unknown compiler: {compiler}. Valid compilers: {compiler_names}')
+        if compiler is None:
+            return self._default_compiler()
+        compiler_cls = compiler_names[compiler]
+        compiler_fallback_to_native = self.params_aux.get('compiler_fallback_to_native', True)
+        if not compiler_cls.can_compile():
+            if not compiler_fallback_to_native:
+                raise AssertionError(f'Specified compiler ({compiler}) is unable to compile'
+                                     ' (potentially lacking dependencies) and "compiler_fallback_to_native==False"')
+            compiler_cls = self._default_compiler()
+        return compiler_cls
 
     def get_trained_params(self) -> dict:
         """

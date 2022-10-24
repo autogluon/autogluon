@@ -27,7 +27,7 @@ def test_rf_regression(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
 
 
-def test_rf_compile_binary(fit_helper):
+def test_rf_binary_compile_onnx(fit_helper):
     fit_args = dict(
         hyperparameters={RFModel: [
             {}, # defaults to native compiler
@@ -38,7 +38,7 @@ def test_rf_compile_binary(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3)
 
 
-def test_rf_compile_multiclass(fit_helper):
+def test_rf_multiclass_compile_onnx(fit_helper):
     fit_args = dict(
         hyperparameters={RFModel: [
             {}, # defaults to native compiler
@@ -49,7 +49,7 @@ def test_rf_compile_multiclass(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3)
 
 
-def test_rf_compile_regression(fit_helper):
+def test_rf_regression_compile_onnx(fit_helper):
     fit_args = dict(
         hyperparameters={RFModel: [
             {}, # defaults to native compiler

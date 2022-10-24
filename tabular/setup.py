@@ -54,7 +54,7 @@ extras_require = {
         'vowpalwabbit>=8.10,<8.11'
     ],
     'skl2onnx': [
-        'skl2onnx>=1.7.0,<1.13.0'
+        'skl2onnx>=1.12.0,<1.13.0'
     ]
 }
 
