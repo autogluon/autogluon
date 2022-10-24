@@ -485,8 +485,9 @@ class MultiModalPredictor:
                 stratify=stratify,
                 random_state=np.random.RandomState(seed),
             )
-            train_data = train_data.reset_index(drop=True)
-            tuning_data = tuning_data.reset_index(drop=True)
+            if self._pipeline == OBJECT_DETECTION:  # TODO: investigate why we need this and remove it
+                train_data = train_data.reset_index(drop=True)
+                tuning_data = tuning_data.reset_index(drop=True)
 
         column_types = infer_column_types(
             data=train_data,
