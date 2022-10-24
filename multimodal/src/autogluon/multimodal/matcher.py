@@ -1147,7 +1147,7 @@ class MultiModalMatcher:
 
         return outputs
 
-    def _ranking_evaluate(
+    def _evaluate_ranking(
         self,
         qr_relevance: Union[pd.DataFrame, dict, list],
         query_data: Union[pd.DataFrame, dict, list],
@@ -1196,13 +1196,9 @@ class MultiModalMatcher:
 
         ndcg, _map, recall, precision = compute_ranking_score(results=rank_results, qrel_dict=rank_labels)
 
-        logger.info(
-            f"Evaluation Results: NCDG={str(ndcg)}, MAP={str(_map)}, Recall={str(recall)}, Precision={str(precision)}."
-        )
-
         return ndcg, _map, recall, precision
 
-    def _matching_evaluate(
+    def _evaluate_matching(
         self,
         data: Union[pd.DataFrame, dict, list],
         id_mappings: Optional[Dict[str, Dict]] = None,
@@ -1262,8 +1258,8 @@ class MultiModalMatcher:
     def evaluate(
         self,
         data: Optional[Union[pd.DataFrame, dict, list]] = None,
-        query_data: Optional[Union[pd.DataFrame, dict, list]] = None,
-        response_data: Optional[Union[pd.DataFrame, dict, list]] = None,
+        query_data: Optional[list] = None,
+        response_data: Optional[list] = None,
         id_mappings: Optional[Dict[str, Dict]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
@@ -1277,7 +1273,11 @@ class MultiModalMatcher:
         Parameters
         ----------
         data
-            A dataframe, containing the same columns as the training data
+            A dataframe, containing the same columns as the training data.
+        query_data
+            A list of queries.
+        response_data
+            A list of response data, in which to match the queries.
         id_mappings
              Id-to-content mappings. The contents can be text, image, etc.
              This is used when the dataframe contains the query/response indexes instead of their contents.
@@ -1286,6 +1286,12 @@ class MultiModalMatcher:
             If None, we only return the score for the stored `_eval_metric_name`.
         return_pred
             Whether to return the prediction result of each row.
+        chunk_size
+            Scan the response data by chunk_size each time. Increasing the value increases the speed, but requires more memory.
+        cosine
+            Whether to use cosine similarity in computing the matching score (default True). If False, use the dot product.
+        top_k
+            Retrieve top k matching entries.
 
         Returns
         -------
@@ -1293,7 +1299,7 @@ class MultiModalMatcher:
         Optionally return a dataframe of prediction results.
         """
         if all(v is not None for v in [data, query_data, response_data]):
-            return self._ranking_evaluate(
+            return self._evaluate_ranking(
                 qr_relevance=data,
                 query_data=query_data,
                 response_data=response_data,
@@ -1303,7 +1309,7 @@ class MultiModalMatcher:
                 top_k=top_k,
             )
         elif data is not None:
-            return self._matching_evaluate(
+            return self._evaluate_matching(
                 data=data,
                 id_mappings=id_mappings,
                 metrics=metrics,

@@ -20,9 +20,10 @@ def init_pretrained(
 
     Parameters
     ----------
+    pipeline
+        Name of the pipeline.
     hyperparameters
         The customized hyperparameters used to override the default.
-        Users need to use it to choose one model, e.g., {"model.names": ["clip"]}.
 
     Returns
     -------
@@ -56,22 +57,27 @@ def init_pretrained_matcher(
 
     Parameters
     ----------
+    pipeline
+        Name of the pipeline.
     hyperparameters
         The customized hyperparameters used to override the default.
-        Users need to use it to choose one model, e.g., {"model.names": ["clip"]}.
 
     Returns
     -------
     config
-        A DictConfig object containing the configurations for zero-shot learning.
+        A DictConfig object containing the configurations for the pipeline.
     query_config
+        Configurations for the query model and related.
     response_config
+        Configurations for the response model and related.
     query_model
+        Query model with pre-trained weights.
     response_model
-        The model with pre-trained weights.
+        Response model with pre-trained weights.
     query_processors
-        The data processors associated with the pre-trained model.
+        The data processors associated with the query model.
     response_processors
+        The data processors associated with the response model.
     """
     config = get_config(
         presets=pipeline,

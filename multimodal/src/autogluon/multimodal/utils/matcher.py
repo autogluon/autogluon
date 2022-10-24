@@ -285,6 +285,22 @@ def create_siamese_model(
 
 
 def compute_semantic_similarity(a: torch.Tensor, b: torch.Tensor, cosine: Optional[bool] = True):
+    """
+    Compute the semantic similarity of each vector in `a` with each vector in `b`.
+
+    Parameters
+    ----------
+    a
+        A tensor with shape (n, dim).
+    b
+        A tensor with shape (m, dim).
+    cosine
+        Whether to use cosine similarity. If false, use dot product.
+
+    Returns
+    -------
+    A similarity matrix with shape (n, m).
+    """
     if not isinstance(a, torch.Tensor):
         a = torch.as_tensor(a)
 
@@ -326,10 +342,14 @@ def semantic_search(
     id_mappings
         Id-to-content mappings. The contents can be text, image, etc.
         This is used when the dataframe contains the query/response indexes instead of their contents.
-    return_prob
-        Whether to return the probability.
-    as_pandas
-        Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
+    query_chunk_size
+        Process queries by query_chunk_size each time.
+    response_chunk_size
+        Process response data by response_chunk_size each time.
+    top_k
+        Retrieve top k matching entries.
+    cosine
+        Whether to use cosine similarity in computing the matching score (default True). If False, use the dot product.
 
     Returns
     -------
