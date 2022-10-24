@@ -13,7 +13,7 @@ from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
-from autogluon.timeseries.models import DeepARModel, ETSModel
+from autogluon.timeseries.models import DeepARMXNetModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.gluonts import GenericGluonTSMXNetModel
 
@@ -207,7 +207,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
 
 
 @pytest.mark.parametrize(
-    "model_class", [DeepARModel, ETSModel, partial(GenericGluonTSMXNetModel, gluonts_estimator_class=MQRNNEstimator)]
+    "model_class", [DeepARMXNetModel, ETSModel, partial(GenericGluonTSMXNetModel, gluonts_estimator_class=MQRNNEstimator)]
 )
 @pytest.mark.parametrize("test_data_index", [["A", "B"], ["C", "D"], ["A"]])
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_aligns_with_time(
@@ -234,7 +234,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
 
 
 @pytest.mark.parametrize(
-    "model_class", [DeepARModel, ETSModel, partial(GenericGluonTSMXNetModel, gluonts_estimator_class=MQRNNEstimator)]
+    "model_class", [DeepARMXNetModel, ETSModel, partial(GenericGluonTSMXNetModel, gluonts_estimator_class=MQRNNEstimator)]
 )
 @pytest.mark.parametrize(
     "train_data, test_data",

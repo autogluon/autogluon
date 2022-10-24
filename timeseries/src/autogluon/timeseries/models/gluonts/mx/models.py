@@ -63,7 +63,7 @@ class AbstractGluonTSMXNetModel(AbstractGluonTSModel):
                 validation_data=self._to_gluonts_dataset(val_data),
             )
 
-class DeepARModel(AbstractGluonTSMXNetModel):
+class DeepARMXNetModel(AbstractGluonTSMXNetModel):
     """DeepAR model from GluonTS.
 
     The model consists of an RNN encoder (LSTM or GRU) and a decoder that outputs the
@@ -143,7 +143,7 @@ class AbstractGluonTSSeq2SeqModel(AbstractGluonTSMXNetModel):
             return self.gluonts_estimator_class.from_hyperparameters(**self._get_estimator_init_args())
 
 
-class MQCNNModel(AbstractGluonTSSeq2SeqModel):
+class MQCNNMXNetModel(AbstractGluonTSSeq2SeqModel):
     """MQCNN model from GluonTS.
 
     The model consists of a CNN encoder and a decoder that directly predicts the
@@ -221,7 +221,7 @@ class MQCNNModel(AbstractGluonTSSeq2SeqModel):
         return args
 
 
-class MQRNNModel(AbstractGluonTSSeq2SeqModel):
+class MQRNNMXNetModel(AbstractGluonTSSeq2SeqModel):
     """MQRNN model from GluonTS.
 
     The model consists of an RNN encoder and a decoder that directly predicts the
@@ -267,7 +267,7 @@ class MQRNNModel(AbstractGluonTSSeq2SeqModel):
     gluonts_estimator_class: Type[GluonTSEstimator] = MQRNNEstimator
 
 
-class SimpleFeedForwardModel(AbstractGluonTSMXNetModel):
+class SimpleFeedForwardMXNetModel(AbstractGluonTSMXNetModel):
     """SimpleFeedForward model from GluonTS.
 
     The model consists of a multilayer perceptron (MLP) that predicts the distribution
@@ -326,7 +326,7 @@ class SimpleFeedForwardModel(AbstractGluonTSMXNetModel):
             return self.gluonts_estimator_class.from_hyperparameters(**hyperparameters)
 
 
-class TemporalFusionTransformerModel(AbstractGluonTSMXNetModel):
+class TemporalFusionTransformerMXNetModel(AbstractGluonTSMXNetModel):
     """TemporalFusionTransformer model from GluonTS.
 
     The model combines an LSTM encoder, a transformer decoder, and directly predicts
@@ -387,7 +387,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSMXNetModel):
         return super().predict(data=data, quantile_levels=quantile_levels, **kwargs)
 
 
-class TransformerModel(AbstractGluonTSMXNetModel):
+class TransformerMXNetModel(AbstractGluonTSMXNetModel):
     """Autoregressive transformer forecasting model from GluonTS.
 
     The model consists of an Transformer encoder and a decoder that outputs the
@@ -473,7 +473,7 @@ class GenericGluonTSMXNetModel(AbstractGluonTSMXNetModel):
             return self.gluonts_estimator_class.from_hyperparameters(**self._get_estimator_init_args())
 
 
-class GenericGluonTSModelFactory(AbstractTimeSeriesModelFactory):
+class GenericGluonTSMXNetModelFactory(AbstractTimeSeriesModelFactory):
     """Factory class for GenericGluonTSModel for convenience of use"""
 
     def __init__(self, gluonts_estimator_class: Type[GluonTSEstimator], **kwargs):

@@ -12,8 +12,8 @@ from gluonts.model.seq2seq import MQRNNEstimator
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
-from autogluon.timeseries.models import DeepARModel
-from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSModelFactory
+from autogluon.timeseries.models import DeepARMXNetModel
+from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSMXNetModelFactory
 
 from .common import (
     DUMMY_TS_DATAFRAME,
@@ -135,11 +135,11 @@ def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_perfo
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
     [
-        ({DeepARModel: {"epochs": 1}}, 1),
+        ({DeepARMXNetModel: {"epochs": 1}}, 1),
         (
             {
-                GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                DeepARModel: {"epochs": 1},
+                GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                DeepARMXNetModel: {"epochs": 1},
             },
             2,
         ),

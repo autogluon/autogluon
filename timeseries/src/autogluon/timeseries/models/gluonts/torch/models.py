@@ -120,11 +120,11 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
         return model
 
 
-class DeepARPyTorchModel(AbstractGluonTSPyTorchModel):
+class DeepARModel(AbstractGluonTSPyTorchModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DeepAREstimator
 
 
-class SimpleFeedForwardPyTorchModel(AbstractGluonTSPyTorchModel):
+class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = SimpleFeedForwardEstimator
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:

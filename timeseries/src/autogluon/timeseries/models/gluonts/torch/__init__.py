@@ -1,6 +1,6 @@
-from .models import DeepARPyTorchModel, SimpleFeedForwardPyTorchModel
+from .models import DeepARModel, SimpleFeedForwardModel
 
 __all__ = [
-    "DeepARPyTorchModel",
-    "SimpleFeedForwardPyTorchModel",
+    "DeepARModel",
+    "SimpleFeedForwardModel",
 ]

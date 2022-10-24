@@ -1,21 +1,21 @@
 from .models import (
-    DeepARModel,
+    DeepARMXNetModel,
     GenericGluonTSMXNetModel,
-    MQCNNModel,
-    MQRNNModel,
+    MQCNNMXNetModel,
+    MQRNNMXNetModel,
     ProphetModel,
-    SimpleFeedForwardModel,
-    TemporalFusionTransformerModel,
-    TransformerModel,
+    SimpleFeedForwardMXNetModel,
+    TemporalFusionTransformerMXNetModel,
+    TransformerMXNetModel,
 )
 
 __all__ = [
-    "DeepARModel",
+    "DeepARMXNetModel",
     "GenericGluonTSMXNetModel",
-    "MQCNNModel",
-    "MQRNNModel",
+    "MQCNNMXNetModel",
+    "MQRNNMXNetModel",
     "ProphetModel",
-    "SimpleFeedForwardModel",
-    "TemporalFusionTransformerModel",
-    "TransformerModel",
+    "SimpleFeedForwardMXNetModel",
+    "TemporalFusionTransformerMXNetModel",
+    "TransformerMXNetModel",
 ]

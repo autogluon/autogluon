@@ -8,15 +8,15 @@ from .abstract import AbstractTimeSeriesModel
 from .abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 from .autogluon_tabular import AutoGluonTabularModel
 from .gluonts import (
-    DeepARModel,
-    DeepARPyTorchModel, 
-    MQCNNModel,
-    MQRNNModel,
+    DeepARMXNetModel,
+    DeepARModel, 
+    MQCNNMXNetModel,
+    MQRNNMXNetModel,
     ProphetModel,
+    SimpleFeedForwardMXNetModel,
     SimpleFeedForwardModel,
-    SimpleFeedForwardPyTorchModel,
-    TemporalFusionTransformerModel,
-    TransformerModel,
+    TemporalFusionTransformerMXNetModel,
+    TransformerMXNetModel,
 )
 from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel
 from .statsmodels import ARIMAModel, ETSModel, ThetaModel
@@ -25,15 +25,15 @@ logger = logging.getLogger(__name__)
 
 
 MODEL_TYPES = dict(
-    MQCNN=MQCNNModel,
-    MQRNN=MQRNNModel,
-    SimpleFeedForward=SimpleFeedForwardModel,
-    SimpleFeedForwardPyTorch=SimpleFeedForwardPyTorchModel,
-    DeepAR=DeepARModel,
-    DeepARPyTorch=DeepARPyTorchModel,
+    MQCNN=MQCNNMXNetModel,
+    MQRNN=MQRNNMXNetModel,
+    SimpleFeedForward=SimpleFeedForwardMXNetModel,
+    SimpleFeedForwardPyTorch=SimpleFeedForwardModel,
+    DeepAR=DeepARMXNetModel,
+    DeepARPyTorch=DeepARModel,
     Prophet=ProphetModel,
-    Transformer=TransformerModel,
-    TemporalFusionTransformer=TemporalFusionTransformerModel,
+    Transformer=TransformerMXNetModel,
+    TemporalFusionTransformer=TemporalFusionTransformerMXNetModel,
     SktimeARIMA=SktimeARIMAModel,
     SktimeAutoARIMA=SktimeAutoARIMAModel,
     SktimeAutoETS=SktimeAutoETSModel,

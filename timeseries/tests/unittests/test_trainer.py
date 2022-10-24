@@ -13,10 +13,10 @@ from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
-from autogluon.timeseries.models import DeepARModel
+from autogluon.timeseries.models import DeepARMXNetModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesEnsembleWrapper
 from autogluon.timeseries.models.gluonts import GenericGluonTSMXNetModel
-from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSModelFactory
+from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSMXNetModelFactory
 from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
 from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
@@ -272,11 +272,11 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
     [
-        ({DeepARModel: {"epochs": 1}}, 1),
+        ({DeepARMXNetModel: {"epochs": 1}}, 1),
         (
             {
-                GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                DeepARModel: {"epochs": 1},
+                GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                DeepARMXNetModel: {"epochs": 1},
             },
             2,
         ),
@@ -302,12 +302,12 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
 @pytest.mark.parametrize(
     "hyperparameter_list, expected_number_of_unique_names, expected_suffixes",
     [
-        ([{DeepARModel: {"epochs": 1}}], 1, []),
+        ([{DeepARMXNetModel: {"epochs": 1}}], 1, []),
         (
             [
                 {
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
                 }
             ],
             2,
@@ -315,8 +315,8 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
         ),
         (
             [
-                {DeepARModel: {"epochs": 1}},
-                {DeepARModel: {"epochs": 1}},
+                {DeepARMXNetModel: {"epochs": 1}},
+                {DeepARMXNetModel: {"epochs": 1}},
             ],
             2,
             ["AR_2"],
@@ -324,9 +324,9 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
         (
             [
                 {
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
                 }
             ],
             3,
@@ -334,20 +334,20 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
         ),
         (
             [
-                {DeepARModel: {"epochs": 1}},
-                {DeepARModel: {"epochs": 1}},
-                {DeepARModel: {"epochs": 1}},
+                {DeepARMXNetModel: {"epochs": 1}},
+                {DeepARMXNetModel: {"epochs": 1}},
+                {DeepARMXNetModel: {"epochs": 1}},
             ],
             3,
             ["AR_2", "AR_3"],
         ),
         (
             [
-                {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1}},
-                {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1}},
+                {GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1}},
+                {GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1}},
                 {
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
                 },
             ],
             4,
@@ -356,13 +356,13 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
         (
             [
                 {
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
                 },
                 {
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
                 },
             ],
             5,
@@ -371,9 +371,9 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
         (
             [
                 {
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator, name="MQRNN_2"): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator, name="MQRNN_2"): {"epochs": 1},
                 },
             ],
             3,
@@ -382,17 +382,17 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
         (
             [
                 {
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
                 },
                 {
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator, name="MQRNN_2"): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator, name="MQRNN_2"): {"epochs": 1},
                 },
                 {
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator, name="MQRNN_2"): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator, name="MQRNN_2"): {"epochs": 1},
                 },
             ],
             7,
@@ -434,14 +434,14 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
     "hyperparameters",
     [
         {
-            GenericGluonTSModelFactory(MQRNNEstimator): {
+            GenericGluonTSMXNetModelFactory(MQRNNEstimator): {
                 "context_length": 4,
                 "epochs": 1,
             },
             "SimpleFeedForward": {"epochs": 1},
         },
         {
-            GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+            GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
             "DeepAR": {"epochs": 1},
         },
     ],
@@ -457,7 +457,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_model_templates_ca
     for model in models:
         if isinstance(model, GenericGluonTSMXNetModel):
             model_hyperparam = next(
-                hyperparameters[m] for m in hyperparameters if isinstance(m, GenericGluonTSModelFactory)
+                hyperparameters[m] for m in hyperparameters if isinstance(m, GenericGluonTSMXNetModelFactory)
             )
         else:
             model_hyperparam = hyperparameters[model.name]
@@ -477,7 +477,7 @@ def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_
     hyperparameter_tune_kwargs,
     expected_num_trained_models,
 ):
-    hyperparameters = {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": ag.Int(1, 4)}}
+    hyperparameters = {GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": ag.Int(1, 4)}}
     # mock the default hps factory to prevent preset hyperparameter configurations from
     # creeping into the test case
     with mock.patch("autogluon.timeseries.models.presets.get_default_hps") as default_hps_mock:
