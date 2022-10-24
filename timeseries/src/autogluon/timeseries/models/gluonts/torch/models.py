@@ -2,6 +2,7 @@
 Module including wrappers for PyTorch implementations of models in GluonTS
 """
 import logging
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type
 
@@ -18,6 +19,7 @@ from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPy
 from gluonts.torch.model.forecast import DistributionForecast, Forecast
 from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPredictor
 from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
+from pytorch_lightning.callbacks import Timer
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.hpo.constants import CUSTOM_BACKEND
@@ -25,8 +27,6 @@ from autogluon.core.utils import warning_filter
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel, SimpleGluonTSDataset
 from autogluon.timeseries.utils.warning_filters import disable_root_logger
-
-from .callback import PLTimeLimitCallback
 
 # FIXME: introduces cpflows dependency. We exclude this model until a future release.
 # from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
@@ -104,7 +104,8 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
         # TODO: reintroduce early stopping callbacks
 
         # update auxiliary parameters
-        self._deferred_init_params_aux(dataset=train_data, callbacks=[PLTimeLimitCallback(time_limit)], **kwargs)
+        callbacks = [Timer(timedelta(seconds=time_limit))] if time_limit is not None else []
+        self._deferred_init_params_aux(dataset=train_data, callbacks=callbacks, **kwargs)
 
         estimator = self._get_estimator()
         with warning_filter(), disable_root_logger():
