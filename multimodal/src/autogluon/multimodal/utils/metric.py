@@ -13,9 +13,11 @@ from ..constants import (
     AVERAGE_PRECISION,
     BINARY,
     F1,
+    MAP,
     METRIC_MODE_MAP,
     MULTICLASS,
     NER,
+    OBJECT_DETECTION,
     OVERALL_ACCURACY,
     REGRESSION,
     RMSE,
@@ -31,6 +33,7 @@ logger = logging.getLogger(AUTOMM)
 
 def infer_metrics(
     problem_type: Optional[str] = None,
+    pipeline: Optional[str] = None,
     eval_metric_name: Optional[str] = None,
 ):
     """
@@ -42,6 +45,8 @@ def infer_metrics(
     ----------
     problem_type
         Type of problem.
+    pipeline
+        Predictor pipeline, used when problem_type is None.
     eval_metric_name
         Name of evaluation metric provided by users.
 
@@ -80,6 +85,11 @@ def infer_metrics(
         eval_metric_name = ROC_AUC
     elif problem_type == REGRESSION:
         eval_metric_name = RMSE
+    elif problem_type is None:
+        if pipeline == OBJECT_DETECTION:
+            eval_metric_name = MAP
+        else:
+            raise NotImplementedError(f"Problem type: {problem_type}, pipeline: {pipeline} is not supported yet!")
     else:
         raise NotImplementedError(f"Problem type: {problem_type} is not supported yet!")
 
@@ -88,7 +98,9 @@ def infer_metrics(
     return validation_metric_name, eval_metric_name
 
 
-def get_minmax_mode(metric_name: str):
+def get_minmax_mode(
+    metric_name: str,
+):
     """
     Get minmax mode based on metric name
 
