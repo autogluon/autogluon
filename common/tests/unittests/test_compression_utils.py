@@ -1,7 +1,3 @@
-import gzip
-import bz2
-import lzma
-
 from autogluon.common.utils import compression_utils
 
 

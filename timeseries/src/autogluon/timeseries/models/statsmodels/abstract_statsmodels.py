@@ -13,6 +13,7 @@ from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
+from autogluon.timeseries.utils.warning_filters import statsmodels_joblib_warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -168,9 +169,10 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
         fit_fn = partial(
             self._fit_local_model, sm_model_fit_args=sm_model_fit_args, sm_model_init_args=sm_model_init_args
         )
-        fitted_models = Parallel(n_jobs=self.n_jobs)(delayed(fit_fn)(timeseries=ts) for ts in timeseries_to_fit)
-        for item_id, model in zip(items_to_fit, fitted_models):
-            self._fitted_models[train_hash.loc[item_id]] = model
+        with statsmodels_joblib_warning_filter():
+            fitted_models = Parallel(n_jobs=self.n_jobs)(delayed(fit_fn)(timeseries=ts) for ts in timeseries_to_fit)
+            for item_id, model in zip(items_to_fit, fitted_models):
+                self._fitted_models[train_hash.loc[item_id]] = model
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
         self._check_predict_inputs(data, quantile_levels=quantile_levels, **kwargs)

@@ -44,8 +44,9 @@ def map_id_content(ids, contents):
 dataset = ir_datasets.load("beir/fiqa/dev")
 
 # Prepare dataset
-docs_df = pd.DataFrame(dataset.docs_iter())
-queries_df = pd.DataFrame(dataset.queries_iter())
+# Sample dataset with frac=0.2 for demo
+docs_df = pd.DataFrame(dataset.docs_iter()).sample(frac=0.2, random_state=42)
+queries_df = pd.DataFrame(dataset.queries_iter()).sample(frac=0.2, random_state=42)
 docs_text = docs_df["text"].tolist()
 docs_id = docs_df["doc_id"].tolist()
 queries_text = queries_df["text"].tolist()
@@ -218,7 +219,7 @@ qrel_dict = get_qrels(dataset)
 evaluate_bm25(docs_text, queries_text, docs_id, queries_id, qrel_dict, 10)
 ```
 
-The `NDCG@10` when using BM25 is 0.2231.
+The `NDCG@10` when using BM25 is 0.07008.
 
 ### 5. Use Sementic Embedding
 
@@ -312,7 +313,7 @@ docs_embeddings = docs_embeddings if isinstance(docs_embeddings, torch.Tensor) e
 evaluate_semantic_embedding(docs_embeddings, queries_embeddings, docs_id, queries_id, qrel_dict, 10)
 ```
 
-The `NDCG@10` when using semantic embedding is 0.38061. There is already a significant improvement over the `NDCG@10` when we used BM25 as the scoring function.
+The `NDCG@10` when using semantic embedding is 0.09343. There is already a significant improvement over the `NDCG@10` when we used BM25 as the scoring function.
 
 ### 6. Hybrid BM25
 
@@ -378,7 +379,7 @@ top_k = 10
 evaluate_hybridBM25(recall_num, beta, top_k)
 ```
 
-We were able to improve the `NDCG@10` score from 0.38061 to 0.38439 by tuning `beta` and `recall_num`.
+We were able to improve the `NDCG@10` score from 0.09343 to 0.10809 by tuning `beta` and `recall_num`.
 
 #### 7. Summary
 

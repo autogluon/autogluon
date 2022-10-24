@@ -22,6 +22,7 @@ try:
     from mmcv.parallel import DataContainer
     from mmcv.parallel import collate
 except ImportError:
+
     class DataContainer:
         """A container for any type of objects.
         Typically tensors will be stacked in the collate function and sliced along
@@ -167,4 +168,3 @@ class CollateMMCV():
         self.samples_per_gpu = samples_per_gpu
     def __call__(self, x):
         return collate(x, samples_per_gpu=self.samples_per_gpu)
-

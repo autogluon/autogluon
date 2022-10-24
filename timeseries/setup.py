@@ -28,9 +28,10 @@ install_requires = [
     "scipy",
     "pandas",
     "psutil>=5.7.3,<5.9",
-    "gluonts>=0.8.0,<0.10.0",
+    "gluonts~=0.11.0",
     f"autogluon.core=={version}",
     f"autogluon.common=={version}",
+    f"autogluon.tabular=={version}",
 ]
 
 try:

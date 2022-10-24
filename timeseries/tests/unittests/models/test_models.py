@@ -18,12 +18,15 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.gluonts import GenericGluonTSModel
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
+from .test_autogluon_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
 from .test_statsmodels import TESTABLE_MODELS as STATSMODELS_TESTABLE_MODELS
 
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
-TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS + STATSMODELS_TESTABLE_MODELS
+TESTABLE_MODELS = (
+    GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS + STATSMODELS_TESTABLE_MODELS + TABULAR_TESTABLE_MODELS
+)
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
 
 
@@ -37,7 +40,7 @@ def trained_models():
             path=temp_model_path + os.path.sep,
             freq="H",
             prediction_length=prediction_length,
-            hyperparameters={"epochs": 1},
+            hyperparameters={"epochs": 1, "maxiter": 1},
         )
 
         model.fit(train_data=DUMMY_TS_DATAFRAME)
@@ -107,22 +110,20 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         freq="H",
         quantile_levels=[0.1, 0.9],
         hyperparameters={
-            "epochs": ag.Int(3, 4),
+            "epochs": ag.Int(1, 3),
         },
     )
+    num_trials = 2
 
-    hyperparameter_tune_kwargs = "auto"
-
-    models, results = model.hyperparameter_tune(
-        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+    hpo_results, _ = model.hyperparameter_tune(
+        hyperparameter_tune_kwargs={"num_trials": num_trials, "scheduler": "local", "searcher": "random"},
         time_limit=100,
         train_data=DUMMY_TS_DATAFRAME,
         val_data=DUMMY_TS_DATAFRAME,
     )
-
-    assert len(results["config_history"]) == 2
-    assert results["config_history"][0]["epochs"] == 3
-    assert results["config_history"][1]["epochs"] == 4
+    assert len(hpo_results) == num_trials
+    for result in hpo_results.values():
+        assert 1 <= result["hyperparameters"]["epochs"] <= 3
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -170,6 +171,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         quantile_levels=quantile_levels,
         hyperparameters={
             "epochs": 1,
+            "maxiter": 1,
         },
     )
     # TFT cannot handle arbitrary quantiles
@@ -193,8 +195,6 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
 ):
     train_data = DUMMY_TS_DATAFRAME
     model = trained_models[(prediction_length, repr(model_class))]
-
-    model.fit(train_data=train_data)
 
     predictions = model.predict(train_data)
 

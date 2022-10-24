@@ -49,6 +49,9 @@ extras_require = {
 
 tests_require = [
     'pytest',
+    'types-requests',
+    'types-setuptools',
+    'pytest-mypy',
     # TODO(Re-enable ray_lightning once it released 0.3.0) 'ray_lightning>=0.2.0,<0.3.0'
 ]
 

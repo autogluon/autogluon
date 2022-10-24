@@ -1,4 +1,3 @@
-import copy
 import logging
 import re
 from pathlib import Path
@@ -7,13 +6,14 @@ from typing import Any, Dict, Iterator, List, Optional, Type
 import gluonts
 import numpy as np
 import pandas as pd
+from gluonts.core.settings import let
 from gluonts.dataset.common import Dataset as GluonTSDataset
-from gluonts.env import env as gluonts_env
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.utils import warning_filter
 from autogluon.core.utils.savers import save_pkl
 
@@ -25,7 +25,6 @@ from .callback import GluonTSEarlyStoppingCallback, TimeLimitCallback
 
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
-gluonts_env.use_tqdm = False
 
 
 class SimpleGluonTSDataset(GluonTSDataset):
@@ -56,7 +55,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             yield {
                 "item_id": j,
                 "target": df[self.target_field_name].to_numpy(dtype=np.float64),
-                "start": pd.Timestamp(df.index[0], freq=self.freq),
+                "start": pd.Period(df.index[0], freq=self.freq),
             }
 
 
@@ -209,7 +208,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self._deferred_init_params_aux(dataset=train_data, callbacks=callbacks, **kwargs)
 
         estimator = self._get_estimator()
-        with warning_filter(), disable_root_logger():
+        with warning_filter(), disable_root_logger(), let(gluonts.env.env, use_tqdm=False):
             self.gts_predictor = estimator.train(
                 self._to_gluonts_dataset(train_data),
                 validation_data=self._to_gluonts_dataset(val_data),
@@ -226,7 +225,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         )
         input_index_type = type(data.index.levels[0][0])
 
-        with warning_filter():
+        with warning_filter(), let(gluonts.env.env, use_tqdm=False):
             quantiles = quantile_levels or self.quantile_levels
             if not all(0 < q < 1 for q in quantiles):
                 raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
@@ -261,57 +260,55 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         return list(self.gts_predictor.predict(**predictor_kwargs))
 
+    @staticmethod
+    def _sample_to_quantile_forecast(forecast: SampleForecast, quantile_levels: List[float]) -> QuantileForecast:
+        forecast_arrays = []
+
+        quantile_keys = [str(q) for q in quantile_levels]
+        for q in quantile_keys:
+            forecast_arrays.append(forecast.quantile(q))
+
+        forecast_init_args = dict(
+            forecast_arrays=np.array(forecast_arrays),
+            start_date=forecast.start_date,
+            forecast_keys=quantile_keys,
+            item_id=forecast.item_id,
+        )
+        if isinstance(forecast.start_date, pd.Timestamp):  # GluonTS version is <0.10
+            forecast_init_args.update({"freq": forecast.freq})
+        return QuantileForecast(**forecast_init_args)
+
     def _gluonts_forecasts_to_data_frame(
         self, forecasts: List[Forecast], quantile_levels: List[float]
     ) -> TimeSeriesDataFrame:
-        # if predictions are gluonts SampleForecasts, convert them to quantile forecasts
-        # but save the means
-        forecast_means = []
-        quantiles = [str(q) for q in quantile_levels]
+        forecast_means = [f.mean for f in forecasts]
 
+        # if predictions are gluonts SampleForecasts, convert to quantile forecasts
         if isinstance(forecasts[0], SampleForecast):
-            transformed_targets = []
-            for forecast in forecasts:
-                tmp = []
-                for quantile in quantiles:
-                    tmp.append(forecast.quantile(quantile))
-                transformed_targets.append(
-                    QuantileForecast(
-                        forecast_arrays=np.array(tmp),
-                        start_date=forecast.start_date,
-                        freq=forecast.freq,
-                        forecast_keys=quantiles,
-                        item_id=forecast.item_id,
-                    )
-                )
-                forecast_means.append(forecast.mean)
-
-            forecasts = copy.deepcopy(transformed_targets)
+            forecasts = [self._sample_to_quantile_forecast(f, quantile_levels) for f in forecasts]
 
         # sanity check to ensure all quantiles are accounted for
-        assert all(q in forecasts[0].forecast_keys for q in quantiles), (
+        assert all(str(q) in forecasts[0].forecast_keys for q in quantile_levels), (
             "Some forecast quantiles are missing from GluonTS forecast outputs. Was"
             " the model trained to forecast all quantiles?"
         )
-        result_dfs = []
-        item_ids = (d.item_id for d in forecasts)
 
-        for i, item_id in enumerate(item_ids):
-            item_forecast_dict = dict(
-                mean=forecast_means[i]
-                if forecast_means
-                else (forecasts[i].quantile(0.5))  # assign P50 to mean if mean is missing
-            )
-            for quantile in quantiles:
-                item_forecast_dict[quantile] = forecasts[i].quantile(str(quantile))
+        result_dfs = []
+        for i, forecast in enumerate(forecasts):
+            item_forecast_dict = dict(mean=forecast_means[i])
+            for quantile in quantile_levels:
+                item_forecast_dict[str(quantile)] = forecast.quantile(str(quantile))
 
             df = pd.DataFrame(item_forecast_dict)
-            df[ITEMID] = item_id
+            df[ITEMID] = forecast.item_id
             df[TIMESTAMP] = pd.date_range(
-                start=forecasts[i].start_date,
+                start=forecasts[i].start_date.to_timestamp(how="S"),
                 periods=self.prediction_length,
                 freq=self.freq,
             )
             result_dfs.append(df)
 
         return TimeSeriesDataFrame.from_data_frame(pd.concat(result_dfs))
+
+    def _get_hpo_backend(self):
+        return RAY_BACKEND

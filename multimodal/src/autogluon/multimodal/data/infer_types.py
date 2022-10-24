@@ -561,7 +561,7 @@ def infer_problem_type_output_shape(
                 for annotation in data[label_column].iteritems()
                 for annot in json.loads(annotation[-1])
             ]
-            return provided_problem_type, len(set(unique_entity_groups))
+            return provided_problem_type, len(set(unique_entity_groups)) + 2
         else:
             raise ValueError(
                 f"Problem type '{provided_problem_type}' doesn't have a valid output shape "

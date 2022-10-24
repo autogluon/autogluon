@@ -8,7 +8,7 @@ from autogluon.common.utils.utils import setup_outputdir
 class SetupOutputDirTestCase(unittest.TestCase):
     def test(self):
         # checks that setup_outputdir raises when incorrect type is given
-        with self.assertRaises(Exception) as context:
+        with self.assertRaises(Exception):
             path = 2.2
             setup_outputdir(path, warn_if_exist=True, create_dir=False, path_suffix=None)
 

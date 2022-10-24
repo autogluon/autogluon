@@ -1,8 +1,11 @@
-import os, boto3, logging
+import boto3
+import logging
+import os
 
 from ..utils import s3_utils
 
 logger = logging.getLogger(__name__)
+
 
 def get_pointer_content(path, verbose=True):
     if s3_utils.is_s3_url(path):
@@ -16,6 +19,6 @@ def get_pointer_content(path, verbose=True):
         content_path = f.read()
         f.close()
     if verbose:
-        logger.log(15, 'Loaded pointer file '+str(path)+' pointing to '+str(content_path))
+        logger.log(15, 'Loaded pointer file ' + str(path) + ' pointing to ' + str(content_path))
 
     return content_path

@@ -33,7 +33,7 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
                     if os.path.isdir(path):
                         raise FileExistsError
                     break
-            except FileExistsError as e:
+            except FileExistsError:
                 path = f"AutogluonModels/ag-{timestamp}-{i:03d}{path_suffix}{os.path.sep}"
         else:
             raise RuntimeError("more than 1000 jobs launched in the same second")
@@ -44,7 +44,7 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
                 os.makedirs(path, exist_ok=False)
             elif os.path.isdir(path):
                 raise FileExistsError
-        except FileExistsError as e:
+        except FileExistsError:
             logger.warning(f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"')
     path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
     if path[-1] != os.path.sep:
@@ -62,7 +62,7 @@ def get_python_version(include_micro=True) -> str:
 def get_package_versions() -> Dict[str, str]:
     """Gets a dictionary of package name -> package version for every package installed in the environment"""
     import pkg_resources
-    package_dict = pkg_resources.working_set.by_key
+    package_dict = pkg_resources.working_set.by_key  # type: ignore
     package_version_dict = {key: val.version for key, val in package_dict.items()}
     return package_version_dict
 

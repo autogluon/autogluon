@@ -427,18 +427,19 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         ):
             default_num_trials = 10
 
+        tuning_start_time = time.time()
         with disable_tqdm():
-            hpo_models, hpo_results = model.hyperparameter_tune(
+            hpo_models, _ = model.hyperparameter_tune(
                 train_data=train_data,
                 val_data=val_data,
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 time_limit=time_limit,
                 default_num_trials=default_num_trials,
             )
+        total_tuning_time = time.time() - tuning_start_time
 
-        self.hpo_results[model.name] = hpo_results
+        self.hpo_results[model.name] = hpo_models
         model_names_trained = []
-        # TODO: Does this code still work if all model configurations failed?
         # add each of the trained HPO configurations to the trained models
         for model_hpo_name, model_info in hpo_models.items():
             model_path = model_info["path"]
@@ -450,18 +451,21 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         logger.info(f"\tTrained {len(model_names_trained)} models while tuning {model.name}.")
 
-        # TODO: log result for ray backend
-        if hpo_results and isinstance(hpo_results, dict):
+        if len(model_names_trained) > 0:
             if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
                 sign_str = "-"
             else:
                 sign_str = ""
+
+            trained_model_results = [hpo_models[model_name] for model_name in model_names_trained]
+            best_model_result = max(trained_model_results, key=lambda x: x["val_score"])
+
             logger.info(
-                f"\t{hpo_results.get('best_reward'):<7.4f}".ljust(15)
+                f"\t{best_model_result['val_score']:<7.4f}".ljust(15)
                 + f"= Validation score ({sign_str}{self.eval_metric})"
             )
-            logger.info(f"\t{hpo_results.get('total_time'):<7.2f} s".ljust(15) + "= Total tuning time")
-            logger.debug(f"\tBest hyperparameter configuration: {hpo_results.get('best_config')}")
+            logger.info(f"\t{total_tuning_time:<7.2f} s".ljust(15) + "= Total tuning time")
+            logger.debug(f"\tBest hyperparameter configuration: {best_model_result['hyperparameters']}")
 
         return model_names_trained
 

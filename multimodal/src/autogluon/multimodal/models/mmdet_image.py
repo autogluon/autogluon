@@ -141,6 +141,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
     def dump_config(self, path):
         self.config.dump(path)
 
+        self.name_to_id = self.get_layer_ids()
+
     @property
     def image_key(self):
         return f"{self.prefix}_{IMAGE}"

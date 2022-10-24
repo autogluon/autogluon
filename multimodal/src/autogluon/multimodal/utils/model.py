@@ -129,7 +129,7 @@ def select_model(
 def create_model(
     model_name: str,
     model_config: DictConfig,
-    num_classes: Optional[int] = None,
+    num_classes: Optional[int] = 0,
     num_numerical_columns: Optional[int] = None,
     num_categories: Optional[List[int]] = None,
     pretrained: Optional[bool] = True,
