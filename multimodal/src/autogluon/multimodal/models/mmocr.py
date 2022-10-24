@@ -6,13 +6,19 @@ try:
     from mmcv.parallel import collate, scatter
 except ImportError:
     mmcv = None
+
 try:
+    from mmocr.datasets.pipelines.crop import crop_img
     from mmocr.utils.model import revert_sync_batchnorm
 except ImportError:
     mmocr = None
-from mmdet.datasets import replace_ImageToTensor
-from mmdet.datasets.pipelines import Compose
-from mmocr.datasets.pipelines.crop import crop_img
+
+try:
+    from mmdet.datasets import replace_ImageToTensor
+    from mmdet.datasets.pipelines import Compose
+except ImportError:
+    mmdet = None
+
 from torch import nn
 
 from ..constants import (
@@ -42,12 +48,12 @@ class MMOCRAutoModel(nn.Module):
 
     def __init__(self, prefix: str, det_ckpt_name: str, recog_ckpt_name: str, kie_ckpt_name: str):
         """
-        Load a pretrained ocr text detection detector from MMOCR.
+        Load a pretrained ocr text detector from MMOCR.
 
         Parameters
         ----------
         prefix
-            The prefix of the MMdetAutoModel model.
+            The prefix of the MMOCRAutoModel model.
         det_ckpt_name
             Name of the text detection checkpoint.
         recog_ckpt_name
