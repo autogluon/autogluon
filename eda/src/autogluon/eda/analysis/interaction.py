@@ -146,10 +146,14 @@ class NonparametricAssociation(AbstractAnalysis):
     """
 
     def __init__(self,
+                 data = None,
+                 association_cols: list = [],
                  parent: Union[None, AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
                  **kwargs) -> None:
         super().__init__(parent, children, **kwargs)
+        self.association_cols = association_cols
+        self.data = data
 
     @staticmethod
     def custom_kruskal(df, obj_col_name, num_col_name):
@@ -195,17 +199,12 @@ class NonparametricAssociation(AbstractAnalysis):
             return NonparametricAssociation.custom_kruskal(df, object_col[0], numeric_col[0])
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
-        print('hello')
-        print(args)
-        return ('association_cols' in args)
+        return True
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
-        print(args)
-        state.association_tests = {}
-        for (ds, df) in self.available_datasets(args):
-            tests = {}
-            for i, col1 in enumerate(args['association_cols'][:-1]):
-                for col2 in args['association_cols'][i+1:]:
-                    print(ds, col1, col2)
-                    tests[(col1, col2)] = NonparametricAssociation.nonparametric_test(df, col1, col2)
-            state.association_tests[ds] = tests
+        print(self.association_cols)
+        tests = {}
+        for i, col1 in enumerate(self.association_cols[:-1]):
+            for col2 in self.association_cols[i+1:]:
+                tests[(col1, col2)] = NonparametricAssociation.nonparametric_test(self.data, col1, col2)
+        state.association_tests = tests
