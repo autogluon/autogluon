@@ -8,11 +8,7 @@ from .models import (
     TemporalFusionTransformerModel,
     TransformerModel,
 )
-from .pytorch import (
-    DeepARPyTorchModel,
-    SimpleFeedForwardPyTorchModel
-)
-    
+from .pytorch import DeepARPyTorchModel, SimpleFeedForwardPyTorchModel
 
 __all__ = [
     "DeepARModel",

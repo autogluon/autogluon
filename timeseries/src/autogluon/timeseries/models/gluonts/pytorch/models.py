@@ -14,15 +14,16 @@ from gluonts.torch.distributions import AffineTransformed
 from gluonts.torch.distributions.distribution_output import NormalOutput
 from gluonts.torch.model.deepar import DeepAREstimator
 from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
-from gluonts.torch.model.forecast import Forecast, DistributionForecast
+from gluonts.torch.model.forecast import DistributionForecast, Forecast
 from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPredictor
 from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.core.hpo.constants import CUSTOM_BACKEND
 from autogluon.core.utils import warning_filter
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID, TIMESTAMP
-from autogluon.timeseries.utils.warning_filters import disable_root_logger
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel, SimpleGluonTSDataset
+from autogluon.timeseries.utils.warning_filters import disable_root_logger
 
 from .callback import PLTimeLimitCallback
 
@@ -30,7 +31,7 @@ from .callback import PLTimeLimitCallback
 # from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
 
 # FIXME: DeepNPTS does not implement the GluonTS PyTorch API, and does not use
-# PyTorch Ligthning. We exclude this model until a future release. 
+# PyTorch Ligthning. We exclude this model until a future release.
 # from gluonts.torch.model.deep_npts import DeepNPTSEstimator
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,9 @@ pl_loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDic
 
 class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator]
+
+    def _get_hpo_backend(self):
+        return CUSTOM_BACKEND
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         """Get GluonTS specific constructor arguments for estimator objects, an alias to
@@ -122,22 +126,21 @@ class SimpleFeedForwardPyTorchModel(AbstractGluonTSPyTorchModel):
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
-        init_kwargs.update(dict(
-            distr_output=NormalOutput()
-        ))
+        init_kwargs.update(dict(distr_output=NormalOutput()))
         return init_kwargs
 
     def _to_gluonts_dataset(self, time_series_df: Optional[TimeSeriesDataFrame]) -> Optional[GluonTSDataset]:
         return (
-            SimpleGluonTSDataset(time_series_df, target_field_name=self.target, float_dtype=np.float32) 
-            if time_series_df is not None else None
+            SimpleGluonTSDataset(time_series_df, target_field_name=self.target, float_dtype=np.float32)
+            if time_series_df is not None
+            else None
         )
-    
+
     def _gluonts_forecasts_to_data_frame(
         self, forecasts: List[Forecast], quantile_levels: List[float]
     ) -> TimeSeriesDataFrame:
         assert isinstance(forecasts[0], DistributionForecast)
-       
+
         result_dfs = []
         for i, forecast in enumerate(forecasts):
             item_forecast_dict = dict(mean=forecast.mean)
@@ -146,8 +149,10 @@ class SimpleFeedForwardPyTorchModel(AbstractGluonTSPyTorchModel):
                 # torch AffineTransformed
                 fdist = forecast.distribution
                 q_transformed = (
-                    fdist.scale * fdist.base_dist.icdf(torch.Tensor(quantile_levels).unsqueeze(1)) + fdist.loc
-                ).numpy().tolist()
+                    (fdist.scale * fdist.base_dist.icdf(torch.Tensor(quantile_levels).unsqueeze(1)) + fdist.loc)
+                    .numpy()
+                    .tolist()
+                )
                 for ix, quantile in enumerate(quantile_levels):
                     item_forecast_dict[str(quantile)] = q_transformed[ix]
             else:

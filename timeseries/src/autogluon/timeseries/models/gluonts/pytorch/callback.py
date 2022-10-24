@@ -13,7 +13,9 @@ class PLTimeLimitCallback(pl.callbacks.Callback):
     is reached."""
 
     def __init__(self, time_limit=None):
-        self.start_time = None
+        # in Ray experiments the callback was sometimes initialized and model trained
+        # without calling the on_trained_start hook. we therefore initialize to current time.
+        self.start_time = time.time()
         self.time_limit = time_limit
 
     def on_train_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
