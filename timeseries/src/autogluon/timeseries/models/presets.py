@@ -8,13 +8,13 @@ from .abstract import AbstractTimeSeriesModel
 from .abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 from .autogluon_tabular import AutoGluonTabularModel
 from .gluonts import (
+    DeepARModel,
     DeepARMXNetModel,
-    DeepARModel, 
     MQCNNMXNetModel,
     MQRNNMXNetModel,
     ProphetModel,
-    SimpleFeedForwardMXNetModel,
     SimpleFeedForwardModel,
+    SimpleFeedForwardMXNetModel,
     TemporalFusionTransformerMXNetModel,
     TransformerMXNetModel,
 )

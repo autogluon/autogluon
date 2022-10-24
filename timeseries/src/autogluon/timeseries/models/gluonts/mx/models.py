@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import List, Type, Optional
+from typing import List, Optional, Type
 
 import gluonts
 import mxnet as mx
@@ -26,6 +26,7 @@ from .callback import GluonTSEarlyStoppingCallback, TimeLimitCallback
 
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
+
 
 class AbstractGluonTSMXNetModel(AbstractGluonTSModel):
     def _fit(
@@ -62,6 +63,7 @@ class AbstractGluonTSMXNetModel(AbstractGluonTSModel):
                 self._to_gluonts_dataset(train_data),
                 validation_data=self._to_gluonts_dataset(val_data),
             )
+
 
 class DeepARMXNetModel(AbstractGluonTSMXNetModel):
     """DeepAR model from GluonTS.

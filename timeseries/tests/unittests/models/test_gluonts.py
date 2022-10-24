@@ -9,13 +9,13 @@ from gluonts.mx.model.transformer import TransformerEstimator
 
 import autogluon.core as ag
 from autogluon.timeseries.models.gluonts import (  # MQRNNModel,; TransformerModel,
-    DeepARMXNetModel,
     DeepARModel,
+    DeepARMXNetModel,
     GenericGluonTSMXNetModel,
     MQCNNMXNetModel,
     ProphetModel,
-    SimpleFeedForwardMXNetModel,
     SimpleFeedForwardModel,
+    SimpleFeedForwardMXNetModel,
     TemporalFusionTransformerMXNetModel,
 )
 from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSMXNetModelFactory
