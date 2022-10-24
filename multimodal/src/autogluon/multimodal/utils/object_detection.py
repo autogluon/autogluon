@@ -530,6 +530,7 @@ class COCODataset:
             print(f"saving file at {save_path}")
             json.dump(coco_format_result, f)
 
+
 def cocoeval_torchmetrics(outputs):
     from . import MeanAveragePrecision
     import torch
@@ -599,6 +600,7 @@ def cocoeval_pycocotools(outputs, data, anno_file, cache_path, metrics):
         metrics = metrics[0]
 
     return {metrics: cocoEval.stats[0]}
+
 
 def cocoeval(outputs, data, anno_file, cache_path, metrics, tool="pycocotools"):
     if tool == "pycocotools":

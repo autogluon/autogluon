@@ -163,8 +163,10 @@ def datacontainer_to_cuda(container, device: Union[str, torch.device]):
                     type: {type(container.data[idx])}"
                 container._data[idx] = container.data[idx].to(device)
 
-class CollateMMCV():
+
+class CollateMMCV:
     def __init__(self, samples_per_gpu):
         self.samples_per_gpu = samples_per_gpu
+
     def __call__(self, x):
         return collate(x, samples_per_gpu=self.samples_per_gpu)

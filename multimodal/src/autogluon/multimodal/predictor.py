@@ -1465,7 +1465,10 @@ class MultiModalPredictor:
                 **optimization_kwargs,
             )
         elif self._pipeline == OBJECT_DETECTION:
-            task = MMDetLitModule(model=self._model, **optimization_kwargs,)
+            task = MMDetLitModule(
+                model=self._model,
+                **optimization_kwargs,
+            )
         else:
             task = LitModule(
                 model=self._model,
@@ -1592,7 +1595,9 @@ class MultiModalPredictor:
         self._save_path = os.path.abspath(os.path.expanduser(self._save_path))
         cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
 
-        return cocoeval(outputs=outputs, data=data, anno_file=anno_file, cache_path=cache_path, metrics=metrics, tool="pycocotools")
+        return cocoeval(
+            outputs=outputs, data=data, anno_file=anno_file, cache_path=cache_path, metrics=metrics, tool="pycocotools"
+        )
 
     def _process_batch(
         self,

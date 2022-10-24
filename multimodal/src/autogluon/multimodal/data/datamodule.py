@@ -84,7 +84,9 @@ class BaseDataModule(LightningDataModule):
             preprocessor=self.df_preprocessor,
             processors=self.data_processors,
             id_mappings=self.id_mappings,
-            is_training=(split in [TRAIN, VAL]), # TODO: This change for object detection only, need to change before PR
+            is_training=(
+                split in [TRAIN, VAL]
+            ),  # TODO: This change for object detection only, need to change before PR
         )
 
         setattr(self, f"{split}_dataset", dataset)

@@ -178,8 +178,9 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         -------
             A dictionary with bounding boxes.
         """
-        raise NotImplementedError("MMDetAutoModelForObjectDetection.forward() is deprecated since "
-                                 "it does not support multi gpu.")
+        raise NotImplementedError(
+            "MMDetAutoModelForObjectDetection.forward() is deprecated since " "it does not support multi gpu."
+        )
 
         data = batch[self.image_key]
 

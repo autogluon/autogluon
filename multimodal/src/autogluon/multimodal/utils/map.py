@@ -216,10 +216,10 @@ class MeanAveragePrecision(Metric):
         max_det_thr, _ = torch.sort(IntTensor(max_detection_thresholds or [1, 10, 100]))
         self.max_detection_thresholds = max_det_thr.tolist()
         self.bbox_area_ranges = {
-            "all": (0**2, int(1e5**2)),
-            "small": (0**2, 32**2),
-            "medium": (32**2, 96**2),
-            "large": (96**2, int(1e5**2)),
+            "all": (0 ** 2, int(1e5 ** 2)),
+            "small": (0 ** 2, 32 ** 2),
+            "medium": (32 ** 2, 96 ** 2),
+            "large": (96 ** 2, int(1e5 ** 2)),
         }
 
         if not isinstance(class_metrics, bool):
@@ -354,7 +354,13 @@ class MeanAveragePrecision(Metric):
         }
 
     def __evaluate_image_preds_no_gt(
-        self, det: Tensor, idx: int, det_label_mask: Tensor, max_det: int, area_range: Tuple[int, int], nb_iou_thrs: int
+        self,
+        det: Tensor,
+        idx: int,
+        det_label_mask: Tensor,
+        max_det: int,
+        area_range: Tuple[int, int],
+        nb_iou_thrs: int,
     ) -> Dict[str, Any]:
         """Some predictions but no GT."""
         # GTs

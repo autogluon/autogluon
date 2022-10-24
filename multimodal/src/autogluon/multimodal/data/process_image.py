@@ -65,13 +65,16 @@ from .utils import extract_value_from_config
 logger = logging.getLogger(AUTOMM)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-class CollateMMCV():
+
+class CollateMMCV:
     def __init__(self, samples_per_gpu):
         self.samples_per_gpu = samples_per_gpu
+
     def __call__(self, x):
         ret = collate(x, samples_per_gpu=self.samples_per_gpu)
         # print("collate_size: %s" % len(ret["img_metas"][0]))
         return ret
+
 
 class ImageProcessor:
     """

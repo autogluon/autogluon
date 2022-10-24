@@ -4,7 +4,8 @@ from autogluon.multimodal import MultiModalPredictor
 
 
 def load_and_evaluate(
-    load_path, test_path="/media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_test.json",
+    load_path,
+    test_path="/media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_test.json",
 ):
     predictor = MultiModalPredictor.load(load_path)
 

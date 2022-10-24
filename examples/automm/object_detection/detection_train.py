@@ -69,9 +69,9 @@ def detection_train(
             "optimization.max_epochs": epochs,
             "optimization.top_k": 1,
             "optimization.top_k_average_method": "best",
-            "optimization.warmup_steps": 0.,
+            "optimization.warmup_steps": 0.0,
             "optimization.patience": 40,
-            "env.per_gpu_batch_size": 3, # decrease it when model is large
+            "env.per_gpu_batch_size": 3,  # decrease it when model is large
         },
     )
     fit_end = time.time()

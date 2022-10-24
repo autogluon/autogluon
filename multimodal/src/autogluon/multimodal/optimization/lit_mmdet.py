@@ -79,12 +79,12 @@ class MMDetLitModule(pl.LightningModule):
                 assert not isinstance(m, RoIPool), "CPU inference with RoIPool is not supported currently."
         """
         imgs, img_metas = self._val_batch_to_val(batch)
-        #batch_result = self.model.forward_test(
+        # batch_result = self.model.forward_test(
         #    imgs=imgs,
         #    img_metas=img_metas,
-        #)  # batch_size, 80, (n, 5)
+        # )  # batch_size, 80, (n, 5)
         pred_results = self.model.model(return_loss=False, rescale=True, img=imgs, img_metas=img_metas)
-        #print(pred_results)
+        # print(pred_results)
 
         return pred_results
 
@@ -179,7 +179,6 @@ class MMDetLitModule(pl.LightningModule):
             )
 
         return preds, target
-
 
     def evaluate(self, sample, stage=None):
         """

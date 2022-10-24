@@ -199,9 +199,15 @@ def get_metric(
     elif metric_name == F1:
         return CustomF1Score(num_classes=num_classes, pos_label=pos_label), None
     elif metric_name == MAP:
-        return MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False), None # TODO: remove parameter hardcodings here, and add class_metrics
+        return (
+            MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False),
+            None,
+        )  # TODO: remove parameter hardcodings here, and add class_metrics
     elif metric_name == DIRECT_LOSS:
-        return torchmetrics.MeanMetric(nan_strategy="warn"), None # This only works for detection where custom_metric is not required for BaseAggregator
+        return (
+            torchmetrics.MeanMetric(nan_strategy="warn"),
+            None,
+        )  # This only works for detection where custom_metric is not required for BaseAggregator
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 
@@ -605,7 +611,7 @@ def apply_layerwise_lr_decay(
         group_name = "layer_%d_%s" % (layer_id, group_name)
 
         if group_name not in parameter_group_names:
-            scale = lr_decay**layer_id
+            scale = lr_decay ** layer_id
             parameter_group_names[group_name] = {
                 "weight_decay": this_weight_decay,
                 "params": [],
