@@ -1,11 +1,9 @@
 import logging
 from typing import List, Optional
 
-from mmcv.parallel import collate, scatter
-
 try:
     import mmcv
-    from mmcv.parallel import scatter
+    from mmcv.parallel import collate, scatter
 except ImportError:
     mmcv = None
 try:
