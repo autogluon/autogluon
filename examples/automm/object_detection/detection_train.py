@@ -58,7 +58,7 @@ def detection_train(
         },
         pipeline="object_detection",
         output_shape=num_classes,
-        val_metric=val_metric
+        val_metric=val_metric,
     )
 
     import time
@@ -79,10 +79,8 @@ def detection_train(
     )
     fit_end = time.time()
     print("time usage for fit: %.2f" % (fit_end - start))
-    predictor.save("./temp_test_ag_model")
 
-    if num_gpus == 1 and test_path is not None: # TODO: support multigpu inference
-        predictor = MultiModalPredictor.load("./temp_test_ag_model")
+    if num_gpus == 1 and test_path is not None:  # TODO: support multigpu inference
         print(predictor.evaluate(test_path))
         print("time usage for eval: %.2f" % (time.time() - fit_end))
 
@@ -113,5 +111,5 @@ if __name__ == "__main__":
         epochs=args.epochs,
         num_gpus=args.num_gpus,
         val_metric=args.val_metric,  # "mAP" or "direct_loss" or None (use default: "direct_loss")
-        per_gpu_batch_size=args.per_gpu_batch_size
+        per_gpu_batch_size=args.per_gpu_batch_size,
     )
