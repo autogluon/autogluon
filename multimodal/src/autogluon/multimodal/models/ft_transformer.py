@@ -367,7 +367,7 @@ class AdditiveAttention(nn.Module):
         trainable = []
         if share_qv_weights:
             self.qv_proj = nn.Linear(d_token, d_token, bias=bias)
-            trainable.extend([self.share_qv_weights])
+            trainable.extend([self.qv_proj])
         else:
             self.q_proj = nn.Linear(d_token, d_token, bias=bias)
             self.v_proj = nn.Linear(d_token, d_token, bias=bias)
