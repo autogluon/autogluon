@@ -58,7 +58,6 @@ from ..constants import (
     MMOCR_TEXT_RECOG,
     TIMM_IMAGE,
 )
-from ..utils import CollateMMCV
 from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config, is_rois_input
@@ -206,6 +205,7 @@ class ImageProcessor:
 
         if self.prefix.lower().startswith(MMLAB_MODELS):
             assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+            from ..utils import CollateMMCV
             fn.update(
                 {
                     self.image_key: CollateMMCV(samples_per_gpu=per_gpu_batch_size),
