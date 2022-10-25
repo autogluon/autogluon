@@ -10,7 +10,6 @@ from omegaconf import DictConfig, OmegaConf
 from pytorch_metric_learning import distances, losses, miners
 from torch import nn, optim
 from torch.nn import functional as F
-from ..utils import MeanAveragePrecision
 from transformers import Adafactor
 from transformers.trainer_pt_utils import get_parameter_names
 
@@ -51,6 +50,7 @@ from ..constants import (
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
 )
+from ..utils import MeanAveragePrecision
 from .losses import SoftTargetCrossEntropy
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,

@@ -58,10 +58,10 @@ from ..constants import (
     MMOCR_TEXT_RECOG,
     TIMM_IMAGE,
 )
+from ..utils import CollateMMCV
 from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config, is_rois_input
-from ..utils import CollateMMCV
 
 logger = logging.getLogger(AUTOMM)
 ImageFile.LOAD_TRUNCATED_IMAGES = True

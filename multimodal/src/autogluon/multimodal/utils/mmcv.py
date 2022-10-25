@@ -19,8 +19,7 @@ def assert_tensor_type(func: Callable) -> Callable:
 
 
 try:
-    from mmcv.parallel import DataContainer
-    from mmcv.parallel import collate
+    from mmcv.parallel import DataContainer, collate
 except ImportError:
 
     class DataContainer:

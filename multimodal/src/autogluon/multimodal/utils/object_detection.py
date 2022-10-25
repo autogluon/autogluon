@@ -532,8 +532,9 @@ class COCODataset:
 
 
 def cocoeval_torchmetrics(outputs):
-    from . import MeanAveragePrecision
     import torch
+
+    from . import MeanAveragePrecision
 
     map_metric = MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False)
     for output in outputs:  # TODO: refactor here
@@ -578,8 +579,9 @@ def cocoeval_torchmetrics(outputs):
 def cocoeval_pycocotools(outputs, data, anno_file, cache_path, metrics):
     from pycocotools.coco import COCO
     from pycocotools.cocoeval import COCOeval
-    from . import extract_from_output
+
     from ..constants import BBOX
+    from . import extract_from_output
 
     coco_dataset = COCODataset(anno_file)
 
