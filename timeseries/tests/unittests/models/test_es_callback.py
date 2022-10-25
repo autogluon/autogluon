@@ -95,8 +95,18 @@ def test_early_stopping_patience_used_in_hp(temp_model_path):
             "context_length": 5,
             "early_stopping_patience": patience,
         },
-        "MQCNNMXNet": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5, "early_stopping_patience": patience},
-        "DeepARMXNet": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5, "early_stopping_patience": patience},
+        "MQCNNMXNet": {
+            "epochs": 5,
+            "num_batches_per_epoch": 10,
+            "context_length": 5,
+            "early_stopping_patience": patience,
+        },
+        "DeepARMXNet": {
+            "epochs": 5,
+            "num_batches_per_epoch": 10,
+            "context_length": 5,
+            "early_stopping_patience": patience,
+        },
     }
 
     predictor = TimeSeriesPredictor(path=temp_model_path)
