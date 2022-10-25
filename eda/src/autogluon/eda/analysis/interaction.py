@@ -1,4 +1,4 @@
-from typing import Union, List, Any, Dict
+from typing import Union, List, Any, Dict, Optional
 
 import numpy as np
 from scipy.cluster import hierarchy as hc
@@ -113,6 +113,16 @@ class CorrelationSignificance(AbstractAnalysis):
 
 
 class FeatureDistanceAnalysis(AbstractAnalysis, StateCheckMixin):
+
+    def __init__(self,
+                 near_duplicates_threshold: float = 0.0,
+                 parent: Optional[AbstractAnalysis] = None,
+                 children: List[AbstractAnalysis] = [],
+                 state: Optional[AnalysisState] = None,
+                 **kwargs) -> None:
+        super().__init__(parent, children, state, **kwargs)
+        self.near_duplicates_threshold = near_duplicates_threshold
+
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return self.all_keys_must_be_present(args, 'train_data', 'label', 'feature_generator')
 
@@ -122,8 +132,37 @@ class FeatureDistanceAnalysis(AbstractAnalysis, StateCheckMixin):
         np.fill_diagonal(corr, 1)
         corr_condensed = hc.distance.squareform(1 - np.nan_to_num(corr))
         z = hc.linkage(corr_condensed, method='average')
+        columns = list(x.columns)
         s = {
-            'columns': x.columns,
+            'columns': columns,
             'linkage': z,
+            'near_duplicates_threshold': self.near_duplicates_threshold,
+            'near_duplicates': self.__get_linkage_clusters(z, columns, self.near_duplicates_threshold),
         }
         state['feature_distance'] = s
+
+    @staticmethod
+    def __get_linkage_clusters(linkage, columns, threshold: float):
+        idx_to_col = {i: v for i, v in enumerate(columns)}
+        idx_to_dist = {}
+        clusters = {}
+        for (f1, f2, d, l), i in zip(
+                linkage,
+                np.arange(len(idx_to_col), len(idx_to_col) + len(linkage))
+        ):
+            idx_to_dist[i] = d
+            f1 = int(f1)
+            f2 = int(f2)
+            if d <= threshold:
+                clusters[i] = [*clusters.pop(f1, [f1]), *clusters.pop(f2, [f2])]
+
+        results = []
+        for i, nodes in clusters.items():
+            d = idx_to_dist[i]
+            nodes = [idx_to_col[n] for n in nodes]
+            results.append({
+                'nodes': sorted(nodes),
+                'distance': d,
+            })
+
+        return results
