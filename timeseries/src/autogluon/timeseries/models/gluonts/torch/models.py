@@ -161,7 +161,7 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
                 # FIXME: this is a hack to get around GluonTS not implementing quantiles for
                 # torch AffineTransformed
                 fdist = forecast.distribution
-                quantiles_tensor = torch.Tensor(quantile_levels, device=fdist.scale.device).unsqueeze(1)
+                quantiles_tensor = torch.tensor(quantile_levels, device=fdist.scale.device).unsqueeze(1)
                 q_transformed = (fdist.scale * fdist.base_dist.icdf(quantiles_tensor) + fdist.loc).numpy().tolist()
                 for ix, quantile in enumerate(quantile_levels):
                     item_forecast_dict[str(quantile)] = q_transformed[ix]
