@@ -319,7 +319,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
                 {DeepARMXNetModel: {"epochs": 1}},
             ],
             2,
-            ["AR_2"],
+            ["ARMXNet_2"],
         ),
         (
             [
@@ -339,7 +339,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
                 {DeepARMXNetModel: {"epochs": 1}},
             ],
             3,
-            ["AR_2", "AR_3"],
+            ["ARMXNet_2", "ARMXNet_3"],
         ),
         (
             [
