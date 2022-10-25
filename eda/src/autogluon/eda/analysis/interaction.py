@@ -202,9 +202,26 @@ class NonparametricAssociation(AbstractAnalysis):
         return True
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
-        print(self.association_cols)
         tests = {}
+        n_cols = len(self.association_cols)
+        pval_matrix = np.zeros((n_cols, n_cols))
         for i, col1 in enumerate(self.association_cols[:-1]):
             for col2 in self.association_cols[i+1:]:
                 tests[(col1, col2)] = NonparametricAssociation.nonparametric_test(self.data, col1, col2)
-        state.association_tests = tests
+        for i in range(n_cols):
+            for j in range(n_cols):
+                if i == j:
+                    pval_matrix[i,j] = 1.0
+                    continue
+                if i < j:
+                    col1 = self.association_cols[i]
+                    col2 = self.association_cols[j]
+                else:
+                    col1 = self.association_cols[j]
+                    col2 = self.association_cols[i]
+                pval_matrix[i,j] = tests[(col1, col2)]['pvalue']
+        state.association_pvalue_matrix = pd.DataFrame(pval_matrix,
+                     columns = self.association_cols,
+                     index = self.association_cols)
+        state.association_cols = self.association_cols
+        state.association_tests = sorted(tests.items(), key=lambda x: x[1]['pvalue'])

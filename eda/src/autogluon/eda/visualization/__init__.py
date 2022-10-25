@@ -4,3 +4,4 @@ from .layouts import *
 from .model import *
 from .shift import *
 from .missing import *
+from .interaction import NonparametricSignificanceVisualization
