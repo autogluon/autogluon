@@ -94,7 +94,9 @@ def infer_metrics(
             elif validation_metric_name == MAP:
                 return MAP, MAP
             else:
-                raise ValueError(f"Problem type: {problem_type}, pipeline: {pipeline}, validation_metric_name: {validation_metric_name} is not supported!")
+                raise ValueError(
+                    f"Problem type: {problem_type}, pipeline: {pipeline}, validation_metric_name: {validation_metric_name} is not supported!"
+                )
         else:
             raise NotImplementedError(f"Problem type: {problem_type}, pipeline: {pipeline} is not supported yet!")
     else:
