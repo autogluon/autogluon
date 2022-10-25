@@ -391,6 +391,7 @@ class CloudPredictor(ABC):
         instance_type='ml.m5.2xlarge',
         instance_count=1,
         volume_size=100,
+        custom_image_uri=None,
         wait=True,
         autogluon_sagemaker_estimator_kwargs=dict(),
         **kwargs
@@ -504,6 +505,7 @@ class CloudPredictor(ABC):
             base_job_name="autogluon-cloudpredictor-train",
             output_path=output_path,
             inputs=inputs,
+            custom_image_uri=custom_image_uri,
             wait=wait,
             job_name=job_name,
             autogluon_sagemaker_estimator_kwargs=autogluon_sagemaker_estimator_kwargs,

@@ -167,6 +167,7 @@ class SageMakerFitJob(SageMakerJob):
         base_job_name,
         output_path,
         inputs,
+        custom_image_uri,
         wait,
         job_name,
         autogluon_sagemaker_estimator_kwargs,
@@ -184,6 +185,7 @@ class SageMakerFitJob(SageMakerJob):
             py_version=py_version,
             base_job_name=base_job_name,
             output_path=output_path,
+            custom_image_uri=custom_image_uri,
             **autogluon_sagemaker_estimator_kwargs
         )
         logger.log(20, f'Start sagemaker training job `{job_name}`')
