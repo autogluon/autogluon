@@ -168,4 +168,22 @@ class CollateMMCV:
         self.samples_per_gpu = samples_per_gpu
 
     def __call__(self, x):
-        return collate(x, samples_per_gpu=self.samples_per_gpu)
+        from . import unpack_datacontainers
+
+        ret = collate(x, samples_per_gpu=self.samples_per_gpu)
+        ret = unpack_datacontainers(ret)
+        if isinstance(ret["img_metas"][0][0], list):
+            img_metas = ret["img_metas"][0]
+            imgs = [ret["img"][0][0].float()]
+            return dict(imgs=imgs, img_metas=img_metas)
+        else:
+            img_metas = ret["img_metas"][0]
+            img = ret["img"][0].float()
+            batch_size = img.shape[0]
+            gt_bboxes = []
+            gt_labels = []
+            for i in range(batch_size):
+                gt_bboxes.append(ret["gt_bboxes"][0][i].float())
+                gt_labels.append(ret["gt_labels"][0][i].long())
+
+            return dict(img=img, img_metas=img_metas, gt_bboxes=gt_bboxes, gt_labels=gt_labels)

@@ -16,7 +16,7 @@ try:
 except ImportError:
     pass
 
-from ..constants import AUTOMM
+from ..constants import AUTOMM, IMAGE, LABEL
 from ..utils import unpack_datacontainers
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
@@ -58,57 +58,40 @@ class MMDetLitModule(pl.LightningModule):
         self.validation_metric_name = f"val_{validation_metric_name}"
         self.use_loss = isinstance(validation_metric, BaseAggregator)
         self.id2label = self.model.id2label
+        self.input_data_key = self.model.prefix + "_" + IMAGE
+        self.input_label_key = self.model.prefix + "_" + LABEL
 
     def _predict_step(self, batch, batch_idx=0, return_loss=False):
-        imgs, img_metas = self._val_batch_to_val(batch)
-        pred_results = self.model.model(return_loss=False, rescale=True, img=imgs, img_metas=img_metas)
+        pred_results = self.model.model(
+            return_loss=False,
+            rescale=True,
+            img=batch[self.input_data_key]["imgs"],
+            img_metas=batch[self.input_data_key]["img_metas"],
+        )
 
         return pred_results
-
-    def _val_batch_to_val(self, batch):
-        # TODO: move unpack code to collate function
-        batch = unpack_datacontainers(batch)
-
-        img_metas = batch["mmdet_image_image"]["img_metas"][0]
-        imgs = [batch["mmdet_image_image"]["img"][0][0].float().to(self.device)]
-
-        return imgs, img_metas
 
     def _val_batch_to_train(self, batch):
         batch = unpack_datacontainers(batch)
 
-        img_metas = batch["mmdet_image_image"]["img_metas"][0][0]
-        img = batch["mmdet_image_image"]["img"][0][0].float().to(self.device)
+        img_metas = batch[self.input_data_key]["img_metas"][0][0]
+        img = batch[self.input_data_key]["img"][0][0].float().to(self.device)
         batch_size = img.shape[0]
         gt_bboxes = []
         gt_labels = []
         for i in range(batch_size):
-            gt_bboxes.append(torch.tensor(batch["mmdet_image_image"]["gt_bboxes"][0][i]).float().to(self.device))
-            gt_labels.append(torch.tensor(batch["mmdet_image_image"]["gt_labels"][0][i]).long().to(self.device))
+            gt_bboxes.append(torch.tensor(batch[self.input_data_key]["gt_bboxes"][0][i]).float().to(self.device))
+            gt_labels.append(torch.tensor(batch[self.input_data_key]["gt_labels"][0][i]).long().to(self.device))
 
         return img, img_metas, gt_bboxes, gt_labels
 
     def _train_batch_to_val(self, batch):
         batch = unpack_datacontainers(batch)
 
-        img_metas = [batch["mmdet_image_image"]["img_metas"][0]]
-        imgs = [batch["mmdet_image_image"]["img"][0].float().to(self.device)]
+        img_metas = [batch[self.input_data_key]["img_metas"][0]]
+        imgs = [batch[self.input_data_key]["img"][0].float().to(self.device)]
 
         return imgs, img_metas
-
-    def _train_batch_to_train(self, batch):
-        batch = unpack_datacontainers(batch)
-
-        img_metas = batch["mmdet_image_image"]["img_metas"][0]
-        img = batch["mmdet_image_image"]["img"][0].float().to(self.device)
-        batch_size = img.shape[0]
-        gt_bboxes = []
-        gt_labels = []
-        for i in range(batch_size):
-            gt_bboxes.append(torch.tensor(batch["mmdet_image_image"]["gt_bboxes"][0][i]).float().to(self.device))
-            gt_labels.append(torch.tensor(batch["mmdet_image_image"]["gt_labels"][0][i]).long().to(self.device))
-
-        return img, img_metas, gt_bboxes, gt_labels
 
     def _loss_step(self, img, img_metas, gt_bboxes, gt_labels):
         loss, log_vars = self.compute_loss(
@@ -134,9 +117,9 @@ class MMDetLitModule(pl.LightningModule):
                     labels.append(category_idx)
             preds.append(
                 dict(
-                    boxes=torch.tensor(np.array(boxes).astype(float)).float().to(self.device),
-                    scores=torch.tensor(scores).float().to(self.device),
-                    labels=torch.tensor(labels).long().to(self.device),
+                    boxes=torch.tensor(np.array(boxes).astype(float)).float(),
+                    scores=torch.tensor(scores).float(),
+                    labels=torch.tensor(labels).long(),
                 )
             )
 
@@ -144,15 +127,15 @@ class MMDetLitModule(pl.LightningModule):
 
         batch_size = len(preds)
         batch = unpack_datacontainers(sample)
-        gt = batch["mmdet_image_label"]  # batch_size, (n, 5)
+        gt = batch[self.input_label_key]  # batch_size, (n, 5)
         for i in range(batch_size):
             img_gt = np.array(gt[i])
             boxes = img_gt[:, :4]
             labels = img_gt[:, 4]
             target.append(
                 dict(
-                    boxes=torch.tensor(boxes).float().to(self.device),
-                    labels=torch.tensor(labels).long().to(self.device),
+                    boxes=torch.tensor(boxes).float(),
+                    labels=torch.tensor(labels).long(),
                 )
             )
 
@@ -238,16 +221,24 @@ class MMDetLitModule(pl.LightningModule):
             self.log(f"step/{loss_name}", losses[key])
 
     def training_step(self, batch, batch_idx):
-        img, img_metas, gt_bboxes, gt_labels = self._train_batch_to_train(batch)
-        loss, log_vars = self._loss_step(img, img_metas, gt_bboxes, gt_labels)
+        loss, log_vars = self._loss_step(
+            img=batch[self.input_data_key]["img"],
+            img_metas=batch[self.input_data_key]["img_metas"],
+            gt_bboxes=batch[self.input_data_key]["gt_bboxes"],
+            gt_labels=batch[self.input_data_key]["gt_labels"],
+        )
         # log step losses
         self.log_step_results(log_vars)
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         if self.use_loss:
-            img, img_metas, gt_bboxes, gt_labels = self._train_batch_to_train(batch)
-            val_loss, log_vars = self._loss_step(img, img_metas, gt_bboxes, gt_labels)
+            val_loss, log_vars = self._loss_step(
+                img=batch[self.input_data_key]["img"],
+                img_metas=batch[self.input_data_key]["img_metas"],
+                gt_bboxes=batch[self.input_data_key]["gt_bboxes"],
+                gt_labels=batch[self.input_data_key]["gt_labels"],
+            )
             self.validation_metric.update(val_loss)
         else:
             self.evaluate(batch, "val")
@@ -271,7 +262,7 @@ class MMDetLitModule(pl.LightningModule):
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         pred = self._predict_step(batch, batch_idx)
         if "mmdet_image_label" in batch:
-            return {"bbox": pred, "label": batch["mmdet_image_label"]}
+            return {"bbox": pred, "label": batch[self.input_label_key]}
         else:
             return {"bbox": pred}
 
