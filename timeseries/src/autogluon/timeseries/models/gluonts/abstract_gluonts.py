@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Type
 
 import gluonts
+import gluonts.core.settings
 import numpy as np
 import pandas as pd
 from gluonts.dataset.common import Dataset as GluonTSDataset
@@ -24,7 +25,6 @@ from autogluon.timeseries.utils.warning_filters import disable_root_logger
 
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
-pl_loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict if "pytorch_lightning" in name]
 
 
 GLUONTS_SUPPORTED_OFFSETS = ["Y", "Q", "M", "W", "D", "B", "H", "T", "min", "S"]
@@ -243,8 +243,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         verbosity = kwargs.get("verbosity", 2)
         set_logger_verbosity(verbosity, logger=logger)
         gts_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
-        for pl_logger in pl_loggers:
-            pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
 
         if verbosity > 3:
             logger.warning(
@@ -261,7 +259,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         )
 
         estimator = self._get_estimator()
-        with warning_filter(), disable_root_logger():
+        with warning_filter(), disable_root_logger(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
             self.gts_predictor = estimator.train(
                 self._to_gluonts_dataset(train_data),
                 validation_data=self._to_gluonts_dataset(val_data),

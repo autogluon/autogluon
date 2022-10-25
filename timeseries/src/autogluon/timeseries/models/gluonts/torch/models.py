@@ -24,12 +24,13 @@ from pytorch_lightning.callbacks import Timer
 from autogluon.core.hpo.constants import CUSTOM_BACKEND
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
+from autogluon.timeseries.utils.warning_filters import torch_warning_filter
 
 # FIXME: introduces cpflows dependency. We exclude this model until a future release.
 # from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
 
 # FIXME: DeepNPTS does not implement the GluonTS PyTorch API, and does not use
-# PyTorch Ligthning. We exclude this model until a future release.
+# PyTorch Lightning. We exclude this model until a future release.
 # from gluonts.torch.model.deep_npts import DeepNPTSEstimator
 
 logger = logging.getLogger(__name__)
@@ -95,8 +96,9 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
 
     @classmethod
     def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "AbstractGluonTSModel":
-        model = super().load(path, reset_paths, verbose)
-        model.gts_predictor = GluonTSPyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
+        with torch_warning_filter():
+            model = super().load(path, reset_paths, verbose)
+            model.gts_predictor = GluonTSPyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
         return model
 
 
