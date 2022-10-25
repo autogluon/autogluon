@@ -95,9 +95,9 @@ class MMDetLitModule(pl.LightningModule):
                     labels.append(category_idx)
             preds.append(
                 dict(
-                    boxes=torch.tensor(np.array(boxes).astype(float)).float(),
-                    scores=torch.tensor(scores).float(),
-                    labels=torch.tensor(labels).long(),
+                    boxes=torch.tensor(np.array(boxes).astype(float)).float().to(self.device),
+                    scores=torch.tensor(scores).float().to(self.device),
+                    labels=torch.tensor(labels).long().to(self.device),
                 )
             )
 
@@ -112,8 +112,8 @@ class MMDetLitModule(pl.LightningModule):
             labels = img_gt[:, 4]
             target.append(
                 dict(
-                    boxes=torch.tensor(boxes).float(),
-                    labels=torch.tensor(labels).long(),
+                    boxes=torch.tensor(boxes).float().to(self.device),
+                    labels=torch.tensor(labels).long().to(self.device),
                 )
             )
 
