@@ -85,9 +85,11 @@ def get_static_features(item_ids: List[Union[str, int]], feature_names: List[str
         if idx % 2 == 0:
             values = np.random.rand(len(item_ids))
         else:
-            values = np.random.choice(["X", "Y", "Z", "1"], size=len(item_ids))
+            values = np.random.choice(["X", "Y", "Z", "1"], size=len(item_ids)).astype(object)
         features[feat_name] = values
-    return pd.DataFrame(features, index=list(item_ids))
+    df = pd.DataFrame(features, index=list(item_ids))
+    df.index.name = ITEMID
+    return df
 
 
 DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC = get_data_frame_with_variable_lengths(
