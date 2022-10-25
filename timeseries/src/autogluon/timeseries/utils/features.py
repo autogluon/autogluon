@@ -50,3 +50,10 @@ def get_categorical_and_continuous_features(
         continuous_features = None
 
     return categorical_features, continuous_features
+
+
+def convert_numerical_features_to_float(dataframe: pd.DataFrame, float_dtype=np.float64):
+    for col_name in dataframe.columns:
+        if pd.api.types.is_numeric_dtype(dataframe[col_name]):
+            dataframe[col_name] = dataframe[col_name].astype(float_dtype)
+    return dataframe

@@ -7,7 +7,10 @@ import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.core.learner import AbstractLearner
-from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
+from autogluon.timeseries.utils.features import (
+    ContinuousAndCategoricalFeatureGenerator,
+    convert_numerical_features_to_float,
+)
 
 from .dataset import TimeSeriesDataFrame
 from .evaluator import TimeSeriesEvaluator
@@ -58,7 +61,6 @@ class TimeSeriesLearner(AbstractLearner):
         val_data: TimeSeriesDataFrame = None,
         hyperparameters: Union[str, Dict] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
-        static_feature_metadata: Optional[FeatureMetadata] = None,
         **kwargs,
     ) -> None:
         return self._fit(
@@ -66,7 +68,6 @@ class TimeSeriesLearner(AbstractLearner):
             val_data=val_data,
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-            static_feature_metadata=static_feature_metadata,
             **kwargs,
         )
 
@@ -77,7 +78,6 @@ class TimeSeriesLearner(AbstractLearner):
         hyperparameters: Union[str, Dict] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         time_limit: Optional[int] = None,
-        static_feature_metadata: Optional[FeatureMetadata] = None,
         **kwargs,
     ) -> None:
         self._time_limit = time_limit
@@ -89,10 +89,7 @@ class TimeSeriesLearner(AbstractLearner):
         )
         logger.info(f"AutoGluon will save models to {self.path}")
 
-        # Process static features
-        train_data, val_data = self._preprocess_static_features(
-            train_data=train_data, static_feature_metadata=static_feature_metadata, val_data=val_data
-        )
+        train_data, val_data = self._preprocess_static_features(train_data=train_data, val_data=val_data)
 
         # Process dynamic features
         # TODO: Handle dynamic features
@@ -140,45 +137,72 @@ class TimeSeriesLearner(AbstractLearner):
     def _preprocess_static_features(
         self,
         train_data: TimeSeriesDataFrame,
-        static_feature_metadata: FeatureMetadata,
         val_data: Optional[TimeSeriesDataFrame] = None,
+        # TODO: Fix unused argument
+        static_feature_metadata: Optional[FeatureMetadata] = None,
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
-        """Convert static features to real and categorical dtypes"""
+        """Convert static features to categorical & float dtypes, and check if val data has compatible features.
+
+        If train_data has static features, then one of the following is guaranteed be true:
+        - val_data is None (split will be done automatically)
+        - val_data has static features that include the same columns
+
+        If train_data doesn't have static features, then one of the following is guaranteed be true:
+        - val_data is None (split will be done automatically)
+        - val_data doesn't have static features
+        """
+        # Avoid modifying data inplace
+        train_data = train_data.copy(deep=False)
+        if val_data is not None:
+            val_data = val_data.copy(deep=False)
+
         self.feature_pipeline = ContinuousAndCategoricalFeatureGenerator(feature_metadata=static_feature_metadata)
 
-        # Avoid modifying train_data outside of predictor
-        train_data = train_data.copy(deep=False)
-        if train_data.static_features is not None:
-            original_columns = train_data.static_features.columns
+        if train_data.static_features is None:
+            if val_data is not None and val_data.static_features is not None:
+                val_data.static_features = None
+        else:
+            original_static_feature_columns = train_data.static_features.columns
             train_data.static_features = self.feature_pipeline.fit_transform(train_data.static_features)
+            train_data.static_features = convert_numerical_features_to_float(train_data.static_features)
 
             mapped_to_categorical = []
             mapped_to_continuous = []
             unused = []
-            for col_name in original_columns:
-                if col_name not in train_data.static_features:
-                    unused.append(col_name)
-                elif train_data.static_features[col_name].dtype == "category":
+            for col_name in original_static_feature_columns:
+                if train_data.static_features[col_name].dtype == "category":
                     mapped_to_categorical.append(col_name)
-                else:
+                elif train_data.static_features[col_name].dtype == np.float64:
                     mapped_to_continuous.append(col_name)
-            train_data.static_features[mapped_to_continuous] = train_data.static_features[mapped_to_continuous].astype(
-                np.float64
-            )
+                else:
+                    unused.append(col_name)
 
             logger.info("Following types of static features have been inferred:")
             logger.info(f"\tcategorical: {mapped_to_categorical}")
-            logger.info(f"\tcontinuous (numeric): {mapped_to_continuous}")
+            logger.info(f"\tcontinuous (float): {mapped_to_continuous}")
             if len(unused) > 0:
                 logger.info(f"\tremoved (neither categorical nor continuous): {unused}")
-            logger.info("Please manually set static_feature_metadata if the inferred types are incorrect.")
+            logger.info(
+                "To learn how to fix incorrectly inferred types, please see documentation for TimeSeriesPredictor.fit "
+            )
 
-        if val_data is not None and val_data.static_features is not None:
-            val_data = val_data.copy(deep=False)
-            if train_data.static_features is not None:
-                val_data.static_features = self.feature_pipeline.transform(val_data.static_features)
-            else:
-                val_data.static_features = None
+            if val_data is not None:
+                if val_data.static_features is None:
+                    raise ValueError(
+                        "Provided train_data has static_features, but tuning_data has no static features. "
+                        "Please set `tuning_data=None` to automatically generate tuning_data, or make sure that the given "
+                        "tuning_data also has static_features."
+                    )
+                try:
+                    val_data.static_features = val_data.static_features[original_static_feature_columns]
+                    val_data.static_features = self.feature_pipeline.transform(val_data.static_features)
+                    val_data.static_features = convert_numerical_features_to_float(val_data.static_features)
+                except:
+                    raise ValueError(
+                        "tuning_data.static_features should have the same columns as train_data.static_features. "
+                        "Please set `tuning_data=None` to automatically generate tuning_data, or make sure that "
+                        "names & dtypes of columns in tuning_data.static_features exactly match train_data.static_features"
+                    )
 
         return train_data, val_data
 
@@ -188,6 +212,13 @@ class TimeSeriesLearner(AbstractLearner):
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
+        if self.feature_pipeline.is_fit:
+            if data.static_features is None:
+                raise ValueError(
+                    "Cannot predict since data has no static features (but training data had static features)"
+                )
+            data.static_features = self.feature_pipeline.transform(data.static_features)
+            data.static_features = convert_numerical_features_to_float(data.static_features)
         prediction = self.load_trainer().predict(data=data, model=model, **kwargs)
         if prediction is None:
             raise RuntimeError("Prediction failed, please provide a different model to the `predict` method.")
