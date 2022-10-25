@@ -209,18 +209,31 @@ class TimeSeriesPredictor:
         ----------
         train_data : TimeSeriesDataFrame
             Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
+
+            If ``train_data`` has static features (i.e., ``train_data.static_features`` is a pandas DataFrame), the
+            predictor will interpret columns with ``int`` and ``float`` dtypes as continuous (real-valued) features,
+            columns with ``object`` and ``str`` dtypes as categorical features, and will ignore the rest of columns.
+
+            For example, to ensure that column "store_id" with dtype ``int`` is interpreted as a
+            we need to change its type to ``category``::
+
+                train_data.static_features["store_id"] = train_data.static_features["store_id"].astype("category")
+
         tuning_data : TimeSeriesDataFrame, optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
             time series are used for computing the validation score.
+
+            Leaving this argument empty and letting AutoGluon automatically generate the validation set from
+            ``train_data`` is a good default.
 
             If not provided, AutoGluon will split :attr:`train_data` into training and tuning subsets using
             ``validation_splitter``. If ``tuning_data`` is provided, ``validation_splitter`` will be ignored.
             See the description of ``validation_splitter`` in the docstring for
             :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
 
-            Leaving this argument empty and letting AutoGluon automatically generate the validation set from
-            ``train_data`` is a good default.
+            If ``train_data`` has static features, ``tuning_data`` must have also have static features with the same
+            column names and dtypes.
         time_limit : int, optional
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
             seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models

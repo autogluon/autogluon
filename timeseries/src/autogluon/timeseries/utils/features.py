@@ -1,5 +1,6 @@
 from typing import Optional, Tuple, Union
 
+import numpy as np
 import pandas as pd
 from pandas.api.types import is_categorical_dtype, is_numeric_dtype
 
@@ -11,13 +12,12 @@ from autogluon.features.generators import CategoryFeatureGenerator, IdentityFeat
 class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
     """Generates categorical and continuous features for time series models."""
 
-    def __init__(self, feature_metadata: Optional[FeatureMetadata] = None):
-        # TODO: Ensure that feature_metadata only contains numeric and categorical dtypes
+    def __init__(self, feature_metadata: Optional[FeatureMetadata] = None, **kwargs):
         generators = [
             CategoryFeatureGenerator(minimum_cat_count=1),
             IdentityFeatureGenerator(infer_features_in_args={"valid_raw_types": [R_INT, R_FLOAT]}),
         ]
-        super().__init__(generators=[generators], post_generators=[], feature_metadata_in=feature_metadata)
+        super().__init__(generators=[generators], post_generators=[], feature_metadata_in=feature_metadata, **kwargs)
 
 
 def get_categorical_and_continuous_features(

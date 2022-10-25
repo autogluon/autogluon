@@ -143,11 +143,11 @@ class TimeSeriesLearner(AbstractLearner):
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         """Convert static features to categorical & float dtypes, and check if val data has compatible features.
 
-        If train_data has static features, then one of the following is guaranteed be true:
+        If train_data has static features, then one of the following is guaranteed to be true:
         - val_data is None (split will be done automatically)
-        - val_data has static features that include the same columns
+        - val_data has static features with the same columns as train_data
 
-        If train_data doesn't have static features, then one of the following is guaranteed be true:
+        If train_data doesn't have static features, then one of the following is guaranteed to be true:
         - val_data is None (split will be done automatically)
         - val_data doesn't have static features
         """
@@ -156,7 +156,9 @@ class TimeSeriesLearner(AbstractLearner):
         if val_data is not None:
             val_data = val_data.copy(deep=False)
 
-        self.feature_pipeline = ContinuousAndCategoricalFeatureGenerator(feature_metadata=static_feature_metadata)
+        self.feature_pipeline = ContinuousAndCategoricalFeatureGenerator(
+            feature_metadata=static_feature_metadata, verbosity=0
+        )
 
         if train_data.static_features is None:
             if val_data is not None and val_data.static_features is not None:
