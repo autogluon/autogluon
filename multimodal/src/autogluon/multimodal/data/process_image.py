@@ -51,8 +51,8 @@ from ..constants import (
     COLUMN,
     IMAGE,
     IMAGE_VALID_NUM,
-    MMCV_MODELS,
     MMDET_IMAGE,
+    MMLAB_MODELS,
     MMOCR,
     MMOCR_TEXT_DET,
     MMOCR_TEXT_RECOG,
@@ -158,15 +158,18 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        if self.prefix.lower().startswith(MMCV_MODELS):
+        if self.prefix.lower().startswith(MMLAB_MODELS):
             if self.prefix.lower().startswith(MMDET_IMAGE):
                 assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
             else:
                 assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
             cfg = model.model.cfg
-            cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
-            self.val_processor = Compose(cfg.data.test.pipeline)
-            self.train_processor = Compose(cfg.data.test.pipeline)
+            try:  # yolov3
+                training_pipeline = cfg.data.train.dataset.pipeline
+            except:  # faster_rcnn
+                training_pipeline = cfg.data.train.pipeline
+            self.val_processor = Compose(replace_ImageToTensor(cfg.data.val.pipeline))
+            self.train_processor = Compose(replace_ImageToTensor(training_pipeline))
         else:
             self.train_processor = self.construct_processor(self.train_transform_types)
             self.val_processor = self.construct_processor(self.val_transform_types)
@@ -200,7 +203,7 @@ class ImageProcessor:
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
-        if self.prefix.lower().startswith(MMCV_MODELS):
+        if self.prefix.lower().startswith(MMLAB_MODELS):
             assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
             fn.update(
                 {
@@ -395,14 +398,21 @@ class ImageProcessor:
         """
         images = []
         zero_images = []
+        mm_data = dict(img_prefix=None, bbox_fields=[])
         ret = {}
         column_start = 0
-        for per_col_name, per_col_image_paths in image_paths.items():
-            for img_path in per_col_image_paths[: self.max_img_num_per_col]:
-                if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
-                    data = dict(img_info=dict(filename=img_path), img_prefix=None)
-                    images.append(self.val_processor(data))
+        if self.prefix.lower().startswith(MMLAB_MODELS):
+            for per_col_name, per_col_content in image_paths.items():
+                if per_col_name != "rois":  # TODO: remove hardcode
+                    mm_data["img_info"] = dict(filename=per_col_content[0])
                 else:
+                    rois = np.array(per_col_content)
+                    mm_data["ann_info"] = dict(bboxes=rois[:, :4], labels=rois[:, 4])
+            if self.requires_column_info:
+                pass  # TODO
+        else:
+            for per_col_name, per_col_image_paths in image_paths.items():
+                for img_path in per_col_image_paths[: self.max_img_num_per_col]:
                     with warnings.catch_warnings():
                         warnings.filterwarnings(
                             "ignore",
@@ -431,14 +441,14 @@ class ImageProcessor:
                     else:
                         images.append(img)
 
-            if self.requires_column_info:
-                # only count the valid images since they are put ahead of the zero images in the below returning
-                ret[f"{self.image_column_prefix}_{per_col_name}"] = np.array(
-                    [column_start, len(images)], dtype=np.int64
-                )
-                column_start = len(images)
-        if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
-            ret.update({self.image_key: images[0]})
+                if self.requires_column_info:
+                    # only count the valid images since they are put ahead of the zero images in the below returning
+                    ret[f"{self.image_column_prefix}_{per_col_name}"] = np.array(
+                        [column_start, len(images)], dtype=np.int64
+                    )
+                    column_start = len(images)
+        if self.prefix.lower().startswith(MMLAB_MODELS):
+            ret.update({self.image_key: self.train_processor(mm_data) if is_training else self.val_processor(mm_data)})
         else:
             ret.update(
                 {

@@ -22,6 +22,7 @@ from ..constants import (
     NER,
     NER_ANNOTATION,
     NUMERICAL,
+    ROIS,
     TEXT,
 )
 from ..data import (
@@ -377,7 +378,7 @@ def get_mixup(
             mixup_config.mixup_alpha > 0 or mixup_config.cutmix_alpha > 0.0 or mixup_config.cutmix_minmax is not None
         )
 
-    mixup_state = model_active & mixup_active & (num_classes > 1)
+    mixup_state = model_active & mixup_active & ((num_classes is not None) and (num_classes > 1))
     mixup_fn = None
     if mixup_state:
         mixup_args = dict(
