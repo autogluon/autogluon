@@ -117,7 +117,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
 
     hpo_results, _ = model.hyperparameter_tune(
         hyperparameter_tune_kwargs={"num_trials": num_trials, "scheduler": "local", "searcher": "random"},
-        time_limit=200,
+        time_limit=300,
         train_data=DUMMY_TS_DATAFRAME,
         val_data=DUMMY_TS_DATAFRAME,
     )

@@ -5,7 +5,7 @@ import logging
 import warnings
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Type
+from typing import Any, Callable, Dict, List, Optional, Type
 
 import gluonts
 import numpy as np
@@ -23,7 +23,7 @@ from pytorch_lightning.callbacks import Timer
 
 from autogluon.core.hpo.constants import CUSTOM_BACKEND
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
-from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel, SimpleGluonTSDataset
+from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
 # FIXME: introduces cpflows dependency. We exclude this model until a future release.
 # from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
@@ -80,6 +80,18 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
 
     def _get_callbacks(self, time_limit: int, *args, **kwargs) -> List[Callable]:
         return [Timer(timedelta(seconds=time_limit))] if time_limit is not None else []
+
+    def _fit(
+        self,
+        train_data: TimeSeriesDataFrame,
+        val_data: Optional[TimeSeriesDataFrame] = None,
+        time_limit: int = None,
+        **kwargs,
+    ) -> None:
+        verbosity = kwargs.get("verbosity", 2)
+        for pl_logger in pl_loggers:
+            pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
+        super()._fit(train_data=train_data, val_data=val_data, time_limit=time_limit, **kwargs)
 
     @classmethod
     def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "AbstractGluonTSModel":

@@ -18,8 +18,9 @@ from autogluon.timeseries.models.gluonts import (  # MQRNNModel,; TransformerMod
     SimpleFeedForwardMXNetModel,
     TemporalFusionTransformerMXNetModel,
 )
-from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSMXNetModelFactory
 from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
+from autogluon.timeseries.models.gluonts.mx.models import AbstractGluonTSMXNetModel, GenericGluonTSMXNetModelFactory
+from autogluon.timeseries.models.gluonts.torch.models import AbstractGluonTSPyTorchModel
 
 from ..common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
 
@@ -97,7 +98,10 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(model_class, te
     loaded_model = model.__class__.load(path=model.path)
 
     assert model.gluonts_estimator_class is loaded_model.gluonts_estimator_class
-    assert loaded_model.gts_predictor == model.gts_predictor
+    if isinstance(model, AbstractGluonTSMXNetModel):
+        assert loaded_model.gts_predictor == model.gts_predictor
+    elif isinstance(model, AbstractGluonTSPyTorchModel):
+        assert loaded_model.gts_predictor.to(model.gts_predictor.device) == model.gts_predictor
 
 
 @pytest.mark.skipif(
