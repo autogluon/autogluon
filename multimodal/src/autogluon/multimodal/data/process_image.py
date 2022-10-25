@@ -205,13 +205,21 @@ class ImageProcessor:
 
         if self.prefix.lower().startswith(MMLAB_MODELS):
             assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-            from ..utils import CollateMMCV
+            if self.prefix.lower().startswith(MMDET_IMAGE):
+                from ..utils import CollateMMCV
 
-            fn.update(
-                {
-                    self.image_key: CollateMMCV(samples_per_gpu=per_gpu_batch_size),
-                }
-            )
+                fn.update(
+                    {
+                        self.image_key: CollateMMCV(samples_per_gpu=per_gpu_batch_size),
+                    }
+                )
+            else:
+                # TODO: update MMOCR
+                fn.update(
+                    {
+                        self.image_key: lambda x: collate(x, samples_per_gpu=per_gpu_batch_size),
+                    }
+                )
         else:
             fn.update(
                 {
