@@ -7,10 +7,10 @@ from pandas.api.types import is_categorical_dtype, is_numeric_dtype
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, R_INT
 from autogluon.features.generators import (
+    AsTypeFeatureGenerator,
     CategoryFeatureGenerator,
     IdentityFeatureGenerator,
     PipelineFeatureGenerator,
-    AsTypeFeatureGenerator,
 )
 
 

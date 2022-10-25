@@ -6,8 +6,8 @@ from autogluon.timeseries.splitter import MultiWindowSplitter, append_suffix_to_
 
 from .common import (
     DUMMY_VARIABLE_LENGTH_TS_DATAFRAME,
-    get_data_frame_with_variable_lengths,
     DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC,
+    get_data_frame_with_variable_lengths,
 )
 
 

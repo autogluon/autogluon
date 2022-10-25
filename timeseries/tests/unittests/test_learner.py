@@ -18,10 +18,9 @@ from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactor
 from .common import (
     DUMMY_TS_DATAFRAME,
     DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC,
-    get_static_features,
     get_data_frame_with_variable_lengths,
+    get_static_features,
 )
-
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
