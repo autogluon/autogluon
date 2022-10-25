@@ -191,6 +191,24 @@ class TimeSeriesPredictor:
             )
         return df
 
+    def _check_data_frame_features(self, train_data: TimeSeriesDataFrame, tuning_data: TimeSeriesDataFrame) -> None:
+        """Check if the static features of tuning data are compatible with train data."""
+        if train_data.static_features is None:
+            return
+        else:
+            if tuning_data.static_features is None:
+                raise ValueError(
+                    "Provided train_data has static_features, but tuning_data has no static features. "
+                    "Please set `tuning_data=None` to automatically generate tuning_data, or make sure that the given "
+                    "tuning_data also has static_features."
+                )
+            if not set(tuning_data.static_features.columns).issubset(set(train_data.static_features.columns)):
+                raise ValueError(
+                    "Provided tuning_data should have the same columns in static_features as train_data. "
+                    "Please set `tuning_data=None` to automatically generate tuning_data, or make sure that the given "
+                    "tuning_data has the same static_features columns as train_data."
+                )
+
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)
     def fit(
         self,
@@ -332,10 +350,9 @@ class TimeSeriesPredictor:
         if hyperparameters is None:
             hyperparameters = "default"
 
-        # TODO: Ensure that static features in train_data and tuning_data match if tuning_data is given
-
         train_data = self._check_and_prepare_data_frame(train_data)
         tuning_data = self._check_and_prepare_data_frame(tuning_data)
+        self._check_data_frame_features(train_data=train_data, tuning_data=tuning_data)
 
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity)

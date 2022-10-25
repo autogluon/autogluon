@@ -33,28 +33,24 @@ class SimpleGluonTSDataset(GluonTSDataset):
     GluonTS Dataset protocol via lazy iterations.
     """
 
-    time_series_df: TimeSeriesDataFrame
-    feat_static_cat: Optional[pd.DataFrame] = None
-    feat_static_real: Optional[pd.DataFrame] = None
-
     def __init__(
         self,
         time_series_df: TimeSeriesDataFrame,
         target_field_name: str = "target",
-        use_feat_static_cat: bool = False,
-        use_feat_static_real: bool = False,
+        feat_static_cat: Optional[pd.DataFrame] = None,
+        feat_static_real: Optional[pd.DataFrame] = None,
     ):
         assert time_series_df is not None
         assert time_series_df.freq, "Initializing GluonTS data sets without freq is not allowed"
         self.time_series_df = time_series_df
         self.target_field_name = target_field_name
+        self.feat_static_cat = feat_static_cat
+        self.feat_static_real = feat_static_real
 
-        if use_feat_static_cat or use_feat_static_real:
-            feat_static_cat, feat_static_real = get_categorical_and_continuous_features(time_series_df.static_features)
-            if use_feat_static_cat:
-                self.feat_static_cat = feat_static_cat.astype(np.int64)
-            if use_feat_static_real:
-                self.feat_static_real = feat_static_real.astype(np.float64)
+        if self.feat_static_cat is not None:
+            self.feat_static_cat = self.feat_static_cat.astype(np.int64)
+        if self.feat_static_real is not None:
+            self.feat_static_real = self.feat_static_real.astype(np.float64)
 
     @property
     def freq(self):
@@ -105,10 +101,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     gluonts_model_path = "gluon_ts"
     gluonts_estimator_class: Type[GluonTSEstimator] = None
-    use_feat_static_cat: bool = False
-    use_feat_static_real: bool = False
-    use_feat_dynamic_real: bool = False
-    feat_static_cat_cardinality: List[int] = []
 
     def __init__(
         self,
@@ -132,6 +124,10 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         )
         self.gts_predictor: Optional[GluonTSPredictor] = None
         self.callbacks = []
+        self.use_feat_static_cat = False
+        self.use_feat_static_real = False
+        self.use_feat_dynamic_real = False
+        self.feat_static_cat_cardinality: List[int] = []
 
     def save(self, path: str = None, **kwargs) -> str:
         if path is None:
@@ -170,10 +166,10 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                     "Dataset frequency not provided in the dataset, fit arguments or "
                     "during initialization. Please provide a `freq` string to `fit`."
                 )
-            if ds.static_features is not None:
-                feat_static_cat, feat_static_real = get_categorical_and_continuous_features(ds.static_features)
-                self.use_feat_static_cat = len(feat_static_cat.columns) > 0
-                self.use_feat_static_real = len(feat_static_real.columns) > 0
+            feat_static_cat, feat_static_real = get_categorical_and_continuous_features(ds.static_features)
+            self.use_feat_static_cat = feat_static_cat is not None
+            self.use_feat_static_real = feat_static_real is not None
+            if self.use_feat_static_cat:
                 self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
 
         if "callbacks" in kwargs:
@@ -204,11 +200,16 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     def _to_gluonts_dataset(self, time_series_df: Optional[TimeSeriesDataFrame]) -> Optional[GluonTSDataset]:
         if time_series_df is not None:
+            feat_static_cat, feat_static_real = get_categorical_and_continuous_features(time_series_df.static_features)
+            if not self.use_feat_static_cat:
+                feat_static_cat = None
+            if not self.use_feat_static_real:
+                feat_static_real = None
             return SimpleGluonTSDataset(
                 time_series_df,
                 target_field_name=self.target,
-                use_feat_static_cat=self.use_feat_static_cat,
-                use_feat_static_real=self.use_feat_static_real,
+                feat_static_cat=feat_static_cat,
+                feat_static_real=feat_static_real,
             )
         else:
             return None

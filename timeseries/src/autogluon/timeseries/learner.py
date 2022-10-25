@@ -46,6 +46,7 @@ class TimeSeriesLearner(AbstractLearner):
         )
         self.validation_splitter = validation_splitter
         logger.info(f"Learner random seed set to {random_state}")
+        self.feature_pipeline: ContinuousAndCategoricalFeatureGenerator = None
 
     def load_trainer(self) -> AbstractTimeSeriesTrainer:
         """Return the trainer object corresponding to the learner."""
@@ -142,6 +143,7 @@ class TimeSeriesLearner(AbstractLearner):
         static_feature_metadata: FeatureMetadata,
         val_data: Optional[TimeSeriesDataFrame] = None,
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        """Convert static features to real and categorical dtypes"""
         self.feature_pipeline = ContinuousAndCategoricalFeatureGenerator(feature_metadata=static_feature_metadata)
 
         # Avoid modifying train_data outside of predictor

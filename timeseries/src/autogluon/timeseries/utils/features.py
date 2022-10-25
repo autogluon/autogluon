@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import pandas as pd
 from pandas.api.types import is_categorical_dtype, is_numeric_dtype
@@ -20,8 +20,16 @@ class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
         super().__init__(generators=[generators], post_generators=[], feature_metadata_in=feature_metadata)
 
 
-def get_categorical_and_continuous_features(dataframe: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Split categorical and continuous columns of a dataframe into two separate dataframes."""
+def get_categorical_and_continuous_features(
+    dataframe: Optional[pd.DataFrame],
+) -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]:
+    """Split categorical and continuous columns of a dataframe into two separate dataframes.
+
+    If the dataframe doesn't contain columns of the given type, None is returned.
+    """
+    if dataframe is None:
+        return None, None
+
     categorical_column_names = []
     continuous_column_names = []
 
@@ -31,4 +39,14 @@ def get_categorical_and_continuous_features(dataframe: pd.DataFrame) -> Tuple[pd
         elif is_numeric_dtype(column_values):
             continuous_column_names.append(column_name)
 
-    return dataframe[categorical_column_names], dataframe[continuous_column_names]
+    if len(categorical_column_names) > 0:
+        categorical_features = dataframe[categorical_column_names]
+    else:
+        categorical_features = None
+
+    if len(continuous_column_names) > 0:
+        continuous_features = dataframe[continuous_column_names]
+    else:
+        continuous_features = None
+
+    return categorical_features, continuous_features
