@@ -238,31 +238,35 @@ def test_when_static_features_columns_in_tuning_data_are_missing_then_exception_
         learner._preprocess_static_features(train_data=train_data, val_data=val_data)
 
 
-@pytest.mark.parametrize(
-    "train_data, val_data",
-    [
-        (
-            get_data_frame_with_variable_lengths(
-                {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2"])
-            ),
-            get_data_frame_with_variable_lengths(
-                {"B": 25, "A": 20}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2", "f3"])
-            ),
-        ),
-        (
-            get_data_frame_with_variable_lengths({"B": 25, "A": 20}, static_features=None),
-            get_data_frame_with_variable_lengths(
-                {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2"])
-            ),
-        ),
-        (DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC, None),
-    ],
-)
-def test_when_static_features_match_in_train_and_val_data_then_no_exception_is_raised(
-    temp_model_path, train_data, val_data
+def test_when_train_data_has_no_static_features_but_val_data_has_static_features_then_val_data_features_get_removed(
+    temp_model_path,
 ):
+    train_data = get_data_frame_with_variable_lengths({"B": 25, "A": 20}, static_features=None)
+    val_data = get_data_frame_with_variable_lengths(
+        {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2"])
+    )
     learner = TimeSeriesLearner(path_context=temp_model_path)
-    learner._preprocess_static_features(train_data=train_data, val_data=val_data)
+    _, val_data_processed = learner._preprocess_static_features(train_data=train_data, val_data=val_data)
+    assert val_data.static_features is not None
+    assert val_data_processed.static_features is None
+
+
+def test_when_train_data_static_features_are_subset_of_val_data_static_features_then_columns_are_correct(
+    temp_model_path,
+):
+    train_data = get_data_frame_with_variable_lengths(
+        {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2"])
+    )
+    val_data = get_data_frame_with_variable_lengths(
+        {"B": 25, "A": 20}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2", "f3"])
+    )
+    learner = TimeSeriesLearner(path_context=temp_model_path)
+    train_data_processed, val_data_processed = learner._preprocess_static_features(
+        train_data=train_data, val_data=val_data
+    )
+    assert sorted(val_data.static_features.columns) == ["f1", "f2", "f3"]
+    for data in [val_data_processed, train_data, train_data_processed]:
+        assert sorted(data.static_features.columns) == ["f1", "f2"]
 
 
 def test_when_static_features_are_preprocessed_then_dtypes_are_correct(temp_model_path):
