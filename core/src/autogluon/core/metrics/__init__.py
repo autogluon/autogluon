@@ -542,10 +542,11 @@ log_loss = make_scorer('log_loss',
                        needs_proba=True)
 log_loss.add_alias('nll')
 
-pac_score = make_scorer('pac_score',
-                        classification_metrics.pac_score,
-                        greater_is_better=True,
-                        needs_proba=True)
+pac = make_scorer('pac',
+                  classification_metrics.pac,
+                  greater_is_better=True,
+                  needs_proba=True)
+pac.add_alias('pac_score')
 
 REGRESSION_METRICS = dict()
 for scorer in [
@@ -572,7 +573,7 @@ for scorer in [
     mcc,
     roc_auc_ovo_macro,
     log_loss,
-    pac_score,
+    pac,
     quadratic_kappa,
 ]:
     for metric_dict in [BINARY_METRICS, MULTICLASS_METRICS]:
