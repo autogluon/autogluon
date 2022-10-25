@@ -1,16 +1,14 @@
 import logging
 import re
-from typing import List, Optional, Type
+from typing import Callable, List, Type
 
 import gluonts
 import mxnet as mx
 
-from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.utils import warning_filter
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
-from autogluon.timeseries.utils.warning_filters import disable_root_logger
 
 with warning_filter():
     from gluonts.model.estimator import Estimator as GluonTSEstimator, DummyEstimator
@@ -29,40 +27,14 @@ gts_logger = logging.getLogger(gluonts.__name__)
 
 
 class AbstractGluonTSMXNetModel(AbstractGluonTSModel):
-    def _fit(
-        self,
-        train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: int = None,
-        **kwargs,
-    ) -> None:
-        verbosity = kwargs.get("verbosity", 2)
-        set_logger_verbosity(verbosity, logger=logger)
-        gts_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
-
-        if verbosity > 3:
-            logger.warning(
-                "GluonTS logging is turned on during training. Note that losses reported by GluonTS "
-                "may not correspond to those specified via `eval_metric`."
-            )
-
-        self._check_fit_params()
-
+    def _get_callbacks(self, time_limit: int, *args, **kwargs) -> List[Callable]:
         callbacks = [TimeLimitCallback(time_limit)]
 
         early_stopping_patience = self._get_model_params().get("early_stopping_patience", None)
         if early_stopping_patience:
             callbacks.append(GluonTSEarlyStoppingCallback(early_stopping_patience))
 
-        # update auxiliary parameters
-        self._deferred_init_params_aux(dataset=train_data, callbacks=callbacks, **kwargs)
-
-        estimator = self._get_estimator()
-        with warning_filter(), disable_root_logger(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
-            self.gts_predictor = estimator.train(
-                self._to_gluonts_dataset(train_data),
-                validation_data=self._to_gluonts_dataset(val_data),
-            )
+        return callbacks
 
 
 class DeepARMXNetModel(AbstractGluonTSMXNetModel):

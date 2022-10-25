@@ -5,7 +5,7 @@ import logging
 import warnings
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, List, Optional, Type
 
 import gluonts
 import numpy as np
@@ -22,12 +22,9 @@ from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPred
 from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
 from pytorch_lightning.callbacks import Timer
 
-from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.hpo.constants import CUSTOM_BACKEND
-from autogluon.core.utils import warning_filter
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel, SimpleGluonTSDataset
-from autogluon.timeseries.utils.warning_filters import disable_root_logger
 
 # FIXME: introduces cpflows dependency. We exclude this model until a future release.
 # from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
@@ -82,38 +79,8 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
             **init_args,
         )
 
-    def _fit(
-        self,
-        train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: int = None,
-        **kwargs,
-    ) -> None:
-        verbosity = kwargs.get("verbosity", 2)
-        set_logger_verbosity(verbosity, logger=logger)
-        gts_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
-        for pl_logger in pl_loggers:
-            pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
-
-        if verbosity > 3:
-            logger.warning(
-                "GluonTS logging is turned on during training. Note that losses reported by GluonTS "
-                "may not correspond to those specified via `eval_metric`."
-            )
-
-        self._check_fit_params()
-        # TODO: reintroduce early stopping callbacks
-
-        # update auxiliary parameters
-        callbacks = [Timer(timedelta(seconds=time_limit))] if time_limit is not None else []
-        self._deferred_init_params_aux(dataset=train_data, callbacks=callbacks, **kwargs)
-
-        estimator = self._get_estimator()
-        with warning_filter(), disable_root_logger():
-            self.gts_predictor = estimator.train(
-                self._to_gluonts_dataset(train_data),
-                validation_data=self._to_gluonts_dataset(val_data),
-            )
+    def _get_callbacks(self, time_limit: int, *args, **kwargs) -> List[Callable]:
+        return [Timer(timedelta(seconds=time_limit))] if time_limit is not None else []
 
     @classmethod
     def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "AbstractGluonTSModel":
@@ -136,10 +103,9 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
         if "distr_output" in init_kwargs:
             warnings.warn(
                 f"distr_output {init_kwargs['distr_output']} specified for SimpleFeedForward, however training"
-                "will default to the Gaussian distribution.",
-                category=UserWarning,
+                "will default to the Gaussian distribution."
             )
-        init_kwargs.update(dict(distr_output=NormalOutput()))
+        init_kwargs["distr_output"] = NormalOutput()
         return init_kwargs
 
     def _to_gluonts_dataset(self, time_series_df: Optional[TimeSeriesDataFrame]) -> Optional[GluonTSDataset]:
@@ -162,7 +128,7 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
                 # torch AffineTransformed
                 fdist = forecast.distribution
                 quantiles_tensor = torch.tensor(quantile_levels, device=fdist.scale.device).unsqueeze(1)
-                q_transformed = (fdist.scale * fdist.base_dist.icdf(quantiles_tensor) + fdist.loc).numpy().tolist()
+                q_transformed = (fdist.scale * fdist.base_dist.icdf(quantiles_tensor) + fdist.loc).cpu().numpy().tolist()
                 for ix, quantile in enumerate(quantile_levels):
                     item_forecast_dict[str(quantile)] = q_transformed[ix]
             else:

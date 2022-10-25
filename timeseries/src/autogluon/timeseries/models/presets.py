@@ -7,12 +7,11 @@ import autogluon.core as ag
 from .abstract import AbstractTimeSeriesModel
 from .abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 from .autogluon_tabular import AutoGluonTabularModel
-from .gluonts import (
+from .gluonts import (  # ProphetModel,
     DeepARModel,
     DeepARMXNetModel,
     MQCNNMXNetModel,
     MQRNNMXNetModel,
-    ProphetModel,
     SimpleFeedForwardModel,
     SimpleFeedForwardMXNetModel,
     TemporalFusionTransformerMXNetModel,
@@ -31,7 +30,7 @@ MODEL_TYPES = dict(
     SimpleFeedForwardMXNet=SimpleFeedForwardMXNetModel,
     DeepAR=DeepARModel,
     DeepARMXNet=DeepARMXNetModel,
-    Prophet=ProphetModel,
+    # Prophet=ProphetModel,
     Transformer=TransformerMXNetModel,
     TemporalFusionTransformer=TemporalFusionTransformerMXNetModel,
     SktimeARIMA=SktimeARIMAModel,
@@ -52,7 +51,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     TemporalFusionTransformer=45,
     DeepAR=50,
     DeepARMXNet=30,
-    Prophet=10,
+    # Prophet=10,
     SktimeAutoARIMA=20,
     SktimeARIMA=50,
     SktimeAutoETS=60,
