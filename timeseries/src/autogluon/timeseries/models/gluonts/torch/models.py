@@ -5,14 +5,13 @@ import logging
 import warnings
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, List, Type
 
 import gluonts
 import numpy as np
 import pandas as pd
 import torch
 from gluonts.core.component import from_hyperparameters
-from gluonts.dataset.common import Dataset as GluonTSDataset
 from gluonts.torch.distributions import AffineTransformed
 from gluonts.torch.distributions.distribution_output import NormalOutput
 from gluonts.torch.model.deepar import DeepAREstimator
@@ -95,6 +94,7 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
 
 class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = SimpleFeedForwardEstimator
+    float_dtype: Type = np.float32
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
@@ -107,13 +107,6 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
             )
         init_kwargs["distr_output"] = NormalOutput()
         return init_kwargs
-
-    def _to_gluonts_dataset(self, time_series_df: Optional[TimeSeriesDataFrame]) -> Optional[GluonTSDataset]:
-        return (
-            SimpleGluonTSDataset(time_series_df, target_field_name=self.target, float_dtype=np.float32)
-            if time_series_df is not None
-            else None
-        )
 
     def _gluonts_forecasts_to_data_frame(
         self, forecasts: List[Forecast], quantile_levels: List[float]

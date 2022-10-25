@@ -24,15 +24,15 @@ logger = logging.getLogger(__name__)
 
 
 MODEL_TYPES = dict(
-    MQCNN=MQCNNMXNetModel,
-    MQRNN=MQRNNMXNetModel,
+    MQCNNMXNet=MQCNNMXNetModel,
+    MQRNNMXNet=MQRNNMXNetModel,
     SimpleFeedForward=SimpleFeedForwardModel,
     SimpleFeedForwardMXNet=SimpleFeedForwardMXNetModel,
     DeepAR=DeepARModel,
     DeepARMXNet=DeepARMXNetModel,
     # Prophet=ProphetModel,
-    Transformer=TransformerMXNetModel,
-    TemporalFusionTransformer=TemporalFusionTransformerMXNetModel,
+    TransformerMXNet=TransformerMXNetModel,
+    TemporalFusionTransformerMXNet=TemporalFusionTransformerMXNetModel,
     SktimeARIMA=SktimeARIMAModel,
     SktimeAutoARIMA=SktimeAutoARIMAModel,
     SktimeAutoETS=SktimeAutoETSModel,
@@ -43,12 +43,12 @@ MODEL_TYPES = dict(
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
-    MQCNN=40,
-    MQRNN=40,
+    MQCNNMXNet=40,
+    MQRNNMXNet=40,
     SimpleFeedForward=50,
     SimpleFeedForwardMXNet=30,
-    Transformer=40,
-    TemporalFusionTransformer=45,
+    TransformerMXNet=40,
+    TemporalFusionTransformerMXNet=45,
     DeepAR=50,
     DeepARMXNet=30,
     # Prophet=10,
@@ -82,7 +82,7 @@ def get_default_hps(key, prediction_length):
             "DeepAR": {
                 "context_length": context_length,
             },
-            "TemporalFusionTransformer": {
+            "TemporalFusionTransformerMXNet": {
                 "context_length": context_length,
             },
         },
@@ -110,12 +110,12 @@ def get_default_hps(key, prediction_length):
                 "batch_size": 64,
                 "context_length": context_length,
             },
-            "Transformer": {
+            "TransformerMXNet": {
                 "model_dim": ag.Categorical(32, 64),
                 "batch_size": 64,
                 "context_length": context_length,
             },
-            "TemporalFusionTransformer": {
+            "TemporalFusionTransformerMXNet": {
                 "hidden_dim": ag.Categorical(32, 64),
                 "batch_size": 64,
                 "context_length": context_length,

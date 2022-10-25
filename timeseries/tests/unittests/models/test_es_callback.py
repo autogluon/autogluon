@@ -89,14 +89,14 @@ def test_early_stopping_patience_used_in_hp(temp_model_path):
     patience = 5
 
     hps = {
-        "SimpleFeedForward": {
+        "SimpleFeedForwardMXNet": {
             "epochs": 5,
             "num_batches_per_epoch": 10,
             "context_length": 5,
             "early_stopping_patience": patience,
         },
-        "MQCNN": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5, "early_stopping_patience": patience},
-        "DeepAR": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5, "early_stopping_patience": patience},
+        "MQCNNMXNet": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5, "early_stopping_patience": patience},
+        "DeepARMXNet": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5, "early_stopping_patience": patience},
     }
 
     predictor = TimeSeriesPredictor(path=temp_model_path)
@@ -112,9 +112,9 @@ def test_early_stopping_patience_used_in_hp(temp_model_path):
 def test_early_stopping_patience_not_used_in_hp(temp_model_path):
 
     hps = {
-        "SimpleFeedForward": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
-        "MQCNN": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
-        "DeepAR": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
+        "SimpleFeedForwardMXNet": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
+        "MQCNNMXNet": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
+        "DeepARMXNet": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
     }
 
     predictor = TimeSeriesPredictor(path=temp_model_path, hyperparameters=hps)

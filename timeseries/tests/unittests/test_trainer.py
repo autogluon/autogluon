@@ -311,7 +311,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
                 }
             ],
             2,
-            ["RNN_2"],
+            ["RNNMXNet_2"],
         ),
         (
             [
@@ -330,7 +330,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
                 }
             ],
             3,
-            ["RNN_2", "RNN_3"],
+            ["RNNMXNet_2", "RNNMXNet_3"],
         ),
         (
             [
@@ -351,7 +351,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
                 },
             ],
             4,
-            ["RNN_2", "RNN_3", "RNN_4"],
+            ["RNNMXNet_2", "RNNMXNet_3", "RNNMXNet_4"],
         ),
         (
             [
@@ -366,18 +366,18 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
                 },
             ],
             5,
-            ["RNN_2", "RNN_3", "RNN_4", "RNN_5"],
+            ["RNNMXNet_2", "RNNMXNet_3", "RNNMXNet_4", "RNNMXNet_5"],
         ),
         (
             [
                 {
                     GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
                     GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSMXNetModelFactory(MQRNNEstimator, name="MQRNN_2"): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator, name="MQRNNMXNet_2"): {"epochs": 1},
                 },
             ],
             3,
-            ["RNN_2", "RNN_2_2"],
+            ["RNNMXNet_2", "RNNMXNet_2_2"],
         ),
         (
             [
@@ -388,15 +388,15 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
                 {
                     GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
                     GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSMXNetModelFactory(MQRNNEstimator, name="MQRNN_2"): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator, name="MQRNNMXNet_2"): {"epochs": 1},
                 },
                 {
                     GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSMXNetModelFactory(MQRNNEstimator, name="MQRNN_2"): {"epochs": 1},
+                    GenericGluonTSMXNetModelFactory(MQRNNEstimator, name="MQRNNMXNet_2"): {"epochs": 1},
                 },
             ],
             7,
-            ["RNN", "RNN_2", "RNN_3", "RNN_4", "RNN_5", "RNN_2_2", "RNN_2_3"],
+            ["RNNMXNet", "RNNMXNet_2", "RNNMXNet_3", "RNNMXNet_4", "RNNMXNet_5", "RNNMXNet_2_2", "RNNMXNet_2_3"],
         ),
     ],
 )

@@ -115,6 +115,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     gluonts_model_path = "gluon_ts"
     gluonts_estimator_class: Type[GluonTSEstimator] = None
+    float_dtype: Type = np.float64  # datatype of floating point numbers passed internally to GluonTS
 
     def __init__(
         self,
@@ -227,6 +228,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 target_field_name=self.target,
                 feat_static_cat=feat_static_cat,
                 feat_static_real=feat_static_real,
+                float_dtype=self.float_dtype,
             )
         else:
             return None
