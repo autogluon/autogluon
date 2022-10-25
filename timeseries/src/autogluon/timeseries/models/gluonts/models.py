@@ -71,6 +71,12 @@ class DeepARModel(AbstractGluonTSModel):
     context_length : int, optional
         Number of steps to unroll the RNN for before computing predictions
         (default: None, in which case context_length = prediction_length)
+    disable_static_features : bool, default = False
+        If True, static features won't be used by the model even if they are present in the dataset.
+        If False, static features will be used by the model if they are present in the dataset.
+    disable_dynamic_features : bool, default = False
+        If True, dynamic features won't be used by the model even if they are present in the dataset.
+        If False, dynamic features will be used by the model if they are present in the dataset.
     num_layers : int, default = 2
         Number of RNN layers
     num_cells : int, default = 40
@@ -104,10 +110,15 @@ class DeepARModel(AbstractGluonTSModel):
 
     def _get_model_params(self) -> dict:
         args = super()._get_model_params()
-        args.setdefault("use_feat_static_cat", self.use_feat_static_cat)
-        args.setdefault("use_feat_static_real", self.use_feat_static_real)
-        args.setdefault("use_feat_dynamic_real", self.use_feat_dynamic_real)
-        args.setdefault("cardinality", self.feat_static_cat_cardinality)
+        disable_static_features = args.pop("disable_static_features", False)
+        if not disable_static_features:
+            args.setdefault("use_feat_static_cat", self.use_feat_static_cat)
+            args.setdefault("use_feat_static_real", self.use_feat_static_real)
+            args.setdefault("cardinality", self.feat_static_cat_cardinality)
+
+        disable_dynamic_features = args.pop("disable_dynamic_features", False)
+        if not disable_dynamic_features:
+            args.setdefault("use_feat_dynamic_real", self.use_feat_dynamic_real)
         return args
 
 
@@ -145,6 +156,12 @@ class MQCNNModel(AbstractGluonTSSeq2SeqModel):
     context_length : int, optional
         Number of steps to unroll the RNN for before computing predictions
         (default: None, in which case context_length = prediction_length)
+    disable_static_features : bool, default = False
+        If True, static features won't be used by the model even if they are present in the dataset.
+        If False, static features will be used by the model if they are present in the dataset.
+    disable_dynamic_features : bool, default = False
+        If True, dynamic features won't be used by the model even if they are present in the dataset.
+        If False, dynamic features will be used by the model if they are present in the dataset.
     embedding_dimension : int, optional
         Dimension of the embeddings for categorical features. (default: [min(50, (cat+1)//2) for cat in cardinality])
     add_time_feature : bool, default = True
@@ -191,10 +208,15 @@ class MQCNNModel(AbstractGluonTSSeq2SeqModel):
 
     def _get_model_params(self) -> dict:
         args = super()._get_model_params()
-        args.setdefault("use_feat_static_cat", self.use_feat_static_cat)
-        args.setdefault("use_feat_static_real", self.use_feat_static_real)
-        args.setdefault("use_feat_dynamic_real", self.use_feat_dynamic_real)
-        args.setdefault("cardinality", self.feat_static_cat_cardinality)
+        disable_static_features = args.pop("disable_static_features", False)
+        if not disable_static_features:
+            args.setdefault("use_feat_static_cat", self.use_feat_static_cat)
+            args.setdefault("use_feat_static_real", self.use_feat_static_real)
+            args.setdefault("cardinality", self.feat_static_cat_cardinality)
+
+        disable_dynamic_features = args.pop("disable_dynamic_features", False)
+        if not disable_dynamic_features:
+            args.setdefault("use_feat_dynamic_real", self.use_feat_dynamic_real)
         return args
 
 
