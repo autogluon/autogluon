@@ -166,11 +166,14 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                     "Dataset frequency not provided in the dataset, fit arguments or "
                     "during initialization. Please provide a `freq` string to `fit`."
                 )
-            feat_static_cat, feat_static_real = get_categorical_and_continuous_features(ds.static_features)
-            self.use_feat_static_cat = feat_static_cat is not None
-            self.use_feat_static_real = feat_static_real is not None
-            if self.use_feat_static_cat:
-                self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
+
+            disable_static_features = self._get_model_params().get("disable_static_features", False)
+            if not disable_static_features:
+                feat_static_cat, feat_static_real = get_categorical_and_continuous_features(ds.static_features)
+                self.use_feat_static_cat = feat_static_cat is not None
+                self.use_feat_static_real = feat_static_real is not None
+                if self.use_feat_static_cat:
+                    self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
 
         if "callbacks" in kwargs:
             self.callbacks += kwargs["callbacks"]

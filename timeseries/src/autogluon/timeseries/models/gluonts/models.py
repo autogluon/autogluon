@@ -110,15 +110,10 @@ class DeepARModel(AbstractGluonTSModel):
 
     def _get_model_params(self) -> dict:
         args = super()._get_model_params()
-        disable_static_features = args.pop("disable_static_features", False)
-        if not disable_static_features:
-            args.setdefault("use_feat_static_cat", self.use_feat_static_cat)
-            args.setdefault("use_feat_static_real", self.use_feat_static_real)
-            args.setdefault("cardinality", self.feat_static_cat_cardinality)
-
-        disable_dynamic_features = args.pop("disable_dynamic_features", False)
-        if not disable_dynamic_features:
-            args.setdefault("use_feat_dynamic_real", self.use_feat_dynamic_real)
+        args.setdefault("use_feat_static_cat", self.use_feat_static_cat)
+        args.setdefault("use_feat_static_real", self.use_feat_static_real)
+        args.setdefault("cardinality", self.feat_static_cat_cardinality)
+        args.setdefault("use_feat_dynamic_real", self.use_feat_dynamic_real)
         return args
 
 
@@ -208,15 +203,10 @@ class MQCNNModel(AbstractGluonTSSeq2SeqModel):
 
     def _get_model_params(self) -> dict:
         args = super()._get_model_params()
-        disable_static_features = args.pop("disable_static_features", False)
-        if not disable_static_features:
-            args.setdefault("use_feat_static_cat", self.use_feat_static_cat)
-            args.setdefault("use_feat_static_real", self.use_feat_static_real)
-            args.setdefault("cardinality", self.feat_static_cat_cardinality)
-
-        disable_dynamic_features = args.pop("disable_dynamic_features", False)
-        if not disable_dynamic_features:
-            args.setdefault("use_feat_dynamic_real", self.use_feat_dynamic_real)
+        args.setdefault("use_feat_static_cat", self.use_feat_static_cat)
+        args.setdefault("use_feat_static_real", self.use_feat_static_real)
+        args.setdefault("cardinality", self.feat_static_cat_cardinality)
+        args.setdefault("use_feat_dynamic_real", self.use_feat_dynamic_real)
         return args
 
 
