@@ -263,3 +263,14 @@ def test_when_static_features_match_in_train_and_val_data_then_no_exception_is_r
 ):
     learner = TimeSeriesLearner(path_context=temp_model_path)
     learner._preprocess_static_features(train_data=train_data, val_data=val_data)
+
+
+def test_when_static_features_are_preprocessed_then_dtypes_are_correct(temp_model_path):
+    train_data = get_data_frame_with_variable_lengths(
+        {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2", "f3"])
+    )
+    learner = TimeSeriesLearner(path_context=temp_model_path)
+    train_data_processed, _ = learner._preprocess_static_features(train_data=train_data, val_data=None)
+    assert train_data_processed.static_features["f1"].dtype == np.float64
+    assert train_data_processed.static_features["f2"].dtype == "category"
+    assert train_data_processed.static_features["f3"].dtype == np.float64

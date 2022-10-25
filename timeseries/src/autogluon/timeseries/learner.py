@@ -166,7 +166,7 @@ class TimeSeriesLearner(AbstractLearner):
         else:
             original_static_feature_columns = train_data.static_features.columns
             train_data.static_features = self.feature_pipeline.fit_transform(train_data.static_features)
-            train_data.static_features = convert_numerical_features_to_float(train_data.static_features)
+            # train_data.static_features = convert_numerical_features_to_float(train_data.static_features)
 
             mapped_to_categorical = []
             mapped_to_continuous = []

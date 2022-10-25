@@ -6,7 +6,12 @@ from pandas.api.types import is_categorical_dtype, is_numeric_dtype
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, R_INT
-from autogluon.features.generators import CategoryFeatureGenerator, IdentityFeatureGenerator, PipelineFeatureGenerator
+from autogluon.features.generators import (
+    CategoryFeatureGenerator,
+    IdentityFeatureGenerator,
+    PipelineFeatureGenerator,
+    AsTypeFeatureGenerator,
+)
 
 
 class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
@@ -17,7 +22,15 @@ class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
             CategoryFeatureGenerator(minimum_cat_count=1),
             IdentityFeatureGenerator(infer_features_in_args={"valid_raw_types": [R_INT, R_FLOAT]}),
         ]
-        super().__init__(generators=[generators], post_generators=[], feature_metadata_in=feature_metadata, **kwargs)
+        super().__init__(
+            generators=[generators],
+            post_generators=[],
+            pre_generators=[AsTypeFeatureGenerator(convert_bool=False)],
+            feature_metadata_in=feature_metadata,
+            pre_enforce_types=False,
+            pre_drop_useless=False,
+            **kwargs,
+        )
 
 
 def get_categorical_and_continuous_features(
