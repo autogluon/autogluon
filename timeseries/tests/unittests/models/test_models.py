@@ -175,7 +175,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         },
     )
     # TFT cannot handle arbitrary quantiles
-    if model.name == "TemporalFusionTransformer":
+    if "TemporalFusionTransformer" in model.name:
         return
 
     model.fit(train_data=DUMMY_TS_DATAFRAME)
