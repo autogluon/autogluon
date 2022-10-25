@@ -71,28 +71,6 @@ class MMDetLitModule(pl.LightningModule):
 
         return pred_results
 
-    def _val_batch_to_train(self, batch):
-        batch = unpack_datacontainers(batch)
-
-        img_metas = batch[self.input_data_key]["img_metas"][0][0]
-        img = batch[self.input_data_key]["img"][0][0].float().to(self.device)
-        batch_size = img.shape[0]
-        gt_bboxes = []
-        gt_labels = []
-        for i in range(batch_size):
-            gt_bboxes.append(torch.tensor(batch[self.input_data_key]["gt_bboxes"][0][i]).float().to(self.device))
-            gt_labels.append(torch.tensor(batch[self.input_data_key]["gt_labels"][0][i]).long().to(self.device))
-
-        return img, img_metas, gt_bboxes, gt_labels
-
-    def _train_batch_to_val(self, batch):
-        batch = unpack_datacontainers(batch)
-
-        img_metas = [batch[self.input_data_key]["img_metas"][0]]
-        imgs = [batch[self.input_data_key]["img"][0].float().to(self.device)]
-
-        return imgs, img_metas
-
     def _loss_step(self, img, img_metas, gt_bboxes, gt_labels):
         loss, log_vars = self.compute_loss(
             img=img,
