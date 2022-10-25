@@ -2352,7 +2352,8 @@ class MultiModalPredictor:
 
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]
-        predictor._pipeline = assets["pipeline"]
+        if "pipeline" in assets:  # back compatibility
+            predictor._pipeline = assets["pipeline"]
         predictor._eval_metric_name = assets["eval_metric_name"]
         predictor._verbosity = verbosity
         predictor._resume = resume
