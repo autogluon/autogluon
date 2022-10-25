@@ -60,35 +60,13 @@ class MMDetLitModule(pl.LightningModule):
         self.id2label = self.model.id2label
 
     def _predict_step(self, batch, batch_idx=0, return_loss=False):
-        """
-        from mmcv.ops import RoIPool
-        from mmcv.parallel import scatter
-
-        # TODO: move unpack code to collate function
-        data = batch["mmdet_image_image"]
-        data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
-        data["img"] = [img.data[0] for img in data["img"]]
-        # scatter may not work for multigpu
-        #print("input size: %s" % len(data["img"][0]))
-        #logger.info(str(next(self.model.parameters()).device))
-        if next(self.model.parameters()).is_cuda:
-            # scatter to specified GPU
-            data = scatter(data, [self.device])[0]
-        else:
-            for m in self.model.modules():
-                assert not isinstance(m, RoIPool), "CPU inference with RoIPool is not supported currently."
-        """
         imgs, img_metas = self._val_batch_to_val(batch)
-        # batch_result = self.model.forward_test(
-        #    imgs=imgs,
-        #    img_metas=img_metas,
-        # )  # batch_size, 80, (n, 5)
         pred_results = self.model.model(return_loss=False, rescale=True, img=imgs, img_metas=img_metas)
-        # print(pred_results)
 
         return pred_results
 
     def _val_batch_to_val(self, batch):
+        # TODO: move unpack code to collate function
         batch = unpack_datacontainers(batch)
 
         img_metas = batch["mmdet_image_image"]["img_metas"][0]
@@ -268,14 +246,8 @@ class MMDetLitModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         if self.use_loss:
-            # img, img_metas, gt_bboxes, gt_labels = self._val_batch_to_train(batch)
             img, img_metas, gt_bboxes, gt_labels = self._train_batch_to_train(batch)
-            loss, log_vars = self._loss_step(img, img_metas, gt_bboxes, gt_labels)
-            if ("loss_cls" in log_vars) and ("loss_conf" in log_vars):  # TODO: remove this hard coding for yolov3
-                val_loss = loss
-                # val_loss = log_vars["loss_cls"]/2 + log_vars["loss_conf"]/4 + log_vars["loss_xy"] + log_vars["loss_wh"]
-            else:
-                val_loss = loss
+            val_loss, log_vars = self._loss_step(img, img_metas, gt_bboxes, gt_labels)
             self.validation_metric.update(val_loss)
         else:
             self.evaluate(batch, "val")
@@ -298,7 +270,6 @@ class MMDetLitModule(pl.LightningModule):
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         pred = self._predict_step(batch, batch_idx)
-        # print("output size: %s" % str(len(pred)))
         if "mmdet_image_label" in batch:
             return {"bbox": pred, "label": batch["mmdet_image_label"]}
         else:
@@ -315,6 +286,7 @@ class MMDetLitModule(pl.LightningModule):
         [sched]
             Learning rate scheduler.
         """
+        # TODO: add freeze layer and different lr for head and backbone.
         kwargs = dict(
             model=self.model,
             lr=self.hparams.lr,

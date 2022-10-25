@@ -59,6 +59,10 @@ class BaseDataModule(LightningDataModule):
         id_mappings
              Id-to-content mappings. The contents can be text, image, etc.
              This is used when the dataframe contains the query/response indexes instead of their contents.
+        val_is_train
+             Whether we want to treat validation as training.
+             This is used when we want to use val_loss as val metric, and thus training_pipeline
+             instead of val_pipeline during validation.
         """
         super().__init__()
         self.prepare_data_per_node = True

@@ -405,7 +405,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             col_value = df[col_name]
             col_type = self._column_types[col_name]
 
-            if col_type == ROIS: 
+            if col_type == ROIS:
                 processed_data = df[col_name].tolist()
             elif col_type == IMAGE_PATH or IMAGE:
                 processed_data = col_value.apply(lambda ele: ele.split(";")).tolist()

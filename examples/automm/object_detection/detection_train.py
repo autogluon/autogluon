@@ -7,8 +7,8 @@ An example to finetune an MMDetection model on COCO:
         --test_path coco17/annotations/instances_val2017.json \
         --checkpoint_name yolov3_mobilenetv2_320_300e_coco \
         --num_classes 80 \
-        --lr <learning_rate>
-        --wd <weight_decay>
+        --lr <learning_rate> \
+        --wd <weight_decay> \
         --epochs <epochs>
 
 An example to finetune an MMDetection model on VOC:
@@ -16,12 +16,12 @@ An example to finetune an MMDetection model on VOC:
     https://github.com/open-mmlab/mmdetection/blob/9d3e162459590eee4cfc891218dfbb5878378842/tools/dataset_converters/pascal_voc.py
     Then, run:
     python detection_train.py \
-        --train_path /media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_trainval.json
-        --test_path /media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_test.json
-        --checkpoint_name yolov3_mobilenetv2_320_300e_coco
-        --num_classes 20
-        --lr <learning_rate>
-        --wd <weight_decay>
+        --train_path /media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_trainval.json \
+        --test_path /media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_test.json \
+        --checkpoint_name yolov3_mobilenetv2_320_300e_coco \
+        --num_classes 20 \
+        --lr <learning_rate> \
+        --wd <weight_decay> \
         --epochs <epochs>
 
 Note that for now it's required to install nightly build torchmetrics.
@@ -43,6 +43,7 @@ def detection_train(
     epochs=50,
     num_gpus=4,
     val_metric=None,
+    per_gpu_batch_size=8,
 ):
 
     # TODO: add val_path
@@ -73,16 +74,14 @@ def detection_train(
             "optimization.top_k_average_method": "best",
             "optimization.warmup_steps": 0.0,
             "optimization.patience": 40,
-            "env.per_gpu_batch_size": 3,  # decrease it when model is large
+            "env.per_gpu_batch_size": per_gpu_batch_size,  # decrease it when model is large
         },
     )
     fit_end = time.time()
     print("time usage for fit: %.2f" % (fit_end - start))
     predictor.save("./temp_test_ag_model")
 
-    exit()
-
-    if test_path is not None:
+    if num_gpus == 1 and test_path is not None: # TODO: support multigpu inference
         predictor = MultiModalPredictor.load("./temp_test_ag_model")
         print(predictor.evaluate(test_path))
         print("time usage for eval: %.2f" % (time.time() - fit_end))
@@ -100,6 +99,7 @@ if __name__ == "__main__":
     parser.add_argument("--wd", default=1e-3, type=float)
     parser.add_argument("--epochs", default=50, type=int)
     parser.add_argument("--num_gpus", default=4, type=int)
+    parser.add_argument("--per_gpu_batch_size", default=8, type=int)
     parser.add_argument("--val_metric", default=None, type=str)
     args = parser.parse_args()
 
@@ -112,5 +112,6 @@ if __name__ == "__main__":
         wd=args.wd,
         epochs=args.epochs,
         num_gpus=args.num_gpus,
-        val_metric=args.val_metric
+        val_metric=args.val_metric,  # "mAP" or "direct_loss" or None (use default: "direct_loss")
+        per_gpu_batch_size=args.per_gpu_batch_size
     )

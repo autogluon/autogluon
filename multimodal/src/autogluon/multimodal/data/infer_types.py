@@ -504,7 +504,6 @@ def infer_rois_column_type(
     return column_types
 
 
-
 def infer_problem_type_output_shape(
     label_column: str,
     column_types: Optional[Dict] = None,

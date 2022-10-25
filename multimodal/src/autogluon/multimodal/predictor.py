@@ -1679,12 +1679,12 @@ class MultiModalPredictor:
             requires_label=requires_label,
         )
 
-        strategy = "dp"
+        strategy = "dp"  # default used in inference.
 
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
 
         if self._pipeline == OBJECT_DETECTION:
-            # strategy = "ddp" # TODO: make multigpu inference work
+            # strategy = "ddp" # TODO: enable multigpu inference
             num_gpus = 1
 
         if num_gpus == 1:

@@ -3,12 +3,12 @@ The example to evaluate a pretrained object detection model in AutoMM.
 
 An example to evaluate an MMDetection model on COCO:
     python detection_eval.py \
-        --test_path coco17/annotations/instances_val2017.json
+        --test_path coco17/annotations/instances_val2017.json \
         --checkpoint_name yolov3_mobilenetv2_320_300e_coco
 
 An example to evaluate an MMDetection model on VOC:
     python detection_eval.py \
-        --test_path VOCdevkit/VOCCOCO/voc07_test.json
+        --test_path VOCdevkit/VOCCOCO/voc07_test.json \
         --checkpoint_name faster_rcnn_r50_fpn_1x_voc0712
 
 Note that for now it's required to install nightly build torchmetrics.
@@ -54,4 +54,3 @@ if __name__ == "__main__":
         checkpoint_name=args.checkpoint_name,
         num_gpus=args.num_gpus,
     )
-    # detection_evaluation("faster_rcnn_r50_fpn_1x_voc0712", "VOCdevkit/VOCCOCO/voc07_test.json")
