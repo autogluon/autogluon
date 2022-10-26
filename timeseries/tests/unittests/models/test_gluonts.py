@@ -6,7 +6,6 @@ from gluonts.model.predictor import Predictor as GluonTSPredictor
 from gluonts.model.prophet import PROPHET_IS_INSTALLED
 from gluonts.mx.model.seq2seq import MQRNNEstimator
 from gluonts.mx.model.transformer import TransformerEstimator
-from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 
 import autogluon.core as ag
 from autogluon.timeseries.models.gluonts import (  # MQRNNModel,; TransformerModel,
@@ -18,6 +17,7 @@ from autogluon.timeseries.models.gluonts import (  # MQRNNModel,; TransformerMod
     TemporalFusionTransformerModel,
 )
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
+from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 
 from ..common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
 
