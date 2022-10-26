@@ -277,3 +277,14 @@ def test_when_static_features_are_preprocessed_then_dtypes_are_correct(temp_mode
     assert train_data_processed.static_features["f1"].dtype == np.float64
     assert train_data_processed.static_features["f2"].dtype == "category"
     assert train_data_processed.static_features["f3"].dtype == np.float64
+
+
+def test_when_train_data_has_static_feat_but_pred_data_has_no_static_feat_then_exception_is_raised(temp_model_path):
+    train_data = get_data_frame_with_variable_lengths(
+        {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2"])
+    )
+    pred_data = get_data_frame_with_variable_lengths({"B": 20, "A": 15}, static_features=None)
+    learner = TimeSeriesLearner(path_context=temp_model_path)
+    learner.fit(train_data=train_data, hyperparameters={"ETS": {"maxiter": 1}})
+    with pytest.raises(ValueError, match="Cannot predict since data has no static features"):
+        learner.predict(pred_data)

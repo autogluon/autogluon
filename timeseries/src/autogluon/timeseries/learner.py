@@ -156,14 +156,13 @@ class TimeSeriesLearner(AbstractLearner):
         if val_data is not None:
             val_data = val_data.copy(deep=False)
 
-        self.feature_pipeline = ContinuousAndCategoricalFeatureGenerator(
-            feature_metadata=static_feature_metadata, verbosity=0
-        )
-
         if train_data.static_features is None:
             if val_data is not None and val_data.static_features is not None:
                 val_data.static_features = None
         else:
+            self.feature_pipeline = ContinuousAndCategoricalFeatureGenerator(
+                feature_metadata=static_feature_metadata, verbosity=0
+            )
             original_static_feature_columns = train_data.static_features.columns
             train_data.static_features = self.feature_pipeline.fit_transform(train_data.static_features)
             # train_data.static_features = convert_numerical_features_to_float(train_data.static_features)
@@ -214,7 +213,7 @@ class TimeSeriesLearner(AbstractLearner):
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        if self.feature_pipeline.is_fit:
+        if self.feature_pipeline is not None:
             if data.static_features is None:
                 raise ValueError(
                     "Cannot predict since data has no static features (but training data had static features)"
