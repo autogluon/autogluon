@@ -218,8 +218,11 @@ def run(
     search_space = _convert_search_space(search_space)
 
     if not ray.is_initialized():
-        ray.init(log_to_driver=False, **total_resources)
-
+        ray.init(
+            log_to_driver=False,
+            runtime_env={"env_vars": {"PL_DISABLE_FORK": "1"}},  # https://github.com/ray-project/ray/issues/28197
+            **total_resources
+        )
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     resources_per_trial = ray_tune_adapter.get_resources_per_trial(
         total_resources=total_resources,
