@@ -17,7 +17,7 @@ from autogluon.timeseries.models.gluonts import (  # MQRNNModel,; TransformerMod
 )
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
 
-from ..common import DUMMY_TS_DATAFRAME
+from ..common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
 
 TESTABLE_MODELS = [
     DeepARModel,
@@ -28,6 +28,11 @@ TESTABLE_MODELS = [
     partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
     GenericGluonTSModelFactory(TransformerEstimator),
     TemporalFusionTransformerModel,
+]
+
+MODELS_WITH_STATIC_FEATURES = [
+    DeepARModel,
+    MQCNNModel,
 ]
 
 # if PROPHET_IS_INSTALLED:
@@ -203,3 +208,18 @@ def test_when_tft_quantiles_are_deciles_then_forecast_contains_correct_quantiles
     predictions = model.predict(data=DUMMY_TS_DATAFRAME)
     assert "mean" in predictions.columns
     assert all(str(q) in predictions.columns for q in quantiles)
+
+
+@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
+def test_when_static_features_are_available_then_they_are_used_by_model(model_class):
+    model = model_class(hyperparameters={"epochs": 1})
+    model.fit(train_data=DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC)
+    assert model.use_feat_static_cat == True
+    assert model.use_feat_static_real == True
+    assert len(model.feat_static_cat_cardinality) == 1
+
+
+@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
+def test_when_disable_static_features_set_to_true_then_static_features_are_not_used(model_class):
+    model = model_class(hyperparameters={"epochs": 1})
+    model.fit(train_data=DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC)
