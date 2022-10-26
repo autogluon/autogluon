@@ -230,6 +230,7 @@ class RFModel(AbstractModel):
             model.estimators_ = None
         self.model = model
         self.params_trained['n_estimators'] = self.model.n_estimators
+        # FIXME: v0.6 Move to generic compile call, ensure compile time is included in fit time
         self.compile()
 
     # TODO: Remove this after simplifying _predict_proba to reduce code duplication. This is only present for SOFTCLASS support.
