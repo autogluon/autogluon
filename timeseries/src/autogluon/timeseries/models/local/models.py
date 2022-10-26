@@ -1,13 +1,84 @@
 from typing import List
 import numpy as np
 import pandas as pd
-from joblib import delayed, Parallel
+from scipy.stats import norm
 
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_timestamps
 from .abstract_local_model import AbstractLocalModel
 
 
-class SeasonalNaive(AbstractLocalModel):
+def naive_forecast(
+    time_series: pd.DataFrame, freq: str, prediction_length: int, quantile_levels: List[float], seasonal_period: int
+):
+    forecast_timestamps = get_forecast_horizon_timestamps(
+        past_timestamps=time_series.index, freq=freq, prediction_length=prediction_length
+    )
+
+    target = time_series.values.ravel()
+    forecast = {}
+    if len(target) > seasonal_period and seasonal_period > 1:
+        indices = [len(target) - seasonal_period + k % seasonal_period for k in range(prediction_length)]
+        forecast["mean"] = target[indices]
+        residuals = target[:-seasonal_period] - target[seasonal_period:]
+    else:
+        # Fall back to naive forecast if time series too short or seasonal_period == 1
+        forecast["mean"] = np.full(shape=[prediction_length], fill_value=target[-1])
+        residuals = target[:-1] - target[1:]
+
+    # Assuming the residuals follow normal distribution with mean 0
+    sigma = np.sqrt(np.mean(np.square(residuals)))
+    # Sum of two normally distributed random variables with scale sigma has scale = sqrt(2) * sigma
+    sigma_accumulated_over_time = sigma * np.sqrt(np.arange(1, prediction_length + 1))
+
+    for q in quantile_levels:
+        forecast[str(q)] = forecast["mean"] + norm.ppf(q) * sigma_accumulated_over_time
+
+    return pd.DataFrame(forecast, index=forecast_timestamps)
+
+
+class NaiveModel(AbstractLocalModel):
+    """Baseline model that sets the forecast equal to the last observed value.
+
+    Quantiles are obtained by assuming that the residuals follow zero-mean normal distribution, scale of which is
+    estimated from the empirical distribution of the residuals.
+    """
+
+    @staticmethod
+    def _predict_with_local_model(
+        time_series: pd.Series,
+        freq: str,
+        prediction_length: int,
+        quantile_levels: List[float],
+        local_model_args: dict,
+        **kwargs,
+    ) -> pd.DataFrame:
+        return naive_forecast(
+            time_series=time_series,
+            freq=freq,
+            prediction_length=prediction_length,
+            quantile_levels=quantile_levels,
+            seasonal_period=1,
+        )
+
+
+class SeasonalNaiveModel(AbstractLocalModel):
+    """Baseline model that sets the forecast equal to the last observed value from the same season.
+
+    Quantiles are obtained by assuming that the residuals follow zero-mean normal distribution, scale of which is
+    estimated from the empirical distribution of the residuals.
+
+
+    Other Parameters
+    ----------------
+    seasonal_period : int or None, default = None
+        Number of time steps in a complete seasonal cycle for seasonal models. For example, 7 for daily data with a
+        weekly cycle or 12 for monthly data with an annual cycle.
+        When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
+        specified manually by providing an integer > 1.
+        If seasonal_period (inferred or provided) is equal to 1, will fall back to Naive forecast.
+        Seasonality will also be disabled, if the length of the time series is < seasonal_period.
+    """
+
     allowed_local_model_args = ["seasonal_period"]
 
     @staticmethod
@@ -19,20 +90,10 @@ class SeasonalNaive(AbstractLocalModel):
         local_model_args: dict,
         **kwargs,
     ) -> pd.DataFrame:
-        seasonal_period = local_model_args["seasonal_period"]
-        forecast_timestamps = get_forecast_horizon_timestamps(
-            past_timestamps=time_series.index, freq=freq, prediction_length=prediction_length
+        return naive_forecast(
+            time_series=time_series,
+            freq=freq,
+            prediction_length=prediction_length,
+            quantile_levels=quantile_levels,
+            seasonal_period=local_model_args["seasonal_period"],
         )
-
-        target = time_series.values
-        forecast = {}
-        if len(target) >= seasonal_period:
-            indices = [len(target) - seasonal_period + k % seasonal_period for k in range(prediction_length)]
-            forecast["mean"] = target[indices].reshape(-1)
-        else:
-            forecast["mean"] = np.full(shape=[prediction_length], fill_value=target.mean())
-
-        for q in quantile_levels:
-            forecast[str(q)] = forecast["mean"]
-
-        return pd.DataFrame(forecast, index=forecast_timestamps)

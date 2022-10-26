@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 class AbstractLocalModel(AbstractTimeSeriesModel):
     allowed_local_model_args: List[str] = []
-    local_model_predict_fn: Callable
 
     def __init__(
         self,
@@ -50,10 +49,17 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
     def _fit(self, train_data: TimeSeriesDataFrame, time_limit: int = None, **kwargs):
         # Initialize parameters passed to each local model
-        local_model_args = self._get_model_params().copy()
-        local_model_args.pop("n_jobs", None)
+        raw_local_model_args = self._get_model_params().copy()
+        raw_local_model_args.pop("n_jobs", None)
 
-        unused_local_model_args = [arg for arg in local_model_args.keys() if arg not in self.allowed_local_model_args]
+        unused_local_model_args = []
+        local_model_args = {}
+        for key, value in raw_local_model_args.items():
+            if key in self.allowed_local_model_args:
+                local_model_args[key] = value
+            else:
+                unused_local_model_args.append(key)
+
         if len(unused_local_model_args):
             logger.warning(
                 f" {self.name} ignores following hyperparameters: {unused_local_model_args}. "
@@ -100,7 +106,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             logger.debug(f"{self.name} received {len(items_to_fit)} new items to predict, generating predictions")
             time_series_to_fit = [data.loc[item_id][self.target] for item_id in items_to_fit]
             predictions = Parallel(n_jobs=self.n_jobs, prefer="threads")(
-                delayed(self.local_model_predict_fn)(
+                delayed(self._predict_with_local_model)(
                     time_series=ts,
                     prediction_length=self.prediction_length,
                     freq=self.freq,

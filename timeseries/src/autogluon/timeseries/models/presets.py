@@ -7,7 +7,8 @@ import autogluon.core as ag
 from .abstract import AbstractTimeSeriesModel
 from .abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 from .autogluon_tabular import AutoGluonTabularModel
-from .gluonts import (  # ProphetModel,
+from .local import NaiveModel, SeasonalNaiveModel
+from .gluonts import (
     DeepARModel,
     DeepARMXNetModel,
     MQCNNMXNetModel,
@@ -40,6 +41,8 @@ MODEL_TYPES = dict(
     ARIMA=ARIMAModel,
     Theta=ThetaModel,
     AutoGluonTabular=AutoGluonTabularModel,
+    Naive=NaiveModel,
+    SeasonalNaive=SeasonalNaiveModel,
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
@@ -58,6 +61,8 @@ DEFAULT_MODEL_PRIORITY = dict(
     ETS=60,
     Theta=60,
     AutoGluonTabular=45,
+    Naive=70,
+    SeasonalNaive=70,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 MINIMUM_CONTEXT_LENGTH = 10
@@ -67,11 +72,15 @@ def get_default_hps(key, prediction_length):
     context_length = max(prediction_length * 2, MINIMUM_CONTEXT_LENGTH)
     default_model_hps = {
         "local_only": {
+            "Naive": {},
+            "SeasonalNaive": {},
             "ARIMA": {},
             "ETS": {},
             "Theta": {},
         },
         "default": {
+            "Naive": {},
+            "SeasonalNaive": {},
             "ARIMA": {},
             "ETS": {},
             "Theta": {},
@@ -87,6 +96,8 @@ def get_default_hps(key, prediction_length):
             "AutoGluonTabular": {},
         },
         "default_hpo": {
+            "Naive": {},
+            "SeasonalNaive": {},
             "ARIMA": {
                 "order": ag.Categorical((2, 0, 1), (2, 1, 0), (2, 1, 1), (1, 1, 1)),
                 "seasonal_order": ag.Categorical((0, 0, 0), (1, 0, 0)),
