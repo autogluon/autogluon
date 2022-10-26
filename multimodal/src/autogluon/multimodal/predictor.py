@@ -1202,7 +1202,7 @@ class MultiModalPredictor:
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
-                accelerator='gpu' if num_gpus > 0 else None,
+                accelerator="gpu" if num_gpus > 0 else None,
                 devices=num_gpus if not use_ray_lightning else None,  # ray lightning requires not specifying gpus
                 auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
                 num_nodes=config.env.num_nodes,
