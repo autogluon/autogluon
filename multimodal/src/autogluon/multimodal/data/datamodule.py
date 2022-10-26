@@ -81,11 +81,11 @@ class BaseDataModule(LightningDataModule):
         self.test_data = test_data
         self.predict_data = predict_data
         self.id_mappings = id_mappings
-        self.val_is_train = val_is_train
+        self.val_use_training_mode = val_use_training_mode
 
     def set_dataset(self, split):
         data_split = getattr(self, f"{split}_data")
-        if self.val_is_train:
+        if self.val_use_training_mode:
             is_training = split in [TRAIN, VAL]
         else:
             is_training = split == TRAIN

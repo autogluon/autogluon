@@ -1015,7 +1015,7 @@ class MultiModalPredictor:
         if teacher_data_processors is not None:
             data_processors = [data_processors, teacher_data_processors]
 
-        val_is_train = (self._pipeline == OBJECT_DETECTION) and (validation_metric_name != MAP)
+        val_use_training_mode = (self._pipeline == OBJECT_DETECTION) and (validation_metric_name != MAP)
         train_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
@@ -1023,7 +1023,7 @@ class MultiModalPredictor:
             num_workers=config.env.num_workers,
             train_data=train_df,
             val_data=val_df,
-            val_is_train=val_is_train,
+            val_use_training_mode=val_use_training_mode,
         )
         optimization_kwargs = dict(
             optim_type=config.optimization.optim_type,
