@@ -204,6 +204,7 @@ def create_fusion_data_processors(
 
     for per_name, per_model in model_dict.items():
         model_config = getattr(config.model, per_model.prefix)
+        data_types = model_config.data_types.copy()
 
         if per_name == NER:
             # create a multimodal processor for NER.
@@ -215,8 +216,8 @@ def create_fusion_data_processors(
                 )
             )
             requires_label = False
-            if TEXT in model_config.data_types:
-                model_config.data_types.remove(TEXT)
+            if TEXT in data_types:
+                data_types.remove(TEXT)
 
         if requires_label:
             # each model has its own label processor
@@ -227,8 +228,8 @@ def create_fusion_data_processors(
             )
             data_processors[LABEL].append(label_processor)
 
-        if requires_data and model_config.data_types:
-            for data_type in model_config.data_types:
+        if requires_data and data_types:
+            for data_type in data_types:
                 per_data_processor = create_data_processor(
                     data_type=data_type,
                     model=per_model,
