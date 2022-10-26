@@ -41,14 +41,14 @@ def test_ApplyFeatureGenerator():
     ])
 
     state = analysis.fit()
-    assert list(df_train.dtypes.apply(str).values) == ['object', 'int64', 'object', 'int64']
-    assert list(df_test.dtypes.apply(str).values) == ['object', 'int64', 'object', 'int64']
+    assert list(df_train.dtypes.apply(str).to_numpy()) == ['object', 'int64', 'object', 'int64']
+    assert list(df_test.dtypes.apply(str).to_numpy()) == ['object', 'int64', 'object', 'int64']
 
-    assert list(state.no_wrapper.args.train_data[df_train.columns].dtypes.apply(str).values) == ['object', 'int64', 'object', 'int64']
-    assert list(state.no_wrapper.args.test_data[df_test.columns].dtypes.apply(str).values) == ['object', 'int64', 'object', 'int64']
+    assert list(state.no_wrapper.args.train_data[df_train.columns].dtypes.apply(str).to_numpy()) == ['object', 'int64', 'object', 'int64']
+    assert list(state.no_wrapper.args.test_data[df_test.columns].dtypes.apply(str).to_numpy()) == ['object', 'int64', 'object', 'int64']
 
-    assert list(state.feature_generator_default.args.train_data[df_train.columns].dtypes.apply(str).values) == ['category', 'int64', 'category', 'int64']
-    assert list(state.feature_generator_default.args.test_data[df_test.columns].dtypes.apply(str).values) == ['category', 'int64', 'category', 'int64']
+    assert list(state.feature_generator_default.args.train_data[df_train.columns].dtypes.apply(str).to_numpy()) == ['category', 'int64', 'category', 'int64']
+    assert list(state.feature_generator_default.args.test_data[df_test.columns].dtypes.apply(str).to_numpy()) == ['category', 'int64', 'category', 'int64']
 
-    assert list(state.feature_generator_numbers.args.train_data[df_train.columns].dtypes.apply(str).values) == ['int8', 'int64', 'int8', 'int64']
-    assert list(state.feature_generator_numbers.args.test_data[df_test.columns].dtypes.apply(str).values) == ['int8', 'int64', 'int8', 'int64']
+    assert list(state.feature_generator_numbers.args.train_data[df_train.columns].dtypes.apply(str).to_numpy()) == ['int8', 'int64', 'int8', 'int64']
+    assert list(state.feature_generator_numbers.args.test_data[df_test.columns].dtypes.apply(str).to_numpy()) == ['int8', 'int64', 'int8', 'int64']

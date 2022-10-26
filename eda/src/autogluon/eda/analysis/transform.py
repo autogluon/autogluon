@@ -50,7 +50,7 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
 
     def __init__(self,
                  parent: Optional[AbstractAnalysis] = None,
-                 children: List[AbstractAnalysis] = [],
+                 children: Optional[List[AbstractAnalysis]] = None,
                  state: Optional[AnalysisState] = None,
                  category_to_numbers: bool = False,
                  feature_generator: Optional[AbstractFeatureGenerator] = None,

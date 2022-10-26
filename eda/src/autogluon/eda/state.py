@@ -40,7 +40,7 @@ class AnalysisState(dict):
 class StateCheckMixin:
     logger = logging.getLogger(__name__)
 
-    def at_least_one_key_must_be_present(self, state: AnalysisState, *keys):
+    def at_least_one_key_must_be_present(self, state: AnalysisState, *keys) -> bool:
         """
         Checks if at least one key is present in the state
 
@@ -61,7 +61,7 @@ class StateCheckMixin:
         self.logger.warning(f'{self.__class__.__name__}: at least one of the following keys must be present: {keys}')
         return False
 
-    def all_keys_must_be_present(self, state: AnalysisState, *keys):
+    def all_keys_must_be_present(self, state: AnalysisState, *keys) -> bool:
         """
         Checks if all the keys are present in the state
 
