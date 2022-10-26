@@ -11,6 +11,7 @@ from ..utils.ag_sagemaker import (
 )
 from ..utils.constants import (
     LOCAL_MODE,
+    LOCAL_MODE_GPU,
     MODEL_ARTIFACT_NAME
 )
 
@@ -173,7 +174,7 @@ class SageMakerFitJob(SageMakerJob):
         autogluon_sagemaker_estimator_kwargs,
         **kwargs
     ):
-        self._local_mode = (instance_type == LOCAL_MODE)
+        self._local_mode = (instance_type in (LOCAL_MODE, LOCAL_MODE_GPU))
         sagemaker_estimator = AutoGluonSagemakerEstimator(
             role=role,
             entry_point=entry_point,
@@ -254,13 +255,14 @@ class SageMakerBatchTransformationJob(SageMakerJob):
         job_name,
         split_type,
         content_type,
+        custom_image_uri,
         wait,
         model_kwargs,
         transformer_kwargs,
         repack_model=False,
         **kwargs
     ):
-        self._local_mode = (instance_type == LOCAL_MODE)
+        self._local_mode = (instance_type in (LOCAL_MODE, LOCAL_MODE_GPU))
         if repack_model:
             model_cls = AutoGluonRepackInferenceModel
         else:
@@ -273,6 +275,7 @@ class SageMakerBatchTransformationJob(SageMakerJob):
             framework_version=framework_version,
             py_version=py_version,
             instance_type=instance_type,
+            custom_image_uri=custom_image_uri,
             entry_point=entry_point,
             predictor_cls=predictor_cls,
             **model_kwargs
