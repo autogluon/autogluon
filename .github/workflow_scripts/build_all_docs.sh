@@ -67,7 +67,7 @@ sed -i -e "s@###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###@$other_doc_version_bran
 
 shopt -s extglob
 rm -rf ./docs/tutorials/!(index.rst)
-cd docs && d2lbook build rst && d2lbook build html
+cd docs && d2lbook build rst && d2lbook build html && cp static/images/* _build/html/_static
 
 COMMAND_EXIT_CODE=$?
 if [ $COMMAND_EXIT_CODE -ne 0 ]; then

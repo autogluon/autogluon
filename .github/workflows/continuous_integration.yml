@@ -2,7 +2,15 @@ name: Continuous Integration
 
 on:
   push:
+    paths-ignore:
+      - 'cloud/**'
+      - '.github/workflows/cloud_continuous_integration.yml'
+      - '.github/workflow_scripts/test_cloud.sh'
   pull_request_target:
+    paths-ignore:
+      - 'cloud/**'
+      - '.github/workflows/cloud_continuous_integration.yml'
+      - '.github/workflow_scripts/test_cloud.sh'
 
 permissions:
   id-token: write
@@ -18,7 +26,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Lint Check on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-CPU
@@ -30,7 +46,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Common on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-CPU
@@ -42,7 +66,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Core on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-CPU
@@ -54,7 +86,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Features on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-CPU
@@ -66,19 +106,55 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Tabular on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
           job-name: AutoGluon-Tabular
           command: chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh
+  test_eda:
+    needs: lint_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
+      - name: Test EDA on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-CPU
+          job-name: AutoGluon-EDA
+          command: chmod +x ./.github/workflow_scripts/test_eda.sh && ./.github/workflow_scripts/test_eda.sh
   test_text:
     needs: lint_check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Text on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -90,7 +166,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Multimodal on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -102,7 +186,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Vision on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -114,7 +206,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Timeseries on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -126,14 +226,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Install on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-CPU
           job-name: AutoGluon-Install
           command: chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
   build_image_prediction_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_text, test_multimodal, test_vision, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_text, test_multimodal, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -145,9 +253,9 @@ jobs:
         with:
           job-type: CI-GPU
           job-name: AutoGluon-BuildImagePrediction
-          command: chmod +x ./.github/workflow_scripts/build_image_prediction_tutorial.sh && ./.github/workflow_scripts/build_image_prediction_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+          command: chmod +x ./.github/workflow_scripts/build_image_prediction_tutorial.sh && ./.github/workflow_scripts/build_image_prediction_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_object_detection_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_text, test_multimodal, test_vision, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_text, test_multimodal, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -159,9 +267,9 @@ jobs:
         with:
           job-type: CI-GPU
           job-name: AutoGluon-BuildObjectDetection
-          command: chmod +x ./.github/workflow_scripts/build_object_detection_tutorial.sh && ./.github/workflow_scripts/build_object_detection_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+          command: chmod +x ./.github/workflow_scripts/build_object_detection_tutorial.sh && ./.github/workflow_scripts/build_object_detection_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_tabular_prediction_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_text, test_multimodal, test_vision, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_text, test_multimodal, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -173,9 +281,9 @@ jobs:
         with:
           job-type: CI-GPU
           job-name: AutoGluon-BuildTabularPrediction
-          command: chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+          command: chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_multimodal_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_text, test_multimodal, test_vision, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_text, test_multimodal, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -187,9 +295,9 @@ jobs:
         with:
           job-type: CI-GPU
           job-name: AutoGluon-BuildMultimodal
-          command: chmod +x ./.github/workflow_scripts/build_multimodal_tutorial.sh && ./.github/workflow_scripts/build_multimodal_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+          command: chmod +x ./.github/workflow_scripts/build_multimodal_tutorial.sh && ./.github/workflow_scripts/build_multimodal_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_text_prediction_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_text, test_multimodal, test_vision, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_text, test_multimodal, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -201,9 +309,9 @@ jobs:
         with:
           job-type: CI-GPU
           job-name: AutoGluon-BuildTextPrediction
-          command: chmod +x ./.github/workflow_scripts/build_text_prediction_tutorial.sh && ./.github/workflow_scripts/build_text_prediction_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+          command: chmod +x ./.github/workflow_scripts/build_text_prediction_tutorial.sh && ./.github/workflow_scripts/build_text_prediction_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_cloud_fit_deploy_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_text, test_multimodal, test_vision, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_text, test_multimodal, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -215,9 +323,9 @@ jobs:
         with:
           job-type: CI-CPU
           job-name: AutoGluon-BuildCloudFitDeploy
-          command: chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+          command: chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_timeseries_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_text, test_multimodal, test_vision, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_text, test_multimodal, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -229,7 +337,7 @@ jobs:
         with:
           job-type: CI-GPU
           job-name: AutoGluon-BuildTimeseries
-          command: chmod +x ./.github/workflow_scripts/build_timeseries_tutorial.sh && ./.github/workflow_scripts/build_timeseries_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+          command: chmod +x ./.github/workflow_scripts/build_timeseries_tutorial.sh && ./.github/workflow_scripts/build_timeseries_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_all_docs:
     needs: [build_image_prediction_tutorial, build_object_detection_tutorial, build_tabular_prediction_tutorial, build_multimodal_tutorial, build_text_prediction_tutorial, build_cloud_fit_deploy_tutorial, build_timeseries_tutorial]
     runs-on: ubuntu-latest
@@ -243,7 +351,7 @@ jobs:
         with:
           job-type: CI-GPU
           job-name: AutoGluon-BuildAllDocs
-          command: chmod +x ./.github/workflow_scripts/build_all_docs.sh && ./.github/workflow_scripts/build_all_docs.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+          command: chmod +x ./.github/workflow_scripts/build_all_docs.sh && ./.github/workflow_scripts/build_all_docs.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   copy-docs:
     needs: build_all_docs
     runs-on: ubuntu-latest
@@ -262,12 +370,12 @@ jobs:
         if: ${{ github.event_name == 'push' }}
         run: |
           chmod +x ./.github/workflow_scripts/copy_docs.sh
-          ./.github/workflow_scripts/copy_docs.sh ${{ github.ref }} ${{ github.repository }} ${{ env.SHORT_SHA }}
+          ./.github/workflow_scripts/copy_docs.sh '${{ github.ref }}' '${{ github.repository }}' '${{ env.SHORT_SHA }}'
       - name: Copy Docs to Bucket(For pull request)
         if: ${{ github.event_name == 'pull_request_target' }}
         run: |
           chmod +x ./.github/workflow_scripts/copy_docs.sh
-          ./.github/workflow_scripts/copy_docs.sh ${{ github.event.pull_request.head.ref }} ${{ github.event.pull_request.head.repo.full_name }} ${{ env.SHORT_SHA }} PR-${{ github.event.number }}
+          ./.github/workflow_scripts/copy_docs.sh '${{ github.event.pull_request.head.ref }}' '${{ github.event.pull_request.head.repo.full_name }}' '${{ env.SHORT_SHA }}' PR-'${{ github.event.number }}'
       - name: Comment on PR
         if: ${{ github.event_name == 'pull_request_target' }}
         uses: peter-evans/create-or-update-comment@v2.0.0

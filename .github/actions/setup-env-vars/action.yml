@@ -7,9 +7,9 @@ runs:
       if: ${{ github.event_name == 'push' }}
       shell: bash
       run: |
-        SHA=${{ github.sha }}
-        branch=${{ github.ref }}
-        git_repo=${{ github.repository }}
+        SHA='${{ github.sha }}'
+        branch='${{ github.ref }}'
+        git_repo='${{ github.repository }}'
         short_sha=$(git rev-parse --short "$SHA")
         pr_number="" 
 
@@ -21,11 +21,11 @@ runs:
       if: ${{ github.event_name == 'pull_request_target' }}
       shell: bash
       run: |
-        SHA=${{ github.event.pull_request.head.sha }}
-        branch=${{ github.event.pull_request.head.ref }}
-        git_repo=${{ github.event.pull_request.head.repo.full_name }}
+        SHA='${{ github.event.pull_request.head.sha }}'
+        branch='${{ github.event.pull_request.head.ref }}'
+        git_repo='${{ github.event.pull_request.head.repo.full_name }}'
         short_sha=$(git rev-parse --short "$SHA")
-        pr_number=PR-${{ github.event.number }}
+        pr_number=PR-'${{ github.event.number }}'
 
         echo "BRANCH=$branch" >> $GITHUB_ENV
         echo "GIT_REPO=$git_repo" >> $GITHUB_ENV

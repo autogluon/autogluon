@@ -17,7 +17,7 @@ runs:
       uses: aws-actions/configure-aws-credentials@v1
       with:
         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
-        role-duration-seconds: 7200
+        role-duration-seconds: 14400
         aws-region: us-east-1
     - name: Install dependencies
       shell: bash
@@ -36,10 +36,10 @@ runs:
       run: |
         echo "Start submitting job"
         python ./CI/batch/submit-job.py --job-type ${{ inputs.job-type }}-PUSH \
-                                        --name ${{ inputs.job-name }}-${{ github.ref }} \
-                                        --source-ref ${{ github.ref }} \
+                                        --name ${{ inputs.job-name }}-'${{ github.ref }}' \
+                                        --source-ref '${{ github.ref }}' \
                                         --work-dir ${{ inputs.work-dir }} \
-                                        --remote https://github.com/${{ github.repository }} \
+                                        --remote https://github.com/'${{ github.repository }}' \
                                         --command "${{ inputs.command }}" \
                                         --safe-to-use-script \
                                         --wait
@@ -49,10 +49,10 @@ runs:
       run: |
         echo "Start submitting job"
         python ./CI/batch/submit-job.py --job-type ${{ inputs.job-type }} \
-                                        --name ${{ inputs.job-name }}-PR#${{ github.event.number }} \
-                                        --source-ref ${{ github.event.pull_request.head.sha }} \
+                                        --name ${{ inputs.job-name }}-PR#'${{ github.event.number }}' \
+                                        --source-ref '${{ github.event.pull_request.head.sha }}' \
                                         --work-dir ${{ inputs.work-dir }} \
-                                        --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
+                                        --remote https://github.com/'${{ github.event.pull_request.head.repo.full_name }}' \
                                         --command "${{ inputs.command }}" \
                                         --safe-to-use-script \
                                         --wait
@@ -62,9 +62,9 @@ runs:
       run: |
         echo "Start submitting job"
         python ./CI/batch/submit-job.py --job-type ${{ inputs.job-type }} \
-                                        --name ${{ inputs.job-name }}-PR#${{ github.event.number }} \
-                                        --source-ref ${{ github.event.pull_request.head.sha }} \
+                                        --name ${{ inputs.job-name }}-PR#'${{ github.event.number }}' \
+                                        --source-ref '${{ github.event.pull_request.head.sha }}' \
                                         --work-dir ${{ inputs.work-dir }} \
-                                        --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
+                                        --remote https://github.com/'${{ github.event.pull_request.head.repo.full_name }}' \
                                         --command "${{ inputs.command }}" \
                                         --wait

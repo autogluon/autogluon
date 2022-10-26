@@ -64,10 +64,7 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
-          python3 -m pip install --upgrade -e common/[tests]
-          env
-          cd common/
-          python3 -m pytest --junitxml=results.xml --runslow tests
+         chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
 
   core:
     needs: setup
@@ -98,11 +95,7 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
-          python3 -m pip install --upgrade -e common/[tests]
-          python3 -m pip install --upgrade -e core/[all,tests]
-          env
-          cd core/
-          python3 -m pytest --junitxml=results.xml --runslow tests
+          chmod +x ./.github/workflow_scripts/test_core.sh && ./.github/workflow_scripts/test_core.sh
 
   features:
     needs: setup
@@ -133,11 +126,38 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
-          python3 -m pip install --upgrade -e common/[tests]
-          python3 -m pip install --upgrade -e features/
-          env
-          cd features/
-          python3 -m pytest --junitxml=results.xml --runslow tests
+          chmod +x ./.github/workflow_scripts/test_features.sh && ./.github/workflow_scripts/test_features.sh
+
+  eda:
+    needs: setup
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Checkout repository for PR
+        if: (github.event_name == 'workflow_dispatch')
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.pr-sha }}
+      - name: Checkout repository for nightly test
+        if: (github.event_name == 'schedule')
+        uses: actions/checkout@v2
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          activate-environment: autogluon_py3
+          environment-file: .github/workflows_env/unittest_env.yml
+          auto-update-conda: true
+          python-version: 3.9
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          chmod +x ./.github/workflow_scripts/test_eda.sh && ./.github/workflow_scripts/test_eda.sh
 
   tabular:
     needs: setup
@@ -177,13 +197,7 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
-          python3 -m pip install --upgrade -e common/[tests]
-          python3 -m pip install --upgrade -e core/[all]
-          python3 -m pip install --upgrade -e features/
-          python3 -m pip install --upgrade -e tabular/[all,tests]
-          env
-          cd tabular/
-          python3 -m pytest --junitxml=results.xml --runslow -m "not gpu" tests
+          chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh "-m not gpu"
 
   install:
     needs: setup
@@ -214,12 +228,7 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
-          python3 -m pip install --upgrade -e common/[tests]
-          python3 -m pip install --upgrade -e core/[all]
-          python3 -m pip install --upgrade -e features/
-          python3 -m pip install --upgrade -e tabular/[all,tests]
-          python3 -m pip install --upgrade -e multimodal/
-          python3 -m pip install --upgrade -e text/
-          python3 -m pip install --upgrade -e vision/
-          python3 -m pip install --upgrade -e timeseries/
-          python3 -m pip install --upgrade -e autogluon/
+          # test_install.sh script will install mxnet, which doesn't work on Windows.
+          source .github/workflow_scripts/env_setup.sh
+          setup_build_env
+          install_all
