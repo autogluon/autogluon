@@ -230,6 +230,7 @@ class RFModel(AbstractModel):
             model.estimators_ = None
         self.model = model
         self.params_trained['n_estimators'] = self.model.n_estimators
+        self.compile()
 
     # TODO: Remove this after simplifying _predict_proba to reduce code duplication. This is only present for SOFTCLASS support.
     def _predict_proba(self, X, **kwargs):
