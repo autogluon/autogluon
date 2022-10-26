@@ -70,9 +70,9 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
     return num_gpus
 
 
-def infer_precision(num_gpus: int, precision: Union[int, str],
-                    as_torch: Optional[bool] = False,
-                    cpu_only_warning: bool = True):
+def infer_precision(
+        num_gpus: int, precision: Union[int, str], as_torch: Optional[bool] = False, cpu_only_warning: bool = True
+):
     """
     Infer the proper precision based on the environment setup and the provided precision.
 
