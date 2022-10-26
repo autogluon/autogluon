@@ -204,7 +204,10 @@ def create_fusion_data_processors(
 
     for per_name, per_model in model_dict.items():
         model_config = getattr(config.model, per_model.prefix)
-        data_types = model_config.data_types.copy()
+        if model_config.data_types is not None:
+            data_types = model_config.data_types.copy()
+        else:
+            data_types = None
 
         if per_name == NER:
             # create a multimodal processor for NER.
@@ -216,7 +219,7 @@ def create_fusion_data_processors(
                 )
             )
             requires_label = False
-            if TEXT in data_types:
+            if data_types is not None and TEXT in data_types:
                 data_types.remove(TEXT)
 
         if requires_label:
