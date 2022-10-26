@@ -212,15 +212,6 @@ def test_when_tft_quantiles_are_deciles_then_forecast_contains_correct_quantiles
     assert all(str(q) in predictions.columns for q in quantiles)
 
 
-@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
-def test_when_static_features_are_available_then_they_are_used_by_model(model_class):
-    model = model_class(hyperparameters={"epochs": 1})
-    model.fit(train_data=DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC)
-    assert model.use_feat_static_cat == True
-    assert model.use_feat_static_real == True
-    assert len(model.feat_static_cat_cardinality) == 1
-
-
 @pytest.fixture(scope="module")
 def df_with_static():
     feature_pipeline = ContinuousAndCategoricalFeatureGenerator(verbosity=0)
