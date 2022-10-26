@@ -9,7 +9,7 @@ from autogluon.timeseries.utils.forecast import get_forecast_horizon_timestamps
 from .abstract_local_model import AbstractLocalModel
 
 
-def naive_forecast(
+def seasonal_naive_forecast(
     time_series: pd.DataFrame, freq: str, prediction_length: int, quantile_levels: List[float], seasonal_period: int
 ):
     forecast_timestamps = get_forecast_horizon_timestamps(
@@ -18,22 +18,25 @@ def naive_forecast(
 
     target = time_series.values.ravel()
     forecast = {}
+
     if len(target) > seasonal_period and seasonal_period > 1:
         indices = [len(target) - seasonal_period + k % seasonal_period for k in range(prediction_length)]
         forecast["mean"] = target[indices]
         residuals = target[:-seasonal_period] - target[seasonal_period:]
+
+        sigma = np.sqrt(np.mean(np.square(residuals)))
+        num_full_seasons = np.arange(1, prediction_length + 1) // seasonal_period
+        sigma_per_timestep = sigma * np.sqrt(num_full_seasons + 1)
     else:
-        # Fall back to naive forecast if time series too short or seasonal_period == 1
+        # Fall back to naive forecast
         forecast["mean"] = np.full(shape=[prediction_length], fill_value=target[-1])
         residuals = target[:-1] - target[1:]
 
-    # Assuming the residuals follow normal distribution with mean 0
-    sigma = np.sqrt(np.mean(np.square(residuals)))
-    # Sum of two normally distributed random variables with scale sigma has scale = sqrt(2) * sigma
-    sigma_accumulated_over_time = sigma * np.sqrt(np.arange(1, prediction_length + 1))
+        sigma = np.sqrt(np.mean(np.square(residuals)))
+        sigma_per_timestep = sigma * np.sqrt(np.arange(1, prediction_length + 1))
 
     for q in quantile_levels:
-        forecast[str(q)] = forecast["mean"] + norm.ppf(q) * sigma_accumulated_over_time
+        forecast[str(q)] = forecast["mean"] + norm.ppf(q) * sigma_per_timestep
 
     return pd.DataFrame(forecast, index=forecast_timestamps)
 
@@ -43,6 +46,9 @@ class NaiveModel(AbstractLocalModel):
 
     Quantiles are obtained by assuming that the residuals follow zero-mean normal distribution, scale of which is
     estimated from the empirical distribution of the residuals.
+
+    As described in https://otexts.com/fpp3/prediction-intervals.html
+
     """
 
     @staticmethod
@@ -54,7 +60,7 @@ class NaiveModel(AbstractLocalModel):
         local_model_args: dict,
         **kwargs,
     ) -> pd.DataFrame:
-        return naive_forecast(
+        return seasonal_naive_forecast(
             time_series=time_series,
             freq=freq,
             prediction_length=prediction_length,
@@ -68,6 +74,8 @@ class SeasonalNaiveModel(AbstractLocalModel):
 
     Quantiles are obtained by assuming that the residuals follow zero-mean normal distribution, scale of which is
     estimated from the empirical distribution of the residuals.
+
+    As described in https://otexts.com/fpp3/prediction-intervals.html
 
 
     Other Parameters
@@ -92,7 +100,7 @@ class SeasonalNaiveModel(AbstractLocalModel):
         local_model_args: dict,
         **kwargs,
     ) -> pd.DataFrame:
-        return naive_forecast(
+        return seasonal_naive_forecast(
             time_series=time_series,
             freq=freq,
             prediction_length=prediction_length,
