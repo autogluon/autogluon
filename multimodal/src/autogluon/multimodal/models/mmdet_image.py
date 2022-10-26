@@ -179,7 +179,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             A dictionary with bounding boxes.
         """
         # TODO: refactor this to work like forward() in MMDet
-        warnings.warn("MMDetAutoModelForObjectDetection.forward() is deprecated since it does not support multi gpu.")
+        logger.warning("MMDetAutoModelForObjectDetection.forward() is deprecated since it does not support multi gpu.")
 
         data = batch[self.image_key]
 

@@ -116,6 +116,7 @@ def is_rois_column(data: pd.Series) -> bool:
     if isinstance(data[idx], str):
         try:
             rois = json.loads(data[idx][0])
+            # TODO: better infer logic / input format to not confuse with other modality
             return rois and isinstance(rois, list) and len(data[idx][0]) == 5
         except:
             return False

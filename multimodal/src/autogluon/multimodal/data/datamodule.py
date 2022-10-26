@@ -30,7 +30,7 @@ class BaseDataModule(LightningDataModule):
         test_data: Optional[pd.DataFrame] = None,
         predict_data: Optional[pd.DataFrame] = None,
         id_mappings: Optional[Dict[str, Dict]] = None,
-        val_is_train: bool = False,
+        val_use_training_mode: bool = False,
     ):
         """
         Parameters
@@ -59,10 +59,10 @@ class BaseDataModule(LightningDataModule):
         id_mappings
              Id-to-content mappings. The contents can be text, image, etc.
              This is used when the dataframe contains the query/response indexes instead of their contents.
-        val_is_train
-             Whether we want to treat validation as training.
-             This is used when we want to use val_loss as val metric, and thus training_pipeline
-             instead of val_pipeline during validation.
+        val_use_training_mode
+             whether we are triggering is_training when creating the dataset for validation.
+             This is used when we want to use val_loss as val metric, and thus we'll use data pipeline
+             for training instead of for inference during validation.
         """
         super().__init__()
         self.prepare_data_per_node = True
