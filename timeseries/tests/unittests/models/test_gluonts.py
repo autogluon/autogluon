@@ -1,10 +1,12 @@
 from functools import partial
+from unittest import mock
 
 import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 from gluonts.model.prophet import PROPHET_IS_INSTALLED
 from gluonts.mx.model.seq2seq import MQRNNEstimator
 from gluonts.mx.model.transformer import TransformerEstimator
+from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 
 import autogluon.core as ag
 from autogluon.timeseries.models.gluonts import (  # MQRNNModel,; TransformerModel,
@@ -219,7 +221,50 @@ def test_when_static_features_are_available_then_they_are_used_by_model(model_cl
     assert len(model.feat_static_cat_cardinality) == 1
 
 
+@pytest.fixture(scope="module")
+def df_with_static():
+    feature_pipeline = ContinuousAndCategoricalFeatureGenerator(verbosity=0)
+    df = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC.copy(deep=False)
+    df.static_features = feature_pipeline.fit_transform(df.static_features)
+    return df
+
+
 @pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
-def test_when_disable_static_features_set_to_true_then_static_features_are_not_used(model_class):
-    model = model_class(hyperparameters={"epochs": 1})
-    model.fit(train_data=DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC)
+def test_when_static_features_present_then_they_are_passed_to_dataset(model_class, df_with_static):
+    model = model_class()
+    with mock.patch(
+        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
+    ) as patch_dataset:
+        try:
+            model.fit(train_data=df_with_static)
+        except TypeError:
+            call_kwargs = patch_dataset.call_args[1]
+            feat_static_cat = call_kwargs["feat_static_cat"]
+            feat_static_real = call_kwargs["feat_static_real"]
+            assert (feat_static_cat.dtypes == "category").all()
+            assert (feat_static_real.dtypes == "float").all()
+
+
+@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
+def test_when_static_features_present_then_model_attributes_set_correctly(model_class, df_with_static):
+    model = model_class(hyperparameters={"epochs": 1, "num_batches_per_epoch": 1})
+    model.fit(train_data=df_with_static)
+    assert model.use_feat_static_cat
+    assert model.use_feat_static_real
+    assert len(model.feat_static_cat_cardinality) == 1
+
+
+@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
+def test_when_disable_static_features_set_to_true_then_static_features_are_not_used(model_class, df_with_static):
+    model = model_class(hyperparameters={"disable_static_features": True})
+    with mock.patch(
+        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
+    ) as patch_dataset:
+        try:
+            model.fit(train_data=df_with_static)
+        except TypeError:
+            call_kwargs = patch_dataset.call_args[1]
+            feat_static_cat = call_kwargs["feat_static_cat"]
+            feat_static_real = call_kwargs["feat_static_real"]
+            assert feat_static_cat is None
+            assert feat_static_real is None
