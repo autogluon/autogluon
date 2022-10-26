@@ -51,6 +51,8 @@ class NaiveModel(AbstractLocalModel):
 
     """
 
+    allowed_local_model_args = ["seasonal_period"]
+
     @staticmethod
     def _predict_with_local_model(
         time_series: pd.Series,
