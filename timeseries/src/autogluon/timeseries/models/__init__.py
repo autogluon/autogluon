@@ -1,5 +1,4 @@
 from .autogluon_tabular import AutoGluonTabularModel
-from .local import NaiveModel, SeasonalNaiveModel
 from .gluonts import (
     DeepARModel,
     DeepARMXNetModel,
@@ -10,6 +9,7 @@ from .gluonts import (
     TemporalFusionTransformerMXNetModel,
     TransformerMXNetModel,
 )
+from .local import NaiveModel, SeasonalNaiveModel
 from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel, SktimeTBATSModel, SktimeThetaModel
 from .statsmodels import ARIMAModel, ETSModel, ThetaModel
 

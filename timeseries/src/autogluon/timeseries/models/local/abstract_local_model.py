@@ -2,12 +2,14 @@ import logging
 import re
 from multiprocessing import cpu_count
 from typing import Any, Callable, Dict, List, Optional
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
-from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
-from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+
 import pandas as pd
+from joblib import Parallel, delayed
+
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
 from autogluon.timeseries.utils.seasonality import get_seasonality
-from joblib import delayed, Parallel
 
 logger = logging.getLogger(__name__)
 

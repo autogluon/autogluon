@@ -1,9 +1,11 @@
 from typing import List
+
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_timestamps
+
 from .abstract_local_model import AbstractLocalModel
 
 

@@ -7,7 +7,6 @@ import autogluon.core as ag
 from .abstract import AbstractTimeSeriesModel
 from .abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 from .autogluon_tabular import AutoGluonTabularModel
-from .local import NaiveModel, SeasonalNaiveModel
 from .gluonts import (
     DeepARModel,
     DeepARMXNetModel,
@@ -18,6 +17,7 @@ from .gluonts import (
     TemporalFusionTransformerMXNetModel,
     TransformerMXNetModel,
 )
+from .local import NaiveModel, SeasonalNaiveModel
 from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel
 from .statsmodels import ARIMAModel, ETSModel, ThetaModel
 

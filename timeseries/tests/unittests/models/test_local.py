@@ -8,8 +8,8 @@ from autogluon.timeseries.models.local import NaiveModel, SeasonalNaiveModel
 from ..common import (
     DUMMY_TS_DATAFRAME,
     DUMMY_VARIABLE_LENGTH_TS_DATAFRAME,
-    get_data_frame_with_item_index,
     dict_equal_primitive,
+    get_data_frame_with_item_index,
 )
 
 TESTABLE_MODELS = [
