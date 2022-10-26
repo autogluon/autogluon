@@ -50,6 +50,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         self._cached_predictions: Dict[str, pd.DataFrame] = {}
 
     def _fit(self, train_data: TimeSeriesDataFrame, time_limit: int = None, **kwargs):
+        self._check_fit_params()
         # Initialize parameters passed to each local model
         raw_local_model_args = self._get_model_params().copy()
         raw_local_model_args.pop("n_jobs", None)
