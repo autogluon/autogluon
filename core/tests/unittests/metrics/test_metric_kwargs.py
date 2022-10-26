@@ -17,6 +17,16 @@ def test_metric_kwargs():
     assert score > score_pos_label_0
     assert score_pos_label_0 == 0.4
 
+    error = f1.error(y_true, y_pred)
+    error_pos_label_1 = f1.error(y_true, y_pred, pos_label=1)
+    error_pos_label_0 = f1.error(y_true, y_pred, pos_label=0)
+
+    assert f1.optimum == 1
+    assert error == (f1.optimum - score)
+    assert error_pos_label_1 == (f1.optimum - score_pos_label_1)
+    assert error_pos_label_0 == (f1.optimum - score_pos_label_0)
+    assert error_pos_label_0 == 0.6
+
 
 def test_metric_kwargs_init():
     y_true = np.array([1, 1, 1, 0, 0, 0])
