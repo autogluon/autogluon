@@ -1950,6 +1950,29 @@ class TabularPredictor:
             fi_df[low_str] = pd.Series(ci_low_dict)
         return fi_df
 
+    def compile_models(self, compiler_configs={}):
+        """
+        Compile models for accelerated prediction.
+        This can be helpful to reduce prediction latency and improve throughput.
+
+        Note that this is currently an experimental feature, the supported alternative compiler can be ['native', 'onnx'].
+
+        Parameters
+        ----------
+        compiler_configs : dict, default = {}
+            compiler : str, default = 'native'
+                The compiler that is used for model compilation.
+            batch_size : int, default = None
+                The batch size that is optimized for model prediction.
+                By default, the batch size is None. This means the compiler would try to leverage dynamic shape for prediction.
+                Using batch_size=1 would be more suitable for online prediction, which expects a result from one data point.
+                However, it can be slow for batch processing, because of the overhead of multiple kernel execution.
+                Increasing batch size to a number that is larger than 1 would help increase the prediction throughput.
+                This comes with an expense of utilizing larger memory for prediction.
+        """
+        self._assert_is_fit('compile_models')
+        self._trainer.compile_models(**compiler_configs)
+
     def persist_models(self, models='best', with_ancestors=True, max_memory=0.1) -> list:
         """
         Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online-inference where low latency is critical.

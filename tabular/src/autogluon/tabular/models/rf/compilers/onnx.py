@@ -59,7 +59,7 @@ class RFOnnxCompiler:
             return False
 
     @staticmethod
-    def compile(obj, path: str):
+    def compile(obj, path: str, batch_size=None):
         if isinstance(obj.model, RFOnnxPredictor):
             return obj.model
         # Convert into ONNX format

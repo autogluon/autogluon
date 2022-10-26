@@ -250,7 +250,6 @@ class AbstractModel:
             get_features_kwargs_extra=None,  # If not None, applies an additional feature filter to the result of get_feature_kwargs. This should be reserved for users and be None by default. | Currently undocumented in task.
             predict_1_batch_size=None,  # If not None, calculates `self.predict_1_time` at end of fit call by predicting on this many rows of data.
             temperature_scalar=None,  # Temperature scaling parameter that is set post-fit if calibrate=True during TabularPredictor.fit() on the model with the best validation score and eval_metric="log_loss".
-            compiler='native', # The compiler backend that is used for prediction. This defaults to 'native' backend for all models. A list of supported compilers can be found via calling _valid_compilers.
         )
         return default_auxiliary_params
 
@@ -873,16 +872,18 @@ class AbstractModel:
     #  Is it called during fit? Is it called after fit?
     #  Can it be called as a post-fit operation on an already fit predictor on a per-model basis?
     #  Does this call overwrite the existing model or make a new one?
-    def compile(self, path: str = None, verbose=True) -> str:
+    def compile(self, path: str = None, verbose=True, compiler_configs={}) -> str:
         if path is None:
             path = self.path
         file_path = path + self.model_file_name
+        compiler = compiler_configs.get("compiler", "native")
+        batch_size = compiler_configs.get("batch_size", 1)
 
         save_in_pkl = True
         if self.model is not None:
-            self._compiler = self._get_compiler()
+            self._compiler = self._get_compiler(compiler=compiler)
             if self._compiler is not None:
-                self.model = self._compiler.compile(obj=self, path=path)
+                self.model = self._compiler.compile(obj=self, path=path, batch_size=batch_size)
                 save_in_pkl = self._compiler.save_in_pkl
         _model = self.model
         if not save_in_pkl:
@@ -894,8 +895,7 @@ class AbstractModel:
     def _default_compiler(self):
         return None
 
-    def _get_compiler(self):
-        compiler = self.params_aux.get('compiler', None)
+    def _get_compiler(self, compiler='native'):
         compilers = self._valid_compilers()
         compiler_names = {c.name: c for c in compilers}
         if compiler is not None and compiler not in compiler_names:
