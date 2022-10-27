@@ -5,7 +5,6 @@ TEXT = "text"
 NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
 IDENTIFIER = "identifier"
-MULTIMODAL = "multimodal"
 
 # Problem types
 CLASSIFICATION = "classification"
