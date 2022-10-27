@@ -213,7 +213,9 @@ def apply_df_preprocessor(
     return modality_features, modality_types, sample_num
 
 
-def apply_data_processor(per_sample_features: dict, data_processors: dict, is_training: bool):
+def apply_data_processor(
+    per_sample_features: dict, data_processors: dict, feature_modalities: dict, is_training: bool
+):
     """
     Process one sample's features.
 
@@ -234,7 +236,11 @@ def apply_data_processor(per_sample_features: dict, data_processors: dict, is_tr
     for per_modality, per_modality_processors in data_processors.items():
         for per_model_processor in per_modality_processors:
             if per_modality in per_sample_features and per_sample_features[per_modality]:
-                sample_features.update(per_model_processor(per_sample_features[per_modality], is_training=is_training))
+                sample_features.update(
+                    per_model_processor(
+                        per_sample_features[per_modality], feature_modalities[per_modality], is_training=is_training
+                    )
+                )
 
     return sample_features
 
@@ -323,7 +329,7 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
 
     Returns
     -------
-    Token-level labels or word-level lavels
+    Token-level/word-level labels and text features.
     """
     col_tokens, token_to_word_mappings, word_offsets = tokenize_ner_text(ner_text, tokenizer)
     num_words = len(set(token_to_word_mappings)) - 1
@@ -346,9 +352,11 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
             token_label[idx] = word_label[counter]
             counter += 1
     if not is_eval:
-        return token_label  # return token-level labels for training
+        label = token_label  # return token-level labels for training
     else:
-        return word_label  # return word-level labels for evaluation
+        label = word_label  # return word-level labels for evaluation
+
+    return label, col_tokens, token_to_word_mappings, word_offsets
 
 
 def tokenize_ner_text(text, tokenizer):

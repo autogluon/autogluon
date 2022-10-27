@@ -1,7 +1,7 @@
 import ast
 import logging
 import warnings
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 import PIL
@@ -463,6 +463,7 @@ class ImageProcessor:
     def __call__(
         self,
         images: Dict[str, List[str]],
+        feature_modalities: Dict[str, Union[int, float, list]],
         is_training: bool,
     ) -> Dict:
         """
@@ -472,6 +473,8 @@ class ImageProcessor:
         ----------
         images
             Images of one sample.
+        feature_modalities
+            The modality of the feature columns.
         is_training
             Whether to process images in the training mode.
 

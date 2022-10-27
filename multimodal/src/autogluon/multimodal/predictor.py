@@ -1651,6 +1651,7 @@ class MultiModalPredictor:
             per_sample_features = apply_data_processor(
                 per_sample_features=per_sample_features,
                 data_processors=data_processors,
+                feature_modalities=modality_types,
                 is_training=False,
             )
             processed_features.append(per_sample_features)
