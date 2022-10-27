@@ -84,9 +84,13 @@ class SimpleGluonTSDataset(GluonTSDataset):
                 FieldName.START: pd.Period(df.index[0], freq=self.freq),
             }
             if self.feat_static_cat is not None:
-                time_series[FieldName.FEAT_STATIC_CAT] = self.feat_static_cat.loc[item_id].to_numpy(dtype=self.int_dtype)
+                time_series[FieldName.FEAT_STATIC_CAT] = self.feat_static_cat.loc[item_id].to_numpy(
+                    dtype=self.int_dtype
+                )
             if self.feat_static_real is not None:
-                time_series[FieldName.FEAT_STATIC_REAL] = self.feat_static_real.loc[item_id].to_numpy(dtype=self.float_dtype)
+                time_series[FieldName.FEAT_STATIC_REAL] = self.feat_static_real.loc[item_id].to_numpy(
+                    dtype=self.float_dtype
+                )
 
             yield time_series
 

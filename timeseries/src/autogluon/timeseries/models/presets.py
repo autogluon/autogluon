@@ -68,10 +68,9 @@ def get_default_hps(key, prediction_length):
     context_length = max(prediction_length * 2, MINIMUM_CONTEXT_LENGTH)
     default_model_hps = {
         "local_only": {
-            "SimpleFeedForward": {},
-            "SimpleFeedForwardMXNet": {},
-            "DeepAR": {},
-            "DeepARMXNet": {},
+            "ARIMA": {},
+            "ETS": {},
+            "Theta": {},
         },
         "default": {
             "ARIMA": {},
