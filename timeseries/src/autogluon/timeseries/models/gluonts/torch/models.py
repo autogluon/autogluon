@@ -25,7 +25,7 @@ from autogluon.core.hpo.constants import CUSTOM_BACKEND
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
-from autogluon.timeseries.utils.warning_filters import torch_warning_filter, disable_root_logger
+from autogluon.timeseries.utils.warning_filters import disable_root_logger, torch_warning_filter
 
 # FIXME: introduces cpflows dependency. We exclude this model until a future release.
 # from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
