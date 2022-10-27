@@ -1490,7 +1490,8 @@ class MultiModalPredictor:
 
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
-                gpus=num_gpus,
+                accelerator="gpu" if num_gpus > 0 else None,
+                devices=num_gpus if num_gpus > 0 else None,
                 auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
