@@ -194,7 +194,7 @@ class TimeSeriesLearner(AbstractLearner):
                     "Please set `tuning_data=None` to automatically generate tuning_data, or make sure that names "
                     "and dtypes of columns in tuning_data.static_features exactly match train_data.static_features"
                 )
-                self._check_compatible_static_features(
+                self._check_static_feature_compatibility(
                     other_static_features=val_data.static_features, fix_message=fix_message, other_name="tuning_data"
                 )
                 val_data.static_features = val_data.static_features[self._train_static_feature_columns]
@@ -203,9 +203,10 @@ class TimeSeriesLearner(AbstractLearner):
 
         return train_data, val_data
 
-    def _check_compatible_static_features(
+    def _check_static_feature_compatibility(
         self, other_static_features: pd.DataFrame, fix_message: str, other_name: str
-    ):
+    ) -> None:
+        """Make sure that given static features are compatible with training data (have same columns and dtypes)."""
         if other_static_features is None:
             raise ValueError(
                 f"Provided {other_name} has no static_features, but train_data has static features. " + fix_message
@@ -236,7 +237,7 @@ class TimeSeriesLearner(AbstractLearner):
                 "Please make sure that data has static_features with columns and dtypes exactly matching "
                 "train_data.static_features. "
             )
-            self._check_compatible_static_features(data.static_features, fix_message=fix_message, other_name="data")
+            self._check_static_feature_compatibility(data.static_features, fix_message=fix_message, other_name="data")
             data.static_features = self.static_feature_pipeline.transform(data.static_features)
             data.static_features = convert_numerical_features_to_float(data.static_features)
         prediction = self.load_trainer().predict(data=data, model=model, **kwargs)
