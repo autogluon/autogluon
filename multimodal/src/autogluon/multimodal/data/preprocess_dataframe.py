@@ -83,7 +83,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
-            if col_type in [TEXT, IMAGE, IMAGE_PATH, ROIS, NULL]:
+            if col_type.startswith((TEXT, IMAGE, ROIS)) or col_type == NULL:
                 continue
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(
@@ -311,7 +311,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif self.label_type == NER_ANNOTATION:
             self._label_generator.fit(y, X[self._text_feature_names[0]])
         else:
-            raise NotImplementedError(f"Type of label column is not supported. Label column type={self._label_column}")
+            raise NotImplementedError(f"Type of label column is not supported. Label column type={self.label_type}")
 
     def fit(self, X: Optional[pd.DataFrame] = None, y: Optional[pd.Series] = None):
         """
