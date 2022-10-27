@@ -2,9 +2,13 @@ from ast import literal_eval
 
 import pytest
 
-from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter, append_suffix_to_item_id
+from autogluon.timeseries.splitter import MultiWindowSplitter, append_suffix_to_item_id
 
-from .common import DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, get_data_frame_with_variable_lengths
+from .common import (
+    DUMMY_VARIABLE_LENGTH_TS_DATAFRAME,
+    DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC,
+    get_data_frame_with_variable_lengths,
+)
 
 
 def get_original_item_id_and_slice(tuning_item_id: str):
@@ -66,3 +70,17 @@ def test_when_splitter_adds_suffix_to_index_then_data_is_not_copied():
     ts_df = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy()
     ts_df_with_suffix = append_suffix_to_item_id(ts_dataframe=ts_df, suffix="_[None:None]")
     assert ts_df.values.base is ts_df_with_suffix.values.base
+
+
+def test_when_static_features_are_present_then_splitter_correctly_splits_them():
+    original_df = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC.copy()
+    splitter = MultiWindowSplitter()
+    prediction_length = 7
+    train_data, val_data = splitter.split(ts_dataframe=original_df, prediction_length=prediction_length)
+
+    for item_id in train_data.item_ids:
+        assert (train_data.static_features.loc[item_id] == original_df.static_features.loc[item_id]).all()
+
+    for item_id in val_data.item_ids:
+        original_item_id, _, _ = get_original_item_id_and_slice(item_id)
+        assert (val_data.static_features.loc[item_id] == original_df.static_features.loc[original_item_id]).all()
