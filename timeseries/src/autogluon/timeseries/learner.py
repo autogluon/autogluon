@@ -49,7 +49,9 @@ class TimeSeriesLearner(AbstractLearner):
         )
         self.validation_splitter = validation_splitter
         logger.info(f"Learner random seed set to {random_state}")
-        self.feature_pipeline: ContinuousAndCategoricalFeatureGenerator = None
+        self.static_feature_pipeline = ContinuousAndCategoricalFeatureGenerator()
+        self._train_static_feature_columns: pd.Index = None
+        self._train_static_feature_dtypes: pd.Series = None
 
     def load_trainer(self) -> AbstractTimeSeriesTrainer:
         """Return the trainer object corresponding to the learner."""
@@ -138,8 +140,6 @@ class TimeSeriesLearner(AbstractLearner):
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
-        # TODO: Fix unused argument
-        static_feature_metadata: Optional[FeatureMetadata] = None,
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         """Convert static features to categorical & float dtypes, and check if val data has compatible features.
 
@@ -158,19 +158,21 @@ class TimeSeriesLearner(AbstractLearner):
 
         if train_data.static_features is None:
             if val_data is not None and val_data.static_features is not None:
+                logger.warning(
+                    "tuning_data has static_features but train_data has no static_features. "
+                    "tuning_data.static_features will be ignored."
+                )
                 val_data.static_features = None
         else:
-            self.feature_pipeline = ContinuousAndCategoricalFeatureGenerator(
-                feature_metadata=static_feature_metadata, verbosity=0
-            )
-            original_static_feature_columns = train_data.static_features.columns
-            train_data.static_features = self.feature_pipeline.fit_transform(train_data.static_features)
+            self._train_static_feature_columns = train_data.static_features.columns
+            self._train_static_feature_dtypes = train_data.static_features.dtypes
+            train_data.static_features = self.static_feature_pipeline.fit_transform(train_data.static_features)
             train_data.static_features = convert_numerical_features_to_float(train_data.static_features)
 
             mapped_to_categorical = []
             mapped_to_continuous = []
             unused = []
-            for col_name in original_static_feature_columns:
+            for col_name in self._train_static_feature_columns:
                 if train_data.static_features[col_name].dtype == "category":
                     mapped_to_categorical.append(col_name)
                 elif train_data.static_features[col_name].dtype == np.float64:
@@ -188,24 +190,40 @@ class TimeSeriesLearner(AbstractLearner):
             )
 
             if val_data is not None:
-                if val_data.static_features is None:
-                    raise ValueError(
-                        "Provided train_data has static_features, but tuning_data has no static features. "
-                        "Please set `tuning_data=None` to automatically generate tuning_data, or make sure that the given "
-                        "tuning_data also has static_features."
-                    )
-                try:
-                    val_data.static_features = val_data.static_features[original_static_feature_columns]
-                    val_data.static_features = self.feature_pipeline.transform(val_data.static_features)
-                    val_data.static_features = convert_numerical_features_to_float(val_data.static_features)
-                except:
-                    raise ValueError(
-                        "tuning_data.static_features should have the same columns as train_data.static_features. "
-                        "Please set `tuning_data=None` to automatically generate tuning_data, or make sure that "
-                        "names & dtypes of columns in tuning_data.static_features exactly match train_data.static_features"
-                    )
+                fix_message = (
+                    "Please set `tuning_data=None` to automatically generate tuning_data, or make sure that names "
+                    "and dtypes of columns in tuning_data.static_features exactly match train_data.static_features"
+                )
+                self._check_compatible_static_features(
+                    other_static_features=val_data.static_features, fix_message=fix_message, other_name="tuning_data"
+                )
+                val_data.static_features = val_data.static_features[self._train_static_feature_columns]
+                val_data.static_features = self.static_feature_pipeline.transform(val_data.static_features)
+                val_data.static_features = convert_numerical_features_to_float(val_data.static_features)
 
         return train_data, val_data
+
+    def _check_compatible_static_features(
+        self, other_static_features: pd.DataFrame, fix_message: str, other_name: str
+    ):
+        if other_static_features is None:
+            raise ValueError(
+                f"Provided {other_name} has no static_features, but train_data has static features. " + fix_message
+            )
+        missing_columns = self._train_static_feature_columns.difference(other_static_features.columns)
+        if len(missing_columns) > 0:
+            raise ValueError(
+                f"Columns {missing_columns.to_list()} are missing in {other_name}.static_features but were present in "
+                "train_data.static_features. " + fix_message
+            )
+        different_dtype_columns = self._train_static_feature_columns[
+            other_static_features[self._train_static_feature_columns].dtypes != self._train_static_feature_dtypes
+        ]
+        if len(different_dtype_columns) > 0:
+            raise ValueError(
+                f"Columns {different_dtype_columns.to_list()} in tuning_data.static_features have dtypes that don't "
+                "match train_data.static_features. " + fix_message
+            )
 
     def predict(
         self,
@@ -213,12 +231,13 @@ class TimeSeriesLearner(AbstractLearner):
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        if self.feature_pipeline is not None:
-            if data.static_features is None:
-                raise ValueError(
-                    "Cannot predict since data has no static features (but training data had static features)"
-                )
-            data.static_features = self.feature_pipeline.transform(data.static_features)
+        if self.static_feature_pipeline.is_fit():
+            fix_message = (
+                "Please make sure that data has static_features with columns and dtypes exactly matching "
+                "train_data.static_features. "
+            )
+            self._check_compatible_static_features(data.static_features, fix_message=fix_message, other_name="data")
+            data.static_features = self.static_feature_pipeline.transform(data.static_features)
             data.static_features = convert_numerical_features_to_float(data.static_features)
         prediction = self.load_trainer().predict(data=data, model=model, **kwargs)
         if prediction is None:

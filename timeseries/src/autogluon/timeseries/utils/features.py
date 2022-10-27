@@ -17,7 +17,7 @@ from autogluon.features.generators import (
 class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
     """Generates categorical and continuous features for time series models."""
 
-    def __init__(self, feature_metadata: Optional[FeatureMetadata] = None, **kwargs):
+    def __init__(self, feature_metadata: Optional[FeatureMetadata] = None, verbosity: int = 0, **kwargs):
         generators = [
             CategoryFeatureGenerator(minimum_cat_count=1),
             IdentityFeatureGenerator(infer_features_in_args={"valid_raw_types": [R_INT, R_FLOAT]}),
@@ -29,6 +29,7 @@ class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
             feature_metadata_in=feature_metadata,
             pre_enforce_types=False,
             pre_drop_useless=False,
+            verbosity=verbosity,
             **kwargs,
         )
 

@@ -214,7 +214,7 @@ def test_when_tft_quantiles_are_deciles_then_forecast_contains_correct_quantiles
 
 @pytest.fixture(scope="module")
 def df_with_static():
-    feature_pipeline = ContinuousAndCategoricalFeatureGenerator(verbosity=0)
+    feature_pipeline = ContinuousAndCategoricalFeatureGenerator()
     df = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC.copy(deep=False)
     df.static_features = feature_pipeline.fit_transform(df.static_features)
     return df
@@ -243,6 +243,7 @@ def test_when_static_features_present_then_model_attributes_set_correctly(model_
     assert model.use_feat_static_cat
     assert model.use_feat_static_real
     assert len(model.feat_static_cat_cardinality) == 1
+    assert 1 <= model.feat_static_cat_cardinality[0] <= 4
 
 
 @pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
@@ -259,3 +260,17 @@ def test_when_disable_static_features_set_to_true_then_static_features_are_not_u
             feat_static_real = call_kwargs["feat_static_real"]
             assert feat_static_cat is None
             assert feat_static_real is None
+
+
+@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
+def test_given_fit_with_static_features_when_predicting_then_static_features_are_used(model_class, df_with_static):
+    model = model_class(hyperparameters={"epochs": 1, "num_batches_per_epoch": 1})
+    model.fit(train_data=df_with_static)
+    with mock.patch("gluonts.mx.model.predictor.RepresentableBlockPredictor.predict") as mock_predict:
+        try:
+            model.predict(df_with_static)
+        except IndexError:
+            gluonts_dataset = mock_predict.call_args[1]["dataset"]
+            item = next(iter(gluonts_dataset))
+            assert item["feat_static_cat"].shape == (1,)
+            assert item["feat_static_real"].shape == (2,)
