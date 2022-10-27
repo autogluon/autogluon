@@ -214,7 +214,7 @@ class TimeSeriesPredictor:
             predictor will interpret columns with ``int`` and ``float`` dtypes as continuous (real-valued) features,
             columns with ``object`` and ``str`` dtypes as categorical features, and will ignore the rest of columns.
 
-            For example, to ensure that column "store_id" with dtype ``int`` is interpreted as a
+            For example, to ensure that column "store_id" with dtype ``int`` is interpreted as a category,
             we need to change its type to ``category``::
 
                 train_data.static_features["store_id"] = train_data.static_features["store_id"].astype("category")
@@ -416,6 +416,9 @@ class TimeSeriesPredictor:
         ----------
         data : TimeSeriesDataFrame
             Time series data to forecast with.
+
+            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
+            static features that have the same columns and dtypes.
         model : str, optional
             Name of the model that you would like to use for prediction. By default, the best model during training
             (with highest validation score) will be used.
