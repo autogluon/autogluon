@@ -18,9 +18,9 @@ from autogluon.timeseries.models.gluonts import (  # MQRNNModel,; TransformerMod
     SimpleFeedForwardMXNetModel,
     TemporalFusionTransformerMXNetModel,
 )
-from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 from autogluon.timeseries.models.gluonts.mx.models import AbstractGluonTSMXNetModel, GenericGluonTSMXNetModelFactory
 from autogluon.timeseries.models.gluonts.torch.models import AbstractGluonTSPyTorchModel
+from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 
 from ..common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
 
