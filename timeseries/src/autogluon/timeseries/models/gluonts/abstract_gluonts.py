@@ -42,6 +42,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         feat_static_cat: Optional[pd.DataFrame] = None,
         feat_static_real: Optional[pd.DataFrame] = None,
         float_dtype: Type = np.float64,
+        int_dtype: Type = np.int64,
     ):
         assert time_series_df is not None
         assert time_series_df.freq, "Initializing GluonTS data sets without freq is not allowed"
@@ -50,11 +51,12 @@ class SimpleGluonTSDataset(GluonTSDataset):
         self.feat_static_cat = feat_static_cat
         self.feat_static_real = feat_static_real
 
-        if self.feat_static_cat is not None:
-            self.feat_static_cat = self.feat_static_cat.astype(np.int64)
-        if self.feat_static_real is not None:
-            self.feat_static_real = self.feat_static_real.astype(np.float64)
+        self.int_dtype = int_dtype
         self.float_dtype = float_dtype
+        if self.feat_static_cat is not None:
+            self.feat_static_cat = self.feat_static_cat.astype(self.int_dtype)
+        if self.feat_static_real is not None:
+            self.feat_static_real = self.feat_static_real.astype(self.float_dtype)
 
     @property
     def freq(self):
@@ -82,9 +84,9 @@ class SimpleGluonTSDataset(GluonTSDataset):
                 FieldName.START: pd.Period(df.index[0], freq=self.freq),
             }
             if self.feat_static_cat is not None:
-                time_series[FieldName.FEAT_STATIC_CAT] = self.feat_static_cat.loc[item_id].to_numpy()
+                time_series[FieldName.FEAT_STATIC_CAT] = self.feat_static_cat.loc[item_id].to_numpy(dtype=self.int_dtype)
             if self.feat_static_real is not None:
-                time_series[FieldName.FEAT_STATIC_REAL] = self.feat_static_real.loc[item_id].to_numpy()
+                time_series[FieldName.FEAT_STATIC_REAL] = self.feat_static_real.loc[item_id].to_numpy(dtype=self.float_dtype)
 
             yield time_series
 
@@ -115,7 +117,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     gluonts_model_path = "gluon_ts"
     gluonts_estimator_class: Type[GluonTSEstimator] = None
-    float_dtype: Type = np.float64  # datatype of floating point numbers passed internally to GluonTS
+    # datatype of floating point and integers passed internally to GluonTS
+    float_dtype: Type = np.float64
+    int_dtype: Type = np.int64
 
     def __init__(
         self,
@@ -229,6 +233,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 feat_static_cat=feat_static_cat,
                 feat_static_real=feat_static_real,
                 float_dtype=self.float_dtype,
+                int_dtype=self.int_dtype,
             )
         else:
             return None
