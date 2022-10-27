@@ -22,9 +22,10 @@ from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
 from pytorch_lightning.callbacks import Timer
 
 from autogluon.core.hpo.constants import CUSTOM_BACKEND
+from autogluon.core.utils.loaders import load_pkl
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
-from autogluon.timeseries.utils.warning_filters import torch_warning_filter
+from autogluon.timeseries.utils.warning_filters import torch_warning_filter, disable_root_logger
 
 # FIXME: introduces cpflows dependency. We exclude this model until a future release.
 # from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
@@ -94,10 +95,18 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
             pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
         super()._fit(train_data=train_data, val_data=val_data, time_limit=time_limit, **kwargs)
 
+    def save(self, path: str = None, **kwargs) -> str:
+        # we flush callbacks instance variable if it has been set. it can keep weak references
+        # which breaks training
+        self.callbacks = []
+        return super().save(path, **kwargs)
+
     @classmethod
     def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "AbstractGluonTSModel":
         with torch_warning_filter():
-            model = super().load(path, reset_paths, verbose)
+            model = load_pkl.load(path=path + cls.model_file_name, verbose=verbose)
+            if reset_paths:
+                model.set_contexts(path)
             model.gts_predictor = GluonTSPyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
         return model
 
@@ -132,7 +141,8 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
             item_forecast_dict = dict(mean=forecast.mean)
             if isinstance(forecast.distribution, AffineTransformed):
                 # FIXME: this is a hack to get around GluonTS not implementing quantiles for
-                # torch AffineTransformed
+                # torch AffineTransformed. We hence force PyTorch SFF to always use Gaussian error.
+                # However, this leads to a ~2x regression in error compared to MXNet SFF.
                 fdist = forecast.distribution
                 quantiles_tensor = torch.tensor(quantile_levels, device=fdist.scale.device).unsqueeze(1)
                 q_transformed = (
