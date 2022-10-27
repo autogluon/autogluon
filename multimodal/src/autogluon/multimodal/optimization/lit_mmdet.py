@@ -224,7 +224,7 @@ class MMDetLitModule(pl.LightningModule):
     def validation_epoch_end(self, validation_step_outputs):
         val_result = self.validation_metric.compute()
         if self.use_loss:
-            self.log_dict({"val_direct_loss": val_result})
+            self.log_dict({"val_direct_loss": val_result}, sync_dist=True)
         else:
             # TODO: add mAP/mAR_per_class
             mAPs = {"val_" + k: v for k, v in val_result.items()}
