@@ -118,7 +118,7 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
 class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = SimpleFeedForwardEstimator
     float_dtype: Type = np.float32
-    float_dtype: Type = np.int32
+    int_dtype: Type = np.int32
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
