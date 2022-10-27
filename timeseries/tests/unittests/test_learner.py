@@ -221,7 +221,7 @@ def test_when_static_features_in_tuning_data_are_missing_then_exception_is_raise
     )
     val_data = get_data_frame_with_variable_lengths({"B": 25, "A": 20}, static_features=None)
     learner = TimeSeriesLearner(path_context=temp_model_path)
-    with pytest.raises(ValueError, match="Provided train_data has static_features, but tuning_data has no"):
+    with pytest.raises(ValueError, match="Provided tuning_data has no static_features,"):
         learner._preprocess_static_features(train_data=train_data, val_data=val_data)
 
 
@@ -233,7 +233,7 @@ def test_when_static_features_columns_in_tuning_data_are_missing_then_exception_
         {"B": 25, "A": 20}, static_features=get_static_features(["B", "A"], feature_names=["f1"])
     )
     learner = TimeSeriesLearner(path_context=temp_model_path)
-    with pytest.raises(ValueError, match="tuning_data.static_features should have the same columns as train_data"):
+    with pytest.raises(ValueError, match="are missing in tuning_data.static_features but were present"):
         learner._preprocess_static_features(train_data=train_data, val_data=val_data)
 
 
@@ -286,5 +286,5 @@ def test_when_train_data_has_static_feat_but_pred_data_has_no_static_feat_then_e
     pred_data = get_data_frame_with_variable_lengths({"B": 20, "A": 15}, static_features=None)
     learner = TimeSeriesLearner(path_context=temp_model_path)
     learner.fit(train_data=train_data, hyperparameters={"ETS": {"maxiter": 1}})
-    with pytest.raises(ValueError, match="Cannot predict since data has no static features"):
+    with pytest.raises(ValueError, match="Provided data has no static_features"):
         learner.predict(pred_data)
