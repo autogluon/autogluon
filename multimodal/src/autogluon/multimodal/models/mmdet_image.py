@@ -57,6 +57,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         logger.debug(f"initializing {checkpoint_name}")
         self.checkpoint_name = checkpoint_name
         self.pretrained = pretrained
+        self.num_classes = num_classes
 
         if checkpoint_name == "faster_rcnn_r50_fpn_1x_voc0712":
             # download voc configs in our s3 bucket
@@ -95,13 +96,30 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         if isinstance(config_file, str):
             self.config = mmcv.Config.fromfile(config_file)
 
+        if "bbox_head" in self.config.model.keys():  # yolov3
+            if self.num_classes:
+                self.config.model["bbox_head"]["num_classes"] = self.num_classes
+            else:
+                self.num_classes = self.config.model["bbox_head"]["num_classes"]
+        elif "roi_head" in self.config.model.keys():  # faster_rcnn
+            if self.num_classes:
+                self.config.model["roi_head"]["bbox_head"]["num_classes"] = self.num_classes
+            else:
+                self.num_classes = self.config.model["roi_head"]["bbox_head"]["num_classes"]
+        else:
+            raise ValueError("Cannot retrieve num_classes for current model structure.")
+        self.id2label = dict(zip(range(self.num_classes), range(self.num_classes)))
+
         # build model and load pretrained weights
         assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
         self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
 
-        if checkpoint is not None:
+        if self.pretrained and checkpoint is not None:
             checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
-        if "CLASSES" in checkpoint.get("meta", {}):
+
+        if num_classes == 20:  # TODO: remove hardcode
+            self.model.CLASSES = get_classes("voc")
+        elif "CLASSES" in checkpoint.get("meta", {}):
             self.model.CLASSES = checkpoint["meta"]["CLASSES"]
         else:
             warnings.simplefilter("once")
@@ -110,6 +128,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.model.cfg = self.config  # save the config in the model for convenience
 
         self.prefix = prefix
+
+        self.name_to_id = self.get_layer_ids()
 
     @property
     def image_key(self):
@@ -163,6 +183,15 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
         ret = {BBOX: results}
         return {self.prefix: ret}
+
+    def forward_test(self, imgs, img_metas, rescale=True):
+        return self.model.forward_test(imgs=imgs, img_metas=img_metas, rescale=rescale)
+
+    def forward_train(self, img, img_metas, gt_bboxes, gt_labels):
+        return self.model.forward_train(img=img, img_metas=img_metas, gt_bboxes=gt_bboxes, gt_labels=gt_labels)
+
+    def _parse_losses(self, losses):
+        return self.model._parse_losses(losses)
 
     def get_layer_ids(
         self,

@@ -15,12 +15,12 @@ class AbstractAnalysis(ABC, StateCheckMixin):
 
     def __init__(self,
                  parent: Optional[AbstractAnalysis] = None,
-                 children: List[AbstractAnalysis] = [],
+                 children: Optional[List[AbstractAnalysis]] = None,
                  state: Optional[AnalysisState] = None,
                  **kwargs) -> None:
 
         self.parent = parent
-        self.children: List[AbstractAnalysis] = children
+        self.children: List[AbstractAnalysis] = [] if children is None else children
         self.state: Optional[AnalysisState] = state
         for c in self.children:
             c.parent = self
@@ -133,7 +133,7 @@ class BaseAnalysis(AbstractAnalysis):
 
     def __init__(self,
                  parent: Optional[AbstractAnalysis] = None,
-                 children: List[AbstractAnalysis] = [],
+                 children: Optional[List[AbstractAnalysis]] = None,
                  **kwargs) -> None:
         super().__init__(parent, children, **kwargs)
 
@@ -152,7 +152,7 @@ class Namespace(AbstractAnalysis):
     def __init__(self,
                  namespace: Optional[str] = None,
                  parent: Optional[AbstractAnalysis] = None,
-                 children: List[AbstractAnalysis] = [],
+                 children: Optional[List[AbstractAnalysis]] = None,
                  **kwargs) -> None:
         super().__init__(parent, children, **kwargs)
         self.namespace = namespace

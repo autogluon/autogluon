@@ -8,7 +8,7 @@ from nlpaug import Augmenter
 from nlpaug.util import Method
 from text_unidecode import unidecode
 
-from ..constants import IDENTIFIER, MMCV_MODELS
+from ..constants import IDENTIFIER, MMLAB_MODELS
 from .collator import Dict
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 
@@ -161,7 +161,7 @@ def get_collate_fn(
             per_modality_column_names = per_preprocessor.get_column_names(modality=per_modality)
             if per_modality_column_names:
                 for per_model_processor in per_data_processors_group[per_modality]:
-                    if per_model_processor.prefix.lower().startswith(MMCV_MODELS):
+                    if per_model_processor.prefix.lower().startswith(MMLAB_MODELS):
                         collate_fn.update(
                             per_model_processor.collate_fn(
                                 per_modality_column_names, per_gpu_batch_size=per_gpu_batch_size

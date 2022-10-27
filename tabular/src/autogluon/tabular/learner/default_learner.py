@@ -63,6 +63,8 @@ class DefaultLearner(AbstractTabularLearner):
         logger.log(20, f'AutoGluon Version:  {self.version}')
         logger.log(20, f'Python Version:     {self._python_version}')
         logger.log(20, f'Operating System:   {platform.system()}')
+        logger.log(20, f'Platform Machine:   {platform.machine()}')
+        logger.log(20, f'Platform Version:   {platform.version()}')
         logger.log(20, f'Train Data Rows:    {len(X)}')
         logger.log(20, f'Train Data Columns: {len([column for column in X.columns if column != self.label])}')
         if X_val is not None:

@@ -63,7 +63,7 @@ class AbstractTrainer:
             self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
 
         logger.log(25, f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric.name}'")
-        if not self.eval_metric.greater_is_better:
+        if not self.eval_metric.greater_is_better_internal:
             logger.log(25, "\tThis metric's sign has been flipped to adhere to being higher_is_better. The metric score can be multiplied by -1 to get the metric value.")
         if not (self.eval_metric.needs_pred or self.eval_metric.needs_quantile):
             logger.log(25, "\tThis metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
@@ -1510,7 +1510,7 @@ class AbstractTrainer:
         if model.val_score is not None:
             if model.eval_metric.name != self.eval_metric.name:
                 logger.log(20, f'\tNote: model has different eval_metric than default.')
-            if not model.eval_metric.greater_is_better:
+            if not model.eval_metric.greater_is_better_internal:
                 sign_str = '-'
             else:
                 sign_str = ''

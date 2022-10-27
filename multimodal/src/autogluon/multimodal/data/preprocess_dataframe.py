@@ -83,7 +83,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
-            if col_type.startswith((TEXT, IMAGE)) or col_type == NULL:
+            if col_type.startswith((TEXT, IMAGE, ROIS)) or col_type == NULL:
                 continue
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(
@@ -208,7 +208,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return self._fit_y_called
 
     def get_column_names(self, modality: str):
-        if modality.startswith(IMAGE):
+        if modality.startswith(IMAGE) or modality == ROIS:
             return self._image_path_names if hasattr(self, "_image_path_names") else self._image_feature_names
         elif modality.startswith(TEXT):
             return self._text_feature_names
@@ -281,7 +281,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     generator = self._feature_generators[col_name]
                     generator.fit(np.expand_dims(processed_data.to_numpy(), axis=-1))
                     self._numerical_feature_names.append(col_name)
-            elif col_type.startswith(IMAGE):
+            elif col_type.startswith(IMAGE) or col_type == ROIS:  # TODO: Use transform_multimodal and remove this hack
                 self._image_feature_names.append(col_name)
             else:
                 raise NotImplementedError(
@@ -398,12 +398,16 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         assert (
             self._fit_called or self._fit_x_called
         ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_image."
+
         image_features = {}
         image_types = {}
         for col_name in self._image_feature_names:
             col_value = df[col_name]
             col_type = self._column_types[col_name]
-            if col_type == IMAGE_PATH or IMAGE:
+
+            if col_name == ROIS:  # TODO: infer ROIS type correctly in evaluation/prediction
+                processed_data = df[col_name].tolist()
+            elif col_type == IMAGE_PATH or IMAGE:
                 processed_data = col_value.apply(lambda ele: ele.split(";")).tolist()
             elif col_type == f"{IMAGE}_{IDENTIFIER}":
                 processed_data = col_value

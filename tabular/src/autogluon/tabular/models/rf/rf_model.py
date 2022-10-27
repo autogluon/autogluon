@@ -1,6 +1,7 @@
 import logging
 import math
 import pickle
+import os
 import sys
 import time
 
@@ -15,6 +16,9 @@ from autogluon.core.utils.utils import normalize_pred_probas
 from autogluon.core.models import AbstractModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 
+from .compilers.native import RFNativeCompiler
+from .compilers.onnx import RFOnnxCompiler
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,6 +30,7 @@ class RFModel(AbstractModel):
         super().__init__(**kwargs)
         self._feature_generator = None
         self._daal = False  # Whether daal4py backend is being used
+        self._num_features_post_process = None
 
     def _get_model_type(self):
         if self.problem_type == QUANTILE:
@@ -152,6 +157,7 @@ class RFModel(AbstractModel):
         n_estimators_test = min(4, max(1, math.floor(n_estimators_minimum/5)))
 
         X = self.preprocess(X)
+        self._num_features_post_process = X.shape[1]
         n_estimator_increments = [n_estimators_final]
 
         num_trees_per_estimator = self._get_num_trees_per_estimator()
@@ -224,6 +230,8 @@ class RFModel(AbstractModel):
             model.estimators_ = None
         self.model = model
         self.params_trained['n_estimators'] = self.model.n_estimators
+        # FIXME: v0.6 Move to generic compile call, ensure compile time is included in fit time
+        self.compile()
 
     # TODO: Remove this after simplifying _predict_proba to reduce code duplication. This is only present for SOFTCLASS support.
     def _predict_proba(self, X, **kwargs):
@@ -358,3 +366,29 @@ class RFModel(AbstractModel):
         else:
             tags['valid_oof'] = True
         return tags
+
+    def _valid_compilers(self):
+        return [RFNativeCompiler, RFOnnxCompiler]
+
+    def _default_compiler(self):
+        return RFNativeCompiler
+
+    def save(self, path: str = None, verbose=True) -> str:
+        _model = self.model
+        if self.model is not None:
+            self._compiler = self._get_compiler()
+            self._is_model_saved = True
+            if self._compiler is not None:
+                self.model = None  # Don't save model in pkl
+        path = super().save(path=path, verbose=verbose)
+        self.model = _model
+        if _model is not None and self._compiler is not None:
+            self.model = self._compiler.compile(obj=self, path=path)
+        return path
+
+    @classmethod
+    def load(cls, path: str, reset_paths=True, verbose=True):
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        if model._is_model_saved:
+            model.model = model._compiler.load(obj=model, path=path)
+        return model
