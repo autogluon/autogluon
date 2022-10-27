@@ -37,6 +37,7 @@ TESTABLE_MX_MODELS = [
 
 MODELS_WITH_STATIC_FEATURES = [
     DeepARModel,
+    DeepARMXNetModel,
     MQCNNMXNetModel,
 ]
 TESTABLE_PYTORCH_MODELS = [DeepARModel, SimpleFeedForwardModel]
