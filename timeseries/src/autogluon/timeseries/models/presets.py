@@ -43,22 +43,21 @@ MODEL_TYPES = dict(
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
-    MQCNNMXNet=40,
-    MQRNNMXNet=40,
-    SimpleFeedForward=50,
-    SimpleFeedForwardMXNet=30,
-    TransformerMXNet=40,
-    TemporalFusionTransformerMXNet=45,
-    DeepAR=50,
+    MQCNNMXNet=20,
+    MQRNNMXNet=20,
+    SimpleFeedForward=30,
+    SimpleFeedForwardMXNet=25,
+    TransformerMXNet=30,
+    TemporalFusionTransformerMXNet=30,
+    DeepAR=40,
     DeepARMXNet=30,
-    # Prophet=10,
     SktimeAutoARIMA=20,
     SktimeARIMA=50,
     SktimeAutoETS=60,
     ARIMA=50,
     ETS=60,
     Theta=60,
-    AutoGluonTabularModel=0,
+    AutoGluonTabular=45,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 MINIMUM_CONTEXT_LENGTH = 10
@@ -85,6 +84,7 @@ def get_default_hps(key, prediction_length):
             "TemporalFusionTransformerMXNet": {
                 "context_length": context_length,
             },
+            "AutoGluonTabular": {},
         },
         "default_hpo": {
             "ARIMA": {

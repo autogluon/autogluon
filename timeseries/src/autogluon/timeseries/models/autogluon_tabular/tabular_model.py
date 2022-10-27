@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+import scipy.stats
 
 # TODO: Drop GluonTS dependency
 from gluonts.time_feature import get_lags_for_frequency, time_features_from_frequency_str
@@ -32,12 +33,21 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         Note that the selected models must support ``problem_type="quantile"``.
     """
 
-    # TODO: Add XT/RF after https://github.com/awslabs/autogluon/pull/2204 is merged
-    # TODO: Add catboost with MultiQuantile loss (after catboost v1.1)?
-    # TODO: Other tabular models in quantile? (LightGBM?)
     default_tabular_hyperparameters = {
-        "NN_TORCH": {},
-        "FASTAI": {},
+        "RF": {},
+        "XT": {},
+        "XGB": {},
+        "CAT": {},
+        "GBM": {},
+    }
+
+    TIMESERIES_METRIC_TO_TABULAR_METRIC = {
+        "MASE": "mean_absolute_percentage_error",
+        "MAPE": "mean_absolute_percentage_error",
+        "sMAPE": "mean_absolute_percentage_error",
+        "mean_wQuantileLoss": "mean_absolute_percentage_error",
+        "MSE": "mean_squared_error",
+        "RMSE": "root_mean_squared_error",
     }
 
     def __init__(
@@ -63,16 +73,12 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         self._lag_indices: np.array = None
         self._time_features: List[Callable] = None
         self._available_features: pd.Index = None
-        self._drop_median_prediction = False
-
-        if 0.5 not in self.quantile_levels:
-            self._drop_median_prediction = True
-            self.quantile_levels = sorted(self.quantile_levels + [0.5])
+        self.residuals_std = 0.0
 
         self.tabular_predictor = TabularPredictor(
             label=self.target,
-            problem_type=ag.constants.QUANTILE,
-            quantile_levels=self.quantile_levels,
+            problem_type=ag.constants.REGRESSION,
+            eval_metric=self.TIMESERIES_METRIC_TO_TABULAR_METRIC.get(self.eval_metric),
         )
 
     def _get_features_dataframe(
@@ -166,6 +172,8 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             hyperparameters=tabular_hyperparameters,
             verbosity=verbosity - 2,
         )
+        residuals = (self.tabular_predictor.predict(train_df) - train_df[self.target]).values
+        self.residuals_std = np.sqrt(np.mean(np.square(residuals)))
         # Logger level is changed inside .fit(), restore to the initial value
         autogluon_logger.setLevel(logging_level)
 
@@ -183,29 +191,21 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         return data.groupby(ITEMID, sort=False).apply(extend_single_time_series)
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
-        if quantile_levels is not None:
-            output_quantiles = quantile_levels
-            if not set(quantile_levels).issubset(set(self.quantile_levels)):
-                raise ValueError(
-                    f"{self.name} expects quantile_levels to be a subset of {self.quantile_levels} "
-                    f" (received quantile_levels = {quantile_levels})."
-                )
-        else:
-            output_quantiles = self.quantile_levels
-            if self._drop_median_prediction:
-                output_quantiles.remove(0.5)
+        self._check_predict_inputs(data=data, quantile_levels=quantile_levels)
+        if quantile_levels is None:
+            quantile_levels = self.quantile_levels
 
         data, scale_per_item = self._normalize_targets(data)
         data_extended = self._extend_index(data)
         features = self._get_features_dataframe(data_extended, last_k_values=self.prediction_length)
         predictions = self.tabular_predictor.predict(features[self._available_features])
 
+        predictions = predictions.rename("mean").to_frame()
         preds_index = data_extended.slice_by_timestep(-self.prediction_length, None).index
         predictions.set_index(preds_index, inplace=True)
 
-        predictions["mean"] = predictions[0.5]
-        predictions = predictions[["mean"] + output_quantiles]
-        predictions.rename(str, axis=1, inplace=True)
+        for q in quantile_levels:
+            predictions[str(q)] = predictions["mean"] + self.residuals_std * scipy.stats.norm.ppf(q)
 
         predictions = self._rescale_targets(predictions, scale_per_item)
         return TimeSeriesDataFrame(predictions).loc[data.item_ids]
