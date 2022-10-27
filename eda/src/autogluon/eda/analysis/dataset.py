@@ -44,7 +44,7 @@ class Sampler(AbstractAnalysis):
     def __init__(self,
                  sample: Union[None, int, float] = None,
                  parent: Optional[AbstractAnalysis] = None,
-                 children: List[AbstractAnalysis] = [],
+                 children: Optional[List[AbstractAnalysis]] = None,
                  **kwargs) -> None:
         super().__init__(parent, children, **kwargs)
         if sample is not None and isinstance(sample, float):
