@@ -1075,7 +1075,9 @@ class AbstractModel:
         model_cls = self.__class__
         init_params = self.get_params()
         # We set soft time limit to avoid trials being terminated directly by ray tune
-        trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
+        trial_soft_time_limit = None
+        if hpo_executor.time_limit is not None:
+            trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
 
         fit_kwargs = dict()
         fit_kwargs['feature_metadata'] = self.feature_metadata
@@ -1095,7 +1097,9 @@ class AbstractModel:
         model_estimate_memory_usage = None
         if self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(X=X, **kwargs)
-        minimum_resources = self.get_minimum_resources()
+        minimum_resources = self.get_minimum_resources(
+            is_gpu_available=(hpo_executor.resources.get('num_gpus', 0) > 0)
+        )
         hpo_executor.execute(
             model_trial=model_trial,
             train_fn_kwargs=train_fn_kwargs,
@@ -1195,8 +1199,14 @@ class AbstractModel:
             elif res_min[resource_name] > resources[resource_name]:
                 raise AssertionError(f'Model requires {res_min[resource_name]} {resource_name} to fit, but {resources[resource_name]} are available.')
 
-    def get_minimum_resources(self) -> Dict[str, int]:
+    def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:
         """
+        Parameters
+        ----------
+        is_gpu_available
+            Whether gpu is availalbe in the system.
+            Model that can be trained both on cpu and gpu can decide the minimum resources based on this.
+
         Returns a dictionary of minimum resource requirements to fit the model.
         Subclass should consider overriding this method if it requires more resources to train.
         If a resource is not part of the output dictionary, it is considered unnecessary.
