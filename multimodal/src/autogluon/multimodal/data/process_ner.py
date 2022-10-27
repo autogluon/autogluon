@@ -34,10 +34,9 @@ logger = logging.getLogger(AUTOMM)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
-class MultiModalProcessor:
+class NerProcessor:
     """
-    Prepare multimodal data for the model specified by "prefix". For multiple models requiring multimodal data,
-    we need to create a MultiModal for each related model so that they will have independent input.
+    Prepare NER data for the model specified by "prefix".
     """
 
     def __init__(

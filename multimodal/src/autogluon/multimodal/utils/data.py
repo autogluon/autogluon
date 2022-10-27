@@ -18,7 +18,6 @@ from ..constants import (
     FEW_SHOT,
     IMAGE,
     LABEL,
-    MULTIMODAL,
     NER,
     NER_ANNOTATION,
     NUMERICAL,
@@ -31,8 +30,8 @@ from ..data import (
     LabelProcessor,
     MixupModule,
     MultiModalFeaturePreprocessor,
-    MultiModalProcessor,
     NerLabelEncoder,
+    NerProcessor,
     NumericalProcessor,
     TextProcessor,
 )
@@ -148,8 +147,8 @@ def create_data_processor(
         )
     elif data_type == LABEL:
         data_processor = LabelProcessor(model=model)
-    elif data_type == MULTIMODAL:
-        data_processor = MultiModalProcessor(
+    elif data_type == NER:
+        data_processor = NerProcessor(
             model=model,
         )
     else:
@@ -191,7 +190,7 @@ def create_fusion_data_processors(
         CATEGORICAL: [],
         NUMERICAL: [],
         LABEL: [],
-        MULTIMODAL: [],
+        NER: [],
     }
 
     model_dict = {model.prefix: model}
@@ -211,9 +210,9 @@ def create_fusion_data_processors(
 
         if per_name == NER:
             # create a multimodal processor for NER.
-            data_processors[MULTIMODAL].append(
+            data_processors[NER].append(
                 create_data_processor(
-                    data_type=MULTIMODAL,
+                    data_type=NER,
                     config=config,
                     model=per_model,
                 )

@@ -19,7 +19,6 @@ from ..constants import (
     IMAGE,
     IMAGE_PATH,
     LABEL,
-    MULTIMODAL,
     NER,
     NER_ANNOTATION,
     NULL,
@@ -219,11 +218,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             return self._numerical_feature_names
         elif modality == LABEL:
             return [self._label_column]  # as a list to be consistent with others
-        elif modality == MULTIMODAL:
-            if self.label_type == NER_ANNOTATION:
-                return self._text_feature_names + [self._label_column]
-            else:
-                raise ValueError(f"Please specify which columns are included for {modality}.")
+        elif self.label_type == NER_ANNOTATION:
+            return self._text_feature_names + [self._label_column]
         else:
             raise ValueError(f"Unknown modality: {modality}.")
 
@@ -535,7 +531,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         return {self._label_column: y}, {self._label_column: self.label_type}
 
-    def transform_multimodal(
+    def transform_ner(
         self,
         df: pd.DataFrame,
     ) -> Tuple[Dict[str, NDArray[(Any,), Any]], Dict[str, str]]:
