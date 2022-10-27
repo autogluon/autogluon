@@ -151,7 +151,7 @@ def siamese_network():
 def text_similarity():
     return {
         "model.names": ["hf_text"],
-        "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",
+        "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
         "model.hf_text.pooling_mode": "mean",
     }
 

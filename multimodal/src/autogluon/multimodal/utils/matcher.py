@@ -328,8 +328,10 @@ def compute_semantic_similarity(a: torch.Tensor, b: torch.Tensor, similarity_typ
 
 def semantic_search(
     matcher,
-    query_data: Union[pd.DataFrame, dict, list],
-    response_data: Union[pd.DataFrame, dict, list],
+    query_data: Optional[Union[pd.DataFrame, dict, list]] = None,
+    response_data: Optional[Union[pd.DataFrame, dict, list]] = None,
+    query_embeddings: Optional[torch.Tensor] = None,
+    response_embeddings: Optional[torch.Tensor] = None,
     query_chunk_size: int = 100,
     response_chunk_size: int = 500000,
     top_k: int = 10,
@@ -345,6 +347,10 @@ def semantic_search(
         The query data.
     response_data
         The response data.
+    query_embeddings
+        2-D query embeddings.
+    response_embeddings
+        2-D response embeddings.
     id_mappings
         Id-to-content mappings. The contents can be text, image, etc.
         This is used when the dataframe contains the query/response indexes instead of their contents.
@@ -361,31 +367,63 @@ def semantic_search(
     -------
     Search results.
     """
-    query_header = matcher._query[0] if matcher._query is not None else QUERY
-    query_data = data_to_df(query_data, header=query_header)
-    response_header = matcher._response[0] if matcher._response else RESPONSE
-    response_data = data_to_df(response_data, header=response_header)
-    queries_result_list = [[] for _ in range(len(query_data))]
+    assert (
+        query_data is None or query_embeddings is None
+    ), "Both query_data and query_embeddings are detected, but you can only use one of them."
+    assert query_data is not None or query_embeddings is not None, "Both query_data and query_embeddings are None."
+    assert (
+        response_data is None or response_embeddings is None
+    ), "Both response_data and response_embeddings are detected, but you can only use one of them."
+    assert (
+        response_data is not None or response_embeddings is not None
+    ), "Both response_data and response_embeddings are None."
 
-    for query_start_idx in range(0, len(query_data), query_chunk_size):
-        query_embeddings = matcher.extract_embedding(
-            query_data[query_start_idx : query_start_idx + query_chunk_size],
-            signature=QUERY,
-            id_mappings=id_mappings,
-            as_tensor=True,
-        )
-        # Iterate over chunks of the corpus
-        for response_start_idx in range(0, len(response_data), response_chunk_size):
-            response_embeddings = matcher.extract_embedding(
-                response_data[response_start_idx : response_start_idx + response_chunk_size],
-                signature=RESPONSE,
+    if query_embeddings is None:
+        query_header = matcher._query[0] if matcher._query is not None else QUERY
+        query_data = data_to_df(query_data, header=query_header)
+    if response_embeddings is None:
+        response_header = matcher._response[0] if matcher._response else RESPONSE
+        response_data = data_to_df(response_data, header=response_header)
+
+    if query_embeddings is None:
+        num_queries = len(query_data)
+    else:
+        num_queries = len(query_embeddings)
+
+    if response_embeddings is None:
+        num_responses = len(response_data)
+    else:
+        num_responses = len(response_embeddings)
+
+    queries_result_list = [[] for _ in range(num_queries)]
+
+    for query_start_idx in range(0, num_queries, query_chunk_size):
+        if query_embeddings is None:
+            batch_query_embeddings = matcher.extract_embedding(
+                query_data[query_start_idx : query_start_idx + query_chunk_size],
+                signature=QUERY,
                 id_mappings=id_mappings,
                 as_tensor=True,
             )
+        else:
+            batch_query_embeddings = query_embeddings[query_start_idx : query_start_idx + query_chunk_size]
+        # Iterate over chunks of the corpus
+        for response_start_idx in range(0, num_responses, response_chunk_size):
+            if response_embeddings is None:
+                batch_response_embeddings = matcher.extract_embedding(
+                    response_data[response_start_idx : response_start_idx + response_chunk_size],
+                    signature=RESPONSE,
+                    id_mappings=id_mappings,
+                    as_tensor=True,
+                )
+            else:
+                batch_response_embeddings = response_embeddings[
+                    response_start_idx : response_start_idx + response_chunk_size
+                ]
             # Compute cosine similarities
             scores = compute_semantic_similarity(
-                a=query_embeddings,
-                b=response_embeddings,
+                a=batch_query_embeddings,
+                b=batch_response_embeddings,
                 similarity_type=similarity_type,
             )
 

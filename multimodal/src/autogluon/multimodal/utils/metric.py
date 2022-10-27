@@ -151,6 +151,7 @@ def compute_ranking_score(
 ):
     """
     Compute NDCG, MAP, Recall, and Precision.
+    TODO: Consider MRR.
 
     Parameters
     ----------

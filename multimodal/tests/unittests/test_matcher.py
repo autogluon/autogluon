@@ -152,6 +152,16 @@ def test_text_semantic_search():
         response_data=corpus,
         top_k=5,
     )
+    # extract embeddings first and then do semantic search
+    query_embeddings = matcher.extract_embedding(queries)
+    response_embeddings = matcher.extract_embedding(corpus)
+    hits_2 = semantic_search(
+        matcher=matcher,
+        query_embeddings=query_embeddings,
+        response_embeddings=response_embeddings,
+        top_k=5,
+    )
+
     hits_gt = [
         [
             {"corpus_id": 0, "score": 0.7035943269729614},
@@ -176,7 +186,8 @@ def test_text_semantic_search():
         ],
     ]
 
-    for per_query_hits, per_query_hit_gt in zip(hits, hits_gt):
-        for per_hit, per_hit_gt in zip(per_query_hits, per_query_hit_gt):
-            assert per_hit["corpus_id"] == per_hit_gt["corpus_id"]
+    for per_query_hits, per_query_hits_2, per_query_hit_gt in zip(hits, hits_2, hits_gt):
+        for per_hit, per_hit_2, per_hit_gt in zip(per_query_hits, per_query_hits_2, per_query_hit_gt):
+            assert per_hit["corpus_id"] == per_hit_2["corpus_id"] == per_hit_gt["corpus_id"]
+            npt.assert_almost_equal(per_hit["score"], per_hit_2["score"])
             npt.assert_almost_equal(per_hit["score"], per_hit_gt["score"])
