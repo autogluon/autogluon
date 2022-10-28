@@ -1542,6 +1542,13 @@ class MultiModalPredictor:
 
         if strategy == "ddp":
             outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
+        elif self._pipeline == OBJECT_DETECTION:
+            # reformat single gpu output for onject detection
+            # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
+            if len(outputs[0][BBOX][0]) == 2:  # additional axis for mask_rcnn, TODO: remove hardcode here
+                outputs = [{BBOX: bbox[0]} for ele in outputs for bbox in ele[BBOX]]
+            else:
+                outputs = [{BBOX: bbox} for ele in outputs for bbox in ele[BBOX]]
 
         return outputs
 
