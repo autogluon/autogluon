@@ -3,7 +3,9 @@ import os
 import time
 from collections import defaultdict
 from pathlib import Path
+from typing import Callable, Dict, List, Optional, Union
 
+import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import BasePredictionWriter
 
@@ -12,9 +14,20 @@ from ..constants import AUTOMM
 logger = logging.getLogger(AUTOMM)
 
 
-# TODO: doc for this file
 class DDPCacheWriter(BasePredictionWriter):
-    def __init__(self, pipeline, write_interval, sleep_time=5):
+    def __init__(self, pipeline: Optional[str], write_interval: Optional[str], sleep_time=5):
+        """
+        Parameters
+        ----------
+        pipeline
+            The predictor's pipeline. Used as identifier of cache path.
+        write_interval
+            When to write. Could be "batch" or "epoch".
+            See Lightning's source code at
+            https://pytorch-lightning.readthedocs.io/en/stable/_modules/pytorch_lightning/callbacks/prediction_writer.html#BasePredictionWriter
+        sleep_time
+            If other process does not finish writing, sleep for a few seconds and recheck.
+        """
         super().__init__(write_interval)
         self._pipeline = pipeline
         self._sleep_time = sleep_time
@@ -36,13 +49,43 @@ class DDPCacheWriter(BasePredictionWriter):
         if self.cache_dir[-1] != os.path.sep:
             self.cache_dir = self.cache_dir + os.path.sep
 
-    def get_predictions_cache_dir(self, global_rank):
+    def get_predictions_cache_dir(self, global_rank: int):
+        """
+        Parameters
+        ----------
+        global_rank
+            Global rank of current process.
+        """
         return os.path.join(self.cache_dir, f"predictions_{global_rank}.pt")
 
-    def get_batch_indices_cache_dir(self, global_rank):
+    def get_batch_indices_cache_dir(self, global_rank: int):
+        """
+        Parameters
+        ----------
+        global_rank
+            Global rank of current process.
+        """
         return os.path.join(self.cache_dir, f"batch_indices_{global_rank}.pt")
 
-    def write_on_epoch_end(self, trainer, pl_module, predictions, batch_indices):
+    def write_on_epoch_end(
+        self,
+        trainer: pl.Trainer,
+        pl_module: Optional[pl.LightningModule],
+        predictions: Optional[torch.Tensor],
+        batch_indices: Optional[torch.Tensor],
+    ):
+        """
+        Parameters
+        ----------
+        trainer
+            Pytorch Lightning trainer.
+        pl_module
+            Pytorch Lightning module.
+        predictions
+            The predicted results.
+        batch_indices
+            The corresponding batch indices for prediction results.
+        """
         # this will create N (num processes) files in `cache_dir` each containing
         # the predictions of its respective rank
         torch.save(predictions, self.get_predictions_cache_dir(trainer.global_rank))
@@ -50,11 +93,17 @@ class DDPCacheWriter(BasePredictionWriter):
         # from prediction data
         torch.save(batch_indices, self.get_batch_indices_cache_dir(trainer.global_rank))
 
-    def read_single_gpu_result(self, gpu_idx):
-        batch_indices_file = self.get_batch_indices_cache_dir(gpu_idx)
-        predictions_file = self.get_predictions_cache_dir(gpu_idx)
+    def read_single_gpu_result(self, global_rank: Optional[int]):
+        """
+        Parameters
+        ----------
+        global_rank
+            Global rank of current process.
+        """
+        batch_indices_file = self.get_batch_indices_cache_dir(global_rank)
+        predictions_file = self.get_predictions_cache_dir(global_rank)
         while (not os.path.exists(batch_indices_file)) or (not os.path.exists(predictions_file)):
-            logger.info(f"waiting for gpu #{gpu_idx}...")
+            logger.info(f"waiting for gpu #{global_rank}...")
             time.sleep(self._sleep_time)
         batch_indices = torch.load(batch_indices_file)[0]
         predictions = torch.load(predictions_file)[0]
@@ -63,11 +112,16 @@ class DDPCacheWriter(BasePredictionWriter):
         return batch_indices, predictions
 
     def collect_all_gpu_results(self, num_gpus):
-
+        """
+        Parameters
+        ----------
+        num_gpus
+            Number of gpus used.
+        """
         outputs = defaultdict(dict)
         output_keys = []
-        for gpu_idx in range(num_gpus):
-            batch_indices, predictions = self.read_single_gpu_result(gpu_idx)
+        for global_rank in range(num_gpus):
+            batch_indices, predictions = self.read_single_gpu_result(global_rank)
             if not output_keys:
                 output_keys = list(predictions[0].keys())
             for group_idx, batch_group in enumerate(batch_indices):
