@@ -167,7 +167,7 @@ class MultiModalPredictor:
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 3,
-        output_shape: Optional[int] = None,  # TODO: infer this for detection
+        num_classes: Optional[int] = None,  # TODO: can we infer this from data?
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
     ):
@@ -215,6 +215,10 @@ class MultiModalPredictor:
             If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
             where `L` ranges from 0 to 50
             (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
+        num_classes
+            Number of classes. Used in classification task.
+            If this is specified and is different from the pretrained model's output,
+            the model's head will be changed to have <num_classes> output.
         warn_if_exist
             Whether to raise warning if the specified path already exists.
         enable_progress_bar
@@ -247,7 +251,7 @@ class MultiModalPredictor:
         self._pipeline = pipeline.lower() if pipeline is not None else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = val_metric
-        self._output_shape = output_shape
+        self._output_shape = num_classes
         self._save_path = path
         self._ckpt_path = None
         self._pretrained_path = None
