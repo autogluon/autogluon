@@ -30,6 +30,9 @@ install_requires = [
     'seaborn>=0.12.0,<0.13',
     'ipython>=8.0,<9.0',
     'ipywidgets>=8.0,<9.0',
+    f'autogluon.core=={version}',
+    f'autogluon.features=={version}',
+    f'autogluon.tabular=={version}',
 ]
 
 extras_require = dict()

@@ -1,7 +1,6 @@
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
 from .. import AnalysisState
-# from ..state import StateCheckMixin
 
 __all__ = ['XShiftSummary']
 
@@ -23,7 +22,7 @@ class XShiftSummary(AbstractVisualization, JupyterMixin):
         """
         if not results['detection_status']:
             ret_md = (
-                f"We did not detect a substantial difference between the training and test X distributions."
+                "We did not detect a substantial difference between the training and test X distributions."
             )
             return ret_md
         else:
