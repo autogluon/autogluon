@@ -89,7 +89,7 @@ class DatasetSummary(AbstractAnalysis):
 
     See Also
     --------
-    :class:`autogluon.eda.visualization.dataset.DatasetStatistics`
+    :py:class:`~autogluon.eda.visualization.dataset.DatasetStatistics`
     """
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
@@ -128,7 +128,7 @@ class RawTypesAnalysis(AbstractAnalysis):
 
     See Also
     --------
-    :class:`autogluon.eda.visualization.dataset.DatasetStatistics`
+    :py:class:`~autogluon.eda.visualization.dataset.DatasetStatistics`
     """
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
@@ -164,8 +164,8 @@ class VariableTypeAnalysis(AbstractAnalysis):
 
     See Also
     --------
-    :class:`autogluon.eda.analysis.dataset.RawTypesAnalysis`
-    :class:`autogluon.eda.visualization.dataset.DatasetStatistics`
+    :py:class:`~autogluon.eda.analysis.dataset.RawTypesAnalysis`
+    :py:class:`~autogluon.eda.visualization.dataset.DatasetStatistics`
     """
 
     def __init__(self,
@@ -220,7 +220,7 @@ class SpecialTypesAnalysis(AbstractAnalysis):
 
     See Also
     --------
-    :class:`autogluon.eda.visualization.dataset.DatasetStatistics`
+    :py:class:`~autogluon.eda.visualization.dataset.DatasetStatistics`
     """
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:

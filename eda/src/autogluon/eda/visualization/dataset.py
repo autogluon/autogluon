@@ -14,7 +14,9 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
     """
     Display aggregate dataset statistics and dataset-level information.
 
-    The report is a composite view of combination of performed analyses: DatasetSummary, RawTypesAnalysis, VariableTypeAnalysis, SpecialTypesAnalysis.
+    The report is a composite view of combination of performed analyses: :py:class:`~autogluon.eda.analysis.dataset.DatasetSummary`,
+    :py:class:`~autogluon.eda.analysis.dataset.RawTypesAnalysis`, :py:class:`~autogluon.eda.analysis.dataset.VariableTypeAnalysis`,
+    :py:class:`~autogluon.eda.analysis.dataset.SpecialTypesAnalysis`.
     The components can be present in any combination (assuming their dependencies are satisfied).
 
     The report requires at lest one of the analyses present to be rendered.
@@ -39,10 +41,10 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
 
     See Also
     --------
-    :class:`autogluon.eda.analysis.dataset.DatasetSummary`
-    :class:`autogluon.eda.analysis.dataset.RawTypesAnalysis`
-    :class:`autogluon.eda.analysis.dataset.VariableTypeAnalysis`
-    :class:`autogluon.eda.analysis.dataset.SpecialTypesAnalysis`
+    :py:class:`~autogluon.eda.analysis.dataset.DatasetSummary`
+    :py:class:`~autogluon.eda.analysis.dataset.RawTypesAnalysis`
+    :py:class:`~autogluon.eda.analysis.dataset.VariableTypeAnalysis`
+    :py:class:`~autogluon.eda.analysis.dataset.SpecialTypesAnalysis`
     """
 
     def __init__(self,
@@ -64,27 +66,17 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
         for k in ['dataset_stats', 'missing_statistics', 'raw_type', 'variable_type', 'special_types']:
             if k in state:
                 datasets = state[k].keys()
+                break
 
         for ds in datasets:
             # Merge different metrics
-            stats: Dict[str, Any] = {}
-            if 'dataset_stats' in state:
-                stats = {**stats, **state.dataset_stats[ds]}
-            if 'missing_statistics' in state:
-                stats = {**stats, **{f'missing_{k}': v for k, v in state.missing_statistics[ds].items() if k in ['count', 'ratio']}}
-            if 'raw_type' in state:
-                stats['raw_type'] = state.raw_type[ds]
-            if 'variable_type' in state:
-                stats['variable_type'] = state.variable_type[ds]
-            if 'special_types' in state:
-                stats['special_types'] = state.special_types[ds]
+            stats = self._merge_analysis_facets(ds, state)
             # Fix counts
             df = pd.DataFrame(stats)
             if 'dataset_stats' in state:
-                df = self.__fix_counts(df, ['unique', 'freq'])
+                df = self._fix_counts(df, ['unique', 'freq'])
             if 'missing_statistics' in state:
-                df = self.__fix_counts(df, ['missing_count'])
-
+                df = self._fix_counts(df, ['missing_count'])
             df = df.fillna('')
 
             self.render_header_if_needed(state, f'{ds} dataset summary')
@@ -93,7 +85,22 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
             self.display_obj(df)
 
     @staticmethod
-    def __fix_counts(df: DataFrame, cols: List[str]) -> DataFrame:
+    def _merge_analysis_facets(ds: str, state: AnalysisState):
+        stats: Dict[str, Any] = {}
+        if 'dataset_stats' in state:
+            stats = state.dataset_stats[ds].copy()
+        if 'missing_statistics' in state:
+            stats = {**stats, **{f'missing_{k}': v for k, v in state.missing_statistics[ds].items() if k in ['count', 'ratio']}}
+        if 'raw_type' in state:
+            stats['raw_type'] = state.raw_type[ds]
+        if 'variable_type' in state:
+            stats['variable_type'] = state.variable_type[ds]
+        if 'special_types' in state:
+            stats['special_types'] = state.special_types[ds]
+        return stats
+
+    @staticmethod
+    def _fix_counts(df: DataFrame, cols: List[str]) -> DataFrame:
         for k in cols:
             if k in df.columns:
                 df[k] = df[k].fillna(-1).astype(int).replace({-1: ''})
@@ -104,7 +111,7 @@ class DatasetTypeMismatch(AbstractVisualization, JupyterMixin, StateCheckMixin):
     """
     Display mismatch between raw types between datasets provided. In case if mismatch found, mark the row with a warning.
 
-    The report requires RawTypesAnalysis analysis present.
+    The report requires :py:class:`~autogluon.eda.analysis.dataset.RawTypesAnalysis` analysis present.
 
     Examples
     --------
@@ -123,7 +130,7 @@ class DatasetTypeMismatch(AbstractVisualization, JupyterMixin, StateCheckMixin):
 
     See Also
     --------
-    :class:`autogluon.eda.analysis.dataset.RawTypesAnalysis`
+    :py:class:`~autogluon.eda.analysis.dataset.RawTypesAnalysis`
     """
 
     def __init__(self, headers: bool = False, namespace: str = None, **kwargs) -> None:
