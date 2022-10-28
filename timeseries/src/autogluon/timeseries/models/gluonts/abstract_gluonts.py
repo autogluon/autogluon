@@ -53,10 +53,6 @@ class SimpleGluonTSDataset(GluonTSDataset):
 
         self.int_dtype = int_dtype
         self.float_dtype = float_dtype
-        if self.feat_static_cat is not None:
-            self.feat_static_cat = self.feat_static_cat.astype(self.int_dtype)
-        if self.feat_static_real is not None:
-            self.feat_static_real = self.feat_static_real.astype(self.float_dtype)
 
     @property
     def freq(self):
@@ -260,7 +256,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             )
 
         self._check_fit_params()
-        # TODO: reintroduce early stopping callbacks
 
         # update auxiliary parameters
         self._deferred_init_params_aux(

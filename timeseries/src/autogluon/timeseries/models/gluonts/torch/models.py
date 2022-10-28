@@ -25,7 +25,7 @@ from autogluon.core.hpo.constants import CUSTOM_BACKEND
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
-from autogluon.timeseries.utils.warning_filters import disable_root_logger, torch_warning_filter
+from autogluon.timeseries.utils.warning_filters import torch_warning_filter
 
 # FIXME: introduces cpflows dependency. We exclude this model until a future release.
 # from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
@@ -33,6 +33,8 @@ from autogluon.timeseries.utils.warning_filters import disable_root_logger, torc
 # FIXME: DeepNPTS does not implement the GluonTS PyTorch API, and does not use
 # PyTorch Lightning. We exclude this model until a future release.
 # from gluonts.torch.model.deep_npts import DeepNPTSEstimator
+
+# TODO: add docstrings for models
 
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
@@ -111,6 +113,7 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
         return model
 
 
+# TODO: enable static features
 class DeepARModel(AbstractGluonTSPyTorchModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DeepAREstimator
 
@@ -118,7 +121,6 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
 class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = SimpleFeedForwardEstimator
     float_dtype: Type = np.float32
-    int_dtype: Type = np.int32
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
@@ -157,6 +159,7 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
 
             df = pd.DataFrame(item_forecast_dict)
             df[ITEMID] = forecast.item_id
+            # TODO: replace with get_forecast_horizon_timestamps
             df[TIMESTAMP] = pd.date_range(
                 start=forecasts[i].start_date.to_timestamp(how="S"),
                 periods=self.prediction_length,
