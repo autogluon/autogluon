@@ -1,4 +1,5 @@
 from functools import partial
+from unittest import mock
 
 import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
@@ -9,26 +10,38 @@ from gluonts.mx.model.transformer import TransformerEstimator
 import autogluon.core as ag
 from autogluon.timeseries.models.gluonts import (  # MQRNNModel,; TransformerModel,
     DeepARModel,
-    GenericGluonTSModel,
-    MQCNNModel,
+    DeepARMXNetModel,
+    GenericGluonTSMXNetModel,
+    MQCNNMXNetModel,
     ProphetModel,
     SimpleFeedForwardModel,
-    TemporalFusionTransformerModel,
+    SimpleFeedForwardMXNetModel,
+    TemporalFusionTransformerMXNetModel,
 )
-from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
+from autogluon.timeseries.models.gluonts.mx.models import AbstractGluonTSMXNetModel, GenericGluonTSMXNetModelFactory
+from autogluon.timeseries.models.gluonts.torch.models import AbstractGluonTSPyTorchModel
+from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 
-from ..common import DUMMY_TS_DATAFRAME
+from ..common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
 
-TESTABLE_MODELS = [
-    DeepARModel,
-    MQCNNModel,
+TESTABLE_MX_MODELS = [
+    DeepARMXNetModel,
+    MQCNNMXNetModel,
     # MQRNNModel,
-    SimpleFeedForwardModel,
+    SimpleFeedForwardMXNetModel,
     # TransformerModel,
-    partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
-    GenericGluonTSModelFactory(TransformerEstimator),
-    TemporalFusionTransformerModel,
+    partial(GenericGluonTSMXNetModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
+    GenericGluonTSMXNetModelFactory(TransformerEstimator),
+    TemporalFusionTransformerMXNetModel,
 ]
+
+MODELS_WITH_STATIC_FEATURES = [
+    DeepARModel,
+    DeepARMXNetModel,
+    MQCNNMXNetModel,
+]
+TESTABLE_PYTORCH_MODELS = [DeepARModel, SimpleFeedForwardModel]
+TESTABLE_MODELS = TESTABLE_MX_MODELS + TESTABLE_PYTORCH_MODELS
 
 # if PROPHET_IS_INSTALLED:
 #     TESTABLE_MODELS += [ProphetModel]
@@ -86,7 +99,10 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(model_class, te
     loaded_model = model.__class__.load(path=model.path)
 
     assert model.gluonts_estimator_class is loaded_model.gluonts_estimator_class
-    assert loaded_model.gts_predictor == model.gts_predictor
+    if isinstance(model, AbstractGluonTSMXNetModel):
+        assert loaded_model.gts_predictor == model.gts_predictor
+    elif isinstance(model, AbstractGluonTSPyTorchModel):
+        assert loaded_model.gts_predictor.to(model.gts_predictor.device) == model.gts_predictor
 
 
 @pytest.mark.skipif(
@@ -173,7 +189,7 @@ def test_when_hyperparameter_tune_called_on_prophet_then_hyperparameters_are_pas
     ],
 )
 def test_when_tft_quantiles_are_not_deciles_then_value_error_is_raised(temp_model_path, quantiles, should_fail):
-    model = TemporalFusionTransformerModel(
+    model = TemporalFusionTransformerMXNetModel(
         path=temp_model_path,
         freq=DUMMY_TS_DATAFRAME.freq,
         prediction_length=4,
@@ -192,7 +208,7 @@ def test_when_tft_quantiles_are_not_deciles_then_value_error_is_raised(temp_mode
 @pytest.mark.parametrize("quantiles", [[0.1, 0.5, 0.9], [0.2, 0.3, 0.7]])
 def test_when_tft_quantiles_are_deciles_then_forecast_contains_correct_quantiles(temp_model_path, quantiles):
     # TFT is not covered by the quantiles test in test_models.py
-    model = TemporalFusionTransformerModel(
+    model = TemporalFusionTransformerMXNetModel(
         path=temp_model_path,
         freq=DUMMY_TS_DATAFRAME.freq,
         prediction_length=4,
@@ -203,3 +219,67 @@ def test_when_tft_quantiles_are_deciles_then_forecast_contains_correct_quantiles
     predictions = model.predict(data=DUMMY_TS_DATAFRAME)
     assert "mean" in predictions.columns
     assert all(str(q) in predictions.columns for q in quantiles)
+
+
+@pytest.fixture(scope="module")
+def df_with_static():
+    feature_pipeline = ContinuousAndCategoricalFeatureGenerator()
+    df = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC.copy(deep=False)
+    df.static_features = feature_pipeline.fit_transform(df.static_features)
+    return df
+
+
+@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
+def test_when_static_features_present_then_they_are_passed_to_dataset(model_class, df_with_static):
+    model = model_class()
+    with mock.patch(
+        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
+    ) as patch_dataset:
+        try:
+            model.fit(train_data=df_with_static)
+        except TypeError:
+            call_kwargs = patch_dataset.call_args[1]
+            feat_static_cat = call_kwargs["feat_static_cat"]
+            feat_static_real = call_kwargs["feat_static_real"]
+            assert (feat_static_cat.dtypes == "category").all()
+            assert (feat_static_real.dtypes == "float").all()
+
+
+@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
+def test_when_static_features_present_then_model_attributes_set_correctly(model_class, df_with_static):
+    model = model_class(hyperparameters={"epochs": 1, "num_batches_per_epoch": 1})
+    model.fit(train_data=df_with_static)
+    assert model.use_feat_static_cat
+    assert model.use_feat_static_real
+    assert len(model.feat_static_cat_cardinality) == 1
+    assert 1 <= model.feat_static_cat_cardinality[0] <= 4
+
+
+@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
+def test_when_disable_static_features_set_to_true_then_static_features_are_not_used(model_class, df_with_static):
+    model = model_class(hyperparameters={"disable_static_features": True})
+    with mock.patch(
+        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
+    ) as patch_dataset:
+        try:
+            model.fit(train_data=df_with_static)
+        except TypeError:
+            call_kwargs = patch_dataset.call_args[1]
+            feat_static_cat = call_kwargs["feat_static_cat"]
+            feat_static_real = call_kwargs["feat_static_real"]
+            assert feat_static_cat is None
+            assert feat_static_real is None
+
+
+@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
+def test_given_fit_with_static_features_when_predicting_then_static_features_are_used(model_class, df_with_static):
+    model = model_class(hyperparameters={"epochs": 1, "num_batches_per_epoch": 1})
+    model.fit(train_data=df_with_static)
+    with mock.patch("gluonts.mx.model.predictor.RepresentableBlockPredictor.predict") as mock_predict:
+        try:
+            model.predict(df_with_static)
+        except IndexError:
+            gluonts_dataset = mock_predict.call_args[1]["dataset"]
+            item = next(iter(gluonts_dataset))
+            assert item["feat_static_cat"].shape == (1,)
+            assert item["feat_static_real"].shape == (2,)

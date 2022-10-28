@@ -1,15 +1,16 @@
 import logging
 import re
-from typing import List, Type
+from typing import Callable, List, Type
 
+import gluonts
 import mxnet as mx
 
 from autogluon.core.utils import warning_filter
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
+from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
 with warning_filter():
-    import gluonts.time_feature
     from gluonts.model.estimator import Estimator as GluonTSEstimator, DummyEstimator
     from gluonts.model.prophet import ProphetPredictor
     from gluonts.mx.context import get_mxnet_context
@@ -19,40 +20,24 @@ with warning_filter():
     from gluonts.mx.model.tft import TemporalFusionTransformerEstimator
     from gluonts.mx.model.seq2seq import MQCNNEstimator, MQRNNEstimator
 
-from .abstract_gluonts import AbstractGluonTSModel
+from .callback import GluonTSEarlyStoppingCallback, TimeLimitCallback
 
 logger = logging.getLogger(__name__)
-
-# HACK: DeepAR currently raises an exception when it finds a frequency it doesn't like.
-#  we monkey-patch the get_lags and features functions here to return a default
-#  instead of failing. We can remove this after porting to pytorch + patching GluonTS
-def get_lags_for_frequency_safe(*args, **kwargs):
-    from gluonts.time_feature import get_lags_for_frequency
-
-    try:
-        return get_lags_for_frequency(*args, **kwargs)
-    except Exception as e:
-        if "invalid frequency" not in str(e):
-            raise
-        return get_lags_for_frequency(freq_str="A")
+gts_logger = logging.getLogger(gluonts.__name__)
 
 
-def time_features_from_frequency_str_safe(*args, **kwargs):
-    from gluonts.time_feature import time_features_from_frequency_str
+class AbstractGluonTSMXNetModel(AbstractGluonTSModel):
+    def _get_callbacks(self, time_limit: int, *args, **kwargs) -> List[Callable]:
+        callbacks = [TimeLimitCallback(time_limit)]
 
-    try:
-        return time_features_from_frequency_str(*args, **kwargs)
-    except Exception as e:
-        if "Unsupported frequency" not in str(e):
-            raise
-        return []
+        early_stopping_patience = self._get_model_params().get("early_stopping_patience", None)
+        if early_stopping_patience:
+            callbacks.append(GluonTSEarlyStoppingCallback(early_stopping_patience))
 
-
-gluonts.time_feature.get_lags_for_frequency = get_lags_for_frequency_safe
-gluonts.time_feature.time_features_from_frequency_str = time_features_from_frequency_str_safe
+        return callbacks
 
 
-class DeepARModel(AbstractGluonTSModel):
+class DeepARMXNetModel(AbstractGluonTSMXNetModel):
     """DeepAR model from GluonTS.
 
     The model consists of an RNN encoder (LSTM or GRU) and a decoder that outputs the
@@ -71,6 +56,12 @@ class DeepARModel(AbstractGluonTSModel):
     context_length : int, optional
         Number of steps to unroll the RNN for before computing predictions
         (default: None, in which case context_length = prediction_length)
+    disable_static_features : bool, default = False
+        If True, static features won't be used by the model even if they are present in the dataset.
+        If False, static features will be used by the model if they are present in the dataset.
+    disable_dynamic_features : bool, default = False
+        If True, dynamic features won't be used by the model even if they are present in the dataset.
+        If False, dynamic features will be used by the model if they are present in the dataset.
     num_layers : int, default = 2
         Number of RNN layers
     num_cells : int, default = 40
@@ -102,8 +93,16 @@ class DeepARModel(AbstractGluonTSModel):
 
     gluonts_estimator_class: Type[GluonTSEstimator] = DeepAREstimator
 
+    def _get_model_params(self) -> dict:
+        args = super()._get_model_params()
+        args.setdefault("use_feat_static_cat", self.use_feat_static_cat)
+        args.setdefault("use_feat_static_real", self.use_feat_static_real)
+        args.setdefault("cardinality", self.feat_static_cat_cardinality)
+        args.setdefault("use_feat_dynamic_real", self.use_feat_dynamic_real)
+        return args
 
-class AbstractGluonTSSeq2SeqModel(AbstractGluonTSModel):
+
+class AbstractGluonTSSeq2SeqModel(AbstractGluonTSMXNetModel):
     """Abstract class for MQCNN and MQRNN which require hybridization to be turned off
     when fitting on the GPU.
     """
@@ -118,7 +117,7 @@ class AbstractGluonTSSeq2SeqModel(AbstractGluonTSModel):
             return self.gluonts_estimator_class.from_hyperparameters(**self._get_estimator_init_args())
 
 
-class MQCNNModel(AbstractGluonTSSeq2SeqModel):
+class MQCNNMXNetModel(AbstractGluonTSSeq2SeqModel):
     """MQCNN model from GluonTS.
 
     The model consists of a CNN encoder and a decoder that directly predicts the
@@ -137,6 +136,12 @@ class MQCNNModel(AbstractGluonTSSeq2SeqModel):
     context_length : int, optional
         Number of steps to unroll the RNN for before computing predictions
         (default: None, in which case context_length = prediction_length)
+    disable_static_features : bool, default = False
+        If True, static features won't be used by the model even if they are present in the dataset.
+        If False, static features will be used by the model if they are present in the dataset.
+    disable_dynamic_features : bool, default = False
+        If True, dynamic features won't be used by the model even if they are present in the dataset.
+        If False, dynamic features will be used by the model if they are present in the dataset.
     embedding_dimension : int, optional
         Dimension of the embeddings for categorical features. (default: [min(50, (cat+1)//2) for cat in cardinality])
     add_time_feature : bool, default = True
@@ -181,8 +186,16 @@ class MQCNNModel(AbstractGluonTSSeq2SeqModel):
 
     gluonts_estimator_class: Type[GluonTSEstimator] = MQCNNEstimator
 
+    def _get_model_params(self) -> dict:
+        args = super()._get_model_params()
+        args.setdefault("use_feat_static_cat", self.use_feat_static_cat)
+        args.setdefault("use_feat_static_real", self.use_feat_static_real)
+        args.setdefault("cardinality", self.feat_static_cat_cardinality)
+        args.setdefault("use_feat_dynamic_real", self.use_feat_dynamic_real)
+        return args
 
-class MQRNNModel(AbstractGluonTSSeq2SeqModel):
+
+class MQRNNMXNetModel(AbstractGluonTSSeq2SeqModel):
     """MQRNN model from GluonTS.
 
     The model consists of an RNN encoder and a decoder that directly predicts the
@@ -228,7 +241,7 @@ class MQRNNModel(AbstractGluonTSSeq2SeqModel):
     gluonts_estimator_class: Type[GluonTSEstimator] = MQRNNEstimator
 
 
-class SimpleFeedForwardModel(AbstractGluonTSModel):
+class SimpleFeedForwardMXNetModel(AbstractGluonTSMXNetModel):
     """SimpleFeedForward model from GluonTS.
 
     The model consists of a multilayer perceptron (MLP) that predicts the distribution
@@ -287,7 +300,7 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
             return self.gluonts_estimator_class.from_hyperparameters(**hyperparameters)
 
 
-class TemporalFusionTransformerModel(AbstractGluonTSModel):
+class TemporalFusionTransformerMXNetModel(AbstractGluonTSMXNetModel):
     """TemporalFusionTransformer model from GluonTS.
 
     The model combines an LSTM encoder, a transformer decoder, and directly predicts
@@ -348,7 +361,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
         return super().predict(data=data, quantile_levels=quantile_levels, **kwargs)
 
 
-class TransformerModel(AbstractGluonTSModel):
+class TransformerMXNetModel(AbstractGluonTSMXNetModel):
     """Autoregressive transformer forecasting model from GluonTS.
 
     The model consists of an Transformer encoder and a decoder that outputs the
@@ -398,7 +411,7 @@ class TransformerModel(AbstractGluonTSModel):
     gluonts_estimator_class: Type[GluonTSEstimator] = TransformerEstimator
 
 
-class GenericGluonTSModel(AbstractGluonTSModel):
+class GenericGluonTSMXNetModel(AbstractGluonTSMXNetModel):
     """Generic wrapper model class for GluonTS models (in GluonTS terminology---
     Estimators). While this class is meant to generally enable fast use of GluonTS
     models in autogluon, specific GluonTS models accessed through this wrapper may
@@ -434,7 +447,7 @@ class GenericGluonTSModel(AbstractGluonTSModel):
             return self.gluonts_estimator_class.from_hyperparameters(**self._get_estimator_init_args())
 
 
-class GenericGluonTSModelFactory(AbstractTimeSeriesModelFactory):
+class GenericGluonTSMXNetModelFactory(AbstractTimeSeriesModelFactory):
     """Factory class for GenericGluonTSModel for convenience of use"""
 
     def __init__(self, gluonts_estimator_class: Type[GluonTSEstimator], **kwargs):
@@ -444,7 +457,7 @@ class GenericGluonTSModelFactory(AbstractTimeSeriesModelFactory):
     def __call__(self, **kwargs):
         model_init_kwargs = self.init_kwargs.copy()
         model_init_kwargs.update(kwargs)
-        return GenericGluonTSModel(
+        return GenericGluonTSMXNetModel(
             gluonts_estimator_class=self.gluonts_estimator_class,
             **model_init_kwargs,
         )
@@ -455,7 +468,7 @@ class _ProphetDummyEstimator(DummyEstimator):
         return self.predictor
 
 
-class ProphetModel(AbstractGluonTSModel):
+class ProphetModel(AbstractGluonTSMXNetModel):
     """Wrapper around `Prophet <https://github.com/facebook/prophet>`_, which wraps the
     library through GluonTS's wrapper.
 

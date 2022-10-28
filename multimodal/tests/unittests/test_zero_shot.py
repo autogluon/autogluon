@@ -3,7 +3,7 @@ import pytest
 import requests
 from PIL import Image
 
-from autogluon.multimodal import MultiModalPredictor
+from autogluon.multimodal import MultiModalMatcher, MultiModalPredictor
 
 
 def download_sample_images():
@@ -145,3 +145,42 @@ def test_timm_zero_shot(checkpoint_name):
     assert features["123"].ndim == 2 and features["123"].shape[0] == 1
     assert np.all(masks["abc"] == np.array([1]))
     assert np.all(masks["123"] == np.array([1]))
+
+
+def test_matcher_text_similarity():
+    matcher = MultiModalMatcher(pipeline="text_similarity")
+    corpus = [
+        "A man is eating food.",
+        "A man is eating a piece of bread.",
+        "The girl is carrying a baby.",
+        "A man is riding a horse.",
+        "A woman is playing violin.",
+        "Two men pushed carts through the woods.",
+        "A man is riding a white horse on an enclosed ground.",
+        "A monkey is playing drums.",
+        "A cheetah is running behind its prey.",
+    ]
+    queries = [
+        "A man is eating pasta.",
+        "Someone in a gorilla costume is playing a set of drums.",
+        "A cheetah chases prey on across a field.",
+    ]
+    query_embeddings = matcher.extract_embedding(queries)
+    corpus_embeddings = matcher.extract_embedding(corpus)
+    assert len(query_embeddings) == len(queries)
+    assert len(corpus_embeddings) == len(corpus)
+
+    query_embeddings = matcher.extract_embedding(queries, signature="query")
+    corpus_embeddings = matcher.extract_embedding(corpus, signature="response")
+    assert len(query_embeddings) == len(queries)
+    assert len(corpus_embeddings) == len(corpus)
+
+    query_embeddings = matcher.extract_embedding({"abc": queries})
+    corpus_embeddings = matcher.extract_embedding({"abc": corpus})
+    assert len(query_embeddings) == len(queries)
+    assert len(corpus_embeddings) == len(corpus)
+
+    query_embeddings = matcher.extract_embedding({"abc": queries}, signature="query")
+    corpus_embeddings = matcher.extract_embedding({"abc": corpus}, signature="response")
+    assert len(query_embeddings) == len(queries)
+    assert len(corpus_embeddings) == len(corpus)

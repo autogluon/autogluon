@@ -95,10 +95,12 @@ class BaseDataset(torch.utils.data.Dataset):
                     modality_features=getattr(self, f"modality_features_{group_id}"),
                     modality_types=getattr(self, f"modality_types_{group_id}"),
                     idx=idx,
+                    id_mappings=self.id_mappings,
                 )
                 per_ret = apply_data_processor(
                     per_sample_features=per_sample_features,
                     data_processors=per_processors_group,
+                    feature_modalities=getattr(self, f"modality_types_{group_id}"),
                     is_training=self.is_training,
                 )
                 ret.update(per_ret)

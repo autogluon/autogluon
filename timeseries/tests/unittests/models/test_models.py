@@ -13,9 +13,9 @@ from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
-from autogluon.timeseries.models import DeepARModel, ETSModel
+from autogluon.timeseries.models import DeepARMXNetModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.models.gluonts import GenericGluonTSModel
+from autogluon.timeseries.models.gluonts import GenericGluonTSMXNetModel
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
 from .test_autogluon_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
@@ -117,7 +117,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
 
     hpo_results, _ = model.hyperparameter_tune(
         hyperparameter_tune_kwargs={"num_trials": num_trials, "scheduler": "local", "searcher": "random"},
-        time_limit=100,
+        time_limit=300,
         train_data=DUMMY_TS_DATAFRAME,
         val_data=DUMMY_TS_DATAFRAME,
     )
@@ -175,7 +175,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         },
     )
     # TFT cannot handle arbitrary quantiles
-    if model.name == "TemporalFusionTransformer":
+    if "TemporalFusionTransformer" in model.name:
         return
 
     model.fit(train_data=DUMMY_TS_DATAFRAME)
@@ -207,7 +207,8 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
 
 
 @pytest.mark.parametrize(
-    "model_class", [DeepARModel, ETSModel, partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator)]
+    "model_class",
+    [DeepARMXNetModel, ETSModel, partial(GenericGluonTSMXNetModel, gluonts_estimator_class=MQRNNEstimator)],
 )
 @pytest.mark.parametrize("test_data_index", [["A", "B"], ["C", "D"], ["A"]])
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_aligns_with_time(
@@ -234,7 +235,8 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
 
 
 @pytest.mark.parametrize(
-    "model_class", [DeepARModel, ETSModel, partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator)]
+    "model_class",
+    [DeepARMXNetModel, ETSModel, partial(GenericGluonTSMXNetModel, gluonts_estimator_class=MQRNNEstimator)],
 )
 @pytest.mark.parametrize(
     "train_data, test_data",

@@ -51,6 +51,7 @@ from .constants import (
     LABEL,
     LAST_CHECKPOINT,
     LOGITS,
+    MAP,
     MASKS,
     MAX,
     MIN,
@@ -78,6 +79,7 @@ from .data.infer_types import (
     infer_column_types,
     infer_label_column_type_by_problem_type_and_pipeline,
     infer_problem_type_output_shape,
+    infer_rois_column_type,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
@@ -102,6 +104,7 @@ from .utils import (
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
+    cocoeval,
     compute_inference_batch_size,
     compute_num_gpus,
     compute_score,
@@ -158,6 +161,7 @@ class MultiModalPredictor:
         label: Optional[str] = None,
         problem_type: Optional[str] = None,
         pipeline: Optional[str] = None,
+        val_metric: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -241,7 +245,7 @@ class MultiModalPredictor:
         self._problem_type = problem_type.lower() if problem_type is not None else None
         self._pipeline = pipeline.lower() if pipeline is not None else None
         self._eval_metric_name = eval_metric
-        self._validation_metric_name = None
+        self._validation_metric_name = val_metric
         self._output_shape = output_shape
         self._save_path = path
         self._ckpt_path = None
@@ -485,9 +489,6 @@ class MultiModalPredictor:
                 stratify=stratify,
                 random_state=np.random.RandomState(seed),
             )
-            if self._pipeline == OBJECT_DETECTION:  # TODO: investigate why we need this and remove it
-                train_data = train_data.reset_index(drop=True)
-                tuning_data = tuning_data.reset_index(drop=True)
 
         column_types = infer_column_types(
             data=train_data,
@@ -557,6 +558,7 @@ class MultiModalPredictor:
                 problem_type=problem_type,
                 pipeline=self._pipeline,
                 eval_metric_name=self._eval_metric_name,
+                validation_metric_name=self._validation_metric_name,
             )
         else:
             validation_metric_name = self._validation_metric_name
@@ -1013,6 +1015,7 @@ class MultiModalPredictor:
         if teacher_data_processors is not None:
             data_processors = [data_processors, teacher_data_processors]
 
+        val_use_training_mode = (self._pipeline == OBJECT_DETECTION) and (validation_metric_name != MAP)
         train_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
@@ -1020,6 +1023,7 @@ class MultiModalPredictor:
             num_workers=config.env.num_workers,
             train_data=train_df,
             val_data=val_df,
+            val_use_training_mode=val_use_training_mode,
         )
         optimization_kwargs = dict(
             optim_type=config.optimization.optim_type,
@@ -1202,7 +1206,10 @@ class MultiModalPredictor:
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
-                gpus=num_gpus if not use_ray_lightning else None,  # ray lightning requires not specifying gpus
+                accelerator="gpu" if num_gpus > 0 else None,
+                devices=num_gpus
+                if not use_ray_lightning and num_gpus > 0
+                else None,  # ray lightning requires not specifying gpus
                 auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
                 num_nodes=config.env.num_nodes,
                 precision=precision,
@@ -1464,7 +1471,10 @@ class MultiModalPredictor:
                 **optimization_kwargs,
             )
         elif self._pipeline == OBJECT_DETECTION:
-            task = MMDetLitModule(model=self._model)
+            task = MMDetLitModule(
+                model=self._model,
+                **optimization_kwargs,
+            )
         else:
             task = LitModule(
                 model=self._model,
@@ -1487,7 +1497,8 @@ class MultiModalPredictor:
 
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
-                gpus=num_gpus,
+                accelerator="gpu" if num_gpus > 0 else None,
+                devices=num_gpus if num_gpus > 0 else None,
                 auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
@@ -1535,6 +1546,11 @@ class MultiModalPredictor:
                     pipeline=self._pipeline,
                     data=data,
                 )
+            if self._pipeline == OBJECT_DETECTION:
+                column_types = infer_rois_column_type(
+                    column_types=column_types,
+                    data=data,
+                )
         else:  # called .fit() or .load()
             column_types = self._column_types
 
@@ -1569,9 +1585,6 @@ class MultiModalPredictor:
         anno_file
             The annotation file in COCO format
         """
-        from pycocotools.coco import COCO
-        from pycocotools.cocoeval import COCOeval
-
         if isinstance(anno_file_or_df, str):
             anno_file = anno_file_or_df
             data = from_coco(anno_file)
@@ -1580,53 +1593,23 @@ class MultiModalPredictor:
             anno_file = self.detection_anno_train
             data = anno_file_or_df
 
-        coco_dataset = COCODataset(anno_file)
-
         outputs = self._predict(
             data=data,
             requires_label=True,
         )  # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
 
-        from torchmetrics.detection.mean_ap import MeanAveragePrecision
+        # Cache prediction results as COCO format # TODO: refactor this
+        if not self._save_path:
+            self._save_path = setup_outputdir(
+                path=None,
+                warn_if_exist=self._warn_if_exist,
+            )
+        self._save_path = os.path.abspath(os.path.expanduser(self._save_path))
+        cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
 
-        map_metric = MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False)
-        for output in outputs:  # TODO: refactor here
-            pred_results = output["bbox"]
-            preds = []
-            for img_idx, img_result in enumerate(pred_results):
-                img_result = img_result
-                boxes = []
-                scores = []
-                labels = []
-                for category_idx, category_result in enumerate(img_result):
-                    for item_idx, item_result in enumerate(category_result):
-                        boxes.append(item_result[:4])
-                        scores.append(float(item_result[4]))
-                        labels.append(category_idx)
-                preds.append(
-                    dict(
-                        boxes=torch.tensor(np.array(boxes).astype(float)).float().to("cuda:0"),
-                        scores=torch.tensor(scores).float().to("cuda:0"),
-                        labels=torch.tensor(labels).long().to("cuda:0"),
-                    )
-                )
-
-            target = []
-            gts = output["label"]
-            for gt in gts:
-                img_gt = np.array(gt)
-                boxes = img_gt[:, :4]
-                labels = img_gt[:, 4]
-                target.append(
-                    dict(
-                        boxes=torch.tensor(boxes).float().to("cuda:0"),
-                        labels=torch.tensor(labels).long().to("cuda:0"),
-                    )
-                )
-
-            map_metric.update(preds, target)
-
-        return map_metric.compute()
+        return cocoeval(
+            outputs=outputs, data=data, anno_file=anno_file, cache_path=cache_path, metrics=metrics, tool="pycocotools"
+        )
 
     def _process_batch(
         self,
@@ -1651,6 +1634,7 @@ class MultiModalPredictor:
             per_sample_features = apply_data_processor(
                 per_sample_features=per_sample_features,
                 data_processors=data_processors,
+                feature_modalities=modality_types,
                 is_training=False,
             )
             processed_features.append(per_sample_features)
@@ -1692,7 +1676,8 @@ class MultiModalPredictor:
         seed: Optional[int] = 123,
     ) -> List[Dict]:
 
-        pl.seed_everything(seed, workers=True)
+        with apply_log_filter(LogFilter("Global seed set to")):  # Ignore the log "Global seed set to"
+            pl.seed_everything(seed, workers=True)
 
         data, df_preprocessor, data_processors = self._on_predict_start(
             config=self._config,
@@ -1703,10 +1688,15 @@ class MultiModalPredictor:
         strategy = "dp"  # default used in inference.
 
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
+
+        if self._pipeline == OBJECT_DETECTION:
+            # strategy = "ddp" # TODO: enable multigpu inference
+            num_gpus = 1
+
         if num_gpus == 1:
             strategy = None
 
-        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision)
+        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False)
 
         if not realtime:
             batch_size = compute_inference_batch_size(
@@ -2182,6 +2172,7 @@ class MultiModalPredictor:
                     "column_types": self._column_types,
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
+                    "pipeline": self._pipeline,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
@@ -2367,6 +2358,8 @@ class MultiModalPredictor:
 
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]
+        if "pipeline" in assets:  # back compatibility
+            predictor._pipeline = assets["pipeline"]
         predictor._eval_metric_name = assets["eval_metric_name"]
         predictor._verbosity = verbosity
         predictor._resume = resume

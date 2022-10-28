@@ -143,7 +143,7 @@ class NerLabelEncoder:
         all_annotations, _ = self.extract_ner_annotations(y)
         transformed_y = []
         for annotation, text_snippet in zip(all_annotations, x.iteritems()):
-            word_label = process_ner_annotations(annotation, text_snippet[-1], tokenizer, is_eval=True)
+            word_label, _, _, _ = process_ner_annotations(annotation, text_snippet[-1], tokenizer, is_eval=True)
             word_label_invers = []
             for l in word_label:
                 entity_group = self.inverse_entity_map[l]

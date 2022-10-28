@@ -1,30 +1,33 @@
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Type
+from typing import Any, Callable, Dict, Iterator, List, Optional, Type
 
 import gluonts
+import gluonts.core.settings
 import numpy as np
 import pandas as pd
-from gluonts.core.settings import let
 from gluonts.dataset.common import Dataset as GluonTSDataset
+from gluonts.dataset.field_names import FieldName
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
+from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.utils import warning_filter
 from autogluon.core.utils.savers import save_pkl
-
-from ...dataset import TimeSeriesDataFrame
-from ...dataset.ts_dataframe import ITEMID, TIMESTAMP
-from ...utils.warning_filters import disable_root_logger
-from ..abstract import AbstractTimeSeriesModel
-from .callback import GluonTSEarlyStoppingCallback, TimeLimitCallback
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.utils.features import get_categorical_and_continuous_features
+from autogluon.timeseries.utils.warning_filters import disable_root_logger
 
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
+
+
+GLUONTS_SUPPORTED_OFFSETS = ["Y", "Q", "M", "W", "D", "B", "H", "T", "min", "S"]
 
 
 class SimpleGluonTSDataset(GluonTSDataset):
@@ -36,27 +39,56 @@ class SimpleGluonTSDataset(GluonTSDataset):
         self,
         time_series_df: TimeSeriesDataFrame,
         target_field_name: str = "target",
+        feat_static_cat: Optional[pd.DataFrame] = None,
+        feat_static_real: Optional[pd.DataFrame] = None,
+        float_dtype: Type = np.float64,
+        int_dtype: Type = np.int64,
     ):
         assert time_series_df is not None
         assert time_series_df.freq, "Initializing GluonTS data sets without freq is not allowed"
         self.time_series_df = time_series_df
         self.target_field_name = target_field_name
+        self.feat_static_cat = feat_static_cat
+        self.feat_static_real = feat_static_real
+
+        self.int_dtype = int_dtype
+        self.float_dtype = float_dtype
 
     @property
     def freq(self):
-        return self.time_series_df.freq
+        # FIXME: GluonTS expects a frequency string, but only supports a limited number of such strings
+        # for feature generation. If the frequency string doesn't match or is not provided, it raises an exception.
+        # Here we bypass this by issuing a default "yearly" frequency, tricking it into not producing
+        # any lags or features.
+        freq_ = self.time_series_df.freq
+        pd_offset = to_offset(freq_)
+
+        # normalize freq str to handle peculiarities such as W-SUN
+        offset_base_alias = pd_offset.name.split("-")[0]
+
+        return "A" if offset_base_alias is None or offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS else freq_
 
     def __len__(self):
         return len(self.time_series_df.item_ids)  # noqa
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
-        for j in self.time_series_df.item_ids:  # noqa
-            df = self.time_series_df.loc[j]
-            yield {
-                "item_id": j,
-                "target": df[self.target_field_name].to_numpy(dtype=np.float64),
-                "start": pd.Period(df.index[0], freq=self.freq),
+        for item_id in self.time_series_df.item_ids:  # noqa
+            df = self.time_series_df.loc[item_id]
+            time_series = {
+                FieldName.ITEM_ID: item_id,
+                FieldName.TARGET: df[self.target_field_name].to_numpy(dtype=self.float_dtype),
+                FieldName.START: pd.Period(df.index[0], freq=self.freq),
             }
+            if self.feat_static_cat is not None:
+                time_series[FieldName.FEAT_STATIC_CAT] = self.feat_static_cat.loc[item_id].to_numpy(
+                    dtype=self.int_dtype
+                )
+            if self.feat_static_real is not None:
+                time_series[FieldName.FEAT_STATIC_REAL] = self.feat_static_real.loc[item_id].to_numpy(
+                    dtype=self.float_dtype
+                )
+
+            yield time_series
 
 
 class AbstractGluonTSModel(AbstractTimeSeriesModel):
@@ -85,6 +117,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     gluonts_model_path = "gluon_ts"
     gluonts_estimator_class: Type[GluonTSEstimator] = None
+    # datatype of floating point and integers passed internally to GluonTS
+    float_dtype: Type = np.float64
+    int_dtype: Type = np.int64
 
     def __init__(
         self,
@@ -108,6 +143,10 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         )
         self.gts_predictor: Optional[GluonTSPredictor] = None
         self.callbacks = []
+        self.use_feat_static_cat = False
+        self.use_feat_static_real = False
+        self.use_feat_dynamic_real = False
+        self.feat_static_cat_cardinality: List[int] = []
 
     def save(self, path: str = None, **kwargs) -> str:
         if path is None:
@@ -147,12 +186,20 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                     "during initialization. Please provide a `freq` string to `fit`."
                 )
 
+            disable_static_features = self._get_model_params().get("disable_static_features", False)
+            if not disable_static_features:
+                feat_static_cat, feat_static_real = get_categorical_and_continuous_features(ds.static_features)
+                self.use_feat_static_cat = feat_static_cat is not None
+                self.use_feat_static_real = feat_static_real is not None
+                if self.use_feat_static_cat:
+                    self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
+
         if "callbacks" in kwargs:
             self.callbacks += kwargs["callbacks"]
 
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""
-        args = super()._get_model_params()
+        args = super()._get_model_params().copy()
         args.update(
             dict(
                 freq=self.freq,
@@ -161,7 +208,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 callbacks=self.callbacks,
             )
         )
-
         return args
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
@@ -175,9 +221,22 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             return self.gluonts_estimator_class.from_hyperparameters(**self._get_estimator_init_args())
 
     def _to_gluonts_dataset(self, time_series_df: Optional[TimeSeriesDataFrame]) -> Optional[GluonTSDataset]:
-        return (
-            SimpleGluonTSDataset(time_series_df, target_field_name=self.target) if time_series_df is not None else None
-        )
+        if time_series_df is not None:
+            feat_static_cat, feat_static_real = get_categorical_and_continuous_features(time_series_df.static_features)
+            if not self.use_feat_static_cat:
+                feat_static_cat = None
+            if not self.use_feat_static_real:
+                feat_static_real = None
+            return SimpleGluonTSDataset(
+                time_series_df,
+                target_field_name=self.target,
+                feat_static_cat=feat_static_cat,
+                feat_static_real=feat_static_real,
+                float_dtype=self.float_dtype,
+                int_dtype=self.int_dtype,
+            )
+        else:
+            return None
 
     def _fit(
         self,
@@ -198,21 +257,21 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         self._check_fit_params()
 
-        callbacks = [TimeLimitCallback(time_limit)]
-
-        early_stopping_patience = self._get_model_params().get("early_stopping_patience", None)
-        if early_stopping_patience:
-            callbacks.append(GluonTSEarlyStoppingCallback(early_stopping_patience))
-
         # update auxiliary parameters
-        self._deferred_init_params_aux(dataset=train_data, callbacks=callbacks, **kwargs)
+        self._deferred_init_params_aux(
+            dataset=train_data, callbacks=self._get_callbacks(time_limit=time_limit), **kwargs
+        )
 
         estimator = self._get_estimator()
-        with warning_filter(), disable_root_logger(), let(gluonts.env.env, use_tqdm=False):
+        with warning_filter(), disable_root_logger(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
             self.gts_predictor = estimator.train(
                 self._to_gluonts_dataset(train_data),
                 validation_data=self._to_gluonts_dataset(val_data),
             )
+
+    def _get_callbacks(self, time_limit: int, *args, **kwargs) -> List[Callable]:
+        """Retrieve a list of callback objects for the GluonTS trainer"""
+        raise NotImplementedError
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
         if self.gts_predictor is None:
@@ -225,14 +284,12 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         )
         input_index_type = type(data.index.levels[0][0])
 
-        with warning_filter(), let(gluonts.env.env, use_tqdm=False):
+        with warning_filter(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
             quantiles = quantile_levels or self.quantile_levels
             if not all(0 < q < 1 for q in quantiles):
                 raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
 
             predicted_targets = self._predict_gluonts_forecasts(data, **kwargs)
-            if not isinstance(predicted_targets[0], (QuantileForecast, SampleForecast)):
-                raise TypeError("DistributionForecast is not supported.")
 
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
@@ -281,6 +338,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     def _gluonts_forecasts_to_data_frame(
         self, forecasts: List[Forecast], quantile_levels: List[float]
     ) -> TimeSeriesDataFrame:
+        if not isinstance(forecasts[0], (QuantileForecast, SampleForecast)):
+            raise TypeError("DistributionForecast is not supported.")
+
         forecast_means = [f.mean for f in forecasts]
 
         # if predictions are gluonts SampleForecasts, convert to quantile forecasts

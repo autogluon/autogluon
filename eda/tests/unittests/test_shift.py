@@ -57,4 +57,3 @@ class TestShift(unittest.TestCase):
         res = shft_ana.state.xshift_results
         assert all(res[k] is not None for k in ['detection_status', 'pvalue', 'pvalue_threshold', 'eval_metric',
                                                 'feature_importance'])
-        assert res['detection_status'] is False

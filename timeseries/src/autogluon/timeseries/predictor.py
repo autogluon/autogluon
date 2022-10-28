@@ -3,13 +3,13 @@ import pprint
 import time
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Type, Union
 
 import pandas as pd
 
+from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
-from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
@@ -137,21 +137,6 @@ class TimeSeriesPredictor:
         self.quantile_levels = quantile_levels or kwargs.get(
             "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         )
-
-        learner_type = kwargs.pop("learner_type", TimeSeriesLearner)
-        learner_kwargs = kwargs.pop("learner_kwargs", dict())
-        learner_kwargs = learner_kwargs.copy()
-        learner_kwargs.update(
-            dict(
-                path_context=self.path,
-                eval_metric=eval_metric,
-                target=self.target,
-                prediction_length=self.prediction_length,
-                quantile_levels=self.quantile_levels,
-            )
-        )
-        self._learner: AbstractLearner = learner_type(**learner_kwargs)
-        self._learner_type = type(self._learner)
         if validation_splitter == "last_window":
             splitter = LastWindowSplitter()
         elif validation_splitter == "multi_window":
@@ -164,15 +149,34 @@ class TimeSeriesPredictor:
                 f"`autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` "
                 f"(received {validation_splitter} of type {type(validation_splitter)})."
             )
-        self.validation_splitter: AbstractTimeSeriesSplitter = splitter
+
+        learner_type = kwargs.pop("learner_type", TimeSeriesLearner)
+        learner_kwargs = kwargs.pop("learner_kwargs", dict())
+        learner_kwargs = learner_kwargs.copy()
+        learner_kwargs.update(
+            dict(
+                path_context=self.path,
+                eval_metric=eval_metric,
+                target=self.target,
+                prediction_length=self.prediction_length,
+                quantile_levels=self.quantile_levels,
+                validation_splitter=splitter,
+            )
+        )
+        self._learner: AbstractLearner = learner_type(**learner_kwargs)
+        self._learner_type = type(self._learner)
 
     @property
     def _trainer(self) -> AbstractTimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
 
+    @property
+    def validation_splitter(self) -> AbstractTimeSeriesSplitter:
+        return self._learner.validation_splitter
+
     def _check_and_prepare_data_frame(self, df: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
-        """Given a sequence of ``TimeSeriesDataFrame``s, replace their time indexes if
-        ``self.ignore_time_index`` is set, and ensure their frequencies are available.
+        """Ensure that TimeSeriesDataFrame has a frequency, or replace its time index with a dummy if
+        ``self.ignore_time_index`` is True.
         """
         if df is None:
             return df
@@ -205,18 +209,31 @@ class TimeSeriesPredictor:
         ----------
         train_data : TimeSeriesDataFrame
             Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
+
+            If ``train_data`` has static features (i.e., ``train_data.static_features`` is a pandas DataFrame), the
+            predictor will interpret columns with ``int`` and ``float`` dtypes as continuous (real-valued) features,
+            columns with ``object`` and ``str`` dtypes as categorical features, and will ignore the rest of columns.
+
+            For example, to ensure that column "store_id" with dtype ``int`` is interpreted as a category,
+            we need to change its type to ``category``::
+
+                train_data.static_features["store_id"] = train_data.static_features["store_id"].astype("category")
+
         tuning_data : TimeSeriesDataFrame, optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
             time series are used for computing the validation score.
 
+            Leaving this argument empty and letting AutoGluon automatically generate the validation set from
+            ``train_data`` is a good default.
+
             If not provided, AutoGluon will split :attr:`train_data` into training and tuning subsets using
-            ``self.validation_splitter``. If ``tuning_data`` is provided, ``self.validation_splitter`` will be ignored.
+            ``validation_splitter``. If ``tuning_data`` is provided, ``validation_splitter`` will be ignored.
             See the description of ``validation_splitter`` in the docstring for
             :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
 
-            Leaving this argument empty and letting AutoGluon automatically generate the validation set from
-            ``train_data`` is a good default.
+            If ``train_data`` has static features, ``tuning_data`` must have also have static features with the same
+            column names and dtypes.
         time_limit : int, optional
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
             seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models
@@ -331,7 +348,7 @@ class TimeSeriesPredictor:
         tuning_data = self._check_and_prepare_data_frame(tuning_data)
 
         verbosity = kwargs.get("verbosity", self.verbosity)
-        set_logger_verbosity(verbosity, logger=logger)
+        set_logger_verbosity(verbosity)
 
         fit_args = dict(
             prediction_length=self.prediction_length,
@@ -359,29 +376,15 @@ class TimeSeriesPredictor:
         logger.info(f"{pprint.pformat(fit_args)}")
         logger.info(
             f"Provided training data set with {len(train_data)} rows, {train_data.num_items} items. "
-            f"Average time series length is {len(train_data) / train_data.num_items}."
+            f"Average time series length is {len(train_data) / train_data.num_items:.1f}."
         )
         if tuning_data is not None:
             logger.info(
                 f"Provided tuning data set with {len(tuning_data)} rows, {tuning_data.num_items} items. "
-                f"Average time series length is {len(tuning_data) / tuning_data.num_items}."
+                f"Average time series length is {len(tuning_data) / tuning_data.num_items:.1f}."
             )
         logger.info(f"Training artifacts will be saved to: {Path(self.path).resolve()}")
         logger.info("=====================================================")
-
-        # Inform the user extra columns in dataset will not be used.
-        extra_columns = [c for c in train_data.columns.copy() if c != self.target]
-        if len(extra_columns) > 0:
-            logger.warning(f"Provided columns {extra_columns} will not be used.")
-
-        if tuning_data is None:
-            logger.warning(
-                "Validation data is None. "
-                + self.validation_splitter.describe_validation_strategy(prediction_length=self.prediction_length)
-            )
-            train_data, tuning_data = self.validation_splitter.split(
-                ts_dataframe=train_data, prediction_length=self.prediction_length
-            )
 
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
@@ -413,6 +416,9 @@ class TimeSeriesPredictor:
         ----------
         data : TimeSeriesDataFrame
             Time series data to forecast with.
+
+            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
+            static features that have the same columns and dtypes.
         model : str, optional
             Name of the model that you would like to use for prediction. By default, the best model during training
             (with highest validation score) will be used.

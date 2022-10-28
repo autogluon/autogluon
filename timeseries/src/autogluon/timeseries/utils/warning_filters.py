@@ -33,9 +33,19 @@ def statsmodels_warning_filter():
 
 
 @contextlib.contextmanager
+def torch_warning_filter():
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            yield
+        finally:
+            pass
+
+
+@contextlib.contextmanager
 def statsmodels_joblib_warning_filter():
     env_py_warnings = os.environ.get("PYTHONWARNINGS", "")
-    warning_categories = [RuntimeWarning, UserWarning, FutureWarning, ConvergenceWarning, ValueWarning]  # ignore these
+    warning_categories = [RuntimeWarning, UserWarning, FutureWarning]  # ignore these
     try:
         # required to suppress gluonts evaluation warnings as the module uses multiprocessing
         os.environ["PYTHONWARNINGS"] = ",".join([f"ignore::{c.__name__}" for c in warning_categories])

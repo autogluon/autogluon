@@ -12,10 +12,15 @@ from gluonts.model.seq2seq import MQRNNEstimator
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
-from autogluon.timeseries.models import DeepARModel
-from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
+from autogluon.timeseries.models import DeepARMXNetModel
+from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSMXNetModelFactory
 
-from .common import DUMMY_TS_DATAFRAME
+from .common import (
+    DUMMY_TS_DATAFRAME,
+    DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC,
+    get_data_frame_with_variable_lengths,
+    get_static_features,
+)
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
@@ -130,11 +135,11 @@ def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_perfo
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
     [
-        ({DeepARModel: {"epochs": 1}}, 1),
+        ({DeepARMXNetModel: {"epochs": 1}}, 1),
         (
             {
-                GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                DeepARModel: {"epochs": 1},
+                GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
+                DeepARMXNetModel: {"epochs": 1},
             },
             2,
         ),
@@ -208,3 +213,78 @@ def test_given_random_seed_when_learner_called_then_random_seed_set_correctly(te
 
     loaded_learner = TimeSeriesLearner.load(temp_model_path)
     assert random_seed == loaded_learner.random_state
+
+
+def test_when_static_features_in_tuning_data_are_missing_then_exception_is_raised(temp_model_path):
+    train_data = get_data_frame_with_variable_lengths(
+        {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2"])
+    )
+    val_data = get_data_frame_with_variable_lengths({"B": 25, "A": 20}, static_features=None)
+    learner = TimeSeriesLearner(path_context=temp_model_path)
+    with pytest.raises(ValueError, match="Provided tuning_data has no static_features,"):
+        learner._preprocess_static_features(train_data=train_data, val_data=val_data)
+
+
+def test_when_static_features_columns_in_tuning_data_are_missing_then_exception_is_raised(temp_model_path):
+    train_data = get_data_frame_with_variable_lengths(
+        {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2"])
+    )
+    val_data = get_data_frame_with_variable_lengths(
+        {"B": 25, "A": 20}, static_features=get_static_features(["B", "A"], feature_names=["f1"])
+    )
+    learner = TimeSeriesLearner(path_context=temp_model_path)
+    with pytest.raises(ValueError, match="are missing in tuning_data.static_features but were present"):
+        learner._preprocess_static_features(train_data=train_data, val_data=val_data)
+
+
+def test_when_train_data_has_no_static_features_but_val_data_has_static_features_then_val_data_features_get_removed(
+    temp_model_path,
+):
+    train_data = get_data_frame_with_variable_lengths({"B": 25, "A": 20}, static_features=None)
+    val_data = get_data_frame_with_variable_lengths(
+        {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2"])
+    )
+    learner = TimeSeriesLearner(path_context=temp_model_path)
+    _, val_data_processed = learner._preprocess_static_features(train_data=train_data, val_data=val_data)
+    assert val_data.static_features is not None
+    assert val_data_processed.static_features is None
+
+
+def test_when_train_data_static_features_are_subset_of_val_data_static_features_then_columns_are_correct(
+    temp_model_path,
+):
+    train_data = get_data_frame_with_variable_lengths(
+        {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2"])
+    )
+    val_data = get_data_frame_with_variable_lengths(
+        {"B": 25, "A": 20}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2", "f3"])
+    )
+    learner = TimeSeriesLearner(path_context=temp_model_path)
+    train_data_processed, val_data_processed = learner._preprocess_static_features(
+        train_data=train_data, val_data=val_data
+    )
+    assert sorted(val_data.static_features.columns) == ["f1", "f2", "f3"]
+    for data in [val_data_processed, train_data, train_data_processed]:
+        assert sorted(data.static_features.columns) == ["f1", "f2"]
+
+
+def test_when_static_features_are_preprocessed_then_dtypes_are_correct(temp_model_path):
+    train_data = get_data_frame_with_variable_lengths(
+        {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2", "f3"])
+    )
+    learner = TimeSeriesLearner(path_context=temp_model_path)
+    train_data_processed, _ = learner._preprocess_static_features(train_data=train_data, val_data=None)
+    assert train_data_processed.static_features["f1"].dtype == np.float64
+    assert train_data_processed.static_features["f2"].dtype == "category"
+    assert train_data_processed.static_features["f3"].dtype == np.float64
+
+
+def test_when_train_data_has_static_feat_but_pred_data_has_no_static_feat_then_exception_is_raised(temp_model_path):
+    train_data = get_data_frame_with_variable_lengths(
+        {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2"])
+    )
+    pred_data = get_data_frame_with_variable_lengths({"B": 20, "A": 15}, static_features=None)
+    learner = TimeSeriesLearner(path_context=temp_model_path)
+    learner.fit(train_data=train_data, hyperparameters={"ETS": {"maxiter": 1}})
+    with pytest.raises(ValueError, match="Provided data has no static_features"):
+        learner.predict(pred_data)

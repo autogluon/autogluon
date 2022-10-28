@@ -7,14 +7,15 @@ import autogluon.core as ag
 from .abstract import AbstractTimeSeriesModel
 from .abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 from .autogluon_tabular import AutoGluonTabularModel
-from .gluonts import (
+from .gluonts import (  # ProphetModel,
     DeepARModel,
-    MQCNNModel,
-    MQRNNModel,
-    ProphetModel,
+    DeepARMXNetModel,
+    MQCNNMXNetModel,
+    MQRNNMXNetModel,
     SimpleFeedForwardModel,
-    TemporalFusionTransformerModel,
-    TransformerModel,
+    SimpleFeedForwardMXNetModel,
+    TemporalFusionTransformerMXNetModel,
+    TransformerMXNetModel,
 )
 from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel
 from .statsmodels import ARIMAModel, ETSModel, ThetaModel
@@ -23,13 +24,15 @@ logger = logging.getLogger(__name__)
 
 
 MODEL_TYPES = dict(
-    MQCNN=MQCNNModel,
-    MQRNN=MQRNNModel,
+    MQCNNMXNet=MQCNNMXNetModel,
+    MQRNNMXNet=MQRNNMXNetModel,
     SimpleFeedForward=SimpleFeedForwardModel,
+    SimpleFeedForwardMXNet=SimpleFeedForwardMXNetModel,
     DeepAR=DeepARModel,
-    Prophet=ProphetModel,
-    Transformer=TransformerModel,
-    TemporalFusionTransformer=TemporalFusionTransformerModel,
+    DeepARMXNet=DeepARMXNetModel,
+    # Prophet=ProphetModel,
+    TransformerMXNet=TransformerMXNetModel,
+    TemporalFusionTransformerMXNet=TemporalFusionTransformerMXNetModel,
     SktimeARIMA=SktimeARIMAModel,
     SktimeAutoARIMA=SktimeAutoARIMAModel,
     SktimeAutoETS=SktimeAutoETSModel,
@@ -40,13 +43,15 @@ MODEL_TYPES = dict(
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
-    MQCNN=40,
-    MQRNN=40,
+    MQCNNMXNet=40,
+    MQRNNMXNet=40,
     SimpleFeedForward=50,
-    Transformer=40,
-    TemporalFusionTransformer=45,
+    SimpleFeedForwardMXNet=30,
+    TransformerMXNet=40,
+    TemporalFusionTransformerMXNet=45,
     DeepAR=50,
-    Prophet=10,
+    DeepARMXNet=30,
+    # Prophet=10,
     SktimeAutoARIMA=20,
     SktimeARIMA=50,
     SktimeAutoETS=60,
@@ -77,7 +82,7 @@ def get_default_hps(key, prediction_length):
             "DeepAR": {
                 "context_length": context_length,
             },
-            "TemporalFusionTransformer": {
+            "TemporalFusionTransformerMXNet": {
                 "context_length": context_length,
             },
         },
@@ -105,12 +110,12 @@ def get_default_hps(key, prediction_length):
                 "batch_size": 64,
                 "context_length": context_length,
             },
-            "Transformer": {
+            "TransformerMXNet": {
                 "model_dim": ag.Categorical(32, 64),
                 "batch_size": 64,
                 "context_length": context_length,
             },
-            "TemporalFusionTransformer": {
+            "TemporalFusionTransformerMXNet": {
                 "hidden_dim": ag.Categorical(32, 64),
                 "batch_size": 64,
                 "context_length": context_length,
