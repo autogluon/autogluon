@@ -10,7 +10,6 @@ from omegaconf import DictConfig, OmegaConf
 from pytorch_metric_learning import distances, losses, miners
 from torch import nn, optim
 from torch.nn import functional as F
-from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from transformers import Adafactor
 from transformers.trainer_pt_utils import get_parameter_names
 
@@ -26,6 +25,7 @@ from ..constants import (
     COSINE_EMBEDDING_LOSS,
     COSINE_SIMILARITY,
     CROSS_ENTROPY,
+    DIRECT_LOSS,
     F1,
     FEATURES,
     IA3,
@@ -50,6 +50,7 @@ from ..constants import (
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
 )
+from ..utils import MeanAveragePrecision
 from .losses import SoftTargetCrossEntropy
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
@@ -197,9 +198,16 @@ def get_metric(
         return torchmetrics.SpearmanCorrCoef(), None
     elif metric_name == F1:
         return CustomF1Score(num_classes=num_classes, pos_label=pos_label), None
-    elif metric_name == MAP:
-        return MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False), None
-        # return MeanAveragePrecision(box_format='xyxy',iou_type="bbox",class_metrics=True), None # TODO: remove parameter hardcodings here
+    elif metric_name == MAP.lower():
+        return (
+            MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False),
+            None,
+        )  # TODO: remove parameter hardcodings here, and add class_metrics
+    elif metric_name == DIRECT_LOSS:
+        return (
+            torchmetrics.MeanMetric(nan_strategy="warn"),
+            None,
+        )  # This only works for detection where custom_metric is not required for BaseAggregator
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 

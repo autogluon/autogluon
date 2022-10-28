@@ -60,7 +60,7 @@ from ..constants import (
 )
 from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
-from .utils import extract_value_from_config
+from .utils import extract_value_from_config, is_rois_input
 
 logger = logging.getLogger(AUTOMM)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -205,11 +205,21 @@ class ImageProcessor:
 
         if self.prefix.lower().startswith(MMLAB_MODELS):
             assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-            fn.update(
-                {
-                    self.image_key: lambda x: collate(x, samples_per_gpu=per_gpu_batch_size),
-                }
-            )
+            if self.prefix.lower().startswith(MMDET_IMAGE):
+                from ..utils import CollateMMCV
+
+                fn.update(
+                    {
+                        self.image_key: CollateMMCV(samples_per_gpu=per_gpu_batch_size),
+                    }
+                )
+            else:
+                # TODO: update MMOCR
+                fn.update(
+                    {
+                        self.image_key: lambda x: collate(x, samples_per_gpu=per_gpu_batch_size),
+                    }
+                )
         else:
             fn.update(
                 {
@@ -403,11 +413,11 @@ class ImageProcessor:
         column_start = 0
         if self.prefix.lower().startswith(MMLAB_MODELS):
             for per_col_name, per_col_content in image_paths.items():
-                if per_col_name != "rois":  # TODO: remove hardcode
-                    mm_data["img_info"] = dict(filename=per_col_content[0])
-                else:
+                if is_rois_input(per_col_content):
                     rois = np.array(per_col_content)
                     mm_data["ann_info"] = dict(bboxes=rois[:, :4], labels=rois[:, 4])
+                else:
+                    mm_data["img_info"] = dict(filename=per_col_content[0])
             if self.requires_column_info:
                 pass  # TODO
         else:

@@ -13,6 +13,7 @@ from ..constants import (
     AUTOMM,
     AVERAGE_PRECISION,
     BINARY,
+    DIRECT_LOSS,
     F1,
     MAP,
     METRIC_MODE_MAP,
@@ -36,6 +37,7 @@ def infer_metrics(
     problem_type: Optional[str] = None,
     pipeline: Optional[str] = None,
     eval_metric_name: Optional[str] = None,
+    validation_metric_name: Optional[str] = None,
 ):
     """
     Infer the validation metric and the evaluation metric if not provided.
@@ -88,7 +90,14 @@ def infer_metrics(
         eval_metric_name = RMSE
     elif problem_type is None:
         if pipeline == OBJECT_DETECTION:
-            eval_metric_name = MAP
+            if (not validation_metric_name) or validation_metric_name.lower() == DIRECT_LOSS:
+                return DIRECT_LOSS, MAP
+            elif validation_metric_name == MAP:
+                return MAP, MAP
+            else:
+                raise ValueError(
+                    f"Problem type: {problem_type}, pipeline: {pipeline}, validation_metric_name: {validation_metric_name} is not supported!"
+                )
         else:
             raise NotImplementedError(f"Problem type: {problem_type}, pipeline: {pipeline} is not supported yet!")
     else:
