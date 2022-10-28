@@ -10,32 +10,38 @@ from gluonts.mx.model.transformer import TransformerEstimator
 import autogluon.core as ag
 from autogluon.timeseries.models.gluonts import (  # MQRNNModel,; TransformerModel,
     DeepARModel,
-    GenericGluonTSModel,
-    MQCNNModel,
+    DeepARMXNetModel,
+    GenericGluonTSMXNetModel,
+    MQCNNMXNetModel,
     ProphetModel,
     SimpleFeedForwardModel,
-    TemporalFusionTransformerModel,
+    SimpleFeedForwardMXNetModel,
+    TemporalFusionTransformerMXNetModel,
 )
-from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
+from autogluon.timeseries.models.gluonts.mx.models import AbstractGluonTSMXNetModel, GenericGluonTSMXNetModelFactory
+from autogluon.timeseries.models.gluonts.torch.models import AbstractGluonTSPyTorchModel
 from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 
 from ..common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
 
-TESTABLE_MODELS = [
-    DeepARModel,
-    MQCNNModel,
+TESTABLE_MX_MODELS = [
+    DeepARMXNetModel,
+    MQCNNMXNetModel,
     # MQRNNModel,
-    SimpleFeedForwardModel,
+    SimpleFeedForwardMXNetModel,
     # TransformerModel,
-    partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
-    GenericGluonTSModelFactory(TransformerEstimator),
-    TemporalFusionTransformerModel,
+    partial(GenericGluonTSMXNetModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
+    GenericGluonTSMXNetModelFactory(TransformerEstimator),
+    TemporalFusionTransformerMXNetModel,
 ]
 
 MODELS_WITH_STATIC_FEATURES = [
     DeepARModel,
-    MQCNNModel,
+    DeepARMXNetModel,
+    MQCNNMXNetModel,
 ]
+TESTABLE_PYTORCH_MODELS = [DeepARModel, SimpleFeedForwardModel]
+TESTABLE_MODELS = TESTABLE_MX_MODELS + TESTABLE_PYTORCH_MODELS
 
 # if PROPHET_IS_INSTALLED:
 #     TESTABLE_MODELS += [ProphetModel]
@@ -93,7 +99,10 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(model_class, te
     loaded_model = model.__class__.load(path=model.path)
 
     assert model.gluonts_estimator_class is loaded_model.gluonts_estimator_class
-    assert loaded_model.gts_predictor == model.gts_predictor
+    if isinstance(model, AbstractGluonTSMXNetModel):
+        assert loaded_model.gts_predictor == model.gts_predictor
+    elif isinstance(model, AbstractGluonTSPyTorchModel):
+        assert loaded_model.gts_predictor.to(model.gts_predictor.device) == model.gts_predictor
 
 
 @pytest.mark.skipif(
@@ -180,7 +189,7 @@ def test_when_hyperparameter_tune_called_on_prophet_then_hyperparameters_are_pas
     ],
 )
 def test_when_tft_quantiles_are_not_deciles_then_value_error_is_raised(temp_model_path, quantiles, should_fail):
-    model = TemporalFusionTransformerModel(
+    model = TemporalFusionTransformerMXNetModel(
         path=temp_model_path,
         freq=DUMMY_TS_DATAFRAME.freq,
         prediction_length=4,
@@ -199,7 +208,7 @@ def test_when_tft_quantiles_are_not_deciles_then_value_error_is_raised(temp_mode
 @pytest.mark.parametrize("quantiles", [[0.1, 0.5, 0.9], [0.2, 0.3, 0.7]])
 def test_when_tft_quantiles_are_deciles_then_forecast_contains_correct_quantiles(temp_model_path, quantiles):
     # TFT is not covered by the quantiles test in test_models.py
-    model = TemporalFusionTransformerModel(
+    model = TemporalFusionTransformerMXNetModel(
         path=temp_model_path,
         freq=DUMMY_TS_DATAFRAME.freq,
         prediction_length=4,

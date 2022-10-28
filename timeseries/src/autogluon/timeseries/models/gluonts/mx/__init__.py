@@ -1,4 +1,4 @@
-from .mx import (
+from .models import (
     DeepARMXNetModel,
     GenericGluonTSMXNetModel,
     MQCNNMXNetModel,
@@ -8,17 +8,16 @@ from .mx import (
     TemporalFusionTransformerMXNetModel,
     TransformerMXNetModel,
 )
-from .torch import DeepARModel, SimpleFeedForwardModel
+
+# TODO: add mxnet import guard and warning
 
 __all__ = [
     "DeepARMXNetModel",
-    "DeepARModel",
     "GenericGluonTSMXNetModel",
     "MQCNNMXNetModel",
     "MQRNNMXNetModel",
     "ProphetModel",
     "SimpleFeedForwardMXNetModel",
-    "SimpleFeedForwardModel",
     "TemporalFusionTransformerMXNetModel",
     "TransformerMXNetModel",
 ]
