@@ -1,4 +1,4 @@
-from typing import Union, List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 import pandas as pd
 from pandas import DataFrame
@@ -20,6 +20,17 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
     The components can be present in any combination (assuming their dependencies are satisfied).
 
     The report requires at lest one of the analyses present to be rendered.
+
+    Parameters
+    ----------
+    headers: bool, default = False
+        if `True` then render headers
+    namespace: str, default = None
+        namespace to use; can be nested like `ns_a.ns_b.ns_c`
+     sort_by: Optional[str], default = None
+        column to sort the resulting table
+     sort_asc: bool, default = True
+        if `sort_by` provided, then if sorting should ascending or descending
 
     Examples
     --------
@@ -50,7 +61,7 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
     def __init__(self,
                  headers: bool = False,
                  namespace: str = None,
-                 sort_by: Union[None, str] = None,
+                 sort_by: Optional[str] = None,
                  sort_asc: bool = True,
                  **kwargs) -> None:
         super().__init__(namespace, **kwargs)
@@ -112,6 +123,13 @@ class DatasetTypeMismatch(AbstractVisualization, JupyterMixin, StateCheckMixin):
     Display mismatch between raw types between datasets provided. In case if mismatch found, mark the row with a warning.
 
     The report requires :py:class:`~autogluon.eda.analysis.dataset.RawTypesAnalysis` analysis present.
+
+    Parameters
+    ----------
+    headers: bool, default = False
+        if `True` then render headers
+    namespace: str, default = None
+        namespace to use; can be nested like `ns_a.ns_b.ns_c`
 
     Examples
     --------

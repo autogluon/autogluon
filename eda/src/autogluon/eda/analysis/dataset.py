@@ -27,7 +27,6 @@ class Sampler(AbstractAnalysis):
         parent Analysis
     children: List[AbstractAnalysis], default []
         wrapped analyses; these will receive sampled `args` during `fit` call
-    kwargs
 
     Examples
     --------
@@ -145,6 +144,15 @@ class VariableTypeAnalysis(AbstractAnalysis):
     Infers variable types for the column: numeric vs category.
 
     This analysis depends on :func:`RawTypesAnalysis`.
+
+    Parameters
+    ----------
+    numeric_as_categorical_threshold: int, default = 20
+        if numeric column has less than this value, then the variable should be considered as categorical
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: List[AbstractAnalysis], default []
+        wrapped analyses; these will receive sampled `args` during `fit` call
 
     Examples
     --------
