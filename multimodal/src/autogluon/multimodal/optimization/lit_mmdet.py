@@ -224,13 +224,13 @@ class MMDetLitModule(pl.LightningModule):
     def validation_epoch_end(self, validation_step_outputs):
         val_result = self.validation_metric.compute()
         if self.use_loss:
-            self.print("val_loss: %.2f" % val_result.item())
+            # self.log("val_loss: %.2f" % val_result.item())
             self.log_dict({"val_direct_loss": val_result})
         else:
             # TODO: add mAP/mAR_per_class
             mAPs = {"val_" + k: v for k, v in val_result.items()}
             mAPs["val_mAP"] = mAPs["val_map"]
-            self.print("mAPs: %s" % mAPs)
+            # self.log("mAPs: %s" % mAPs)
             self.log_dict(mAPs, sync_dist=True)
         self.validation_metric.reset()
 

@@ -100,6 +100,7 @@ from .utils import (
     AutoMMModelCheckpointIO,
     COCODataset,
     CustomUnpickler,
+    DDPCacheWriter,
     LogFilter,
     apply_log_filter,
     assign_feature_column_names,
@@ -1459,6 +1460,14 @@ class MultiModalPredictor:
             predict_data=data,
         )
 
+        callbacks = []
+        if strategy == "ddp":
+            if self._pipeline != OBJECT_DETECTION:
+                raise NotImplementedError(f"inference using ddp is only implemented for {OBJECT_DETECTION}")
+            else:
+                pred_writer = DDPCacheWriter(pipeline=self._pipeline, write_interval="epoch")
+                callbacks = [pred_writer]
+
         if self._problem_type == NER:
             task = NerLitModule(
                 model=self._model,
@@ -1504,6 +1513,7 @@ class MultiModalPredictor:
                 deterministic=self._config.env.deterministic,
                 max_epochs=-1,  # Add max_epochs to disable warning
                 logger=False,
+                callbacks=callbacks,
             )
 
             with warnings.catch_warnings():
@@ -1517,7 +1527,16 @@ class MultiModalPredictor:
                 outputs = evaluator.predict(
                     task,
                     datamodule=predict_dm,
+                    return_predictions=not callbacks,
                 )
+
+                import sys
+
+                if evaluator.global_rank != 0:
+                    sys.exit(f"Prediction finished, exit the process with global_rank={evaluator.global_rank}...")
+
+        if strategy == "ddp":
+            outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
 
         return outputs
 
@@ -1572,6 +1591,8 @@ class MultiModalPredictor:
         self,
         anno_file_or_df: str,
         metrics: str,
+        return_pred: Optional[bool] = False,
+        seed: Optional[int] = 123,
     ):
         """
         Evaluate object detection model on a test dataset in COCO format.
@@ -1580,7 +1601,10 @@ class MultiModalPredictor:
         ----------
         anno_file
             The annotation file in COCO format
+        return_pred
+            Whether to return the prediction result of each row.
         """
+        # TODO: refactor this into evaluate()
         if isinstance(anno_file_or_df, str):
             anno_file = anno_file_or_df
             data = from_coco(anno_file)
@@ -1592,6 +1616,7 @@ class MultiModalPredictor:
         outputs = self._predict(
             data=data,
             requires_label=True,
+            seed=seed,
         )  # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
 
         # Cache prediction results as COCO format # TODO: refactor this
@@ -1601,11 +1626,21 @@ class MultiModalPredictor:
                 warn_if_exist=self._warn_if_exist,
             )
         self._save_path = os.path.abspath(os.path.expanduser(self._save_path))
-        cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
+        cocoeval_cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
 
-        return cocoeval(
-            outputs=outputs, data=data, anno_file=anno_file, cache_path=cache_path, metrics=metrics, tool="pycocotools"
+        eval_results = cocoeval(
+            outputs=outputs,
+            data=data,
+            anno_file=anno_file,
+            cache_path=cocoeval_cache_path,
+            metrics=metrics,
+            tool="pycocotools",
         )
+
+        if return_pred:
+            return eval_results, outputs
+        else:
+            return eval_results
 
     def _process_batch(
         self,
@@ -1684,8 +1719,8 @@ class MultiModalPredictor:
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
 
         if self._pipeline == OBJECT_DETECTION:
-            # strategy = "ddp" # TODO: enable multigpu inference
-            num_gpus = 1
+            strategy = "ddp"  # TODO: enable multigpu inference
+            # num_gpus = 1
 
         if num_gpus == 1:
             strategy = None
@@ -1757,7 +1792,9 @@ class MultiModalPredictor:
         Optionally return a dataframe of prediction results.
         """
         if self._pipeline == OBJECT_DETECTION:
-            return self.evaluate_coco(data, metrics)
+            if realtime:
+                return NotImplementedError(f"Current pipeline {self._pipeline} does not support realtime predict.")
+            return self.evaluate_coco(anno_file_or_df=data, metrics=metrics, return_pred=return_pred, seed=seed)
 
         if self._problem_type == NER:
             ret_type = NER_RET

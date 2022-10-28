@@ -436,7 +436,7 @@ def from_coco(
         d["image"].append(abs_path)
         d["rois"].append(rois)
     df = pd.DataFrame(d)
-    df["rois_label"] = df.loc[:, "rois"].copy()
+    df["label"] = df.loc[:, "rois"].copy()
     return df.sort_values("image").reset_index(drop=True)
 
 
