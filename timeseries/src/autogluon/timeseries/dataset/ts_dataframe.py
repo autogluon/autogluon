@@ -109,6 +109,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
         super().__init__(data=data, *args, **kwargs)
         self._static_features: Optional[pd.DataFrame] = None
         if static_features is not None:
+            if isinstance(static_features, pd.Series):
+                static_features = static_features.to_frame()
+            if not isinstance(static_features, pd.DataFrame):
+                raise ValueError(
+                    f"static_features must be a pandas DataFrame (received object of type {type(static_features)})"
+                )
             self.static_features = static_features
 
         # internal value for cached frequency values that are inferred. corresponds to either a

@@ -41,7 +41,7 @@ install_requires = [
     "pytorch_lightning>=1.7.4,<1.8.0",
     "text-unidecode<=1.3",
     "torchmetrics>=0.8.0,<0.9.0",
-    "transformers>=4.18.0,<4.21.0",
+    "transformers>=4.23.0,<4.24.0",
     "nptyping>=1.4.4,<1.5.0",
     "omegaconf>=2.1.1,<2.2.0",
     "sentencepiece>=0.1.95,<0.2.0",
@@ -54,6 +54,7 @@ install_requires = [
     "openmim>0.1.5,<=0.2.1",
     "pycocotools>=2.0.4,<=2.0.4",
     "defusedxml>=0.7.1,<=0.7.1",
+    "pytrec-eval>=0.5,<=0.5",
     "albumentations>=1.1.0,<=1.2.0",
 ]
 

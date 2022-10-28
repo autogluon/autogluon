@@ -401,8 +401,8 @@ class TabularPredictor:
                 For example, set `hyperparameters = { 'NN_TORCH':{...} }` if say you only want to train (PyTorch) neural networks and no other types of models.
             Values = dict of hyperparameter settings for each model type, or list of dicts.
                 Each hyperparameter can either be a single fixed value or a search space containing many possible values.
-                Unspecified hyperparameters will be set to default values (or default search spaces if `hyperparameter_tune = True`).
-                Caution: Any provided search spaces will error if `hyperparameter_tune = False`.
+                Unspecified hyperparameters will be set to default values (or default search spaces if `hyperparameter_tune_kwargs='auto'`).
+                Caution: Any provided search spaces will error if `hyperparameter_tune_kwargs=None` (Default).
                 To train multiple models of a given type, set the value to a list of hyperparameter dictionaries.
                     For example, `hyperparameters = {'RF': [{'criterion': 'gini'}, {'criterion': 'entropy'}]}` will result in 2 random forest models being trained with separate hyperparameters.
                 Some model types have preset hyperparameter configs keyed under strings as shorthand for a complex model hyperparameter configuration known to work well:

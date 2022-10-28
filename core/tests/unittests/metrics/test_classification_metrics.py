@@ -188,7 +188,7 @@ def test_log_loss_with_sklearn(gt, probs):
     # Thus, the true value should be the negation of the real log_loss
     np.testing.assert_allclose(ag_loss, -sklearn_log_loss)
 
-    ag_loss_as_sklearn = log_loss.convert_score_to_sklearn_val(ag_loss)
+    ag_loss_as_sklearn = log_loss.convert_score_to_original(ag_loss)
     np.testing.assert_allclose(ag_loss_as_sklearn, sklearn_log_loss)
 
 

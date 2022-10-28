@@ -147,6 +147,15 @@ def siamese_network():
     return automm_presets.create("default")
 
 
+@automm_presets.register()
+def text_similarity():
+    return {
+        "model.names": ["hf_text"],
+        "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
+        "model.hf_text.pooling_mode": "mean",
+    }
+
+
 def list_automm_presets(verbose: bool = False):
     """
     List all available presets.

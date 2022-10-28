@@ -1016,7 +1016,8 @@ class MultiModalPredictor:
         if teacher_data_processors is not None:
             data_processors = [data_processors, teacher_data_processors]
 
-        val_is_train = (self._pipeline == OBJECT_DETECTION) and (validation_metric_name != MAP)
+        val_use_training_mode = (self._pipeline == OBJECT_DETECTION) and (validation_metric_name != MAP)
+
         train_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
@@ -1024,7 +1025,7 @@ class MultiModalPredictor:
             num_workers=config.env.num_workers,
             train_data=train_df,
             val_data=val_df,
-            val_is_train=val_is_train,
+            val_use_training_mode=val_use_training_mode,
         )
         optimization_kwargs = dict(
             optim_type=config.optimization.optim_type,
@@ -1207,7 +1208,10 @@ class MultiModalPredictor:
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
-                gpus=num_gpus if not use_ray_lightning else None,  # ray lightning requires not specifying gpus
+                accelerator="gpu" if num_gpus > 0 else None,
+                devices=num_gpus
+                if not use_ray_lightning and num_gpus > 0
+                else None,  # ray lightning requires not specifying gpus
                 auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
                 num_nodes=config.env.num_nodes,
                 precision=precision,
@@ -1503,7 +1507,8 @@ class MultiModalPredictor:
 
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
-                gpus=num_gpus,
+                accelerator="gpu" if num_gpus > 0 else None,
+                devices=num_gpus if num_gpus > 0 else None,
                 auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
@@ -1665,6 +1670,7 @@ class MultiModalPredictor:
             per_sample_features = apply_data_processor(
                 per_sample_features=per_sample_features,
                 data_processors=data_processors,
+                feature_modalities=modality_types,
                 is_training=False,
             )
             processed_features.append(per_sample_features)
@@ -1706,7 +1712,8 @@ class MultiModalPredictor:
         seed: Optional[int] = 123,
     ) -> List[Dict]:
 
-        pl.seed_everything(seed, workers=True)
+        with apply_log_filter(LogFilter("Global seed set to")):  # Ignore the log "Global seed set to"
+            pl.seed_everything(seed, workers=True)
 
         data, df_preprocessor, data_processors = self._on_predict_start(
             config=self._config,
@@ -1719,13 +1726,12 @@ class MultiModalPredictor:
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
 
         if self._pipeline == OBJECT_DETECTION:
-            strategy = "ddp"  # TODO: enable multigpu inference
-            # num_gpus = 1
+            strategy = "ddp"
 
         if num_gpus == 1:
             strategy = None
 
-        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision)
+        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False)
 
         if not realtime:
             batch_size = compute_inference_batch_size(

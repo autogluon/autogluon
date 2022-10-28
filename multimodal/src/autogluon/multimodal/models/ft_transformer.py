@@ -364,18 +364,27 @@ class AdditiveAttention(nn.Module):
         self.n_heads = n_heads
         self.share_qv_weights = share_qv_weights
         self.dropout = nn.Dropout(dropout)
+        trainable = []
         if share_qv_weights:
             self.qv_proj = nn.Linear(d_token, d_token, bias=bias)
+            trainable.extend([self.qv_proj])
         else:
             self.q_proj = nn.Linear(d_token, d_token, bias=bias)
             self.v_proj = nn.Linear(d_token, d_token, bias=bias)
+            trainable.extend([self.q_proj, self.v_proj])
+
         self.k_proj = nn.Linear(d_token, d_token, bias=bias)
         self.W_q = nn.Linear(d_token, n_heads)
         self.W_k = nn.Linear(d_token, n_heads)
         self.r_out = nn.Linear(d_token, d_token)
+        trainable.extend([self.k_proj, self.W_q, self.W_k, self.r_out])
 
         if initialization == "xavier":
             self.apply(init_weights)
+        else:
+            for m in trainable:
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
     def forward(
         self,

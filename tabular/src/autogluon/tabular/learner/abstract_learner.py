@@ -584,19 +584,12 @@ class AbstractTabularLearner(AbstractLearner):
                     )
                 performance_dict[aux_metric.name] = score
 
-        if self.eval_metric.name in performance_dict:
-            score_eval = performance_dict[self.eval_metric.name]
-            score_eval_flipped = self.eval_metric.convert_score_to_sklearn_val(score_eval)  # flip negative once again back to positive (so higher is no longer necessarily better)
-            if score_eval_flipped != score_eval:
-                flipped = True
-            else:
-                flipped = False
-            if not silent:
-                logger.log(20, f"Evaluation: {self.eval_metric.name} on test data: {score_eval}")
-                if flipped:
-                    logger.log(20, f"\tNote: Scores are always higher_is_better. This metric score can be multiplied by -1 to get the metric value.")
-
         if not silent:
+            if self.eval_metric.name in performance_dict:
+                score_eval = performance_dict[self.eval_metric.name]
+                logger.log(20, f"Evaluation: {self.eval_metric.name} on test data: {score_eval}")
+                if not self.eval_metric.greater_is_better_internal:
+                    logger.log(20, f"\tNote: Scores are always higher_is_better. This metric score can be multiplied by -1 to get the metric value.")
             logger.log(20, "Evaluations on test data:")
             logger.log(20, json.dumps(performance_dict, indent=4))
 

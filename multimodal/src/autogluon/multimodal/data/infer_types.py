@@ -116,6 +116,7 @@ def is_rois_column(data: pd.Series) -> bool:
     if isinstance(data[idx], str):
         try:
             rois = json.loads(data[idx][0])
+            # TODO: better infer logic / input format to not confuse with other modality
             return rois and isinstance(rois, list) and len(data[idx][0]) == 5
         except:
             return False
@@ -383,8 +384,8 @@ def infer_column_types(
 
         if is_rois_column(data[col_name]):
             column_types[col_name] = ROIS
-        elif is_identifier_column(data[col_name], col_name=col_name, id_mappings=id_mappings):
-            column_types[col_name] = (f"{id_mappings_types[col_name]}_{IDENTIFIER}",)
+        if is_identifier_column(data[col_name], col_name=col_name, id_mappings=id_mappings):
+            column_types[col_name] = f"{id_mappings_types[col_name]}_{IDENTIFIER}"
         elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
         ):  # Infer categorical column
