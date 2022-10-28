@@ -59,18 +59,20 @@ class RFOnnxCompiler:
             return False
 
     @staticmethod
-    def compile(obj, path: str, batch_size=None):
-        if isinstance(obj.model, RFOnnxPredictor):
-            return obj.model
-        # Convert into ONNX format
-        from skl2onnx import convert_sklearn
-        from skl2onnx.common.data_types import FloatTensorType
-        initial_type = [('float_input', FloatTensorType([None, obj._num_features_post_process]))]
-        onx = convert_sklearn(obj.model, initial_types=initial_type)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path + "model.onnx", "wb") as f:
-            f.write(onx.SerializeToString())
-        return RFOnnxCompiler.load(obj=obj, path=path)
+    def compile(model, input_types=None):
+        if input_types is None:
+            input_types = []
+    #     if isinstance(model, RFOnnxPredictor):
+    #         return model
+    #     # Convert into ONNX format
+    #     from skl2onnx import convert_sklearn
+    #     from skl2onnx.common.data_types import FloatTensorType
+    #     initial_type = [('float_input', FloatTensorType([None, obj._num_features_post_process]))]
+    #     onx = convert_sklearn(model, initial_types=initial_type)
+    #     os.makedirs(os.path.dirname(path), exist_ok=True)
+    #     with open(path + "model.onnx", "wb") as f:
+    #         f.write(onx.SerializeToString())
+    #     return RFOnnxCompiler.load(obj=obj, path=path)
 
     @staticmethod
     def load(obj, path: str):

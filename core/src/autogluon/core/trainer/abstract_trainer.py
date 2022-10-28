@@ -1134,14 +1134,20 @@ class AbstractTrainer:
         if self.low_memory:
             self.models = models
 
-    def compile_models(self, **kwargs):
-        models_to_compile = list(self.models.keys())
-        if len(models_to_compile) == 0:
-            raise RuntimeError("No valid persisted model to be compiled. "
-                               "Make sure make a call to `persist_models` before trying to compile the models.")
-        for model_name in models_to_compile:
-            self.models[model_name].compile(compiler_configs=kwargs)
-        return models_to_compile
+    def compile_models(self, model_names='all', **kwargs):
+        if model_names == 'all':
+            model_names = self.get_model_names(can_infer=True)
+        elif model_names == 'best':
+            if self.model_best is not None:
+                model_names = [self.model_best]
+            else:
+                model_names = [self.get_model_best(can_infer=True)]
+        if not isinstance(model_names, list):
+            raise ValueError(f'model_names must be a list of model names. Invalid value: {model_names}')
+        for model_name in model_names:
+            model = self.load_model(model_name)
+            model.compile(compiler_configs=kwargs)
+        return model_names
 
     def persist_models(self, model_names='all', with_ancestors=False, max_memory=None) -> List[str]:
         if model_names == 'all':

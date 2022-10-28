@@ -143,8 +143,7 @@ class FitHelper:
         )
         predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)
         if compile_models:
-            persisted_models = predictor.persist_models(models="best", with_ancestors=False)
-            predictor.compile_models(compiler_configs=compiler_configs)
+            predictor.compile_models(models="best", compiler_configs=compiler_configs)
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)
         predictor.predict(test_data)

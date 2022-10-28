@@ -127,6 +127,7 @@ class AbstractModel:
         self._features_internal = None  # Internal features, safe to use internally via the `_features` property
         self._feature_metadata = None  # Internal feature metadata, safe to use internally
         self._is_features_in_same_as_ex = None  # Whether self.features == self._features_internal
+        self._input_types_post_process = None # A list of tuples containing [(shape, dtype),] for compiler optimization
 
         self.fit_time = None  # Time taken to fit in seconds (Training data)
         self.predict_time = None  # Time taken to predict in seconds (Validation data)
@@ -305,6 +306,7 @@ class AbstractModel:
             X = self._preprocess_nonadaptive(X, **kwargs)
         if preprocess_stateful:
             X = self._preprocess(X, **kwargs)
+        self._input_types_post_process = [(x.shape, x.dtype) for x in X] if isinstance(X, list) else [(X.shape, X.dtype),]
         return X
 
     # TODO: Remove kwargs?
@@ -872,25 +874,25 @@ class AbstractModel:
     #  Is it called during fit? Is it called after fit?
     #  Can it be called as a post-fit operation on an already fit predictor on a per-model basis?
     #  Does this call overwrite the existing model or make a new one?
-    def compile(self, path: str = None, verbose=True, compiler_configs={}) -> str:
-        if path is None:
-            path = self.path
-        file_path = path + self.model_file_name
+    def compile(self, compiler_configs=None) -> str:
+        """
+        Compile the trained model for faster inference.
+        """
+        assert self.is_fit(), "The model must be fit before calling the compile method."
+        if compiler_configs is None:
+            compiler_configs = {}
         compiler = compiler_configs.get("compiler", "native")
-        batch_size = compiler_configs.get("batch_size", 1)
+        batch_size = compiler_configs.get("batch_size", None)
 
         save_in_pkl = True
         if self.model is not None:
             self._compiler = self._get_compiler(compiler=compiler)
             if self._compiler is not None:
-                self.model = self._compiler.compile(obj=self, path=path, batch_size=batch_size)
+                input_types = [(tuple([batch_size]+list(shape)[1:]), dtype)
+                               for shape, dtype in self._input_types_post_process]
+                self.model = self._compiler.compile(model=self.model, input_types=input_types)
                 save_in_pkl = self._compiler.save_in_pkl
-        _model = self.model
-        if not save_in_pkl:
-            self.model = None
-        save_pkl.save(path=file_path, object=self, verbose=verbose)
-        self.model = _model
-        return path
+        return self.model, save_in_pkl
 
     def _default_compiler(self):
         return None
