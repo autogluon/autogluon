@@ -31,6 +31,7 @@ install_requires = [
     'ipython>=7.34,<9.0',
     'ipywidgets>=8.0,<9.0',
     f'autogluon.core=={version}',
+    f'autogluon.common=={version}',
     f'autogluon.features=={version}',
     f'autogluon.tabular=={version}',
 ]
