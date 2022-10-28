@@ -114,6 +114,7 @@ class TimeSeriesPredictor:
     def __init__(
         self,
         target: Optional[str] = None,
+        known_covariates_names: Optional[List[str]] = None,
         prediction_length: int = 1,
         eval_metric: Optional[str] = None,
         path: Optional[str] = None,
@@ -131,6 +132,18 @@ class TimeSeriesPredictor:
         if target is not None and kwargs.get("label") is not None:
             raise ValueError("Both `label` and `target` are specified. Please specify at most one of these arguments.")
         self.target = target or kwargs.get("label", "target")
+
+        if known_covariates_names is None:
+            known_covariates_names = []
+        if isinstance(known_covariates_names, str):
+            known_covariates_names = [known_covariates_names]
+        if not all(isinstance(name, str) for name in known_covariates_names):
+            raise ValueError(
+                "known_covariates_names must be a list of strings (names of columns that are known at prediction time)."
+            )
+        if self.target in known_covariates_names:
+            raise ValueError(f"Target column {self.target} cannot be one of the known covariates.")
+        self.known_covariates_names = known_covariates_names
 
         self.prediction_length = prediction_length
         self.eval_metric = eval_metric
@@ -158,6 +171,7 @@ class TimeSeriesPredictor:
                 path_context=self.path,
                 eval_metric=eval_metric,
                 target=self.target,
+                known_covariates_names=self.known_covariates_names,
                 prediction_length=self.prediction_length,
                 quantile_levels=self.quantile_levels,
                 validation_splitter=splitter,
@@ -337,10 +351,6 @@ class TimeSeriesPredictor:
         if self._learner.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
 
-        if self.target not in train_data.columns:
-            raise ValueError(f"Target column `{self.target}` not found in the training data set.")
-        if tuning_data is not None and self.target not in tuning_data.columns:
-            raise ValueError(f"Target column `{self.target}` not found in the tuning data set.")
         if hyperparameters is None:
             hyperparameters = "default"
 
@@ -352,7 +362,7 @@ class TimeSeriesPredictor:
 
         fit_args = dict(
             prediction_length=self.prediction_length,
-            target_column=self.target,
+            target=self.target,
             time_limit=time_limit,
             evaluation_metric=self.eval_metric,
             hyperparameters=hyperparameters,

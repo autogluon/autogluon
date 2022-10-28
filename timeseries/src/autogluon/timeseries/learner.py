@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Any, Dict, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -31,6 +31,7 @@ class TimeSeriesLearner(AbstractLearner):
         self,
         path_context: str,
         target: str = "target",
+        known_covariates_names: Optional[List[str]] = None,
         random_state: int = 0,
         trainer_type: Type[AbstractTimeSeriesTrainer] = AutoTimeSeriesTrainer,
         eval_metric: Optional[str] = None,
@@ -42,6 +43,7 @@ class TimeSeriesLearner(AbstractLearner):
         self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.trainer_type = trainer_type
         self.target = target
+        self.known_covariates_names = [] if known_covariates_names is None else known_covariates_names
         self.prediction_length = prediction_length
         self.quantile_levels = kwargs.get(
             "quantile_levels",
@@ -100,11 +102,8 @@ class TimeSeriesLearner(AbstractLearner):
 
         train_data, val_data = self._preprocess_static_features(train_data=train_data, val_data=val_data)
 
-        # Process dynamic features
-        # TODO: Handle dynamic features
-        extra_columns = [c for c in train_data.columns.copy() if c != self.target]
-        if len(extra_columns) > 0:
-            logger.warning(f"Provided columns {extra_columns} will not be used.")
+        train_data = self._preprocess_dynamic_features(data=train_data, data_frame_name="train_data")
+        val_data = self._preprocess_dynamic_features(data=val_data, data_frame_name="tuning_data", report_unused=False)
 
         # Train / validation split
         if val_data is None:
@@ -232,6 +231,46 @@ class TimeSeriesLearner(AbstractLearner):
                 f"Columns {different_dtype_columns.to_list()} in tuning_data.static_features have dtypes that don't "
                 "match train_data.static_features. " + fix_message
             )
+
+    def _preprocess_time_series_dataframe(
+        self,
+        data: Optional[TimeSeriesDataFrame],
+        data_frame_name: str,
+        report_unused: bool = True,
+    ) -> Optional[TimeSeriesDataFrame]:
+        """Convert dynamic features to float dtype and remove unused columns.
+
+        The returned dataframe is guaranteed to only include
+        - the target columns
+        - dynamic features that will be known in the future (at prediction time)
+        """
+        if data is None:
+            return data
+
+        if self.target not in data.columns:
+            raise ValueError(f"Target column `{self.target}` not found in {data_frame_name}.")
+
+        data = data.copy(deep=False)
+        if len(self.known_covariates_names) > 0:
+            missing_columns = list(set(self.known_covariates_names).difference(set(data.columns)))
+            if len(missing_columns) > 0:
+                raise ValueError(
+                    f"Columns {missing_columns} provided as known_covariates_names are missing from {data_frame_name}."
+                )
+            try:
+                data[self.known_covariates_names] = data[self.known_covariates_names].astype(np.float64)
+            except ValueError:
+                raise ValueError(
+                    f"Columns {self.known_covariates_names} must all have numeric (float or int) dtypes, "
+                    f"but in {data_frame_name} they have dtypes {data[self.known_covariates_names].dtypes}"
+                )
+
+        unused_columns = list(set(data.columns).difference(set([self.target] + self.known_covariates_names)))
+        if len(unused_columns) > 0:
+            if report_unused:
+                logger.warning(f"Provided columns {unused_columns} in {data_frame_name} will be ignored.")
+            data = data.drop(unused_columns, axis=1)
+        return data
 
     def predict(
         self,
