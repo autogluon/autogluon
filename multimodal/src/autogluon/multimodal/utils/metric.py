@@ -28,6 +28,10 @@ from ..constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
+    RSUM,
+    NDCG,
+    IMAGE_TEXT_SIMILARITY,
+    TEXT_SIMILARITY,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -98,6 +102,8 @@ def infer_metrics(
                 raise ValueError(
                     f"Problem type: {problem_type}, pipeline: {pipeline}, validation_metric_name: {validation_metric_name} is not supported!"
                 )
+        elif pipeline == IMAGE_TEXT_SIMILARITY or TEXT_SIMILARITY:
+            return RSUM, NDCG
         else:
             raise NotImplementedError(f"Problem type: {problem_type}, pipeline: {pipeline} is not supported yet!")
     else:

@@ -50,6 +50,7 @@ from .constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
+    IMAGE_TEXT_SIMILARITY,
 )
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
@@ -445,6 +446,7 @@ class MultiModalMatcher:
             validation_metric_name, eval_metric_name = infer_metrics(
                 problem_type=problem_type,
                 eval_metric_name=self._eval_metric_name,
+                pipeline=self._pipeline,
             )
         else:
             validation_metric_name = self._validation_metric_name
@@ -627,8 +629,8 @@ class MultiModalMatcher:
             response_columns=self._response,
         )
 
-        query_config = select_model(config=query_config, df_preprocessor=query_df_preprocessor)
-        response_config = select_model(config=response_config, df_preprocessor=response_df_preprocessor)
+        query_config = select_model(config=query_config, df_preprocessor=query_df_preprocessor, strict=False)
+        response_config = select_model(config=response_config, df_preprocessor=response_df_preprocessor, strict=False)
 
         if self._query_model is None or self._response_model is None:
             if presets == "siamese_network":
@@ -676,12 +678,15 @@ class MultiModalMatcher:
             distance_type=config.matcher.distance.type,
         )
 
-        miner_func = get_matcher_miner_func(
-            miner_type=config.matcher.miner.type,
-            pos_margin=config.matcher.miner.pos_margin,
-            neg_margin=config.matcher.miner.neg_margin,
-            distance_type=config.matcher.distance.type,
-        )
+        if self._pipeline == IMAGE_TEXT_SIMILARITY:
+            miner_func = None
+        else:
+            miner_func = get_matcher_miner_func(
+                miner_type=config.matcher.miner.type,
+                pos_margin=config.matcher.miner.pos_margin,
+                neg_margin=config.matcher.miner.neg_margin,
+                distance_type=config.matcher.distance.type,
+            )
 
         self._query_config = query_config
         self._response_config = response_config
@@ -1017,7 +1022,7 @@ class MultiModalMatcher:
                 id_mappings=id_mappings,
             )
             if self._label_column and self._label_column in data.columns:
-                column_types = infer_label_column_type_by_problem_type(
+                column_types = infer_label_column_type_by_problem_type_and_pipeline(
                     column_types=column_types,
                     label_columns=self._label_column,
                     problem_type=self._problem_type,

@@ -12,6 +12,7 @@ from torch import nn, optim
 from torch.nn import functional as F
 from transformers import Adafactor
 from transformers.trainer_pt_utils import get_parameter_names
+import numpy as np
 
 from ..constants import (
     ACC,
@@ -49,9 +50,11 @@ from ..constants import (
     ROC_AUC,
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
+    RSUM,
+    MULTI_NEGATIVES_SOFTMAX_LOSS,
 )
 from ..utils import MeanAveragePrecision
-from .losses import SoftTargetCrossEntropy
+from .losses import SoftTargetCrossEntropy, MultiNegativesSoftmaxLoss
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
@@ -147,6 +150,27 @@ class CustomF1Score(torchmetrics.F1Score):
         return f1_score
 
 
+def compute_rsum(image_features, text_features, logit_scale, top_ks=[1, 5, 10]):
+    # metrics = {}
+    rsum = 0
+    logits_per_image = (logit_scale * image_features @ text_features.t()).detach().cpu()
+    logits_per_text = logits_per_image.t().detach().cpu()
+
+    logits = {"image_to_text": logits_per_image, "text_to_image": logits_per_text}
+    ground_truth = torch.arange(len(text_features)).view(-1, 1)
+
+    for name, logit in logits.items():
+        ranking = torch.argsort(logit, descending=True)
+        preds = torch.where(ranking == ground_truth)[1]
+        preds = preds.detach().cpu().numpy()
+        # metrics[f"{name}_mean_rank"] = preds.mean() + 1
+        # metrics[f"{name}_median_rank"] = np.floor(np.median(preds)) + 1
+        for k in top_ks:
+            rsum += np.mean(preds < k)
+
+    return rsum
+
+
 def get_metric(
     metric_name: str,
     num_classes: Optional[int] = None,
@@ -208,6 +232,8 @@ def get_metric(
             torchmetrics.MeanMetric(nan_strategy="warn"),
             None,
         )  # This only works for detection where custom_metric is not required for BaseAggregator
+    elif metric_name == RSUM:
+        return torchmetrics.MeanMetric(), compute_rsum
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 
@@ -739,16 +765,16 @@ def infer_matcher_loss(data_format: str, problem_type: str):
     """
     if data_format == "pair":
         if problem_type is None:
-            return ["multi_negatives_softmax_loss"]
+            return [MULTI_NEGATIVES_SOFTMAX_LOSS]
         elif problem_type == BINARY:
-            return ["contrastive_loss"]
+            return [CONTRASTIVE_LOSS]
         elif problem_type == REGRESSION:
             return ["cosine_similarity_loss"]
         else:
             raise ValueError(f"Unsupported data format {data_format} with problem type {problem_type}")
     elif data_format == "triplet":
         if problem_type is None:
-            return ["multi_negatives_softmax_loss"]
+            return [MULTI_NEGATIVES_SOFTMAX_LOSS]
         else:
             raise ValueError(f"Unsupported data format {data_format} with problem type {problem_type}")
     else:
@@ -797,6 +823,12 @@ def get_matcher_loss_func(
             pos_margin=pos_margin,
             neg_margin=neg_margin,
             distance=get_metric_learning_distance_func(distance_type),
+        )
+    elif loss_type.lower() == MULTI_NEGATIVES_SOFTMAX_LOSS:
+        return MULTI_NEGATIVES_SOFTMAX_LOSS(
+            local_loss=True,
+            gather_with_grad=True,
+            cache_labels=True,
         )
     else:
         raise ValueError(f"Unknown metric learning loss: {loss_type}")

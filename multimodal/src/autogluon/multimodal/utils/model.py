@@ -52,6 +52,7 @@ logger = logging.getLogger(AUTOMM)
 def select_model(
     config: DictConfig,
     df_preprocessor: MultiModalFeaturePreprocessor,
+    strict: Optional[bool] = True,
 ):
     """
     Filter model config through the detected modalities in the training data.
@@ -78,7 +79,7 @@ def select_model(
     data_status = {}
     for per_modality in ALL_MODALITIES:
         data_status[per_modality] = False
-    if len(df_preprocessor.image_path_names) > 0:
+    if len(df_preprocessor.image_feature_names) > 0:
         data_status[IMAGE] = True
     if len(df_preprocessor.text_feature_names) > 0:
         data_status[TEXT] = True
@@ -101,7 +102,11 @@ def select_model(
         if all(model_data_status):
             selected_model_names.append(model_name)
         else:
-            delattr(config.model, model_name)
+            if any(model_data_status) and not strict:
+                filtered_data_types = [d_type for d_type, d_status in zip(model_config.data_types, model_data_status) if d_status]
+                model_config.data_types = filtered_data_types
+            else:
+                delattr(config.model, model_name)
 
     if len(selected_model_names) == 0:
         raise ValueError("No model is available for this dataset.")

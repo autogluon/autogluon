@@ -156,6 +156,14 @@ def text_similarity():
     }
 
 
+@automm_presets.register()
+def image_text_similarity():
+    return {
+        "model.names": ["clip"],
+        "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
+    }
+
+
 def list_automm_presets(verbose: bool = False):
     """
     List all available presets.
