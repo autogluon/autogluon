@@ -1,21 +1,18 @@
-from collections import defaultdict
 import logging
 import os
 import time
-from typing import Dict, List, Optional, Tuple, Union
+from collections import defaultdict
 from pathlib import Path
 
-from omegaconf import DictConfig, OmegaConf
-from pytorch_lightning.callbacks import BasePredictionWriter
 import torch
-
-from autogluon.common.utils.utils import setup_outputdir
+from pytorch_lightning.callbacks import BasePredictionWriter
 
 from ..constants import AUTOMM
 
 logger = logging.getLogger(AUTOMM)
 
 
+# TODO: doc for this file
 class DDPCacheWriter(BasePredictionWriter):
     def __init__(self, pipeline, write_interval, sleep_time=5):
         super().__init__(write_interval)
