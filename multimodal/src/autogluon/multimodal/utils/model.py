@@ -266,6 +266,7 @@ def create_model(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
             num_classes=num_classes,
+            pretrained=pretrained,
         )
     elif model_name.lower().startswith(MMOCR_TEXT_DET):
         model = MMOCRAutoModelForTextDetection(

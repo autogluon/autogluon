@@ -66,11 +66,7 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         for feature_name in feature_masks[0].keys():
             ret[feature_name] = torch.cat([ele[feature_name] for ele in feature_masks])
     elif ret_type == BBOX:
-        # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
-        if len(outputs[0]["bbox"][0]) == 2:  # additional axis for mask_rcnn
-            return [bbox[0] for ele in outputs for bbox in ele[BBOX]]
-        else:
-            return [bbox for ele in outputs for bbox in ele[BBOX]]
+        return [ele[BBOX] for ele in outputs]
     elif ret_type == TEXT:
         return [ele[TEXT] for ele in outputs]  # single image
     elif ret_type == SCORE:

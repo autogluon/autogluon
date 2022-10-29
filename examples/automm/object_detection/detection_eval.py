@@ -26,7 +26,7 @@ def detection_evaluation(
     num_gpus=1,
 ):
     predictor = MultiModalPredictor(
-        label="rois_label",
+        label="label",
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,

@@ -50,7 +50,7 @@ def detection_train(
     # TODO: remove hardcode for num_classes
 
     predictor = MultiModalPredictor(
-        label="rois_label",
+        label="label",
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
