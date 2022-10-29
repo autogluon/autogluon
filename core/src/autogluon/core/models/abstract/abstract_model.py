@@ -1075,7 +1075,10 @@ class AbstractModel:
         model_cls = self.__class__
         init_params = self.get_params()
         # We set soft time limit to avoid trials being terminated directly by ray tune
-        trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
+        if hpo_executor.time_limit is None:
+            trial_soft_time_limit = None
+        else:
+            trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
 
         fit_kwargs = dict()
         fit_kwargs['feature_metadata'] = self.feature_metadata
