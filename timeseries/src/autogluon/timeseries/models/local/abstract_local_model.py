@@ -40,7 +40,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         if hyperparameters is None:
             hyperparameters = {}
         n_jobs = hyperparameters.get("n_jobs", 0.5)
-        if isinstance(n_jobs, float) and 0 < n_jobs <= 1.0:
+        if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
             self.n_jobs = max(int(cpu_count() * n_jobs), 1)
         elif isinstance(n_jobs, int):
             self.n_jobs = n_jobs
@@ -79,7 +79,9 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         logger.debug(f"{self.name} is a local model, so the model will be fit at prediction time.")
         return self
 
-    def _update_local_model_args(self, data: TimeSeriesDataFrame, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
+    def _update_local_model_args(
+        self, data: TimeSeriesDataFrame, local_model_args: Dict[str, Any], **kwargs
+    ) -> Dict[str, Any]:
         return local_model_args
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:

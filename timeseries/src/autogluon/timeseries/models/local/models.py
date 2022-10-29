@@ -10,7 +10,7 @@ from .abstract_local_model import AbstractLocalModel
 
 
 def seasonal_naive_forecast(
-    time_series: pd.DataFrame, freq: str, prediction_length: int, quantile_levels: List[float], seasonal_period: int
+    time_series: pd.Series, freq: str, prediction_length: int, quantile_levels: List[float], seasonal_period: int
 ):
     forecast_timestamps = get_forecast_horizon_timestamps(
         past_timestamps=time_series.index, freq=freq, prediction_length=prediction_length
@@ -22,7 +22,7 @@ def seasonal_naive_forecast(
     if len(target) > seasonal_period and seasonal_period > 1:
         indices = [len(target) - seasonal_period + k % seasonal_period for k in range(prediction_length)]
         forecast["mean"] = target[indices]
-        residuals = target[:-seasonal_period] - target[seasonal_period:]
+        residuals = target[seasonal_period:] - target[:-seasonal_period]
 
         sigma = np.sqrt(np.mean(np.square(residuals)))
         num_full_seasons = np.arange(1, prediction_length + 1) // seasonal_period
@@ -30,7 +30,7 @@ def seasonal_naive_forecast(
     else:
         # Fall back to naive forecast
         forecast["mean"] = np.full(shape=[prediction_length], fill_value=target[-1])
-        residuals = target[:-1] - target[1:]
+        residuals = target[1:] - target[:-1]
 
         sigma = np.sqrt(np.mean(np.square(residuals)))
         sigma_per_timestep = sigma * np.sqrt(np.arange(1, prediction_length + 1))
