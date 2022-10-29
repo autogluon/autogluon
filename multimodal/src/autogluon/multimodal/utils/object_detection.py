@@ -300,7 +300,6 @@ def _check_load_coco_bbox(
     entry: dict,
     min_object_area: Optional[Union[int, float]] = 0,
     use_crowd: Optional[bool] = False,
-    is_voc: Optional[bool] = False,
 ):
     """
     Check and load ground-truth labels. Modified from gluon cv.
@@ -343,11 +342,9 @@ def _check_load_coco_bbox(
         # require non-zero box area
         if obj["area"] > 0 and xmax > xmin and ymax > ymin:
             # TODO: remove hardcoding here
-            class_label = (
-                coco.loadCats(obj["category_id"])[0]["id"]
-                if is_voc
-                else COCOId2Idx(coco.loadCats(obj["category_id"])[0]["id"])
-            )
+            cat_ids = coco.getCatIds()
+            id_to_idx = dict(zip(cat_ids, range(len(cat_ids))))
+            class_label = id_to_idx[coco.loadCats(obj["category_id"])[0]["id"]]
             rois.append(
                 [
                     float(xmin),
@@ -402,8 +399,6 @@ def from_coco(
         anno_file = os.path.expanduser(anno_file)
     coco = COCO(anno_file)
 
-    is_voc = "voc" in anno_file
-
     if isinstance(root, Path):
         root = str(root.expanduser().resolve())
     elif isinstance(root, str):
@@ -429,7 +424,7 @@ def from_coco(
         if not os.path.exists(abs_path):
             raise IOError("Image: {} not exists.".format(abs_path))
         rois, _ = _check_load_coco_bbox(
-            coco, entry, min_object_area=min_object_area, use_crowd=use_crowd, is_voc=is_voc
+            coco, entry, min_object_area=min_object_area, use_crowd=use_crowd,
         )
         if not rois:
             continue
@@ -491,9 +486,9 @@ def get_image_name_num(path):
 
 
 class COCODataset:
+    # refactor data loading into here
     def __init__(self, anno_file):
         self.anno_file = anno_file
-        self.is_voc = "voc" in anno_file
 
         with open(anno_file, "r") as f:
             d = json.load(f)
