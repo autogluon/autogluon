@@ -170,6 +170,7 @@ class MultiModalPredictor:
         num_classes: Optional[int] = None,  # TODO: can we infer this from data?
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
+        init_scratch: Optional[bool] = False,
     ):
         """
         Parameters
@@ -224,6 +225,9 @@ class MultiModalPredictor:
         enable_progress_bar
             Whether to show progress bar. It will be True by default and will also be
             disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
+        init_scratch
+            Whether to init model from scratch. It's useful when we want to load a checkpoints
+            without its weights.
         """
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
@@ -266,6 +270,7 @@ class MultiModalPredictor:
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
+        self._init_scratch = init_scratch
 
         if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
             warnings.warn(
@@ -281,7 +286,10 @@ class MultiModalPredictor:
 
         if self._pipeline is not None:
             self._config, self._model, self._data_processors = init_pretrained(
-                pipeline=self._pipeline, hyperparameters=hyperparameters, num_classes=self._output_shape
+                pipeline=self._pipeline,
+                hyperparameters=hyperparameters,
+                num_classes=self._output_shape,
+                init_scratch=self._init_scratch,
             )
 
     @property
