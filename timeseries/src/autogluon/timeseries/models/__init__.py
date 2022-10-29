@@ -9,6 +9,7 @@ from .gluonts import (
     TemporalFusionTransformerMXNetModel,
     TransformerMXNetModel,
 )
+from .local import NaiveModel, SeasonalNaiveModel
 from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel, SktimeTBATSModel, SktimeThetaModel
 from .statsmodels import ARIMAModel, ETSModel, ThetaModel
 
@@ -30,4 +31,6 @@ __all__ = [
     "ETSModel",
     "ThetaModel",
     "AutoGluonTabularModel",
+    "NaiveModel",
+    "SeasonalNaiveModel",
 ]
