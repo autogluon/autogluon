@@ -65,6 +65,18 @@ class TimeSeriesPredictor:
         - ``"RMSE"``: root mean squared error
 
         For more information about these metrics, see https://docs.aws.amazon.com/forecast/latest/dg/metrics.html.
+    known_covariates_names: List[str], optional
+        Names of the covariates that are known in advance for all time steps in the forecast horizon. These are also
+        known as dynamic features, exogenous variables, additional regressors or related time series. Examples of such
+        covariates include holidays, promotions or weather forecasts.
+
+        Currently, only numeric (float of integer dtype) are supported.
+
+        If ``known_covariates_names`` are provided, then:
+
+        - :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will expect that ``train_data`` contains the columns listed in ``known_covariates_names``.
+        - :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict` will expect an additional keyword argument ``known_covariates`` containing the future values of the known covariates in ``TimeSeriesDataFrame`` format.
+
     quantile_levels : List[float], optional
         List of increasing decimals that specifies which quantiles should be estimated when making distributional
         forecasts. Defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
@@ -224,6 +236,11 @@ class TimeSeriesPredictor:
         train_data : TimeSeriesDataFrame
             Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
 
+            If ``known_covariates_names`` were specified when creating the predictor, ``train_data`` must include the
+            columns listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+            The known covariates must have a numeric (float or integer) dtype. Columns of ``train_data`` except
+            ``target`` and those listed in ``known_covariates_names`` will be ignored.
+
             If ``train_data`` has static features (i.e., ``train_data.static_features`` is a pandas DataFrame), the
             predictor will interpret columns with ``int`` and ``float`` dtypes as continuous (real-valued) features,
             columns with ``object`` and ``str`` dtypes as categorical features, and will ignore the rest of columns.
@@ -245,6 +262,10 @@ class TimeSeriesPredictor:
             ``validation_splitter``. If ``tuning_data`` is provided, ``validation_splitter`` will be ignored.
             See the description of ``validation_splitter`` in the docstring for
             :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
+
+            If ``known_covariates_names`` were specified when creating the predictor, ``tuning_data`` must also include
+            the columns listed in ``known_covariates_names`` with the covariates values aligned with the target time
+            series.
 
             If ``train_data`` has static features, ``tuning_data`` must have also have static features with the same
             column names and dtypes.
@@ -428,8 +449,21 @@ class TimeSeriesPredictor:
         data : TimeSeriesDataFrame
             Time series data to forecast with.
 
+            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
+            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+
             If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
             static features that have the same columns and dtypes.
+        known_covariates : TimeSeriesDataFrame, optional
+            If ``known_covariates_names`` were specified when creating the predictor, it is necessary to provide the
+            values of the known covariates for each time series during the forecast horizon. That is:
+
+            - The columns must include all columns listed in ``known_covariates_names``
+            - The ``item_id`` index must include all item ids present in ``data``
+            - The ``timestamp`` index must include the values for ``prediction_length`` many time steps into the future from the end of each time series in ``data``
+
+            Example::
+            TODO
         model : str, optional
             Name of the model that you would like to use for prediction. By default, the best model during training
             (with highest validation score) will be used.
@@ -443,7 +477,7 @@ class TimeSeriesPredictor:
                 category=DeprecationWarning,
             )
         data = self._check_and_prepare_data_frame(data)
-        known_covariates = self._check_and_prepare_data_frame(known_covariates)
+        # TODO: What happens if `ignore_index=True`?
         return self._learner.predict(data, known_covariates=known_covariates, model=model, **kwargs)
 
     def evaluate(self, data: TimeSeriesDataFrame, **kwargs):
