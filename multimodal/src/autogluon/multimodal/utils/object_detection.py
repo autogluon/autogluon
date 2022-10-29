@@ -424,7 +424,10 @@ def from_coco(
         if not os.path.exists(abs_path):
             raise IOError("Image: {} not exists.".format(abs_path))
         rois, _ = _check_load_coco_bbox(
-            coco, entry, min_object_area=min_object_area, use_crowd=use_crowd,
+            coco,
+            entry,
+            min_object_area=min_object_area,
+            use_crowd=use_crowd,
         )
         if not rois:
             continue
