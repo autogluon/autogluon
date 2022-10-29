@@ -79,9 +79,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         logger.debug(f"{self.name} is a local model, so the model will be fit at prediction time.")
         return self
 
-    def _update_local_model_args(
-        self, data: TimeSeriesDataFrame, local_model_args: Dict[str, Any], **kwargs
-    ) -> Dict[str, Any]:
+    def _update_local_model_args(self, local_model_args: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         return local_model_args
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
