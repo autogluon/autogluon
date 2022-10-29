@@ -1,7 +1,7 @@
 import logging
 import re
 from multiprocessing import cpu_count
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from joblib import Parallel, delayed

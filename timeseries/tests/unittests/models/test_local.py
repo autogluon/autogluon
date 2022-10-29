@@ -139,7 +139,6 @@ def test_when_invalid_model_arguments_provided_then_model_ignores_them(model_cla
     )
     with caplog.at_level(logging.WARNING):
         model.fit(train_data=DUMMY_TS_DATAFRAME)
-        assert "ignores following hyperparameters: ['bad_argument']" in caplog.text
         assert "bad_argument" not in model._local_model_args
 
 
