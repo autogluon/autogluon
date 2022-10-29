@@ -51,6 +51,7 @@ COLUMN_FEATURES = "column_features"
 BBOX = "bbox"
 ROIS = "rois"
 SCORE = "score"
+LOGIT_SCALE = "logit_scale"
 
 # Metric
 MAP = "map"

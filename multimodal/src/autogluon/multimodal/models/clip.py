@@ -16,6 +16,7 @@ from ..constants import (
     MASKS,
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
+    LOGIT_SCALE,
 )
 from .utils import assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
 
@@ -192,6 +193,8 @@ class CLIPForImageText(nn.Module):
                 logits = torch.sum(image_features * text_features, dim=-1)
 
             ret[LOGITS] = logits
+
+        ret[LOGIT_SCALE] = self.model.logit_scale.exp()
 
         return {self.prefix: ret}
 
