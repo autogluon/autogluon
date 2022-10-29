@@ -37,19 +37,19 @@ class SimpleGluonTSDataset(GluonTSDataset):
 
     def __init__(
         self,
-        time_series_df: TimeSeriesDataFrame,
-        target_field_name: str = "target",
+        target_df: TimeSeriesDataFrame,
         feat_static_cat: Optional[pd.DataFrame] = None,
         feat_static_real: Optional[pd.DataFrame] = None,
+        feat_dynamic_real: Optional[TimeSeriesDataFrame] = None,
         float_dtype: Type = np.float64,
         int_dtype: Type = np.int64,
     ):
-        assert time_series_df is not None
-        assert time_series_df.freq, "Initializing GluonTS data sets without freq is not allowed"
-        self.time_series_df = time_series_df
-        self.target_field_name = target_field_name
+        assert target_df is not None
+        assert target_df.freq, "Initializing GluonTS data sets without freq is not allowed"
+        self.target_df = target_df
         self.feat_static_cat = feat_static_cat
         self.feat_static_real = feat_static_real
+        self.feat_dynamic_real = feat_dynamic_real
 
         self.int_dtype = int_dtype
         self.float_dtype = float_dtype
@@ -60,7 +60,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         # for feature generation. If the frequency string doesn't match or is not provided, it raises an exception.
         # Here we bypass this by issuing a default "yearly" frequency, tricking it into not producing
         # any lags or features.
-        freq_ = self.time_series_df.freq
+        freq_ = self.target_df.freq
         pd_offset = to_offset(freq_)
 
         # normalize freq str to handle peculiarities such as W-SUN
@@ -69,14 +69,14 @@ class SimpleGluonTSDataset(GluonTSDataset):
         return "A" if offset_base_alias is None or offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS else freq_
 
     def __len__(self):
-        return len(self.time_series_df.item_ids)  # noqa
+        return len(self.target_df.item_ids)  # noqa
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
-        for item_id in self.time_series_df.item_ids:  # noqa
-            df = self.time_series_df.loc[item_id]
+        for item_id in self.target_df.item_ids:  # noqa
+            df = self.target_df.loc[item_id]
             time_series = {
                 FieldName.ITEM_ID: item_id,
-                FieldName.TARGET: df[self.target_field_name].to_numpy(dtype=self.float_dtype),
+                FieldName.TARGET: df.squeeze().to_numpy(dtype=self.float_dtype),
                 FieldName.START: pd.Period(df.index[0], freq=self.freq),
             }
             if self.feat_static_cat is not None:
@@ -86,6 +86,10 @@ class SimpleGluonTSDataset(GluonTSDataset):
             if self.feat_static_real is not None:
                 time_series[FieldName.FEAT_STATIC_REAL] = self.feat_static_real.loc[item_id].to_numpy(
                     dtype=self.float_dtype
+                )
+            if self.feat_dynamic_real is not None:
+                time_series[FieldName.FEAT_DYNAMIC_REAL] = (
+                    self.feat_dynamic_real.loc[item_id].to_numpy(dtype=self.float_dtype).T
                 )
 
             yield time_series
@@ -186,13 +190,18 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                     "during initialization. Please provide a `freq` string to `fit`."
                 )
 
-            disable_static_features = self._get_model_params().get("disable_static_features", False)
+            model_params = self._get_model_params()
+            disable_static_features = model_params.get("disable_static_features", False)
+            disable_dynamic_features = model_params.get("disable_dynamic_features", False)
             if not disable_static_features:
                 feat_static_cat, feat_static_real = get_categorical_and_continuous_features(ds.static_features)
                 self.use_feat_static_cat = feat_static_cat is not None
                 self.use_feat_static_real = feat_static_real is not None
                 if self.use_feat_static_cat:
                     self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
+            if not disable_dynamic_features:
+                feat_dynamic_real = ds.drop(self.target, axis=1)
+                self.use_feat_dynamic_real = len(feat_dynamic_real.columns) > 0
 
         if "callbacks" in kwargs:
             self.callbacks += kwargs["callbacks"]
@@ -227,11 +236,12 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 feat_static_cat = None
             if not self.use_feat_static_real:
                 feat_static_real = None
+            feat_dynamic_real = time_series_df.drop(self.target, axis=1) if self.use_feat_dynamic_real else None
             return SimpleGluonTSDataset(
-                time_series_df,
-                target_field_name=self.target,
+                target_df=time_series_df[[self.target]],
                 feat_static_cat=feat_static_cat,
                 feat_static_real=feat_static_real,
+                feat_dynamic_real=feat_dynamic_real,
                 float_dtype=self.float_dtype,
                 int_dtype=self.int_dtype,
             )

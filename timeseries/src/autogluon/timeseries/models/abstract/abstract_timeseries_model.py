@@ -226,7 +226,10 @@ class AbstractTimeSeriesModel(AbstractModel):
             raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
 
     def predict(
-        self, data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]], **kwargs
+        self,
+        data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]],
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        **kwargs,
     ) -> TimeSeriesDataFrame:
         """Given a dataset, predict the next `self.prediction_length` time steps.
         This method produces predictions for the forecast horizon *after* the individual time series.
@@ -240,6 +243,8 @@ class AbstractTimeSeriesModel(AbstractModel):
         data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]]
             The dataset where each time series is the "context" for predictions. For ensemble models that depend on
             the predictions of other models, this method may accept a dictionary of previous models' predictions.
+        known_covariates : Optional[TimeSeriesDataFrame]
+            A TimeSeriesDataFrame containing the values of the known covariates during the forecast horizon.
 
         Other Parameters
         ----------------

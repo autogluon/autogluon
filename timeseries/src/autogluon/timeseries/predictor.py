@@ -417,6 +417,7 @@ class TimeSeriesPredictor:
     def predict(
         self,
         data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[str] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
@@ -442,7 +443,8 @@ class TimeSeriesPredictor:
                 category=DeprecationWarning,
             )
         data = self._check_and_prepare_data_frame(data)
-        return self._learner.predict(data, model=model, **kwargs)
+        known_covariates = self._check_and_prepare_data_frame(known_covariates)
+        return self._learner.predict(data, known_covariates=known_covariates, model=model, **kwargs)
 
     def evaluate(self, data: TimeSeriesDataFrame, **kwargs):
         """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``

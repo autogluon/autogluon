@@ -5,14 +5,13 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 import numpy as np
 import pandas as pd
 
-from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.core.learner import AbstractLearner
 from autogluon.timeseries.utils.features import (
     ContinuousAndCategoricalFeatureGenerator,
     convert_numerical_features_to_float,
 )
 
-from .dataset import TimeSeriesDataFrame
+from .dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID, TIMESTAMP
 from .evaluator import TimeSeriesEvaluator
 from .models.abstract import AbstractTimeSeriesModel
 from .splitter import AbstractTimeSeriesSplitter, LastWindowSplitter
@@ -236,6 +235,7 @@ class TimeSeriesLearner(AbstractLearner):
         self,
         data: Optional[TimeSeriesDataFrame],
         data_frame_name: str,
+        check_target: bool = True,
         report_unused: bool = True,
     ) -> Optional[TimeSeriesDataFrame]:
         """Convert dynamic features to float dtype and remove unused columns.
@@ -247,7 +247,7 @@ class TimeSeriesLearner(AbstractLearner):
         if data is None:
             return data
 
-        if self.target not in data.columns:
+        if check_target and self.target not in data.columns:
             raise ValueError(f"Target column `{self.target}` not found in {data_frame_name}.")
 
         data = data.copy(deep=False)
@@ -272,9 +272,41 @@ class TimeSeriesLearner(AbstractLearner):
             data = data.drop(unused_columns, axis=1)
         return data
 
+    def _filter_known_covariates(
+        self,
+        known_covariates: Optional[TimeSeriesDataFrame],
+        data: TimeSeriesDataFrame,
+    ) -> Optional[TimeSeriesDataFrame]:
+        if len(self.known_covariates_names) > 0 and known_covariates is None:
+            raise ValueError(
+                f"known_covariates {self.known_covariates_names} for the forecast horizon should be provided at prediction time."
+            )
+        missing_item_ids = data.item_ids.difference(known_covariates.item_ids)
+        if len(missing_item_ids) > 0:
+            raise ValueError(
+                f"known_covariates are missing information for the following item_ids: {missing_item_ids.to_list()}."
+            )
+
+        offset = pd.tseries.frequencies.to_offset(data.freq)
+
+        def get_forecast_index_for_item(time_series: TimeSeriesDataFrame) -> pd.Series:
+            start = time_series.index.get_level_values(TIMESTAMP)[-1] + offset
+            return pd.date_range(start=start, freq=offset, periods=self.prediction_length, name=TIMESTAMP).to_series()
+
+        forecast_index = data.groupby(ITEMID, sort=False).apply(get_forecast_index_for_item).index
+        try:
+            known_covariates = known_covariates.loc[forecast_index]
+        except KeyError:
+            raise ValueError(
+                f"known_covariates should include the values for prediction_length={self.prediction_length} "
+                "many time steps into the future."
+            )
+        return known_covariates
+
     def predict(
         self,
         data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
@@ -286,7 +318,12 @@ class TimeSeriesLearner(AbstractLearner):
             self._check_static_feature_compatibility(data.static_features, fix_message=fix_message, other_name="data")
             data.static_features = self.static_feature_pipeline.transform(data.static_features)
             data.static_features = convert_numerical_features_to_float(data.static_features)
-        prediction = self.load_trainer().predict(data=data, model=model, **kwargs)
+        data = self._preprocess_time_series_dataframe(data, data_frame_name="data")
+        known_covariates = self._preprocess_time_series_dataframe(
+            known_covariates, data_frame_name="known_covariates", check_target=False
+        )
+        known_covariates = self._filter_known_covariates(known_covariates=known_covariates, data=data)
+        prediction = self.load_trainer().predict(data=data, known_covariates=known_covariates, model=model, **kwargs)
         if prediction is None:
             raise RuntimeError("Prediction failed, please provide a different model to the `predict` method.")
         return prediction
