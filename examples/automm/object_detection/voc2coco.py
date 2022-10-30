@@ -129,7 +129,7 @@ def main():
     parser.add_argument("--train_ratio", type=float, default=0.6, help="training set ratio")
     parser.add_argument("--val_ratio", type=float, default=0.2, help="validation set ratio")
     parser.add_argument(
-        "--not_extract_num_from_imgid", action="store_false", help="Extract image number from the image filename"
+        "--not_extract_num_from_imgid", action="store_true", help="Extract image number from the image filename"
     )
     args = parser.parse_args()
 
