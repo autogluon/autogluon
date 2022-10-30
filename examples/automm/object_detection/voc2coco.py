@@ -46,7 +46,7 @@ def get_annpaths(
     N = len(ann_paths)
     num_train = int(N * train_ratio)
     num_val = int(N * val_ratio)
-    return {"train": ann_paths[:num_train], "val": ann_paths[num_train:num_val], "test": ann_paths[num_val:]}
+    return {"train": ann_paths[:num_train], "val": ann_paths[num_train:num_train+num_val], "test": ann_paths[num_train+num_val:]}
 
 
 def get_image_info(annotation_root, extract_num_from_imgid=True):
