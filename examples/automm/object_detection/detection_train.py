@@ -57,7 +57,7 @@ def detection_train(
             "env.strategy": "ddp",
         },
         pipeline="object_detection",
-        output_shape=num_classes,
+        num_classes=num_classes,
         val_metric=val_metric,
     )
 
