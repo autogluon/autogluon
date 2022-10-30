@@ -4,9 +4,16 @@ Reference: https://github.com/yukkyo/voc2coco/blob/master/voc2coco.py
 With changes:
 1. id stored as int by default
 2. provide only root_dir, and corresponding simplification
-3. do all the bash script works
-4. split train/val/test
-5. Use defusedxml.ElementTree for security issue
+3. split train/val/test
+4. Use defusedxml.ElementTree for security issue
+
+To use:
+1. run in root_dir:
+    grep -ERoh '<name>(.*)</name>' ./Annotations | sort | uniq | sed 's/<name>//g' | sed 's/<\/name>//g' > labels.txt
+2. run in root_dir:
+    ls Annotations/* > pathlist.txt
+3. run here:
+    python3 voc2coco.py --root_dir <root_dir> --train_ratio <train_ratio> --val_ratio <val_ratio>
 """
 
 import argparse
@@ -85,14 +92,14 @@ def get_coco_annotation_from_obj(obj, label2id):
 
 
 def convert_xmls_to_cocojson(
-    annotation_paths: List[str], label2id: Dict[str, int], output_jsonpath: str, extract_num_from_imgid: bool = True
+    annotation_paths: List[str], label2id: Dict[str, int], output_jsonpath: str, extract_num_from_imgid: bool = True, root_dir: str = "./",
 ):
     output_json_dict = {"images": [], "type": "instances", "annotations": [], "categories": []}
     bnd_id = 1  # START_BOUNDING_BOX_ID, TODO input as args ?
     print("Start converting !")
     for a_path in tqdm(annotation_paths):
         # Read annotation xml
-        ann_tree = ET.parse(a_path)
+        ann_tree = ET.parse(os.path.join(root_dir, a_path))
         ann_root = ann_tree.getroot()
 
         img_info = get_image_info(annotation_root=ann_root, extract_num_from_imgid=extract_num_from_imgid)
@@ -114,23 +121,6 @@ def convert_xmls_to_cocojson(
         f.write(output_json)
 
 
-def run_bash(command):
-    process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
-    output, error = process.communicate()
-
-
-def run_bash_commands(root_dir):
-    anno_path = os.path.join(root_dir, "Annotations")
-    labels_path = os.path.join(root_dir, "labels.txt")
-    pathlist_path = os.path.join(root_dir, "path_list.txt")
-
-    get_label_script = f"grep -ERoh '<name>(.*)</name>' {anno_path} | sort | uniq | sed 's/<name>//g > ' | sed 's/<\/name>//g' > {labels_path}"
-    run_bash(get_label_script)
-
-    get_pathlist_script = f"ls {anno_path}/* > {pathlist_path}"
-    run_bash(get_pathlist_script)
-
-
 def main():
     parser = argparse.ArgumentParser(description="This script support converting voc format xmls to coco format json")
     parser.add_argument("--root_dir", type=str, default=None, help="path to VOC format dataset root")
@@ -147,11 +137,9 @@ def main():
     assert args.val_ratio >= 0
     assert args.train_ratio + args.val_ratio <= 1
 
-    annpaths_list_path = os.path.join(args.root_dir, "path_list.txt")
+    annpaths_list_path = os.path.join(args.root_dir, "pathlist.txt")
     labels_path = os.path.join(args.root_dir, "labels.txt")
-    output_path_fmt = os.path.join(args.root_dir, "Annotations", "coco_%s.py")
-
-    run_bash_commands(root_dir=args.root_dir)
+    output_path_fmt = os.path.join(args.root_dir, "Annotations", "coco_%s.json")
 
     label2id = get_label2id(labels_path=labels_path)
     ann_paths = get_annpaths(
@@ -165,6 +153,7 @@ def main():
             label2id=label2id,
             output_jsonpath=output_path_fmt % mode,
             extract_num_from_imgid=(not args.not_extract_num_from_imgid),
+            root_dir=args.root_dir,
         )
 
 
