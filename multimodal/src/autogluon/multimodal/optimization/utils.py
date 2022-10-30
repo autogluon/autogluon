@@ -62,7 +62,7 @@ from ..constants import (
     ROC_AUC,
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
-    RSUM,
+    HIT_RATE,
     MULTI_NEGATIVES_SOFTMAX_LOSS,
 )
 from ..utils import MeanAveragePrecision
@@ -162,9 +162,33 @@ class CustomF1Score(torchmetrics.F1Score):
         return f1_score
 
 
-def compute_rsum(image_features, text_features, logit_scale, top_ks=[1, 5, 10]):
+class CustomHitRate(torchmetrics.Metric):
+    def __init__(self):
+        super.__init__()
+        self.add_state("query_embeddings", default=[], dist_reduce_fx=None)
+        self.add_state("response_embeddings", default=[], dist_reduce_fx=None)
+        self.add_state("logit_scale", default=[], dist_reduce_fx=None)
+
+    def update(self, batch_query_embeds: torch.Tensor, batch_response_embeds: torch.Tensor, batch_logit_scale: Optional[torch.Tensor] = None):
+        self.query_embeddings.append(batch_query_embeds)
+        self.response_embeddings.append(batch_response_embeds)
+        if batch_logit_scale is not None:
+            self.logit_scale.append(batch_logit_scale)
+
+    def compute(self):
+        query_embeddings = torch.cat(self.query_embeddings)
+        response_embeddings = torch.cat(self.response_embeddings)
+        if self.logit_scale:
+            logit_scale = torch.mean(self.logit_scale)
+        else:
+            logit_scale = 1
+
+        return compute_hit_rate(query_embeddings, response_embeddings, logit_scale)
+
+
+def compute_hit_rate(image_features, text_features, logit_scale, top_ks=[1, 5, 10]):
     # metrics = {}
-    rsum = 0
+    hit_rate = 0
     logits_per_image = (logit_scale * image_features @ text_features.t()).detach().cpu()
     logits_per_text = logits_per_image.t().detach().cpu()
 
@@ -178,9 +202,9 @@ def compute_rsum(image_features, text_features, logit_scale, top_ks=[1, 5, 10]):
         # metrics[f"{name}_mean_rank"] = preds.mean() + 1
         # metrics[f"{name}_median_rank"] = np.floor(np.median(preds)) + 1
         for k in top_ks:
-            rsum += np.mean(preds < k)
+            hit_rate += np.mean(preds < k)
 
-    return rsum
+    return hit_rate
 
 
 def get_metric(
@@ -244,8 +268,8 @@ def get_metric(
             torchmetrics.MeanMetric(nan_strategy="warn"),
             None,
         )  # This only works for detection where custom_metric is not required for BaseAggregator
-    elif metric_name == RSUM:
-        return torchmetrics.MeanMetric(), compute_rsum
+    elif metric_name == HIT_RATE:
+        return None, compute_rsum
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 

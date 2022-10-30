@@ -74,7 +74,7 @@ CROSS_ENTROPY = "cross_entropy"
 COSINE_EMBEDDING_LOSS = "cosine_embedding_loss"
 F1 = "f1"
 DIRECT_LOSS = "direct_loss"
-RSUM = "rsum"
+HIT_RATE = "hit_rate"
 NDCG = "ndcg"
 METRIC_MODE_MAP = {
     ACC: MAX,

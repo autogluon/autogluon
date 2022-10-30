@@ -18,6 +18,7 @@ from .utils import (
     generate_metric_learning_labels,
     get_lr_scheduler,
     get_optimizer,
+    CustomHitRate,
 )
 from .losses import MultiNegativesSoftmaxLoss
 
@@ -198,11 +199,14 @@ class MatcherLitModule(pl.LightningModule):
         label: torch.Tensor,
         query_embeddings: torch.Tensor,
         response_embeddings: torch.Tensor,
+        logit_scale: Optional[torch.Tensor] = None,
         reverse_prob: Optional[bool] = False,
     ):
 
         if isinstance(metric, BaseAggregator):
             metric.update(custom_metric_func(query_embeddings, response_embeddings, label))
+        elif isinstance(metric, CustomHitRate):
+            metric.update(query_embeddings, response_embeddings, logit_scale)
         else:
             metric.update(
                 compute_probability(
@@ -229,13 +233,15 @@ class MatcherLitModule(pl.LightningModule):
         response_outputs = self.response_model(batch)[self.response_model.prefix]
         response_embeddings = response_outputs[FEATURES]
 
+        logit_scale = response_outputs[LOGIT_SCALE] if LOGIT_SCALE in response_outputs else None,
+
         loss = self._compute_loss(
             query_embeddings=query_embeddings,
             response_embeddings=response_embeddings,
             label=self._get_label(batch),
-            logit_scale=response_outputs[LOGIT_SCALE] if LOGIT_SCALE in response_outputs else None,
+            logit_scale=logit_scale,
         )
-        return query_embeddings, response_embeddings, loss
+        return query_embeddings, response_embeddings, logit_scale, loss
 
     def training_step(self, batch, batch_idx):
         """
@@ -256,7 +262,7 @@ class MatcherLitModule(pl.LightningModule):
         -------
         Average loss of the mini-batch data.
         """
-        _, _, loss = self._shared_step(batch)
+        _, _, _, loss = self._shared_step(batch)
         self.log("train_loss", loss)
         return loss
 
@@ -276,7 +282,7 @@ class MatcherLitModule(pl.LightningModule):
         batch_idx
             Index of mini-batch.
         """
-        query_embeddings, response_embeddings, loss = self._shared_step(batch)
+        query_embeddings, response_embeddings, logit_scale, loss = self._shared_step(batch)
         # By default, on_step=False and on_epoch=True
         self.log("val_loss", loss)
 
@@ -286,6 +292,7 @@ class MatcherLitModule(pl.LightningModule):
             query_embeddings=query_embeddings,
             response_embeddings=response_embeddings,
             label=self._get_label(batch),
+            logit_scale=logit_scale,
             reverse_prob=self.reverse_prob,
         )
 

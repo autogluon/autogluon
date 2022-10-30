@@ -28,7 +28,7 @@ from ..constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    RSUM,
+    HIT_RATE,
     NDCG,
     IMAGE_TEXT_SIMILARITY,
     TEXT_SIMILARITY,
@@ -103,7 +103,7 @@ def infer_metrics(
                     f"Problem type: {problem_type}, pipeline: {pipeline}, validation_metric_name: {validation_metric_name} is not supported!"
                 )
         elif pipeline == IMAGE_TEXT_SIMILARITY or TEXT_SIMILARITY:
-            return RSUM, NDCG
+            return HIT_RATE, NDCG
         else:
             raise NotImplementedError(f"Problem type: {problem_type}, pipeline: {pipeline} is not supported yet!")
     else:
