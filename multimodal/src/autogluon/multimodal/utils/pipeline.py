@@ -15,6 +15,7 @@ def init_pretrained(
     pipeline: Optional[str],
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
     num_classes: Optional[int] = None,
+    classes: Optional[list] = None,
     init_scratch: Optional[bool] = False,
 ):
     """
@@ -35,12 +36,16 @@ def init_pretrained(
         The model with pre-trained weights.
     data_processors
         The data processors associated with the pre-trained model.
+    num_classes
+        The number of classes.
+    classes
+        All classes in this dataset.
     """
     config = get_config(presets=pipeline, overrides=hyperparameters)
     assert (
         len(config.model.names) == 1
     ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
-    model = create_fusion_model(config=config, pretrained=(not init_scratch), num_classes=num_classes)
+    model = create_fusion_model(config=config, pretrained=(not init_scratch), num_classes=num_classes, classes=classes)
 
     data_processors = create_fusion_data_processors(
         config=config,

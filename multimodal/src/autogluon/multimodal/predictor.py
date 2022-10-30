@@ -168,6 +168,7 @@ class MultiModalPredictor:
         path: Optional[str] = None,
         verbosity: Optional[int] = 3,
         num_classes: Optional[int] = None,  # TODO: can we infer this from data?
+        classes: Optional[list] = None,
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
@@ -220,6 +221,8 @@ class MultiModalPredictor:
             Number of classes. Used in classification task.
             If this is specified and is different from the pretrained model's output,
             the model's head will be changed to have <num_classes> output.
+        classes
+            All classes in this dataset.
         warn_if_exist
             Whether to raise warning if the specified path already exists.
         enable_progress_bar
@@ -256,6 +259,7 @@ class MultiModalPredictor:
         self._eval_metric_name = eval_metric
         self._validation_metric_name = val_metric
         self._output_shape = num_classes
+        self._classes = classes
         self._save_path = path
         self._ckpt_path = None
         self._pretrained_path = None
@@ -289,6 +293,7 @@ class MultiModalPredictor:
                 pipeline=self._pipeline,
                 hyperparameters=hyperparameters,
                 num_classes=self._output_shape,
+                classes=self._classes,
                 init_scratch=self._init_scratch,
             )
 
@@ -695,6 +700,7 @@ class MultiModalPredictor:
             model = create_fusion_model(
                 config=predictor._config,
                 num_classes=predictor._output_shape,
+                classes=predictor._classes,
                 num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
                 num_categories=predictor._df_preprocessor.categorical_num_categories,
                 pretrained=False,  # set "pretrain=False" to prevent downloading online models
@@ -912,6 +918,7 @@ class MultiModalPredictor:
             model = create_fusion_model(
                 config=config,
                 num_classes=self._output_shape,
+                classes=self._classes,
                 num_numerical_columns=len(df_preprocessor.numerical_feature_names),
                 num_categories=df_preprocessor.categorical_num_categories,
             )
@@ -2232,6 +2239,7 @@ class MultiModalPredictor:
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
+                    "classes": self._classes,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
                     "version": ag_version.__version__,
@@ -2423,6 +2431,7 @@ class MultiModalPredictor:
         predictor._pretrain_path = path
         predictor._config = config
         predictor._output_shape = assets["output_shape"]
+        predictor._classes = assets["classes"]
         predictor._column_types = assets["column_types"]
         predictor._validation_metric_name = assets["validation_metric_name"]
         predictor._df_preprocessor = df_preprocessor
@@ -2468,6 +2477,7 @@ class MultiModalPredictor:
         model = create_fusion_model(
             config=predictor._config,
             num_classes=predictor._output_shape,
+            classes=predictor._classes,
             num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
             num_categories=predictor._df_preprocessor.categorical_num_categories,
             pretrained=False

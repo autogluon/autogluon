@@ -35,6 +35,7 @@ from autogluon.multimodal import MultiModalPredictor
 
 def detection_train(
     train_path,
+    val_path=None,
     test_path=None,
     checkpoint_name="faster_rcnn_r50_fpn_2x_coco",
     num_classes=80,
@@ -58,6 +59,14 @@ def detection_train(
         },
         pipeline="object_detection",
         num_classes=num_classes,
+        classes=[
+            "bicycle",
+            "bird",
+            "car",
+            "cat",
+            "dog",
+            "person",
+        ],
         val_metric=val_metric,
     )
 
@@ -66,9 +75,11 @@ def detection_train(
     start = time.time()
     predictor.fit(
         train_path,
+        tuning_data=val_path,
         hyperparameters={
             "optimization.learning_rate": lr,
             "optimization.weight_decay": wd,
+            "optimization.lr_choice": "two_stages",
             "optimization.max_epochs": epochs,
             "optimization.top_k": 1,
             "optimization.top_k_average_method": "best",
@@ -90,6 +101,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--train_path", default="/media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_trainval.json", type=str
     )
+    parser.add_argument("--val_path", default=None, type=str)
     parser.add_argument("--test_path", default="/media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_test.json", type=str)
     parser.add_argument("--checkpoint_name", default="yolov3_mobilenetv2_320_300e_coco", type=str)
     parser.add_argument("--num_classes", default=20, type=int)
@@ -103,6 +115,7 @@ if __name__ == "__main__":
 
     detection_train(
         train_path=args.train_path,
+        val_path=args.val_path,
         test_path=args.test_path,
         checkpoint_name=args.checkpoint_name,
         num_classes=args.num_classes,
