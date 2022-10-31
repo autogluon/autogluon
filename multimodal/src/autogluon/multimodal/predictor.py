@@ -276,7 +276,7 @@ class MultiModalPredictor:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
         self._init_scratch = init_scratch
-        self._fit_called = False # While using ddp, after fit called, we can only use single gpu.
+        self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
 
         if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
             warnings.warn(
@@ -1653,7 +1653,10 @@ class MultiModalPredictor:
         # TODO: refactor this into evaluate()
         if isinstance(anno_file_or_df, str):
             anno_file = anno_file_or_df
-            data = from_coco_or_voc(anno_file, "test") # TODO: remove default test hardcoding for VOC
+            data = from_coco_or_voc(
+                anno_file, "test"
+            )  # TODO: maybe remove default splits hardcoding (only used in VOC)
+            eval_tool = "torchmetrics"  # we can only use torchmetrics for VOC format evaluation.
         else:
             # during validation, it will call evaluate with df as input
             anno_file = self.detection_anno_train

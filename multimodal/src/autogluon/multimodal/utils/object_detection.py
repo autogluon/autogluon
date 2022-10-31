@@ -562,6 +562,7 @@ def cocoeval_torchmetrics(outputs):
     import torch
 
     from . import MeanAveragePrecision
+
     map_metric = MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False)
 
     preds = []
@@ -640,4 +641,3 @@ def from_coco_or_voc(file_path, splits: Optional[str] = None):
         return from_voc(root=file_path, splits=splits)
     else:
         return from_coco(file_path)
-

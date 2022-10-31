@@ -54,9 +54,11 @@ def detection_train(
     # TODO: move this code to predictor
     classes = None
     eval_tool = None
+    VOC_format = False
     if os.path.isdir(train_path):
         classes = get_voc_classes(train_path)
         eval_tool = "torchmetrics"
+        VOC_format = True
 
     predictor = MultiModalPredictor(
         label="label",
@@ -85,9 +87,10 @@ def detection_train(
     fit_end = time.time()
     print("time usage for fit: %.2f" % (fit_end - start))
 
-    if num_gpus == 1 and test_path is not None:  # TODO: torchmetrics is not working after multi gpu training
-        print(predictor.evaluate(test_path, eval_tool=eval_tool))
-        print("time usage for eval: %.2f" % (time.time() - fit_end))
+    if test_path is not None:
+        if (not eval_tool) or eval_tool == "pycocotools" or (eval_tool == "torchmetrics" and num_gpus == 1):
+            print(predictor.evaluate(test_path, eval_tool=eval_tool))
+            print("time usage for eval: %.2f" % (time.time() - fit_end))
 
 
 if __name__ == "__main__":
