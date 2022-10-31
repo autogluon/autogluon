@@ -3,12 +3,12 @@ The example to train an object detection model in AutoMM.
 
 An example to finetune an MMDetection model on COCO:
     python detection_train.py \
-        --train_path coco17/annotations/instances_train2017.json
-        --test_path coco17/annotations/instances_val2017.json
-        --checkpoint_name yolov3_mobilenetv2_320_300e_coco
-        --num_classes 80
-        --lr <learning_rate>
-        --wd <weight_decay>
+        --train_path coco17/annotations/instances_train2017.json \
+        --test_path coco17/annotations/instances_val2017.json \
+        --checkpoint_name yolov3_mobilenetv2_320_300e_coco \
+        --num_classes 80 \
+        --lr <learning_rate> \
+        --wd <weight_decay> \
         --epochs <epochs>
 
 An example to finetune an MMDetection model on VOC:
@@ -16,12 +16,12 @@ An example to finetune an MMDetection model on VOC:
     https://github.com/open-mmlab/mmdetection/blob/9d3e162459590eee4cfc891218dfbb5878378842/tools/dataset_converters/pascal_voc.py
     Then, run:
     python detection_train.py \
-        --train_path /media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_trainval.json
-        --test_path /media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_test.json
-        --checkpoint_name yolov3_mobilenetv2_320_300e_coco
-        --num_classes 20
-        --lr <learning_rate>
-        --wd <weight_decay>
+        --train_path /media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_trainval.json \
+        --test_path /media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_test.json \
+        --checkpoint_name yolov3_mobilenetv2_320_300e_coco \
+        --num_classes 20 \
+        --lr <learning_rate> \
+        --wd <weight_decay> \
         --epochs <epochs>
 
 Note that for now it's required to install nightly build torchmetrics.
@@ -41,6 +41,9 @@ def detection_train(
     lr=1e-3,
     wd=1e-4,
     epochs=50,
+    num_gpus=4,
+    val_metric=None,
+    per_gpu_batch_size=8,
 ):
 
     # TODO: add val_path
@@ -50,10 +53,12 @@ def detection_train(
         label="rois_label",
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": 1,
+            "env.num_gpus": num_gpus,
+            "env.strategy": "ddp",
         },
         pipeline="object_detection",
         output_shape=num_classes,
+        val_metric=val_metric,
     )
 
     import time
@@ -65,14 +70,18 @@ def detection_train(
             "optimization.learning_rate": lr,
             "optimization.weight_decay": wd,
             "optimization.max_epochs": epochs,
-            # "env.per_gpu_batch_size": 4, # decrease it when model is large
+            "optimization.top_k": 1,
+            "optimization.top_k_average_method": "best",
+            "optimization.warmup_steps": 0.0,
+            "optimization.patience": 40,
+            "env.per_gpu_batch_size": per_gpu_batch_size,  # decrease it when model is large
         },
     )
     fit_end = time.time()
+    print("time usage for fit: %.2f" % (fit_end - start))
 
-    if test_path is not None:
-        print("time usage for fit: %.2f" % (fit_end - start))
-        predictor.evaluate(test_path)
+    if num_gpus == 1 and test_path is not None:  # TODO: support multigpu inference
+        print(predictor.evaluate(test_path))
         print("time usage for eval: %.2f" % (time.time() - fit_end))
 
 
@@ -87,6 +96,9 @@ if __name__ == "__main__":
     parser.add_argument("--lr", default=1e-3, type=float)
     parser.add_argument("--wd", default=1e-3, type=float)
     parser.add_argument("--epochs", default=50, type=int)
+    parser.add_argument("--num_gpus", default=4, type=int)
+    parser.add_argument("--per_gpu_batch_size", default=8, type=int)
+    parser.add_argument("--val_metric", default=None, type=str)
     args = parser.parse_args()
 
     detection_train(
@@ -97,4 +109,7 @@ if __name__ == "__main__":
         lr=args.lr,
         wd=args.wd,
         epochs=args.epochs,
+        num_gpus=args.num_gpus,
+        val_metric=args.val_metric,  # "mAP" or "direct_loss" or None (use default: "direct_loss")
+        per_gpu_batch_size=args.per_gpu_batch_size,
     )

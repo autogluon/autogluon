@@ -29,6 +29,8 @@ install_requires = [
     "pandas",
     "psutil>=5.7.3,<5.9",
     "gluonts~=0.11.0",
+    "torch>=1.9,<1.13",
+    "pytorch-lightning>=1.7.4,<1.8.0",
     f"autogluon.core=={version}",
     f"autogluon.common=={version}",
     f"autogluon.tabular=={version}",

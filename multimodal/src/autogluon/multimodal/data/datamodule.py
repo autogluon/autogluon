@@ -30,6 +30,7 @@ class BaseDataModule(LightningDataModule):
         test_data: Optional[pd.DataFrame] = None,
         predict_data: Optional[pd.DataFrame] = None,
         id_mappings: Optional[Dict[str, Dict]] = None,
+        val_use_training_mode: bool = False,
     ):
         """
         Parameters
@@ -58,6 +59,10 @@ class BaseDataModule(LightningDataModule):
         id_mappings
              Id-to-content mappings. The contents can be text, image, etc.
              This is used when the dataframe contains the query/response indexes instead of their contents.
+        val_use_training_mode
+             whether we are triggering is_training when creating the dataset for validation.
+             This is used when we want to use val_loss as val metric, and thus we'll use data pipeline
+             for training instead of for inference during validation.
         """
         super().__init__()
         self.prepare_data_per_node = True
@@ -76,15 +81,20 @@ class BaseDataModule(LightningDataModule):
         self.test_data = test_data
         self.predict_data = predict_data
         self.id_mappings = id_mappings
+        self.val_use_training_mode = val_use_training_mode
 
     def set_dataset(self, split):
         data_split = getattr(self, f"{split}_data")
+        if self.val_use_training_mode:
+            is_training = split in [TRAIN, VAL]
+        else:
+            is_training = split == TRAIN
         dataset = BaseDataset(
             data=data_split,
             preprocessor=self.df_preprocessor,
             processors=self.data_processors,
             id_mappings=self.id_mappings,
-            is_training=split == TRAIN,
+            is_training=is_training,
         )
 
         setattr(self, f"{split}_dataset", dataset)

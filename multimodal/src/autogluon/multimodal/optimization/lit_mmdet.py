@@ -16,7 +16,7 @@ try:
 except ImportError:
     pass
 
-from ..constants import AUTOMM
+from ..constants import AUTOMM, IMAGE, LABEL
 from ..utils import unpack_datacontainers
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
@@ -56,44 +56,22 @@ class MMDetLitModule(pl.LightningModule):
         self.model = model
         self.validation_metric = validation_metric
         self.validation_metric_name = f"val_{validation_metric_name}"
-        if isinstance(validation_metric, BaseAggregator) and custom_metric_func is None:
-            raise ValueError(
-                f"validation_metric {validation_metric} is an aggregation metric,"
-                f"which must be used with a customized metric function."
-            )
-        self.custom_metric_func = custom_metric_func
+        self.use_loss = isinstance(validation_metric, BaseAggregator)
         self.id2label = self.model.id2label
+        self.input_data_key = self.model.prefix + "_" + IMAGE
+        self.input_label_key = self.model.prefix + "_" + LABEL
 
-    def _predict_step(self, batch, batch_idx=0):
-        from mmcv.ops import RoIPool
-        from mmcv.parallel import scatter
+    def _predict_step(self, batch, batch_idx=0, return_loss=False):
+        pred_results = self.model.model(
+            return_loss=False,
+            rescale=True,
+            img=batch[self.input_data_key]["imgs"],
+            img_metas=batch[self.input_data_key]["img_metas"],
+        )
 
-        # TODO: move unpack code to collate function
-        data = batch["mmdet_image_image"]
-        data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
-        data["img"] = [img.data[0] for img in data["img"]]
-        if next(self.model.parameters()).is_cuda:
-            # scatter to specified GPU
-            data = scatter(data, [self.device])[0]
-        else:
-            for m in self.model.modules():
-                assert not isinstance(m, RoIPool), "CPU inference with RoIPool is not supported currently."
-        pred_results = self.model.model(return_loss=False, rescale=True, **data)
         return pred_results
 
-    def _training_step(self, batch, batch_idx=0):
-        batch = unpack_datacontainers(batch)
-
-        # TODO: test mmcv scatter
-        img_metas = batch["mmdet_image_image"]["img_metas"][0]
-        img = batch["mmdet_image_image"]["img"][0].float().to(self.device)
-        batch_size = img.shape[0]
-        gt_bboxes = []
-        gt_labels = []
-        for i in range(batch_size):
-            gt_bboxes.append(torch.tensor(batch["mmdet_image_image"]["gt_bboxes"][0][i]).float().to(self.device))
-            gt_labels.append(torch.tensor(batch["mmdet_image_image"]["gt_labels"][0][i]).long().to(self.device))
-
+    def _loss_step(self, img, img_metas, gt_bboxes, gt_labels):
         loss, log_vars = self.compute_loss(
             img=img,
             img_metas=img_metas,
@@ -101,18 +79,9 @@ class MMDetLitModule(pl.LightningModule):
             gt_labels=gt_labels,
         )
 
-        # log step losses
-        self.log_step_results(log_vars)
-
         return loss, log_vars
 
-    def evaluate(self, sample, stage=None):
-        """
-        sample: dict
-            Single data sample.
-        """
-        pred_results = self._predict_step(sample)
-
+    def _get_map_input(self, pred_results, sample):
         preds = []
         for img_idx, img_result in enumerate(pred_results):
             img_result = img_result
@@ -136,7 +105,7 @@ class MMDetLitModule(pl.LightningModule):
 
         batch_size = len(preds)
         batch = unpack_datacontainers(sample)
-        gt = batch["mmdet_image_label"]  # batch_size, (n, 5)
+        gt = batch[self.input_label_key]  # batch_size, (n, 5)
         for i in range(batch_size):
             img_gt = np.array(gt[i])
             boxes = img_gt[:, :4]
@@ -147,6 +116,17 @@ class MMDetLitModule(pl.LightningModule):
                     labels=torch.tensor(labels).long().to(self.device),
                 )
             )
+
+        return preds, target
+
+    def evaluate(self, sample, stage=None):
+        """
+        sample: dict
+            Single data sample.
+        """
+        pred_results = self._predict_step(sample)
+
+        preds, target = self._get_map_input(pred_results, sample)
 
         # use MeanAveragePrecision, example code: https://github.com/Lightning-AI/metrics/blob/master/examples/detection_map.py
         self.validation_metric.update(preds, target)
@@ -219,29 +199,46 @@ class MMDetLitModule(pl.LightningModule):
             self.log(f"step/{loss_name}", losses[key])
 
     def training_step(self, batch, batch_idx):
-        loss, log_vars = self._training_step(batch, batch_idx)
+        loss, log_vars = self._loss_step(
+            img=batch[self.input_data_key]["img"],
+            img_metas=batch[self.input_data_key]["img_metas"],
+            gt_bboxes=batch[self.input_data_key]["gt_bboxes"],
+            gt_labels=batch[self.input_data_key]["gt_labels"],
+        )
+        # log step losses
+        self.log_step_results(log_vars)
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        self.evaluate(batch, "val")
+        if self.use_loss:
+            val_loss, log_vars = self._loss_step(
+                img=batch[self.input_data_key]["img"],
+                img_metas=batch[self.input_data_key]["img_metas"],
+                gt_bboxes=batch[self.input_data_key]["gt_bboxes"],
+                gt_labels=batch[self.input_data_key]["gt_labels"],
+            )
+            self.validation_metric.update(val_loss)
+        else:
+            self.evaluate(batch, "val")
 
     def validation_epoch_end(self, validation_step_outputs):
-        # TODO: add mAP/mAR_per_class
-        mAPs = {"val_" + k: v for k, v in self.validation_metric.compute().items()}
-        mAPs["val_mAP"] = mAPs["val_map"]
-        self.print(mAPs)
-        self.log_dict(mAPs, sync_dist=True)
+        val_result = self.validation_metric.compute()
+        if self.use_loss:
+            self.log_dict({"val_direct_loss": val_result}, sync_dist=True)
+        else:
+            # TODO: add mAP/mAR_per_class
+            mAPs = {"val_" + k: v for k, v in val_result.items()}
+            mAPs["val_mAP"] = mAPs["val_map"]
+            self.log_dict(mAPs, sync_dist=True)
         self.validation_metric.reset()
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         raise NotImplementedError("test with lit_mmdet is not implemented yet.")
-        res = self.evaluate(batch, "test")
-        return res
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         pred = self._predict_step(batch, batch_idx)
         if "mmdet_image_label" in batch:
-            return {"bbox": pred, "label": batch["mmdet_image_label"]}
+            return {"bbox": pred, "label": batch[self.input_label_key]}
         else:
             return {"bbox": pred}
 
@@ -256,6 +253,7 @@ class MMDetLitModule(pl.LightningModule):
         [sched]
             Learning rate scheduler.
         """
+        # TODO: add freeze layer and different lr for head and backbone.
         kwargs = dict(
             model=self.model,
             lr=self.hparams.lr,

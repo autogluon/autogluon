@@ -36,6 +36,12 @@ class ObjectDetector(object):
     Dataset = ObjectDetection.Dataset
 
     def __init__(self, path=None, verbosity=2):
+        warnings.warn(
+            f"AutoGluon ObjectDetector will be deprecated in v0.7. "
+            f"Please use AutoGluon MultiModalPredictor instead for more functionalities and better support. "
+            f"Visit https://auto.gluon.ai/stable/tutorials/multimodal/index.html for more details!",
+            DeprecationWarning,
+        )
         if path is None:
             path = os.getcwd()
         self._log_dir = path

@@ -26,6 +26,7 @@ from ..constants import (
     ROIS,
     TEXT,
 )
+from .utils import is_rois_input
 
 logger = logging.getLogger(AUTOMM)
 
@@ -112,16 +113,15 @@ def is_rois_column(data: pd.Series) -> bool:
     Whether the column is a rois column.
     """
     idx = data.first_valid_index()
-    if isinstance(data[idx], list):
-        return len(data[idx]) and isinstance(data[idx][0], list) and len(data[idx][0]) == 5
-    else:  # support list input in json str
-        isinstance(data[idx], str)
-        rois = {}
+    if isinstance(data[idx], str):
         try:
             rois = json.loads(data[idx][0])
+            # TODO: better infer logic / input format to not confuse with other modality
+            return rois and isinstance(rois, list) and len(data[idx][0]) == 5
         except:
-            pass
-        return rois and isinstance(rois, list) and len(data[idx][0]) == 5
+            return False
+    else:
+        return is_rois_input(data[idx])
 
 
 def is_numerical_column(
@@ -384,8 +384,8 @@ def infer_column_types(
 
         if is_rois_column(data[col_name]):
             column_types[col_name] = ROIS
-        elif is_identifier_column(data[col_name], col_name=col_name, id_mappings=id_mappings):
-            column_types[col_name] = (f"{id_mappings_types[col_name]}_{IDENTIFIER}",)
+        if is_identifier_column(data[col_name], col_name=col_name, id_mappings=id_mappings):
+            column_types[col_name] = f"{id_mappings_types[col_name]}_{IDENTIFIER}"
         elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
         ):  # Infer categorical column
@@ -492,6 +492,16 @@ def infer_label_column_type_by_problem_type_and_pipeline(
         if column_types[col_name] not in allowable_label_types:
             column_types[col_name] = fallback_label_type
 
+    return column_types
+
+
+def infer_rois_column_type(
+    column_types: Dict,
+    data: Optional[pd.DataFrame] = None,
+):
+    for col_name in column_types.keys():
+        if is_rois_column(data[col_name]):
+            column_types[col_name] = ROIS
     return column_types
 
 

@@ -462,7 +462,7 @@ class CloudPredictor(ABC):
 
         autogluon_sagemaker_estimator_kwargs = copy.deepcopy(autogluon_sagemaker_estimator_kwargs)
         autogluon_sagemaker_estimator_kwargs.pop('output_path', None)
-        output_path = self.cloud_output_path + '/output'
+        output_path = self.cloud_output_path + '/model'
         cloud_bucket, _ = s3_path_to_bucket_prefix(self.cloud_output_path)
 
         self._train_script_path = ScriptManager.get_train_script(self.predictor_type, framework_version)

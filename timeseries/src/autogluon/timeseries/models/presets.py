@@ -9,13 +9,15 @@ from .abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 from .autogluon_tabular import AutoGluonTabularModel
 from .gluonts import (
     DeepARModel,
-    MQCNNModel,
-    MQRNNModel,
-    ProphetModel,
+    DeepARMXNetModel,
+    MQCNNMXNetModel,
+    MQRNNMXNetModel,
     SimpleFeedForwardModel,
-    TemporalFusionTransformerModel,
-    TransformerModel,
+    SimpleFeedForwardMXNetModel,
+    TemporalFusionTransformerMXNetModel,
+    TransformerMXNetModel,
 )
+from .local import NaiveModel, SeasonalNaiveModel
 from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel
 from .statsmodels import ARIMAModel, ETSModel, ThetaModel
 
@@ -23,13 +25,15 @@ logger = logging.getLogger(__name__)
 
 
 MODEL_TYPES = dict(
-    MQCNN=MQCNNModel,
-    MQRNN=MQRNNModel,
+    MQCNNMXNet=MQCNNMXNetModel,
+    MQRNNMXNet=MQRNNMXNetModel,
     SimpleFeedForward=SimpleFeedForwardModel,
+    SimpleFeedForwardMXNet=SimpleFeedForwardMXNetModel,
     DeepAR=DeepARModel,
-    Prophet=ProphetModel,
-    Transformer=TransformerModel,
-    TemporalFusionTransformer=TemporalFusionTransformerModel,
+    DeepARMXNet=DeepARMXNetModel,
+    # Prophet=ProphetModel,
+    TransformerMXNet=TransformerMXNetModel,
+    TemporalFusionTransformerMXNet=TemporalFusionTransformerMXNetModel,
     SktimeARIMA=SktimeARIMAModel,
     SktimeAutoARIMA=SktimeAutoARIMAModel,
     SktimeAutoETS=SktimeAutoETSModel,
@@ -37,23 +41,28 @@ MODEL_TYPES = dict(
     ARIMA=ARIMAModel,
     Theta=ThetaModel,
     AutoGluonTabular=AutoGluonTabularModel,
+    Naive=NaiveModel,
+    SeasonalNaive=SeasonalNaiveModel,
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
-    MQCNN=40,
-    MQRNN=40,
-    SimpleFeedForward=50,
-    Transformer=40,
-    TemporalFusionTransformer=45,
-    DeepAR=50,
-    Prophet=10,
+    MQCNNMXNet=20,
+    MQRNNMXNet=20,
+    SimpleFeedForward=30,
+    SimpleFeedForwardMXNet=25,
+    TransformerMXNet=30,
+    TemporalFusionTransformerMXNet=30,
+    DeepAR=40,
+    DeepARMXNet=30,
     SktimeAutoARIMA=20,
     SktimeARIMA=50,
     SktimeAutoETS=60,
     ARIMA=50,
     ETS=60,
     Theta=60,
-    AutoGluonTabularModel=0,
+    AutoGluonTabular=45,
+    Naive=70,
+    SeasonalNaive=70,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 MINIMUM_CONTEXT_LENGTH = 10
@@ -63,11 +72,15 @@ def get_default_hps(key, prediction_length):
     context_length = max(prediction_length * 2, MINIMUM_CONTEXT_LENGTH)
     default_model_hps = {
         "local_only": {
+            "Naive": {},
+            "SeasonalNaive": {},
             "ARIMA": {},
             "ETS": {},
             "Theta": {},
         },
         "default": {
+            "Naive": {},
+            "SeasonalNaive": {},
             "ARIMA": {},
             "ETS": {},
             "Theta": {},
@@ -77,11 +90,14 @@ def get_default_hps(key, prediction_length):
             "DeepAR": {
                 "context_length": context_length,
             },
-            "TemporalFusionTransformer": {
+            "TemporalFusionTransformerMXNet": {
                 "context_length": context_length,
             },
+            "AutoGluonTabular": {},
         },
         "default_hpo": {
+            "Naive": {},
+            "SeasonalNaive": {},
             "ARIMA": {
                 "order": ag.Categorical((2, 0, 1), (2, 1, 0), (2, 1, 1), (1, 1, 1)),
                 "seasonal_order": ag.Categorical((0, 0, 0), (1, 0, 0)),
@@ -105,12 +121,12 @@ def get_default_hps(key, prediction_length):
                 "batch_size": 64,
                 "context_length": context_length,
             },
-            "Transformer": {
+            "TransformerMXNet": {
                 "model_dim": ag.Categorical(32, 64),
                 "batch_size": 64,
                 "context_length": context_length,
             },
-            "TemporalFusionTransformer": {
+            "TemporalFusionTransformerMXNet": {
                 "hidden_dim": ag.Categorical(32, 64),
                 "batch_size": 64,
                 "context_length": context_length,

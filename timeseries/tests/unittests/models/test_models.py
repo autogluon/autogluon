@@ -13,19 +13,24 @@ from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
-from autogluon.timeseries.models import DeepARModel, ETSModel
+from autogluon.timeseries.models import DeepARMXNetModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.models.gluonts import GenericGluonTSModel
+from autogluon.timeseries.models.gluonts import GenericGluonTSMXNetModel
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
 from .test_autogluon_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
+from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
 from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
 from .test_statsmodels import TESTABLE_MODELS as STATSMODELS_TESTABLE_MODELS
 
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
 TESTABLE_MODELS = (
-    GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS + STATSMODELS_TESTABLE_MODELS + TABULAR_TESTABLE_MODELS
+    GLUONTS_TESTABLE_MODELS
+    + SKTIME_TESTABLE_MODELS
+    + STATSMODELS_TESTABLE_MODELS
+    + TABULAR_TESTABLE_MODELS
+    + LOCAL_TESTABLE_MODELS
 )
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
 
@@ -104,7 +109,6 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, trained_models, 
 @flaky
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(model_class, temp_model_path):
-
     model = model_class(
         path=temp_model_path,
         freq="H",
@@ -113,11 +117,14 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
             "epochs": ag.Int(1, 3),
         },
     )
+    if model.name == "AutoGluonTabular":
+        pytest.skip("AutoGluonTabular model doesn't support HPO")
+
     num_trials = 2
 
     hpo_results, _ = model.hyperparameter_tune(
         hyperparameter_tune_kwargs={"num_trials": num_trials, "scheduler": "local", "searcher": "random"},
-        time_limit=100,
+        time_limit=300,
         train_data=DUMMY_TS_DATAFRAME,
         val_data=DUMMY_TS_DATAFRAME,
     )
@@ -175,7 +182,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         },
     )
     # TFT cannot handle arbitrary quantiles
-    if model.name == "TemporalFusionTransformer":
+    if "TemporalFusionTransformer" in model.name:
         return
 
     model.fit(train_data=DUMMY_TS_DATAFRAME)
@@ -207,7 +214,8 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
 
 
 @pytest.mark.parametrize(
-    "model_class", [DeepARModel, ETSModel, partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator)]
+    "model_class",
+    [DeepARMXNetModel, ETSModel, partial(GenericGluonTSMXNetModel, gluonts_estimator_class=MQRNNEstimator)],
 )
 @pytest.mark.parametrize("test_data_index", [["A", "B"], ["C", "D"], ["A"]])
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_aligns_with_time(
@@ -234,7 +242,8 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
 
 
 @pytest.mark.parametrize(
-    "model_class", [DeepARModel, ETSModel, partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator)]
+    "model_class",
+    [DeepARMXNetModel, ETSModel, partial(GenericGluonTSMXNetModel, gluonts_estimator_class=MQRNNEstimator)],
 )
 @pytest.mark.parametrize(
     "train_data, test_data",

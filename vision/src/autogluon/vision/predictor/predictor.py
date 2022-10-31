@@ -56,6 +56,12 @@ class ImagePredictor(object):
     Dataset = ImageClassification.Dataset
 
     def __init__(self, label='label', problem_type=None, eval_metric=None, path=None, verbosity=2):
+        warnings.warn(
+            f"AutoGluon ImagePredictor will be deprecated in v0.7. "
+            f"Please use AutoGluon MultiModalPredictor instead for more functionalities and better support. "
+            f"Visit https://auto.gluon.ai/stable/tutorials/multimodal/index.html for more details!",
+            DeprecationWarning,
+        )
         self._problem_type = problem_type
         self._eval_metric = eval_metric
         if path is None:

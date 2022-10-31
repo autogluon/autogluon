@@ -68,7 +68,9 @@ from .utils import (
     average_checkpoints,
     compute_inference_batch_size,
     compute_num_gpus,
+    compute_ranking_score,
     compute_score,
+    compute_semantic_similarity,
     create_fusion_data_processors,
     create_siamese_model,
     customize_model_names,
@@ -81,6 +83,7 @@ from .utils import (
     infer_metrics,
     infer_precision,
     init_df_preprocessor,
+    init_pretrained_matcher,
     load_text_tokenizers,
     process_save_path,
     save_pretrained_model_configs,
@@ -102,13 +105,15 @@ class MultiModalMatcher:
 
     def __init__(
         self,
-        query: Union[str, List[str]],
-        response: Union[str, List[str]],
+        query: Optional[Union[str, List[str]]] = None,
+        response: Optional[Union[str, List[str]]] = None,
         negative: Optional[Union[str, List[str]]] = None,
         label: Optional[str] = None,
         match_label: Optional[Union[int, str]] = None,
         problem_type: Optional[str] = None,
+        pipeline: Optional[str] = None,
         eval_metric: Optional[str] = None,
+        hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 3,
         warn_if_exist: Optional[bool] = True,
@@ -194,6 +199,7 @@ class MultiModalMatcher:
         self._match_label = match_label
         self._label_column = label
         self._problem_type = problem_type.lower() if problem_type is not None else None
+        self._pipeline = pipeline.lower() if pipeline is not None else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = None
@@ -219,6 +225,17 @@ class MultiModalMatcher:
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
+
+        if self._pipeline is not None:
+            (
+                self._config,
+                self._query_config,
+                self._response_config,
+                self._query_model,
+                self._response_model,
+                self._query_processors,
+                self._response_processors,
+            ) = init_pretrained_matcher(pipeline=self._pipeline, hyperparameters=hyperparameters)
 
     @property
     def query(self):
@@ -265,7 +282,9 @@ class MultiModalMatcher:
     def fit(
         self,
         train_data: pd.DataFrame,
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[
+            Dict[str, Dict]
+        ] = None,  # TODO rename it to linked_content and support dict of pd.Series.
         presets: Optional[str] = None,
         tuning_data: Optional[pd.DataFrame] = None,
         time_limit: Optional[int] = None,
@@ -283,7 +302,11 @@ class MultiModalMatcher:
         Parameters
         ----------
         train_data
-            A dataframe containing training data.
+            A dataframe, containing the query data, response data, and their relevance. For example,
+            | query_col1  | query_col2 | response_col1 | response_col2 | relevance_score |
+            |-------------|------------|---------------|---------------|-----------------|
+            |             | ....       | ....          | ...           | ...             |
+            |             | ....       | ....          | ...           | ...             |
         id_mappings
              Id-to-content mappings. The contents can be text, image, etc.
              This is used when the dataframe contains the query/response indexes instead of their contents.
@@ -459,30 +482,32 @@ class MultiModalMatcher:
 
     def _get_matcher_df_preprocessor(
         self,
-        query_config: DictConfig,
-        response_config: DictConfig,
         data: pd.DataFrame,
         column_types: Dict,
+        query_config: Optional[DictConfig] = None,
+        response_config: Optional[DictConfig] = None,
+        query_columns: Optional[List] = None,
+        response_columns: Optional[List] = None,
     ):
-        if self._query_df_preprocessor is None:
+        if self._query_df_preprocessor is None and query_config is not None:
             query_df_preprocessor = init_df_preprocessor(
                 config=query_config,
-                column_types={k: column_types[k] for k in self._query},
-                train_df_x=data[self._query],
+                column_types={k: column_types[k] for k in query_columns},
+                train_df_x=data[query_columns],
             )
         else:  # continuing training
             query_df_preprocessor = self._query_df_preprocessor
 
-        if self._response_df_preprocessor is None:
+        if self._response_df_preprocessor is None and response_config is not None:
             response_df_preprocessor = init_df_preprocessor(
                 config=response_config,
-                column_types={k: column_types[k] for k in self._response},
-                train_df_x=data[self._response],
+                column_types={k: column_types[k] for k in response_columns},
+                train_df_x=data[response_columns],
             )
         else:  # continuing training
             response_df_preprocessor = self._response_df_preprocessor
 
-        if self._label_df_preprocessor is None:
+        if self._label_df_preprocessor is None and response_config is not None and self._label_column in column_types:
             label_df_preprocessor = init_df_preprocessor(
                 config=response_config,
                 column_types={self._label_column: column_types[self._label_column]},
@@ -496,12 +521,14 @@ class MultiModalMatcher:
 
     def _get_matcher_data_processors(
         self,
-        query_model: nn.Module,
-        query_config: DictConfig,
-        response_model: nn.Module,
-        response_config: DictConfig,
+        query_model: Optional[nn.Module] = None,
+        query_config: Optional[DictConfig] = None,
+        response_model: Optional[nn.Module] = None,
+        response_config: Optional[DictConfig] = None,
     ):
-        if self._query_processors is None:
+        if query_model is None:
+            query_processors = None
+        elif self._query_processors is None and all(v is not None for v in [query_model, query_config]):
             query_processors = create_fusion_data_processors(
                 model=query_model,
                 config=query_config,
@@ -511,7 +538,9 @@ class MultiModalMatcher:
         else:  # continuing training
             query_processors = self._query_processors
 
-        if self._response_processors is None:
+        if response_model is None:
+            response_processors = None
+        elif self._response_processors is None and all(v is not None for v in [response_model, response_config]):
             response_processors = create_fusion_data_processors(
                 model=response_model,
                 config=response_config,
@@ -522,7 +551,11 @@ class MultiModalMatcher:
             response_processors = self._response_processors
 
         # only need labels for the response model
-        if self._label_processors is None:
+        if response_model is None:
+            label_processors = None
+        elif self._label_processors is None and all(
+            v is not None for v in [self._label_column, response_model, response_config]
+        ):
             label_processors = create_fusion_data_processors(
                 model=response_model,
                 config=response_config,
@@ -568,7 +601,7 @@ class MultiModalMatcher:
                 query_config = copy.deepcopy(config)
                 # customize config model names to make them consistent with model prefixes.
                 query_config.model = customize_model_names(
-                    config=query_config.model, customized_names=[f"{n}_query" for n in query_config.model.names]
+                    config=query_config.model, customized_names=[f"{n}_{QUERY}" for n in query_config.model.names]
                 )
             else:
                 query_config = self._query_config
@@ -578,7 +611,7 @@ class MultiModalMatcher:
                 # customize config model names to make them consistent with model prefixes.
                 response_config.model = customize_model_names(
                     config=response_config.model,
-                    customized_names=[f"{n}_response" for n in response_config.model.names],
+                    customized_names=[f"{n}_{RESPONSE}" for n in response_config.model.names],
                 )
             else:
                 response_config = self._response_config
@@ -586,10 +619,12 @@ class MultiModalMatcher:
             raise ValueError("Currently only support presets: siamese_network.")
 
         query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._get_matcher_df_preprocessor(
-            query_config=query_config,
-            response_config=response_config,
             data=train_df,
             column_types=self._column_types,
+            query_config=query_config,
+            response_config=response_config,
+            query_columns=self._query,
+            response_columns=self._response,
         )
 
         query_config = select_model(config=query_config, df_preprocessor=query_df_preprocessor)
@@ -949,39 +984,90 @@ class MultiModalMatcher:
         requires_label: bool,
         signature: Optional[str] = None,
     ) -> List[Dict]:
+        assert signature in [QUERY, RESPONSE, None]
 
-        data = data_to_df(data=data)
+        data = data_to_df(data=data, header=signature)
 
         if self._column_types is None:
-            allowable_query_dtypes, fallback_query_dtype = infer_dtypes_by_model_names(
-                model_config=self._query_config.model
-            )
-            allowable_response_dtypes, fallback_response_dtype = infer_dtypes_by_model_names(
-                model_config=self._response_config.model
-            )
-            # TODO: consider that query and response have different modalities.
-            assert sorted(allowable_query_dtypes) == sorted(allowable_response_dtypes)
-            assert fallback_query_dtype == fallback_response_dtype
+            if signature is None or signature == QUERY:
+                allowable_query_dtypes, fallback_query_dtype = infer_dtypes_by_model_names(
+                    model_config=self._query_config.model
+                )
+            if signature is None or signature == RESPONSE:
+                allowable_response_dtypes, fallback_response_dtype = infer_dtypes_by_model_names(
+                    model_config=self._response_config.model
+                )
+            if signature == QUERY:
+                allowable_dtypes = allowable_query_dtypes
+                fallback_dtype = fallback_query_dtype
+            elif signature == RESPONSE:
+                allowable_dtypes = allowable_response_dtypes
+                fallback_dtype = fallback_response_dtype
+            else:
+                # TODO: consider that query and response have different modalities.
+                assert sorted(allowable_query_dtypes) == sorted(allowable_response_dtypes)
+                assert fallback_query_dtype == fallback_response_dtype
+                allowable_dtypes = allowable_query_dtypes
+                fallback_dtype = fallback_query_dtype
+
             column_types = infer_column_types(
                 data=data,
-                allowable_column_types=allowable_query_dtypes,
-                fallback_column_type=fallback_query_dtype,
+                allowable_column_types=allowable_dtypes,
+                fallback_column_type=fallback_dtype,
+                id_mappings=id_mappings,
             )
+            if self._label_column and self._label_column in data.columns:
+                column_types = infer_label_column_type_by_problem_type(
+                    column_types=column_types,
+                    label_columns=self._label_column,
+                    problem_type=self._problem_type,
+                    data=data,
+                )
         else:  # called .fit() or .load()
             column_types = self._column_types
 
+        query_config = None
+        query_model = None
+        response_config = None
+        response_model = None
+        query_columns = None
+        response_columns = None
+
+        if signature == QUERY:
+            query_config = self._query_config
+            query_model = self._query_model
+            query_columns = (self._query if self._query else list(data.columns),)
+            if isinstance(query_columns, tuple):
+                query_columns = query_columns[0]
+        elif signature == RESPONSE:
+            response_config = self._response_config
+            response_model = self._response_model
+            response_columns = self._response if self._response else list(data.columns)
+            if isinstance(response_columns, tuple):
+                response_columns = response_columns[0]
+        else:
+            query_config = self._query_config
+            query_model = self._query_model
+            response_config = self._response_config
+            response_model = self._response_model
+            assert self._query and self._response
+            query_columns = self._query
+            response_columns = self._response
+
         query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._get_matcher_df_preprocessor(
-            query_config=self._query_config,
-            response_config=self._response_config,
             data=data,
             column_types=column_types,
+            query_config=query_config,
+            response_config=response_config,
+            query_columns=query_columns,
+            response_columns=response_columns,
         )
 
         query_processors, response_processors, label_processors = self._get_matcher_data_processors(
-            query_model=self._query_model,
-            query_config=self._query_config,
-            response_model=self._response_model,
-            response_config=self._response_config,
+            query_model=query_model,
+            query_config=query_config,
+            response_model=response_model,
+            response_config=response_config,
         )
 
         # For prediction data with no labels provided.
@@ -991,6 +1077,8 @@ class MultiModalMatcher:
             df_preprocessors.append(label_df_preprocessor)
             data_processors.append(label_processors)
 
+        df_preprocessors = [item for item in df_preprocessors if item is not None]
+        data_processors = [item for item in data_processors if item is not None]
         strategy = "dp"  # default used in inference.
 
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
@@ -1021,8 +1109,8 @@ class MultiModalMatcher:
             match_label = None
 
         task = MatcherLitModule(
-            query_model=self._query_model,
-            response_model=self._response_model,
+            query_model=query_model,
+            response_model=response_model,
             signature=signature,
             match_label=match_label,
         )
@@ -1065,35 +1153,66 @@ class MultiModalMatcher:
 
         return outputs
 
-    def evaluate(
+    def _evaluate_ranking(
+        self,
+        qr_relevance: Union[pd.DataFrame, dict, list],
+        query_data: Union[pd.DataFrame, dict, list],
+        response_data: Union[pd.DataFrame, dict, list],
+        id_mappings: Optional[Dict[str, Dict]] = None,
+        chunk_size: Optional[int] = 1024,
+        similarity_type: Optional[str] = "cosine",
+        top_k: Optional[int] = 100,
+    ):
+        query_header = self._query[0] if self._query is not None else QUERY
+        query_data = data_to_df(data=query_data, header=query_header)
+        response_header = self._response[0] if self._response else RESPONSE
+        response_data = data_to_df(data=response_data, header=response_header)
+
+        qr_relevance = data_to_df(data=qr_relevance)
+
+        rank_labels = {}
+        for i, per_row in qr_relevance.iterrows():
+            rank_labels.setdefault(per_row[self._query[0]], {})[per_row[self._response[0]]] = int(
+                per_row[self._label_column]
+            )
+
+        rank_results = dict()
+        query_embeddings = self.extract_embedding(query_data, signature=QUERY, id_mappings=id_mappings, as_tensor=True)
+        num_chunks = max(1, len(response_data) // chunk_size)
+        for response_chunk in np.array_split(response_data, num_chunks):
+            response_embeddings = self.extract_embedding(
+                response_chunk, signature=RESPONSE, id_mappings=id_mappings, as_tensor=True
+            )
+            similarity_scores = compute_semantic_similarity(
+                a=query_embeddings, b=response_embeddings, similarity_type=similarity_type
+            )
+            similarity_scores[torch.isnan(similarity_scores)] = -1
+            top_k_scores, top_k_indices = torch.topk(
+                similarity_scores,
+                k=min(top_k + 1, len(similarity_scores[1])),
+                dim=1,
+                largest=True,
+                sorted=False,
+            )
+            top_k_indices = top_k_indices.cpu().tolist()
+            top_k_scores = top_k_scores.cpu().tolist()
+            for i in range(len(query_data)):
+                query_idx = query_data.iloc[i][self._query[0]]
+                for sub_response_idx, score in zip(top_k_indices[i], top_k_scores[i]):
+                    response_idx = response_chunk.iloc[int(sub_response_idx)][self._response[0]]
+                    rank_results.setdefault(query_idx, {})[response_idx] = score
+
+        ndcg, _map, recall, precision = compute_ranking_score(results=rank_results, qrel_dict=rank_labels)
+
+        return ndcg, _map, recall, precision
+
+    def _evaluate_matching(
         self,
         data: Union[pd.DataFrame, dict, list],
         id_mappings: Optional[Dict[str, Dict]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
     ):
-        """
-        Evaluate model on a test dataset.
-
-        Parameters
-        ----------
-        data
-            A dataframe, containing the same columns as the training data
-        id_mappings
-             Id-to-content mappings. The contents can be text, image, etc.
-             This is used when the dataframe contains the query/response indexes instead of their contents.
-        metrics
-            A list of metric names to report.
-            If None, we only return the score for the stored `_eval_metric_name`.
-        return_pred
-            Whether to return the prediction result of each row.
-
-        Returns
-        -------
-        A dictionary with the metric names and their corresponding scores.
-        Optionally return a dataframe of prediction results.
-        """
-
         outputs = self._predict(
             data=data,
             id_mappings=id_mappings,
@@ -1144,62 +1263,72 @@ class MultiModalMatcher:
         else:
             return results
 
-    def semantic_search(
+    def evaluate(
         self,
-        query_data: Union[pd.DataFrame, dict, list],
-        response_data: Union[pd.DataFrame, dict, list],
-        id_mappings: Dict[str, Dict],
-        return_prob: Optional[bool] = False,
-        as_pandas: Optional[bool] = None,
+        data: Optional[Union[pd.DataFrame, dict, list]] = None,
+        query_data: Optional[list] = None,
+        response_data: Optional[list] = None,
+        id_mappings: Optional[Dict[str, Dict]] = None,
+        metrics: Optional[Union[str, List[str]]] = None,
+        return_pred: Optional[bool] = False,
+        chunk_size: Optional[int] = 1024,
+        similarity_type: Optional[str] = "cosine",
+        top_k: Optional[int] = 100,
     ):
         """
-        Perform a cosine similarity search between query data and response data.
+        Evaluate model on a test dataset.
 
         Parameters
         ----------
+        data
+            A dataframe, containing the query data, response data, and their relevance. For example,
+            | query_col1  | query_col2 | response_col1 | response_col2 | relevance_score |
+            |-------------|------------|---------------|---------------|-----------------|
+            |             | ....       | ....          | ...           | ...             |
+            |             | ....       | ....          | ...           | ...             |
         query_data
-            The query data.
+            A list of queries.
         response_data
-            The response data.
+            A list of response data, in which to match the queries.
         id_mappings
-            Id-to-content mappings. The contents can be text, image, etc.
-            This is used when the dataframe contains the query/response indexes instead of their contents.
-        return_prob
-            Whether to return the probability.
-        as_pandas
-            Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when the dataframe contains the query/response indexes instead of their contents.
+        metrics
+            A list of metric names to report.
+            If None, we only return the score for the stored `_eval_metric_name`.
+        return_pred
+            Whether to return the prediction result of each row.
+        chunk_size
+            Scan the response data by chunk_size each time. Increasing the value increases the speed, but requires more memory.
+        similarity_type
+            Use what function (cosine/dot_prod) to score the similarity (default: cosine).
+        top_k
+            Retrieve top k matching entries.
 
         Returns
         -------
-        Search results.
+        A dictionary with the metric names and their corresponding scores.
+        Optionally return a dataframe of prediction results.
         """
-        query_embeddings = self.extract_embedding(query_data, signature=QUERY, id_mappings=id_mappings, as_tensor=True)
-        assert (
-            len(query_embeddings) == 1
-        ), f"Multiple embedding types `{query_embeddings.keys()}` exist in query data. Please reduce them to one type."
-        query_embeddings = list(query_embeddings.values())[0]
-
-        response_embeddings = self.extract_embedding(
-            response_data, signature=RESPONSE, id_mappings=id_mappings, as_tensor=True
-        )
-        assert (
-            len(response_embeddings) == 1
-        ), f"Multiple embedding types `{response_embeddings.keys()}` exist in candidate data. Please reduce them to one type."
-        response_embeddings = list(response_embeddings.values())[0]
-
-        if return_prob:
-            ret = (100.0 * query_embeddings @ response_embeddings.T).float().softmax(dim=-1)
+        if all(v is not None for v in [data, query_data, response_data]):
+            return self._evaluate_ranking(
+                qr_relevance=data,
+                query_data=query_data,
+                response_data=response_data,
+                id_mappings=id_mappings,
+                chunk_size=chunk_size,
+                similarity_type=similarity_type,
+                top_k=top_k,
+            )
+        elif data is not None:
+            return self._evaluate_matching(
+                data=data,
+                id_mappings=id_mappings,
+                metrics=metrics,
+                return_pred=return_pred,
+            )
         else:
-            ret = (query_embeddings @ response_embeddings.T).argmax(dim=-1)
-
-        ret = tensor_to_ndarray(ret)
-
-        if (
-            as_pandas is None and isinstance(query_data, pd.DataFrame) and isinstance(response_data, pd.DataFrame)
-        ) or as_pandas is True:
-            ret = self._as_pandas(data=query_data, to_be_converted=ret)
-
-        return ret
+            raise ValueError(f"Invalid input.")
 
     def predict(
         self,
@@ -1302,7 +1431,7 @@ class MultiModalMatcher:
     def extract_embedding(
         self,
         data: Union[pd.DataFrame, dict, list],
-        signature: str,
+        signature: Optional[str] = None,
         id_mappings: Optional[Dict[str, Dict]] = None,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
@@ -1331,6 +1460,9 @@ class MultiModalMatcher:
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
+        if signature is None:
+            signature = QUERY
+
         outputs = self._predict(
             data=data,
             id_mappings=id_mappings,
