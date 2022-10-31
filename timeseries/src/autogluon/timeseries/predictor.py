@@ -423,6 +423,14 @@ class TimeSeriesPredictor:
             Name of the model that you would like to use for prediction. By default, the best model during training
             (with highest validation score) will be used.
         """
+        if "quantile_levels" in kwargs:
+            warnings.warn(
+                "Passing `quantile_levels` as a keyword argument to `TimeSeriesPredictor.predict` is deprecated and "
+                "will be removed in v0.7.0. This might also lead to some models not working properly. "
+                "Please specify the desired quantile levels when creating the predictor as "
+                "`TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
+                category=DeprecationWarning,
+            )
         data = self._check_and_prepare_data_frame(data)
         return self._learner.predict(data, model=model, **kwargs)
 
