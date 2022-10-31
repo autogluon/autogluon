@@ -6,7 +6,7 @@ from autogluon.timeseries.splitter import MultiWindowSplitter, append_suffix_to_
 
 from .common import (
     DUMMY_VARIABLE_LENGTH_TS_DATAFRAME,
-    DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC,
+    DATAFRAME_WITH_STATIC,
     get_data_frame_with_variable_lengths,
 )
 
@@ -73,7 +73,7 @@ def test_when_splitter_adds_suffix_to_index_then_data_is_not_copied():
 
 
 def test_when_static_features_are_present_then_splitter_correctly_splits_them():
-    original_df = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC.copy()
+    original_df = DATAFRAME_WITH_STATIC.copy()
     splitter = MultiWindowSplitter()
     prediction_length = 7
     train_data, val_data = splitter.split(ts_dataframe=original_df, prediction_length=prediction_length)

@@ -13,7 +13,7 @@ from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter
 
-from .common import DUMMY_TS_DATAFRAME
+from .common import DUMMY_TS_DATAFRAME, DATAFRAME_WITH_COVARIATES
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
@@ -495,3 +495,11 @@ def test_given_mixed_searchspace_and_hyperparameter_tune_kwargs_when_predictor_f
             "num_trials": 2,
         },
     )
+
+
+@pytest.mark.parametrize("target_columns", ["target", "CUSTOM_TARGET"])
+def test_when_target_included_in_known_covariates_then_exception_is_raised(temp_model_path, target_column):
+    with pytest.raises(ValueError, match="cannot be one of the known covariates"):
+        predictor = TimeSeriesPredictor(
+            path_context=temp_model_path, target=target_column, known_covariates_names=["Y", target_column, "X"]
+        )
