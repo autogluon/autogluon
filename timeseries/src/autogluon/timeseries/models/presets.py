@@ -5,17 +5,18 @@ from typing import Any, Dict, List, Union
 import autogluon.core as ag
 import autogluon.timeseries as agts
 
-from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
 from . import (
+    ARIMAModel,
     AutoGluonTabularModel,
     DeepARModel,
+    ETSModel,
+    NaiveModel,
+    SeasonalNaiveModel,
     SimpleFeedForwardModel,
-    NaiveModel, 
-    SeasonalNaiveModel, 
-    ARIMAModel, 
-    ETSModel, 
     ThetaModel,
 )
+from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
+
 logger = logging.getLogger(__name__)
 
 # define the model zoo with their aliases
@@ -39,6 +40,7 @@ if agts.MXNET_INSTALLED:
         TemporalFusionTransformerMXNetModel,
         TransformerMXNetModel,
     )
+
     MXNET_MODEL_TYPES = dict(
         DeepARMXNet=DeepARMXNetModel,
         SimpleFeedForwardMXNet=SimpleFeedForwardMXNetModel,
@@ -52,6 +54,7 @@ else:
 
 if agts.SKTIME_INSTALLED:
     from .sktime import ARIMASktimeModel, AutoARIMASktimeModel, AutoETSSktimeModel
+
     SKTIME_MODEL_TYPES = dict(
         ARIMASktime=ARIMASktimeModel,
         AutoARIMASktime=AutoARIMASktimeModel,
@@ -59,10 +62,8 @@ if agts.SKTIME_INSTALLED:
     )
 else:
     SKTIME_MODEL_TYPES = {}
-    
-MODEL_TYPES = dict(
-    **DEFAULT_MODEL_TYPES, **SKTIME_MODEL_TYPES, **MXNET_MODEL_TYPES
-)
+
+MODEL_TYPES = dict(**DEFAULT_MODEL_TYPES, **SKTIME_MODEL_TYPES, **MXNET_MODEL_TYPES)
 
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
@@ -140,7 +141,7 @@ def get_default_hps(key, prediction_length):
             },
         },
     }
-    
+
     # update with MXNet if installed
     if agts.MXNET_INSTALLED:
         mxnet_default_updates = {
@@ -160,13 +161,11 @@ def get_default_hps(key, prediction_length):
                     "batch_size": 64,
                     "context_length": context_length,
                 },
-            }
+            },
         }
         for k in default_model_hps:
-            default_model_hps[k] = dict(
-                **default_model_hps[k], **mxnet_default_updates.get(k, {})
-            )
-    
+            default_model_hps[k] = dict(**default_model_hps[k], **mxnet_default_updates.get(k, {}))
+
     return default_model_hps[key]
 
 

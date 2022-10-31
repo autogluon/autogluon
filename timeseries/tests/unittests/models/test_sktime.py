@@ -4,7 +4,8 @@ from unittest import mock
 import pandas as pd
 import pytest
 
-from autogluon.timeseries import TimeSeriesDataFrame, SKTIME_INSTALLED
+from autogluon.timeseries import SKTIME_INSTALLED, TimeSeriesDataFrame
+
 if not SKTIME_INSTALLED:
     pytest.skip(allow_module_level=True)
 

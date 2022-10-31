@@ -4,14 +4,12 @@ import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
 import autogluon.timeseries as agts
-from autogluon.timeseries.models.gluonts import (
-    DeepARModel,
-    SimpleFeedForwardModel,
-)
+from autogluon.timeseries.models.gluonts import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.models.gluonts.torch.models import AbstractGluonTSPyTorchModel
 from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 
 from ...common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
+
 if agts.MXNET_INSTALLED:
     from .mx.test_mx import TESTABLE_MX_MODELS, TESTABLE_MX_MODELS_WITH_STATIC_FEATURES
 else:

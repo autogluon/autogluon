@@ -4,24 +4,25 @@ from unittest import mock
 import pytest
 
 from autogluon.timeseries import MXNET_INSTALLED
+
 if not MXNET_INSTALLED:
     pytest.skip(allow_module_level=True)
-from autogluon.timeseries.models.presets import get_default_hps
-from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSMXNetModelFactory
-from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
-
-from ....common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
-
 from gluonts.mx.model.seq2seq import MQRNNEstimator
 from gluonts.mx.model.transformer import TransformerEstimator
 
-from autogluon.timeseries.models.gluonts.mx import(
+from autogluon.timeseries.models.gluonts.mx import (
     DeepARMXNetModel,
     GenericGluonTSMXNetModel,
     MQCNNMXNetModel,
     SimpleFeedForwardMXNetModel,
     TemporalFusionTransformerMXNetModel,
 )
+from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSMXNetModelFactory
+from autogluon.timeseries.models.presets import get_default_hps
+from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
+
+from ....common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
+
 TESTABLE_MX_MODELS = [
     DeepARMXNetModel,
     MQCNNMXNetModel,
@@ -82,9 +83,7 @@ def test_when_tft_quantiles_are_deciles_then_forecast_contains_correct_quantiles
 @pytest.mark.parametrize("preset_key", ["default_hpo", "default"])
 def test_when_mxnet_installed_then_default_presets_include_mxnet_models(preset_key):
     hps = get_default_hps(key=preset_key, prediction_length=5)
-    assert any(
-        "MXNet" in model_name for model_name in hps.keys()
-    )
+    assert any("MXNet" in model_name for model_name in hps.keys())
 
 
 @pytest.fixture(scope="module")

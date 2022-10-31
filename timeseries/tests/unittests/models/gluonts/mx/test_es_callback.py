@@ -1,6 +1,7 @@
 import pytest
 
 from autogluon.timeseries import MXNET_INSTALLED
+
 if not MXNET_INSTALLED:
     pytest.skip(allow_module_level=True)
 

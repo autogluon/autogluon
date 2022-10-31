@@ -19,7 +19,6 @@ from .models import (
     TransformerMXNetModel,
 )
 
-
 MXNET_MODEL_NAMES = [
     "DeepARMXNetModel",
     "MQCNNMXNetModel",

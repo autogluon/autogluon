@@ -6,6 +6,7 @@ with warning_filter():
 
 from .abstract_gluonts import AbstractGluonTSModel
 
+
 class _ProphetDummyEstimator(DummyEstimator):
     def train(self, train_data, validation_data=None, **kwargs):
         return self.predictor

@@ -10,11 +10,10 @@ from sktime.forecasting.base import BaseForecaster
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
-
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
 from autogluon.timeseries.utils.seasonality import get_seasonality
-from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 
 logger = logging.getLogger(__name__)
 sktime_logger = logging.getLogger(sktime.__name__)

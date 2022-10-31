@@ -5,16 +5,17 @@ from subprocess import PIPE, Popen
 
 import autogluon.timeseries as agts
 
+
 def test_check_style():
     logging.getLogger().setLevel(logging.INFO)
     logging.info("PEP8 Style check")
     flake8_proc = Popen(
         [
-            "flake8", 
-            "--count", 
-            "--exclude", 
-            "__init__.py", 
-            "--max-line-length", 
+            "flake8",
+            "--count",
+            "--exclude",
+            "__init__.py",
+            "--max-line-length",
             "300",
             str(Path(agts.__file__).parent),
         ],
