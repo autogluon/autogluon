@@ -20,7 +20,7 @@ from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
 logger = logging.getLogger(__name__)
 
 # define the model zoo with their aliases
-DEFAULT_MODEL_TYPES = dict(
+MODEL_TYPES = dict(
     SimpleFeedForward=SimpleFeedForwardModel,
     DeepAR=DeepARModel,
     # Prophet=ProphetModel,
@@ -41,29 +41,27 @@ if agts.MXNET_INSTALLED:
         TransformerMXNetModel,
     )
 
-    MXNET_MODEL_TYPES = dict(
-        DeepARMXNet=DeepARMXNetModel,
-        SimpleFeedForwardMXNet=SimpleFeedForwardMXNetModel,
-        MQCNNMXNet=MQCNNMXNetModel,
-        MQRNNMXNet=MQRNNMXNetModel,
-        TransformerMXNet=TransformerMXNetModel,
-        TemporalFusionTransformerMXNet=TemporalFusionTransformerMXNetModel,
+    MODEL_TYPES.update(
+        dict(
+            DeepARMXNet=DeepARMXNetModel,
+            SimpleFeedForwardMXNet=SimpleFeedForwardMXNetModel,
+            MQCNNMXNet=MQCNNMXNetModel,
+            MQRNNMXNet=MQRNNMXNetModel,
+            TransformerMXNet=TransformerMXNetModel,
+            TemporalFusionTransformerMXNet=TemporalFusionTransformerMXNetModel,
+        )
     )
-else:
-    MXNET_MODEL_TYPES = {}
 
 if agts.SKTIME_INSTALLED:
     from .sktime import ARIMASktimeModel, AutoARIMASktimeModel, AutoETSSktimeModel
 
-    SKTIME_MODEL_TYPES = dict(
-        ARIMASktime=ARIMASktimeModel,
-        AutoARIMASktime=AutoARIMASktimeModel,
-        AutoETSSktime=AutoETSSktimeModel,
+    MODEL_TYPES.update(
+        dict(
+            ARIMASktime=ARIMASktimeModel,
+            AutoARIMASktime=AutoARIMASktimeModel,
+            AutoETSSktime=AutoETSSktimeModel,
+        )
     )
-else:
-    SKTIME_MODEL_TYPES = {}
-
-MODEL_TYPES = dict(**DEFAULT_MODEL_TYPES, **SKTIME_MODEL_TYPES, **MXNET_MODEL_TYPES)
 
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
