@@ -12,6 +12,7 @@ from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTS
 
 with warning_filter():
     from gluonts.model.estimator import Estimator as GluonTSEstimator
+    from gluonts.dataset.field_names import FieldName
     from gluonts.mx.context import get_mxnet_context
     from gluonts.mx.model.deepar import DeepAREstimator
     from gluonts.mx.model.simple_feedforward import SimpleFeedForwardEstimator
@@ -337,6 +338,14 @@ class TemporalFusionTransformerMXNetModel(AbstractGluonTSMXNetModel):
 
     gluonts_estimator_class: Type[GluonTSEstimator] = TemporalFusionTransformerEstimator
     supported_quantiles: set = set([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+
+    def _get_estimator_init_args(self) -> dict:
+        init_kwargs = super()._get_estimator_init_args()
+        if self.num_feat_static_real > 0:
+            init_kwargs["static_feature_dims"] = {FieldName.FEAT_STATIC_REAL: self.num_feat_static_real}
+        if self.num_feat_dynamic_real > 0:
+            init_kwargs["dynamic_feature_dims"] = {FieldName.FEAT_DYNAMIC_REAL: self.num_feat_dynamic_real}
+        return init_kwargs
 
     def _get_estimator(self) -> GluonTSEstimator:
         """Return the GluonTS Estimator object for the model"""

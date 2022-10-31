@@ -286,7 +286,12 @@ class AbstractTimeSeriesModel(AbstractModel):
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
-        return self.predict(data.slice_by_timestep(None, -self.prediction_length), **kwargs)
+        past_data = data.slice_by_timestep(None, -self.prediction_length)
+        if len(data.columns) > 1:
+            known_covariates = data.slice_by_timestep(-self.prediction_length, None).drop(self.target, axis=1)
+        else:
+            known_covariates = None
+        return self.predict(data=past_data, known_covariates=known_covariates, **kwargs)
 
     def score(self, data: TimeSeriesDataFrame, metric: str = None, **kwargs) -> float:
         """Return the evaluation scores for given metric and dataset. The last

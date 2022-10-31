@@ -486,9 +486,14 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : TimeSeriesDataFrame
-            The data to evaluate the best model on. The last ``prediction_length`` time steps of the
-            data set, for each item, will be held out for prediction and forecast accuracy will be calculated
-            on these time steps.
+            The data to evaluate the best model on. The last ``prediction_length`` time steps of the data set, for each
+            item, will be held out for prediction and forecast accuracy will be calculated on these time steps.
+
+            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
+            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+
+            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
+            static features that have the same columns and dtypes.
 
         Other Parameters
         ----------------
@@ -577,6 +582,13 @@ class TimeSeriesPredictor:
         data : TimeSeriesDataFrame, optional
             dataset used for additional evaluation. If not provided, the validation set used during training will be
             used.
+
+            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
+            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+
+            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
+            static features that have the same columns and dtypes.
+
         silent : bool, default = False
             If False, the leaderboard DataFrame will be printed.
 

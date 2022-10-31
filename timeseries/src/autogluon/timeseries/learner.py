@@ -258,7 +258,7 @@ class TimeSeriesLearner(AbstractLearner):
                 data[self.target] = data[self.target].astype(np.float64)
             except ValueError:
                 raise ValueError(
-                    f"The target columns {self.target} must have numeric (float or int) dtype, "
+                    f"The target column {self.target} must have numeric (float or int) dtype, "
                     f"but in {data_frame_name} it has dtype {data[self.target].dtype}"
                 )
 
@@ -343,9 +343,11 @@ class TimeSeriesLearner(AbstractLearner):
     def score(
         self, data: TimeSeriesDataFrame, model: AbstractTimeSeriesModel = None, metric: Optional[str] = None
     ) -> float:
+        data = self._preprocess_target_and_covariates(data, data_frame_name="data")
         return self.load_trainer().score(data=data, model=model, metric=metric)
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
+        data = self._preprocess_target_and_covariates(data, data_frame_name="data")
         return self.load_trainer().leaderboard(data)
 
     def get_info(self, include_model_info: bool = False, **kwargs) -> Dict[str, Any]:
