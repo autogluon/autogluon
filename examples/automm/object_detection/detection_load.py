@@ -12,7 +12,7 @@ def load_and_evaluate(
     import time
 
     start = time.time()
-    result = predictor.evaluate(test_path)
+    result = predictor.evaluate(test_path, eval_tool="torchmetrics")
     print("time usage: %.2f" % (time.time() - start))
     print(result)
 

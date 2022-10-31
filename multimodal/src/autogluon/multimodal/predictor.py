@@ -1562,12 +1562,13 @@ class MultiModalPredictor:
         if strategy == "ddp":
             outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
         elif self._pipeline == OBJECT_DETECTION:
-            # reformat single gpu output for onject detection
+            # reformat single gpu output for object detection
             # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
+            # output LABEL if exists for evaluations
             if len(outputs[0][BBOX][0]) == 2:  # additional axis for mask_rcnn, TODO: remove hardcode here
-                outputs = [{BBOX: bbox[0]} for ele in outputs for bbox in ele[BBOX]]
+                outputs = [{BBOX: bbox[0], LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox[0]} for ele in outputs for i, bbox in enumerate(ele[BBOX])]
             else:
-                outputs = [{BBOX: bbox} for ele in outputs for bbox in ele[BBOX]]
+                outputs = [{BBOX: bbox, LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox} for ele in outputs for i, bbox in enumerate(ele[BBOX])]
 
         return outputs
 
@@ -1624,6 +1625,7 @@ class MultiModalPredictor:
         metrics: str,
         return_pred: Optional[bool] = False,
         seed: Optional[int] = 123,
+        eval_tool: Optional[str] = None,
     ):
         """
         Evaluate object detection model on a test dataset in COCO format.
@@ -1634,6 +1636,8 @@ class MultiModalPredictor:
             The annotation file in COCO format
         return_pred
             Whether to return the prediction result of each row.
+        eval_tool
+            The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
         """
         # TODO: refactor this into evaluate()
         if isinstance(anno_file_or_df, str):
@@ -1665,7 +1669,7 @@ class MultiModalPredictor:
             anno_file=anno_file,
             cache_path=cocoeval_cache_path,
             metrics=metrics,
-            tool="pycocotools",
+            tool=eval_tool,
         )
 
         if return_pred:
@@ -1753,6 +1757,7 @@ class MultiModalPredictor:
 
         if self._pipeline == OBJECT_DETECTION:
             strategy = "ddp"
+            num_gpus = 1 #TODO: remove
 
         if num_gpus == 1:
             strategy = None
@@ -1799,6 +1804,7 @@ class MultiModalPredictor:
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
         seed: Optional[int] = 123,
+        eval_tool: Optional[str] = None,
     ):
         """
         Evaluate model on a test dataset.
@@ -1817,6 +1823,8 @@ class MultiModalPredictor:
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
+        eval_tool
+            The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
 
         Returns
         -------
@@ -1826,7 +1834,7 @@ class MultiModalPredictor:
         if self._pipeline == OBJECT_DETECTION:
             if realtime:
                 return NotImplementedError(f"Current pipeline {self._pipeline} does not support realtime predict.")
-            return self.evaluate_coco(anno_file_or_df=data, metrics=metrics, return_pred=return_pred, seed=seed)
+            return self.evaluate_coco(anno_file_or_df=data, metrics=metrics, return_pred=return_pred, seed=seed, eval_tool=eval_tool)
 
         if self._problem_type == NER:
             ret_type = NER_RET

@@ -108,8 +108,14 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                     f"Using COCO classes because num_classes = {num_classes}. Provide data while init MultiModalPredictor if this is not COCO."
                 )
                 self.model.CLASSES = get_classes("coco")
+            elif "CLASSES" in checkpoint.get("meta", {}):
+                warnings.simplefilter("once")
+                warnings.warn(
+                    f"Using classes provided in checkpoints: {checkpoint['meta']['CLASSES']}. Provide data while init MultiModalPredictor if this is not expected."
+                )
+                self.model.CLASSES = checkpoint["meta"]["CLASSES"]
             else:
-                raise ValueError("Classes need to be specified if this is not COCO or VOC dataset.")
+                raise ValueError("Classes need to be specified.")
 
         self.model.cfg = self.config  # save the config in the model for convenience
 

@@ -535,41 +535,38 @@ def cocoeval_torchmetrics(outputs):
     from . import MeanAveragePrecision
 
     map_metric = MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False)
-    for output in outputs:  # TODO: refactor here
-        pred_results = output["bbox"]
-        preds = []
-        for img_idx, img_result in enumerate(pred_results):
-            img_result = img_result
-            boxes = []
-            scores = []
-            labels = []
-            for category_idx, category_result in enumerate(img_result):
-                for item_idx, item_result in enumerate(category_result):
-                    boxes.append(item_result[:4])
-                    scores.append(float(item_result[4]))
-                    labels.append(category_idx)
-            preds.append(
-                dict(
-                    boxes=torch.tensor(np.array(boxes).astype(float)).float().to("cpu"),
-                    scores=torch.tensor(scores).float().to("cpu"),
-                    labels=torch.tensor(labels).long().to("cpu"),
-                )
-            )
 
-        target = []
-        gts = output["label"]
-        for gt in gts:
-            img_gt = np.array(gt)
-            boxes = img_gt[:, :4]
-            labels = img_gt[:, 4]
-            target.append(
-                dict(
-                    boxes=torch.tensor(boxes).float().to("cpu"),
-                    labels=torch.tensor(labels).long().to("cpu"),
-                )
+    preds = []
+    target = []
+    for img_idx, img_output in enumerate(outputs):  # TODO: refactor here
+        img_result = img_output["bbox"]
+        boxes = []
+        scores = []
+        labels = []
+        for category_idx, category_result in enumerate(img_result):
+            for item_idx, item_result in enumerate(category_result):
+                boxes.append(item_result[:4])
+                scores.append(float(item_result[4]))
+                labels.append(category_idx)
+        preds.append(
+            dict(
+                boxes=torch.tensor(np.array(boxes).astype(float)).float().to("cpu"),
+                scores=torch.tensor(scores).float().to("cpu"),
+                labels=torch.tensor(labels).long().to("cpu"),
             )
+        )
 
-        map_metric.update(preds, target)
+        img_gt = np.array(img_output["label"])
+        boxes = img_gt[:, :4]
+        labels = img_gt[:, 4]
+        target.append(
+            dict(
+                boxes=torch.tensor(boxes).float().to("cpu"),
+                labels=torch.tensor(labels).long().to("cpu"),
+            )
+        )
+
+    map_metric.update(preds, target)
 
     return map_metric.compute()
 
@@ -603,7 +600,7 @@ def cocoeval_pycocotools(outputs, data, anno_file, cache_path, metrics):
 
 
 def cocoeval(outputs, data, anno_file, cache_path, metrics, tool="pycocotools"):
-    if tool == "pycocotools":
+    if (not tool) or tool == "pycocotools":
         return cocoeval_pycocotools(outputs, data, anno_file, cache_path, metrics)
     elif tool == "torchmetrics":
         return cocoeval_torchmetrics(outputs)
