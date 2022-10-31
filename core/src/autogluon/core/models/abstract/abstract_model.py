@@ -132,6 +132,7 @@ class AbstractModel:
         self.fit_time = None  # Time taken to fit in seconds (Training data)
         self.predict_time = None  # Time taken to predict in seconds (Validation data)
         self.predict_1_time = None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
+        self.compile_time = None  # Time taken to compile the model in seconds
         self.val_score = None  # Score with eval_metric (Validation data)
 
         self.params = {}
@@ -868,15 +869,47 @@ class AbstractModel:
             transform_func=transform_func, transform_func_kwargs=transform_func_kwargs, silent=silent, **kwargs
         )
 
-    # TODO: PoC, refactor prior to v0.6 release
-    #  Add Documentation
-    #  Define when this should be called
-    #  Is it called during fit? Is it called after fit?
-    #  Can it be called as a post-fit operation on an already fit predictor on a per-model basis?
-    #  Does this call overwrite the existing model or make a new one?
-    def compile(self, compiler_configs=None) -> str:
+    def can_compile(self, compiler_configs=None):
+        """
+        """
+        if not self.is_fit():
+            return False
+        # Get model specific compiler options
+        # Model type can be described with either model type, or model name as string
+        if type(self) in compiler_configs:
+            configs = compiler_configs[type(self)]
+        elif self.name in compiler_configs:
+            configs = compiler_configs[self.name]
+        else:
+            configs = compiler_configs
+        compiler = configs.get("compiler", "native")
+        compiler_fallback_to_native = configs.get('compiler_fallback_to_native', False)
+
+        compilers = self._valid_compilers()
+        compiler_names = {c.name: c for c in compilers}
+        if compiler is not None and compiler not in compiler_names:
+            return False
+        compiler_cls = compiler_names[compiler]
+        if not compiler_cls.can_compile():
+            if not compiler_fallback_to_native:
+                return False
+        return True
+
+    def compile(self, compiler_configs=None):
         """
         Compile the trained model for faster inference.
+
+        NOTE:
+        - The model is assumed to be fitted before compilation.
+        - If save_in_pkl attribute of the compiler is False, self.model would be set to None.
+          The compiled model can be loaded via load_model method.
+
+        Parameters
+        ----------
+        compiler_configs : dict, default=None
+            Model specific compiler options.
+            This can be useful to specify the compiler backend for a specific model, 
+            e.g. {"RandomForest": {"compiler": "onnx"}}
         """
         assert self.is_fit(), "The model must be fit before calling the compile method."
         if compiler_configs is None:
@@ -892,21 +925,25 @@ class AbstractModel:
             configs = compiler_configs
         compiler = configs.get("compiler", "native")
         batch_size = configs.get("batch_size", None)
+        compiler_fallback_to_native = configs.get('compiler_fallback_to_native', False)
 
-        if self.model is not None:
-            self._compiler = self._get_compiler(compiler=compiler)
-            if self._compiler is not None:
-                input_types = [(tuple([batch_size]+list(shape)[1:]), dtype)
-                               for shape, dtype in self._input_types_post_process]
-                self._compiler.compile(model=self.model, path=self.path, input_types=input_types)
-                if not self._compiler.save_in_pkl:
-                    self.model = None
-                self.save(path=self.path, verbose=False)
+        self._compiler = self._get_compiler(compiler=compiler,
+                                            compiler_fallback_to_native=compiler_fallback_to_native)
+        if self._compiler is not None:
+            input_types = [(tuple([batch_size]+list(shape)[1:]), dtype)
+                           for shape, dtype in self._input_types_post_process]
+            self._compiler.compile(model=self.model, path=self.path, input_types=input_types)
+            if not self._compiler.save_in_pkl:
+                self.model = None
+            self.save(path=self.path, verbose=False)
 
     def _default_compiler(self):
         return None
 
-    def _get_compiler(self, compiler='native'):
+    def _valid_compilers(self):
+        return []
+
+    def _get_compiler(self, compiler='native', compiler_fallback_to_native=True):
         compilers = self._valid_compilers()
         compiler_names = {c.name: c for c in compilers}
         if compiler is not None and compiler not in compiler_names:
@@ -914,7 +951,6 @@ class AbstractModel:
         if compiler is None:
             return self._default_compiler()
         compiler_cls = compiler_names[compiler]
-        compiler_fallback_to_native = self.params_aux.get('compiler_fallback_to_native', True)
         if not compiler_cls.can_compile():
             if not compiler_fallback_to_native:
                 raise AssertionError(f'Specified compiler ({compiler}) is unable to compile'
@@ -1158,6 +1194,7 @@ class AbstractModel:
     def reset_metrics(self):
         self.fit_time = None
         self.predict_time = None
+        self.compile_time = None
         self.val_score = None
         self.params_trained = dict()
 
@@ -1288,6 +1325,7 @@ class AbstractModel:
             'feature_metadata': self.feature_metadata,
             # 'disk_size': self.get_disk_size(),
             'memory_size': self.get_memory_size(),  # Memory usage of model in bytes
+            'compile_time': self.compile_time,
         }
         return info
 

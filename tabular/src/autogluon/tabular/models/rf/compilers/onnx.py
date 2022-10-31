@@ -61,6 +61,20 @@ class RFOnnxCompiler:
 
     @staticmethod
     def compile(model, path: str, input_types=None):
+        """
+        Compile the trained model for faster inference.
+
+        Parameters
+        ----------
+        model
+            The native model that is expected to be compiled.
+        path : str
+            The path for saving the compiled model.
+        input_types : list, default=None
+            A list of tuples containing shape and element type info, e.g. [((1, 14), np.float32),].
+            The list would be used as the input data for the model.
+            The compiler would optimize the model to perform best with the given input type.
+        """
         if input_types is None or not isinstance(input_types[0], tuple):
             raise RuntimeError("input_types argument should contain at least one tuple"
                                ", e.g. [((1, 14), np.float32)]")
@@ -83,7 +97,6 @@ class RFOnnxCompiler:
         onnx_model = convert_sklearn(model, initial_types=initial_type, options=options)
         predictor =  RFOnnxPredictor(model=onnx_model)
         RFOnnxCompiler.save(onnx_model, path)
-        return predictor
 
     @staticmethod
     def save(model, path: str):

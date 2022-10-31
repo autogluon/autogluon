@@ -1135,6 +1135,18 @@ class AbstractTrainer:
             self.models = models
 
     def compile_models(self, model_names='all', compiler_configs=None):
+        """
+        Compile a list of models for accelerated prediction.
+
+        Parameters
+        ----------
+        model_names : str or list
+            A list of model names for model compilation. Alternatively, this can be 'all' or 'best'.
+        compiler_configs: dict, default=None
+            Model specific compiler options.
+            This can be useful to specify the compiler backend for a specific model, 
+            e.g. {"RandomForest": {"compiler": "onnx"}}
+        """
         if model_names == 'all':
             model_names = self.get_model_names(can_infer=True)
         elif model_names == 'best':
@@ -1146,7 +1158,13 @@ class AbstractTrainer:
             raise ValueError(f'model_names must be a list of model names. Invalid value: {model_names}')
         for model_name in model_names:
             model = self.load_model(model_name)
-            model.compile(compiler_configs=compiler_configs)
+            # Check if already compiled, or if can't compile due to missing dependencies,
+            # or if model hasn't implemented compiling.
+            if model.can_compile(compiler_configs):
+                compile_start_time = time.time()
+                model.compile(compiler_configs=compiler_configs)
+                compile_end_time = time.time()
+                model.compile_time = compile_end_time - compile_start_time
         return model_names
 
     def persist_models(self, model_names='all', with_ancestors=False, max_memory=None) -> List[str]:
@@ -2273,6 +2291,7 @@ class AbstractTrainer:
                 custom_info['child_hyperparameters'] = bagged_info.get('child_hyperparameters', None)
                 custom_info['child_hyperparameters_fit'] = bagged_info.get('child_hyperparameters_fit', None)
                 custom_info['child_ag_args_fit'] = bagged_info.get('child_ag_args_fit', None)
+                custom_info['compile_time'] = bagged_info.get('compile_time', model_info[model_name]['compile_time'])
                 custom_model_info[model_name] = custom_info
 
             model_info_keys = ['num_features', 'model_type', 'hyperparameters', 'hyperparameters_fit', 'ag_args_fit', 'features']

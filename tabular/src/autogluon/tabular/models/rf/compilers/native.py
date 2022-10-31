@@ -19,17 +19,14 @@ class AbstractNativeCompiler:
         ----------
         model
             The native model that is expected to be compiled.
+        path : str
+            The path for saving the compiled model.
         input_types : list, default=None
             A list of tuples containing shape and element type info, e.g. [((1, 14), np.float32),].
             The list would be used as the input data for the model.
             The compiler would optimize the model to perform best with the given input type.
-
-        Returns
-        -------
-        model
-            The optimized predictor with predict() and predict_proba() interface.
         """
-        return model
+        AbstractNativeCompiler.save(model, path)
 
     @staticmethod
     def save(model, path: str):

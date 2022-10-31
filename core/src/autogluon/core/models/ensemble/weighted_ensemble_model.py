@@ -72,10 +72,3 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
-
-    def compile(self, compiler_configs=None) -> str:
-        if compiler_configs is None:
-            compiler_configs = {}
-        for model_name in self.base_model_names:
-            model = self.load_base_model(model_name)
-            model.compile(compiler_configs=compiler_configs)
