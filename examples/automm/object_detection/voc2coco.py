@@ -5,7 +5,7 @@ With changes:
 1. id stored as int by default
 2. provide only root_dir, and corresponding simplification
 3. split train/val/test
-4. Use defusedxml.ElementTree for security issue
+4. Use defusedxml.ElementTree for security concern
 
 To use:
 1. run in root_dir:
