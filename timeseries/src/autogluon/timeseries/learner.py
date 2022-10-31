@@ -95,7 +95,7 @@ class TimeSeriesLearner(AbstractLearner):
         if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
             logger.info(
                 "\tThis metric's sign has been flipped to adhere to being 'higher is better'. "
-                "The metric score can be multiplied by -1 to get the metric value.",
+                "The reported score can be multiplied by -1 to get the metric value.",
             )
 
         train_data, val_data = self._preprocess_static_features(train_data=train_data, val_data=val_data)
