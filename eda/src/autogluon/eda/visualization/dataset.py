@@ -19,7 +19,7 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
     :py:class:`~autogluon.eda.analysis.dataset.SpecialTypesAnalysis`.
     The components can be present in any combination (assuming their dependencies are satisfied).
 
-    The report requires at lest one of the analyses present to be rendered.
+    The report requires at least one of the analyses present to be rendered.
 
     Parameters
     ----------
