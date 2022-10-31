@@ -29,8 +29,10 @@ This will be solved in next pr. (MeanAveragePrecision will be moved to AG tempor
 """
 
 import argparse
+import os
 
 from autogluon.multimodal import MultiModalPredictor
+from autogluon.multimodal.utils import get_voc_classes
 
 
 def detection_train(
@@ -50,6 +52,11 @@ def detection_train(
     # TODO: add val_path
     # TODO: remove hardcode for num_classes
 
+    # TODO: move this code to predictor
+    classes = None
+    if os.path.isdir(train_path):
+        classes = get_voc_classes(train_path)
+
     predictor = MultiModalPredictor(
         label="label",
         hyperparameters={
@@ -59,14 +66,7 @@ def detection_train(
         },
         pipeline="object_detection",
         num_classes=num_classes,
-        classes=[
-            "bicycle",
-            "bird",
-            "car",
-            "cat",
-            "dog",
-            "person",
-        ],
+        classes=classes,
         val_metric=val_metric,
     )
 
@@ -79,6 +79,7 @@ def detection_train(
         hyperparameters={
             "optimization.learning_rate": lr,
             "optimization.weight_decay": wd,
+            "optimization.lr_decay": 0.98,
             "optimization.lr_choice": "two_stages",
             "optimization.max_epochs": epochs,
             "optimization.top_k": 1,
