@@ -72,7 +72,7 @@ class SimpleAbstractTrainer:
         """Return the name of the best model by model performance on the validation set."""
         models = self.get_model_names()
         if not models:
-            raise ValueError("Trainer has no fit models that can infer.")
+            raise ValueError("Trainer has no fit models that can predict.")
         model_performances = self.get_models_attribute_dict(attribute="val_score")
         performances_list = [(m, model_performances[m]) for m in models if model_performances[m] is not None]
 

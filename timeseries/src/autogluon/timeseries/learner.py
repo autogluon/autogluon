@@ -91,6 +91,13 @@ class TimeSeriesLearner(AbstractLearner):
         )
         logger.info(f"AutoGluon will save models to {self.path}")
 
+        logger.info(f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric}'")
+        if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
+            logger.info(
+                "\tThis metric's sign has been flipped to adhere to being 'higher is better'. "
+                "The reported score can be multiplied by -1 to get the metric value.",
+            )
+
         train_data, val_data = self._preprocess_static_features(train_data=train_data, val_data=val_data)
 
         # Process dynamic features
@@ -102,7 +109,7 @@ class TimeSeriesLearner(AbstractLearner):
         # Train / validation split
         if val_data is None:
             logger.warning(
-                "Validation data is None. "
+                "tuning_data is None. "
                 + self.validation_splitter.describe_validation_strategy(prediction_length=self.prediction_length)
             )
             train_data, val_data = self.validation_splitter.split(

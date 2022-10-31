@@ -135,6 +135,7 @@ def main(args):
         hyperparameters={
             "env.num_gpus": args.num_gpu,
             "env.precision": args.precision,
+            "env.strategy": "ddp",
             "optimization.max_epochs": args.max_epochs,
             "model.hf_text.checkpoint_name": args.student_model,
             "model.hf_text.text_trivial_aug_maxscale": args.aug_scale,

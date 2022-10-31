@@ -13,7 +13,8 @@ from .text_special import TextSpecialFeatureGenerator
 logger = logging.getLogger(__name__)
 
 
-# TODO: write out in English the full set of transformations that are applied (and eventually host page on website). Also explicitly write out all of the feature-generator "hyperparameters" that might affect the results from the AutoML FeatureGenerator
+# TODO: write out in English the full set of transformations that are applied (and eventually host page on website).
+#  Also explicitly write out all of the feature-generator "hyperparameters" that might affect the results from the AutoML FeatureGenerator
 class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     """
     Pipeline feature generator with simplified arguments to handle most Tabular data including text and dates adequately.
@@ -35,7 +36,8 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         These features will be converted to 'int' features representing milliseconds since epoch.
         Appends DatetimeFeatureGenerator() to the generator group.
     enable_text_special_features : bool, default True
-        Whether to use 'object' features identified as 'text' features to generate 'text_special' features such as word count, capital letter ratio, and symbol counts.
+        Whether to use 'object' features identified as 'text' features to generate 'text_special' features such as word count,
+        capital letter ratio, and symbol counts.
         Appends TextSpecialFeatureGenerator() to the generator group.
     enable_text_ngram_features : bool, default True
         Whether to use 'object' features identified as 'text' features to generate 'text_ngram' features.
@@ -45,11 +47,12 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         For example, 'sentence' --> 'sentence_raw_text'
     enable_vision_features : bool, default True
         [Experimental]
-        Whether to keep 'object' features identified as 'image_path' special type. Features of this form should have a string path to an image file as their value.
+        Whether to keep 'object' features identified as 'image_path' special type.
+        Features of this form should have a string path to an image file as their value.
         Only vision models can leverage these features, and these features will not be treated as categorical.
         Note: 'image_path' features will not be automatically inferred. These features must be explicitly specified as such in a custom FeatureMetadata object.
         Note: It is recommended that the string paths use absolute paths rather than relative, as it will likely be more stable.
-    vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
+    vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)  # noqa
         sklearn CountVectorizer object to use in :class:`TextNgramFeatureGenerator`.
         Only used if `enable_text_ngram_features=True`.
     **kwargs :
@@ -85,10 +88,12 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
                  text_ngram_params=None,
                  **kwargs):
         if 'generators' in kwargs:
-            raise KeyError(f'generators is not a valid parameter to {self.__class__.__name__}. Use {PipelineFeatureGenerator.__name__} to specify custom generators.')
+            raise KeyError(f'generators is not a valid parameter to {self.__class__.__name__}. '
+                           f'Use {PipelineFeatureGenerator.__name__} to specify custom generators.')
         if 'enable_raw_features' in kwargs:
             enable_numeric_features = kwargs.pop('enable_raw_features')
-            logger.warning(f"'enable_raw_features is a deprecated parameter, use 'enable_numeric_features' instead. Specifying 'enable_raw_features' will raise an exception starting in 0.1.0")
+            logger.warning("'enable_raw_features is a deprecated parameter, use 'enable_numeric_features' instead. "
+                           "Specifying 'enable_raw_features' will raise an exception starting in 0.1.0")
 
         self.enable_numeric_features = enable_numeric_features
         self.enable_categorical_features = enable_categorical_features

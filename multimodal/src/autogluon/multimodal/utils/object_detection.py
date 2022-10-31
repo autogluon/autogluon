@@ -641,4 +641,3 @@ def from_coco_or_voc(file_path, splits: Optional[str] = None):
         return from_voc(root=file_path, splits=splits)
     else:
         return from_coco(file_path)
-

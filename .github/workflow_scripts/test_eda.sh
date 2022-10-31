@@ -13,4 +13,8 @@ install_features
 install_eda
 
 cd eda/
-python3 -m pytest --mypy --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
+python3 -m tox -e lint
+python3 -m tox -e typecheck
+# TODO: enable once black is applied
+# python3 -m tox -e format
+python3 -m tox -- --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests

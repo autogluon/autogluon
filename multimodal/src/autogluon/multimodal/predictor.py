@@ -276,6 +276,7 @@ class MultiModalPredictor:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
         self._init_scratch = init_scratch
+        self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
 
         if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
             warnings.warn(
@@ -1273,6 +1274,7 @@ class MultiModalPredictor:
                 datamodule=train_dm,
                 ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
             )
+            self._fit_called = True
 
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
@@ -1651,7 +1653,10 @@ class MultiModalPredictor:
         # TODO: refactor this into evaluate()
         if isinstance(anno_file_or_df, str):
             anno_file = anno_file_or_df
-            data = from_coco_or_voc(anno_file, "test") # TODO: remove default test hardcoding for VOC
+            data = from_coco_or_voc(
+                anno_file, "test"
+            )  # TODO: maybe remove default splits hardcoding (only used in VOC)
+            eval_tool = "torchmetrics"  # we can only use torchmetrics for VOC format evaluation.
         else:
             # during validation, it will call evaluate with df as input
             anno_file = self.detection_anno_train
@@ -1766,7 +1771,9 @@ class MultiModalPredictor:
 
         if self._pipeline == OBJECT_DETECTION:
             strategy = "ddp"
-            num_gpus = 1  # TODO: fix pycocotools error on custom dataset, and fix torchmetrics eval under multi gpu
+
+        if strategy == "ddp" and self._fit_called:
+            num_gpus = 1  # While using DDP, we can only use single gpu after fit is called
 
         if num_gpus == 1:
             strategy = None
@@ -2450,7 +2457,8 @@ class MultiModalPredictor:
         predictor._pretrain_path = path
         predictor._config = config
         predictor._output_shape = assets["output_shape"]
-        predictor._classes = assets["classes"]
+        if "classes" in assets:
+            predictor._classes = assets["classes"]
         predictor._column_types = assets["column_types"]
         predictor._validation_metric_name = assets["validation_metric_name"]
         predictor._df_preprocessor = df_preprocessor
