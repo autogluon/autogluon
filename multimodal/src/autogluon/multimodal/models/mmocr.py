@@ -156,7 +156,6 @@ class MMOCRAutoModel(nn.Module):
                 texts.append(r["text"])
                 scores.append(r["score"])
             ret = {TEXT: texts, SCORE: scores}
-           # ret = {TEXT: recog_results[0]["text"], SCORE: recog_results[0]["score"]}     
             return {self.prefix: ret}
         elif self.det_model != None and self.recog_model != None:
             det_results = self.det_model(return_loss=False, rescale=True, **data)
@@ -168,7 +167,7 @@ class MMOCRAutoModel(nn.Module):
 
             bboxes_list = [res for res in det_results]
             end2end_res = []
-            
+
             for bboxes, arr in zip(bboxes_list, arrays):
                 img_e2e_res = {"result": []}
                 for bbox in bboxes["boundary_result"]:

@@ -47,9 +47,9 @@ def test_mmocr_text_recognition_inference(checkpoint_name):
     MMOCR_res = ocr.readtext(mmocr_image_name, output=None)
 
     # compare
-    assert len(pred['text']) == len(MMOCR_res)
-    assert len(pred['score']) == len(MMOCR_res)
-    for p_text, m_text in zip(pred['text'], MMOCR_res):
-        assert p_text == m_text['text']
-    for p_score, m_score in zip(pred['score'], MMOCR_res):
-        assert p_score == m_score['score']
+    assert len(pred["text"]) == len(MMOCR_res)
+    assert len(pred["score"]) == len(MMOCR_res)
+    for p_text, m_text in zip(pred["text"], MMOCR_res):
+        assert p_text == m_text["text"]
+    for p_score, m_score in zip(pred["score"], MMOCR_res):
+        assert p_score == m_score["score"]

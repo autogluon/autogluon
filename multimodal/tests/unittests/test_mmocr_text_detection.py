@@ -42,14 +42,14 @@ def test_mmocr_text_detection_inference(checkpoint_name):
     MMOCR_res = ocr.readtext([mmocr_image_name] * 10, output=None)
 
     # compare the outputs of original model's output and our model
-    pred = pred['bbox']
+    pred = pred["bbox"]
     assert len(pred) == len(MMOCR_res)  # num of text lines
 
     for p, m in zip(pred, MMOCR_res):
         assert len(p) == len(m["boundary_result"])  # num of bounding boxs
 
         for i in range(len(p)):
-            assert len(p[i]) == len(m["boundary_result"][i]) # 2 * num of coordinate points
+            assert len(p[i]) == len(m["boundary_result"][i])  # 2 * num of coordinate points
 
             for j in range(len(p[i])):
                 assert abs(p[i][j] - m["boundary_result"][i][j]) <= 1e-6
