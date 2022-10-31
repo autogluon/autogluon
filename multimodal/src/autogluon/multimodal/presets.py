@@ -161,6 +161,7 @@ def image_text_similarity():
     return {
         "model.names": ["clip"],
         "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
+        "matcher.loss.type": "multi_negatives_softmax_loss",
     }
 
 

@@ -162,7 +162,16 @@ class MatcherLitModule(pl.LightningModule):
         logit_scale: Optional[torch.tensor] = None,
     ):
         assert query_embeddings.shape == response_embeddings.shape
-        if self.miner_func is not None:
+
+        if isinstance(self.loss_func, MultiNegativesSoftmaxLoss):
+            loss = self.loss_func(
+                features_a=query_embeddings,
+                features_b=response_embeddings,
+                logit_scale=logit_scale,
+                rank=self.global_rank,
+                world_size=self.trainer.world_size,
+            )
+        else:
             embeddings = torch.cat([query_embeddings, response_embeddings], dim=0)  # (b*2, d)
 
             metric_learning_labels = generate_metric_learning_labels(
@@ -179,16 +188,6 @@ class MatcherLitModule(pl.LightningModule):
                 labels=metric_learning_labels,
                 indices_tuple=indices_tuple,
             )
-        elif isinstance(self.loss_func, MultiNegativesSoftmaxLoss):
-            loss = self.loss_func(
-                features_a=query_embeddings,
-                features_b=response_embeddings,
-                logit_scale=logit_scale,
-                rank=self.global_rank,
-                world_size=self.trainer.world_size,
-            )
-        else:
-            raise ValueError("Invalid matching loss function.")
 
         return loss
 
@@ -289,10 +288,10 @@ class MatcherLitModule(pl.LightningModule):
         self._compute_metric_score(
             metric=self.validation_metric,
             custom_metric_func=self.custom_metric_func,
-            query_embeddings=query_embeddings,
-            response_embeddings=response_embeddings,
+            query_embeddings=query_embeddings.cpu(),
+            response_embeddings=response_embeddings.cpu(),
             label=self._get_label(batch),
-            logit_scale=logit_scale,
+            logit_scale=logit_scale.cpu(),
             reverse_prob=self.reverse_prob,
         )
 

@@ -95,6 +95,8 @@ from .utils import (
 )
 
 logger = logging.getLogger(AUTOMM)
+logging.basicConfig()
+logging.getLogger(AUTOMM).setLevel(logging.DEBUG)
 
 
 class MultiModalMatcher:
@@ -521,6 +523,17 @@ class MultiModalMatcher:
 
         return query_df_preprocessor, response_df_preprocessor, label_df_preprocessor
 
+    def _filter_data_processors(self, data_processors, config):
+        # print(f"data_processors keys: {list(data_processors.keys())}")
+        filtered_data_processors = dict()
+        for model_name in config.model.names:
+            # print(f"model_name: {model_name}")
+            model_config = getattr(config.model, model_name)
+            for d_type in model_config.data_types:
+                # print(f"d_type: {d_type}")
+                filtered_data_processors[d_type] = data_processors[d_type]
+        return filtered_data_processors
+
     def _get_matcher_data_processors(
         self,
         query_model: Optional[nn.Module] = None,
@@ -538,7 +551,7 @@ class MultiModalMatcher:
                 requires_data=True,
             )
         else:  # continuing training
-            query_processors = self._query_processors
+            query_processors = self._filter_data_processors(self._query_processors, query_config)
 
         if response_model is None:
             response_processors = None
@@ -550,7 +563,7 @@ class MultiModalMatcher:
                 requires_data=True,
             )
         else:  # continuing training
-            response_processors = self._response_processors
+            response_processors = self._filter_data_processors(self._response_processors, response_config)
 
         # only need labels for the response model
         if response_model is None:
@@ -655,14 +668,19 @@ class MultiModalMatcher:
         logger.debug(f"query_processors_count: {query_processors_count}")
         response_processors_count = {k: len(v) for k, v in response_processors.items()}
         logger.debug(f"response_processors_count: {response_processors_count}")
-        label_processors_count = {k: len(v) for k, v in label_processors.items()}
-        logger.debug(f"label_processors_count: {label_processors_count}")
+        if label_processors:
+            label_processors_count = {k: len(v) for k, v in label_processors.items()}
+            logger.debug(f"label_processors_count: {label_processors_count}")
 
-        pos_label = try_to_infer_pos_label(
-            data_config=response_config.data,
-            label_encoder=label_df_preprocessor.label_generator,
-            problem_type=self._problem_type,
-        )
+        if label_df_preprocessor:
+            pos_label = try_to_infer_pos_label(
+                data_config=response_config.data,
+                label_encoder=label_df_preprocessor.label_generator,
+                problem_type=self._problem_type,
+            )
+        else:
+            pos_label = None
+
         validation_metric, custom_metric_func = get_metric(
             metric_name=validation_metric_name,
             num_classes=self._output_shape,

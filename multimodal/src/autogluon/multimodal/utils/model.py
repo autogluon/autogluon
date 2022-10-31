@@ -105,6 +105,7 @@ def select_model(
             if any(model_data_status) and not strict:
                 filtered_data_types = [d_type for d_type, d_status in zip(model_config.data_types, model_data_status) if d_status]
                 model_config.data_types = filtered_data_types
+                selected_model_names.append(model_name)
             else:
                 delattr(config.model, model_name)
 
@@ -127,6 +128,8 @@ def select_model(
 
     config.model.names = selected_model_names
     logger.debug(f"selected models: {selected_model_names}")
+    for model_name in selected_model_names:
+        logger.debug(f"model dtypes: {getattr(config.model, model_name).data_types}")
 
     return config
 
