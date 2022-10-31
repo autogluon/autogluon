@@ -8,8 +8,9 @@ if not MXNET_INSTALLED:
     pytest.skip(allow_module_level=True)
 from autogluon.timeseries.models.presets import get_default_hps
 from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSMXNetModelFactory
+from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 
-from ....common import DUMMY_TS_DATAFRAME
+from ....common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
 
 from gluonts.mx.model.seq2seq import MQRNNEstimator
 from gluonts.mx.model.transformer import TransformerEstimator
@@ -84,6 +85,14 @@ def test_when_mxnet_installed_then_default_presets_include_mxnet_models(preset_k
     assert any(
         "MXNet" in model_name for model_name in hps.keys()
     )
+
+
+@pytest.fixture(scope="module")
+def df_with_static():
+    feature_pipeline = ContinuousAndCategoricalFeatureGenerator()
+    df = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC.copy(deep=False)
+    df.static_features = feature_pipeline.fit_transform(df.static_features)
+    return df
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MX_MODELS_WITH_STATIC_FEATURES)
