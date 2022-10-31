@@ -30,10 +30,10 @@ class InferenceSessionWrapper:
 
 
 class RFOnnxPredictor:
-    def __init__(self, model, num_classes):
-        self.num_classes = num_classes
+    def __init__(self, model):
+        # self.num_classes = num_classes
         self.sess = InferenceSessionWrapper(model)
-        self.model = model
+        self.num_classes = self.sess.get_outputs()[1].shape[1]
 
     def predict(self, X):
         input_name = self.sess.get_inputs()[0].name
@@ -61,19 +61,25 @@ class RFOnnxCompiler:
             return False
 
     @staticmethod
-    def compile(model, input_types=None):
+    def compile(model, path: str, input_types=None):
         if input_types is None or not isinstance(input_types[0], tuple):
             raise RuntimeError("input_types argument should contain at least one tuple"
                                ", e.g. [((1, 14), np.float32)]")
         if isinstance(model, RFOnnxPredictor):
             return model
-        # Convert into ONNX format
+
         from skl2onnx import convert_sklearn
         from skl2onnx.common.data_types import FloatTensorType
         input_shape = list(input_types[0][0])
         initial_type = [('float_input', FloatTensorType(input_shape))]
-        onnx_model = convert_sklearn(model, initial_types=initial_type)
-        predictor =  RFOnnxPredictor(model=onnx_model, num_classes=model.n_classes_)
+        # Without ZipMap
+        # See http://onnx.ai/sklearn-onnx/auto_examples/plot_convert_zipmap.html#without-zipmap
+        options = {id(model): {'zipmap': False}}
+
+        # Convert the model to onnx
+        onnx_model = convert_sklearn(model, initial_types=initial_type, options=options)
+        predictor =  RFOnnxPredictor(model=onnx_model)
+        RFOnnxCompiler.save(onnx_model, path)
         return predictor
 
     @staticmethod
@@ -81,11 +87,10 @@ class RFOnnxCompiler:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path + "model.onnx", "wb") as f:
             f.write(model.SerializeToString())
-        return RFOnnxCompiler.load(path=path)
+        return path + "model.onnx"
 
     @staticmethod
-    def load(obj, path: str):
+    def load(path: str):
         import onnx
         onnx_bytes = onnx.load(path + "model.onnx")
-        model = InferenceSessionWrapper(onnx_bytes)
-        return RFOnnxPredictor(model=model)
+        return RFOnnxPredictor(model=onnx_bytes)

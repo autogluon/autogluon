@@ -881,18 +881,27 @@ class AbstractModel:
         assert self.is_fit(), "The model must be fit before calling the compile method."
         if compiler_configs is None:
             compiler_configs = {}
-        compiler = compiler_configs.get("compiler", "native")
-        batch_size = compiler_configs.get("batch_size", None)
 
-        save_in_pkl = True
+        # Get model specific compiler options
+        # Model type can be described with either model type, or model name as string
+        if type(self) in compiler_configs:
+            configs = compiler_configs[type(self)]
+        elif self.name in compiler_configs:
+            configs = compiler_configs[self.name]
+        else:
+            configs = compiler_configs
+        compiler = configs.get("compiler", "native")
+        batch_size = configs.get("batch_size", None)
+
         if self.model is not None:
             self._compiler = self._get_compiler(compiler=compiler)
             if self._compiler is not None:
                 input_types = [(tuple([batch_size]+list(shape)[1:]), dtype)
                                for shape, dtype in self._input_types_post_process]
-                self.model = self._compiler.compile(model=self.model, input_types=input_types)
-                save_in_pkl = self._compiler.save_in_pkl
-        return self.model, save_in_pkl
+                self._compiler.compile(model=self.model, path=self.path, input_types=input_types)
+                if not self._compiler.save_in_pkl:
+                    self.model = None
+                self.save(path=self.path, verbose=False)
 
     def _default_compiler(self):
         return None

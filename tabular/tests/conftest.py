@@ -132,7 +132,9 @@ class FitHelper:
                                  extra_metrics=None,
                                  expected_model_count=2,
                                  compile_models=False,
-                                 compiler_configs={}):
+                                 compiler_configs=None):
+        if compiler_configs is None:
+            compiler_configs = {}
         directory_prefix = './datasets/'
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
         label = dataset_info['label']
@@ -143,8 +145,8 @@ class FitHelper:
         )
         predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)
         if compile_models:
-            predictor.compile_models(models="best", compiler_configs=compiler_configs)
-            predictor.persist_models(models="best")
+            predictor.compile_models(models="all", compiler_configs=compiler_configs)
+            predictor.persist_models(models="all")
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)
         predictor.predict(test_data)

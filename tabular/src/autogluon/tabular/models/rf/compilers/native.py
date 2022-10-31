@@ -11,7 +11,7 @@ class AbstractNativeCompiler:
         return True
 
     @staticmethod
-    def compile(model, input_types=None):
+    def compile(model, path: str, input_types=None):
         """
         Compile the trained model for faster inference.
 
@@ -33,6 +33,7 @@ class AbstractNativeCompiler:
 
     @staticmethod
     def save(model, path: str):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path + 'model_native.pkl', 'wb') as fp:
             fp.write(pickle.dumps(model))
 
