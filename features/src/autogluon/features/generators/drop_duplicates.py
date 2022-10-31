@@ -24,7 +24,8 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         If None or greater than the number of rows, no initial filter will occur. This may increase the time to fit immensely for large datasets.
     sample_size_final : int, default 20000
         The number of rows to sample when doing the final filter to determine duplicate features.
-        This theoretically can lead to features that are very nearly duplicates but not exact duplicates being removed, but should be near impossible in practice.
+        This theoretically can lead to features that are very nearly duplicates but not exact duplicates being removed,
+        but should be near impossible in practice.
         If None or greater than the number of rows, will perform exact duplicate detection (most expensive).
         It is recommend to keep this value below 100000 to maintain reasonable fit times.
     **kwargs :

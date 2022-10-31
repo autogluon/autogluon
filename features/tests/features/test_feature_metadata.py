@@ -68,7 +68,8 @@ def test_feature_metadata(data_helper):
     )
     feature_metadata_recombined = feature_metadata_keep.join_metadata(feature_metadata_remove)
     feature_metadata_recombined_alternate = FeatureMetadata.join_metadatas(metadata_list=[feature_metadata_keep, feature_metadata_remove])
-    feature_metadata_recombined_full = FeatureMetadata.join_metadatas(metadata_list=[feature_metadata_keep, feature_metadata_remove, feature_metadata_custom], shared_raw_features='error_if_diff')
+    feature_metadata_recombined_full = FeatureMetadata.join_metadatas(metadata_list=[feature_metadata_keep, feature_metadata_remove, feature_metadata_custom],
+                                                                      shared_raw_features='error_if_diff')
 
     # Therefore
     with pytest.raises(AssertionError):
