@@ -3,6 +3,7 @@ import logging
 from typing import Any, Dict, List, Union
 
 import autogluon.core as ag
+import autogluon.timeseries as agts
 
 from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
 from . import (
@@ -38,9 +39,9 @@ MODEL_TYPES = dict(
     # Prophet=ProphetModel,
     TransformerMXNet=TransformerMXNetModel,
     TemporalFusionTransformerMXNet=TemporalFusionTransformerMXNetModel,
-    SktimeARIMA=ARIMASktimeModel,
-    SktimeAutoARIMA=AutoARIMASktimeModel,
-    SktimeAutoETS=AutoETSSktimeModel,
+    ARIMASktime=ARIMASktimeModel,
+    AutoARIMASktime=AutoARIMASktimeModel,
+    AutoETSSktime=AutoETSSktimeModel,
     ETS=ETSModel,
     ARIMA=ARIMAModel,
     Theta=ThetaModel,
@@ -58,9 +59,9 @@ DEFAULT_MODEL_PRIORITY = dict(
     TemporalFusionTransformerMXNet=30,
     DeepAR=40,
     DeepARMXNet=30,
-    SktimeAutoARIMA=20,
-    SktimeARIMA=50,
-    SktimeAutoETS=60,
+    AutoARIMASktime=20,
+    ARIMASktime=50,
+    AutoETSSktime=60,
     ARIMA=50,
     ETS=60,
     Theta=60,

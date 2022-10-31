@@ -4,7 +4,10 @@ from unittest import mock
 import pandas as pd
 import pytest
 
-from autogluon.timeseries import TimeSeriesDataFrame
+from autogluon.timeseries import TimeSeriesDataFrame, SKTIME_INSTALLED
+if not SKTIME_INSTALLED:
+    pytest.skip()
+
 from autogluon.timeseries.models.sktime import (  # AutoARIMAModel,; TBATSModel,
     AbstractSktimeModel,
     ARIMASktimeModel,
