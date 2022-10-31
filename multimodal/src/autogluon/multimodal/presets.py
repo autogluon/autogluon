@@ -162,6 +162,8 @@ def image_text_similarity():
         "model.names": ["clip"],
         "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
         "matcher.loss.type": "multi_negatives_softmax_loss",
+        "env.per_gpu_batch_size": 128,
+        "optimization.learning_rate": 1e-5,
     }
 
 

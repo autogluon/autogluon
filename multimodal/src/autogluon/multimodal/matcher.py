@@ -95,8 +95,8 @@ from .utils import (
 )
 
 logger = logging.getLogger(AUTOMM)
-logging.basicConfig()
-logging.getLogger(AUTOMM).setLevel(logging.DEBUG)
+# logging.basicConfig()
+# logging.getLogger(AUTOMM).setLevel(logging.DEBUG)
 
 
 class MultiModalMatcher:
@@ -686,6 +686,9 @@ class MultiModalMatcher:
             num_classes=self._output_shape,
             pos_label=pos_label,
         )
+        logger.debug(f"validation_metric_name: {validation_metric_name}")
+        logger.debug(f"validation_metric: {validation_metric}")
+        logger.debug(f"custom_metric_func: {custom_metric_func}")
 
         loss_func = get_matcher_loss_func(
             data_format=self._data_format,
@@ -718,13 +721,19 @@ class MultiModalMatcher:
         self._label_processors = label_processors
         self._loss_func = loss_func
 
+        df_preprocessors = [query_df_preprocessor, response_df_preprocessor, label_df_preprocessor]
+        data_processors = [query_processors, response_processors, label_processors]
+        df_preprocessors = [item for item in df_preprocessors if item is not None]
+        data_processors = [item for item in data_processors if item is not None]
+        assert len(df_preprocessors) == len(data_processors)
+
         train_dm = BaseDataModule(
-            df_preprocessor=[query_df_preprocessor, response_df_preprocessor, label_df_preprocessor],
-            data_processors=[query_processors, response_processors, label_processors],
+            df_preprocessor=df_preprocessors,
+            data_processors=data_processors,
             per_gpu_batch_size=config.env.per_gpu_batch_size,
             num_workers=config.env.num_workers,
             train_data=train_df,
-            val_data=val_df,
+            validate_data=val_df,
             id_mappings=id_mappings,
         )
         optimization_kwargs = dict(
@@ -861,6 +870,12 @@ class MultiModalMatcher:
                 ".* in the `DataLoader` init to improve performance.*",
             )
             warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
+            trainer.validate(
+                task,
+                datamodule=train_dm,
+                ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
+            )
+
             trainer.fit(
                 task,
                 datamodule=train_dm,

@@ -100,7 +100,7 @@ VALID_METRICS = METRIC_MODE_MAP.keys()
 
 # Training status
 TRAIN = "train"
-VAL = "val"
+VALIDATE = "validate"
 TEST = "test"
 PREDICT = "predict"
 

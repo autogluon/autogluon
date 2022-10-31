@@ -1,4 +1,5 @@
 from typing import Optional
+import logging
 
 import torch
 import torch.nn as nn
@@ -15,6 +16,10 @@ try:
     import horovod.torch as hvd
 except ImportError:
     hvd = None
+
+from ..constants import AUTOMM
+
+logger = logging.getLogger(AUTOMM)
 
 
 class RKDLoss(nn.Module):
@@ -203,6 +208,12 @@ class MultiNegativesSoftmaxLoss(nn.Module):
 
     def forward(self, features_a, features_b, logit_scale, rank=0, world_size=1):
         device = features_a.device
+        # logger.debug(f"rank: {rank}")
+        # logger.debug(f"device: {device}")
+        # logger.debug(f"world size: {world_size}")
+        # logger.debug(f"logit_scale: {logit_scale}")
+        # logger.debug(f"features a shape: {features_a.shape}")
+        # logger.debug(f"features b shape: {features_b.shape}")
         if world_size > 1:
             all_features_a, all_features_b = gather_features(
                 features_a, features_b,

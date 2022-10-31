@@ -151,46 +151,60 @@ class CustomF1Score(torchmetrics.F1Score):
 
 
 class CustomHitRate(torchmetrics.Metric):
-    def __init__(self):
-        super.__init__()
+    def __init__(self,):
+        super().__init__()
         self.add_state("query_embeddings", default=[], dist_reduce_fx=None)
         self.add_state("response_embeddings", default=[], dist_reduce_fx=None)
         self.add_state("logit_scale", default=[], dist_reduce_fx=None)
 
-    def update(self, batch_query_embeds: torch.Tensor, batch_response_embeds: torch.Tensor, batch_logit_scale: Optional[torch.Tensor] = None):
+    def update(self, batch_query_embeds: torch.Tensor, batch_response_embeds: torch.Tensor, logit_scale: Optional[torch.Tensor] = None):
         self.query_embeddings.append(batch_query_embeds)
         self.response_embeddings.append(batch_response_embeds)
-        if batch_logit_scale is not None:
-            self.logit_scale.append(batch_logit_scale)
+        if logit_scale is not None:
+            # print(f"batch_logit_scale: {batch_logit_scale}")
+            # if batch_logit_scale.shape[0] == 1:
+            #     batch_logit_scale = batch_logit_scale.repeat(batch_query_embeds.shape[0])
+            # if batch_logit_scale.ndim == 1:
+            #     batch_logit_scale = batch_logit_scale[:, None]
+            self.logit_scale.append(logit_scale)
 
     def compute(self):
         query_embeddings = torch.cat(self.query_embeddings)
         response_embeddings = torch.cat(self.response_embeddings)
         if self.logit_scale:
-            logit_scale = torch.cat(self.logit_scale).mean()
+            logit_scale = torch.mean(torch.stack(self.logit_scale))
         else:
             logit_scale = 1
 
         return compute_hit_rate(query_embeddings, response_embeddings, logit_scale)
 
 
-def compute_hit_rate(image_features, text_features, logit_scale, top_ks=[1, 5, 10]):
-    # metrics = {}
-    hit_rate = 0
-    logits_per_image = (logit_scale * image_features @ text_features.t()).detach().cpu()
-    logits_per_text = logits_per_image.t().detach().cpu()
+def compute_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
+    print(f"features_a shape: {features_a.shape}")
+    print(f"features_b shape: {features_b.shape}")
+    print(f"logit_scale: {logit_scale}")
 
-    logits = {"image_to_text": logits_per_image, "text_to_image": logits_per_text}
-    ground_truth = torch.arange(len(text_features)).view(-1, 1)
+    # metrics = {}
+    assert len(features_a) == len(features_b)
+    hit_rate = 0
+    logits_per_a = (logit_scale * features_a @ features_b.t()).detach().cpu()
+    logits_per_b = logits_per_a.t().detach().cpu()
+
+    logits = {"logits_per_a": logits_per_a, "logits_per_b": logits_per_b}
+    ground_truth = torch.arange(len(features_b)).view(-1, 1)
 
     for name, logit in logits.items():
+        print(f"name: {name}")
         ranking = torch.argsort(logit, descending=True)
         preds = torch.where(ranking == ground_truth)[1]
-        preds = preds.detach().cpu().numpy()
+        # print(f"preds: {preds}")
+        # preds = preds.detach().cpu()
         # metrics[f"{name}_mean_rank"] = preds.mean() + 1
         # metrics[f"{name}_median_rank"] = np.floor(np.median(preds)) + 1
         for k in top_ks:
-            hit_rate += np.mean(preds < k)
+            # print(f"k: {k}")
+            print(f"(preds < k).float().mean(): {(preds < k).float().mean()}")
+            hit_rate += (preds < k).float().mean()
 
     return hit_rate
 
@@ -257,7 +271,7 @@ def get_metric(
             None,
         )  # This only works for detection where custom_metric is not required for BaseAggregator
     elif metric_name == HIT_RATE:
-        return CustomHitRate, None
+        return CustomHitRate(), None
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 
