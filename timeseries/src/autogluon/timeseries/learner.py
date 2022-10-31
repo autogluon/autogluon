@@ -240,11 +240,11 @@ class TimeSeriesLearner(AbstractLearner):
     ) -> Optional[TimeSeriesDataFrame]:
         """Preprocess the columns of the TimeSeriesDataFrame and check if all expected columns are present.
 
-        This includes:
-        - Ensuring that `self.target` is present among the columns (if `must_include_target=True`)
-        - Ensuring that all `self.known_covariates_names` are present among the columns
-        - Ensuring that `self.target` and `self.known_covariates_names` columns have np.float64 dtype
-        - No columns other than `self.target` and `self.known_covariates_names` are present in the dataframe
+        This includes ensuring that:
+        - `self.target` is present among the columns (if `must_include_target=True`)
+        - all `self.known_covariates_names` are present among the columns
+        - `self.target` and `self.known_covariates_names` columns have np.float64 dtype
+        - no columns other than `self.target` and `self.known_covariates_names` are present in the dataframe
         """
         if data is None:
             return data
