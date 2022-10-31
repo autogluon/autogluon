@@ -1,9 +1,8 @@
 import pytest
 
-
 from autogluon.timeseries import MXNET_INSTALLED
 if not MXNET_INSTALLED:
-    pytest.skip()
+    pytest.skip(allow_module_level=True)
 
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from autogluon.timeseries.models.gluonts.mx.callback import (

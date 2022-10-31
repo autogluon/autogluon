@@ -3,6 +3,7 @@ from unittest import mock
 import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
+import autogluon.timeseries as agts
 from autogluon.timeseries.models.gluonts import (
     DeepARModel,
     SimpleFeedForwardModel,
@@ -11,7 +12,11 @@ from autogluon.timeseries.models.gluonts.torch.models import AbstractGluonTSPyTo
 from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 
 from ...common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
-from .mx.test_mx import TESTABLE_MX_MODELS, TESTABLE_MX_MODELS_WITH_STATIC_FEATURES
+if agts.MXNET_INSTALLED:
+    from .mx.test_mx import TESTABLE_MX_MODELS, TESTABLE_MX_MODELS_WITH_STATIC_FEATURES
+else:
+    TESTABLE_MX_MODELS = []
+    TESTABLE_MX_MODELS_WITH_STATIC_FEATURES = []
 
 MODELS_WITH_STATIC_FEATURES = [DeepARModel] + TESTABLE_MX_MODELS_WITH_STATIC_FEATURES
 TESTABLE_PYTORCH_MODELS = [DeepARModel, SimpleFeedForwardModel]
@@ -124,17 +129,3 @@ def test_when_disable_static_features_set_to_true_then_static_features_are_not_u
             feat_static_real = call_kwargs["feat_static_real"]
             assert feat_static_cat is None
             assert feat_static_real is None
-
-
-@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
-def test_given_fit_with_static_features_when_predicting_then_static_features_are_used(model_class, df_with_static):
-    model = model_class(hyperparameters={"epochs": 1, "num_batches_per_epoch": 1})
-    model.fit(train_data=df_with_static)
-    with mock.patch("gluonts.mx.model.predictor.RepresentableBlockPredictor.predict") as mock_predict:
-        try:
-            model.predict(df_with_static)
-        except IndexError:
-            gluonts_dataset = mock_predict.call_args[1]["dataset"]
-            item = next(iter(gluonts_dataset))
-            assert item["feat_static_cat"].shape == (1,)
-            assert item["feat_static_real"].shape == (2,)

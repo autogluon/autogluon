@@ -6,7 +6,7 @@ import pytest
 
 from autogluon.timeseries import TimeSeriesDataFrame, SKTIME_INSTALLED
 if not SKTIME_INSTALLED:
-    pytest.skip()
+    pytest.skip(allow_module_level=True)
 
 from autogluon.timeseries.models.sktime import (  # AutoARIMAModel,; TBATSModel,
     AbstractSktimeModel,

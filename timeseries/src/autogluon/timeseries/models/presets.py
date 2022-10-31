@@ -16,32 +16,13 @@ from . import (
     ETSModel, 
     ThetaModel,
 )
-from .sktime import ARIMASktimeModel, AutoARIMASktimeModel, AutoETSSktimeModel
-from .gluonts.mx import (
-    DeepARMXNetModel,
-    MQCNNMXNetModel,
-    MQRNNMXNetModel,
-    SimpleFeedForwardMXNetModel,
-    TemporalFusionTransformerMXNetModel,
-    TransformerMXNetModel,
-)
-
 logger = logging.getLogger(__name__)
 
-
-MODEL_TYPES = dict(
-    MQCNNMXNet=MQCNNMXNetModel,
-    MQRNNMXNet=MQRNNMXNetModel,
+# define the model zoo with their aliases
+DEFAULT_MODEL_TYPES = dict(
     SimpleFeedForward=SimpleFeedForwardModel,
-    SimpleFeedForwardMXNet=SimpleFeedForwardMXNetModel,
     DeepAR=DeepARModel,
-    DeepARMXNet=DeepARMXNetModel,
     # Prophet=ProphetModel,
-    TransformerMXNet=TransformerMXNetModel,
-    TemporalFusionTransformerMXNet=TemporalFusionTransformerMXNetModel,
-    ARIMASktime=ARIMASktimeModel,
-    AutoARIMASktime=AutoARIMASktimeModel,
-    AutoETSSktime=AutoETSSktimeModel,
     ETS=ETSModel,
     ARIMA=ARIMAModel,
     Theta=ThetaModel,
@@ -49,6 +30,40 @@ MODEL_TYPES = dict(
     Naive=NaiveModel,
     SeasonalNaive=SeasonalNaiveModel,
 )
+if agts.MXNET_INSTALLED:
+    from .gluonts.mx import (
+        DeepARMXNetModel,
+        MQCNNMXNetModel,
+        MQRNNMXNetModel,
+        SimpleFeedForwardMXNetModel,
+        TemporalFusionTransformerMXNetModel,
+        TransformerMXNetModel,
+    )
+    MXNET_MODEL_TYPES = dict(
+        DeepARMXNet=DeepARMXNetModel,
+        SimpleFeedForwardMXNet=SimpleFeedForwardMXNetModel,
+        MQCNNMXNet=MQCNNMXNetModel,
+        MQRNNMXNet=MQRNNMXNetModel,
+        TransformerMXNet=TransformerMXNetModel,
+        TemporalFusionTransformerMXNet=TemporalFusionTransformerMXNetModel,
+    )
+else:
+    MXNET_MODEL_TYPES = {}
+
+if agts.SKTIME_INSTALLED:
+    from .sktime import ARIMASktimeModel, AutoARIMASktimeModel, AutoETSSktimeModel
+    SKTIME_MODEL_TYPES = dict(
+        ARIMASktime=ARIMASktimeModel,
+        AutoARIMASktime=AutoARIMASktimeModel,
+        AutoETSSktime=AutoETSSktimeModel,
+    )
+else:
+    SKTIME_MODEL_TYPES = {}
+    
+MODEL_TYPES = dict(
+    **DEFAULT_MODEL_TYPES, **SKTIME_MODEL_TYPES, **MXNET_MODEL_TYPES
+)
+
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
     MQCNNMXNet=20,
@@ -95,9 +110,6 @@ def get_default_hps(key, prediction_length):
             "DeepAR": {
                 "context_length": context_length,
             },
-            "TemporalFusionTransformerMXNet": {
-                "context_length": context_length,
-            },
             "AutoGluonTabular": {},
         },
         "default_hpo": {
@@ -126,18 +138,35 @@ def get_default_hps(key, prediction_length):
                 "batch_size": 64,
                 "context_length": context_length,
             },
-            "TransformerMXNet": {
-                "model_dim": ag.Categorical(32, 64),
-                "batch_size": 64,
-                "context_length": context_length,
-            },
-            "TemporalFusionTransformerMXNet": {
-                "hidden_dim": ag.Categorical(32, 64),
-                "batch_size": 64,
-                "context_length": context_length,
-            },
         },
     }
+    
+    # update with MXNet if installed
+    if agts.MXNET_INSTALLED:
+        mxnet_default_updates = {
+            "default": {
+                "TemporalFusionTransformerMXNet": {
+                    "context_length": context_length,
+                }
+            },
+            "default_hpo": {
+                "TransformerMXNet": {
+                    "model_dim": ag.Categorical(32, 64),
+                    "batch_size": 64,
+                    "context_length": context_length,
+                },
+                "TemporalFusionTransformerMXNet": {
+                    "hidden_dim": ag.Categorical(32, 64),
+                    "batch_size": 64,
+                    "context_length": context_length,
+                },
+            }
+        }
+        for k in default_model_hps:
+            default_model_hps[k] = dict(
+                **default_model_hps[k], **mxnet_default_updates.get(k, {})
+            )
+    
     return default_model_hps[key]
 
 
