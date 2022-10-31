@@ -42,7 +42,6 @@ def detection_train(
     checkpoint_name="faster_rcnn_r50_fpn_2x_coco",
     num_classes=80,
     lr=1e-3,
-    wd=1e-4,
     epochs=50,
     num_gpus=4,
     val_metric=None,
@@ -64,8 +63,6 @@ def detection_train(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
-            "env.strategy": "ddp",
-            "env.auto_select_gpus": False,  # Have to turn off for detection!
         },
         pipeline="object_detection",
         num_classes=num_classes,
@@ -80,15 +77,8 @@ def detection_train(
         train_path,
         tuning_data=val_path,
         hyperparameters={
-            # "optimization.learning_rate": lr/100,
-            # "optimization.lr_decay": 0.95,
-            # "optimization.lr_mult": 100,
-            # "optimization.lr_choice": "two_stages",
+            "optimization.learning_rate": lr/100, # we use two stage and lr_mult=100 for detection
             "optimization.max_epochs": epochs,
-            # "optimization.top_k": 1,
-            # "optimization.top_k_average_method": "best",
-            # "optimization.warmup_steps": 0.0,
-            # "optimization.patience": 40,
             "env.per_gpu_batch_size": per_gpu_batch_size,  # decrease it when model is large
         },
     )
@@ -110,7 +100,6 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint_name", default="yolov3_mobilenetv2_320_300e_coco", type=str)
     parser.add_argument("--num_classes", default=20, type=int)
     parser.add_argument("--lr", default=1e-3, type=float)
-    parser.add_argument("--wd", default=1e-3, type=float)
     parser.add_argument("--epochs", default=50, type=int)
     parser.add_argument("--num_gpus", default=4, type=int)
     parser.add_argument("--per_gpu_batch_size", default=8, type=int)
@@ -124,7 +113,6 @@ if __name__ == "__main__":
         checkpoint_name=args.checkpoint_name,
         num_classes=args.num_classes,
         lr=args.lr,
-        wd=args.wd,
         epochs=args.epochs,
         num_gpus=args.num_gpus,
         val_metric=args.val_metric,  # "mAP" or "direct_loss" or None (use default: "direct_loss")

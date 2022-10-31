@@ -107,6 +107,8 @@ def object_detection():  # use another presets for training detection models fro
         "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
         "env.eval_batch_size_ratio": 1,
         "env.precision": 32,
+        "env.strategy": "ddp",  # TODO: support ddp_spawn for detection
+        "env.auto_select_gpus": False,  # Have to turn off for detection!
         "optimization.learning_rate": 5e-5,
         "optimization.lr_decay": 0.95,
         "optimization.lr_mult": 100,
