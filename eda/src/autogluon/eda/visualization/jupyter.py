@@ -3,6 +3,9 @@ from IPython.display import display, HTML, Markdown
 
 class JupyterMixin:
 
+    def __init__(self) -> None:
+        self.headers = False
+
     @staticmethod
     def display_obj(obj):
         display(obj)

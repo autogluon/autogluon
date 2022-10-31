@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Dict, Set
 
 import pandas as pd
 
@@ -241,12 +241,13 @@ class SpecialTypesAnalysis(AbstractAnalysis):
 
     @staticmethod
     def infer_special_types(ds):
-        special_types = {}
+        special_types: Dict[str, Set[str]] = {}
         for t, cols in get_type_group_map_special(ds).items():
             for col in cols:
                 if col not in special_types:
                     special_types[col] = set()
                 special_types[col].add(t)
+        result: Dict[str, str] = {}
         for col, types in special_types.items():
-            special_types[col] = ', '.join(sorted(types))
-        return special_types
+            result[col] = ', '.join(sorted(types))
+        return result
