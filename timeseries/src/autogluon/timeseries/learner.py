@@ -16,6 +16,7 @@ from .evaluator import TimeSeriesEvaluator
 from .models.abstract import AbstractTimeSeriesModel
 from .splitter import AbstractTimeSeriesSplitter, LastWindowSplitter
 from .trainer import AbstractTimeSeriesTrainer, AutoTimeSeriesTrainer
+from .utils.forecast import get_forecast_horizon_index
 
 logger = logging.getLogger(__name__)
 
@@ -287,13 +288,7 @@ class TimeSeriesLearner(AbstractLearner):
                 f"known_covariates are missing information for the following item_ids: {missing_item_ids.to_list()}."
             )
 
-        offset = pd.tseries.frequencies.to_offset(data.freq)
-
-        def get_forecast_index_for_item(time_series: TimeSeriesDataFrame) -> pd.Series:
-            start = time_series.index.get_level_values(TIMESTAMP)[-1] + offset
-            return pd.date_range(start=start, freq=offset, periods=self.prediction_length, name=TIMESTAMP).to_series()
-
-        forecast_index = data.groupby(ITEMID, sort=False).apply(get_forecast_index_for_item).index
+        forecast_index = get_forecast_horizon_index(data, prediction_length=self.prediction_length)
         try:
             known_covariates = known_covariates.loc[forecast_index]
         except KeyError:

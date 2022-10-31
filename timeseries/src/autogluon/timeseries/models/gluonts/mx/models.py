@@ -94,10 +94,10 @@ class DeepARMXNetModel(AbstractGluonTSMXNetModel):
 
     def _get_model_params(self) -> dict:
         args = super()._get_model_params()
-        args.setdefault("use_feat_static_cat", self.use_feat_static_cat)
-        args.setdefault("use_feat_static_real", self.use_feat_static_real)
+        args.setdefault("use_feat_static_cat", self.num_feat_static_cat > 0)
+        args.setdefault("use_feat_static_real", self.num_feat_static_real > 0)
         args.setdefault("cardinality", self.feat_static_cat_cardinality)
-        args.setdefault("use_feat_dynamic_real", self.use_feat_dynamic_real)
+        args.setdefault("use_feat_dynamic_real", self.num_feat_dynamic_real > 0)
         return args
 
 
@@ -187,10 +187,10 @@ class MQCNNMXNetModel(AbstractGluonTSSeq2SeqModel):
 
     def _get_model_params(self) -> dict:
         args = super()._get_model_params()
-        args.setdefault("use_feat_static_cat", self.use_feat_static_cat)
-        args.setdefault("use_feat_static_real", self.use_feat_static_real)
+        args.setdefault("use_feat_static_cat", self.num_feat_static_cat > 0)
+        args.setdefault("use_feat_static_real", self.num_feat_static_real > 0)
         args.setdefault("cardinality", self.feat_static_cat_cardinality)
-        args.setdefault("use_feat_dynamic_real", self.use_feat_dynamic_real)
+        args.setdefault("use_feat_dynamic_real", self.num_feat_dynamic_real > 0)
         return args
 
 

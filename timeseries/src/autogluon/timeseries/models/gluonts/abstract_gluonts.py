@@ -147,9 +147,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         )
         self.gts_predictor: Optional[GluonTSPredictor] = None
         self.callbacks = []
-        self.use_feat_static_cat = False
-        self.use_feat_static_real = False
-        self.use_feat_dynamic_real = False
+        self.num_feat_static_cat = 0
+        self.num_feat_static_real = 0
+        self.num_feat_dynamic_real = 0
         self.feat_static_cat_cardinality: List[int] = []
 
     def save(self, path: str = None, **kwargs) -> str:
@@ -232,9 +232,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     def _to_gluonts_dataset(self, time_series_df: Optional[TimeSeriesDataFrame]) -> Optional[GluonTSDataset]:
         if time_series_df is not None:
             feat_static_cat, feat_static_real = get_categorical_and_continuous_features(time_series_df.static_features)
-            if not self.use_feat_static_cat:
+            if self.num_feat_static_cat == 0:
                 feat_static_cat = None
-            if not self.use_feat_static_real:
+            if self.num_feat_static_real == 0:
                 feat_static_real = None
             feat_dynamic_real = time_series_df.drop(self.target, axis=1) if self.use_feat_dynamic_real else None
             return SimpleGluonTSDataset(
