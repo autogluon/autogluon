@@ -101,8 +101,8 @@ class TimeSeriesLearner(AbstractLearner):
 
         train_data, val_data = self._preprocess_static_features(train_data=train_data, val_data=val_data)
 
-        train_data = self._preprocess_covariates_and_target(train_data, data_frame_name="train_data")
-        val_data = self._preprocess_covariates_and_target(val_data, data_frame_name="tuning_data", report_unused=False)
+        train_data = self._preprocess_target_and_covariates(train_data, data_frame_name="train_data")
+        val_data = self._preprocess_target_and_covariates(val_data, data_frame_name="tuning_data", report_unused=False)
 
         # Train / validation split
         if val_data is None:
@@ -231,27 +231,38 @@ class TimeSeriesLearner(AbstractLearner):
                 "match train_data.static_features. " + fix_message
             )
 
-    def _preprocess_covariates_and_target(
+    def _preprocess_target_and_covariates(
         self,
         data: Optional[TimeSeriesDataFrame],
         data_frame_name: str,
-        check_target: bool = True,
+        must_include_target: bool = True,
         report_unused: bool = True,
     ) -> Optional[TimeSeriesDataFrame]:
-        """Convert known covariates to float dtype and remove unused columns.
+        """Preprocess the columns of the TimeSeriesDataFrame and check if all expected columns are present.
 
-        The returned dataframe is guaranteed to only include
-        - known covariates listed in self.known_covariates_names
-        - the target column (if check_target = True)
+        This includes:
+        - Ensuring that `self.target` is present among the columns (if `must_include_target=True`)
+        - Ensuring that all `self.known_covariates_names` are present among the columns
+        - Ensuring that `self.target` and `self.known_covariates_names` columns have np.float64 dtype
+        - No columns other than `self.target` and `self.known_covariates_names` are present in the dataframe
         """
         if data is None:
             return data
 
-        if check_target and self.target not in data.columns:
-            raise ValueError(f"Target column `{self.target}` not found in {data_frame_name}.")
+        data = data.copy(deep=False)
+
+        if must_include_target:
+            if self.target not in data.columns:
+                raise ValueError(f"Target column `{self.target}` not found in {data_frame_name}.")
+            try:
+                data[self.target] = data[self.target].astype(np.float64)
+            except ValueError:
+                raise ValueError(
+                    f"The target columns {self.target} must have numeric (float or int) dtype, "
+                    f"but in {data_frame_name} it has dtype {data[self.target].dtype}"
+                )
 
         if len(self.known_covariates_names) > 0:
-            data = data.copy(deep=False)
             missing_columns = list(set(self.known_covariates_names).difference(set(data.columns)))
             if len(missing_columns) > 0:
                 raise ValueError(
@@ -277,13 +288,17 @@ class TimeSeriesLearner(AbstractLearner):
         known_covariates: Optional[TimeSeriesDataFrame],
         data: TimeSeriesDataFrame,
     ) -> Optional[TimeSeriesDataFrame]:
-        """Select the relevant item_ids and timestamps from the known_covariates dataframe."""
+        """Select the relevant item_ids and timestamps from the known_covariates dataframe.
+
+        If some of the item_ids or timestamps are missing, an exception is raised.
+        """
         if len(self.known_covariates_names) == 0:
             return None
         if len(self.known_covariates_names) > 0 and known_covariates is None:
             raise ValueError(
                 f"known_covariates {self.known_covariates_names} for the forecast horizon should be provided at prediction time."
             )
+
         missing_item_ids = data.item_ids.difference(known_covariates.item_ids)
         if len(missing_item_ids) > 0:
             raise ValueError(
@@ -315,9 +330,9 @@ class TimeSeriesLearner(AbstractLearner):
             self._check_static_feature_compatibility(data.static_features, fix_message=fix_message, other_name="data")
             data.static_features = self.static_feature_pipeline.transform(data.static_features)
             data.static_features = convert_numerical_features_to_float(data.static_features)
-        data = self._preprocess_covariates_and_target(data, data_frame_name="data")
-        known_covariates = self._preprocess_covariates_and_target(
-            known_covariates, data_frame_name="known_covariates", check_target=False
+        data = self._preprocess_target_and_covariates(data, data_frame_name="data")
+        known_covariates = self._preprocess_target_and_covariates(
+            known_covariates, data_frame_name="known_covariates", must_include_target=False
         )
         known_covariates = self._align_covariates_with_forecast_index(known_covariates=known_covariates, data=data)
         prediction = self.load_trainer().predict(data=data, known_covariates=known_covariates, model=model, **kwargs)
