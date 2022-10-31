@@ -400,7 +400,12 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
 
     def after_all_folds_scheduled(self):
         if not self.ray.is_initialized():
-            ray_init_args = dict(num_cpus=self.num_cpus, log_to_driver=False)
+            ray_init_args = dict(
+                log_to_driver=False,
+                runtime_env={"env_vars": {"PL_DISABLE_FORK": "1"}},  # https://github.com/ray-project/ray/issues/28197
+                logging_level=logging.ERROR,  # https://github.com/ray-project/ray/issues/29216
+                num_cpus=self.num_cpus,
+            )
             if self.num_gpus > 0:
                 ray_init_args['num_gpus'] = self.num_gpus
             self.ray.init(**ray_init_args)

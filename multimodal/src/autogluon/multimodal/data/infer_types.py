@@ -21,10 +21,12 @@ from ..constants import (
     NER_ANNOTATION,
     NULL,
     NUMERICAL,
+    OBJECT_DETECTION,
     REGRESSION,
     ROIS,
     TEXT,
 )
+from .utils import is_rois_input
 
 logger = logging.getLogger(AUTOMM)
 
@@ -111,24 +113,15 @@ def is_rois_column(data: pd.Series) -> bool:
     Whether the column is a rois column.
     """
     idx = data.first_valid_index()
-    if isinstance(data[idx], list):
-        return (
-            len(data[idx])
-            and isinstance(data[idx][0], dict)
-            and set(["xmin", "ymin", "xmax", "ymax", "class"]).issubset(data[idx][0].keys())
-        )
-    else:
-        isinstance(data[idx], str)
-        rois = {}
+    if isinstance(data[idx], str):
         try:
             rois = json.loads(data[idx][0])
+            # TODO: better infer logic / input format to not confuse with other modality
+            return rois and isinstance(rois, list) and len(data[idx][0]) == 5
         except:
-            pass
-        return (
-            rois
-            and isinstance(rois, dict)
-            and set(["xmin", "ymin", "xmax", "ymax", "class"]).issubset(data[idx][0].keys())
-        )
+            return False
+    else:
+        return is_rois_input(data[idx])
 
 
 def is_numerical_column(
@@ -380,14 +373,19 @@ def infer_column_types(
             # No valid index, thus, we will just ignore the column
             column_types[col_name] = NULL
             continue
-        if not isinstance(data[col_name][idx], list) and len(data[col_name].unique()) == 1 and is_training:
+        if (
+            (not isinstance(data[col_name][idx], (list, dict, set)))
+            and len(data[col_name].unique()) == 1
+            and is_training
+        ):
             column_types[col_name] = NULL
             continue
+        # TODO: valid check for collections
 
         if is_rois_column(data[col_name]):
             column_types[col_name] = ROIS
         if is_identifier_column(data[col_name], col_name=col_name, id_mappings=id_mappings):
-            column_types[col_name] = (f"{id_mappings_types[col_name]}_{IDENTIFIER}",)
+            column_types[col_name] = f"{id_mappings_types[col_name]}_{IDENTIFIER}"
         elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
         ):  # Infer categorical column
@@ -425,13 +423,14 @@ def check_missing_values(
         )
 
 
-def infer_label_column_type_by_problem_type(
+def infer_label_column_type_by_problem_type_and_pipeline(
     column_types: Dict,
     label_columns: Union[str, List[str]],
-    problem_type: str,
+    problem_type: Optional[str],
+    pipeline: Optional[str] = None,
     data: Optional[pd.DataFrame] = None,
     valid_data: Optional[pd.DataFrame] = None,
-    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, NER_ANNOTATION),
+    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, NER_ANNOTATION, ROIS),
     fallback_label_type: Optional[str] = CATEGORICAL,
 ):
     """
@@ -445,6 +444,8 @@ def infer_label_column_type_by_problem_type(
         The label columns in a pd.DataFrame.
     problem_type
         Type of problem.
+    pipeline
+        Predictor pipeline, used when problem_type is None.
     data
         A pd.DataFrame.
     valid_data
@@ -484,9 +485,23 @@ def infer_label_column_type_by_problem_type(
         elif problem_type == NER:
             column_types[col_name] = NER_ANNOTATION
 
+        if problem_type is None:
+            if pipeline == OBJECT_DETECTION:
+                column_types[col_name] = ROIS
+
         if column_types[col_name] not in allowable_label_types:
             column_types[col_name] = fallback_label_type
 
+    return column_types
+
+
+def infer_rois_column_type(
+    column_types: Dict,
+    data: Optional[pd.DataFrame] = None,
+):
+    for col_name in column_types.keys():
+        if is_rois_column(data[col_name]):
+            column_types[col_name] = ROIS
     return column_types
 
 
@@ -495,6 +510,7 @@ def infer_problem_type_output_shape(
     column_types: Optional[Dict] = None,
     data: Optional[pd.DataFrame] = None,
     provided_problem_type: Optional[str] = None,
+    pipeline: Optional[str] = None,
 ) -> Tuple[str, int]:
     """
     Infer the problem type and output shape based on the label column type and training data.
@@ -511,6 +527,8 @@ def infer_problem_type_output_shape(
         The multimodal pd.DataFrame for training.
     provided_problem_type
         The provided problem type.
+    pipeline
+        Predictor pipeline, used when problem_type is None.
 
     Returns
     -------
@@ -553,14 +571,22 @@ def infer_problem_type_output_shape(
                 for annotation in data[label_column].iteritems()
                 for annot in json.loads(annotation[-1])
             ]
-            return provided_problem_type, len(set(unique_entity_groups))
+            return provided_problem_type, len(set(unique_entity_groups)) + 2
         else:
             raise ValueError(
                 f"Problem type '{provided_problem_type}' doesn't have a valid output shape "
                 f"for training. The supported problem types are"
                 f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}', '{CLASSIFICATION}', '{NER}'"
             )
-
+    elif pipeline is not None:
+        if pipeline == OBJECT_DETECTION:
+            return None, None
+        else:
+            raise ValueError(
+                f"The label column '{label_column}' has type"
+                f" '{column_types[label_column]}', which is not supported yet while"
+                f" provided problem type is None and pipeline is f{pipeline}."
+            )
     else:
         if column_types[label_column] == CATEGORICAL:
             class_num = len(data[label_column].unique())

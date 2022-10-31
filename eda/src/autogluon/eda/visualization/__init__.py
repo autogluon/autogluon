@@ -1,1 +1,1 @@
-from .layouts import SimpleVerticalLinearLayout, SimpleHorizontalLayout, TabLayout, MarkdownSectionComponent
+from .layouts import MarkdownSectionComponent, SimpleVerticalLinearLayout, SimpleHorizontalLayout, TabLayout

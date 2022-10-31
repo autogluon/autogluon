@@ -25,6 +25,7 @@ from ..constants import (
     COSINE_EMBEDDING_LOSS,
     COSINE_SIMILARITY,
     CROSS_ENTROPY,
+    DIRECT_LOSS,
     F1,
     FEATURES,
     IA3,
@@ -34,6 +35,7 @@ from ..constants import (
     LORA,
     LORA_BIAS,
     LORA_NORM,
+    MAP,
     MULTICLASS,
     NER,
     NORM_FIT,
@@ -48,6 +50,7 @@ from ..constants import (
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
 )
+from ..utils import MeanAveragePrecision
 from .losses import SoftTargetCrossEntropy
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
@@ -94,6 +97,8 @@ def get_loss_func(
             loss_func = nn.MSELoss()
     elif problem_type == NER:
         loss_func = nn.CrossEntropyLoss(ignore_index=0)
+    elif problem_type is None:
+        return None
     else:
         raise NotImplementedError
 
@@ -193,6 +198,16 @@ def get_metric(
         return torchmetrics.SpearmanCorrCoef(), None
     elif metric_name == F1:
         return CustomF1Score(num_classes=num_classes, pos_label=pos_label), None
+    elif metric_name == MAP.lower():
+        return (
+            MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False),
+            None,
+        )  # TODO: remove parameter hardcodings here, and add class_metrics
+    elif metric_name == DIRECT_LOSS:
+        return (
+            torchmetrics.MeanMetric(nan_strategy="warn"),
+            None,
+        )  # This only works for detection where custom_metric is not required for BaseAggregator
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 
@@ -339,7 +354,16 @@ def get_weight_decay_param_names(model: nn.Module):
         model,
         [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm],
     )
-    decay_param_names = [name for name in decay_param_names if "bias" not in name]
+    decay_param_names = [
+        name
+        for name in decay_param_names
+        if (
+            "bias" not in name
+            and "cls_token" not in name
+            and "categorical_feature_tokenizer" not in name
+            and "numerical_feature_tokenizer" not in name
+        )
+    ]
     return decay_param_names
 
 

@@ -75,7 +75,7 @@ def balanced_accuracy(solution, prediction):
     return np.mean(bac)  # average over all classes
 
 
-def pac_score(solution, prediction):
+def pac(solution, prediction):
     """
     Probabilistic Accuracy based on log_loss metric.
     We assume the solution is in {0, 1} and prediction in [0, 1].

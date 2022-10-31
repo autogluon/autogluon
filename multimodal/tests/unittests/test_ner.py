@@ -28,7 +28,6 @@ def get_data():
     "checkpoint_name",
     [
         "t5-small",
-        "xlm-roberta-base",
         "bert-base-cased",
     ],
 )

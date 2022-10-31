@@ -8,7 +8,7 @@ from nlpaug import Augmenter
 from nlpaug.util import Method
 from text_unidecode import unidecode
 
-from ..constants import IDENTIFIER, MMCV_MODELS
+from ..constants import IDENTIFIER, MMLAB_MODELS
 from .collator import Dict
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 
@@ -161,7 +161,7 @@ def get_collate_fn(
             per_modality_column_names = per_preprocessor.get_column_names(modality=per_modality)
             if per_modality_column_names:
                 for per_model_processor in per_data_processors_group[per_modality]:
-                    if per_model_processor.prefix.lower().startswith(MMCV_MODELS):
+                    if per_model_processor.prefix.lower().startswith(MMLAB_MODELS):
                         collate_fn.update(
                             per_model_processor.collate_fn(
                                 per_modality_column_names, per_gpu_batch_size=per_gpu_batch_size
@@ -213,7 +213,9 @@ def apply_df_preprocessor(
     return modality_features, modality_types, sample_num
 
 
-def apply_data_processor(per_sample_features: dict, data_processors: dict, is_training: bool):
+def apply_data_processor(
+    per_sample_features: dict, data_processors: dict, feature_modalities: dict, is_training: bool
+):
     """
     Process one sample's features.
 
@@ -234,7 +236,11 @@ def apply_data_processor(per_sample_features: dict, data_processors: dict, is_tr
     for per_modality, per_modality_processors in data_processors.items():
         for per_model_processor in per_modality_processors:
             if per_modality in per_sample_features and per_sample_features[per_modality]:
-                sample_features.update(per_model_processor(per_sample_features[per_modality], is_training=is_training))
+                sample_features.update(
+                    per_model_processor(
+                        per_sample_features[per_modality], feature_modalities[per_modality], is_training=is_training
+                    )
+                )
 
     return sample_features
 
@@ -323,7 +329,7 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
 
     Returns
     -------
-    Token-level labels or word-level lavels
+    Token-level/word-level labels and text features.
     """
     col_tokens, token_to_word_mappings, word_offsets = tokenize_ner_text(ner_text, tokenizer)
     num_words = len(set(token_to_word_mappings)) - 1
@@ -333,7 +339,8 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
         for annot in ner_annotations:
             custom_offset = annot[0]
             custom_label = annot[1]
-            if word_offset[0] == custom_offset[0]:
+            # support multiple words in an annotated offset range.
+            if word_offset[0] >= custom_offset[0] and word_offset[1] <= custom_offset[1]:
                 word_label[idx] = custom_label
 
     token_label = [0] * len(col_tokens.input_ids)
@@ -345,9 +352,11 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
             token_label[idx] = word_label[counter]
             counter += 1
     if not is_eval:
-        return token_label  # return token-level labels for training
+        label = token_label  # return token-level labels for training
     else:
-        return word_label  # return word-level labels for evaluation
+        label = word_label  # return word-level labels for evaluation
+
+    return label, col_tokens, token_to_word_mappings, word_offsets
 
 
 def tokenize_ner_text(text, tokenizer):
@@ -385,3 +394,19 @@ def tokenize_ner_text(text, tokenizer):
     offset_mapping = np.array(col_tokens.offset_mapping, dtype=np.int32)
     word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
     return col_tokens, token_to_word_mappings, word_offsets
+
+
+def is_rois_input(sample):
+    """
+    check if a sample is rois for object detection
+
+    Parameters
+    ----------
+    sample
+        The sampled data.
+
+    Returns
+    -------
+    bool, whether a sample is rois for object detection
+    """
+    return isinstance(sample, list) and len(sample) and isinstance(sample[0], list) and len(sample[0]) == 5

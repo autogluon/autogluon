@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 
 from ..state import AnalysisState, StateCheckMixin
 
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class AbstractVisualization(ABC, StateCheckMixin):
 
-    def __init__(self, namespace: str = None, **kwargs) -> None:
+    def __init__(self, namespace: Optional[str] = None, **kwargs) -> None:
         """
         Parameters
         ----------
@@ -18,10 +18,10 @@ class AbstractVisualization(ABC, StateCheckMixin):
         kwargs
         """
         super().__init__()
-        self.namespace = namespace
+        self.namespace: List[str] = []
         self._kwargs = kwargs
-        if self.namespace is not None:
-            self.namespace: List[str] = self.namespace.split('.')
+        if namespace is not None:
+            self.namespace = namespace.split('.')
 
     def _get_namespace_state(self, state):
         if self.namespace is not None:

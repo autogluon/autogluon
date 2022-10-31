@@ -9,6 +9,9 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "slow: mark test as slow to run")
+    plugin = config.pluginmanager.getplugin("mypy")
+    if plugin is not None:
+        plugin.mypy_argv.append("--ignore-missing-imports")
 
 
 def pytest_collection_modifyitems(config, items):

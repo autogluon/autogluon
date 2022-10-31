@@ -57,7 +57,53 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         logger.debug(f"initializing {checkpoint_name}")
         self.checkpoint_name = checkpoint_name
         self.pretrained = pretrained
+        self.num_classes = num_classes
 
+        checkpoint, config_file = self._load_checkpoint_and_config()
+
+        # read config files
+        assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+        if isinstance(config_file, str):
+            self.config = mmcv.Config.fromfile(config_file)
+
+        if "bbox_head" in self.config.model.keys():  # yolov3
+            if self.num_classes:
+                self.config.model["bbox_head"]["num_classes"] = self.num_classes
+            else:
+                self.num_classes = self.config.model["bbox_head"]["num_classes"]
+        elif "roi_head" in self.config.model.keys():  # faster_rcnn
+            if self.num_classes:
+                self.config.model["roi_head"]["bbox_head"]["num_classes"] = self.num_classes
+            else:
+                self.num_classes = self.config.model["roi_head"]["bbox_head"]["num_classes"]
+        else:
+            raise ValueError("Cannot retrieve num_classes for current model structure.")
+        self.id2label = dict(zip(range(self.num_classes), range(self.num_classes)))
+
+        # build model and load pretrained weights
+        assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
+        self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
+
+        if self.pretrained and checkpoint is not None:
+            checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
+
+        if num_classes == 20:  # TODO: remove hardcode
+            self.model.CLASSES = get_classes("voc")
+        elif "CLASSES" in checkpoint.get("meta", {}):
+            self.model.CLASSES = checkpoint["meta"]["CLASSES"]
+        else:
+            warnings.simplefilter("once")
+            warnings.warn("Class names are not saved in the checkpoint's " "meta data, use COCO classes by default.")
+            self.model.CLASSES = get_classes("coco")
+        self.model.cfg = self.config  # save the config in the model for convenience
+
+        self.prefix = prefix
+
+        self.name_to_id = self.get_layer_ids()
+
+    def _load_checkpoint_and_config(self, checkpoint_name=None):
+        if not checkpoint_name:
+            checkpoint_name = self.checkpoint_name
         if checkpoint_name == "faster_rcnn_r50_fpn_1x_voc0712":
             # download voc configs in our s3 bucket
             from ..utils import download
@@ -90,26 +136,12 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             checkpoint = download(package="mmdet", configs=[checkpoint_name], dest_root=".")[0]
             config_file = checkpoint_name + ".py"
 
-        # read config files
-        assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-        if isinstance(config_file, str):
-            self.config = mmcv.Config.fromfile(config_file)
+        return checkpoint, config_file
 
-        # build model and load pretrained weights
-        assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
-        self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
+    def dump_config(self, path):
+        self.config.dump(path)
 
-        if checkpoint is not None:
-            checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
-        if "CLASSES" in checkpoint.get("meta", {}):
-            self.model.CLASSES = checkpoint["meta"]["CLASSES"]
-        else:
-            warnings.simplefilter("once")
-            warnings.warn("Class names are not saved in the checkpoint's " "meta data, use COCO classes by default.")
-            self.model.CLASSES = get_classes("coco")
-        self.model.cfg = self.config  # save the config in the model for convenience
-
-        self.prefix = prefix
+        self.name_to_id = self.get_layer_ids()
 
     @property
     def image_key(self):
@@ -146,6 +178,9 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         -------
             A dictionary with bounding boxes.
         """
+        # TODO: refactor this to work like forward() in MMDet, and support realtime predict
+        logger.warning("MMDetAutoModelForObjectDetection.forward() is deprecated since it does not support multi gpu.")
+
         data = batch[self.image_key]
 
         data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
@@ -163,6 +198,15 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
         ret = {BBOX: results}
         return {self.prefix: ret}
+
+    def forward_test(self, imgs, img_metas, rescale=True):
+        return self.model.forward_test(imgs=imgs, img_metas=img_metas, rescale=rescale)
+
+    def forward_train(self, img, img_metas, gt_bboxes, gt_labels):
+        return self.model.forward_train(img=img, img_metas=img_metas, gt_bboxes=gt_bboxes, gt_labels=gt_labels)
+
+    def _parse_losses(self, losses):
+        return self.model._parse_losses(losses)
 
     def get_layer_ids(
         self,

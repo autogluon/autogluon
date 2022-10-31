@@ -47,7 +47,7 @@ function install_features {
 }
 
 function install_eda {
-    python3 -m pip install --upgrade -e eda/
+    python3 -m pip install --upgrade -e eda/[tests]
 }
 
 function install_tabular {
@@ -62,7 +62,7 @@ function install_multimodal {
     # launch different process for each test to make sure memory is released
     python3 -m pip install --upgrade pytest-xdist
     python3 -m pip install --upgrade -e multimodal/[tests]
-    mim install mmcv-full --timeout 1000
+    mim install mmcv-full --timeout 60
     python3 -m pip install --upgrade mmdet
     python3 -m pip install --upgrade mmocr
 }

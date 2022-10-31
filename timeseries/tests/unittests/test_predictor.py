@@ -9,8 +9,7 @@ import pytest
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
-from autogluon.timeseries.models import DeepARModel
-from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory, MQRNNEstimator
+from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter
 
@@ -124,8 +123,8 @@ def test_given_hyperparameters_and_quantiles_when_predictor_called_then_model_ca
         ({DeepARModel: {"epochs": 1}}, 1),
         (
             {
-                GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
                 DeepARModel: {"epochs": 1},
+                SimpleFeedForwardModel: {"epochs": 1},
             },
             2,
         ),

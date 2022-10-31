@@ -25,6 +25,8 @@ class NerLabelEncoder:
         model_config = config.model.ner
         self.ner_special_tags = OmegaConf.to_object(model_config.special_tags)
         self.prefix = config.model.names[0]
+        self.b_prefix = "B-"
+        self.i_prefix = "I-"
 
     def fit(self, y: pd.Series, x: pd.Series):
         """
@@ -78,20 +80,23 @@ class NerLabelEncoder:
                 raise ValueError(f"The provided json annotations are invalid: {e.message}")
             sentence_annotations = []
             for annot in json_ner_annotations:
-                all_entity_groups.append(annot[ENTITY_GROUP])
+                entity_group = annot[ENTITY_GROUP]
+                if not (entity_group.startswith(self.b_prefix) or entity_group.startswith(self.i_prefix)):
+                    entity_group = self.b_prefix + entity_group
+                all_entity_groups.append(entity_group)
                 if self.entity_map is not None:
-                    if annot[ENTITY_GROUP] in self.entity_map:
+                    if entity_group in self.entity_map:
                         sentence_annotations.append(
                             (
                                 (annot[START_OFFSET], annot[END_OFFSET]),
-                                self.entity_map[annot[ENTITY_GROUP]],
+                                self.entity_map[entity_group],
                             )
                         )
                 else:
                     sentence_annotations.append(
                         (
                             (annot[START_OFFSET], annot[END_OFFSET]),
-                            annot[ENTITY_GROUP],
+                            entity_group,
                         )
                     )
             all_annotations.append(sentence_annotations)
@@ -138,8 +143,16 @@ class NerLabelEncoder:
         all_annotations, _ = self.extract_ner_annotations(y)
         transformed_y = []
         for annotation, text_snippet in zip(all_annotations, x.iteritems()):
-            word_label = process_ner_annotations(annotation, text_snippet[-1], tokenizer, is_eval=True)
-            word_label_invers = [self.inverse_entity_map[l] for l in word_label]
+            word_label, _, _, _ = process_ner_annotations(annotation, text_snippet[-1], tokenizer, is_eval=True)
+            word_label_invers = []
+            for l in word_label:
+                entity_group = self.inverse_entity_map[l]
+                if (
+                    not (entity_group.startswith(self.b_prefix) or entity_group.startswith(self.i_prefix))
+                    and entity_group is not self.ner_special_tags[-1]
+                ):
+                    entity_group = self.b_prefix + entity_group
+                word_label_invers.append(entity_group)
             transformed_y.append(word_label_invers)
         return transformed_y
 
@@ -165,7 +178,13 @@ class NerLabelEncoder:
             temp_pred, temp_offset = [], []
             for token_pred, offset in zip(token_preds, offsets):
                 inverse_pred_label = self.inverse_entity_map[token_pred]
-                temp_pred.append(inverse_pred_label)
+                if (
+                    not (inverse_pred_label.startswith(self.b_prefix) or inverse_pred_label.startswith(self.i_prefix))
+                    and inverse_pred_label != self.ner_special_tags[-1]
+                ):
+                    temp_pred.append(self.b_prefix + inverse_pred_label)
+                else:
+                    temp_pred.append(inverse_pred_label)
                 if inverse_pred_label != self.ner_special_tags[-1]:
                     temp_offset.append(
                         {

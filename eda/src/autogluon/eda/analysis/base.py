@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import List, Union, Tuple
+from typing import List, Tuple, Optional, Generator
 
 from pandas import DataFrame
 
@@ -14,14 +14,14 @@ logger = logging.getLogger(__name__)
 class AbstractAnalysis(ABC, StateCheckMixin):
 
     def __init__(self,
-                 parent: Union[None, AbstractAnalysis] = None,
-                 children: List[AbstractAnalysis] = [],
-                 state: AnalysisState = None,
+                 parent: Optional[AbstractAnalysis] = None,
+                 children: Optional[List[AbstractAnalysis]] = None,
+                 state: Optional[AnalysisState] = None,
                  **kwargs) -> None:
 
         self.parent = parent
-        self.children: List[AbstractAnalysis] = children
-        self.state: AnalysisState = state
+        self.children: List[AbstractAnalysis] = [] if children is None else children
+        self.state: Optional[AnalysisState] = state
         for c in self.children:
             c.parent = self
             c.state = self.state
@@ -31,12 +31,12 @@ class AbstractAnalysis(ABC, StateCheckMixin):
         chain = [self]
         while chain[0].parent is not None:
             chain.insert(0, chain[0].parent)
-        args = {}
+        args = AnalysisState()
         for node in chain:
             args = AnalysisState({**args, **node.args})
         return args
 
-    def available_datasets(self, args: AnalysisState) -> Tuple[str, DataFrame]:
+    def available_datasets(self, args: AnalysisState) -> Generator[Tuple[str, DataFrame], None, None]:
         """
         Generator which iterates only through the datasets provided in arguments
 
@@ -63,7 +63,7 @@ class AbstractAnalysis(ABC, StateCheckMixin):
                 state = AnalysisState()
             else:
                 state = self.parent.state
-        return state
+        return state  # type: ignore
 
     @abstractmethod
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
@@ -132,8 +132,8 @@ class AbstractAnalysis(ABC, StateCheckMixin):
 class BaseAnalysis(AbstractAnalysis):
 
     def __init__(self,
-                 parent: Union[None, AbstractAnalysis] = None,
-                 children: List[AbstractAnalysis] = [],
+                 parent: Optional[AbstractAnalysis] = None,
+                 children: Optional[List[AbstractAnalysis]] = None,
                  **kwargs) -> None:
         super().__init__(parent, children, **kwargs)
 
@@ -150,9 +150,9 @@ class Namespace(AbstractAnalysis):
         return True
 
     def __init__(self,
-                 namespace: str = None,
-                 parent: Union[None, AbstractAnalysis] = None,
-                 children: List[AbstractAnalysis] = [],
+                 namespace: Optional[str] = None,
+                 parent: Optional[AbstractAnalysis] = None,
+                 children: Optional[List[AbstractAnalysis]] = None,
                  **kwargs) -> None:
         super().__init__(parent, children, **kwargs)
         self.namespace = namespace

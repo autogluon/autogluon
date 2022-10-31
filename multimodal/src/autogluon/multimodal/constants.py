@@ -50,6 +50,8 @@ ROIS = "rois"
 SCORE = "score"
 
 # Metric
+MAP = "map"
+MEAN_AVERAGE_PRECISION = "mean_average_precision"
 MAX = "max"
 MIN = "min"
 ACCURACY = "accuracy"
@@ -67,9 +69,11 @@ LOG_LOSS = "log_loss"
 CROSS_ENTROPY = "cross_entropy"
 COSINE_EMBEDDING_LOSS = "cosine_embedding_loss"
 F1 = "f1"
+DIRECT_LOSS = "direct_loss"
 METRIC_MODE_MAP = {
     ACC: MAX,
     ACCURACY: MAX,
+    DIRECT_LOSS: MIN,
     RMSE: MIN,
     ROOT_MEAN_SQUARED_ERROR: MIN,
     R2: MAX,
@@ -80,6 +84,8 @@ METRIC_MODE_MAP = {
     PEARSONR: MAX,
     SPEARMANR: MAX,
     F1: MAX,
+    MAP: MAX,
+    MEAN_AVERAGE_PRECISION: MAX,
     OVERALL_ACCURACY: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
@@ -164,7 +170,7 @@ MMOCR_TEXT_DET = "mmocr_text_detection"
 MMOCR_TEXT_RECOG = "mmocr_text_recognition"
 NER_TEXT = "ner_text"
 HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT)
-MMCV_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
+MMLAB_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
 
 # matcher loss type
 CONTRASTIVE_LOSS = "contrastive_loss"

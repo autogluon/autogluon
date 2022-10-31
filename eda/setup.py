@@ -9,9 +9,9 @@ from setuptools import setup
 filepath = os.path.abspath(os.path.dirname(__file__))
 filepath_import = os.path.join(filepath, '..', 'core', 'src', 'autogluon', 'core', '_setup_utils.py')
 spec = importlib.util.spec_from_file_location("ag_min_dependencies", filepath_import)
-ag = importlib.util.module_from_spec(spec)
+ag = importlib.util.module_from_spec(spec)  # type: ignore
 # Identical to `from autogluon.core import _setup_utils as ag`, but works without `autogluon.core` being installed.
-spec.loader.exec_module(ag)
+spec.loader.exec_module(ag)  # type: ignore
 ###########################
 
 version = ag.load_version_file()
@@ -30,12 +30,14 @@ install_requires = [
     'seaborn>=0.12.0,<0.13',
     'ipython>=8.0,<9.0',
     'ipywidgets>=8.0,<9.0',
+    f'autogluon.features=={version}',
 ]
 
 extras_require = dict()
 
 test_requirements = [
-    'pytest'
+    'pytest',
+    'pytest-mypy'
 ]
 
 test_requirements = list(set(test_requirements))

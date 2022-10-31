@@ -55,7 +55,6 @@ class CompareAutoGluonMetadataTestCase(unittest.TestCase):
         logs = compare_autogluon_metadata(original=metadata_og, current=metadata_cu)
         assert len(logs) == 3
 
-
     def test_new_key(self):
         metadata_og = get_autogluon_metadata()
         metadata_cu = copy.deepcopy(metadata_og)
