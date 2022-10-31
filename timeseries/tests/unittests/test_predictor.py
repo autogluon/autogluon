@@ -13,7 +13,7 @@ from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter
 
-from .common import DUMMY_TS_DATAFRAME, DATAFRAME_WITH_COVARIATES
+from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},

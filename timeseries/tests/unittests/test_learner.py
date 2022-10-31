@@ -15,11 +15,7 @@ from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_single_time_series
 
-from .common import (
-    DUMMY_TS_DATAFRAME,
-    get_data_frame_with_variable_lengths,
-    get_static_features,
-)
+from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_variable_lengths, get_static_features
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},

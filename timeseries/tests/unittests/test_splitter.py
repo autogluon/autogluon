@@ -4,11 +4,7 @@ import pytest
 
 from autogluon.timeseries.splitter import MultiWindowSplitter, append_suffix_to_item_id
 
-from .common import (
-    DUMMY_VARIABLE_LENGTH_TS_DATAFRAME,
-    DATAFRAME_WITH_STATIC,
-    get_data_frame_with_variable_lengths,
-)
+from .common import DATAFRAME_WITH_STATIC, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, get_data_frame_with_variable_lengths
 
 
 def get_original_item_id_and_slice(tuning_item_id: str):
