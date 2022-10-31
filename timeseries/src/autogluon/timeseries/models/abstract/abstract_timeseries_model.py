@@ -291,7 +291,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             known_covariates = data.slice_by_timestep(-self.prediction_length, None).drop(self.target, axis=1)
         else:
             known_covariates = None
-        return self.predict(data=past_data, known_covariates=known_covariates, **kwargs)
+        return self.predict(past_data, known_covariates=known_covariates, **kwargs)
 
     def score(self, data: TimeSeriesDataFrame, metric: str = None, **kwargs) -> float:
         """Return the evaluation scores for given metric and dataset. The last
