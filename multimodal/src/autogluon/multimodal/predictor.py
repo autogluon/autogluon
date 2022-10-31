@@ -2457,7 +2457,8 @@ class MultiModalPredictor:
         predictor._pretrain_path = path
         predictor._config = config
         predictor._output_shape = assets["output_shape"]
-        predictor._classes = assets["classes"]
+        if "classes" in assets:
+            predictor._classes = assets["classes"]
         predictor._column_types = assets["column_types"]
         predictor._validation_metric_name = assets["validation_metric_name"]
         predictor._df_preprocessor = df_preprocessor
