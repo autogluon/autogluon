@@ -1929,11 +1929,11 @@ class MultiModalPredictor:
             )
 
             if self._pipeline == OCR_TEXT:
-                logits = []
+                logits = {}
                 for r_type in ret_type:
                     if r_type not in outputs[0]:
                         continue
-                    logits.append(extract_from_output(outputs=outputs, ret_type=r_type))
+                    logits[r_type] = extract_from_output(outputs=outputs, ret_type=r_type)
             else:
                 logits = extract_from_output(outputs=outputs, ret_type=ret_type)
 

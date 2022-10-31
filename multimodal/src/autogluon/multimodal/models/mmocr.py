@@ -128,7 +128,7 @@ class MMOCRAutoModel(nn.Module):
         """
 
         data = batch[self.image_key]
-        # single image
+
         if isinstance(data["img_metas"], List):
             data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
         else:
@@ -146,22 +146,31 @@ class MMOCRAutoModel(nn.Module):
 
         if self.det_model != None and self.recog_model == None:
             det_results = self.det_model(return_loss=False, rescale=True, **data)
-            ret = {BBOX: det_results[0]["boundary_result"]}
+            ret = {BBOX: [d["boundary_result"] for d in det_results]}
             return {self.prefix: ret}
         elif self.det_model == None and self.recog_model != None:
             recog_results = self.model(return_loss=False, rescale=True, **data)
-            ret = {TEXT: recog_results[0]["text"], SCORE: recog_results[0]["score"]}
+            texts = []
+            scores = []
+            for r in recog_results:
+                texts.append(r["text"])
+                scores.append(r["score"])
+            ret = {TEXT: texts, SCORE: scores}
+           # ret = {TEXT: recog_results[0]["text"], SCORE: recog_results[0]["score"]}     
             return {self.prefix: ret}
         elif self.det_model != None and self.recog_model != None:
             det_results = self.det_model(return_loss=False, rescale=True, **data)
+
             arrays = []
             for img_meta in data["img_metas"]:
-                arrays.append(mmcv.imread(img_meta[0]["filename"]))
+                for arr_meta in img_meta:
+                    arrays.append(mmcv.imread(arr_meta["filename"]))
 
             bboxes_list = [res for res in det_results]
             end2end_res = []
-            img_e2e_res = {"result": []}
+            
             for bboxes, arr in zip(bboxes_list, arrays):
+                img_e2e_res = {"result": []}
                 for bbox in bboxes["boundary_result"]:
                     box_res = {}
                     box_res["box"] = [round(x) for x in bbox[:-1]]
@@ -216,12 +225,12 @@ class MMOCRAutoModel(nn.Module):
             for res in end2end_res:
                 simple_res = {}
                 simple_res["text"] = [x["text"] for x in res["result"]]
-            final_res.append(simple_res)
+                final_res.append(simple_res)
 
             # TODO
             if self.kie_model != None:
                 return 1
-            ret = {TEXT: final_res[0]["text"]}
+            ret = {TEXT: final_res}
             return {self.prefix: ret}
 
     def get_layer_ids(

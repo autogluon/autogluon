@@ -32,22 +32,24 @@ def test_mmocr_text_detection_inference(checkpoint_name):
     )
 
     # two dimensions, (num of text lines, 2 * num of coordinate points)
-    pred = predictor.predict({"image": [mmocr_image_name]})
+    pred = predictor.predict({"image": [mmocr_image_name] * 10})
 
     # original MMOCR model's output
     checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
     checkpoint = checkpoints[0]
     config_file = checkpoint_name + ".py"
     ocr = MMOCR(det_ckpt=checkpoint, det_config=config_file, recog=None)
-    MMOCR_res = ocr.readtext(mmocr_image_name, output=None)
+    MMOCR_res = ocr.readtext([mmocr_image_name] * 10, output=None)
 
     # compare the outputs of original model's output and our model
-    assert len(pred[0]) == len(MMOCR_res[0]["boundary_result"])  # num of text lines
+    pred = pred['bbox']
+    assert len(pred) == len(MMOCR_res)  # num of text lines
 
-    for i in range(len(pred[0])):
-        p = pred[0][i]
-        m = MMOCR_res[0]["boundary_result"][i]
-        assert len(p) == len(m)  # 2 * num of coordinate points
+    for p, m in zip(pred, MMOCR_res):
+        assert len(p) == len(m["boundary_result"])  # num of bounding boxs
 
-        for j in range(len(p)):
-            assert abs(p[j] - m[j]) <= 1e-6
+        for i in range(len(p)):
+            assert len(p[i]) == len(m["boundary_result"][i]) # 2 * num of coordinate points
+
+            for j in range(len(p[i])):
+                assert abs(p[i][j] - m["boundary_result"][i][j]) <= 1e-6

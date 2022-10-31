@@ -32,7 +32,8 @@ def test_mmocr_text_recognition_inference(det_ckpt_name, recog_ckpt_name):
         pipeline="ocr_text",
     )
 
-    pred = predictor.predict({"image": [mmocr_image_name]})
+    pred = predictor.predict({"image": [mmocr_image_name] * 10})
+    pred = pred['text']
 
     # original MMOCR model's output
     checkpoints = download(package="mmocr", configs=[det_ckpt_name, recog_ckpt_name], dest_root=".")
@@ -40,9 +41,10 @@ def test_mmocr_text_recognition_inference(det_ckpt_name, recog_ckpt_name):
     det_config_file = det_ckpt_name + ".py"
     recog_config_file = recog_ckpt_name + ".py"
     ocr = MMOCR(det_ckpt=det_ckpt, det_config=det_config_file, recog_ckpt=recog_ckpt, recog_config=recog_config_file)
-    MMOCR_res = ocr.readtext(mmocr_image_name, output=None)
+    MMOCR_res = ocr.readtext([mmocr_image_name] * 10, output=None)
 
-    assert len(pred[0][0]) == len(MMOCR_res[0]["text"])
-
-    for p in pred[0][0]:
-        assert p in MMOCR_res[0]["text"]
+    # compare
+    assert len(pred) == len(MMOCR_res) # number of input samples
+    for p, m in zip(pred, MMOCR_res):
+        for text in p['text']:
+            assert text in m["text"]
