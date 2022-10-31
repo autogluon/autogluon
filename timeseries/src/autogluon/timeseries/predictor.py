@@ -462,8 +462,6 @@ class TimeSeriesPredictor:
             - The ``item_id`` index must include all item ids present in ``data``
             - The ``timestamp`` index must include the values for ``prediction_length`` many time steps into the future from the end of each time series in ``data``
 
-            Example::
-            TODO
         model : str, optional
             Name of the model that you would like to use for prediction. By default, the best model during training
             (with highest validation score) will be used.
@@ -471,13 +469,14 @@ class TimeSeriesPredictor:
         if "quantile_levels" in kwargs:
             warnings.warn(
                 "Passing `quantile_levels` as a keyword argument to `TimeSeriesPredictor.predict` is deprecated and "
-                "will be removed in v0.7.0. This might also lead to some models not working properly. "
+                "will be removed in v0.7. This might also lead to some models not working properly. "
                 "Please specify the desired quantile levels when creating the predictor as "
                 "`TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
                 category=DeprecationWarning,
             )
+        # TODO: What happens to `known_covariates` if `ignore_index=True`?
+        # TODO: Add example
         data = self._check_and_prepare_data_frame(data)
-        # TODO: What happens if `ignore_index=True`?
         return self._learner.predict(data, known_covariates=known_covariates, model=model, **kwargs)
 
     def evaluate(self, data: TimeSeriesDataFrame, **kwargs):

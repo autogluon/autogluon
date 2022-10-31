@@ -6,17 +6,16 @@ import numpy as np
 import pandas as pd
 
 from autogluon.core.learner import AbstractLearner
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.evaluator import TimeSeriesEvaluator
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.splitter import AbstractTimeSeriesSplitter, LastWindowSplitter
+from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer, AutoTimeSeriesTrainer
 from autogluon.timeseries.utils.features import (
     ContinuousAndCategoricalFeatureGenerator,
     convert_numerical_features_to_float,
 )
-
-from .dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID, TIMESTAMP
-from .evaluator import TimeSeriesEvaluator
-from .models.abstract import AbstractTimeSeriesModel
-from .splitter import AbstractTimeSeriesSplitter, LastWindowSplitter
-from .trainer import AbstractTimeSeriesTrainer, AutoTimeSeriesTrainer
-from .utils.forecast import get_forecast_horizon_index
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 
 logger = logging.getLogger(__name__)
 
@@ -102,8 +101,8 @@ class TimeSeriesLearner(AbstractLearner):
 
         train_data, val_data = self._preprocess_static_features(train_data=train_data, val_data=val_data)
 
-        train_data = self._preprocess_dynamic_features(data=train_data, data_frame_name="train_data")
-        val_data = self._preprocess_dynamic_features(data=val_data, data_frame_name="tuning_data", report_unused=False)
+        train_data = self._preprocess_covariates_and_target(train_data, data_frame_name="train_data")
+        val_data = self._preprocess_covariates_and_target(val_data, data_frame_name="tuning_data", report_unused=False)
 
         # Train / validation split
         if val_data is None:
@@ -232,18 +231,18 @@ class TimeSeriesLearner(AbstractLearner):
                 "match train_data.static_features. " + fix_message
             )
 
-    def _preprocess_time_series_dataframe(
+    def _preprocess_covariates_and_target(
         self,
         data: Optional[TimeSeriesDataFrame],
         data_frame_name: str,
         check_target: bool = True,
         report_unused: bool = True,
     ) -> Optional[TimeSeriesDataFrame]:
-        """Convert dynamic features to float dtype and remove unused columns.
+        """Convert known covariates to float dtype and remove unused columns.
 
         The returned dataframe is guaranteed to only include
-        - the target columns
-        - dynamic features that will be known in the future (at prediction time)
+        - known covariates listed in self.known_covariates_names
+        - the target column (if check_target = True)
         """
         if data is None:
             return data
@@ -251,8 +250,8 @@ class TimeSeriesLearner(AbstractLearner):
         if check_target and self.target not in data.columns:
             raise ValueError(f"Target column `{self.target}` not found in {data_frame_name}.")
 
-        data = data.copy(deep=False)
         if len(self.known_covariates_names) > 0:
+            data = data.copy(deep=False)
             missing_columns = list(set(self.known_covariates_names).difference(set(data.columns)))
             if len(missing_columns) > 0:
                 raise ValueError(
@@ -273,11 +272,14 @@ class TimeSeriesLearner(AbstractLearner):
             data = data.drop(unused_columns, axis=1)
         return data
 
-    def _filter_known_covariates(
+    def _align_covariates_with_forecast_index(
         self,
         known_covariates: Optional[TimeSeriesDataFrame],
         data: TimeSeriesDataFrame,
     ) -> Optional[TimeSeriesDataFrame]:
+        """Select the relevant item_ids and timestamps from the known_covariates dataframe."""
+        if len(self.known_covariates_names) == 0:
+            return None
         if len(self.known_covariates_names) > 0 and known_covariates is None:
             raise ValueError(
                 f"known_covariates {self.known_covariates_names} for the forecast horizon should be provided at prediction time."
@@ -288,7 +290,7 @@ class TimeSeriesLearner(AbstractLearner):
                 f"known_covariates are missing information for the following item_ids: {missing_item_ids.to_list()}."
             )
 
-        forecast_index = get_forecast_horizon_index(data, prediction_length=self.prediction_length)
+        forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length=self.prediction_length)
         try:
             known_covariates = known_covariates.loc[forecast_index]
         except KeyError:
@@ -313,11 +315,11 @@ class TimeSeriesLearner(AbstractLearner):
             self._check_static_feature_compatibility(data.static_features, fix_message=fix_message, other_name="data")
             data.static_features = self.static_feature_pipeline.transform(data.static_features)
             data.static_features = convert_numerical_features_to_float(data.static_features)
-        data = self._preprocess_time_series_dataframe(data, data_frame_name="data")
-        known_covariates = self._preprocess_time_series_dataframe(
+        data = self._preprocess_covariates_and_target(data, data_frame_name="data")
+        known_covariates = self._preprocess_covariates_and_target(
             known_covariates, data_frame_name="known_covariates", check_target=False
         )
-        known_covariates = self._filter_known_covariates(known_covariates=known_covariates, data=data)
+        known_covariates = self._align_covariates_with_forecast_index(known_covariates=known_covariates, data=data)
         prediction = self.load_trainer().predict(data=data, known_covariates=known_covariates, model=model, **kwargs)
         if prediction is None:
             raise RuntimeError("Prediction failed, please provide a different model to the `predict` method.")

@@ -34,16 +34,11 @@ class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
         )
 
 
-def get_categorical_and_continuous_features(
-    dataframe: Optional[pd.DataFrame],
-) -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]:
+def get_categorical_and_continuous_features(dataframe: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Split categorical and continuous columns of a dataframe into two separate dataframes.
 
-    If the dataframe doesn't contain columns of the given type, None is returned.
+    Columns that have neither categorical nor numerical dtypes are ignored.
     """
-    if dataframe is None:
-        return None, None
-
     categorical_column_names = []
     continuous_column_names = []
 
@@ -53,20 +48,11 @@ def get_categorical_and_continuous_features(
         elif is_numeric_dtype(column_values):
             continuous_column_names.append(column_name)
 
-    if len(categorical_column_names) > 0:
-        categorical_features = dataframe[categorical_column_names]
-    else:
-        categorical_features = None
-
-    if len(continuous_column_names) > 0:
-        continuous_features = dataframe[continuous_column_names]
-    else:
-        continuous_features = None
-
-    return categorical_features, continuous_features
+    return dataframe[categorical_column_names], dataframe[continuous_column_names]
 
 
 def convert_numerical_features_to_float(dataframe: pd.DataFrame, float_dtype=np.float64):
+    """In-place convert the dtype of all numerical (float or int) columns to the given float dtype."""
     for col_name in dataframe.columns:
         if pd.api.types.is_numeric_dtype(dataframe[col_name]):
             dataframe[col_name] = dataframe[col_name].astype(float_dtype)

@@ -12,8 +12,7 @@ import numpy as np
 import pandas as pd
 import torch
 from gluonts.core.component import from_hyperparameters
-from gluonts.torch.distributions import AffineTransformed
-from gluonts.torch.distributions.distribution_output import NormalOutput
+from gluonts.torch.distributions import AffineTransformed, NormalOutput
 from gluonts.torch.model.deepar import DeepAREstimator
 from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
 from gluonts.torch.model.forecast import DistributionForecast, Forecast
@@ -55,6 +54,7 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
         # GluonTS does not handle context_length=1 well, and sets the context to only prediction_length
         # we set it to a minimum of 10 here.
         init_kwargs["context_length"] = max(10, init_kwargs.get("context_length", self.prediction_length))
+        init_kwargs.setdefault("lr", init_kwargs.get("learning_rate", 1e-3))
 
         return init_kwargs
 
@@ -113,12 +113,97 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
         return model
 
 
-# TODO: enable static features
 class DeepARModel(AbstractGluonTSPyTorchModel):
+    """DeepAR model from GluonTS based on the PyTorch backend.
+
+    The model consists of an RNN encoder (LSTM or GRU) and a decoder that outputs the
+    distribution of the next target value. Close to the model described in [Salinas2020]_.
+
+    .. [Salinas2020] Salinas, David, et al.
+        "DeepAR: Probabilistic forecasting with autoregressive recurrent networks."
+        International Journal of Forecasting. 2020.
+
+    Based on `gluonts.torch.model.deepar.DeepAREstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.deepar.html>`_.
+
+
+    Other Parameters
+    ----------------
+    context_length : int, optional
+        Number of steps to unroll the RNN for before computing predictions
+        (default: None, in which case context_length = prediction_length)
+    disable_static_features : bool, default = False
+        If True, static features won't be used by the model even if they are present in the dataset.
+        If False, static features will be used by the model if they are present in the dataset.
+    disable_dynamic_features : bool, default = False
+        If True, dynamic features won't be used by the model even if they are present in the dataset.
+        If False, dynamic features will be used by the model if they are present in the dataset.
+    num_layers : int, default = 2
+        Number of RNN layers
+    hidden_size : int, default = 40
+        Number of RNN cells for each layer
+    dropout_rate : float, default = 0.1
+        Dropout regularization parameter
+    embedding_dimension : int, optional
+        Dimension of the embeddings for categorical features
+        (if None, defaults to [min(50, (cat+1)//2) for cat in cardinality])
+    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
+        Distribution to use to evaluate observations and sample predictions
+    scaling: bool, default = True
+        Whether to automatically scale the target values
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 32
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
+    """
+
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DeepAREstimator
+
+    def _get_estimator_init_args(self) -> Dict[str, Any]:
+        init_kwargs = super()._get_estimator_init_args()
+        init_kwargs["num_feat_static_cat"] = self.num_feat_static_cat
+        init_kwargs["num_feat_static_real"] = self.num_feat_static_real
+        init_kwargs["cardinality"] = self.feat_static_cat_cardinality
+        init_kwargs["num_feat_dynamic_real"] = self.num_feat_dynamic_real
+        return init_kwargs
 
 
 class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
+    """SimpleFeedForward model from GluonTS based on the PyTorch backend.
+
+    The model consists of a multilayer perceptron (MLP) that predicts the distribution of all the target value in the
+    forecast horizon.
+
+    Based on `gluonts.torch.model.simple_feedforward.SimpleFeedForwardEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.simple_feedforward.html>`_.
+    See GluonTS documentation for additional hyperparameters.
+
+
+    Other Parameters
+    ----------------
+    context_length : int, optional
+        Number of time units that condition the predictions
+        (default: None, in which case context_length = prediction_length)
+    hidden_dimensions: List[int], default = [20, 20]
+        Size of hidden layers in the feedforward network
+    distr_output : gluonts.torch.distributions.DistributionOutput, default = NormalOutput()
+        Distribution to fit.
+    batch_normalization : bool, default = False
+        Whether to use batch normalization
+    mean_scaling : bool, default = True
+        Scale the network input by the data mean and the network output by its inverse
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 32
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
+    """
+
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = SimpleFeedForwardEstimator
     float_dtype: Type = np.float32
 
@@ -159,7 +244,7 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
 
             df = pd.DataFrame(item_forecast_dict)
             df[ITEMID] = forecast.item_id
-            # TODO: replace with get_forecast_horizon_timestamps
+            # TODO: replace with get_forecast_horizon_index_single_time_series
             df[TIMESTAMP] = pd.date_range(
                 start=forecasts[i].start_date.to_timestamp(how="S"),
                 periods=self.prediction_length,

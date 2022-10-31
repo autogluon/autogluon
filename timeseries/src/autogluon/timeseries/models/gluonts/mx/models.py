@@ -37,7 +37,7 @@ class AbstractGluonTSMXNetModel(AbstractGluonTSModel):
 
 
 class DeepARMXNetModel(AbstractGluonTSMXNetModel):
-    """DeepAR model from GluonTS.
+    """DeepAR model from GluonTS based on the MXNet backend.
 
     The model consists of an RNN encoder (LSTM or GRU) and a decoder that outputs the
     distribution of the next target value. Close to the model described in [Salinas2020]_.
@@ -46,7 +46,7 @@ class DeepARMXNetModel(AbstractGluonTSMXNetModel):
         "DeepAR: Probabilistic forecasting with autoregressive recurrent networks."
         International Journal of Forecasting. 2020.
 
-    Based on `gluonts.model.deepar.DeepAREstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.deepar.html>`_.
+    Based on `gluonts.mx.model.deepar.DeepAREstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.mx.model.deepar.html>`_.
     See GluonTS documentation for additional hyperparameters.
 
 
@@ -92,13 +92,15 @@ class DeepARMXNetModel(AbstractGluonTSMXNetModel):
 
     gluonts_estimator_class: Type[GluonTSEstimator] = DeepAREstimator
 
-    def _get_model_params(self) -> dict:
-        args = super()._get_model_params()
-        args.setdefault("use_feat_static_cat", self.num_feat_static_cat > 0)
-        args.setdefault("use_feat_static_real", self.num_feat_static_real > 0)
-        args.setdefault("cardinality", self.feat_static_cat_cardinality)
-        args.setdefault("use_feat_dynamic_real", self.num_feat_dynamic_real > 0)
-        return args
+    def _get_estimator_init_args(self) -> dict:
+        init_kwargs = super()._get_estimator_init_args()
+        # Our API hides these model kwargs from the user. They can only be controlled through disable_static_features
+        # and disable_dynamic_features
+        init_kwargs["use_feat_static_cat"] = self.num_feat_static_cat > 0
+        init_kwargs["use_feat_static_real"] = self.num_feat_static_real > 0
+        init_kwargs["cardinality"] = self.feat_static_cat_cardinality
+        init_kwargs["use_feat_dynamic_real"] = self.num_feat_dynamic_real > 0
+        return init_kwargs
 
 
 class AbstractGluonTSSeq2SeqModel(AbstractGluonTSMXNetModel):
@@ -126,7 +128,7 @@ class MQCNNMXNetModel(AbstractGluonTSSeq2SeqModel):
         "A multi-horizon quantile recurrent forecaster."
         arXiv preprint arXiv:1711.11053 (2017)
 
-    Based on `gluonts.model.seq2seq.MQCNNEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.seq2seq.html#gluonts.model.seq2seq.MQCNNEstimator>`_.
+    Based on `gluonts.mx.model.seq2seq.MQCNNEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.mx.model.seq2seq.html#gluonts.mx.model.seq2seq.MQCNNEstimator>`_.
     See GluonTS documentation for additional hyperparameters.
 
 
@@ -185,13 +187,13 @@ class MQCNNMXNetModel(AbstractGluonTSSeq2SeqModel):
 
     gluonts_estimator_class: Type[GluonTSEstimator] = MQCNNEstimator
 
-    def _get_model_params(self) -> dict:
-        args = super()._get_model_params()
-        args.setdefault("use_feat_static_cat", self.num_feat_static_cat > 0)
-        args.setdefault("use_feat_static_real", self.num_feat_static_real > 0)
-        args.setdefault("cardinality", self.feat_static_cat_cardinality)
-        args.setdefault("use_feat_dynamic_real", self.num_feat_dynamic_real > 0)
-        return args
+    def _get_estimator_init_args(self) -> dict:
+        init_kwargs = super()._get_estimator_init_args()
+        init_kwargs["use_feat_static_cat"] = self.num_feat_static_cat > 0
+        init_kwargs["use_feat_static_real"] = self.num_feat_static_real > 0
+        init_kwargs["cardinality"] = self.feat_static_cat_cardinality
+        init_kwargs["use_feat_dynamic_real"] = self.num_feat_dynamic_real > 0
+        return init_kwargs
 
 
 class MQRNNMXNetModel(AbstractGluonTSSeq2SeqModel):
@@ -204,7 +206,7 @@ class MQRNNMXNetModel(AbstractGluonTSSeq2SeqModel):
         "A multi-horizon quantile recurrent forecaster."
         arXiv preprint arXiv:1711.11053 (2017)
 
-    Based on `gluonts.model.seq2seq.MQRNNEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.seq2seq.html#gluonts.model.seq2seq.MQRNNEstimator>`_.
+    Based on `gluonts.mx.model.seq2seq.MQRNNEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.mx.model.seq2seq.html#gluonts.mx.model.seq2seq.MQRNNEstimator>`_.
     See GluonTS documentation for additional hyperparameters.
 
 
@@ -241,12 +243,12 @@ class MQRNNMXNetModel(AbstractGluonTSSeq2SeqModel):
 
 
 class SimpleFeedForwardMXNetModel(AbstractGluonTSMXNetModel):
-    """SimpleFeedForward model from GluonTS.
+    """SimpleFeedForward model from GluonTS based on the MXNet backend.
 
     The model consists of a multilayer perceptron (MLP) that predicts the distribution
     of the next target value.
 
-    Based on `gluonts.model.simple_feedforward.SimpleFeedForwardEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.simple_feedforward.html?highlight=simplefeedforward>`_.
+    Based on `gluonts.mx.model.simple_feedforward.SimpleFeedForwardEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.mx.model.simple_feedforward.html>`_.
     See GluonTS documentation for additional hyperparameters.
 
     Note that AutoGluon uses hyperparameters ``hidden_dim`` and ``num_layers`` instead of ``num_hidden_dimensions``
@@ -309,7 +311,7 @@ class TemporalFusionTransformerMXNetModel(AbstractGluonTSMXNetModel):
         "Temporal Fusion Transformers for Interpretable Multi-horizon Time Series Forecasting."
         International Journal of Forecasting. 2021.
 
-    Based on `gluonts.model.tft.TemporalFusionTransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.tft.html>`_.
+    Based on `gluonts.mx.model.tft.TemporalFusionTransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.mx.model.tft.html>`_.
     See GluonTS documentation for additional hyperparameters.
 
     Other Parameters
@@ -370,7 +372,7 @@ class TransformerMXNetModel(AbstractGluonTSMXNetModel):
     .. [Vaswani2017] Vaswani, Ashish, et al. "Attention is all you need."
         Advances in neural information processing systems. 2017.
 
-    Based on `gluonts.model.transformer.TransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.transformer.html>`_.
+    Based on `gluonts.mx.model.transformer.TransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.mx.model.transformer.html>`_.
     See GluonTS documentation for additional hyperparameters.
 
 
