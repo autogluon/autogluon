@@ -1,5 +1,10 @@
 import pytest
 
+
+from autogluon.timeseries import MXNET_INSTALLED
+if not MXNET_INSTALLED:
+    pytest.skip()
+
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from autogluon.timeseries.models.gluonts.mx.callback import (
     GluonTSAdaptiveEarlyStoppingCallback,
@@ -7,8 +12,8 @@ from autogluon.timeseries.models.gluonts.mx.callback import (
 )
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
-from ..common import DUMMY_TS_DATAFRAME
-from .test_gluonts import TESTABLE_MX_MODELS as GLUONTS_TESTABLE_MODELS
+from ....common import DUMMY_TS_DATAFRAME
+from ..test_gluonts import TESTABLE_MX_MODELS
 
 
 @pytest.mark.parametrize(
@@ -61,7 +66,7 @@ def test_adaptive_early_stopping_update_patience(best_round, patience):
     assert es.es._update_patience(best_round) == patience
 
 
-@pytest.mark.parametrize("model_class", GLUONTS_TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", TESTABLE_MX_MODELS)
 def test_model_save_load_with_adaptive_es(model_class, temp_model_path):
     model = model_class(
         path=temp_model_path,

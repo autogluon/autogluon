@@ -271,7 +271,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     def _get_callbacks(self, time_limit: int, *args, **kwargs) -> List[Callable]:
         """Retrieve a list of callback objects for the GluonTS trainer"""
-        raise NotImplementedError
+        return []
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
         if self.gts_predictor is None:

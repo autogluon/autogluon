@@ -14,7 +14,6 @@ from .models import (
     GenericGluonTSMXNetModel,
     MQCNNMXNetModel,
     MQRNNMXNetModel,
-    ProphetModel,
     SimpleFeedForwardMXNetModel,
     TemporalFusionTransformerMXNetModel,
     TransformerMXNetModel,
