@@ -19,10 +19,10 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         A list of datetime features to parse out of dates.
         For a full list of options see the methods inside pandas.Series.dt at https://pandas.pydata.org/docs/reference/api/pandas.Series.html
     """
-    def __init__(self, 
-            features: list = ['year', 'month', 'day', 'dayofweek'],
-            **kwargs
-    ):
+
+    def __init__(self,
+                 features: list = ['year', 'month', 'day', 'dayofweek'],
+                 **kwargs):
         super().__init__(**kwargs)
         self.features = features
 
@@ -58,7 +58,8 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
     def _generate_features_datetime(self, X: DataFrame) -> DataFrame:
         X_datetime = DataFrame(index=X.index)
         for datetime_feature in self.features_in:
-            # TODO: Be aware: When converted to float32 by downstream models, the seconds value will be up to 3 seconds off the true time due to rounding error. If seconds matter, find a separate way to generate (Possibly subtract smallest datetime from all values).
+            # TODO: Be aware: When converted to float32 by downstream models, the seconds value will be up to 3 seconds off the true time due to rounding error.
+            #  If seconds matter, find a separate way to generate (Possibly subtract smallest datetime from all values).
             # TODO: could also return an extra boolean column is_nan which could provide predictive signal.
             X_datetime[datetime_feature] = pd.to_datetime(X[datetime_feature], errors='coerce').fillna(self._fillna_map[datetime_feature])
             # X_datetime[datetime_feature] = pd.to_timedelta(X_datetime[datetime_feature]).dt.total_seconds()

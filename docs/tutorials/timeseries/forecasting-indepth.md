@@ -46,10 +46,6 @@ By default, the predictor outputs the quantiles `[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 
 ```python
 predictor = TimeSeriesPredictor(quantile_levels=[0.05, 0.5, 0.95])
 ```
-or generate forecasts for the quantiles of interest at prediction time
-```python
-predictor.predict(data, quantile_levels=[0.05, 0.5, 0.95])
-```
 
 ## Which forecasting models are available in AutoGluon?
 Forecasting models in AutoGluon can be divided into three broad categories: local, global, and ensemble models.

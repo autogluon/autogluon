@@ -1,10 +1,10 @@
 from .abstract_sktime import AbstractSktimeModel
-from .models import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel, SktimeTBATSModel, SktimeThetaModel
+from .models import ARIMASktimeModel, AutoARIMASktimeModel, AutoETSSktimeModel, TBATSSktimeModel, ThetaSktimeModel
 
 __all__ = [
-    "SktimeARIMAModel",
-    "SktimeAutoARIMAModel",
-    "SktimeAutoETSModel",
-    "SktimeTBATSModel",
-    "SktimeThetaModel",
+    "ARIMASktimeModel",
+    "AutoARIMASktimeModel",
+    "AutoETSSktimeModel",
+    "TBATSSktimeModel",
+    "ThetaSktimeModel",
 ]
