@@ -46,7 +46,7 @@ def get_annpaths(
     N = len(ann_paths)
     num_train = int(N * train_ratio)
     num_val = int(N * val_ratio)
-    return {"train": ann_paths[:num_train], "val": ann_paths[num_train:num_val], "test": ann_paths[num_val:]}
+    return {"train": ann_paths[:num_train], "val": ann_paths[num_train:num_train+num_val], "test": ann_paths[num_train+num_val:]}
 
 
 def get_image_info(annotation_root, extract_num_from_imgid=True):
@@ -56,6 +56,8 @@ def get_image_info(annotation_root, extract_num_from_imgid=True):
     else:
         filename = os.path.basename(path)
     img_name = os.path.basename(filename)
+    if filename[-4:] != ".jpg":
+        filename = filename + ".jpg"
     img_id = os.path.splitext(img_name)[0]
     if extract_num_from_imgid and isinstance(img_id, str):
         img_id = int(re.findall(r"\d+", img_id)[0])
@@ -127,7 +129,7 @@ def main():
     parser.add_argument("--train_ratio", type=float, default=0.6, help="training set ratio")
     parser.add_argument("--val_ratio", type=float, default=0.2, help="validation set ratio")
     parser.add_argument(
-        "--not_extract_num_from_imgid", action="store_false", help="Extract image number from the image filename"
+        "--not_extract_num_from_imgid", action="store_true", help="Extract image number from the image filename"
     )
     args = parser.parse_args()
 

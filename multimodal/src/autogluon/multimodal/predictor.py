@@ -115,6 +115,7 @@ from .utils import (
     extract_from_output,
     filter_search_space,
     from_coco,
+    from_coco_or_voc,
     get_config,
     get_local_pretrained_config_paths,
     get_minmax_mode,
@@ -168,6 +169,7 @@ class MultiModalPredictor:
         path: Optional[str] = None,
         verbosity: Optional[int] = 3,
         num_classes: Optional[int] = None,  # TODO: can we infer this from data?
+        classes: Optional[list] = None,
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
@@ -220,6 +222,8 @@ class MultiModalPredictor:
             Number of classes. Used in classification task.
             If this is specified and is different from the pretrained model's output,
             the model's head will be changed to have <num_classes> output.
+        classes
+            All classes in this dataset.
         warn_if_exist
             Whether to raise warning if the specified path already exists.
         enable_progress_bar
@@ -256,6 +260,7 @@ class MultiModalPredictor:
         self._eval_metric_name = eval_metric
         self._validation_metric_name = val_metric
         self._output_shape = num_classes
+        self._classes = classes
         self._save_path = path
         self._ckpt_path = None
         self._pretrained_path = None
@@ -289,6 +294,7 @@ class MultiModalPredictor:
                 pipeline=self._pipeline,
                 hyperparameters=hyperparameters,
                 num_classes=self._output_shape,
+                classes=self._classes,
                 init_scratch=self._init_scratch,
             )
 
@@ -444,9 +450,9 @@ class MultiModalPredictor:
         """
         if self._pipeline == OBJECT_DETECTION:
             self.detection_anno_train = train_data
-            train_data = from_coco(train_data)
+            train_data = from_coco_or_voc(train_data, "train")
             if tuning_data is not None:
-                tuning_data = from_coco(tuning_data)
+                tuning_data = from_coco_or_voc(tuning_data, "val")
 
         if hyperparameter_tune_kwargs is not None:
             # TODO: can we support hyperparameters being the same format as regular training?
@@ -695,6 +701,7 @@ class MultiModalPredictor:
             model = create_fusion_model(
                 config=predictor._config,
                 num_classes=predictor._output_shape,
+                classes=predictor._classes,
                 num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
                 num_categories=predictor._df_preprocessor.categorical_num_categories,
                 pretrained=False,  # set "pretrain=False" to prevent downloading online models
@@ -912,6 +919,7 @@ class MultiModalPredictor:
             model = create_fusion_model(
                 config=config,
                 num_classes=self._output_shape,
+                classes=self._classes,
                 num_numerical_columns=len(df_preprocessor.numerical_feature_names),
                 num_categories=df_preprocessor.categorical_num_categories,
             )
@@ -1555,12 +1563,21 @@ class MultiModalPredictor:
         if strategy == "ddp":
             outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
         elif self._pipeline == OBJECT_DETECTION:
-            # reformat single gpu output for onject detection
+            # reformat single gpu output for object detection
             # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
+            # output LABEL if exists for evaluations
             if len(outputs[0][BBOX][0]) == 2:  # additional axis for mask_rcnn, TODO: remove hardcode here
-                outputs = [{BBOX: bbox[0]} for ele in outputs for bbox in ele[BBOX]]
+                outputs = [
+                    {BBOX: bbox[0], LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox[0]}
+                    for ele in outputs
+                    for i, bbox in enumerate(ele[BBOX])
+                ]
             else:
-                outputs = [{BBOX: bbox} for ele in outputs for bbox in ele[BBOX]]
+                outputs = [
+                    {BBOX: bbox, LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox}
+                    for ele in outputs
+                    for i, bbox in enumerate(ele[BBOX])
+                ]
 
         return outputs
 
@@ -1617,6 +1634,7 @@ class MultiModalPredictor:
         metrics: str,
         return_pred: Optional[bool] = False,
         seed: Optional[int] = 123,
+        eval_tool: Optional[str] = None,
     ):
         """
         Evaluate object detection model on a test dataset in COCO format.
@@ -1627,11 +1645,13 @@ class MultiModalPredictor:
             The annotation file in COCO format
         return_pred
             Whether to return the prediction result of each row.
+        eval_tool
+            The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
         """
         # TODO: refactor this into evaluate()
         if isinstance(anno_file_or_df, str):
             anno_file = anno_file_or_df
-            data = from_coco(anno_file)
+            data = from_coco_or_voc(anno_file, "test") # TODO: remove default test hardcoding for VOC
         else:
             # during validation, it will call evaluate with df as input
             anno_file = self.detection_anno_train
@@ -1658,7 +1678,7 @@ class MultiModalPredictor:
             anno_file=anno_file,
             cache_path=cocoeval_cache_path,
             metrics=metrics,
-            tool="pycocotools",
+            tool=eval_tool,
         )
 
         if return_pred:
@@ -1746,6 +1766,7 @@ class MultiModalPredictor:
 
         if self._pipeline == OBJECT_DETECTION:
             strategy = "ddp"
+            num_gpus = 1  # TODO: fix pycocotools error on custom dataset, and fix torchmetrics eval under multi gpu
 
         if num_gpus == 1:
             strategy = None
@@ -1792,6 +1813,7 @@ class MultiModalPredictor:
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
         seed: Optional[int] = 123,
+        eval_tool: Optional[str] = None,
     ):
         """
         Evaluate model on a test dataset.
@@ -1810,6 +1832,8 @@ class MultiModalPredictor:
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
+        eval_tool
+            The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
 
         Returns
         -------
@@ -1819,7 +1843,9 @@ class MultiModalPredictor:
         if self._pipeline == OBJECT_DETECTION:
             if realtime:
                 return NotImplementedError(f"Current pipeline {self._pipeline} does not support realtime predict.")
-            return self.evaluate_coco(anno_file_or_df=data, metrics=metrics, return_pred=return_pred, seed=seed)
+            return self.evaluate_coco(
+                anno_file_or_df=data, metrics=metrics, return_pred=return_pred, seed=seed, eval_tool=eval_tool
+            )
 
         if self._problem_type == NER:
             ret_type = NER_RET
@@ -2232,6 +2258,7 @@ class MultiModalPredictor:
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
+                    "classes": self._classes,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
                     "version": ag_version.__version__,
@@ -2423,6 +2450,7 @@ class MultiModalPredictor:
         predictor._pretrain_path = path
         predictor._config = config
         predictor._output_shape = assets["output_shape"]
+        predictor._classes = assets["classes"]
         predictor._column_types = assets["column_types"]
         predictor._validation_metric_name = assets["validation_metric_name"]
         predictor._df_preprocessor = df_preprocessor
@@ -2468,6 +2496,7 @@ class MultiModalPredictor:
         model = create_fusion_model(
             config=predictor._config,
             num_classes=predictor._output_shape,
+            classes=predictor._classes,
             num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
             num_categories=predictor._df_preprocessor.categorical_num_categories,
             pretrained=False

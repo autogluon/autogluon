@@ -130,6 +130,7 @@ def create_model(
     model_name: str,
     model_config: DictConfig,
     num_classes: Optional[int] = 0,
+    classes: Optional[list] = None,
     num_numerical_columns: Optional[int] = None,
     num_categories: Optional[List[int]] = None,
     pretrained: Optional[bool] = True,
@@ -145,6 +146,8 @@ def create_model(
         Config of the model.
     num_classes
         The class number for a classification task. It should be 1 for a regression task.
+    classes
+        All classes in this dataset.
     num_numerical_columns
         The number of numerical columns in the training dataframe.
     num_categories
@@ -266,6 +269,7 @@ def create_model(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
             num_classes=num_classes,
+            classes=classes,
             pretrained=pretrained,
         )
     elif model_name.lower().startswith(MMOCR_TEXT_DET):
@@ -329,6 +333,7 @@ def create_model(
 def create_fusion_model(
     config: DictConfig,
     num_classes: Optional[int] = None,
+    classes: Optional[list] = None,
     num_numerical_columns: Optional[int] = None,
     num_categories: Optional[List[int]] = None,
     pretrained: Optional[bool] = True,
@@ -344,6 +349,8 @@ def create_fusion_model(
         A DictConfig object. The model config should be accessible by "config.model".
     num_classes
         The class number for a classification task. It should be 1 for a regression task.
+    classes
+        All classes in this dataset.
     num_numerical_columns
         The number of numerical columns in the training dataframe.
     num_categories
@@ -372,6 +379,7 @@ def create_fusion_model(
             model_name=model_name,
             model_config=model_config,
             num_classes=num_classes,
+            classes=classes,
             num_numerical_columns=num_numerical_columns,
             num_categories=num_categories,
             pretrained=pretrained,

@@ -44,9 +44,11 @@ from .object_detection import (
     COCODataset,
     bbox_xyxy_to_xywh,
     cocoeval,
+    from_coco_or_voc,
     from_coco,
     from_voc,
     get_image_name_num,
+    get_voc_classes,
     getCOCOCatIDs,
 )
 from .onnx import get_onnx_input
