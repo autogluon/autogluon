@@ -375,7 +375,7 @@ class TimeSeriesPredictor:
         logger.info("Fitting with arguments:")
         logger.info(f"{pprint.pformat(fit_args)}")
         logger.info(
-            f"Provided training data set with {len(train_data)} rows, {train_data.num_items} items. "
+            f"Provided training data set with {len(train_data)} rows, {train_data.num_items} items (item = single time series). "
             f"Average time series length is {len(train_data) / train_data.num_items:.1f}."
         )
         if tuning_data is not None:
