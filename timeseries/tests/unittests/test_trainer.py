@@ -13,9 +13,9 @@ from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
-from autogluon.timeseries.models import DeepARMXNetModel
+from autogluon.timeseries.models import DeepARModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesEnsembleWrapper
-from autogluon.timeseries.models.gluonts import GenericGluonTSMXNetModel
+from autogluon.timeseries.models.gluonts.mx import GenericGluonTSMXNetModel
 from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSMXNetModelFactory
 from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
@@ -272,11 +272,11 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
     [
-        ({DeepARMXNetModel: {"epochs": 1}}, 1),
+        ({DeepARModel: {"epochs": 1}}, 1),
         (
             {
                 GenericGluonTSMXNetModelFactory(MQRNNEstimator): {"epochs": 1},
-                DeepARMXNetModel: {"epochs": 1},
+                DeepARModel: {"epochs": 1},
             },
             2,
         ),
@@ -302,7 +302,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
 @pytest.mark.parametrize(
     "hyperparameter_list, expected_number_of_unique_names, expected_suffixes",
     [
-        ([{DeepARMXNetModel: {"epochs": 1}}], 1, []),
+        ([{DeepARModel: {"epochs": 1}}], 1, []),
         (
             [
                 {
@@ -315,11 +315,11 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
         ),
         (
             [
-                {DeepARMXNetModel: {"epochs": 1}},
-                {DeepARMXNetModel: {"epochs": 1}},
+                {DeepARModel: {"epochs": 1}},
+                {DeepARModel: {"epochs": 1}},
             ],
             2,
-            ["ARMXNet_2"],
+            ["AR_2"],
         ),
         (
             [
@@ -334,12 +334,12 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
         ),
         (
             [
-                {DeepARMXNetModel: {"epochs": 1}},
-                {DeepARMXNetModel: {"epochs": 1}},
-                {DeepARMXNetModel: {"epochs": 1}},
+                {DeepARModel: {"epochs": 1}},
+                {DeepARModel: {"epochs": 1}},
+                {DeepARModel: {"epochs": 1}},
             ],
             3,
-            ["ARMXNet_2", "ARMXNet_3"],
+            ["AR_2", "AR_3"],
         ),
         (
             [

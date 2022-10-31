@@ -4,22 +4,26 @@ from typing import Any, Dict, List, Union
 
 import autogluon.core as ag
 
-from .abstract import AbstractTimeSeriesModel
-from .abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
-from .autogluon_tabular import AutoGluonTabularModel
-from .gluonts import (
+from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
+from . import (
+    AutoGluonTabularModel,
     DeepARModel,
+    SimpleFeedForwardModel,
+    NaiveModel, 
+    SeasonalNaiveModel, 
+    ARIMAModel, 
+    ETSModel, 
+    ThetaModel,
+)
+from .sktime import ARIMASktimeModel, AutoARIMASktimeModel, AutoETSSktimeModel
+from .gluonts.mx import (
     DeepARMXNetModel,
     MQCNNMXNetModel,
     MQRNNMXNetModel,
-    SimpleFeedForwardModel,
     SimpleFeedForwardMXNetModel,
     TemporalFusionTransformerMXNetModel,
     TransformerMXNetModel,
 )
-from .local import NaiveModel, SeasonalNaiveModel
-from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel
-from .statsmodels import ARIMAModel, ETSModel, ThetaModel
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +38,9 @@ MODEL_TYPES = dict(
     # Prophet=ProphetModel,
     TransformerMXNet=TransformerMXNetModel,
     TemporalFusionTransformerMXNet=TemporalFusionTransformerMXNetModel,
-    SktimeARIMA=SktimeARIMAModel,
-    SktimeAutoARIMA=SktimeAutoARIMAModel,
-    SktimeAutoETS=SktimeAutoETSModel,
+    SktimeARIMA=ARIMASktimeModel,
+    SktimeAutoARIMA=AutoARIMASktimeModel,
+    SktimeAutoETS=AutoETSSktimeModel,
     ETS=ETSModel,
     ARIMA=ARIMAModel,
     Theta=ThetaModel,

@@ -8,15 +8,17 @@ from gluonts.mx.model.seq2seq import MQRNNEstimator
 from gluonts.mx.model.transformer import TransformerEstimator
 
 import autogluon.core as ag
-from autogluon.timeseries.models.gluonts import (  # MQRNNModel,; TransformerModel,
+from autogluon.timeseries.models.gluonts import (
     DeepARModel,
+    SimpleFeedForwardModel,
+)
+from autogluon.timeseries.models.gluonts.mx import(
     DeepARMXNetModel,
     GenericGluonTSMXNetModel,
     MQCNNMXNetModel,
-    ProphetModel,
-    SimpleFeedForwardModel,
     SimpleFeedForwardMXNetModel,
     TemporalFusionTransformerMXNetModel,
+    ProphetModel,
 )
 from autogluon.timeseries.models.gluonts.mx.models import AbstractGluonTSMXNetModel, GenericGluonTSMXNetModelFactory
 from autogluon.timeseries.models.gluonts.torch.models import AbstractGluonTSPyTorchModel

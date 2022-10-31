@@ -7,22 +7,22 @@ import pytest
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.sktime import (  # AutoARIMAModel,; TBATSModel,
     AbstractSktimeModel,
-    SktimeARIMAModel,
-    SktimeAutoETSModel,
-    SktimeThetaModel,
+    ARIMASktimeModel,
+    AutoETSSktimeModel,
+    ThetaSktimeModel,
 )
 
 from ..common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 
 TESTABLE_MODELS = [
-    SktimeARIMAModel,
-    SktimeAutoETSModel,
-    SktimeThetaModel,
+    ARIMASktimeModel,
+    AutoETSSktimeModel,
+    ThetaSktimeModel,
 ]
 
 
 def test_when_sktime_converts_dataframe_then_data_not_duplicated_and_index_correct():
-    model = SktimeAutoETSModel()
+    model = AutoETSSktimeModel()
 
     df = DUMMY_TS_DATAFRAME.copy(deep=True)
     sktime_df = model._to_sktime_data_frame(df)
@@ -45,7 +45,7 @@ def test_when_sktime_converts_dataframe_then_data_not_duplicated_and_index_corre
 
 
 def test_when_sktime_converts_from_dataframe_then_data_not_duplicated_and_index_correct():
-    model = SktimeAutoETSModel()
+    model = AutoETSSktimeModel()
 
     sktime_df = model._to_sktime_data_frame(DUMMY_TS_DATAFRAME.copy(deep=True))
     df = model._to_time_series_data_frame(sktime_df)

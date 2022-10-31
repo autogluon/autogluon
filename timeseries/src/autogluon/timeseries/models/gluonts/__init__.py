@@ -1,24 +1,5 @@
-from .mx import (
-    DeepARMXNetModel,
-    GenericGluonTSMXNetModel,
-    MQCNNMXNetModel,
-    MQRNNMXNetModel,
-    ProphetModel,
-    SimpleFeedForwardMXNetModel,
-    TemporalFusionTransformerMXNetModel,
-    TransformerMXNetModel,
-)
+import autogluon.timeseries as agts
+
 from .torch import DeepARModel, SimpleFeedForwardModel
 
-__all__ = [
-    "DeepARMXNetModel",
-    "DeepARModel",
-    "GenericGluonTSMXNetModel",
-    "MQCNNMXNetModel",
-    "MQRNNMXNetModel",
-    "ProphetModel",
-    "SimpleFeedForwardMXNetModel",
-    "SimpleFeedForwardModel",
-    "TemporalFusionTransformerMXNetModel",
-    "TransformerMXNetModel",
-]
+__all__ = ["DeepARModel", "SimpleFeedForwardModel"]
