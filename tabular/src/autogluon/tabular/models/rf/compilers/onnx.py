@@ -31,9 +31,8 @@ class InferenceSessionWrapper:
 
 class RFOnnxPredictor:
     def __init__(self, model):
-        # self.num_classes = num_classes
         self.sess = InferenceSessionWrapper(model)
-        self.num_classes = self.sess.get_outputs()[1].shape[1]
+        self.num_classes = self.sess.get_outputs()[-1].shape[1]
 
     def predict(self, X):
         input_name = self.sess.get_inputs()[0].name
@@ -70,11 +69,15 @@ class RFOnnxCompiler:
 
         from skl2onnx import convert_sklearn
         from skl2onnx.common.data_types import FloatTensorType
+        from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
         input_shape = list(input_types[0][0])
         initial_type = [('float_input', FloatTensorType(input_shape))]
+
         # Without ZipMap
         # See http://onnx.ai/sklearn-onnx/auto_examples/plot_convert_zipmap.html#without-zipmap
-        options = {id(model): {'zipmap': False}}
+        options = {}
+        if isinstance(model, (RandomForestClassifier, ExtraTreesClassifier)):
+            options = {id(model): {'zipmap': False}}
 
         # Convert the model to onnx
         onnx_model = convert_sklearn(model, initial_types=initial_type, options=options)
