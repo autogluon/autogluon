@@ -32,6 +32,8 @@ from ..constants import (
     NDCG,
     IMAGE_TEXT_SIMILARITY,
     TEXT_SIMILARITY,
+    PRECISION,
+    RECALL,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -174,7 +176,7 @@ def compute_score(
 
 
 def compute_ranking_score(
-    results: Dict[str, Dict], qrel_dict: Dict[str, Dict], cutoff: Optional[List[int]] = [5, 10, 20]
+    results: Dict[str, Dict], qrel_dict: Dict[str, Dict], metrics: List[str], cutoff: Optional[List[int]] = [5, 10, 20]
 ):
     """
     Compute NDCG, MAP, Recall, and Precision.
@@ -189,35 +191,57 @@ def compute_ranking_score(
     cutoff:
         the cutoff value for NDCG, MAP, Recall, and Precision
     """
-    ndcg = {}
-    _map = {}
-    recall = {}
-    precision = {}
-    for k in cutoff:
-        ndcg[f"NDCG@{k}"] = 0.0
-        _map[f"MAP@{k}"] = 0.0
-        recall[f"Recall@{k}"] = 0.0
-        precision[f"P@{k}"] = 0.0
+    metric_strings = set()
+    for per_metric in metrics:
+        if per_metric.lower() == NDCG:
+            per_metric_string = "ndcg_cut." + ",".join([str(k) for k in cutoff])
+        elif per_metric.lower() == MAP:
+            per_metric_string = "map_cut." + ",".join([str(k) for k in cutoff])
+        elif per_metric.lower() == RECALL:
+            per_metric_string = "recall." + ",".join([str(k) for k in cutoff])
+        elif per_metric.lower() == PRECISION:
+            per_metric_string = "P." + ",".join([str(k) for k in cutoff])
+        else:
+            raise ValueError(f"Unknown metric {per_metric}. Consider using `ndcg`, `map`, `recall`, or `precision`.")
 
-    map_string = "map_cut." + ",".join([str(k) for k in cutoff])
-    ndcg_string = "ndcg_cut." + ",".join([str(k) for k in cutoff])
-    recall_string = "recall." + ",".join([str(k) for k in cutoff])
-    precision_string = "P." + ",".join([str(k) for k in cutoff])
+        metric_strings.add(per_metric_string)
 
-    evaluator = pytrec_eval.RelevanceEvaluator(qrel_dict, {map_string, ndcg_string, recall_string, precision_string})
+    evaluator = pytrec_eval.RelevanceEvaluator(qrel_dict, metric_strings)
     scores = evaluator.evaluate(results)
+
+    metric_results = dict()
+    for k in cutoff:
+        for per_metric in metrics:
+            if per_metric.lower() == NDCG:
+                metric_results[f"NDCG@{k}"] = 0.0
+            elif per_metric.lower() == MAP:
+                metric_results[f"MAP@{k}"] = 0.0
+            elif per_metric.lower() == RECALL:
+                metric_results[f"Recall@{k}"] = 0.0
+            elif per_metric.lower() == PRECISION:
+                metric_results[f"Precision@{k}"] = 0.0
 
     for query_id in scores.keys():
         for k in cutoff:
-            ndcg[f"NDCG@{k}"] += scores[query_id]["ndcg_cut_" + str(k)]
-            _map[f"MAP@{k}"] += scores[query_id]["map_cut_" + str(k)]
-            recall[f"Recall@{k}"] += scores[query_id]["recall_" + str(k)]
-            precision[f"P@{k}"] += scores[query_id]["P_" + str(k)]
+            for per_metric in metrics:
+                if per_metric.lower() == NDCG:
+                    metric_results[f"NDCG@{k}"] += scores[query_id]["ndcg_cut_" + str(k)]
+                elif per_metric.lower() == MAP:
+                    metric_results[f"MAP@{k}"] += scores[query_id]["map_cut_" + str(k)]
+                elif per_metric.lower() == RECALL:
+                    metric_results[f"Recall@{k}"] += scores[query_id]["recall_" + str(k)]
+                elif per_metric.lower() == PRECISION:
+                    metric_results[f"P@{k}"] += scores[query_id]["P_" + str(k)]
 
     for k in cutoff:
-        ndcg[f"NDCG@{k}"] = round(ndcg[f"NDCG@{k}"] / len(scores), 5)
-        _map[f"MAP@{k}"] = round(_map[f"MAP@{k}"] / len(scores), 5)
-        recall[f"Recall@{k}"] = round(recall[f"Recall@{k}"] / len(scores), 5)
-        precision[f"P@{k}"] = round(precision[f"P@{k}"] / len(scores), 5)
+        for per_metric in metrics:
+            if per_metric.lower() == NDCG:
+                metric_results[f"NDCG@{k}"] = round(metric_results[f"NDCG@{k}"] / len(scores), 5)
+            elif per_metric.lower() == MAP:
+                metric_results[f"MAP@{k}"] = round(metric_results[f"MAP@{k}"] / len(scores), 5)
+            elif per_metric.lower() == RECALL:
+                metric_results[f"Recall@{k}"] = round(metric_results[f"Recall@{k}"] / len(scores), 5)
+            elif per_metric.lower() == PRECISION:
+                metric_results[f"P@{k}"] = round(metric_results[f"P@{k}"] / len(scores), 5)
 
-    return ndcg, _map, recall, precision
+    return metric_results

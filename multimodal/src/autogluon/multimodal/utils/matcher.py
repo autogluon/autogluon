@@ -64,6 +64,7 @@ def get_fusion_model_dict(
 def create_fusion_model_dict(
     config: DictConfig,
     single_models: Optional[Dict] = None,
+    pretrained: Optional[bool] = True,
 ):
     """
     Create a dict of single models and fusion piece based on a late-fusion config.
@@ -100,6 +101,7 @@ def create_fusion_model_dict(
         model = create_model(
             model_name=model_name,
             model_config=model_config,
+            pretrained=pretrained,
         )
         if model_name.lower().startswith(FUSION):
             fusion_model = model
@@ -228,6 +230,7 @@ def create_siamese_model(
     response_config: DictConfig,
     query_model: Optional[nn.Module] = None,
     response_model: Optional[nn.Module] = None,
+    pretrained: Optional[bool] = True,
 ):
     """
     Create the query and response models and make them share the same encoders for the same modalities.
@@ -250,6 +253,7 @@ def create_siamese_model(
     if query_model is None:
         single_models, query_fusion_model = create_fusion_model_dict(
             config=query_config.model,
+            pretrained=pretrained,
         )
     else:
         single_models, query_fusion_model = get_fusion_model_dict(
@@ -260,6 +264,7 @@ def create_siamese_model(
         single_models, response_fusion_model = create_fusion_model_dict(
             config=response_config.model,
             single_models=single_models,
+            pretrained=pretrained,
         )
     else:
         single_models, response_fusion_model = get_fusion_model_dict(
@@ -457,3 +462,15 @@ def semantic_search(
         queries_result_list[query_id] = sorted(queries_result_list[query_id], key=lambda x: x["score"], reverse=True)
 
     return queries_result_list
+
+
+def convert_data_for_ranking(data: pd.DataFrame, query_column: str, response_column: str, label_column: Optional[str] = None):
+    data_with_label = data.copy()
+    if label_column is None:
+        data_with_label["relevance"] = [1]*len(data)
+        label_column = "relevance"
+
+    query_data = pd.DataFrame({query_column: data[query_column].unique().tolist()})
+    response_data = pd.DataFrame({response_column: data[response_column].unique().tolist()})
+
+    return data_with_label, query_data, response_data, label_column

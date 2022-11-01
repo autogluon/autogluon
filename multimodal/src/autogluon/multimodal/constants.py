@@ -76,6 +76,8 @@ F1 = "f1"
 DIRECT_LOSS = "direct_loss"
 HIT_RATE = "hit_rate"
 NDCG = "ndcg"
+PRECISION = "precision"
+RECALL = "recall"
 METRIC_MODE_MAP = {
     ACC: MAX,
     ACCURACY: MAX,

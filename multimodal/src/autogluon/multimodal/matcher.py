@@ -92,6 +92,7 @@ from .utils import (
     select_model,
     tensor_to_ndarray,
     try_to_infer_pos_label,
+    convert_data_for_ranking,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -721,6 +722,17 @@ class MultiModalMatcher:
         self._label_processors = label_processors
         self._loss_func = loss_func
 
+        if max_time == timedelta(seconds=0):
+            self._top_k_average(
+                query_model=query_model,
+                response_model=response_model,
+                save_path=save_path,
+                minmax_mode=minmax_mode,
+                top_k_average_method=config.optimization.top_k_average_method,
+                val_df=val_df,
+                validation_metric_name=validation_metric_name,
+            )
+
         df_preprocessors = [query_df_preprocessor, response_df_preprocessor, label_df_preprocessor]
         data_processors = [query_processors, response_processors, label_processors]
         df_preprocessors = [item for item in df_preprocessors if item is not None]
@@ -870,11 +882,12 @@ class MultiModalMatcher:
                 ".* in the `DataLoader` init to improve performance.*",
             )
             warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
-            trainer.validate(
+            scores = trainer.validate(
                 task,
                 datamodule=train_dm,
                 ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
             )
+            print(f"scores: {scores}")
 
             trainer.fit(
                 task,
@@ -947,7 +960,11 @@ class MultiModalMatcher:
                         response_model=response_model,
                         path=top_k_model_paths[0],
                     )
-                    best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
+                    best_score = self._evaluate_symmetric_ranking(val_df)
+                    # if self._pipeline == IMAGE_TEXT_SIMILARITY:
+                    #     best_score = self._evaluate_symmetric_ranking(val_df)
+                    # else:
+                    #     best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
                     for i in range(1, len(top_k_model_paths)):
                         cand_avg_state_dict = average_checkpoints(
                             checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -957,7 +974,11 @@ class MultiModalMatcher:
                             response_model=response_model,
                             state_dict=cand_avg_state_dict,
                         )
-                        cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
+                        cand_score = self._evaluate_symmetric_ranking(val_df)
+                        # if self._pipeline == IMAGE_TEXT_SIMILARITY:
+                        #     cand_score = self._evaluate_symmetric_ranking(val_df)
+                        # else:
+                        #     cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
                         if monitor_op(cand_score, best_score):
                             # Add new ingredient
                             ingredients.append(top_k_model_paths[i])
@@ -1191,27 +1212,63 @@ class MultiModalMatcher:
 
         return outputs
 
+    def _evaluate_symmetric_ranking(self, data):
+        data_with_label, query_data, response_data, label_column = convert_data_for_ranking(
+            data=data,
+            query_column=self._query[0],
+            response_column=self._response[0],
+        )
+        score_1 = self._evaluate_ranking(
+            qr_relevance=data_with_label,
+            query_data=query_data,
+            response_data=response_data,
+            label_column=label_column,
+            cutoff=[1, 5, 10],
+        )
+        data_with_label, query_data, response_data, label_column = convert_data_for_ranking(
+            data=data,
+            query_column=self._response[0],
+            response_column=self._query[0],
+        )
+        score_2 = self._evaluate_ranking(
+            qr_relevance=data_with_label,
+            query_data=query_data,
+            response_data=response_data,
+            label_column=label_column,
+            cutoff=[1, 5, 10],
+        )
+
+        return sum(score_1.values()) + sum(score_2.values())
+
     def _evaluate_ranking(
         self,
         qr_relevance: Union[pd.DataFrame, dict, list],
         query_data: Union[pd.DataFrame, dict, list],
         response_data: Union[pd.DataFrame, dict, list],
+        label_column: str,
         id_mappings: Optional[Dict[str, Dict]] = None,
+        metrics: Optional[Union[str, List[str]]] = None,
         chunk_size: Optional[int] = 1024,
         similarity_type: Optional[str] = "cosine",
         top_k: Optional[int] = 100,
+        cutoff: Optional[List[int]] = [5, 10, 20],
     ):
-        query_header = self._query[0] if self._query is not None else QUERY
-        query_data = data_to_df(data=query_data, header=query_header)
-        response_header = self._response[0] if self._response else RESPONSE
-        response_data = data_to_df(data=response_data, header=response_header)
+        query_column = query_data.columns[0]
+        response_column = response_data.columns[0]
 
         qr_relevance = data_to_df(data=qr_relevance)
+        assert query_column in qr_relevance.columns
+        assert response_column in qr_relevance.columns
+
+        if metrics is None:
+            metrics = [self._eval_metric_name]
+        if isinstance(metrics, str):
+            metrics = [metrics]
 
         rank_labels = {}
         for i, per_row in qr_relevance.iterrows():
-            rank_labels.setdefault(per_row[self._query[0]], {})[per_row[self._response[0]]] = int(
-                per_row[self._label_column]
+            rank_labels.setdefault(per_row[query_column], {})[per_row[response_column]] = int(
+                per_row[label_column]
             )
 
         rank_results = dict()
@@ -1235,14 +1292,14 @@ class MultiModalMatcher:
             top_k_indices = top_k_indices.cpu().tolist()
             top_k_scores = top_k_scores.cpu().tolist()
             for i in range(len(query_data)):
-                query_idx = query_data.iloc[i][self._query[0]]
+                query_idx = query_data.iloc[i][query_column]
                 for sub_response_idx, score in zip(top_k_indices[i], top_k_scores[i]):
-                    response_idx = response_chunk.iloc[int(sub_response_idx)][self._response[0]]
+                    response_idx = response_chunk.iloc[int(sub_response_idx)][response_column]
                     rank_results.setdefault(query_idx, {})[response_idx] = score
 
-        ndcg, _map, recall, precision = compute_ranking_score(results=rank_results, qrel_dict=rank_labels)
+        results = compute_ranking_score(results=rank_results, qrel_dict=rank_labels, metrics=metrics, cutoff=cutoff)
 
-        return ndcg, _map, recall, precision
+        return results
 
     def _evaluate_matching(
         self,
@@ -1312,6 +1369,7 @@ class MultiModalMatcher:
         chunk_size: Optional[int] = 1024,
         similarity_type: Optional[str] = "cosine",
         top_k: Optional[int] = 100,
+        cutoff: Optional[List[int]] = [5, 10, 20],
     ):
         """
         Evaluate model on a test dataset.
@@ -1349,14 +1407,29 @@ class MultiModalMatcher:
         Optionally return a dataframe of prediction results.
         """
         if all(v is not None for v in [data, query_data, response_data]):
+            if isinstance(query_data, list):
+                assert self._query is not None, "query_data is a list. Need a dict or dataframe, whose keys or headers should be in data's headers."
+
+            if isinstance(response_data, list):
+                assert self._response is not None, "response_data is a list. Need a dict or dataframe, whose keys or headers should be in data's headers."
+
+            query_header = self._query[0] if self._query else None
+            query_data = data_to_df(data=query_data, header=query_header)
+
+            response_header = self._response[0] if self._response else None
+            response_data = data_to_df(data=response_data, header=response_header)
+
             return self._evaluate_ranking(
                 qr_relevance=data,
                 query_data=query_data,
                 response_data=response_data,
+                label_column=self._label_column,
                 id_mappings=id_mappings,
+                metrics=metrics,
                 chunk_size=chunk_size,
                 similarity_type=similarity_type,
                 top_k=top_k,
+                cutoff=cutoff,
             )
         elif data is not None:
             return self._evaluate_matching(
@@ -1630,6 +1703,7 @@ class MultiModalMatcher:
                     "column_types": self._column_types,
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
+                    "pipeline": self._pipeline,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
@@ -1726,6 +1800,7 @@ class MultiModalMatcher:
         matcher._match_label = assets["match_label"]
         matcher._label_column = assets["label_column"]
         matcher._problem_type = assets["problem_type"]
+        # matcher._pipeline = assets["pipeline"]
         matcher._eval_metric_name = assets["eval_metric_name"]
         matcher._verbosity = verbosity
         matcher._resume = resume
@@ -1782,6 +1857,7 @@ class MultiModalMatcher:
         query_model, response_model = create_siamese_model(
             query_config=matcher._query_config,
             response_config=matcher._response_config,
+            pretrained=False,
         )
 
         resume_ckpt_path = os.path.join(path, LAST_CHECKPOINT)
