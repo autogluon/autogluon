@@ -1,4 +1,5 @@
 import argparse
+import os.path
 
 from autogluon.multimodal import MultiModalPredictor
 
@@ -8,6 +9,9 @@ def load_and_evaluate(
     test_path,
 ):
     predictor = MultiModalPredictor.load(load_path)
+
+    if os.path.isdir(load_path):
+        predictor.set_num_gpus(num_gpus=1)
 
     import time
 

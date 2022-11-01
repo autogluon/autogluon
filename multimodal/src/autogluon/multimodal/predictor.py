@@ -1812,6 +1812,10 @@ class MultiModalPredictor:
 
         return outputs
 
+    def set_num_gpus(self, num_gpus):
+        assert isinstance(num_gpus, int)
+        self._config.env.num_gpus = num_gpus
+
     def evaluate(
         self,
         data: Union[pd.DataFrame, dict, list, str],
