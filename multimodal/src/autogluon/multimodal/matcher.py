@@ -494,7 +494,9 @@ class MultiModalMatcher:
         query_columns: Optional[List] = None,
         response_columns: Optional[List] = None,
     ):
-        if self._query_df_preprocessor is None and query_config is not None:
+        if query_columns is None:
+            query_df_preprocessor = None
+        elif self._query_df_preprocessor is None and all(v is not None for v in [query_columns, query_config]):
             query_df_preprocessor = init_df_preprocessor(
                 config=query_config,
                 column_types={k: column_types[k] for k in query_columns},
@@ -503,7 +505,9 @@ class MultiModalMatcher:
         else:  # continuing training
             query_df_preprocessor = self._query_df_preprocessor
 
-        if self._response_df_preprocessor is None and response_config is not None:
+        if response_columns is None:
+            response_df_preprocessor = None
+        elif self._response_df_preprocessor is None and all(v is not None for v in [response_columns, response_config]):
             response_df_preprocessor = init_df_preprocessor(
                 config=response_config,
                 column_types={k: column_types[k] for k in response_columns},
@@ -512,7 +516,9 @@ class MultiModalMatcher:
         else:  # continuing training
             response_df_preprocessor = self._response_df_preprocessor
 
-        if self._label_df_preprocessor is None and response_config is not None and self._label_column in column_types:
+        if self._label_column is None:
+            label_df_preprocessor = None
+        elif self._label_df_preprocessor is None and response_config is not None and self._label_column in column_types:
             label_df_preprocessor = init_df_preprocessor(
                 config=response_config,
                 column_types={self._label_column: column_types[self._label_column]},
@@ -732,6 +738,7 @@ class MultiModalMatcher:
                 val_df=val_df,
                 validation_metric_name=validation_metric_name,
             )
+            return self
 
         df_preprocessors = [query_df_preprocessor, response_df_preprocessor, label_df_preprocessor]
         data_processors = [query_processors, response_processors, label_processors]
@@ -1113,6 +1120,10 @@ class MultiModalMatcher:
             query_columns = self._query
             response_columns = self._response
 
+        print(f"signature: {signature}")
+        print(f"column_types: {column_types}")
+        print(f"query_columns: {query_columns}")
+        print(f"response_columns: {response_columns}")
         query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._get_matcher_df_preprocessor(
             data=data,
             column_types=column_types,
@@ -1121,6 +1132,15 @@ class MultiModalMatcher:
             query_columns=query_columns,
             response_columns=response_columns,
         )
+        if query_df_preprocessor is not None:
+            query_df_preprocessor._label_generator = None
+            print(f"query_df_preprocessor: {query_df_preprocessor}")
+        if response_df_preprocessor is not None:
+            response_df_preprocessor._label_generator = None
+            print(f"response_df_preprocessor: {response_df_preprocessor}")
+        if label_df_preprocessor is not None:
+            label_df_preprocessor._label_generator = None
+            print(f"label_df_preprocessor: {label_df_preprocessor}")
 
         query_processors, response_processors, label_processors = self._get_matcher_data_processors(
             query_model=query_model,
@@ -1128,6 +1148,10 @@ class MultiModalMatcher:
             response_model=response_model,
             response_config=response_config,
         )
+
+        print(f"query_processors: {query_processors}")
+        print(f"response_processors: {response_processors}")
+        print(f"label_processors: {label_processors}")
 
         # For prediction data with no labels provided.
         df_preprocessors = [query_df_preprocessor, response_df_preprocessor]
@@ -1218,6 +1242,7 @@ class MultiModalMatcher:
             query_column=self._query[0],
             response_column=self._response[0],
         )
+        print(f"first _evaluate_ranking...\n")
         score_1 = self._evaluate_ranking(
             qr_relevance=data_with_label,
             query_data=query_data,
@@ -1230,12 +1255,15 @@ class MultiModalMatcher:
             query_column=self._response[0],
             response_column=self._query[0],
         )
+        print(f"second _evaluate_ranking...\n")
         score_2 = self._evaluate_ranking(
             qr_relevance=data_with_label,
             query_data=query_data,
             response_data=response_data,
             label_column=label_column,
             cutoff=[1, 5, 10],
+            query_signature=RESPONSE,
+            response_signature=QUERY,
         )
 
         return sum(score_1.values()) + sum(score_2.values())
@@ -1252,13 +1280,23 @@ class MultiModalMatcher:
         similarity_type: Optional[str] = "cosine",
         top_k: Optional[int] = 100,
         cutoff: Optional[List[int]] = [5, 10, 20],
+        query_signature: Optional[str] = None,
+        response_signature: Optional[str] = None,
     ):
         query_column = query_data.columns[0]
         response_column = response_data.columns[0]
+        if query_signature is None:
+            query_signature = QUERY
+        if response_signature is None:
+            response_signature = RESPONSE
 
         qr_relevance = data_to_df(data=qr_relevance)
         assert query_column in qr_relevance.columns
         assert response_column in qr_relevance.columns
+
+        print(f"query_data: {query_data.head(5)}")
+        print(f"response_data: {response_data.head(5)}")
+        print(f"qr_relevance: {qr_relevance.head(5)}")
 
         if metrics is None:
             metrics = [self._eval_metric_name]
@@ -1272,11 +1310,11 @@ class MultiModalMatcher:
             )
 
         rank_results = dict()
-        query_embeddings = self.extract_embedding(query_data, signature=QUERY, id_mappings=id_mappings, as_tensor=True)
+        query_embeddings = self.extract_embedding(query_data, signature=query_signature, id_mappings=id_mappings, as_tensor=True)
         num_chunks = max(1, len(response_data) // chunk_size)
         for response_chunk in np.array_split(response_data, num_chunks):
             response_embeddings = self.extract_embedding(
-                response_chunk, signature=RESPONSE, id_mappings=id_mappings, as_tensor=True
+                response_chunk, signature=response_signature, id_mappings=id_mappings, as_tensor=True
             )
             similarity_scores = compute_semantic_similarity(
                 a=query_embeddings, b=response_embeddings, similarity_type=similarity_type
@@ -1370,6 +1408,9 @@ class MultiModalMatcher:
         similarity_type: Optional[str] = "cosine",
         top_k: Optional[int] = 100,
         cutoff: Optional[List[int]] = [5, 10, 20],
+        label_column: Optional[str] = None,
+        query_signature: Optional[str] = None,
+        response_signature: Optional[str] = None,
     ):
         """
         Evaluate model on a test dataset.
@@ -1419,17 +1460,22 @@ class MultiModalMatcher:
             response_header = self._response[0] if self._response else None
             response_data = data_to_df(data=response_data, header=response_header)
 
+            if label_column is None:
+                label_column = self._label_column
+
             return self._evaluate_ranking(
                 qr_relevance=data,
                 query_data=query_data,
                 response_data=response_data,
-                label_column=self._label_column,
+                label_column=label_column,
                 id_mappings=id_mappings,
                 metrics=metrics,
                 chunk_size=chunk_size,
                 similarity_type=similarity_type,
                 top_k=top_k,
                 cutoff=cutoff,
+                query_signature=query_signature,
+                response_signature=response_signature,
             )
         elif data is not None:
             return self._evaluate_matching(
