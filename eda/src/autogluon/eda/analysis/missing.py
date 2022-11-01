@@ -7,7 +7,7 @@ __all__ = ['MissingValuesAnalysis']
 
 class MissingValuesAnalysis(AbstractAnalysis):
     """
-    Analyze datasets missing values counts and frequencies.
+    Analyze dataset's missing value counts and frequencies
 
     Examples
     --------

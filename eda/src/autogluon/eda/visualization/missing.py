@@ -1,3 +1,5 @@
+import logging
+
 import matplotlib.pyplot as plt
 import missingno as msno
 
@@ -6,6 +8,7 @@ from .jupyter import JupyterMixin
 from .. import AnalysisState
 
 __all__ = ['MissingValues']
+logger = logging.getLogger(__name__)
 
 
 class MissingValues(AbstractVisualization, JupyterMixin):
@@ -50,6 +53,8 @@ class MissingValues(AbstractVisualization, JupyterMixin):
         'dendrogram': msno.dendrogram,
     }
 
+    MAX_MATRIX_VARIABLES_NUMBER = 50
+
     def __init__(self,
                  graph_type: str = 'matrix',
                  headers: bool = False,
@@ -61,13 +66,24 @@ class MissingValues(AbstractVisualization, JupyterMixin):
         self.headers = headers
 
     def can_handle(self, state: AnalysisState) -> bool:
-        return 'missing_statistics' in state
+        can_handle = self.all_keys_must_be_present(state, 'missing_statistics')
+        if can_handle and self.graph_type == 'matrix' and self._has_too_many_variables_for_matrix(state):
+            logging.warning(f'The dataset has more than {self.MAX_MATRIX_VARIABLES_NUMBER} variables; '
+                            f'matrix visualization will comfortably accommodate up to {self.MAX_MATRIX_VARIABLES_NUMBER} labelled variables. '
+                            f'Past that range labels begin to overlap or become unreadable, and by default large displays omit them.')
+        return can_handle
 
     def _render(self, state: AnalysisState) -> None:
         for ds, ds_state in state.missing_statistics.items():
             self.render_header_if_needed(state, f'{ds} missing values analysis')
             widget = self._get_operation(self.graph_type)
             self._internal_render(widget, ds_state.data, **self._kwargs)
+
+    def _has_too_many_variables_for_matrix(self, state: AnalysisState):
+        for _, ds_state in state.missing_statistics.items():
+            if len(ds_state.data.columns) > self.MAX_MATRIX_VARIABLES_NUMBER:
+                return True
+        return False
 
     @staticmethod
     def _internal_render(widget, data, **kwargs):

@@ -54,6 +54,24 @@ def test_get_operation(input_type, expected):
     assert MissingValues()._get_operation(input_type) is expected
 
 
+@pytest.mark.parametrize(
+    "cols_number,expected", [
+        (0, False),
+        (1, False),
+        (50, False),
+        (51, True),
+    ])
+def test_has_too_many_variables_for_matrix(cols_number, expected):
+    cols = [f'col{i}' for i in range(cols_number)]
+    df_test = pd.DataFrame((np.arange(100))[:, None].repeat([len(cols)], axis=1), columns=cols)
+    s = {'missing_statistics': {
+        'test_data': {
+            'data': df_test,
+        }
+    }}
+    assert MissingValues()._has_too_many_variables_for_matrix(AnalysisState(s)) is expected
+
+
 def __prepare_test_data():
     cols = list('AB')
     df_train = pd.DataFrame((np.arange(100))[:, None].repeat([len(cols)], axis=1), columns=cols)
