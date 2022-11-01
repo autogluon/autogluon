@@ -42,7 +42,7 @@ matcher = MultiModalMatcher(
 
 # Fit the model
 matcher.fit(
-    train_data=snli_dev,
+    train_data=snli_train,
     time_limit=180,
     save_path="text_matcher",
 )
