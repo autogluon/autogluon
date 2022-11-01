@@ -65,6 +65,18 @@ class TimeSeriesPredictor:
         - ``"RMSE"``: root mean squared error
 
         For more information about these metrics, see https://docs.aws.amazon.com/forecast/latest/dg/metrics.html.
+    known_covariates_names: List[str], optional
+        Names of the covariates that are known in advance for all time steps in the forecast horizon. These are also
+        known as dynamic features, exogenous variables, additional regressors or related time series. Examples of such
+        covariates include holidays, promotions or weather forecasts.
+
+        Currently, only numeric (float of integer dtype) are supported.
+
+        If ``known_covariates_names`` are provided, then:
+
+        - :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will expect that ``train_data`` contains the columns listed in ``known_covariates_names``.
+        - :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict` will expect an additional keyword argument ``known_covariates`` containing the future values of the known covariates in ``TimeSeriesDataFrame`` format.
+
     quantile_levels : List[float], optional
         List of increasing decimals that specifies which quantiles should be estimated when making distributional
         forecasts. Defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
@@ -114,6 +126,7 @@ class TimeSeriesPredictor:
     def __init__(
         self,
         target: Optional[str] = None,
+        known_covariates_names: Optional[List[str]] = None,
         prediction_length: int = 1,
         eval_metric: Optional[str] = None,
         path: Optional[str] = None,
@@ -131,6 +144,18 @@ class TimeSeriesPredictor:
         if target is not None and kwargs.get("label") is not None:
             raise ValueError("Both `label` and `target` are specified. Please specify at most one of these arguments.")
         self.target = target or kwargs.get("label", "target")
+
+        if known_covariates_names is None:
+            known_covariates_names = []
+        if isinstance(known_covariates_names, str):
+            known_covariates_names = [known_covariates_names]
+        if not all(isinstance(name, str) for name in known_covariates_names):
+            raise ValueError(
+                "known_covariates_names must be a list of strings (names of columns that are known at prediction time)."
+            )
+        if self.target in known_covariates_names:
+            raise ValueError(f"Target column {self.target} cannot be one of the known covariates.")
+        self.known_covariates_names = known_covariates_names
 
         self.prediction_length = prediction_length
         self.eval_metric = eval_metric
@@ -158,6 +183,7 @@ class TimeSeriesPredictor:
                 path_context=self.path,
                 eval_metric=eval_metric,
                 target=self.target,
+                known_covariates_names=self.known_covariates_names,
                 prediction_length=self.prediction_length,
                 quantile_levels=self.quantile_levels,
                 validation_splitter=splitter,
@@ -210,6 +236,11 @@ class TimeSeriesPredictor:
         train_data : TimeSeriesDataFrame
             Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
 
+            If ``known_covariates_names`` were specified when creating the predictor, ``train_data`` must include the
+            columns listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+            The known covariates must have a numeric (float or integer) dtype. Columns of ``train_data`` except
+            ``target`` and those listed in ``known_covariates_names`` will be ignored.
+
             If ``train_data`` has static features (i.e., ``train_data.static_features`` is a pandas DataFrame), the
             predictor will interpret columns with ``int`` and ``float`` dtypes as continuous (real-valued) features,
             columns with ``object`` and ``str`` dtypes as categorical features, and will ignore the rest of columns.
@@ -231,6 +262,10 @@ class TimeSeriesPredictor:
             ``validation_splitter``. If ``tuning_data`` is provided, ``validation_splitter`` will be ignored.
             See the description of ``validation_splitter`` in the docstring for
             :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
+
+            If ``known_covariates_names`` were specified when creating the predictor, ``tuning_data`` must also include
+            the columns listed in ``known_covariates_names`` with the covariates values aligned with the target time
+            series.
 
             If ``train_data`` has static features, ``tuning_data`` must have also have static features with the same
             column names and dtypes.
@@ -337,10 +372,6 @@ class TimeSeriesPredictor:
         if self._learner.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
 
-        if self.target not in train_data.columns:
-            raise ValueError(f"Target column `{self.target}` not found in the training data set.")
-        if tuning_data is not None and self.target not in tuning_data.columns:
-            raise ValueError(f"Target column `{self.target}` not found in the tuning data set.")
         if hyperparameters is None:
             hyperparameters = "default"
 
@@ -352,7 +383,7 @@ class TimeSeriesPredictor:
 
         fit_args = dict(
             prediction_length=self.prediction_length,
-            target_column=self.target,
+            target=self.target,
             time_limit=time_limit,
             evaluation_metric=self.eval_metric,
             hyperparameters=hyperparameters,
@@ -375,7 +406,7 @@ class TimeSeriesPredictor:
         logger.info("Fitting with arguments:")
         logger.info(f"{pprint.pformat(fit_args)}")
         logger.info(
-            f"Provided training data set with {len(train_data)} rows, {train_data.num_items} items. "
+            f"Provided training data set with {len(train_data)} rows, {train_data.num_items} items (item = single time series). "
             f"Average time series length is {len(train_data) / train_data.num_items:.1f}."
         )
         if tuning_data is not None:
@@ -407,6 +438,7 @@ class TimeSeriesPredictor:
     def predict(
         self,
         data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[str] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
@@ -417,8 +449,19 @@ class TimeSeriesPredictor:
         data : TimeSeriesDataFrame
             Time series data to forecast with.
 
+            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
+            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+
             If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
             static features that have the same columns and dtypes.
+        known_covariates : TimeSeriesDataFrame, optional
+            If ``known_covariates_names`` were specified when creating the predictor, it is necessary to provide the
+            values of the known covariates for each time series during the forecast horizon. That is:
+
+            - The columns must include all columns listed in ``known_covariates_names``
+            - The ``item_id`` index must include all item ids present in ``data``
+            - The ``timestamp`` index must include the values for ``prediction_length`` many time steps into the future from the end of each time series in ``data``
+
         model : str, optional
             Name of the model that you would like to use for prediction. By default, the best model during training
             (with highest validation score) will be used.
@@ -426,13 +469,15 @@ class TimeSeriesPredictor:
         if "quantile_levels" in kwargs:
             warnings.warn(
                 "Passing `quantile_levels` as a keyword argument to `TimeSeriesPredictor.predict` is deprecated and "
-                "will be removed in v0.7.0. This might also lead to some models not working properly. "
+                "will be removed in v0.7. This might also lead to some models not working properly. "
                 "Please specify the desired quantile levels when creating the predictor as "
                 "`TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
                 category=DeprecationWarning,
             )
+        # TODO: What happens to `known_covariates` if `ignore_index=True`?
+        # TODO: Add example
         data = self._check_and_prepare_data_frame(data)
-        return self._learner.predict(data, model=model, **kwargs)
+        return self._learner.predict(data, known_covariates=known_covariates, model=model, **kwargs)
 
     def evaluate(self, data: TimeSeriesDataFrame, **kwargs):
         """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``
@@ -441,9 +486,14 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : TimeSeriesDataFrame
-            The data to evaluate the best model on. The last ``prediction_length`` time steps of the
-            data set, for each item, will be held out for prediction and forecast accuracy will be calculated
-            on these time steps.
+            The data to evaluate the best model on. The last ``prediction_length`` time steps of the data set, for each
+            item, will be held out for prediction and forecast accuracy will be calculated on these time steps.
+
+            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
+            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+
+            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
+            static features that have the same columns and dtypes.
 
         Other Parameters
         ----------------
@@ -532,6 +582,13 @@ class TimeSeriesPredictor:
         data : TimeSeriesDataFrame, optional
             dataset used for additional evaluation. If not provided, the validation set used during training will be
             used.
+
+            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
+            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+
+            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
+            static features that have the same columns and dtypes.
+
         silent : bool, default = False
             If False, the leaderboard DataFrame will be printed.
 

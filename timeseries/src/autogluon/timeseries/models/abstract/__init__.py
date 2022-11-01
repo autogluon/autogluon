@@ -1,3 +1,3 @@
-from .abstract_timeseries_model import AbstractTimeSeriesModel
+from .abstract_timeseries_model import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
 
-__all__ = ["AbstractTimeSeriesModel"]
+__all__ = ["AbstractTimeSeriesModel", "AbstractTimeSeriesModelFactory"]

@@ -37,19 +37,19 @@ class SimpleGluonTSDataset(GluonTSDataset):
 
     def __init__(
         self,
-        time_series_df: TimeSeriesDataFrame,
-        target_field_name: str = "target",
+        target_df: TimeSeriesDataFrame,
         feat_static_cat: Optional[pd.DataFrame] = None,
         feat_static_real: Optional[pd.DataFrame] = None,
+        feat_dynamic_real: Optional[TimeSeriesDataFrame] = None,
         float_dtype: Type = np.float64,
         int_dtype: Type = np.int64,
     ):
-        assert time_series_df is not None
-        assert time_series_df.freq, "Initializing GluonTS data sets without freq is not allowed"
-        self.time_series_df = time_series_df
-        self.target_field_name = target_field_name
+        assert target_df is not None
+        assert target_df.freq, "Initializing GluonTS data sets without freq is not allowed"
+        self.target_df = target_df
         self.feat_static_cat = feat_static_cat
         self.feat_static_real = feat_static_real
+        self.feat_dynamic_real = feat_dynamic_real
 
         self.int_dtype = int_dtype
         self.float_dtype = float_dtype
@@ -60,7 +60,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         # for feature generation. If the frequency string doesn't match or is not provided, it raises an exception.
         # Here we bypass this by issuing a default "yearly" frequency, tricking it into not producing
         # any lags or features.
-        freq_ = self.time_series_df.freq
+        freq_ = self.target_df.freq
         pd_offset = to_offset(freq_)
 
         # normalize freq str to handle peculiarities such as W-SUN
@@ -69,14 +69,14 @@ class SimpleGluonTSDataset(GluonTSDataset):
         return "A" if offset_base_alias is None or offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS else freq_
 
     def __len__(self):
-        return len(self.time_series_df.item_ids)  # noqa
+        return len(self.target_df.item_ids)  # noqa
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
-        for item_id in self.time_series_df.item_ids:  # noqa
-            df = self.time_series_df.loc[item_id]
+        for item_id in self.target_df.item_ids:  # noqa
+            df = self.target_df.loc[item_id]
             time_series = {
                 FieldName.ITEM_ID: item_id,
-                FieldName.TARGET: df[self.target_field_name].to_numpy(dtype=self.float_dtype),
+                FieldName.TARGET: df.squeeze().to_numpy(dtype=self.float_dtype),
                 FieldName.START: pd.Period(df.index[0], freq=self.freq),
             }
             if self.feat_static_cat is not None:
@@ -86,6 +86,10 @@ class SimpleGluonTSDataset(GluonTSDataset):
             if self.feat_static_real is not None:
                 time_series[FieldName.FEAT_STATIC_REAL] = self.feat_static_real.loc[item_id].to_numpy(
                     dtype=self.float_dtype
+                )
+            if self.feat_dynamic_real is not None:
+                time_series[FieldName.FEAT_DYNAMIC_REAL] = (
+                    self.feat_dynamic_real.loc[item_id].to_numpy(dtype=self.float_dtype).T
                 )
 
             yield time_series
@@ -143,9 +147,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         )
         self.gts_predictor: Optional[GluonTSPredictor] = None
         self.callbacks = []
-        self.use_feat_static_cat = False
-        self.use_feat_static_real = False
-        self.use_feat_dynamic_real = False
+        self.num_feat_static_cat = 0
+        self.num_feat_static_real = 0
+        self.num_feat_dynamic_real = 0
         self.feat_static_cat_cardinality: List[int] = []
 
     def save(self, path: str = None, **kwargs) -> str:
@@ -186,13 +190,17 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                     "during initialization. Please provide a `freq` string to `fit`."
                 )
 
-            disable_static_features = self._get_model_params().get("disable_static_features", False)
-            if not disable_static_features:
+            model_params = self._get_model_params()
+            disable_static_features = model_params.get("disable_static_features", False)
+            disable_known_covariates = model_params.get("disable_known_covariates", False)
+            if not disable_static_features and ds.static_features is not None:
                 feat_static_cat, feat_static_real = get_categorical_and_continuous_features(ds.static_features)
-                self.use_feat_static_cat = feat_static_cat is not None
-                self.use_feat_static_real = feat_static_real is not None
-                if self.use_feat_static_cat:
-                    self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
+                self.num_feat_static_cat = len(feat_static_cat.columns)
+                self.num_feat_static_real = len(feat_static_real.columns)
+                self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
+            if not disable_known_covariates:
+                feat_dynamic_real = ds.drop(self.target, axis=1)
+                self.num_feat_dynamic_real = len(feat_dynamic_real.columns)
 
         if "callbacks" in kwargs:
             self.callbacks += kwargs["callbacks"]
@@ -220,18 +228,55 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         with warning_filter():
             return self.gluonts_estimator_class.from_hyperparameters(**self._get_estimator_init_args())
 
-    def _to_gluonts_dataset(self, time_series_df: Optional[TimeSeriesDataFrame]) -> Optional[GluonTSDataset]:
+    def _to_gluonts_dataset(
+        self, time_series_df: Optional[TimeSeriesDataFrame], known_covariates: Optional[TimeSeriesDataFrame] = None
+    ) -> Optional[GluonTSDataset]:
         if time_series_df is not None:
-            feat_static_cat, feat_static_real = get_categorical_and_continuous_features(time_series_df.static_features)
-            if not self.use_feat_static_cat:
-                feat_static_cat = None
-            if not self.use_feat_static_real:
-                feat_static_real = None
+            feat_static_cat = None
+            feat_static_real = None
+            if time_series_df.static_features is not None and (self.num_feat_static_cat or self.num_feat_static_real):
+                feat_static_cat, feat_static_real = get_categorical_and_continuous_features(
+                    time_series_df.static_features
+                )
+                if self.num_feat_static_cat > 0:
+                    if len(feat_static_cat.columns) != self.num_feat_static_cat:
+                        raise ValueError(
+                            f"Static features must contain {self.num_feat_dynamic_real} columns of type 'category', "
+                            f"(got {len(feat_static_cat.columns)} columns of type 'category')."
+                        )
+                else:
+                    feat_static_cat = None
+                if self.num_feat_static_real > 0:
+                    if len(feat_static_real.columns) != self.num_feat_static_real:
+                        raise ValueError(
+                            f"Static features must contain {self.num_feat_dynamic_real} columns of type 'float', "
+                            f"(got {len(feat_static_real.columns)} columns of type 'float')."
+                        )
+                else:
+                    feat_static_real = None
+
+            feat_dynamic_real = time_series_df.drop(self.target, axis=1)
+            if known_covariates is not None:
+                feat_dynamic_real = pd.concat([feat_dynamic_real, known_covariates], axis=0)
+                if len(feat_dynamic_real) != len(time_series_df) + self.prediction_length * time_series_df.num_items:
+                    raise ValueError(
+                        f"known_covariates must contain values for the next prediction_length = "
+                        f"{self.prediction_length} time steps in each time series."
+                    )
+            if self.num_feat_dynamic_real > 0:
+                if len(feat_dynamic_real.columns) != self.num_feat_dynamic_real:
+                    raise ValueError(
+                        f"Data must contain {self.num_feat_dynamic_real} columns with known covariates, "
+                        f"(only received {len(feat_dynamic_real.columns)} columns with known covariates)."
+                    )
+            else:
+                feat_dynamic_real = None
+
             return SimpleGluonTSDataset(
-                time_series_df,
-                target_field_name=self.target,
+                target_df=time_series_df[[self.target]],
                 feat_static_cat=feat_static_cat,
                 feat_static_real=feat_static_real,
+                feat_dynamic_real=feat_dynamic_real,
                 float_dtype=self.float_dtype,
                 int_dtype=self.int_dtype,
             )
@@ -271,9 +316,15 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     def _get_callbacks(self, time_limit: int, *args, **kwargs) -> List[Callable]:
         """Retrieve a list of callback objects for the GluonTS trainer"""
-        raise NotImplementedError
+        return []
 
-    def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
+    def predict(
+        self,
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        quantile_levels: List[float] = None,
+        **kwargs,
+    ) -> TimeSeriesDataFrame:
         if self.gts_predictor is None:
             raise ValueError("Please fit the model before predicting.")
 
@@ -289,7 +340,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             if not all(0 < q < 1 for q in quantiles):
                 raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
 
-            predicted_targets = self._predict_gluonts_forecasts(data, **kwargs)
+            predicted_targets = self._predict_gluonts_forecasts(data, known_covariates=known_covariates, **kwargs)
 
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
@@ -308,8 +359,10 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         # Make sure the item_ids are sorted in the same order as in data
         return df.loc[data.item_ids]
 
-    def _predict_gluonts_forecasts(self, data: TimeSeriesDataFrame, **kwargs) -> List[Forecast]:
-        gts_data = self._to_gluonts_dataset(data)
+    def _predict_gluonts_forecasts(
+        self, data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame] = None, **kwargs
+    ) -> List[Forecast]:
+        gts_data = self._to_gluonts_dataset(data, known_covariates=known_covariates)
 
         predictor_kwargs = dict(dataset=gts_data)
         if "num_samples" in kwargs:

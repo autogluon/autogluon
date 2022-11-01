@@ -3,23 +3,20 @@ import itertools
 import os
 import shutil
 import tempfile
-from functools import partial
 from unittest import mock
 
 import numpy as np
 import pytest
 from flaky import flaky
-from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
-from autogluon.timeseries.models import DeepARMXNetModel, ETSModel
+from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.models.gluonts import GenericGluonTSMXNetModel
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
+from .gluonts.test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_autogluon_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
-from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
 from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
 from .test_statsmodels import TESTABLE_MODELS as STATSMODELS_TESTABLE_MODELS
@@ -215,7 +212,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
 
 @pytest.mark.parametrize(
     "model_class",
-    [DeepARMXNetModel, ETSModel, partial(GenericGluonTSMXNetModel, gluonts_estimator_class=MQRNNEstimator)],
+    [DeepARModel, ETSModel],
 )
 @pytest.mark.parametrize("test_data_index", [["A", "B"], ["C", "D"], ["A"]])
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_aligns_with_time(
@@ -243,7 +240,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
 
 @pytest.mark.parametrize(
     "model_class",
-    [DeepARMXNetModel, ETSModel, partial(GenericGluonTSMXNetModel, gluonts_estimator_class=MQRNNEstimator)],
+    [DeepARModel, ETSModel],
 )
 @pytest.mark.parametrize(
     "train_data, test_data",

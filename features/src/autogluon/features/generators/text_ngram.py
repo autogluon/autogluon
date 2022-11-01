@@ -26,18 +26,22 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
     Parameters
     ----------
-    vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer` or :class:`sklearn.feature_extraction.text.TfidfVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
+    vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer` or :class:`sklearn.feature_extraction.text.TfidfVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)  # noqa
         sklearn CountVectorizer which is used to generate the ngrams given the text data.
         Can also specify a TfidfVectorizer, but note that memory usage will increase by 4-8x relative to CountVectorizer.
     vectorizer_strategy : str, default 'combined'
-        If 'combined', all text features are concatenated together to fit the vectorizer. Features generated in this way have their names prepended with '__nlp__.'.
-        If 'separate', all text features are fit separately with their own copy of the vectorizer. Their ngram features are then concatenated together to form the output.
+        If 'combined', all text features are concatenated together to fit the vectorizer.
+        Features generated in this way have their names prepended with '__nlp__.'.
+        If 'separate', all text features are fit separately with their own copy of the vectorizer.
+        Their ngram features are then concatenated together to form the output.
         If 'both', the outputs of 'combined' and 'separate' are concatenated together to form the output.
-        It is generally recommended to keep vectorizer_strategy as 'combined' unless the text features are not associated with each-other, as fitting separate vectorizers could increase memory usage and model training time.
+        It is generally recommended to keep vectorizer_strategy as 'combined' unless the text features are not associated with each-other,
+        as fitting separate vectorizers could increase memory usage and model training time.
         Valid values: ['combined', 'separate', 'both']
     max_memory_ratio : float, default 0.15
         Safety measure to avoid out-of-memory errors downstream in model training.
-        The number of ngrams generated will be capped to take at most max_memory_ratio proportion of total available memory, treating the ngrams as float32 values.
+        The number of ngrams generated will be capped to take at most max_memory_ratio proportion of total available memory,
+        treating the ngrams as float32 values.
         ngram features will be removed in least frequent to most frequent order.
         Note: For vectorizer_strategy values other than 'combined', the resulting ngrams may use more than this value.
         It is recommended to only increase this value above 0.15 if confident that higher values will not result in out-of-memory errors.
@@ -51,7 +55,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         # TODO: Finetune this, or find a better way to ensure stability
         # TODO: adjust max_memory_ratio correspondingly if prefilter_tokens==True
         self.max_memory_ratio = max_memory_ratio  # Ratio of maximum memory the output ngram features are allowed to use in dense int32 form.
-        
+
         if vectorizer is None:
             self.vectorizer_default_raw = vectorizer_auto_ml_default()
         else:
@@ -61,14 +65,14 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
             raise ValueError(f"vectorizer_strategy must be one of {['combined', 'separate', 'both']}, but value is: {vectorizer_strategy}")
         self.vectorizer_strategy = vectorizer_strategy
         self.vectorizer_features = None
-        self.prefilter_tokens = prefilter_tokens 
-        self.prefilter_token_count = prefilter_token_count 
+        self.prefilter_tokens = prefilter_tokens
+        self.prefilter_token_count = prefilter_token_count
         self.token_mask = None
         self._feature_names_dict = dict()
 
     def _fit_transform(self, X: DataFrame, y: Series = None, problem_type: str = None, **kwargs) -> (DataFrame, dict):
         X_out = self._fit_transform_ngrams(X)
-        
+
         if self.prefilter_tokens and self.prefilter_token_count >= X_out.shape[1]:
             logger.warning('`prefilter_tokens` was enabled but `prefilter_token_count` larger than the vocabulary. Disabling `prefilter_tokens`.')
             self.prefilter_tokens = False
@@ -133,7 +137,8 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
                 text_list = list(X[nlp_feature].astype(str).drop_duplicates().values)
             vectorizer_raw = copy.deepcopy(self.vectorizer_default_raw)
             try:
-                vectorizer_fit, _ = self._train_vectorizer(text_list, vectorizer_raw)  # Don't use transform_matrix output because it may contain fewer rows due to drop_duplicates call.
+                # Don't use transform_matrix output because it may contain fewer rows due to drop_duplicates call.
+                vectorizer_fit, _ = self._train_vectorizer(text_list, vectorizer_raw)
                 self._log(20, f'{vectorizer_fit.__class__.__name__} fit with vocabulary size = {len(vectorizer_fit.vocabulary_)}', self.log_prefix + '\t')
             except ValueError:
                 self._log(30, f"Removing text_ngram feature due to error: '{nlp_feature}'", self.log_prefix + '\t')
@@ -171,13 +176,15 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
                         skip_nlp = True
 
                 if skip_nlp:
-                    self._log(30, 'Warning: ngrams generation resulted in OOM error, removing ngrams features. If you want to use ngrams for this problem, increase memory allocation for AutoGluon.', self.log_prefix + '\t')
+                    self._log(30, 'Warning: ngrams generation resulted in OOM error, removing ngrams features. '
+                                  'If you want to use ngrams for this problem, increase memory allocation for AutoGluon.', self.log_prefix + '\t')
                     self._log(10, str(err))
                     self.vectorizers = []
                     self.features_in = []
                     keep_trying_nlp = False
                 else:
-                    self._log(20, 'Warning: ngrams generation resulted in OOM error, attempting to reduce ngram feature count. If you want to optimally use ngrams for this problem, increase memory allocation for AutoGluon.', self.log_prefix + '\t')
+                    self._log(20, 'Warning: ngrams generation resulted in OOM error, attempting to reduce ngram feature count. '
+                                  'If you want to optimally use ngrams for this problem, increase memory allocation for AutoGluon.', self.log_prefix + '\t')
                     self._log(10, str(err))
                     downsample_ratio = 0.25
         if X_text_ngram is None:
@@ -196,7 +203,8 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
             transform_matrix = vectorizer_fit.transform(text_data)
 
             if not self._is_fit:
-                transform_matrix = self._adjust_vectorizer_memory_usage(transform_matrix=transform_matrix, text_data=text_data, vectorizer_fit=vectorizer_fit, downsample_ratio=downsample_ratio)
+                transform_matrix = self._adjust_vectorizer_memory_usage(transform_matrix=transform_matrix, text_data=text_data, vectorizer_fit=vectorizer_fit,
+                                                                        downsample_ratio=downsample_ratio)
                 nlp_features_names = vectorizer_fit.get_feature_names_out()
                 nlp_features_names_final = np.array([f'{nlp_feature}.{x}' for x in nlp_features_names]
                                                     + [f'{nlp_feature}._total_']
@@ -249,7 +257,9 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
     @staticmethod
     def _train_vectorizer(text_data: list, vectorizer):
-        transform_matrix = vectorizer.fit_transform(text_data)  # TODO: Consider upgrading to pandas 0.25.0 to benefit from sparse attribute improvements / bug fixes! https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.25.0.html
+        # TODO: Consider upgrading to pandas 0.25.0 to benefit from sparse attribute improvements / bug fixes!
+        #  https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.25.0.html
+        transform_matrix = vectorizer.fit_transform(text_data)
         vectorizer.stop_words_ = None  # Reduces object size by 100x+ on large datasets, no effect on usability
         return vectorizer, transform_matrix
 
