@@ -77,17 +77,17 @@ class HpoExecutor(ABC):
         initialized_model
             The model that will be performed HPO. This model MUST be initialized
         """
-        user_cpu_count = initialized_model._get_child_aux_val(key='num_cpus', default=None)
-        user_gpu_count = initialized_model._get_child_aux_val(key='num_gpus', default=None)
-        resource_kwargs = initialized_model._preprocess_fit_resources()
+        user_cpu_count = initialized_model.params_aux.get('num_cpus', None)
+        user_gpu_count = initialized_model.params_aux.get('num_gpus', None)
+        minimum_model_resources = initialized_model.get_minimum_resources()
 
         num_gpus = ResourceCalculator.get_total_gpu_count(
+            model_default_num_gpus=minimum_model_resources.get('num_gpus', 0),
             user_specified_num_gpus=user_gpu_count,
-            model_default_num_gpus=resource_kwargs.get('num_gpus', 0),
         )
         num_cpus = ResourceCalculator.get_total_cpu_count(
+            model_default_num_cpus=minimum_model_resources.get('num_cpus', 1),
             user_specified_num_cpus=user_cpu_count,
-            model_default_num_cpus=resource_kwargs.get('num_cpus', 0),
         )
 
         self.resources = dict(num_gpus=num_gpus, num_cpus=num_cpus)
@@ -319,6 +319,7 @@ class CustomHpoExecutor(HpoExecutor):
         self._time_limit = value
     
     def initialize(self, hyperparameter_tune_kwargs, default_num_trials=None, time_limit=None):
+        self.hyperparameter_tune_kwargs = hyperparameter_tune_kwargs
         if not isinstance(hyperparameter_tune_kwargs, tuple):
             if isinstance(hyperparameter_tune_kwargs, dict):
                 hyperparameter_tune_kwargs = hyperparameter_tune_kwargs.copy()
@@ -336,7 +337,8 @@ class CustomHpoExecutor(HpoExecutor):
     def register_resources(self, initialized_model):
         assert self.scheduler_options is not None, 'Call `initialize()` before register resources'
         super().register_resources(initialized_model)
-        self.scheduler_options[1]['resources'] = self.resources
+        print(f'custom backend resource: {self.resources}')
+        self.scheduler_options[1]['resource'] = self.resources
         
     def validate_search_space(self, search_space, model_name):
         if not any(isinstance(search_space[hyperparam], Space) for hyperparam in search_space):
@@ -351,6 +353,8 @@ class CustomHpoExecutor(HpoExecutor):
                     
     def execute(self, model_trial, train_fn_kwargs, **kwargs):
         assert self.scheduler_options is not None, 'Call `initialize()` before execute'
+        if 'resources_per_trial' in self.hyperparameter_tune_kwargs:
+            self.scheduler_options[1]['resource'] = self.hyperparameter_tune_kwargs['resources_per_trial']
         scheduler_cls, scheduler_params = self.scheduler_options  # Unpack tuple
         if scheduler_cls is None or scheduler_params is None:
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")

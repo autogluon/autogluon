@@ -996,8 +996,8 @@ class BaggedEnsembleModel(AbstractModel):
     def validate_fit_resources(self, **kwargs):
         self._get_model_base().validate_fit_resources(**kwargs)
 
-    def get_minimum_resources(self) -> Dict[str, int]:
-        return self._get_model_base().get_minimum_resources()
+    def get_minimum_resources(self, **kwargs) -> Dict[str, int]:
+        return self._get_model_base().get_minimum_resources(**kwargs)
 
     def _get_default_resources(self):
         return self._get_model_base()._get_default_resources()
@@ -1074,9 +1074,14 @@ class BaggedEnsembleModel(AbstractModel):
             init_params['model_base_kwargs'] = model_base.get_params()
         # Here the hyperparameters are unprocessed search space.
         # HPO Executor will handle passing in the correct parameters.
-        init_params['model_base_kwargs'].pop('hyperparameters', None)
+        # But we need to keep the ag_args_fit being passed to the base model
+        if 'hyperparameters' in init_params['model_base_kwargs']:
+            model_base_ag_args_fit = init_params['model_base_kwargs']['hyperparameters'].get('ag_args_fit', {})
+            init_params['model_base_kwargs']['hyperparameters'] = {'ag_args_fit': model_base_ag_args_fit}
         # We set soft time limit to avoid trials being terminated directly by ray tune
-        trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
+        trial_soft_time_limit = None
+        if hpo_executor.time_limit is not None:
+            trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
 
         fit_kwargs = copy.deepcopy(kwargs)
         fit_kwargs['k_fold'] = k_fold
@@ -1099,30 +1104,109 @@ class BaggedEnsembleModel(AbstractModel):
 
         total_cpu_available = hpo_executor.resources.get('num_cpus')  # We should always have num_cpus in resources
         total_gpu_available = hpo_executor.resources.get('num_gpus', 0)
-        minimum_resources_per_fold = self.get_minimum_resources()
+            
+        minimum_resources_per_fold = self.get_minimum_resources(
+            is_gpu_available=(hpo_executor.resources.get('num_gpus', 0) > 0)
+        )
         minimum_cpu_per_fold = minimum_resources_per_fold.get('num_cpus', 1)
         minimum_gpu_per_fold = minimum_resources_per_fold.get('num_gpus', 0)
-        fold_estimate_memory_usage = None
-        num_folds_in_parallel_with_mem = math.inf
+        
+        user_num_cpus_per_fold = initialized_model_base._get_child_aux_val(key='num_cpus', default=None)
+        user_num_gpus_per_fold = initialized_model_base._get_child_aux_val(key='num_gpus', default=None)
+        user_resources_per_trial = hpo_executor.hyperparameter_tune_kwargs.get('resources_per_trial', None)
+        if user_num_cpus_per_fold is not None or user_num_gpus_per_fold is not None:
+            if user_resources_per_trial is not None:
+                logger.warning('Both resources per trial and resources per fold are set. We will only respect resources per fold.')
+            num_folds_in_parallel_with_cpu = math.inf
+            if minimum_cpu_per_fold > 0:
+                num_folds_in_parallel_with_cpu = total_cpu_available // minimum_cpu_per_fold
+            if user_num_cpus_per_fold is not None:
+                assert user_num_cpus_per_fold <= total_cpu_available, \
+                    f"Detected fold level cpu requirement = {user_num_cpus_per_fold} > total cpu granted to AG predictor = {total_cpu_available}"
+                assert user_num_cpus_per_fold >= minimum_cpu_per_fold, \
+                    f"The model requires minimum cpu {minimum_cpu_per_fold}, but you only specified {user_num_cpus_per_fold}"
+                num_folds_in_parallel_with_cpu = total_cpu_available // user_num_cpus_per_fold
+            num_folds_in_parallel_with_gpu = math.inf
+            if minimum_gpu_per_fold > 0:
+                num_folds_in_parallel_with_gpu = total_gpu_available // minimum_gpu_per_fold
+            if user_num_gpus_per_fold is not None:
+                assert user_num_gpus_per_fold <= total_gpu_available, \
+                    f"Detected fold level gpu requirement = {user_num_gpus_per_fold} > total gpu granted to AG predictor = {total_gpu_available}"
+                assert user_num_gpus_per_fold >= minimum_gpu_per_fold, \
+                    f"The model requires minimum gpu {minimum_gpu_per_fold}, but you only specified {user_num_gpus_per_fold}"
+                if minimum_gpu_per_fold > 0:
+                    num_folds_in_parallel_with_gpu = total_gpu_available // user_num_gpus_per_fold
+            num_folds_in_parallel = min(num_folds_in_parallel_with_cpu, num_folds_in_parallel_with_gpu)
 
-        if initialized_model_base.estimate_memory_usage is not None:
-            fold_estimate_memory_usage = initialized_model_base.estimate_memory_usage(X=X, **kwargs)
-            total_memory_available = psutil.virtual_memory().available
-            num_folds_in_parallel_with_mem = total_memory_available // fold_estimate_memory_usage
-
-        num_folds_in_parallel_with_cpu = total_cpu_available // minimum_cpu_per_fold
-        num_folds_in_parallel_with_gpu = math.inf
-        if minimum_gpu_per_fold > 0:
-            num_folds_in_parallel_with_gpu = total_gpu_available // minimum_gpu_per_fold
-        num_folds_in_parallel = min(num_folds_in_parallel_with_mem, num_folds_in_parallel_with_cpu, num_folds_in_parallel_with_gpu)
-        if num_folds_in_parallel // k_fold < 1:
-            # We can only train 1 trial in parallel
-            num_trials_in_parallel = 1
+            minimum_cpu_per_trial = 0
+            if minimum_cpu_per_fold > 0:
+                minimum_cpu_per_trial = int(user_num_cpus_per_fold * num_folds_in_parallel)
+            minimum_gpu_per_trial = 0
+            if minimum_gpu_per_fold > 0:
+                minimum_gpu_per_trial = user_num_gpus_per_fold * num_folds_in_parallel
+            hpo_executor.hyperparameter_tune_kwargs['resources_per_trial'] = {
+                'num_cpus': minimum_cpu_per_trial,
+                'num_gpus': minimum_gpu_per_trial
+            }
         else:
-            num_trials_in_parallel = num_folds_in_parallel // k_fold
-        # We control how many trials run in parallel with minimum_cpu_per_trial and minimum_gpu_per_trial
-        minimum_cpu_per_trial = total_cpu_available // num_trials_in_parallel
-        minimum_gpu_per_trial = total_gpu_available // num_trials_in_parallel
+            if user_resources_per_trial is not None:
+                user_num_cpus_per_trial = user_resources_per_trial.get('num_cpus', None)
+                user_num_gpus_per_trial = user_resources_per_trial.get('num_gpus', None)
+                assert user_num_cpus_per_trial is not None or user_num_gpus_per_trial is not None, \
+                    'You need to specify at least num_cpus or num_gpus for custom resources per trial'
+                num_trials_in_parallel_with_gpu = math.inf
+                if user_num_cpus_per_trial is None:
+                    # If user didn't specify cpu per trial, we find the min based on gpu
+                    num_trials_in_parallel_with_gpu = total_gpu_available // user_num_gpus_per_trial
+                    user_num_cpus_per_trial = total_cpu_available // num_trials_in_parallel_with_gpu
+                num_trials_in_parallel_with_cpu = math.inf
+                if user_num_gpus_per_trial is None:
+                    # If user didn't specify gpu per trial, we find the min based on cpu
+                    num_trials_in_parallel_with_cpu = total_cpu_available // user_num_cpus_per_trial
+                    user_num_gpus_per_trial = total_gpu_available / num_trials_in_parallel_with_cpu
+                assert user_num_cpus_per_trial <= total_cpu_available, \
+                    f"Detected trial level cpu requirement = {user_num_cpus_per_trial} > total cpu granted to AG predictor = {total_cpu_available}"
+                assert user_num_cpus_per_trial >= minimum_cpu_per_fold, \
+                    f"The trial requires minimum cpu {minimum_cpu_per_fold}, but you only specified {user_num_cpus_per_trial}"
+                assert user_num_gpus_per_trial <= total_gpu_available, \
+                    f"Detected trial level gpu requirement = {user_num_gpus_per_trial} > total gpu granted to AG predictor = {total_gpu_available}"
+                assert user_num_gpus_per_trial >= minimum_gpu_per_fold, \
+                    f"The trial requires minimum gpu {minimum_gpu_per_fold}, but you only specified {user_num_gpus_per_trial}"
+                num_trials_in_parallel = min(num_trials_in_parallel_with_cpu, num_trials_in_parallel_with_gpu)
+                assert num_trials_in_parallel > 0
+                minimum_cpu_per_trial = int(user_num_cpus_per_trial)
+                minimum_gpu_per_trial = user_num_gpus_per_trial
+                hpo_executor.hyperparameter_tune_kwargs['resources_per_trial'] = {
+                    'num_cpus': minimum_cpu_per_trial,
+                    'num_gpus': minimum_gpu_per_trial
+                }
+            else:
+                fold_estimate_memory_usage = None
+                num_folds_in_parallel_with_mem = math.inf
+
+                if initialized_model_base.estimate_memory_usage is not None:
+                    fold_estimate_memory_usage = initialized_model_base.estimate_memory_usage(X=X, **kwargs)
+                    total_memory_available = psutil.virtual_memory().available
+                    num_folds_in_parallel_with_mem = total_memory_available // fold_estimate_memory_usage
+
+                num_folds_in_parallel_with_cpu = total_cpu_available // minimum_cpu_per_fold
+                num_folds_in_parallel_with_gpu = math.inf
+                if minimum_gpu_per_fold > 0:
+                    num_folds_in_parallel_with_gpu = total_gpu_available // minimum_gpu_per_fold
+                num_folds_in_parallel = min(num_folds_in_parallel_with_mem, num_folds_in_parallel_with_cpu, num_folds_in_parallel_with_gpu)
+
+                if num_folds_in_parallel // k_fold < 1:
+                    # We can only train 1 trial in parallel
+                    num_trials_in_parallel = 1
+                else:
+                    num_trials_in_parallel = num_folds_in_parallel // k_fold
+                if hpo_executor.executor_type == 'custom':
+                    # custom backend runs sequentially
+                    num_trials_in_parallel = 1
+                # We control how many trials run in parallel with minimum_cpu_per_trial and minimum_gpu_per_trial
+                minimum_cpu_per_trial = int(total_cpu_available // num_trials_in_parallel)
+                minimum_gpu_per_trial = total_gpu_available // num_trials_in_parallel
+                print(minimum_cpu_per_trial)
 
         hpo_executor.execute(
             model_trial=model_trial,
