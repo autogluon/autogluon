@@ -365,8 +365,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         gts_data = self._to_gluonts_dataset(data, known_covariates=known_covariates)
 
         predictor_kwargs = dict(dataset=gts_data)
-        if "num_samples" in kwargs:
-            predictor_kwargs["num_samples"] = kwargs["num_samples"]
+        predictor_kwargs["num_samples"] = kwargs.get("num_samples", 1000)
 
         return list(self.gts_predictor.predict(**predictor_kwargs))
 
