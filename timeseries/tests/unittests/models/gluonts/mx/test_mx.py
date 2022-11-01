@@ -21,7 +21,7 @@ from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSMXNetMod
 from autogluon.timeseries.models.presets import get_default_hps
 from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 
-from ....common import DUMMY_TS_DATAFRAME, DATAFRAME_WITH_STATIC
+from ....common import DATAFRAME_WITH_STATIC, DUMMY_TS_DATAFRAME
 
 TESTABLE_MX_MODELS = [
     DeepARMXNetModel,

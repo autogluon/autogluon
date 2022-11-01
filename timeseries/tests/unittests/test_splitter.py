@@ -5,10 +5,10 @@ import pytest
 from autogluon.timeseries.splitter import MultiWindowSplitter, append_suffix_to_item_id
 
 from .common import (
+    DATAFRAME_WITH_COVARIATES,
     DATAFRAME_WITH_STATIC,
     DUMMY_VARIABLE_LENGTH_TS_DATAFRAME,
     get_data_frame_with_variable_lengths,
-    DATAFRAME_WITH_COVARIATES,
 )
 
 

@@ -17,7 +17,6 @@ from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_singl
 
 from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_variable_lengths, get_static_features
 
-
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
     {"DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}, "Naive": {}},

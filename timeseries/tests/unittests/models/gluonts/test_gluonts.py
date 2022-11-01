@@ -8,13 +8,13 @@ from autogluon.timeseries.models.gluonts import DeepARModel, SimpleFeedForwardMo
 from autogluon.timeseries.models.gluonts.torch.models import AbstractGluonTSPyTorchModel
 from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 
-from ...common import DUMMY_TS_DATAFRAME, DATAFRAME_WITH_STATIC, DATAFRAME_WITH_COVARIATES
+from ...common import DATAFRAME_WITH_COVARIATES, DATAFRAME_WITH_STATIC, DUMMY_TS_DATAFRAME
 
 if agts.MXNET_INSTALLED:
     from .mx.test_mx import (
         TESTABLE_MX_MODELS,
-        TESTABLE_MX_MODELS_WITH_STATIC_FEATURES,
         TESTABLE_MX_MODELS_WITH_KNOWN_COVARIATES,
+        TESTABLE_MX_MODELS_WITH_STATIC_FEATURES,
     )
 else:
     TESTABLE_MX_MODELS = []
