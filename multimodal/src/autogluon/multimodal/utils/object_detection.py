@@ -128,8 +128,10 @@ def get_voc_classes(root):
             class_names = [line.rstrip().lower() for line in f]
         print(f"using class_names in labels.txt: {class_names}")
     else:
-        logger.warning("labels.txt does not exist, using default VOC names. "
-                       "To create labels.txt, run ls Annotations/* > pathlist.txt in root dir")
+        logger.warning(
+            "labels.txt does not exist, using default VOC names. "
+            "To create labels.txt, run ls Annotations/* > pathlist.txt in root dir"
+        )
         class_names = VOC_CLASSES
 
     return class_names
