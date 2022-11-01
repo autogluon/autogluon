@@ -24,7 +24,7 @@ class MissingValues(AbstractVisualization, JupyterMixin):
         - matrix - nullity matrix is a data-dense display which lets you quickly visually pick out patterns in data completion
             This visualization will comfortably accommodate up to 50 labelled variables.
             Past that range labels begin to overlap or become unreadable, and by default large displays omit them.
-        - bar - visualization of nullity by column. Logarithmic scale can by specifying `log=True` in `kwargs`
+        - bar - visualizes how many rows are non-null vs null in the column. Logarithmic scale can by specifying `log=True` in `kwargs`
         - heatmap - correlation heatmap measures nullity correlation: how strongly the presence or absence of one
             variable affects the presence of another. Nullity correlation ranges from -1
             (if one variable appears the other definitely does not) to 0 (variables appearing or not appearing have no effect on one another)
