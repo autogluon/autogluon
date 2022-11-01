@@ -103,10 +103,8 @@ print('Score in the Japanese Testset:', score_in_jp)
 ## Combine Gradient Checkpointing and Parameter-efficient Finetuning
 
 By combining [gradient checkpointing](https://pytorch.org/docs/stable/checkpoint.html) and parameter-efficient finetuning, it is feasible to finetune 
-models that have close to two billion parameters (e.g., [google/mt5-xl](https://huggingface.co/google/mt5-xl)) with a single GPU in [AWS G4 instances](https://aws.amazon.com/ec2/instance-types/g4/). 
-To turn on gradient checkpointing, all you need is to set `"model.hf_text.gradient_checkpointing"` to `True`. 
-To improve the training speed, we won't use [google/mt5-xl](https://huggingface.co/google/mt5-xl) in the following example and 
-you can try it by setting `"model.hf_text.checkpoint_name": "google/mt5-xl"`, or refer to [the example](https://gist.github.com/sxjscience/b011460574c7e41c47a42ba86d026cbc).
+models that have close to two billion parameters (e.g., [google/flan-t5-xl](https://huggingface.co/google/flan-t5-xl)) with a single GPU in [AWS G4 instances](https://aws.amazon.com/ec2/instance-types/g4/). 
+To turn on gradient checkpointing, all you need is to set `"model.hf_text.gradient_checkpointing"` to `True`.
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
@@ -116,6 +114,7 @@ predictor = MultiModalPredictor(label="label",
 predictor.fit(train_en_df,
               presets="multilingual",
               hyperparameters={
+                  "model.hf_text.checkpoint_name": "google/flan-t5-xl",
                   "model.hf_text.gradient_checkpointing": True,
                   "optimization.efficient_finetune": "ia3_bias",
                   "optimization.lr_decay": 0.9,
@@ -129,7 +128,11 @@ predictor.fit(train_en_df,
 
 
 ```{.python .input}
+score_in_en = predictor.evaluate(test_en_df)
+score_in_de = predictor.evaluate(test_de_df)
 score_in_jp = predictor.evaluate(test_jp_df)
+print('Score in the English Testset:', score_in_en)
+print('Score in the German Testset:', score_in_de)
 print('Score in the Japanese Testset:', score_in_jp)
 ```
 
