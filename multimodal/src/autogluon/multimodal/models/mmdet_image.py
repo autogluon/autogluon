@@ -252,9 +252,11 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         A dictionary mapping the layer names (keys) to their ids (values).
         """
         name_to_id = {}
+        # now support: yolov3, faster_rcnn
+        head_layers_patterns = ["bbox_head.fc_cls", "bbox_head.fc_reg", "bbox_head.convs_pred"]
         for n, _ in self.named_parameters():
-            if "bbox_head.convs_pred" in n:  # yolov3 only
-                name_to_id[n] = 0
-            else:
-                name_to_id[n] = 1
+            name_to_id[n] = 1
+            for pattern in head_layers_patterns:
+                if pattern in n:
+                    name_to_id[n] = 0
         return name_to_id
