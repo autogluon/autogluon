@@ -258,6 +258,11 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             feat_dynamic_real = time_series_df.drop(self.target, axis=1)
             if known_covariates is not None:
                 feat_dynamic_real = pd.concat([feat_dynamic_real, known_covariates], axis=0)
+                if len(feat_dynamic_real) != len(time_series_df) + self.prediction_length * time_series_df.num_items:
+                    raise ValueError(
+                        f"known_covariates must contain values for the next prediction_length = "
+                        f"{self.prediction_length} time steps in each time series."
+                    )
             if self.num_feat_dynamic_real > 0:
                 if len(feat_dynamic_real.columns) != self.num_feat_dynamic_real:
                     raise ValueError(

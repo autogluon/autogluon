@@ -1,5 +1,6 @@
 from unittest import mock
 
+import numpy as np
 import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
@@ -23,6 +24,9 @@ else:
 
 MODELS_WITH_STATIC_FEATURES = [DeepARModel] + TESTABLE_MX_MODELS_WITH_STATIC_FEATURES
 MODELS_WITH_KNOWN_COVARIATES = [DeepARModel] + TESTABLE_MX_MODELS_WITH_KNOWN_COVARIATES
+MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES = [
+    m for m in MODELS_WITH_STATIC_FEATURES if m in MODELS_WITH_KNOWN_COVARIATES
+]
 TESTABLE_PYTORCH_MODELS = [DeepARModel, SimpleFeedForwardModel]
 TESTABLE_MODELS = TESTABLE_MX_MODELS + TESTABLE_PYTORCH_MODELS
 
@@ -156,7 +160,7 @@ def test_when_known_covariates_present_then_model_attributes_set_correctly(model
     assert model.num_feat_dynamic_real > 0
 
 
-@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
+@pytest.mark.parametrize("model_class", MODELS_WITH_KNOWN_COVARIATES)
 def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not_used(model_class, df_with_static):
     model = model_class(hyperparameters={**DUMMY_HYPERPARAMETERS, "disable_known_covariates": True})
     with mock.patch(
@@ -168,3 +172,16 @@ def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not
             call_kwargs = patch_dataset.call_args[1]
             feat_dynamic_real = call_kwargs["feat_dynamic_real"]
             assert feat_dynamic_real is None
+
+
+@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES)
+def test_when_static_and_dynamic_covariates_present_then_model_trains_normally(model_class):
+    dataframe_with_static_and_covariates = DATAFRAME_WITH_STATIC.copy()
+    for col_name in ["cov1", "cov2"]:
+        dataframe_with_static_and_covariates[col_name] = np.random.normal(
+            size=len(dataframe_with_static_and_covariates)
+        )
+
+    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS)
+    model.fit(train_data=dataframe_with_static_and_covariates)
+    model.predict_for_scoring(dataframe_with_static_and_covariates)
