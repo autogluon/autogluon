@@ -61,8 +61,7 @@ from .constants import (
     NER,
     NER_RET,
     OBJECT_DETECTION,
-    OCR_TEXT_DETECTION,
-    OCR_TEXT_RECOGNITION,
+    OCR_TEXT,
     PROBABILITY,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
@@ -1904,10 +1903,11 @@ class MultiModalPredictor:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        if self._pipeline == OBJECT_DETECTION or self._pipeline == OCR_TEXT_DETECTION:
+        if self._pipeline == OBJECT_DETECTION:
             ret_type = BBOX
-        elif self._pipeline == OCR_TEXT_RECOGNITION:
-            ret_type = [TEXT, SCORE]
+
+        elif self._pipeline == OCR_TEXT:
+            ret_type = [BBOX, TEXT, SCORE]
         else:
             ret_type = LOGITS
 
@@ -1928,10 +1928,12 @@ class MultiModalPredictor:
                 seed=seed,
             )
 
-            if self._pipeline == OCR_TEXT_RECOGNITION:
-                logits = []
+            if self._pipeline == OCR_TEXT:
+                logits = {}
                 for r_type in ret_type:
-                    logits.append(extract_from_output(outputs=outputs, ret_type=r_type))
+                    if r_type not in outputs[0]:
+                        continue
+                    logits[r_type] = extract_from_output(outputs=outputs, ret_type=r_type)
             else:
                 logits = extract_from_output(outputs=outputs, ret_type=ret_type)
 

@@ -54,8 +54,7 @@ from ..constants import (
     MMDET_IMAGE,
     MMLAB_MODELS,
     MMOCR,
-    MMOCR_TEXT_DET,
-    MMOCR_TEXT_RECOG,
+    MMOCR_TEXT,
     TIMM_IMAGE,
 )
 from .collator import Pad, Stack
@@ -276,23 +275,24 @@ class ImageProcessor:
             image_size = config.test_pipeline[1]["img_scale"][0]
             mean = config.test_pipeline[1]["transforms"][2]["mean"]
             std = config.test_pipeline[1]["transforms"][2]["std"]
-        elif self.prefix.lower().startswith(MMOCR_TEXT_DET):
-            image_size = config.data.test.pipeline[1]["img_scale"][0]
-            mean = config.data.test.pipeline[1]["transforms"][1]["mean"]
-            std = config.data.test.pipeline[1]["transforms"][1]["std"]
-        elif self.prefix.lower().startswith(MMOCR_TEXT_RECOG):
-            tmp_config_dict = {}
-            for d in config.data.test.pipeline:
-                for k, v in d.items():
-                    tmp_config_dict[k] = v
-            if "transforms" in tmp_config_dict:
-                image_size = tmp_config_dict["transforms"][0]["min_width"]
-                mean = tmp_config_dict["transforms"][2]["mean"]
-                std = tmp_config_dict["transforms"][2]["std"]
+        elif self.prefix.lower().startswith(MMOCR_TEXT):
+            if "img_scale" in config.data.test.pipeline[1]:
+                image_size = config.data.test.pipeline[1]["img_scale"][0]
+                mean = config.data.test.pipeline[1]["transforms"][1]["mean"]
+                std = config.data.test.pipeline[1]["transforms"][1]["std"]
             else:
-                image_size = tmp_config_dict["min_width"]
-                mean = tmp_config_dict["mean"]
-                std = tmp_config_dict["std"]
+                tmp_config_dict = {}
+                for d in config.data.test.pipeline:
+                    for k, v in d.items():
+                        tmp_config_dict[k] = v
+                if "transforms" in tmp_config_dict:
+                    image_size = tmp_config_dict["transforms"][0]["min_width"]
+                    mean = tmp_config_dict["transforms"][2]["mean"]
+                    std = tmp_config_dict["transforms"][2]["std"]
+                else:
+                    image_size = tmp_config_dict["min_width"]
+                    mean = tmp_config_dict["mean"]
+                    std = tmp_config_dict["std"]
         elif self.prefix.lower().startswith(TIMM_IMAGE):
             image_size = config["input_size"][-1]
             mean = config["mean"]
