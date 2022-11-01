@@ -1,5 +1,5 @@
 import copy
-from typing import Union, List, Any
+from typing import Union, List, Any, Optional, Dict
 
 import numpy as np
 import pandas as pd
@@ -64,7 +64,7 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
                  num_permutations: int = 1000,
                  test_size_2st: float = 0.3,
                  parent: Union[None, AbstractAnalysis] = None,
-                 children: List[AbstractAnalysis] = [],
+                 children: Optional[List[AbstractAnalysis]] = None,
                  **kwargs) -> None:
         super().__init__(parent, children, **kwargs)
         if classifier_kwargs is None:
@@ -169,10 +169,14 @@ class Classifier2ST:
                  eval_metric=roc_auc,
                  split=0.5,
                  compute_fi=True,
-                 classifier_kwargs={},
+                 classifier_kwargs: Optional[Dict] = None,
                  test_size_2st=0.3,
                  ):
-        classifier_kwargs = copy.deepcopy(classifier_kwargs)
+
+        if classifier_kwargs is None:
+            classifier_kwargs = {}
+        else:
+            classifier_kwargs = copy.deepcopy(classifier_kwargs)
         classifier_kwargs.update({'label': sample_label, 'eval_metric': eval_metric})
         self.classifier = classifier_class(**classifier_kwargs)
         self.classifier_class = classifier_class
@@ -182,7 +186,7 @@ class Classifier2ST:
         self._is_fit = False
         self._test = None
         self.test_stat = None
-        self.has_fi = None
+        self.has_fi: Optional[bool] = None
         self.compute_fi = compute_fi
         self.test_size_2st = test_size_2st
 
@@ -237,10 +241,10 @@ class Classifier2ST:
         """
         perm_stats = [self.test_stat]
         yhat = self.classifier.predict_proba(self._test)[1]
-        for i in range(num_permutations):
+        for _ in range(num_permutations):
             perm_yhat = np.random.permutation(yhat)
             perm_test_stat = self.eval_metric(
-                self._test[self.sample_label],
+                self._test[self.sample_label],  # type: ignore
                 perm_yhat
             )
             perm_stats.append(perm_test_stat)
