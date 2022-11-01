@@ -21,7 +21,7 @@ from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSMXNetMod
 from autogluon.timeseries.models.presets import get_default_hps
 from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 
-from ....common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
+from ....common import DUMMY_TS_DATAFRAME, DATAFRAME_WITH_STATIC
 
 TESTABLE_MX_MODELS = [
     DeepARMXNetModel,
@@ -36,6 +36,11 @@ TESTABLE_MX_MODELS = [
 TESTABLE_MX_MODELS_WITH_STATIC_FEATURES = [
     DeepARMXNetModel,
     MQCNNMXNetModel,
+]
+TESTABLE_MX_MODELS_WITH_KNOWN_COVARIATES = [
+    DeepARMXNetModel,
+    MQCNNMXNetModel,
+    TemporalFusionTransformerMXNetModel,
 ]
 
 
@@ -89,7 +94,7 @@ def test_when_mxnet_installed_then_default_presets_include_mxnet_models(preset_k
 @pytest.fixture(scope="module")
 def df_with_static():
     feature_pipeline = ContinuousAndCategoricalFeatureGenerator()
-    df = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC.copy(deep=False)
+    df = DATAFRAME_WITH_STATIC.copy(deep=False)
     df.static_features = feature_pipeline.fit_transform(df.static_features)
     return df
 

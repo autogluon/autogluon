@@ -134,9 +134,9 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
     disable_static_features : bool, default = False
         If True, static features won't be used by the model even if they are present in the dataset.
         If False, static features will be used by the model if they are present in the dataset.
-    disable_dynamic_features : bool, default = False
-        If True, dynamic features won't be used by the model even if they are present in the dataset.
-        If False, dynamic features will be used by the model if they are present in the dataset.
+    disable_known_covariates : bool, default = False
+        If True, known covariates won't be used by the model even if they are present in the dataset.
+        If False, known covariates will be used by the model if they are present in the dataset.
     num_layers : int, default = 2
         Number of RNN layers
     hidden_size : int, default = 40
@@ -161,6 +161,7 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
     """
 
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DeepAREstimator
+    float_dtype: Type = np.float32
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()

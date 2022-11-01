@@ -4,7 +4,12 @@ import pytest
 
 from autogluon.timeseries.splitter import MultiWindowSplitter, append_suffix_to_item_id
 
-from .common import DATAFRAME_WITH_STATIC, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, get_data_frame_with_variable_lengths
+from .common import (
+    DATAFRAME_WITH_STATIC,
+    DUMMY_VARIABLE_LENGTH_TS_DATAFRAME,
+    get_data_frame_with_variable_lengths,
+    DATAFRAME_WITH_COVARIATES,
+)
 
 
 def get_original_item_id_and_slice(tuning_item_id: str):
@@ -80,3 +85,20 @@ def test_when_static_features_are_present_then_splitter_correctly_splits_them():
     for item_id in val_data.item_ids:
         original_item_id, _, _ = get_original_item_id_and_slice(item_id)
         assert (val_data.static_features.loc[item_id] == original_df.static_features.loc[original_item_id]).all()
+
+
+def test_when_covariates_are_present_then_splitter_correctly_splits_them():
+    original_df = DATAFRAME_WITH_COVARIATES.copy()
+    splitter = MultiWindowSplitter()
+    prediction_length = 7
+    train_data, val_data = splitter.split(ts_dataframe=original_df, prediction_length=prediction_length)
+
+    for column in original_df.drop("target", axis=1).columns:
+        for item_id in train_data.item_ids:
+            train_series = train_data[column].loc[item_id]
+            assert (train_series == original_df[column].loc[item_id][: len(train_series)]).all()
+
+        for item_id in val_data.item_ids:
+            original_item_id, _, _ = get_original_item_id_and_slice(item_id)
+            val_series = val_data[column].loc[item_id]
+            assert (val_series == original_df[column].loc[original_item_id][: len(val_series)]).all()

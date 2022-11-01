@@ -192,13 +192,13 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
             model_params = self._get_model_params()
             disable_static_features = model_params.get("disable_static_features", False)
-            disable_dynamic_features = model_params.get("disable_dynamic_features", False)
+            disable_known_covariates = model_params.get("disable_known_covariates", False)
             if not disable_static_features and ds.static_features is not None:
                 feat_static_cat, feat_static_real = get_categorical_and_continuous_features(ds.static_features)
                 self.num_feat_static_cat = len(feat_static_cat.columns)
                 self.num_feat_static_real = len(feat_static_real.columns)
                 self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
-            if not disable_dynamic_features:
+            if not disable_known_covariates:
                 feat_dynamic_real = ds.drop(self.target, axis=1)
                 self.num_feat_dynamic_real = len(feat_dynamic_real.columns)
 

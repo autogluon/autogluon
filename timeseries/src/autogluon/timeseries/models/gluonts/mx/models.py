@@ -59,9 +59,9 @@ class DeepARMXNetModel(AbstractGluonTSMXNetModel):
     disable_static_features : bool, default = False
         If True, static features won't be used by the model even if they are present in the dataset.
         If False, static features will be used by the model if they are present in the dataset.
-    disable_dynamic_features : bool, default = False
-        If True, dynamic features won't be used by the model even if they are present in the dataset.
-        If False, dynamic features will be used by the model if they are present in the dataset.
+    disable_known_covariates : bool, default = False
+        If True, known covariates won't be used by the model even if they are present in the dataset.
+        If False, known covariates will be used by the model if they are present in the dataset.
     num_layers : int, default = 2
         Number of RNN layers
     num_cells : int, default = 40
@@ -96,7 +96,7 @@ class DeepARMXNetModel(AbstractGluonTSMXNetModel):
     def _get_estimator_init_args(self) -> dict:
         init_kwargs = super()._get_estimator_init_args()
         # Our API hides these model kwargs from the user. They can only be controlled through disable_static_features
-        # and disable_dynamic_features
+        # and disable_known_covariates
         init_kwargs["use_feat_static_cat"] = self.num_feat_static_cat > 0
         init_kwargs["use_feat_static_real"] = self.num_feat_static_real > 0
         init_kwargs["cardinality"] = self.feat_static_cat_cardinality
@@ -141,9 +141,9 @@ class MQCNNMXNetModel(AbstractGluonTSSeq2SeqModel):
     disable_static_features : bool, default = False
         If True, static features won't be used by the model even if they are present in the dataset.
         If False, static features will be used by the model if they are present in the dataset.
-    disable_dynamic_features : bool, default = False
-        If True, dynamic features won't be used by the model even if they are present in the dataset.
-        If False, dynamic features will be used by the model if they are present in the dataset.
+    disable_known_covariates : bool, default = False
+        If True, known covariates won't be used by the model even if they are present in the dataset.
+        If False, known covariates will be used by the model if they are present in the dataset.
     embedding_dimension : int, optional
         Dimension of the embeddings for categorical features. (default: [min(50, (cat+1)//2) for cat in cardinality])
     add_time_feature : bool, default = True
