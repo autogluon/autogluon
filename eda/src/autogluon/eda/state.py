@@ -80,5 +80,6 @@ class StateCheckMixin:
         can_handle = len(keys_not_present) == 0
         if not can_handle:
             self.logger.warning(
-                f'{self.__class__.__name__}: all of the following keys must be present: {keys}. The following keys are missing: {keys_not_present}')
+                f'{self.__class__.__name__}: all of the following keys must be present: [{", ".join(keys)}]. '
+                f'The following keys are missing: [{", ".join(keys_not_present)}]')
         return can_handle

@@ -67,6 +67,11 @@ def test_analyze_return_state():
     assert analyze(state=state, return_state=True) == state
 
 
+def test_analyze_None_state():
+    state = None
+    assert analyze(state=state, return_state=True) == {}
+
+
 def test_analyze_state_dict_convert():
     state = {'some_previous_state': {'arg': 1}}
     assert not isinstance(state, AnalysisState)
