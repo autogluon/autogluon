@@ -101,7 +101,8 @@ def zero_shot_image_classification():
 
 
 @automm_presets.register()
-def object_detection():  # use another presets for training detection models from scratch
+def object_detection():
+    # TODO: add another presets for training detection models from scratch
     return {
         "model.names": ["mmdet_image"],
         "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",

@@ -1557,29 +1557,27 @@ class MultiModalPredictor:
                     return_predictions=not callbacks,
                 )
 
-                import sys
-
-                if evaluator.global_rank != 0:
-                    sys.exit(f"Prediction finished, exit the process with global_rank={evaluator.global_rank}...")
-
-        if strategy == "ddp":
-            outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
-        elif self._pipeline == OBJECT_DETECTION:
-            # reformat single gpu output for object detection
-            # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
-            # output LABEL if exists for evaluations
-            if len(outputs[0][BBOX][0]) == 2:  # additional axis for mask_rcnn, TODO: remove hardcode here
-                outputs = [
-                    {BBOX: bbox[0], LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox[0]}
-                    for ele in outputs
-                    for i, bbox in enumerate(ele[BBOX])
-                ]
-            else:
-                outputs = [
-                    {BBOX: bbox, LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox}
-                    for ele in outputs
-                    for i, bbox in enumerate(ele[BBOX])
-                ]
+                if strategy == "ddp":
+                    if evaluator.global_rank != 0:
+                        sys.exit(f"Prediction finished, exit the process with global_rank={evaluator.global_rank}...")
+                    else:
+                        outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
+                elif self._pipeline == OBJECT_DETECTION:
+                    # reformat single gpu output for object detection
+                    # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
+                    # output LABEL if exists for evaluations
+                    if len(outputs[0][BBOX][0]) == 2:  # additional axis for mask_rcnn, TODO: remove hardcode here
+                        outputs = [
+                            {BBOX: bbox[0], LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox[0]}
+                            for ele in outputs
+                            for i, bbox in enumerate(ele[BBOX])
+                        ]
+                    else:
+                        outputs = [
+                            {BBOX: bbox, LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox}
+                            for ele in outputs
+                            for i, bbox in enumerate(ele[BBOX])
+                        ]
 
         return outputs
 
@@ -1656,7 +1654,8 @@ class MultiModalPredictor:
             data = from_coco_or_voc(
                 anno_file, "test"
             )  # TODO: maybe remove default splits hardcoding (only used in VOC)
-            eval_tool = "torchmetrics"  # we can only use torchmetrics for VOC format evaluation.
+            if os.path.isdir(anno_file):
+                eval_tool = "torchmetrics"  # we can only use torchmetrics for VOC format evaluation.
         else:
             # during validation, it will call evaluate with df as input
             anno_file = self.detection_anno_train

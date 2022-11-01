@@ -101,6 +101,10 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             self.model.CLASSES = self.classes
         else:
             if num_classes == 20:  # TODO: remove hardcode
+                warnings.simplefilter("once")
+                warnings.warn(
+                    f"Using VOC classes because num_classes = {num_classes}. Provide data while init MultiModalPredictor if this is not VOC."
+                )
                 self.model.CLASSES = get_classes("voc")
             elif num_classes == 80:
                 warnings.simplefilter("once")

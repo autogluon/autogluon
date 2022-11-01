@@ -76,6 +76,7 @@ def from_voc(
         for ext in exts:
             img_list.extend([rp.stem for rp in rpath.glob("JPEGImages/*" + ext)])
     d = {"image": [], "rois": []}
+    logger.info(f"Number of Images: {len(img_list)}")
     for stem in img_list:
         basename = stem + ".xml"
         anno_file = (rpath / "Annotations" / basename).resolve()
@@ -127,7 +128,8 @@ def get_voc_classes(root):
             class_names = [line.rstrip().lower() for line in f]
         print(f"using class_names in labels.txt: {class_names}")
     else:
-        warnings.warn("labels.txt does not exist, using default VOC names")
+        logger.warning("labels.txt does not exist, using default VOC names. "
+                       "To create labels.txt, run ls Annotations/* > pathlist.txt in root dir")
         class_names = VOC_CLASSES
 
     return class_names
@@ -382,8 +384,6 @@ def _check_load_coco_bbox(
                 ]
             )
             is_crowds.append(is_crowd)
-    if not rois:
-        print(objs)
     return rois, is_crowds
 
 
