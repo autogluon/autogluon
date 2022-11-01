@@ -16,7 +16,7 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
 
     The report is a composite view of combination of performed analyses: :py:class:`~autogluon.eda.analysis.dataset.DatasetSummary`,
     :py:class:`~autogluon.eda.analysis.dataset.RawTypesAnalysis`, :py:class:`~autogluon.eda.analysis.dataset.VariableTypeAnalysis`,
-    :py:class:`~autogluon.eda.analysis.dataset.SpecialTypesAnalysis`.
+    :py:class:`~autogluon.eda.analysis.dataset.SpecialTypesAnalysis`, :py:class:`~autogluon.eda.analysis.missing.MissingValuesAnalysis`.
     The components can be present in any combination (assuming their dependencies are satisfied).
 
     The report requires at least one of the analyses present to be rendered.
@@ -44,6 +44,7 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
     >>>         eda.dataset.RawTypesAnalysis(),
     >>>         eda.dataset.VariableTypeAnalysis(),
     >>>         eda.dataset.SpecialTypesAnalysis(),
+    >>>         eda.missing.MissingValuesAnalysis(),
     >>>     ],
     >>>     viz_facets=[
     >>>         viz.dataset.DatasetStatistics()
@@ -56,6 +57,7 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
     :py:class:`~autogluon.eda.analysis.dataset.RawTypesAnalysis`
     :py:class:`~autogluon.eda.analysis.dataset.VariableTypeAnalysis`
     :py:class:`~autogluon.eda.analysis.dataset.SpecialTypesAnalysis`
+    :py:class:`~autogluon.eda.analysis.missing.MissingValuesAnalysis`
     """
 
     def __init__(self,
