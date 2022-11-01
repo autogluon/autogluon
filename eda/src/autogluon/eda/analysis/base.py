@@ -36,7 +36,8 @@ class AbstractAnalysis(ABC, StateCheckMixin):
             args = AnalysisState({**args, **node.args})
         return args
 
-    def available_datasets(self, args: AnalysisState) -> Generator[Tuple[str, DataFrame], None, None]:
+    @staticmethod
+    def available_datasets(args: AnalysisState) -> Generator[Tuple[str, DataFrame], None, None]:
         """
         Generator which iterates only through the datasets provided in arguments
 

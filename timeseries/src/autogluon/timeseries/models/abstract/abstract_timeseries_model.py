@@ -218,7 +218,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         logger.debug(f"Predicting with time series model {self.name}")
         logger.debug(
             f"\tProvided data for prediction with {len(data)} rows, {data.num_items} items. "
-            f"Average time series length is {len(data) / data.num_items}."
+            f"Average time series length is {len(data) / data.num_items:.1f}."
         )
 
         quantiles = quantile_levels or self.quantile_levels
