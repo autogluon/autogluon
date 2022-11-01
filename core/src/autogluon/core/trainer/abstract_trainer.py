@@ -1165,6 +1165,8 @@ class AbstractTrainer:
                 model.compile(compiler_configs=compiler_configs)
                 compile_end_time = time.time()
                 model.compile_time = compile_end_time - compile_start_time
+                self.model_graph.nodes[model.name]['compile_time'] = model.compile_time
+                self.save_model(model, reduce_memory=False)
         return model_names
 
     def persist_models(self, model_names='all', with_ancestors=False, max_memory=None) -> List[str]:
@@ -1480,6 +1482,7 @@ class AbstractTrainer:
         self.model_graph.add_node(
             model.name,
             fit_time=model.fit_time,
+            compile_time=model.compile_time,
             predict_time=model.predict_time,
             predict_1_time=model.predict_1_time,
             predict_child_time=predict_child_time,
@@ -2291,7 +2294,6 @@ class AbstractTrainer:
                 custom_info['child_hyperparameters'] = bagged_info.get('child_hyperparameters', None)
                 custom_info['child_hyperparameters_fit'] = bagged_info.get('child_hyperparameters_fit', None)
                 custom_info['child_ag_args_fit'] = bagged_info.get('child_ag_args_fit', None)
-                custom_info['compile_time'] = bagged_info.get('compile_time', model_info[model_name]['compile_time'])
                 custom_model_info[model_name] = custom_info
 
             model_info_keys = ['num_features', 'model_type', 'hyperparameters', 'hyperparameters_fit', 'ag_args_fit', 'features']
@@ -2302,7 +2304,7 @@ class AbstractTrainer:
                     key_dict = {model_name: model_info[model_name][key] for model_name in model_names}
                     model_info_dict[key + '_full'] = [self.get_model_attribute_full(model=model_name, attribute=key_dict) for model_name in model_names]
 
-            model_info_keys = ['num_models', 'memory_size', 'memory_size_min', 'child_model_type', 'child_hyperparameters', 'child_hyperparameters_fit', 'child_ag_args_fit']
+            model_info_keys = ['num_models', 'memory_size', 'memory_size_min', 'compile_time', 'child_model_type', 'child_hyperparameters', 'child_hyperparameters_fit', 'child_ag_args_fit']
             model_info_full_keys = {'memory_size': [('memory_size_w_ancestors', sum)], 'memory_size_min': [('memory_size_min_w_ancestors', max)], 'num_models': [('num_models_w_ancestors', sum)]}
             for key in model_info_keys:
                 model_info_dict[key] = [custom_model_info[model_name][key] for model_name in model_names]

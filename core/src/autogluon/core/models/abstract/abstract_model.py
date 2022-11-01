@@ -869,6 +869,14 @@ class AbstractModel:
 
     def can_compile(self, compiler_configs=None):
         """
+        Verify whether the model can be compiled with the compiler configuration.
+
+        Parameters
+        ----------
+        compiler_configs : dict, default=None
+            Model specific compiler options.
+            This can be useful to specify the compiler backend for a specific model,
+            e.g. {"RandomForest": {"compiler": "onnx"}}
         """
         if not self.is_fit():
             return False
@@ -906,7 +914,7 @@ class AbstractModel:
         ----------
         compiler_configs : dict, default=None
             Model specific compiler options.
-            This can be useful to specify the compiler backend for a specific model, 
+            This can be useful to specify the compiler backend for a specific model,
             e.g. {"RandomForest": {"compiler": "onnx"}}
         """
         assert self.is_fit(), "The model must be fit before calling the compile method."
