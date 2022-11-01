@@ -180,7 +180,8 @@ def is_imagepath_column(
         success = False
         for img_path in image_paths:
             try:
-                img = PIL.Image.open(img_path)
+                with PIL.Image.open(img_path) as img:
+                   pass
                 success = True
                 break
             except:
