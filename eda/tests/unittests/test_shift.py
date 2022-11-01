@@ -47,7 +47,7 @@ class TestShift(unittest.TestCase):
             test_data=test,
             label='class',
             classifier_kwargs={'path': 'AutogluonModels'},
-            classifier_fit_kwargs={'hyperparameters': {'XGB': {}}}
+            classifier_fit_kwargs={'hyperparameters': {'RF': {}}}
         )
         shft_ana = eda.shift.XShiftDetector(**analysis_args)
         shft_ana.fit()
