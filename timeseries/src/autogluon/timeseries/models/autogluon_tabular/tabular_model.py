@@ -121,6 +121,9 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         if last_k_values is not None:
             features = features.groupby(level=ITEMID, sort=False).tail(last_k_values)
 
+        if data.static_features is not None:
+            features = pd.merge(features, data.static_features, how="left", on=ITEMID, suffixes=(None, "_static_feat"))
+
         features.reset_index(inplace=True, drop=True)
         return features
 
@@ -188,7 +191,9 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             new_df = pd.DataFrame(new_values, index=new_index, columns=[self.target])
             return pd.concat([group.droplevel(ITEMID), new_df])
 
-        return data.groupby(ITEMID, sort=False).apply(extend_single_time_series)
+        extended_data = data.groupby(ITEMID, sort=False).apply(extend_single_time_series)
+        extended_data.static_features = data.static_features
+        return extended_data
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
         self._check_predict_inputs(data=data, quantile_levels=quantile_levels)
@@ -212,6 +217,8 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
 
     def _normalize_targets(self, data: TimeSeriesDataFrame, min_scale=1e-5) -> Tuple[TimeSeriesDataFrame, pd.Series]:
         """Normalize data such that each the average absolute value of each time series is equal to 1."""
+        # TODO: Implement other scalers (min/max)?
+        # TODO: Don't include validation data when computing the scale
         scale_per_item = data.abs().groupby(ITEMID, sort=False)[self.target].mean().clip(lower=min_scale)
         normalized_data = data.copy()
         for col in normalized_data.columns:
