@@ -69,6 +69,12 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       How to use AutoMM for entity extraction.
 
    .. card::
+      :title: Text-to-text matching with AutoMM - Quick Start
+      :link: text2text_matching.html
+
+      How to use AutoMM for text to text matching.
+ 
+   .. card::
       :title: Parameter-Efficient Finetuning in AutoMM -- Basic Usage
       :link: efficient_finetuning_basic.html
 
