@@ -127,7 +127,6 @@ class AbstractModel:
         self._features_internal = None  # Internal features, safe to use internally via the `_features` property
         self._feature_metadata = None  # Internal feature metadata, safe to use internally
         self._is_features_in_same_as_ex = None  # Whether self.features == self._features_internal
-        self._input_types_post_process = None # A list of tuples containing [(shape, dtype),] for compiler optimization
 
         self.fit_time = None  # Time taken to fit in seconds (Training data)
         self.predict_time = None  # Time taken to predict in seconds (Validation data)
@@ -307,7 +306,6 @@ class AbstractModel:
             X = self._preprocess_nonadaptive(X, **kwargs)
         if preprocess_stateful:
             X = self._preprocess(X, **kwargs)
-        self._input_types_post_process = [(x.shape, x.dtype) for x in X] if isinstance(X, list) else [(X.shape, X.dtype),]
         return X
 
     # TODO: Remove kwargs?
@@ -930,12 +928,14 @@ class AbstractModel:
         self._compiler = self._get_compiler(compiler=compiler,
                                             compiler_fallback_to_native=compiler_fallback_to_native)
         if self._compiler is not None:
-            input_types = [(tuple([batch_size]+list(shape)[1:]), dtype)
-                           for shape, dtype in self._input_types_post_process]
+            input_types = self._get_input_types(batch_size=batch_size)
             self._compiler.compile(model=self.model, path=self.path, input_types=input_types)
             if not self._compiler.save_in_pkl:
                 self.model = None
             self.save(path=self.path, verbose=False)
+
+    def _get_input_types(self, batch_size=None):
+        return [((batch_size, len(self._features)), np.float32)]
 
     def _default_compiler(self):
         return None
