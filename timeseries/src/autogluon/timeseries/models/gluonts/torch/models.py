@@ -42,6 +42,7 @@ pl_loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDic
 
 class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator]
+    float_dtype: Type = np.float32
 
     def _get_hpo_backend(self):
         return CUSTOM_BACKEND
@@ -161,7 +162,6 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
     """
 
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DeepAREstimator
-    float_dtype: Type = np.float32
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
@@ -206,7 +206,6 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
     """
 
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = SimpleFeedForwardEstimator
-    float_dtype: Type = np.float32
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()

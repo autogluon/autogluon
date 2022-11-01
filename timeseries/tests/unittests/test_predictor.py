@@ -497,7 +497,7 @@ def test_given_mixed_searchspace_and_hyperparameter_tune_kwargs_when_predictor_f
     )
 
 
-@pytest.mark.parametrize("target_columns", ["target", "CUSTOM_TARGET"])
+@pytest.mark.parametrize("target_column", ["target", "CUSTOM_TARGET"])
 def test_when_target_included_in_known_covariates_then_exception_is_raised(temp_model_path, target_column):
     with pytest.raises(ValueError, match="cannot be one of the known covariates"):
         predictor = TimeSeriesPredictor(

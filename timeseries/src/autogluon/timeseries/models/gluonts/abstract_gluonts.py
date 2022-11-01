@@ -232,22 +232,39 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self, time_series_df: Optional[TimeSeriesDataFrame], known_covariates: Optional[TimeSeriesDataFrame] = None
     ) -> Optional[GluonTSDataset]:
         if time_series_df is not None:
-            if time_series_df.static_features is not None:
+            feat_static_cat = None
+            feat_static_real = None
+            if time_series_df.static_features is not None and (self.num_feat_static_cat or self.num_feat_static_real):
                 feat_static_cat, feat_static_real = get_categorical_and_continuous_features(
                     time_series_df.static_features
                 )
-                if self.num_feat_static_cat == 0:
+                if self.num_feat_static_cat > 0:
+                    if len(feat_static_cat.columns) != self.num_feat_static_cat:
+                        raise ValueError(
+                            f"Static features must contain {self.num_feat_dynamic_real} columns of type 'category', "
+                            f"(got {len(feat_static_cat.columns)} columns of type 'category')."
+                        )
+                else:
                     feat_static_cat = None
-                if self.num_feat_static_real == 0:
+                if self.num_feat_static_real > 0:
+                    if len(feat_static_real.columns) != self.num_feat_static_real:
+                        raise ValueError(
+                            f"Static features must contain {self.num_feat_dynamic_real} columns of type 'float', "
+                            f"(got {len(feat_static_real.columns)} columns of type 'float')."
+                        )
+                else:
                     feat_static_real = None
-            else:
-                feat_static_cat = None
-                feat_static_real = None
 
             feat_dynamic_real = time_series_df.drop(self.target, axis=1)
             if known_covariates is not None:
                 feat_dynamic_real = pd.concat([feat_dynamic_real, known_covariates], axis=0)
-            if self.num_feat_dynamic_real == 0:
+            if self.num_feat_dynamic_real > 0:
+                if len(feat_dynamic_real.columns) != self.num_feat_dynamic_real:
+                    raise ValueError(
+                        f"Data must contain {self.num_feat_dynamic_real} columns with known covariates, "
+                        f"(only received {len(feat_dynamic_real.columns)} columns with known covariates)."
+                    )
+            else:
                 feat_dynamic_real = None
 
             return SimpleGluonTSDataset(
