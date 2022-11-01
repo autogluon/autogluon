@@ -1,0 +1,7 @@
+pretrainer:
+  pretrain_epochs: 5
+  augmentation_type: "permutation"
+  corruption_rate: 0.6
+  start_pretrain_coefficient: 1
+  end_pretrain_coefficient: 0.01
+  loss_mixup: "reconstruction"

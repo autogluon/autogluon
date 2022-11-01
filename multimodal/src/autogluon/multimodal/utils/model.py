@@ -229,6 +229,8 @@ def create_model(
             if num_numerical_columns > 300
             else OmegaConf.select(model_config, "additive_attention", default=False),
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
+            row_attention=OmegaConf.select(model_config, "row_attention", default=False),
+            row_attention_layer=OmegaConf.select(model_config, "row_attention_layer", default=None),
         )
     elif model_name.lower().startswith(CATEGORICAL_MLP):
         model = CategoricalMLP(
@@ -264,6 +266,8 @@ def create_model(
             if len(num_categories) > 300
             else OmegaConf.select(model_config, "additive_attention", default=False),
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
+            row_attention=OmegaConf.select(model_config, "row_attention", default=False),
+            row_attention_layer=OmegaConf.select(model_config, "row_attention_layer", default=None),
         )
     elif model_name.lower().startswith(MMDET_IMAGE):
         model = MMDetAutoModelForObjectDetection(
@@ -324,6 +328,8 @@ def create_model(
             if num_numerical_columns + len(num_categories) > 300
             else OmegaConf.select(model_config, "additive_attention", default=False),
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
+            row_attention=OmegaConf.select(model_config, "row_attention", default=False),
+            row_attention_layer=OmegaConf.select(model_config, "row_attention_layer", default=None),
         )
     else:
         raise ValueError(f"unknown model name: {model_name}")

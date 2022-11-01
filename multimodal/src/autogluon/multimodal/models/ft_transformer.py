@@ -508,6 +508,8 @@ class FT_Transformer(nn.Module):
         projection: Optional[bool] = False,
         additive_attention: Optional[bool] = False,
         share_qv_weights: Optional[bool] = False,
+        row_attention: Optional[bool] = False,
+        row_attention_layer: Optional[str] = None,
     ) -> None:
         """
         Parameters
@@ -556,6 +558,10 @@ class FT_Transformer(nn.Module):
             if 'true', then value and query transformation parameters are shared in additive attention.
         """
         super().__init__()
+        if row_attention:
+            assert (
+                row_attention_layer is None
+            ), "If `row_attention` is False, row_attention_layer must be None."
         if isinstance(last_layer_query_idx, int):
             raise ValueError(
                 "last_layer_query_idx must be None, list[int] or slice. "
@@ -606,8 +612,35 @@ class FT_Transformer(nn.Module):
 
         self.prenormalization = prenormalization
         self.last_layer_query_idx = last_layer_query_idx
+        self.row_attention = row_attention
+        self.row_attention_layer = row_attention_layer
 
         self.blocks = nn.ModuleList([])
+        if self.row_attention:
+            self.row_attention_layers = nn.ModuleDict(
+                {
+                    "row_attention": MultiheadAttention(
+                        d_token=d_token,
+                        n_heads=attention_n_heads,
+                        dropout=attention_dropout,
+                        bias=True,
+                        initialization=attention_initialization,
+                    ),
+                    "row_ffn": FT_Transformer.FFN(
+                        d_token=d_token,
+                        d_hidden=ffn_d_hidden,
+                        bias_first=True,
+                        bias_second=True,
+                        dropout=ffn_dropout,
+                        activation=ffn_activation,
+                    ),
+                    "row_attention_residual_dropout": nn.Dropout(residual_dropout),
+                    "row_ffn_residual_dropout": nn.Dropout(residual_dropout),
+                    "row_output": nn.Identity(),  # for hooks-based introspection
+                }
+            )
+            for p in self.row_attention_layers.parameters():
+                nn.init.zeros_(p)
         for layer_idx in range(n_blocks):
             layer = nn.ModuleDict(
                 {
@@ -649,6 +682,10 @@ class FT_Transformer(nn.Module):
                     layer["value_compression"] = make_kv_compression()
                 else:
                     assert kv_compression_sharing == "key-value", _INTERNAL_ERROR_MESSAGE
+            if row_attention:
+                layer.update(
+                    self.row_attention_layers
+                )
             self.blocks.append(layer)
 
         self.head = (
@@ -675,7 +712,10 @@ class FT_Transformer(nn.Module):
         )
 
     def _start_residual(self, layer, stage, x):
-        assert stage in ["attention", "ffn"], _INTERNAL_ERROR_MESSAGE
+        if not self.row_attention:
+            assert stage in ["attention", "ffn"], _INTERNAL_ERROR_MESSAGE
+        else:
+            assert stage in ["attention", "ffn", "row_attention", "row_ffn"], _INTERNAL_ERROR_MESSAGE
         x_residual = x
         if self.prenormalization:
             norm_key = f"{stage}_normalization"
@@ -684,7 +724,10 @@ class FT_Transformer(nn.Module):
         return x_residual
 
     def _end_residual(self, layer, stage, x, x_residual):
-        assert stage in ["attention", "ffn"], _INTERNAL_ERROR_MESSAGE
+        if not self.row_attention:
+            assert stage in ["attention", "ffn"], _INTERNAL_ERROR_MESSAGE
+        else:
+            assert stage in ["attention", "ffn", "row_attention", "row_ffn"], _INTERNAL_ERROR_MESSAGE
         x_residual = layer[f"{stage}_residual_dropout"](x_residual)
         x = x + x_residual
         if not self.prenormalization:
@@ -694,6 +737,23 @@ class FT_Transformer(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         assert x.ndim == 3, "The input must have 3 dimensions: (n_objects, n_tokens, d_token)"
         for layer_idx, layer in enumerate(self.blocks):
+
+            if self.row_attention_layer == "first" and layer_idx == 0:
+                x = torch.transpose(x, 0, 1)
+
+                x_residual = self._start_residual(layer, "row_attention", x)
+                x_residual, _ = layer["row_attention"](
+                    x_residual,
+                    x_residual,
+                    None, None,
+                )
+                x = self._end_residual(layer, "row_attention", x, x_residual)
+                x_residual = self._start_residual(layer, "row_ffn", x)
+                x_residual = layer["row_ffn"](x_residual)
+                x = self._end_residual(layer, "row_ffn", x, x_residual)
+                x = layer["row_output"](x)
+                x = torch.transpose(x, 0, 1)
+
             layer = cast(nn.ModuleDict, layer)
 
             query_idx = self.last_layer_query_idx if layer_idx + 1 == len(self.blocks) else None
@@ -711,6 +771,22 @@ class FT_Transformer(nn.Module):
             x_residual = layer["ffn"](x_residual)
             x = self._end_residual(layer, "ffn", x, x_residual)
             x = layer["output"](x)
+
+            if self.row_attention_layer == "shared" or (self.row_attention_layer == "last" and layer_idx + 1 == len(self.blocks)):
+                x = torch.transpose(x, 0, 1)
+
+                x_residual = self._start_residual(layer, "row_attention", x)
+                x_residual, _ = layer["row_attention"](
+                    x_residual,
+                    x_residual,
+                    None, None,
+                )
+                x = self._end_residual(layer, "row_attention", x, x_residual)
+                x_residual = self._start_residual(layer, "row_ffn", x)
+                x_residual = layer["row_ffn"](x_residual)
+                x = self._end_residual(layer, "row_ffn", x, x_residual)
+                x = layer["row_output"](x)
+                x = torch.transpose(x, 0, 1)
 
         x = self.head(x)
 

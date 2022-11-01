@@ -49,6 +49,7 @@ class FTTransformerModel(MultiModalPredictorModel):
             "env.batch_size": 128,
             "env.num_workers": 0,
             "env.num_workers_evaluation": 0,
+            "env.eval_batch_size_ratio": 1,
             "optimization.max_epochs": 2000,  # Specify a large value to train until convergence
             "optimization.weight_decay": 1.0e-5,
             "optimization.lr_choice": None,

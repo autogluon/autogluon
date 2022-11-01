@@ -37,3 +37,4 @@ optimization:
     "auto" # The replaced loss for regression. Can only support loss function in torch.nn.
     # example
     # "BCEWithLogitsLoss" or "nn.BCEWithLogitsloss"
+  weight_decay_row_attention: 0.1

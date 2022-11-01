@@ -245,6 +245,8 @@ class MultimodalFusionTransformer(nn.Module):
         loss_weight: Optional[float] = None,
         additive_attention: Optional[bool] = False,
         share_qv_weights: Optional[bool] = False,
+        row_attention: Optional[bool] = False,
+        row_attention_layer: Optional[str] = None,
     ):
         """
         Parameters
@@ -355,6 +357,8 @@ class MultimodalFusionTransformer(nn.Module):
             projection=False,
             additive_attention=additive_attention,
             share_qv_weights=share_qv_weights,
+            row_attention=row_attention,
+            row_attention_layer=row_attention_layer,
         )
 
         self.head = FT_Transformer.Head(
