@@ -821,7 +821,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         try:
             return self._predict_model(data, model, known_covariates=known_covariates, **kwargs)
         except Exception as err:
-            logger.error(f"\tWarning: Model {model.name} failed during prediction with exception: {err}")
+            logger.error(f"Warning: Model {model.name} failed during prediction with exception: {err}")
             other_models = [m for m in self.get_model_names() if m != model.name]
             if len(other_models) > 0 and model_was_selected_automatically:
                 logger.info(f"\tYou can call predict(data, model) with one of other available models: {other_models}")
@@ -845,10 +845,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             model_preds = {}
             base_models = self.get_minimum_model_set(model, include_self=False)
             for base_model in base_models:
-                base_model_loaded = self._get_model_for_prediction(base_model)
-                model_preds[base_model] = base_model_loaded.predict_for_scoring(
-                    data, quantile_levels=self.quantile_levels
-                )
+                try:
+                    base_model_loaded = self._get_model_for_prediction(base_model)
+                    model_preds[base_model] = base_model_loaded.predict_for_scoring(
+                        data, quantile_levels=self.quantile_levels
+                    )
+                except Exception as err:
+                    logger.error(
+                        f"Warning: Model {base_model} failed during prediction and will be ignored by "
+                        f"WeightedEnsemble. Error message: {err}"
+                    )
+                    model_preds[base_model] = None
             forecasts = model.predict(model_preds)
 
             model_score = evaluator(data, forecasts) * evaluator.coefficient

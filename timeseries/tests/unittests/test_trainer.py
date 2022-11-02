@@ -416,3 +416,35 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
         assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
         assert all(len(predictions.loc[i]) == 2 for i in predicted_item_index)
         assert not np.any(np.isnan(predictions))
+
+
+@pytest.mark.parametrize("failing_model", ["NaiveModel", "SeasonalNaiveModel"])
+def test_given_base_model_fails_when_trainer_predicts_then_weighted_ensemble_can_predict(
+    temp_model_path, failing_model
+):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
+    trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
+    ensemble = TimeSeriesEnsembleWrapper(weights={"Naive": 0.5, "SeasonalNaive": 0.5}, name="WeightedEnsemble")
+    trainer._add_model(ensemble, base_models=["Naive", "SeasonalNaive"])
+
+    with mock.patch(f"autogluon.timeseries.models.local.models.{failing_model}.predict") as fail_predict:
+        fail_predict.side_effect = RuntimeError("Numerical error")
+        preds = trainer.predict(DUMMY_TS_DATAFRAME, model="WeightedEnsemble")
+        fail_predict.assert_called()
+        assert isinstance(preds, TimeSeriesDataFrame)
+
+
+@pytest.mark.parametrize("failing_model", ["NaiveModel", "SeasonalNaiveModel"])
+def test_given_base_model_fails_when_trainer_predicts_then_weighted_ensemble_can_score(
+    temp_model_path, failing_model
+):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
+    trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
+    ensemble = TimeSeriesEnsembleWrapper(weights={"Naive": 0.5, "SeasonalNaive": 0.5}, name="WeightedEnsemble")
+    trainer._add_model(ensemble, base_models=["Naive", "SeasonalNaive"])
+
+    with mock.patch(f"autogluon.timeseries.models.local.models.{failing_model}.predict") as fail_predict:
+        fail_predict.side_effect = RuntimeError("Numerical error")
+        score = trainer.score(DUMMY_TS_DATAFRAME, model="WeightedEnsemble")
+        fail_predict.assert_called()
+        assert isinstance(score, float)
