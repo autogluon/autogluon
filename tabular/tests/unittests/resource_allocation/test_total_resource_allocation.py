@@ -41,8 +41,8 @@ def test_bagged_model_with_total_resources():
     
     # Given total resources more than what the system has
     total_resources = {
-        'num_cpus': 99,
-        'num_gpus': 99,
+        'num_cpus': 9999,
+        'num_gpus': 9999,
     }
     resources = bagged_model._preprocess_fit_resources(total_resources=total_resources)
     assert resources == {'num_cpus': get_cpu_count(), 'num_gpus': get_gpu_count_all()}
@@ -81,7 +81,8 @@ def test_bagged_model_with_total_resources_and_ensemble_resources():
         }
     )
     resources = bagged_model._preprocess_fit_resources(total_resources=total_resources)
-    assert resources == {'num_cpus': 4, 'num_gpus': 1}
+    # Total resources should not be affected by ensemble resources.
+    assert resources == {'num_cpus': 8, 'num_gpus': 1}
     
 
 def test_bagged_model_without_total_resources():
@@ -111,8 +112,8 @@ def test_bagged_model_without_total_resources_but_with_ensemble_resources():
         model_base,
         hyperparameters={
             'ag_args_fit': {
-                'num_cpus': 99,
-                'num_gpus': 99,
+                'num_cpus': 9999,
+                'num_gpus': 9999,
             }
         }
     )
@@ -129,8 +130,12 @@ def test_bagged_model_without_total_resources_but_with_ensemble_resources():
             }
         }
     )
-    resources = bagged_model._preprocess_fit_resources()
-    assert resources == {'num_cpus': 1, 'num_gpus': 0}
+    kfold = 2
+    resources = bagged_model._preprocess_fit_resources(k_fold=kfold)
+    resources.pop('k_fold')
+    default_model_num_cpus, default_model_num_gpus = model_base._get_default_resources()
+    default_model_resources = {'num_cpus': default_model_num_cpus * kfold, 'num_gpus': default_model_num_gpus * kfold}
+    assert resources == default_model_resources
 
 
 def test_nonbagged_model_with_total_resources():
@@ -184,7 +189,8 @@ def test_nonbagged_model_with_total_resources_and_model_resources():
         'num_gpus': 1,
     }
     resources = model_base._preprocess_fit_resources(total_resources=total_resources)
-    assert resources == {'num_cpus': 1, 'num_gpus': 1}
+    # Here both total_resources and ag_args_fit mean the total resource. We just pick to respect the total
+    assert resources == {'num_cpus': 8, 'num_gpus': 1}
 
 
 def test_nonbagged_model_without_total_resources():
@@ -199,8 +205,8 @@ def test_nonbagged_model_without_total_resources_but_with_model_resources():
     model_base = DummyModel(
         hyperparameters={
             'ag_args_fit': {
-                'num_cpus': 99,
-                'num_gpus': 99
+                'num_cpus': 9999,
+                'num_gpus': 9999
             }
         }
     )
@@ -217,3 +223,4 @@ def test_nonbagged_model_without_total_resources_but_with_model_resources():
     )
     resources = model_base._preprocess_fit_resources()
     assert resources == {'num_cpus': 1, 'num_gpus': 1}
+    

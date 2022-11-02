@@ -485,13 +485,18 @@ class AbstractModel:
             enforced_num_gpus = kwargs.get('num_gpus', None)
             assert enforced_num_cpus is not None and enforced_num_cpus != 'auto' and enforced_num_gpus is not None and enforced_num_gpus != 'auto'
             return kwargs
+        system_num_cpus = get_cpu_count()
+        system_num_gpus = get_gpu_count_all()
         default_num_cpus, default_num_gpus = self._get_default_resources()
+        k_fold = kwargs.get('k_fold', None)
+        if k_fold is not None:
+            # bagged model's default resources should be resources * k_fold if the amount is available
+            default_num_cpus = min(default_num_cpus * k_fold, system_num_cpus)
+            default_num_gpus = min(default_num_gpus * k_fold, system_num_gpus)
         if total_resources is None:
             total_resources = {}
         num_cpus = total_resources.get('num_cpus', 'auto')
         num_gpus = total_resources.get('num_gpus', 'auto')
-        system_num_cpus = get_cpu_count()
-        system_num_gpus = get_gpu_count_all()
         if num_cpus != 'auto' and num_cpus > system_num_cpus:
             logger.warning(f'Specified total num_cpus: {num_cpus}, but only {system_num_cpus} are available. Will use {system_num_cpus} instead')
             num_cpus = system_num_cpus
@@ -506,12 +511,9 @@ class AbstractModel:
         params_aux_num_cpus = self._user_params_aux.get('num_cpus', None)
         params_aux_num_gpus = self._user_params_aux.get('num_gpus', None)
         if params_aux_num_cpus is not None:
-            print(params_aux_num_cpus)
             assert params_aux_num_cpus <= num_cpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total: {num_cpus}'
-            num_cpus = params_aux_num_cpus
         if params_aux_num_gpus is not None:
             assert params_aux_num_gpus <= num_gpus, f'Specified num_gpus per {self.__class__.__name__} is more than the total: {num_gpus}'
-            num_gpus = params_aux_num_gpus
         
         kwargs['num_cpus'] = num_cpus
         kwargs['num_gpus'] = num_gpus

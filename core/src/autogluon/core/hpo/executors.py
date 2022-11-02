@@ -454,8 +454,7 @@ class CustomHpoExecutor(HpoExecutor):
         if self.hyperparameter_tune_kwargs.get('resources_per_trial', None) is not None:
             # Custom backend only run trials sequentially
             self.scheduler_options[1]['resource'] = self.hyperparameter_tune_kwargs['resources_per_trial']
-        # self.scheduler_options[1]['resource'] = self.resources
-        print(f'custom backend resource: {self.resources}, per trial resource: {self.hyperparameter_tune_kwargs}')
+        logger.debug(f'custom backend resource: {self.resources}, per trial resource: {self.hyperparameter_tune_kwargs}')
         
     def validate_search_space(self, search_space, model_name):
         if not any(isinstance(search_space[hyperparam], Space) for hyperparam in search_space):

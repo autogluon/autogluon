@@ -4,7 +4,7 @@ import pandas as pd
 import time
 
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
-from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy
+from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy, SequentialLocalFoldFittingStrategy
 from autogluon.tabular.models import AbstractModel
 
 
@@ -37,6 +37,7 @@ def _prepare_data():
 
 
 def _construct_dummy_fold_strategy(
+    fold_strategy_cls,
     num_jobs,
     num_folds_parallel,
     bagged_resources=None,
@@ -73,18 +74,21 @@ def _construct_dummy_fold_strategy(
         oof_pred_proba=np.array([]),
         oof_pred_model_repeats=np.array([]),
         save_folds=True,
-        num_jobs=num_jobs,
-        num_folds_parallel=num_folds_parallel,
         time_limit_fold_ratio=1,
         **bagged_resources  # These will be processed at abstract model level in a real tabular predictor
     )
-    return ParallelLocalFoldFittingStrategy(**args)
+    if fold_strategy_cls == ParallelLocalFoldFittingStrategy:
+        args['num_jobs'] = num_jobs
+        args['num_folds_parallel'] = num_folds_parallel
+    return fold_strategy_cls(**args)
 
 
-def test_bagging_invalid_resources_per_fold():
+@pytest.mark.parametrize('fold_strategy_cls', [ParallelLocalFoldFittingStrategy, SequentialLocalFoldFittingStrategy])
+def test_bagging_invalid_resources_per_fold(fold_strategy_cls):
     # resources per fold more than resources to ensemble model
     with pytest.raises(AssertionError) as e:
         _construct_dummy_fold_strategy(
+            fold_strategy_cls=fold_strategy_cls,
             num_jobs=8,
             num_folds_parallel=8,
             bagged_resources={
@@ -103,6 +107,7 @@ def test_bagging_invalid_resources_per_fold():
     # resources per fold less than minimum resources
     with pytest.raises(AssertionError) as e:
         _construct_dummy_fold_strategy(
+            fold_strategy_cls=fold_strategy_cls,
             num_jobs=8,
             num_folds_parallel=8,
             bagged_resources={
@@ -120,8 +125,9 @@ def test_bagging_invalid_resources_per_fold():
         )
         
 
-def test_bagging_resources_per_fold():
+def test_parallel_bagging_resources_per_fold():
     fold_fitting_strategy = _construct_dummy_fold_strategy(
+        fold_strategy_cls=ParallelLocalFoldFittingStrategy,
         num_jobs=8,
         num_folds_parallel=8,
         bagged_resources={
@@ -142,6 +148,7 @@ def test_bagging_resources_per_fold():
     assert fold_fitting_strategy.batches == 8
     
     fold_fitting_strategy = _construct_dummy_fold_strategy(
+        fold_strategy_cls=ParallelLocalFoldFittingStrategy,
         num_jobs=8,
         num_folds_parallel=8,
         bagged_resources={
@@ -162,8 +169,9 @@ def test_bagging_resources_per_fold():
     assert fold_fitting_strategy.batches == 1
 
 
-def test_bagging_no_resources_per_fold():
+def test_parallel_bagging_no_resources_per_fold():
     fold_fitting_strategy = _construct_dummy_fold_strategy(
+        fold_strategy_cls=ParallelLocalFoldFittingStrategy,
         num_jobs=8,
         num_folds_parallel=4,
         bagged_resources={
@@ -178,18 +186,65 @@ def test_bagging_no_resources_per_fold():
     assert fold_fitting_strategy.resources == {'num_cpus': 2, 'num_gpus': 0.25}
     assert fold_fitting_strategy.num_parallel_jobs == 4
     assert fold_fitting_strategy.batches == 2
+        
+
+def test_sequential_bagging_resources_per_fold():
+    fold_fitting_strategy = _construct_dummy_fold_strategy(
+        fold_strategy_cls=SequentialLocalFoldFittingStrategy,
+        num_jobs=8,
+        num_folds_parallel=8,
+        bagged_resources={
+            'num_cpus': 8,
+            'num_gpus': 1
+        },
+        model_base_resources={
+            'num_cpus': 4,
+            'num_gpus': 1
+        },
+        model_base_minimum_resources={
+            'num_cpus': 1,
+            'num_gpus': 0.1
+        }
+    )
+    assert fold_fitting_strategy.num_cpus == 8
+    assert fold_fitting_strategy.num_gpus == 1
+    assert fold_fitting_strategy.user_resources_per_job == {'num_cpus': 4, 'num_gpus': 1}
     
-    # Bagged resource less than minimum resources
-    with pytest.raises(AssertionError) as e:
-        _construct_dummy_fold_strategy(
-            num_jobs=8,
-            num_folds_parallel=4,
-            bagged_resources={
-                'num_cpus': 8,
-                'num_gpus': 1
-            },
-            model_base_minimum_resources={
-                'num_cpus': 9,
-                'num_gpus': 0.5
-            }
-        )
+    fold_fitting_strategy = _construct_dummy_fold_strategy(
+        fold_strategy_cls=SequentialLocalFoldFittingStrategy,
+        num_jobs=8,
+        num_folds_parallel=8,
+        bagged_resources={
+            'num_cpus': 8,
+            'num_gpus': 1
+        },
+        model_base_resources={
+            'num_cpus': 1,
+            'num_gpus': 0.1
+        },
+        model_base_minimum_resources={
+            'num_cpus': 1,
+            'num_gpus': 0.1
+        }
+    )
+    assert fold_fitting_strategy.num_cpus == 8
+    assert fold_fitting_strategy.num_gpus == 1
+    assert fold_fitting_strategy.user_resources_per_job == {'num_cpus': 1, 'num_gpus': 0.1}
+
+def test_parallel_bagging_no_resources_per_fold():
+    fold_fitting_strategy = _construct_dummy_fold_strategy(
+        fold_strategy_cls=SequentialLocalFoldFittingStrategy,
+        num_jobs=8,
+        num_folds_parallel=4,
+        bagged_resources={
+            'num_cpus': 8,
+            'num_gpus': 1
+        },
+        model_base_minimum_resources={
+            'num_cpus': 1,
+            'num_gpus': 0.1
+        }
+    )
+    assert fold_fitting_strategy.num_cpus == 8
+    assert fold_fitting_strategy.num_gpus == 1
+    assert fold_fitting_strategy.user_resources_per_job == None
