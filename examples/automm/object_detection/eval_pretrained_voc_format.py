@@ -1,14 +1,9 @@
 """
-The example to evaluate a pretrained object detection model in COCO format.
+The example to evaluate a pretrained object detection model in VOC format.
 
-An example to evaluate a pretrained model on COCO dataset:
+An example to evaluate a pretrained model on VOC dataset (VOC format):
     python eval_pretrained_coco_format.py \
-        --test_path coco17/annotations/instances_val2017.json \
-        --checkpoint_name yolov3_mobilenetv2_320_300e_coco
-
-An example to evaluate a pretrained model on VOC dataset (COCO format):
-    python eval_pretrained_coco_format.py \
-        --test_path VOCdevkit/VOCCOCO/voc07_test.json \
+        --test_path VOCdevkit/VOC2007 \
         --checkpoint_name faster_rcnn_r50_fpn_1x_voc0712
 """
 
@@ -17,9 +12,9 @@ import argparse
 from autogluon.multimodal import MultiModalPredictor
 
 
-def tutorial_script_for_eval_pretrained_coco_format():
+def tutorial_script_for_eval_pretrained_voc_format():
     # this code block is used in tutorial
-    checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
+    checkpoint_name = "faster_rcnn_r50_fpn_1x_voc0712"
     num_gpus = -1  # here we use all available GPUs
 
     predictor = MultiModalPredictor(
@@ -30,14 +25,16 @@ def tutorial_script_for_eval_pretrained_coco_format():
         problem_type="object_detection",
     )
 
-    test_path = "coco17/annotations/instances_val2017.json"
+    test_path = "VOCdevkit/VOC2007"
 
-    predictor.evaluate(test_path)
+    result = predictor.evaluate(test_path)
+
+    print(result)
 
 
 def eval_pretrained_coco_format(
-    checkpoint_name="yolov3_mobilenetv2_320_300e_coco",
-    test_path="coco17/annotations/instances_val2017.json",
+    checkpoint_name="faster_rcnn_r50_fpn_1x_voc0712",
+    test_path="VOCdevkit/VOC2007",
     num_gpus=-1,
 ):
     # TODO: remove label
@@ -58,8 +55,8 @@ def eval_pretrained_coco_format(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--test_path", default="coco17/annotations/instances_val2017.json", type=str)
-    parser.add_argument("--checkpoint_name", default="yolov3_mobilenetv2_320_300e_coco", type=str)
+    parser.add_argument("--test_path", default="VOCdevkit/VOC2007", type=str)
+    parser.add_argument("--checkpoint_name", default="faster_rcnn_r50_fpn_1x_voc0712", type=str)
     parser.add_argument("--num_gpus", default=-1, type=int)
     args = parser.parse_args()
 
