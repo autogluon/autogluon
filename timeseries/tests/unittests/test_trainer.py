@@ -435,9 +435,7 @@ def test_given_base_model_fails_when_trainer_predicts_then_weighted_ensemble_can
 
 
 @pytest.mark.parametrize("failing_model", ["NaiveModel", "SeasonalNaiveModel"])
-def test_given_base_model_fails_when_trainer_predicts_then_weighted_ensemble_can_score(
-    temp_model_path, failing_model
-):
+def test_given_base_model_fails_when_trainer_scores_then_weighted_ensemble_can_score(temp_model_path, failing_model):
     trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
     trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
     ensemble = TimeSeriesEnsembleWrapper(weights={"Naive": 0.5, "SeasonalNaive": 0.5}, name="WeightedEnsemble")
