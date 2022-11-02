@@ -12,11 +12,12 @@ To start, import MultiModalPredictor:
 from autogluon.multimodal import MultiModalPredictor
 ```
 
-We select the Deformable DETR with ResNet50 as backbone, currently this is the only public pretrained version in MMDetection's model zoo.
+We select the two-stage Deformable DETR with ResNet50 as backbone with bounding box finetune,
+for other Deformable DETR models see [MMDetection's Deformable DETR models](https://github.com/open-mmlab/mmdetection/tree/master/configs/deformable_detr). 
 And we use all the GPUs (if any):
 
 ```python
-checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
+checkpoint_name = "deformable_detr_twostage_refine_r50_16x2_50e_coco"
 num_gpus = -1  # use all GPUs
 ```
 

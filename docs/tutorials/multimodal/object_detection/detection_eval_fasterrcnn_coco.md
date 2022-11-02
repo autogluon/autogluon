@@ -11,7 +11,7 @@ To start, import MultiModalPredictor:
 from autogluon.multimodal import MultiModalPredictor
 ```
 
-We select the Faster R-CNN with ResNet50 as backbone and Feature Pyramid Network (FPN)  as neck,
+We select the Faster R-CNN with ResNet50 as backbone and Feature Pyramid Network (FPN) as neck,
 for other Faster R-CNN models see [MMDetection's Faster R-CNN models](https://github.com/open-mmlab/mmdetection/tree/master/configs/faster_rcnn). 
 And we still use all the GPUs (if any):
 
