@@ -624,8 +624,12 @@ def cocoeval_pycocotools(outputs, data, anno_file, cache_path, metrics):
     cocoEval.accumulate()
     cocoEval.summarize()
 
+
+    # TODO: support assigning metrics
     if isinstance(metrics, list):
         metrics = metrics[0]
+    elif metrics is None:
+        metrics = "map"
 
     return {metrics: cocoEval.stats[0]}
 

@@ -1,0 +1,81 @@
+# AutoMM Detection - Evaluate Pretrained Deformable DETR on COCO Format Dataset
+:label:`sec_automm_detection_eval_yolov3_coco`
+
+In this section, our goal is to evaluate Deformable DETR model on VOC2007 dataset in COCO format. Previously we introduced 2 classic models: \[YOLOv3] and \[FasterRCNN].
+Recent years Transformer models become more and more popular in Computer Vision, and Deformable DEtection TRansformer (Deformable DETR) reached the SOTA performance in detection task.
+In terms of speed, it's slower than YOLOv3 and Faster-RCNN, but it also has higher performance.
+
+To start, import MultiModalPredictor:
+
+```python
+from autogluon.multimodal import MultiModalPredictor
+```
+
+We select the Deformable DETR with ResNet50 as backbone, currently this is the only public pretrained version in MMDetection's model zoo.
+And we use all the GPUs (if any):
+
+```python
+checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
+num_gpus = -1  # use all GPUs
+```
+
+We create the MultiModalPredictor with selected checkpoint name and number of GPUs.
+We also need to specify the problem_type is `"object_detection"`.
+
+```python
+predictor = MultiModalPredictor(
+    hyperparameters={
+        "model.mmdet_image.checkpoint_name": checkpoint_name,
+        "env.num_gpus": num_gpus,
+    },
+    problem_type="object_detection",
+)
+```
+
+Here we use COCO17 to test. 
+See other tutorials for \[Prepare Common Public Dataset], \[Convert VOC Format Dataset to COCO Format], and \[Create Custom Dataset].
+While using COCO dataset, the input is the json annotation file of the dataset split.
+In this example, `instances_val2017.json` is the annotation file of validation split of COCO17 dataset.
+
+```python
+test_path = "coco17/annotations/instances_val2017.json"
+```
+
+To evaluate the pretrained Deformable DETR model we loaded, run:
+
+```python
+predictor.evaluate(test_path)
+```
+
+And the evaluation results is shown in command line output. The first value `0.463` is mAP in COCO standard, and the second one `0.659` is mAP in VOC standard (or mAP50). For more details about these metrics, see [COCO's evaluation guideline](https://cocodataset.org/#detection-eval).
+
+```
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.463
+ Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.659
+ Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.500
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.298
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.493
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.607
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.358
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.603
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.652
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.451
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.692
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.830
+time usage: 389.92
+```
+
+Deformable DETR has best performance but takes more time and (GPU memory) space. If there is a restriction in time or space, see \[Evaluate Pretrained Faster-RCNN on COCO Format Dataset] or \[Evaluate Pretrained YOLOv3 on COCO Format Dataset].
+You can also see other tutorials for \[Fast Finetune on COCO format data] or \[Inference on COCO format data (with Visualization)].
+
+### Citation
+```
+@inproceedings{
+zhu2021deformable,
+title={Deformable DETR: Deformable Transformers for End-to-End Object Detection},
+author={Xizhou Zhu and Weijie Su and Lewei Lu and Bin Li and Xiaogang Wang and Jifeng Dai},
+booktitle={International Conference on Learning Representations},
+year={2021},
+url={https://openreview.net/forum?id=gZ9hCDWe6ke}
+}
+```

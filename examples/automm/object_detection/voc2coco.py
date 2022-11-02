@@ -6,7 +6,7 @@ With changes:
 2. provide only root_dir, and corresponding simplification
 3. split train/val/test
 4. Use defusedxml.ElementTree for security concern
-5. TODO: remove invalid bbox (and invalid images?)
+5. TODO: remove invalid images?
 
 To use:
 1. run in root_dir:
@@ -26,6 +26,9 @@ import re
 import subprocess
 from tqdm import tqdm
 from typing import Dict, List
+
+
+MIN_AREA = 4  # TODO: put in arg?
 
 
 def get_label2id(labels_path: str) -> Dict[str, int]:
@@ -76,13 +79,17 @@ def get_coco_annotation_from_obj(obj, label2id):
     assert label in label2id, f"Error: {label} is not in label2id !"
     category_id = label2id[label]
     bndbox = obj.find("bndbox")
-    xmin = int(float(bndbox.findtext("xmin"))) - 1
-    ymin = int(float(bndbox.findtext("ymin"))) - 1
+    xmin = int(float(bndbox.findtext("xmin")))
+    ymin = int(float(bndbox.findtext("ymin")))
     xmax = int(float(bndbox.findtext("xmax")))
     ymax = int(float(bndbox.findtext("ymax")))
-    assert xmax > xmin and ymax > ymin, f"Box size error !: (xmin, ymin, xmax, ymax): {xmin, ymin, xmax, ymax}"
+    if xmin >= xmax or ymin >= ymax:
+        return {}
     o_width = xmax - xmin
     o_height = ymax - ymin
+    area = o_width * o_height
+    if area <= MIN_AREA:
+        return {}
     ann = {
         "area": o_width * o_height,
         "iscrowd": 0,
@@ -111,9 +118,10 @@ def convert_xmls_to_cocojson(
 
         for obj in ann_root.findall("object"):
             ann = get_coco_annotation_from_obj(obj=obj, label2id=label2id)
-            ann.update({"image_id": img_id, "id": bnd_id})
-            output_json_dict["annotations"].append(ann)
-            bnd_id = bnd_id + 1
+            if ann:
+                ann.update({"image_id": img_id, "id": bnd_id})
+                output_json_dict["annotations"].append(ann)
+                bnd_id = bnd_id + 1
 
     for label, label_id in label2id.items():
         category_info = {"supercategory": "none", "id": label_id, "name": label}
