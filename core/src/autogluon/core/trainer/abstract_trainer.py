@@ -1165,6 +1165,9 @@ class AbstractTrainer:
                 model.compile(compiler_configs=compiler_configs)
                 compile_end_time = time.time()
                 model.compile_time = compile_end_time - compile_start_time
+
+                # Update model_graph in order to put compile_time into leaderboard,
+                # since models are saved right after training.
                 self.model_graph.nodes[model.name]['compile_time'] = model.compile_time
                 self.save_model(model, reduce_memory=False)
         return model_names
@@ -2290,6 +2293,7 @@ class AbstractTrainer:
                 custom_info['num_models'] = bagged_info.get('num_child_models', 1)
                 custom_info['memory_size'] = bagged_info.get('max_memory_size', model_info[model_name]['memory_size'])
                 custom_info['memory_size_min'] = bagged_info.get('min_memory_size', model_info[model_name]['memory_size'])
+                custom_info['compile_time'] = bagged_info.get('compile_time', model_info[model_name]['compile_time'])
                 custom_info['child_model_type'] = bagged_info.get('child_model_type', None)
                 custom_info['child_hyperparameters'] = bagged_info.get('child_hyperparameters', None)
                 custom_info['child_hyperparameters_fit'] = bagged_info.get('child_hyperparameters_fit', None)
