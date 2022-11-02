@@ -523,9 +523,7 @@ def get_model_head(model: nn.Module):
 
 
 def get_hf_config_and_model(
-    checkpoint_name: str,
-    pretrained: Optional[bool] = True,
-    low_cpu_mem_usage: Optional[bool] = False
+    checkpoint_name: str, pretrained: Optional[bool] = True, low_cpu_mem_usage: Optional[bool] = False
 ):
     """
     Get a Huggingface config and model based on a checkpoint name.
