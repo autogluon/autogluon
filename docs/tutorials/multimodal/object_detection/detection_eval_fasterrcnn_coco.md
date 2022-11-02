@@ -34,7 +34,7 @@ predictor = MultiModalPredictor(
 ```
 
 Here we use COCO17 to test. 
-See other tutorials for \[Prepare Common Public Dataset], \[Convert VOC Format Dataset to COCO Format], and \[Create Custom Dataset].
+See other tutorials for \[Prepare COCO2017], \[Convert VOC Format Dataset to COCO Format], and \[Create Custom Dataset].
 While using COCO dataset, the input is the json annotation file of the dataset split.
 In this example, `instances_val2017.json` is the annotation file of validation split of COCO17 dataset.
 
