@@ -4,7 +4,7 @@ import pytest
 
 from autogluon.timeseries.models.autogluon_tabular import AutoGluonTabularModel
 
-from ..common import DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
+from ..common import DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, DATAFRAME_WITH_STATIC
 
 TESTABLE_MODELS = [
     AutoGluonTabularModel,
@@ -44,7 +44,7 @@ def test_when_predict_is_called_then_get_features_dataframe_receives_correct_inp
 
 
 def test_when_static_features_present_then_shape_is_correct(temp_model_path):
-    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC.copy()
+    data = DATAFRAME_WITH_STATIC.copy()
     model = AutoGluonTabularModel(path=temp_model_path)
     # Initialize model._lag_indices and model._time_features from freq
     model.fit(train_data=data, time_limit=2)
@@ -55,7 +55,7 @@ def test_when_static_features_present_then_shape_is_correct(temp_model_path):
 
 
 def test_when_static_features_present_then_prediction_works(temp_model_path):
-    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC.copy()
+    data = DATAFRAME_WITH_STATIC.copy()
     model = AutoGluonTabularModel(path=temp_model_path)
     model.fit(train_data=data, time_limit=2)
     model.predict(data)
