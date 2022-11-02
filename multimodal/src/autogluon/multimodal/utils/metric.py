@@ -76,7 +76,10 @@ def infer_metrics(
             raise ValueError(f"Metric {eval_metric_name} is only supported for binary classification.")
 
         if eval_metric_name in VALID_METRICS:
-            validation_metric_name = eval_metric_name
+            if pipeline == IMAGE_TEXT_SIMILARITY:
+                validation_metric_name = HIT_RATE
+            else:
+                validation_metric_name = eval_metric_name
             return validation_metric_name, eval_metric_name
 
         warnings.warn(
@@ -104,7 +107,7 @@ def infer_metrics(
                 raise ValueError(
                     f"Problem type: {problem_type}, pipeline: {pipeline}, validation_metric_name: {validation_metric_name} is not supported!"
                 )
-        elif pipeline == IMAGE_TEXT_SIMILARITY or TEXT_SIMILARITY:
+        elif pipeline == IMAGE_TEXT_SIMILARITY:
             return HIT_RATE, NDCG
         else:
             raise NotImplementedError(f"Problem type: {problem_type}, pipeline: {pipeline} is not supported yet!")

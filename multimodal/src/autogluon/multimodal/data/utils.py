@@ -203,8 +203,6 @@ def apply_df_preprocessor(
     modality_types = {}
     for per_modality in modalities:
         # print(f"per_modality: {per_modality}")
-        per_modality_columns = df_preprocessor.get_column_names(modality=per_modality)
-        # print(f"per_modality columns: {per_modality_columns}")
         per_modality_features, per_modality_types = getattr(df_preprocessor, f"transform_{per_modality}")(data)
         modality_features[per_modality] = per_modality_features
         modality_types[per_modality] = per_modality_types

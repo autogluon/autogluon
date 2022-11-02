@@ -6,15 +6,16 @@ import tempfile
 
 import numpy.testing as npt
 import pytest
-from unittest_datasets import IDChangeDetectionDataset
+from unittest_datasets import IDChangeDetectionDataset, Flickr30kDataset
 from utils import get_home_dir
 
 from autogluon.multimodal import MultiModalMatcher
 from autogluon.multimodal.constants import BINARY, MULTICLASS, QUERY, RESPONSE, UNIFORM_SOUP
-from autogluon.multimodal.utils import semantic_search
+from autogluon.multimodal.utils import semantic_search, convert_data_for_ranking
 
 ALL_DATASETS = {
     "id_change_detection": IDChangeDetectionDataset,
+    "flickr30k": Flickr30kDataset,
 }
 
 
@@ -40,16 +41,61 @@ def verify_matcher_save_load(matcher, df, verify_embedding=True, cls=MultiModalM
             assert response_embeddings.shape[0] == len(df)
 
 
+def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, metric_name, symmetric=False):
+    test_df_with_label, test_query_text_data, test_response_image_data, test_label_column = convert_data_for_ranking(
+        data=test_df,
+        query_column=query_column,
+        response_column=response_column,
+    )
+    socre_1 = matcher.evaluate(
+        data=test_df_with_label,
+        query_data=test_query_text_data,
+        response_data=test_response_image_data,
+        metrics=[metric_name],
+        label_column=test_label_column,
+        cutoff=[1, 5, 10],
+    )
+
+    if symmetric:
+        test_df_with_label, test_query_image_data, test_response_text_data, test_label_column = convert_data_for_ranking(
+            data=test_df,
+            query_column=response_column,
+            response_column=query_column,
+        )
+        socre_2 = matcher.evaluate(
+            data=test_df_with_label,
+            query_data=test_query_image_data,
+            response_data=test_response_text_data,
+            metrics=[metric_name],
+            label_column=test_label_column,
+            query_signature="response",
+            response_signature="query",
+            cutoff=[1, 5, 10],
+        )
+
+
 @pytest.mark.parametrize(
-    "dataset_name,query,response,presets,text_backbone,image_backbone",
+    "dataset_name,query,response,presets,text_backbone,image_backbone, is_ranking, symmetric",
     [
         (
             "id_change_detection",
             "Previous Image",
             "Current Image",
-            "siamese_network",
+            "image_similarity",
             None,
             "swin_tiny_patch4_window7_224",
+            False,
+            False,
+        ),
+        (
+            "flickr30k",
+            "caption",
+            "image",
+            "image_text_similarity",
+            None,
+            None,
+            True,
+            True,
         ),
     ],
 )
@@ -60,15 +106,17 @@ def test_matcher(
     presets,
     text_backbone,
     image_backbone,
+    is_ranking,
+    symmetric,
 ):
     dataset = ALL_DATASETS[dataset_name]()
 
     matcher = MultiModalMatcher(
         query=query,
         response=response,
-        label=dataset.label_columns[0],
+        pipeline=presets,
+        label=dataset.label_columns[0] if dataset.label_columns else None,
         match_label=dataset.match_label,
-        problem_type=dataset.problem_type,
         eval_metric=dataset.metric,
     )
 
@@ -97,17 +145,29 @@ def test_matcher(
 
     matcher.fit(
         train_data=dataset.train_df,
+        tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
         hyperparameters=hyperparameters,
         time_limit=30,
         save_path=save_path,
     )
 
-    score = matcher.evaluate(dataset.test_df)
+    if is_ranking:
+        evaluate_matcher_ranking(
+            matcher=matcher,
+            test_df=dataset.test_df,
+            query_column=query,
+            response_column=response,
+            metric_name=dataset.metric,
+            symmetric=symmetric,
+        )
+    else:
+        score = matcher.evaluate(dataset.test_df)
     verify_matcher_save_load(matcher, dataset.test_df, cls=MultiModalMatcher)
 
     # Test for continuous fit
     matcher.fit(
         train_data=dataset.train_df,
+        tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
         hyperparameters=hyperparameters,
         time_limit=30,
     )
@@ -119,6 +179,7 @@ def test_matcher(
         matcher = MultiModalMatcher.load(root)
         matcher.fit(
             train_data=dataset.train_df,
+            tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
             hyperparameters=hyperparameters,
             time_limit=30,
         )
@@ -191,3 +252,52 @@ def test_text_semantic_search():
             assert per_hit["corpus_id"] == per_hit_2["corpus_id"] == per_hit_gt["corpus_id"]
             npt.assert_almost_equal(per_hit["score"], per_hit_2["score"])
             npt.assert_almost_equal(per_hit["score"], per_hit_gt["score"])
+
+
+def test_image_text_semantic_search():
+    dataset_name = "flickr30k"
+    dataset = ALL_DATASETS[dataset_name]()
+    image_list = dataset.test_df["image"].tolist()
+    text_list = dataset.test_df["caption"].tolist()
+
+    matcher = MultiModalMatcher(
+        pipeline="image_text_similarity",
+        hyperparameters={"model.hf_text.checkpoint_name": "openai/clip-vit-base-patch32"},
+    )
+    text_to_image_hits = semantic_search(
+        matcher=matcher,
+        query_data=text_list,
+        response_data=image_list,
+        top_k=5,
+    )
+    # print("extract embeddings separately...\n\n")
+    # extract embeddings first and then do semantic search
+    query_embeddings = matcher.extract_embedding(text_list)
+    response_embeddings = matcher.extract_embedding(image_list)
+    text_to_image_hits_2 = semantic_search(
+        matcher=matcher,
+        query_embeddings=query_embeddings,
+        response_embeddings=response_embeddings,
+        top_k=5,
+    )
+
+    image_to_text_hits = semantic_search(
+        matcher=matcher,
+        query_data=image_list,
+        response_data=text_list,
+        top_k=5,
+    )
+    # print("extract embeddings separately...\n\n")
+    # extract embeddings first and then do semantic search
+    query_embeddings = matcher.extract_embedding(image_list)
+    response_embeddings = matcher.extract_embedding(text_list)
+    image_to_text_hits_2 = semantic_search(
+        matcher=matcher,
+        query_embeddings=query_embeddings,
+        response_embeddings=response_embeddings,
+        top_k=5,
+    )
+
+
+if __name__ == '__main__':
+    test_image_text_semantic_search()

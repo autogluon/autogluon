@@ -536,6 +536,7 @@ class MultiModalMatcher:
         for model_name in config.model.names:
             # print(f"model_name: {model_name}")
             model_config = getattr(config.model, model_name)
+            # print(f"model_config: {model_config}")
             for d_type in model_config.data_types:
                 # print(f"d_type: {d_type}")
                 filtered_data_processors[d_type] = data_processors[d_type]
@@ -558,6 +559,7 @@ class MultiModalMatcher:
                 requires_data=True,
             )
         else:  # continuing training
+            # for models like clip, we need to choose the image or text processor for query model.
             query_processors = self._filter_data_processors(self._query_processors, query_config)
 
         if response_model is None:
@@ -570,6 +572,7 @@ class MultiModalMatcher:
                 requires_data=True,
             )
         else:  # continuing training
+            # for models like clip, we need to choose the image or text processor for query model.
             response_processors = self._filter_data_processors(self._response_processors, response_config)
 
         # only need labels for the response model
@@ -889,12 +892,12 @@ class MultiModalMatcher:
                 ".* in the `DataLoader` init to improve performance.*",
             )
             warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
-            scores = trainer.validate(
-                task,
-                datamodule=train_dm,
-                ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
-            )
-            print(f"scores: {scores}")
+            # scores = trainer.validate(
+            #     task,
+            #     datamodule=train_dm,
+            #     ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
+            # )
+            # print(f"scores: {scores}")
 
             trainer.fit(
                 task,
@@ -967,11 +970,11 @@ class MultiModalMatcher:
                         response_model=response_model,
                         path=top_k_model_paths[0],
                     )
-                    best_score = self._evaluate_symmetric_ranking(val_df)
-                    # if self._pipeline == IMAGE_TEXT_SIMILARITY:
-                    #     best_score = self._evaluate_symmetric_ranking(val_df)
-                    # else:
-                    #     best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
+
+                    if self._pipeline == IMAGE_TEXT_SIMILARITY:
+                        best_score = self._evaluate_symmetric_ranking(val_df)
+                    else:
+                        best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
                     for i in range(1, len(top_k_model_paths)):
                         cand_avg_state_dict = average_checkpoints(
                             checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -981,11 +984,10 @@ class MultiModalMatcher:
                             response_model=response_model,
                             state_dict=cand_avg_state_dict,
                         )
-                        cand_score = self._evaluate_symmetric_ranking(val_df)
-                        # if self._pipeline == IMAGE_TEXT_SIMILARITY:
-                        #     cand_score = self._evaluate_symmetric_ranking(val_df)
-                        # else:
-                        #     cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
+                        if self._pipeline == IMAGE_TEXT_SIMILARITY:
+                            cand_score = self._evaluate_symmetric_ranking(val_df)
+                        else:
+                            cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
                         if monitor_op(cand_score, best_score):
                             # Add new ingredient
                             ingredients.append(top_k_model_paths[i])
@@ -1132,15 +1134,15 @@ class MultiModalMatcher:
             query_columns=query_columns,
             response_columns=response_columns,
         )
-        if query_df_preprocessor is not None:
-            query_df_preprocessor._label_generator = None
-            print(f"query_df_preprocessor: {query_df_preprocessor}")
-        if response_df_preprocessor is not None:
-            response_df_preprocessor._label_generator = None
-            print(f"response_df_preprocessor: {response_df_preprocessor}")
-        if label_df_preprocessor is not None:
-            label_df_preprocessor._label_generator = None
-            print(f"label_df_preprocessor: {label_df_preprocessor}")
+        # if query_df_preprocessor is not None:
+        #     query_df_preprocessor._label_generator = None
+        #     # print(f"query_df_preprocessor: {query_df_preprocessor}")
+        # if response_df_preprocessor is not None:
+        #     response_df_preprocessor._label_generator = None
+        #     # print(f"response_df_preprocessor: {response_df_preprocessor}")
+        # if label_df_preprocessor is not None:
+        #     label_df_preprocessor._label_generator = None
+            # print(f"label_df_preprocessor: {label_df_preprocessor}")
 
         query_processors, response_processors, label_processors = self._get_matcher_data_processors(
             query_model=query_model,
@@ -1242,7 +1244,7 @@ class MultiModalMatcher:
             query_column=self._query[0],
             response_column=self._response[0],
         )
-        print(f"first _evaluate_ranking...\n")
+        # print(f"first _evaluate_ranking...\n")
         score_1 = self._evaluate_ranking(
             qr_relevance=data_with_label,
             query_data=query_data,
@@ -1255,7 +1257,7 @@ class MultiModalMatcher:
             query_column=self._response[0],
             response_column=self._query[0],
         )
-        print(f"second _evaluate_ranking...\n")
+        # print(f"second _evaluate_ranking...\n")
         score_2 = self._evaluate_ranking(
             qr_relevance=data_with_label,
             query_data=query_data,
@@ -1294,9 +1296,9 @@ class MultiModalMatcher:
         assert query_column in qr_relevance.columns
         assert response_column in qr_relevance.columns
 
-        print(f"query_data: {query_data.head(5)}")
-        print(f"response_data: {response_data.head(5)}")
-        print(f"qr_relevance: {qr_relevance.head(5)}")
+        # print(f"query_data: {query_data.head(5)}")
+        # print(f"response_data: {response_data.head(5)}")
+        # print(f"qr_relevance: {qr_relevance.head(5)}")
 
         if metrics is None:
             metrics = [self._eval_metric_name]
@@ -1846,7 +1848,7 @@ class MultiModalMatcher:
         matcher._match_label = assets["match_label"]
         matcher._label_column = assets["label_column"]
         matcher._problem_type = assets["problem_type"]
-        # matcher._pipeline = assets["pipeline"]
+        matcher._pipeline = assets["pipeline"]
         matcher._eval_metric_name = assets["eval_metric_name"]
         matcher._verbosity = verbosity
         matcher._resume = resume

@@ -506,3 +506,76 @@ class IDChangeDetectionDataset:
     @property
     def match_label(self):
         return 0
+
+
+class Flickr30kDataset:
+    def __init__(self):
+        sha1sum_id = "9f748e009f51ce4013a4244861813220fa1eb517"
+        dataset = "flickr30k"
+        file_name = f"{dataset}_for_unit_tests.zip"
+        url = get_repo_url() + file_name
+        save_path = os.path.join(get_data_home_dir(), file_name)
+        self._path = os.path.join(get_data_home_dir(), dataset)
+        download(
+            url=url,
+            path=save_path,
+            sha1_hash=sha1sum_id,
+        )
+        protected_zip_extraction(
+            save_path,
+            sha1_hash=sha1sum_id,
+            folder=self._path,
+        )
+        # Extract
+        self._train_df = pd.read_csv(os.path.join(self._path, "train.csv"), index_col=0)
+
+        self._val_df = pd.read_csv(os.path.join(self._path, "val.csv"), index_col=0)
+
+        self._test_df = pd.read_csv(os.path.join(self._path, "test.csv"), index_col=0)
+
+        for img_col in self.image_columns:
+            self._train_df[img_col] = self._train_df[img_col].apply(
+                lambda ele: path_expander(ele, base_folder=os.path.join(self._path, "images"))
+            )
+            self._val_df[img_col] = self._val_df[img_col].apply(
+                lambda ele: path_expander(ele, base_folder=os.path.join(self._path, "images"))
+            )
+            self._test_df[img_col] = self._test_df[img_col].apply(
+                lambda ele: path_expander(ele, base_folder=os.path.join(self._path, "images"))
+            )
+
+    @property
+    def feature_columns(self):
+        return ["image", "caption"]
+
+    @property
+    def label_columns(self):
+        return None
+
+    @property
+    def train_df(self):
+        return self._train_df
+
+    @property
+    def val_df(self):
+        return self._val_df
+
+    @property
+    def test_df(self):
+        return self._test_df
+
+    @property
+    def image_columns(self):
+        return ["image"]
+
+    @property
+    def metric(self):
+        return "ndcg"
+
+    @property
+    def problem_type(self):
+        return None
+
+    @property
+    def match_label(self):
+        return None

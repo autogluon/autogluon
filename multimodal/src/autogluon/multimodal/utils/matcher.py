@@ -403,6 +403,7 @@ def semantic_search(
     queries_result_list = [[] for _ in range(num_queries)]
 
     for query_start_idx in range(0, num_queries, query_chunk_size):
+        # print(f"query_start_idx: {query_start_idx}")
         if query_embeddings is None:
             batch_query_embeddings = matcher.extract_embedding(
                 query_data[query_start_idx : query_start_idx + query_chunk_size],
@@ -414,6 +415,7 @@ def semantic_search(
             batch_query_embeddings = query_embeddings[query_start_idx : query_start_idx + query_chunk_size]
         # Iterate over chunks of the corpus
         for response_start_idx in range(0, num_responses, response_chunk_size):
+            # print(f"response_start_idx: {response_start_idx}")
             if response_embeddings is None:
                 batch_response_embeddings = matcher.extract_embedding(
                     response_data[response_start_idx : response_start_idx + response_chunk_size],

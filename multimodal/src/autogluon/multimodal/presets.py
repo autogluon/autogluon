@@ -148,6 +148,14 @@ def siamese_network():
 
 
 @automm_presets.register()
+def image_similarity():
+    return {
+        "model.names": ["timm_image"],
+        "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+    }
+
+
+@automm_presets.register()
 def text_similarity():
     return {
         "model.names": ["hf_text"],

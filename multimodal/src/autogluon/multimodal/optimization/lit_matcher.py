@@ -206,9 +206,9 @@ class MatcherLitModule(pl.LightningModule):
             metric.update(custom_metric_func(query_embeddings, response_embeddings, label))
         elif isinstance(metric, CustomHitRate):
             metric.update(
-                batch_query_embeds=query_embeddings,
-                batch_response_embeds=response_embeddings,
-                logit_scale=logit_scale,
+                batch_query_embeds=query_embeddings.cpu(),
+                batch_response_embeds=response_embeddings.cpu(),
+                logit_scale=logit_scale.cpu() if logit_scale else None,
             )
         else:
             metric.update(
@@ -308,10 +308,10 @@ class MatcherLitModule(pl.LightningModule):
         self._compute_metric_score(
             metric=self.validation_metric,
             custom_metric_func=self.custom_metric_func,
-            query_embeddings=query_embeddings.cpu(),
-            response_embeddings=response_embeddings.cpu(),
+            query_embeddings=query_embeddings,
+            response_embeddings=response_embeddings,
             label=self._get_label(batch),
-            logit_scale=logit_scale.cpu(),
+            logit_scale=logit_scale,
             reverse_prob=self.reverse_prob,
         )
 
