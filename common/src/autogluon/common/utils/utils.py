@@ -23,7 +23,7 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
     if path is None:
         utcnow = datetime.utcnow()
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        path = f"AutogluonModels/ag-{timestamp}{path_suffix}{os.path.sep}"
+        path = f"AutogluonModels{os.path.sep}ag-{timestamp}{path_suffix}{os.path.sep}"
         for i in range(1, 1000):
             try:
                 if create_dir:
@@ -34,7 +34,7 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
                         raise FileExistsError
                     break
             except FileExistsError:
-                path = f"AutogluonModels/ag-{timestamp}-{i:03d}{path_suffix}{os.path.sep}"
+                path = f"AutogluonModels{os.path.sep}ag-{timestamp}-{i:03d}{path_suffix}{os.path.sep}"
         else:
             raise RuntimeError("more than 1000 jobs launched in the same second")
         logger.log(25, f'No path specified. Models will be saved in: "{path}"')
