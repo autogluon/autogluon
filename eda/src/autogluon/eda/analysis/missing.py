@@ -2,7 +2,7 @@ from typing import Dict, Any
 
 from .base import AnalysisState, AbstractAnalysis
 
-__all__ = ['MissingValuesAnalysis']
+__all__ = ["MissingValuesAnalysis"]
 
 
 class MissingValuesAnalysis(AbstractAnalysis):
@@ -38,13 +38,13 @@ class MissingValuesAnalysis(AbstractAnalysis):
         s: Dict[str, Any] = {}
         for (ds, df) in self.available_datasets(args):
             s[ds] = {
-                'count': {},
-                'ratio': {},
+                "count": {},
+                "ratio": {},
             }
             na = df.isna().sum()
             na = na[na > 0]
-            s[ds]['count'] = na.to_dict()
-            s[ds]['ratio'] = (na / len(df)).to_dict()
-            s[ds]['data'] = df
+            s[ds]["count"] = na.to_dict()
+            s[ds]["ratio"] = (na / len(df)).to_dict()
+            s[ds]["data"] = df
 
         state.missing_statistics = s

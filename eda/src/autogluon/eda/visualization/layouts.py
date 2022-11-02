@@ -6,7 +6,7 @@ from ipywidgets import HBox, Output, Layout, Tab
 from .base import AbstractVisualization
 from .. import AnalysisState
 
-__all__ = ['MarkdownSectionComponent', 'SimpleVerticalLinearLayout', 'SimpleHorizontalLayout', 'TabLayout']
+__all__ = ["MarkdownSectionComponent", "SimpleVerticalLinearLayout", "SimpleHorizontalLayout", "TabLayout"]
 
 
 class SimpleVerticalLinearLayout(AbstractVisualization):
@@ -14,10 +14,9 @@ class SimpleVerticalLinearLayout(AbstractVisualization):
     Renders facets in a sequential order (facets will appear in a vertical layout).
     """
 
-    def __init__(self,
-                 facets: Union[AbstractVisualization, List[AbstractVisualization]],
-                 namespace: str = None,
-                 **kwargs) -> None:
+    def __init__(
+        self, facets: Union[AbstractVisualization, List[AbstractVisualization]], namespace: str = None, **kwargs
+    ) -> None:
         super().__init__(namespace, **kwargs)
         if not isinstance(facets, list):
             facets = [facets]
@@ -44,7 +43,7 @@ class SimpleHorizontalLayout(SimpleVerticalLinearLayout):
             with out:
                 facet.render(state)
 
-        display(HBox(outs, layout=Layout(flex='row wrap')))
+        display(HBox(outs, layout=Layout(flex="row wrap")))
 
 
 class TabLayout(SimpleVerticalLinearLayout):
@@ -54,10 +53,7 @@ class TabLayout(SimpleVerticalLinearLayout):
 
     """
 
-    def __init__(self,
-                 facets: Dict[str, AbstractVisualization],
-                 namespace: str = None,
-                 **kwargs) -> None:
+    def __init__(self, facets: Dict[str, AbstractVisualization], namespace: str = None, **kwargs) -> None:
 
         self.facet_tab_names = list(facets.keys())
         super().__init__(list(facets.values()), namespace, **kwargs)
@@ -80,10 +76,7 @@ class MarkdownSectionComponent(AbstractVisualization):
     documentation for details.
     """
 
-    def __init__(self,
-                 markdown: str,
-                 namespace: str = None,
-                 **kwargs) -> None:
+    def __init__(self, markdown: str, namespace: str = None, **kwargs) -> None:
         super().__init__(namespace, **kwargs)
         self.markdown = markdown
 
