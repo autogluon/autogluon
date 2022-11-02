@@ -102,11 +102,22 @@ def zero_shot_image_classification():
 
 @automm_presets.register()
 def object_detection():
+    # TODO: add another presets for training detection models from scratch
     return {
         "model.names": ["mmdet_image"],
         "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
         "env.eval_batch_size_ratio": 1,
         "env.precision": 32,
+        "env.strategy": "ddp",  # TODO: support ddp_spawn for detection
+        "env.auto_select_gpus": False,  # Have to turn off for detection!
+        "optimization.learning_rate": 5e-5,
+        "optimization.lr_decay": 0.95,
+        "optimization.lr_mult": 100,
+        "optimization.lr_choice": "two_stages",
+        "optimization.top_k": 1,
+        "optimization.top_k_average_method": "best",
+        "optimization.warmup_steps": 0.0,
+        "optimization.patience": 40,
     }
 
 
