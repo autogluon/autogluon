@@ -4,7 +4,7 @@ import pytest
 
 from autogluon.timeseries.models.autogluon_tabular import AutoGluonTabularModel
 
-from ..common import DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, DATAFRAME_WITH_STATIC
+from ..common import DATAFRAME_WITH_STATIC, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
 
 TESTABLE_MODELS = [
     AutoGluonTabularModel,
