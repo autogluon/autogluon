@@ -226,7 +226,10 @@ class AbstractTimeSeriesModel(AbstractModel):
             raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
 
     def predict(
-        self, data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]], **kwargs
+        self,
+        data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]],
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        **kwargs,
     ) -> TimeSeriesDataFrame:
         """Given a dataset, predict the next `self.prediction_length` time steps.
         This method produces predictions for the forecast horizon *after* the individual time series.
@@ -240,6 +243,8 @@ class AbstractTimeSeriesModel(AbstractModel):
         data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]]
             The dataset where each time series is the "context" for predictions. For ensemble models that depend on
             the predictions of other models, this method may accept a dictionary of previous models' predictions.
+        known_covariates : Optional[TimeSeriesDataFrame]
+            A TimeSeriesDataFrame containing the values of the known covariates during the forecast horizon.
 
         Other Parameters
         ----------------
@@ -281,7 +286,12 @@ class AbstractTimeSeriesModel(AbstractModel):
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
-        return self.predict(data.slice_by_timestep(None, -self.prediction_length), **kwargs)
+        past_data = data.slice_by_timestep(None, -self.prediction_length)
+        if len(data.columns) > 1:
+            known_covariates = data.slice_by_timestep(-self.prediction_length, None).drop(self.target, axis=1)
+        else:
+            known_covariates = None
+        return self.predict(past_data, known_covariates=known_covariates, **kwargs)
 
     def score(self, data: TimeSeriesDataFrame, metric: str = None, **kwargs) -> float:
         """Return the evaluation scores for given metric and dataset. The last

@@ -1,22 +1,21 @@
 import logging
 import time
-from typing import Any, Dict, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd
 
-from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.core.learner import AbstractLearner
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.evaluator import TimeSeriesEvaluator
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.splitter import AbstractTimeSeriesSplitter, LastWindowSplitter
+from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer, AutoTimeSeriesTrainer
 from autogluon.timeseries.utils.features import (
     ContinuousAndCategoricalFeatureGenerator,
     convert_numerical_features_to_float,
 )
-
-from .dataset import TimeSeriesDataFrame
-from .evaluator import TimeSeriesEvaluator
-from .models.abstract import AbstractTimeSeriesModel
-from .splitter import AbstractTimeSeriesSplitter, LastWindowSplitter
-from .trainer import AbstractTimeSeriesTrainer, AutoTimeSeriesTrainer
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +30,7 @@ class TimeSeriesLearner(AbstractLearner):
         self,
         path_context: str,
         target: str = "target",
+        known_covariates_names: Optional[List[str]] = None,
         random_state: int = 0,
         trainer_type: Type[AbstractTimeSeriesTrainer] = AutoTimeSeriesTrainer,
         eval_metric: Optional[str] = None,
@@ -42,6 +42,7 @@ class TimeSeriesLearner(AbstractLearner):
         self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.trainer_type = trainer_type
         self.target = target
+        self.known_covariates_names = [] if known_covariates_names is None else known_covariates_names
         self.prediction_length = prediction_length
         self.quantile_levels = kwargs.get(
             "quantile_levels",
@@ -100,11 +101,8 @@ class TimeSeriesLearner(AbstractLearner):
 
         train_data, val_data = self._preprocess_static_features(train_data=train_data, val_data=val_data)
 
-        # Process dynamic features
-        # TODO: Handle dynamic features
-        extra_columns = [c for c in train_data.columns.copy() if c != self.target]
-        if len(extra_columns) > 0:
-            logger.warning(f"Provided columns {extra_columns} will not be used.")
+        train_data = self._preprocess_target_and_covariates(train_data, data_frame_name="train_data")
+        val_data = self._preprocess_target_and_covariates(val_data, data_frame_name="tuning_data", report_unused=False)
 
         # Train / validation split
         if val_data is None:
@@ -233,9 +231,94 @@ class TimeSeriesLearner(AbstractLearner):
                 "match train_data.static_features. " + fix_message
             )
 
+    def _preprocess_target_and_covariates(
+        self,
+        data: Optional[TimeSeriesDataFrame],
+        data_frame_name: str,
+        must_include_target: bool = True,
+        report_unused: bool = True,
+    ) -> Optional[TimeSeriesDataFrame]:
+        """Preprocess the columns of the TimeSeriesDataFrame and check if all expected columns are present.
+
+        This includes ensuring that:
+        - `self.target` is present among the columns (if `must_include_target=True`)
+        - all `self.known_covariates_names` are present among the columns
+        - `self.target` and `self.known_covariates_names` columns have np.float64 dtype
+        - no columns other than `self.target` and `self.known_covariates_names` are present in the dataframe
+        """
+        if data is None:
+            return data
+
+        data = data.copy(deep=False)
+
+        if must_include_target:
+            if self.target not in data.columns:
+                raise ValueError(f"Target column `{self.target}` not found in {data_frame_name}.")
+            try:
+                data[self.target] = data[self.target].astype(np.float64)
+            except ValueError:
+                raise ValueError(
+                    f"The target column {self.target} must have numeric (float or int) dtype, "
+                    f"but in {data_frame_name} it has dtype {data[self.target].dtype}"
+                )
+
+        if len(self.known_covariates_names) > 0:
+            missing_columns = list(set(self.known_covariates_names).difference(set(data.columns)))
+            if len(missing_columns) > 0:
+                raise ValueError(
+                    f"Columns {missing_columns} provided as known_covariates_names are missing from {data_frame_name}."
+                )
+            try:
+                data[self.known_covariates_names] = data[self.known_covariates_names].astype(np.float64)
+            except ValueError:
+                raise ValueError(
+                    f"Columns {self.known_covariates_names} must all have numeric (float or int) dtypes, "
+                    f"but in {data_frame_name} they have dtypes {data[self.known_covariates_names].dtypes}"
+                )
+
+        unused_columns = list(set(data.columns).difference(set([self.target] + self.known_covariates_names)))
+        if len(unused_columns) > 0:
+            if report_unused:
+                logger.warning(f"Provided columns {unused_columns} in {data_frame_name} will be ignored.")
+            data = data.drop(unused_columns, axis=1)
+        return data
+
+    def _align_covariates_with_forecast_index(
+        self,
+        known_covariates: Optional[TimeSeriesDataFrame],
+        data: TimeSeriesDataFrame,
+    ) -> Optional[TimeSeriesDataFrame]:
+        """Select the relevant item_ids and timestamps from the known_covariates dataframe.
+
+        If some of the item_ids or timestamps are missing, an exception is raised.
+        """
+        if len(self.known_covariates_names) == 0:
+            return None
+        if len(self.known_covariates_names) > 0 and known_covariates is None:
+            raise ValueError(
+                f"known_covariates {self.known_covariates_names} for the forecast horizon should be provided at prediction time."
+            )
+
+        missing_item_ids = data.item_ids.difference(known_covariates.item_ids)
+        if len(missing_item_ids) > 0:
+            raise ValueError(
+                f"known_covariates are missing information for the following item_ids: {missing_item_ids.to_list()}."
+            )
+
+        forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length=self.prediction_length)
+        try:
+            known_covariates = known_covariates.loc[forecast_index]
+        except KeyError:
+            raise ValueError(
+                f"known_covariates should include the values for prediction_length={self.prediction_length} "
+                "many time steps into the future."
+            )
+        return known_covariates
+
     def predict(
         self,
         data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
@@ -247,7 +330,12 @@ class TimeSeriesLearner(AbstractLearner):
             self._check_static_feature_compatibility(data.static_features, fix_message=fix_message, other_name="data")
             data.static_features = self.static_feature_pipeline.transform(data.static_features)
             data.static_features = convert_numerical_features_to_float(data.static_features)
-        prediction = self.load_trainer().predict(data=data, model=model, **kwargs)
+        data = self._preprocess_target_and_covariates(data, data_frame_name="data")
+        known_covariates = self._preprocess_target_and_covariates(
+            known_covariates, data_frame_name="known_covariates", must_include_target=False
+        )
+        known_covariates = self._align_covariates_with_forecast_index(known_covariates=known_covariates, data=data)
+        prediction = self.load_trainer().predict(data=data, known_covariates=known_covariates, model=model, **kwargs)
         if prediction is None:
             raise RuntimeError("Prediction failed, please provide a different model to the `predict` method.")
         return prediction
@@ -255,9 +343,11 @@ class TimeSeriesLearner(AbstractLearner):
     def score(
         self, data: TimeSeriesDataFrame, model: AbstractTimeSeriesModel = None, metric: Optional[str] = None
     ) -> float:
+        data = self._preprocess_target_and_covariates(data, data_frame_name="data")
         return self.load_trainer().score(data=data, model=model, metric=metric)
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
+        data = self._preprocess_target_and_covariates(data, data_frame_name="data")
         return self.load_trainer().leaderboard(data)
 
     def get_info(self, include_model_info: bool = False, **kwargs) -> Dict[str, Any]:

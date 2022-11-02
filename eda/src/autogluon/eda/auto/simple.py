@@ -60,7 +60,9 @@ def analyze(train_data=None,
     if anlz_facets is None:
         anlz_facets = []
 
-    assert isinstance(state, (dict, AnalysisState))
+    if state is not None:
+        assert isinstance(state, (dict, AnalysisState))
+
     if not isinstance(state, AnalysisState):
         state = AnalysisState(state)
 

@@ -6,7 +6,11 @@ With changes:
 2. provide only root_dir, and corresponding simplification
 3. split train/val/test
 4. Use defusedxml.ElementTree for security concern
+<<<<<<< HEAD
 5. TODO: remove invalid images?
+=======
+5. TODO: remove invalid bbox (and invalid images?)
+>>>>>>> fbf8ed10189dfbbb2c204fbcad2d88f27ac91bd3
 
 To use:
 1. run in root_dir:
@@ -29,7 +33,6 @@ from typing import Dict, List
 
 
 MIN_AREA = 4  # TODO: put in arg?
-
 
 def get_label2id(labels_path: str) -> Dict[str, int]:
     """id is 1 start"""

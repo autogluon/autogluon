@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
-from autogluon.timeseries.utils.forecast import get_forecast_horizon_timestamps
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_single_time_series
 
 from .abstract_local_model import AbstractLocalModel
 
@@ -12,7 +12,7 @@ from .abstract_local_model import AbstractLocalModel
 def seasonal_naive_forecast(
     time_series: pd.Series, freq: str, prediction_length: int, quantile_levels: List[float], seasonal_period: int
 ):
-    forecast_timestamps = get_forecast_horizon_timestamps(
+    forecast_timestamps = get_forecast_horizon_index_single_time_series(
         past_timestamps=time_series.index, freq=freq, prediction_length=prediction_length
     )
 
