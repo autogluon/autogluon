@@ -5,10 +5,12 @@ import time
 import pandas as pd
 import pickle
 import psutil
+
 from abc import abstractmethod
 
 from numpy import ndarray
 from pandas import DataFrame, Series
+from typing import Union
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 
@@ -285,7 +287,6 @@ def _ray_fit(model_base, bagged_ensemble_model_path,
             logger.log(15, f'{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {fold_model.name}')
             X_fold = pd.concat([X_fold, X_pseudo], axis=0, ignore_index=True)
             y_fold = pd.concat([y_fold, y_pseudo], axis=0, ignore_index=True)
-    print(f'ray fit resource in thread {resources}')
     fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold,
                    time_limit=time_limit_fold, **resources, **kwargs_fold)
     time_train_end_fold = time.time()
@@ -344,7 +345,16 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         predict_time: float
             The amount of time used to do out of folds predictions for all folds.
     """
-    def __init__(self, num_jobs: int, num_folds_parallel: int, max_memory_usage_ratio=0.8, num_cpus=None, num_gpus=None, **kwargs):
+    def __init__(
+        self,
+        *,
+        num_jobs: int,
+        num_folds_parallel: int,
+        num_cpus: int,
+        num_gpus: Union[int, float],
+        max_memory_usage_ratio: float = 0.8,
+        **kwargs
+    ):
         super().__init__(**kwargs)
         self.ray = try_import_ray()
         self.max_memory_usage_ratio = min(max_memory_usage_ratio, 1.0)
@@ -358,9 +368,9 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         # initialize the model base to get necessary info for estimating memory usage
         self._initialized_model_base = copy.deepcopy(self.model_base)
         self._initialized_model_base.initialize(X=self.X, y=self.y, **self.model_base_kwargs)
-        self.num_cpus = self._get_cpu_count(num_cpus)
-        self.num_gpus = self._get_gpu_count(num_gpus)
-        print(f'total_num_cpus, num_gpus {num_cpus} | {num_gpus}')
+        self.num_cpus = num_cpus
+        self.num_gpus = num_gpus
+        logger.debug(f'Bagging total_num_cpus, num_gpus {self.num_cpus} | {self.num_gpus}')
         # User specified value through ag_args_fit means they want this individual model to use this amount of resources
         user_resources_per_job = None
         user_cpu_per_job = self._initialized_model_base._get_child_aux_val(key='num_cpus', default=None)
@@ -368,19 +378,17 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         minimum_model_resources = self._initialized_model_base.get_minimum_resources(
             is_gpu_available=(self.num_gpus > 0),
         )
-        minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
-        minimum_model_num_gpus = minimum_model_resources.get('num_gpus', 0)
-        print(f'minimum_model_resources: {minimum_model_resources}')
-        print(f'user_cpu_per_job, user_gpu_per_job {user_cpu_per_job} | {user_gpu_per_job}')
+        logger.debug(f'minimum_model_resources: {minimum_model_resources}')
+        logger.debug(f'user_cpu_per_job, user_gpu_per_job {user_cpu_per_job} | {user_gpu_per_job}')
         if user_cpu_per_job is not None or user_gpu_per_job is not None:
             user_resources_per_job = dict()
         if user_cpu_per_job is not None:
             assert user_cpu_per_job <= self.num_cpus, \
-                f"Detected model level cpu requirement = {user_cpu_per_job} > total cpu granted to AG predictor = {self.num_cpus}"
+                f"Detected model level cpu requirement = {user_cpu_per_job} > total cpu granted to the bagged model = {self.num_cpus}"
             user_resources_per_job['num_cpus'] = user_cpu_per_job
         if user_gpu_per_job is not None: 
             assert user_gpu_per_job <= self.num_gpus, \
-                f"Detected model level gpu requirement = {user_gpu_per_job} > total gpu granted to AG predictor = {self.num_gpus}"
+                f"Detected model level gpu requirement = {user_gpu_per_job} > total gpu granted to the bagged model = {self.num_gpus}"
             user_resources_per_job['num_gpus'] = user_gpu_per_job
         self.resources, self.batches, self.num_parallel_jobs = self._get_resource_suggestions(
             num_jobs=num_jobs,
@@ -402,29 +410,13 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         y_mem = get_approximate_df_mem_usage(self.y.to_frame()).sum()
         return X_mem + y_mem
 
-    def _get_gpu_count(self, user_specified_num_gpus):
-        resource_kwargs = self._initialized_model_base._preprocess_fit_resources()
-
-        return ResourceCalculator.get_total_gpu_count(
-            model_default_num_gpus=resource_kwargs['num_gpus'],
-            user_specified_num_gpus=user_specified_num_gpus,
-        )
-
-    def _get_cpu_count(self, user_specified_num_cpus):
-        resource_kwargs = self._initialized_model_base._preprocess_fit_resources()
-
-        return ResourceCalculator.get_total_cpu_count(
-            model_default_num_cpus=resource_kwargs['num_cpus'],
-            user_specified_num_cpus=user_specified_num_cpus,
-        )
-
     def schedule_fold_model_fit(self, fold_ctx):
         self.jobs.append(fold_ctx)
 
     def after_all_folds_scheduled(self):
         if not self.ray.is_initialized():
             ray_init_args = dict(
-                log_to_driver=True,
+                log_to_driver=False,
                 runtime_env={"env_vars": {"PL_DISABLE_FORK": "1"}},  # https://github.com/ray-project/ray/issues/28197
                 logging_level=logging.ERROR,  # https://github.com/ray-project/ray/issues/29216
                 num_cpus=self.num_cpus,
@@ -498,7 +490,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         fold, folds_finished, folds_left, \
             folds_to_fit, is_last_fold, \
             model_name_suffix = self._get_fold_properties(fold_ctx)
-        print(f'resources per job {resources}')
+        logger.debug(f'Folding resources per job {resources}')
         train_index, val_index = fold
         fold_ctx_ref = self.ray.put(fold_ctx)
         save_bag_folds = self.bagged_ensemble_model.params.get('save_bag_folds', True)
@@ -554,9 +546,6 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         user_specified_num_folds_parallel,
         user_resources_per_job
     ):  
-        print(f'num_jobs {num_jobs}')
-        print(f'user_specified_num_folds_parallel {user_specified_num_folds_parallel}')
-        print(f'user_resources_per_job {user_resources_per_job}')
         user_specified_num_folds_parallel = min(num_jobs, user_specified_num_folds_parallel)
         model_min_resources = self._initialized_model_base.get_minimum_resources(
             is_gpu_available=(self.num_gpus > 0)

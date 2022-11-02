@@ -168,8 +168,6 @@ class NNFastAiTabularModel(AbstractModel):
              num_gpus=0,
              sample_weight=None,
              **kwargs):
-        print(f'FASTAI num_cpus {num_cpus}')
-        print(f'FASTAI num_gpus {num_gpus}')
         try_import_fastai()
         from fastai.tabular.model import tabular_config
         from fastai.tabular.learner import tabular_learner

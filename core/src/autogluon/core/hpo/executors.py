@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import copy
 import logging
+import math
 import os
+import psutil
 import time
 
 from abc import ABC, abstractmethod
@@ -27,6 +29,7 @@ class HpoExecutor(ABC):
     """Interface for abstract model to executor HPO runs"""
     
     def __init__(self):
+        self.hyperparameter_tune_kwargs = None
         self.resources = None
         self.search_space = None
         self._time_limit = None
@@ -68,7 +71,15 @@ class HpoExecutor(ABC):
         """
         raise NotImplementedError
     
-    def register_resources(self, initialized_model: AbstractModel):
+    def register_resources(
+        self,
+        initialized_model: AbstractModel,
+        # total_resources: dict,
+        num_cpus: int,
+        num_gpus: Union[int, float],
+        k_fold=None,
+        **kwargs
+    ):
         """
         Register total resources used for the experiment
         
@@ -77,18 +88,123 @@ class HpoExecutor(ABC):
         initialized_model
             The model that will be performed HPO. This model MUST be initialized
         """
-        user_cpu_count = initialized_model.params_aux.get('num_cpus', None)
-        user_gpu_count = initialized_model.params_aux.get('num_gpus', None)
-        minimum_model_resources = initialized_model.get_minimum_resources()
+        # num_cpus = total_resources.get('num_cpus')
+        # num_gpus = total_resources.get('num_gpus')
+        minimum_model_resources = initialized_model.get_minimum_resources(
+            is_gpu_available=(num_gpus > 0)
+        )
+        minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
+        minimum_model_num_gpus = minimum_model_resources.get('num_gpus', 0)
+        initialized_model_params = initialized_model.get_params()
 
-        num_gpus = ResourceCalculator.get_total_gpu_count(
-            model_default_num_gpus=minimum_model_resources.get('num_gpus', 0),
-            user_specified_num_gpus=user_gpu_count,
-        )
-        num_cpus = ResourceCalculator.get_total_cpu_count(
-            model_default_num_cpus=minimum_model_resources.get('num_cpus', 1),
-            user_specified_num_cpus=user_cpu_count,
-        )
+        if 'hyperparameters' in initialized_model_params and 'ag_args_fit' in initialized_model_params['hyperparameters']:
+            user_specified_trial_num_cpus = initialized_model_params['hyperparameters']['ag_args_fit'].get('num_cpus', None)
+            user_specified_trial_num_gpus = initialized_model_params['hyperparameters']['ag_args_fit'].get('num_gpus', None)
+            if user_specified_trial_num_cpus is not None or user_specified_trial_num_gpus is not None:
+                num_trials_in_parallel_with_gpu = math.inf
+                if user_specified_trial_num_cpus is None:
+                    # If user didn't specify cpu per trial, we find the min based on gpu
+                    num_trials_in_parallel_with_gpu = num_gpus // user_specified_trial_num_gpus
+                    user_specified_trial_num_cpus = num_cpus // num_trials_in_parallel_with_gpu  # keep gpus per trial int to avoid complexity
+                num_trials_in_parallel_with_cpu = math.inf
+                if user_specified_trial_num_gpus is None:
+                    # If user didn't specify gpu per trial, we find the min based on cpu
+                    num_trials_in_parallel_with_cpu = num_cpus // user_specified_trial_num_cpus
+                    user_specified_trial_num_gpus = num_gpus // num_trials_in_parallel_with_cpu  # keep gpus per trial int to avoid complexity
+                assert user_specified_trial_num_cpus <= num_cpus, \
+                    f"Detected trial level cpu requirement = {user_specified_trial_num_cpus} > total cpu granted to AG predictor = {num_cpus}"
+                assert user_specified_trial_num_cpus >= minimum_model_num_cpus, \
+                    f"The trial requires minimum cpu {minimum_model_num_cpus}, but you only specified {user_specified_trial_num_cpus}"
+                assert user_specified_trial_num_gpus <= num_gpus, \
+                    f"Detected trial level gpu requirement = {user_specified_trial_num_gpus} > total gpu granted to AG predictor = {num_gpus}"
+                assert user_specified_trial_num_gpus >= minimum_model_num_gpus, \
+                    f"The trial requires minimum gpu {minimum_model_num_gpus}, but you only specified {user_specified_trial_num_gpus}"
+
+                # Custom backend should set its total resource to be resources_per_trial
+                self.hyperparameter_tune_kwargs['resources_per_trial'] = {
+                    'num_cpus': user_specified_trial_num_cpus,
+                    'num_gpus': user_specified_trial_num_gpus
+                }
+                
+        model_base = initialized_model._get_model_base()
+        if model_base != initialized_model:
+            # This is an ensemble model
+            total_num_cpus_per_trial = num_cpus
+            total_num_gpus_per_trial = num_gpus
+            if 'resources_per_trial' in self.hyperparameter_tune_kwargs:
+                resources_per_trial = self.hyperparameter_tune_kwargs['resources_per_trial']
+                total_num_cpus_per_trial = resources_per_trial.get('num_cpus')
+                total_num_gpus_per_trial = resources_per_trial.get('num_gpus')
+            user_specified_fold_resources = model_base._user_params_aux
+            user_specified_fold_num_cpus = user_specified_fold_resources.get('num_cpus', None)  # We shouldn't always use it
+            user_specified_fold_num_gpus = user_specified_fold_resources.get('num_gpus', None)
+            if user_specified_fold_num_cpus is not None or user_specified_fold_num_gpus is not None:
+                num_folds_in_parallel_with_cpu = math.inf
+                if minimum_model_num_cpus > 0:
+                    num_folds_in_parallel_with_cpu = total_num_cpus_per_trial // minimum_model_num_cpus
+                if user_specified_fold_num_cpus is not None:
+                    assert user_specified_fold_num_cpus <= total_num_cpus_per_trial, \
+                        f"Detected fold level cpu requirement = {user_specified_fold_num_cpus} > total cpu granted to AG predictor per trial= {total_num_cpus_per_trial}"
+                    assert user_specified_fold_num_cpus >= minimum_model_num_cpus, \
+                        f"The model requires minimum cpu {minimum_model_num_cpus}, but you only specified {user_specified_fold_num_cpus}"
+                    num_folds_in_parallel_with_cpu = total_num_cpus_per_trial // user_specified_fold_num_cpus
+                num_folds_in_parallel_with_gpu = math.inf
+                if minimum_model_num_gpus > 0:
+                    num_folds_in_parallel_with_gpu = total_num_gpus_per_trial // minimum_model_num_gpus
+                if user_specified_fold_num_gpus is not None:
+                    assert user_specified_fold_num_gpus <= total_num_gpus_per_trial, \
+                        f"Detected fold level gpu requirement = {user_specified_fold_num_gpus} > total gpu granted to AG predictor per trial = {total_num_gpus_per_trial}"
+                    assert user_specified_fold_num_gpus >= minimum_model_num_gpus, \
+                        f"The model requires minimum gpu {minimum_model_num_gpus}, but you only specified {user_specified_fold_num_gpus}"
+                    if minimum_model_num_gpus > 0:
+                        num_folds_in_parallel_with_gpu = total_num_gpus_per_trial // user_specified_fold_num_gpus
+                num_folds_in_parallel = min(num_folds_in_parallel_with_cpu, num_folds_in_parallel_with_gpu)
+
+                cpu_per_trial = user_specified_fold_num_cpus * min(k_fold, num_folds_in_parallel)
+                gpu_per_trial = user_specified_fold_num_gpus * min(k_fold, num_folds_in_parallel)
+
+                # Custom backend should set its total resource to be resources_per_trial
+                self.hyperparameter_tune_kwargs['resources_per_trial'] = {
+                    'num_cpus': cpu_per_trial,
+                    'num_gpus': gpu_per_trial
+                }
+        if 'resources_per_trial' not in self.hyperparameter_tune_kwargs:
+            # User didn't provide any requirements
+            model_estimate_memory_usage = None
+            num_jobs_in_parallel_with_mem = math.inf
+
+            if initialized_model.estimate_memory_usage is not None:
+                model_estimate_memory_usage = initialized_model.estimate_memory_usage(**kwargs)
+                total_memory_available = psutil.virtual_memory().available
+                num_jobs_in_parallel_with_mem = total_memory_available // model_estimate_memory_usage
+
+            num_jobs_in_parallel_with_cpu = num_cpus // minimum_model_num_cpus
+            num_jobs_in_parallel_with_gpu = math.inf
+            if minimum_model_num_gpus > 0:
+                num_jobs_in_parallel_with_gpu = num_gpus // minimum_model_num_gpus
+            num_jobs_in_parallel = min(num_jobs_in_parallel_with_mem, num_jobs_in_parallel_with_cpu, num_jobs_in_parallel_with_gpu)
+
+            if model_base != initialized_model:
+                # bagged model
+                if num_jobs_in_parallel // k_fold < 1:
+                    # We can only train 1 trial in parallel
+                    num_trials_in_parallel = 1
+                else:
+                    num_trials_in_parallel = num_jobs_in_parallel // k_fold
+                if self.executor_type == 'custom':
+                    # custom backend runs sequentially
+                    num_trials_in_parallel = 1
+                cpu_per_trial = int(num_cpus // num_trials_in_parallel)
+                gpu_per_trial = num_gpus // num_trials_in_parallel
+            else:
+                num_trials = self.hyperparameter_tune_kwargs.get('num_trials', math.inf)
+                cpu_per_trial = int(num_cpus // min(num_jobs_in_parallel, num_trials))
+                gpu_per_trial = num_gpus / min(num_jobs_in_parallel, num_trials)
+
+            self.hyperparameter_tune_kwargs['resources_per_trial'] = {
+                'num_cpus': cpu_per_trial,
+                'num_gpus': gpu_per_trial
+            }
 
         self.resources = dict(num_gpus=num_gpus, num_cpus=num_cpus)
     
@@ -163,8 +279,6 @@ class RayHpoExecutor(HpoExecutor):
     
     def __init__(self):
         super().__init__()
-        self.resources = None
-        self.hyperparameter_tune_kwargs = None
         self.analysis = None
     
     @property
@@ -334,11 +448,14 @@ class CustomHpoExecutor(HpoExecutor):
         self.scheduler_options = hyperparameter_tune_kwargs
         self.time_limit = time_limit
     
-    def register_resources(self, initialized_model):
+    def register_resources(self, initialized_model, **kwargs):
         assert self.scheduler_options is not None, 'Call `initialize()` before register resources'
-        super().register_resources(initialized_model)
-        print(f'custom backend resource: {self.resources}')
-        self.scheduler_options[1]['resource'] = self.resources
+        super().register_resources(initialized_model, **kwargs)
+        if self.hyperparameter_tune_kwargs.get('resources_per_trial', None) is not None:
+            # Custom backend only run trials sequentially
+            self.scheduler_options[1]['resource'] = self.hyperparameter_tune_kwargs['resources_per_trial']
+        # self.scheduler_options[1]['resource'] = self.resources
+        print(f'custom backend resource: {self.resources}, per trial resource: {self.hyperparameter_tune_kwargs}')
         
     def validate_search_space(self, search_space, model_name):
         if not any(isinstance(search_space[hyperparam], Space) for hyperparam in search_space):
@@ -353,8 +470,8 @@ class CustomHpoExecutor(HpoExecutor):
                     
     def execute(self, model_trial, train_fn_kwargs, **kwargs):
         assert self.scheduler_options is not None, 'Call `initialize()` before execute'
-        if 'resources_per_trial' in self.hyperparameter_tune_kwargs:
-            self.scheduler_options[1]['resource'] = self.hyperparameter_tune_kwargs['resources_per_trial']
+        # if 'resources_per_trial' in self.hyperparameter_tune_kwargs:
+        #     self.scheduler_options[1]['resource'] = self.hyperparameter_tune_kwargs['resources_per_trial']
         scheduler_cls, scheduler_params = self.scheduler_options  # Unpack tuple
         if scheduler_cls is None or scheduler_params is None:
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")

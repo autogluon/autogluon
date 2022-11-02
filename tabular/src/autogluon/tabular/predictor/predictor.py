@@ -301,6 +301,8 @@ class TabularPredictor:
             infer_limit=None,
             infer_limit_batch_size=None,
             fit_weighted_ensemble=True,
+            num_cpus='auto',
+            num_gpus='auto',
             **kwargs):
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
@@ -833,6 +835,10 @@ class TabularPredictor:
                            f'\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `presets` and `hyperparameters` configuration.')
 
         core_kwargs = {
+            'total_resources': {
+                'num_cpus': num_cpus,
+                'num_gpus': num_gpus,
+            },
             'ag_args': ag_args,
             'ag_args_ensemble': ag_args_ensemble,
             'ag_args_fit': ag_args_fit,

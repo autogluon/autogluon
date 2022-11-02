@@ -8,7 +8,7 @@ from autogluon.core.utils import try_import
 import psutil
 import sys
 import time
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -27,8 +27,9 @@ from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.constants import RAY_BACKEND, CUSTOM_BACKEND
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
+from ...ray.resources_calculator import ResourceCalculator
 from ...scheduler import LocalSequentialScheduler
-from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
+from ...utils import get_cpu_count, get_gpu_count_all, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMemoryError
 from ...utils.loaders import load_pkl
@@ -475,16 +476,46 @@ class AbstractModel:
         else:
             self.normalize_pred_probas = False
 
-    def _preprocess_fit_resources(self, silent=False, **kwargs):
+    def _preprocess_fit_resources(self, silent=False, total_resources=None, **kwargs):
+        if 'num_cpus' in kwargs and 'num_gpus' in kwargs:
+            # This value will only be passed by autogluon through previous layers(i.e. bagged model to model base).
+            # We respect this value with highest priority
+            # They should always be set to valid values
+            enforced_num_cpus = kwargs.get('num_cpus', None)
+            enforced_num_gpus = kwargs.get('num_gpus', None)
+            assert enforced_num_cpus is not None and enforced_num_cpus != 'auto' and enforced_num_gpus is not None and enforced_num_gpus != 'auto'
+            return kwargs
         default_num_cpus, default_num_gpus = self._get_default_resources()
-        num_cpus = self.params_aux.get('num_cpus', 'auto')
-        num_gpus = self.params_aux.get('num_gpus', 'auto')
-        kwargs['num_cpus'] = kwargs.get('num_cpus', num_cpus)
-        kwargs['num_gpus'] = kwargs.get('num_gpus', num_gpus)
-        if kwargs['num_cpus'] == 'auto':
-            kwargs['num_cpus'] = default_num_cpus
-        if kwargs['num_gpus'] == 'auto':
-            kwargs['num_gpus'] = default_num_gpus
+        if total_resources is None:
+            total_resources = {}
+        num_cpus = total_resources.get('num_cpus', 'auto')
+        num_gpus = total_resources.get('num_gpus', 'auto')
+        system_num_cpus = get_cpu_count()
+        system_num_gpus = get_gpu_count_all()
+        if num_cpus != 'auto' and num_cpus > system_num_cpus:
+            logger.warning(f'Specified total num_cpus: {num_cpus}, but only {system_num_cpus} are available. Will use {system_num_cpus} instead')
+            num_cpus = system_num_cpus
+        if num_gpus != 'auto' and num_gpus > system_num_gpus:
+            logger.warning(f'Specified total num_gpus: {num_gpus}, but only {system_num_gpus} are available. Will use {system_num_gpus} instead')
+            num_gpus = system_num_gpus
+        if num_cpus == 'auto':
+            num_cpus = default_num_cpus
+        if num_gpus == 'auto':
+            num_gpus = default_num_gpus
+        # This will be ag_args_ensemble when bagging, and ag_args_fit when non-bagging
+        params_aux_num_cpus = self._user_params_aux.get('num_cpus', None)
+        params_aux_num_gpus = self._user_params_aux.get('num_gpus', None)
+        if params_aux_num_cpus is not None:
+            print(params_aux_num_cpus)
+            assert params_aux_num_cpus <= num_cpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total: {num_cpus}'
+            num_cpus = params_aux_num_cpus
+        if params_aux_num_gpus is not None:
+            assert params_aux_num_gpus <= num_gpus, f'Specified num_gpus per {self.__class__.__name__} is more than the total: {num_gpus}'
+            num_gpus = params_aux_num_gpus
+        
+        kwargs['num_cpus'] = num_cpus
+        kwargs['num_gpus'] = num_gpus
+        
         if not silent:
             logger.log(15, f"\tFitting {self.name} with 'num_gpus': {kwargs['num_gpus']}, 'num_cpus': {kwargs['num_cpus']}")
         return kwargs
@@ -974,7 +1005,7 @@ class AbstractModel:
         return template
 
     def hyperparameter_tune(self,
-                            hyperparameter_tune_kwargs='auto',
+                            hyperparameter_tune_kwargs = 'auto',
                             hpo_executor: HpoExecutor = None,
                             time_limit: float = None,
                             **kwargs):
@@ -1041,7 +1072,9 @@ class AbstractModel:
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
-        hpo_executor.register_resources(self)
+        kwargs = self._preprocess_fit_resources(**kwargs)
+        self.validate_fit_resources(**kwargs)
+        hpo_executor.register_resources(self, **kwargs)
         return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
 
     def _hyperparameter_tune(self, X, y, X_val, y_val, hpo_executor, **kwargs):
@@ -1183,12 +1216,12 @@ class AbstractModel:
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
         return self._estimate_memory_usage(**kwargs)
 
-    def validate_fit_resources(self, num_cpus='auto', num_gpus='auto', **kwargs):
+    def validate_fit_resources(self, num_cpus='auto', num_gpus='auto', total_resources=None, **kwargs):
         """
         Verifies that the provided num_cpus and num_gpus (or defaults if not provided) are sufficient to train the model.
         Raises an AssertionError if not sufficient.
         """
-        resources = self._preprocess_fit_resources(num_cpus=num_cpus, num_gpus=num_gpus, silent=True)
+        resources = self._preprocess_fit_resources(num_cpus=num_cpus, num_gpus=num_gpus, total_resources=total_resources, silent=True)
         self._validate_fit_resources(**resources)
 
     def _validate_fit_resources(self, **resources):
@@ -1198,6 +1231,12 @@ class AbstractModel:
                 raise AssertionError(f'Model requires {res_min[resource_name]} {resource_name} to fit, but no available amount was defined.')
             elif res_min[resource_name] > resources[resource_name]:
                 raise AssertionError(f'Model requires {res_min[resource_name]} {resource_name} to fit, but {resources[resource_name]} are available.')
+        total_resources = resources.get('total_resources', None)
+        if total_resources is None:
+            total_resources = {}
+        for resource_name, resource_value in total_resources.items():
+            if resources[resource_name] > resource_value:
+                raise AssertionError(f'Specified {resources[resource_name]} {resource_name} to fit, but only {resource_value} are available in total.')
 
     def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:
         """
