@@ -101,6 +101,7 @@ from .utils import (
     AutoMMModelCheckpointIO,
     COCODataset,
     CustomUnpickler,
+    DDPCacheWriter,
     LogFilter,
     apply_log_filter,
     assign_feature_column_names,
@@ -115,6 +116,7 @@ from .utils import (
     extract_from_output,
     filter_search_space,
     from_coco,
+    from_coco_or_voc,
     get_config,
     get_local_pretrained_config_paths,
     get_minmax_mode,
@@ -167,9 +169,11 @@ class MultiModalPredictor:
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 3,
-        output_shape: Optional[int] = None,  # TODO: infer this for detection
+        num_classes: Optional[int] = None,  # TODO: can we infer this from data?
+        classes: Optional[list] = None,
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
+        init_scratch: Optional[bool] = False,
     ):
         """
         Parameters
@@ -215,11 +219,20 @@ class MultiModalPredictor:
             If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
             where `L` ranges from 0 to 50
             (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
+        num_classes
+            Number of classes. Used in classification task.
+            If this is specified and is different from the pretrained model's output,
+            the model's head will be changed to have <num_classes> output.
+        classes
+            All classes in this dataset.
         warn_if_exist
             Whether to raise warning if the specified path already exists.
         enable_progress_bar
             Whether to show progress bar. It will be True by default and will also be
             disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
+        init_scratch
+            Whether to init model from scratch. It's useful when we want to load a checkpoints
+            without its weights.
         """
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
@@ -247,7 +260,8 @@ class MultiModalPredictor:
         self._pipeline = pipeline.lower() if pipeline is not None else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = val_metric
-        self._output_shape = output_shape
+        self._output_shape = num_classes
+        self._classes = classes
         self._save_path = path
         self._ckpt_path = None
         self._pretrained_path = None
@@ -262,6 +276,8 @@ class MultiModalPredictor:
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
+        self._init_scratch = init_scratch
+        self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
 
         if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
             warnings.warn(
@@ -277,7 +293,11 @@ class MultiModalPredictor:
 
         if self._pipeline is not None:
             self._config, self._model, self._data_processors = init_pretrained(
-                pipeline=self._pipeline, hyperparameters=hyperparameters, num_classes=self._output_shape
+                pipeline=self._pipeline,
+                hyperparameters=hyperparameters,
+                num_classes=self._output_shape,
+                classes=self._classes,
+                init_scratch=self._init_scratch,
             )
 
     @property
@@ -432,9 +452,9 @@ class MultiModalPredictor:
         """
         if self._pipeline == OBJECT_DETECTION:
             self.detection_anno_train = train_data
-            train_data = from_coco(train_data)
+            train_data = from_coco_or_voc(train_data, "train")
             if tuning_data is not None:
-                tuning_data = from_coco(tuning_data)
+                tuning_data = from_coco_or_voc(tuning_data, "val")
 
         if hyperparameter_tune_kwargs is not None:
             # TODO: can we support hyperparameters being the same format as regular training?
@@ -683,6 +703,7 @@ class MultiModalPredictor:
             model = create_fusion_model(
                 config=predictor._config,
                 num_classes=predictor._output_shape,
+                classes=predictor._classes,
                 num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
                 num_categories=predictor._df_preprocessor.categorical_num_categories,
                 pretrained=False,  # set "pretrain=False" to prevent downloading online models
@@ -908,6 +929,7 @@ class MultiModalPredictor:
             model = create_fusion_model(
                 config=config,
                 num_classes=self._output_shape,
+                classes=self._classes,
                 num_numerical_columns=len(df_preprocessor.numerical_feature_names),
                 num_categories=df_preprocessor.categorical_num_categories,
             )
@@ -1025,6 +1047,7 @@ class MultiModalPredictor:
             data_processors = [data_processors, teacher_data_processors]
 
         val_use_training_mode = (self._pipeline == OBJECT_DETECTION) and (validation_metric_name != MAP)
+
         train_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
@@ -1279,6 +1302,7 @@ class MultiModalPredictor:
                 datamodule=train_dm,
                 ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
             )
+            self._fit_called = True
 
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
@@ -1490,6 +1514,14 @@ class MultiModalPredictor:
             predict_data=data,
         )
 
+        callbacks = []
+        if strategy == "ddp":
+            if self._pipeline != OBJECT_DETECTION:
+                raise NotImplementedError(f"inference using ddp is only implemented for {OBJECT_DETECTION}")
+            else:
+                pred_writer = DDPCacheWriter(pipeline=self._pipeline, write_interval="epoch")
+                callbacks = [pred_writer]
+
         if self._problem_type == NER:
             task = NerLitModule(
                 model=self._model,
@@ -1536,6 +1568,7 @@ class MultiModalPredictor:
                 deterministic=self._config.env.deterministic,
                 max_epochs=-1,  # Add max_epochs to disable warning
                 logger=False,
+                callbacks=callbacks,
             )
 
             with warnings.catch_warnings():
@@ -1549,7 +1582,30 @@ class MultiModalPredictor:
                 outputs = evaluator.predict(
                     task,
                     datamodule=predict_dm,
+                    return_predictions=not callbacks,
                 )
+
+                if strategy == "ddp":
+                    if evaluator.global_rank != 0:
+                        sys.exit(f"Prediction finished, exit the process with global_rank={evaluator.global_rank}...")
+                    else:
+                        outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
+                elif self._pipeline == OBJECT_DETECTION:
+                    # reformat single gpu output for object detection
+                    # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
+                    # output LABEL if exists for evaluations
+                    if len(outputs[0][BBOX][0]) == 2:  # additional axis for mask_rcnn, TODO: remove hardcode here
+                        outputs = [
+                            {BBOX: bbox[0], LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox[0]}
+                            for ele in outputs
+                            for i, bbox in enumerate(ele[BBOX])
+                        ]
+                    else:
+                        outputs = [
+                            {BBOX: bbox, LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox}
+                            for ele in outputs
+                            for i, bbox in enumerate(ele[BBOX])
+                        ]
 
         return outputs
 
@@ -1604,6 +1660,9 @@ class MultiModalPredictor:
         self,
         anno_file_or_df: str,
         metrics: str,
+        return_pred: Optional[bool] = False,
+        seed: Optional[int] = 123,
+        eval_tool: Optional[str] = None,
     ):
         """
         Evaluate object detection model on a test dataset in COCO format.
@@ -1612,10 +1671,19 @@ class MultiModalPredictor:
         ----------
         anno_file
             The annotation file in COCO format
+        return_pred
+            Whether to return the prediction result of each row.
+        eval_tool
+            The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
         """
+        # TODO: refactor this into evaluate()
         if isinstance(anno_file_or_df, str):
             anno_file = anno_file_or_df
-            data = from_coco(anno_file)
+            data = from_coco_or_voc(
+                anno_file, "test"
+            )  # TODO: maybe remove default splits hardcoding (only used in VOC)
+            if os.path.isdir(anno_file):
+                eval_tool = "torchmetrics"  # we can only use torchmetrics for VOC format evaluation.
         else:
             # during validation, it will call evaluate with df as input
             anno_file = self.detection_anno_train
@@ -1624,6 +1692,7 @@ class MultiModalPredictor:
         outputs = self._predict(
             data=data,
             requires_label=True,
+            seed=seed,
         )  # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
 
         # Cache prediction results as COCO format # TODO: refactor this
@@ -1633,11 +1702,21 @@ class MultiModalPredictor:
                 warn_if_exist=self._warn_if_exist,
             )
         self._save_path = os.path.abspath(os.path.expanduser(self._save_path))
-        cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
+        cocoeval_cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
 
-        return cocoeval(
-            outputs=outputs, data=data, anno_file=anno_file, cache_path=cache_path, metrics=metrics, tool="pycocotools"
+        eval_results = cocoeval(
+            outputs=outputs,
+            data=data,
+            anno_file=anno_file,
+            cache_path=cocoeval_cache_path,
+            metrics=metrics,
+            tool=eval_tool,
         )
+
+        if return_pred:
+            return eval_results, outputs
+        else:
+            return eval_results
 
     def _process_batch(
         self,
@@ -1718,8 +1797,10 @@ class MultiModalPredictor:
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
 
         if self._pipeline == OBJECT_DETECTION:
-            # strategy = "ddp" # TODO: enable multigpu inference
-            num_gpus = 1
+            strategy = "ddp"
+
+        if strategy == "ddp" and self._fit_called:
+            num_gpus = 1  # While using DDP, we can only use single gpu after fit is called
 
         if num_gpus == 1:
             strategy = None
@@ -1759,6 +1840,10 @@ class MultiModalPredictor:
 
         return outputs
 
+    def set_num_gpus(self, num_gpus):
+        assert isinstance(num_gpus, int)
+        self._config.env.num_gpus = num_gpus
+
     def evaluate(
         self,
         data: Union[pd.DataFrame, dict, list, str],
@@ -1766,6 +1851,7 @@ class MultiModalPredictor:
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
         seed: Optional[int] = 123,
+        eval_tool: Optional[str] = None,
     ):
         """
         Evaluate model on a test dataset.
@@ -1784,6 +1870,8 @@ class MultiModalPredictor:
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
+        eval_tool
+            The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
 
         Returns
         -------
@@ -1791,7 +1879,11 @@ class MultiModalPredictor:
         Optionally return a dataframe of prediction results.
         """
         if self._pipeline == OBJECT_DETECTION:
-            return self.evaluate_coco(data, metrics)
+            if realtime:
+                return NotImplementedError(f"Current pipeline {self._pipeline} does not support realtime predict.")
+            return self.evaluate_coco(
+                anno_file_or_df=data, metrics=metrics, return_pred=return_pred, seed=seed, eval_tool=eval_tool
+            )
 
         if self._problem_type == NER:
             ret_type = NER_RET
@@ -2288,6 +2380,7 @@ class MultiModalPredictor:
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
+                    "classes": self._classes,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
                     "version": ag_version.__version__,
@@ -2479,6 +2572,8 @@ class MultiModalPredictor:
         predictor._pretrain_path = path
         predictor._config = config
         predictor._output_shape = assets["output_shape"]
+        if "classes" in assets:
+            predictor._classes = assets["classes"]
         predictor._column_types = assets["column_types"]
         predictor._validation_metric_name = assets["validation_metric_name"]
         predictor._df_preprocessor = df_preprocessor
@@ -2524,6 +2619,7 @@ class MultiModalPredictor:
         model = create_fusion_model(
             config=predictor._config,
             num_classes=predictor._output_shape,
+            classes=predictor._classes,
             num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
             num_categories=predictor._df_preprocessor.categorical_num_categories,
             pretrained=False
