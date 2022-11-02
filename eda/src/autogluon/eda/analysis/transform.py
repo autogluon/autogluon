@@ -48,13 +48,15 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
 
     """
 
-    def __init__(self,
-                 parent: Optional[AbstractAnalysis] = None,
-                 children: Optional[List[AbstractAnalysis]] = None,
-                 state: Optional[AnalysisState] = None,
-                 category_to_numbers: bool = False,
-                 feature_generator: Optional[AbstractFeatureGenerator] = None,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        parent: Optional[AbstractAnalysis] = None,
+        children: Optional[List[AbstractAnalysis]] = None,
+        state: Optional[AnalysisState] = None,
+        category_to_numbers: bool = False,
+        feature_generator: Optional[AbstractFeatureGenerator] = None,
+        **kwargs,
+    ) -> None:
         super().__init__(parent, children, state, **kwargs)
         self.category_to_numbers = category_to_numbers
         if feature_generator is None:
@@ -70,12 +72,12 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
         self.feature_generator = feature_generator
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
-        return self.all_keys_must_be_present(args, 'train_data', 'label')
+        return self.all_keys_must_be_present(args, "train_data", "label")
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         x = args.train_data.drop(columns=args.label)
         self.feature_generator.fit(x)
-        self.args['feature_generator'] = True
+        self.args["feature_generator"] = True
         for (ds, df) in self.available_datasets(args):
             x = df
             y = None
@@ -85,7 +87,7 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
             x_tx = self.feature_generator.transform(x)
             if self.category_to_numbers:
                 for col, dtype in x_tx.dtypes.items():
-                    if dtype == 'category':
+                    if dtype == "category":
                         x_tx[col] = x_tx[col].cat.codes
             if y is not None:
                 x_tx = pd.concat([x_tx, y], axis=1)

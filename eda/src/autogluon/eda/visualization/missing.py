@@ -7,7 +7,7 @@ from .base import AbstractVisualization
 from .jupyter import JupyterMixin
 from .. import AnalysisState
 
-__all__ = ['MissingValues']
+__all__ = ["MissingValues"]
 logger = logging.getLogger(__name__)
 
 
@@ -47,35 +47,35 @@ class MissingValues(AbstractVisualization, JupyterMixin):
     """
 
     __OPERATIONS_MAPPING = {
-        'matrix': msno.matrix,
-        'bar': msno.bar,
-        'heatmap': msno.heatmap,
-        'dendrogram': msno.dendrogram,
+        "matrix": msno.matrix,
+        "bar": msno.bar,
+        "heatmap": msno.heatmap,
+        "dendrogram": msno.dendrogram,
     }
 
     MAX_MATRIX_VARIABLES_NUMBER = 50
 
-    def __init__(self,
-                 graph_type: str = 'matrix',
-                 headers: bool = False,
-                 namespace: str = None,
-                 **kwargs) -> None:
+    def __init__(self, graph_type: str = "matrix", headers: bool = False, namespace: str = None, **kwargs) -> None:
         super().__init__(namespace, **kwargs)
         self.graph_type = graph_type
-        assert self.graph_type in self.__OPERATIONS_MAPPING, f'{self.graph_type} must be one of {self.__OPERATIONS_MAPPING.keys()}'
+        assert (
+            self.graph_type in self.__OPERATIONS_MAPPING
+        ), f"{self.graph_type} must be one of {self.__OPERATIONS_MAPPING.keys()}"
         self.headers = headers
 
     def can_handle(self, state: AnalysisState) -> bool:
-        can_handle = self.all_keys_must_be_present(state, 'missing_statistics')
-        if can_handle and self.graph_type == 'matrix' and self._has_too_many_variables_for_matrix(state):
-            logging.warning(f'The dataset has more than {self.MAX_MATRIX_VARIABLES_NUMBER} variables; '
-                            f'matrix visualization will comfortably accommodate up to {self.MAX_MATRIX_VARIABLES_NUMBER} labelled variables. '
-                            f'Past that range labels begin to overlap or become unreadable, and by default large displays omit them.')
+        can_handle = self.all_keys_must_be_present(state, "missing_statistics")
+        if can_handle and self.graph_type == "matrix" and self._has_too_many_variables_for_matrix(state):
+            logging.warning(
+                f"The dataset has more than {self.MAX_MATRIX_VARIABLES_NUMBER} variables; "
+                f"matrix visualization will comfortably accommodate up to {self.MAX_MATRIX_VARIABLES_NUMBER} labelled variables. "
+                f"Past that range labels begin to overlap or become unreadable, and by default large displays omit them."
+            )
         return can_handle
 
     def _render(self, state: AnalysisState) -> None:
         for ds, ds_state in state.missing_statistics.items():
-            self.render_header_if_needed(state, f'{ds} missing values analysis')
+            self.render_header_if_needed(state, f"{ds} missing values analysis")
             widget = self._get_operation(self.graph_type)
             self._internal_render(widget, ds_state.data, **self._kwargs)
 
