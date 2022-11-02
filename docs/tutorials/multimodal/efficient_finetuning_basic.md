@@ -104,7 +104,8 @@ print('Score in the Japanese Testset:', score_in_jp)
 
 By combining [gradient checkpointing](https://pytorch.org/docs/stable/checkpoint.html) and parameter-efficient finetuning, it is feasible to finetune 
 models that have close to two billion parameters (e.g., [google/flan-t5-xl](https://huggingface.co/google/flan-t5-xl)) with a single GPU in [AWS G4 instances](https://aws.amazon.com/ec2/instance-types/g4/). 
-To turn on gradient checkpointing, all you need is to set `"model.hf_text.gradient_checkpointing"` to `True`. To accelerate the training speed of this tutorial, we will use [google/flan-t5-large](https://huggingface.co/google/flan-t5-large). You can change it to [google/flan-t5-xl](https://huggingface.co/google/flan-t5-xl) when running the code. 
+To turn on gradient checkpointing, all you need is to set `"model.hf_text.gradient_checkpointing"` to `True`.
+To accelerate the training speed of this tutorial, we will use [google/flan-t5-large](https://huggingface.co/google/flan-t5-large). You can change it to [google/flan-t5-xl](https://huggingface.co/google/flan-t5-xl) when running the code. 
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
@@ -114,13 +115,13 @@ predictor = MultiModalPredictor(label="label",
 predictor.fit(train_en_df,
               presets="multilingual",
               hyperparameters={
-                  "model.hf_text.checkpoint_name": "google/flan-t5-large",
+                  "model.hf_text.checkpoint_name": "google/flan-t5-xl",
                   "model.hf_text.gradient_checkpointing": True,
                   "optimization.efficient_finetune": "ia3_bias",
                   "optimization.lr_decay": 0.9,
                   "optimization.learning_rate": 3e-03,
                   "optimization.end_lr": 3e-03,
-                  "optimization.max_epochs": 2,
+                  "optimization.max_epochs": 1,
                   "optimization.warmup_steps": 0,
                   "env.batch_size": 32,
               })
