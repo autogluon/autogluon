@@ -349,7 +349,6 @@ class LGBModel(AbstractModel):
             'num_cpus': 1,
         }
         if is_gpu_available and self._is_gpu_lgbm_installed():
-            # Our custom implementation does not support partial GPU. No gpu usage according to nvidia-smi when the `num_gpus` passed to fit is fractional`
             minimum_resources['num_gpus'] = 0.5
         return minimum_resources
 

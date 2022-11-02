@@ -74,7 +74,6 @@ class HpoExecutor(ABC):
     def register_resources(
         self,
         initialized_model: AbstractModel,
-        # total_resources: dict,
         num_cpus: int,
         num_gpus: Union[int, float],
         k_fold=None,
@@ -88,8 +87,6 @@ class HpoExecutor(ABC):
         initialized_model
             The model that will be performed HPO. This model MUST be initialized
         """
-        # num_cpus = total_resources.get('num_cpus')
-        # num_gpus = total_resources.get('num_gpus')
         minimum_model_resources = initialized_model.get_minimum_resources(
             is_gpu_available=(num_gpus > 0)
         )
@@ -469,8 +466,6 @@ class CustomHpoExecutor(HpoExecutor):
                     
     def execute(self, model_trial, train_fn_kwargs, **kwargs):
         assert self.scheduler_options is not None, 'Call `initialize()` before execute'
-        # if 'resources_per_trial' in self.hyperparameter_tune_kwargs:
-        #     self.scheduler_options[1]['resource'] = self.hyperparameter_tune_kwargs['resources_per_trial']
         scheduler_cls, scheduler_params = self.scheduler_options  # Unpack tuple
         if scheduler_cls is None or scheduler_params is None:
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
