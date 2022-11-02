@@ -178,6 +178,7 @@ def create_model(
             num_classes=num_classes,
             pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
             gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            low_cpu_mem_usage=OmegaConf.select(model_config, "low_cpu_mem_usage", default=False),
             pretrained=pretrained,
         )
     elif model_name.lower().startswith(T_FEW):
@@ -189,6 +190,7 @@ def create_model(
             mc_loss=model_config.mc_loss,  # Adds multiple choice cross entropy loss
             num_classes=num_classes,
             gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            low_cpu_mem_usage=OmegaConf.select(model_config, "low_cpu_mem_usage", default=False),
             pretrained=pretrained,
         )
     elif model_name.lower().startswith(NUMERICAL_MLP):
