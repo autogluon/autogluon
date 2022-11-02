@@ -1,7 +1,8 @@
 # AutoMM Detection - Evaluate Pretrained Deformable DETR on COCO Format Dataset
-:label:`sec_automm_detection_eval_yolov3_coco`
+:label:`sec_automm_detection_eval_ddetr_coco`
 
-In this section, our goal is to evaluate Deformable DETR model on VOC2007 dataset in COCO format. Previously we introduced 2 classic models: \[YOLOv3] and \[FasterRCNN].
+In this section, our goal is to evaluate Deformable DETR model on VOC2007 dataset in COCO format. 
+Previously we introduced 2 classic models: :ref:`sec_automm_detection_eval_yolov3_coco` and :ref:`sec_automm_detection_eval_fasterrcnn_coco`.
 Recent years Transformer models become more and more popular in Computer Vision, and Deformable DEtection TRansformer (Deformable DETR) reached the SOTA performance in detection task.
 In terms of speed, it's slower than YOLOv3 and Faster-RCNN, but it also has higher performance.
 
@@ -65,8 +66,17 @@ And the evaluation results is shown in command line output. The first value `0.4
 time usage: 389.92
 ```
 
-Deformable DETR has best performance but takes more time and (GPU memory) space. If there is a restriction in time or space, see \[Evaluate Pretrained Faster-RCNN on COCO Format Dataset] or \[Evaluate Pretrained YOLOv3 on COCO Format Dataset].
+Deformable DETR has best performance but takes more time and (GPU memory) space. 
+If there is a restriction in time or space, 
+see :ref:`sec_automm_detection_eval_fasterrcnn_coco` or :ref:`sec_automm_detection_eval_yolov3_coco`.
 You can also see other tutorials for \[Fast Finetune on COCO format data] or \[Inference on COCO format data (with Visualization)].
+
+### Other Examples
+
+You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+
+### Customization
+To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.
 
 ### Citation
 ```

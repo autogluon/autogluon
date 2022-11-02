@@ -2,7 +2,7 @@
 :label:`sec_automm_detection_eval_fasterrcnn_coco`
 
 In this section, our goal is to evaluate Faster-RCNN model on VOC2007 dataset in COCO format.
-In previous section we evaluated YOLOv3 which is small and fast. But if higher performance is required, we need a bigger model.
+In previous section :ref:`sec_automm_detection_eval_yolov3_coco`, we evaluated YOLOv3 which is small and fast. But if higher performance is required, we need a bigger model.
 And Faster R-CNN has a balance in speed and performance trade-offs.
 
 To start, import MultiModalPredictor:
@@ -68,9 +68,16 @@ time usage: 257.45
 
 Faster R-CNN balances speed and performance. 
 But in case that faster speed or higher performance is required, 
-see \[Evaluate Pretrained YOLOv3 on COCO Format Dataset] for faster speed,
-or \[Evaluate Pretrained DETR on COCO Format Dataset] for higher performance.
+see :ref:`sec_automm_detection_eval_yolov3_coco` for faster speed,
+or :ref:`sec_automm_detection_eval_ddetr_coco` for higher performance.
 You can also see other tutorials for \[Fast Finetune on COCO format data] or \[Inference on COCO format data (with Visualization)].
+
+### Other Examples
+
+You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+
+### Customization
+To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.
 
 ### Citation
 ```

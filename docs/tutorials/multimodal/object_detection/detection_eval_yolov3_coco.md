@@ -64,8 +64,15 @@ And the evaluation results is shown in command line output. The first value `0.2
 time usage: 81.76
 ```
 
-YOLOv3 is small and fast. For larger model with higher performance, see \[Evaluate Pretrained Faster-RCNN on COCO Format Dataset] or \[Evaluate Pretrained DETR on COCO Format Dataset].
+YOLOv3 is small and fast. For larger model with higher performance, see :ref:`sec_automm_detection_eval_fasterrcnn_coco` or :ref:`sec_automm_detection_eval_ddetr_coco`.
 You can also see other tutorials for \[Fast Finetune on COCO format data] or \[Inference on COCO format data (with Visualization)].
+
+### Other Examples
+
+You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+
+### Customization
+To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.
 
 ### Citation
 ```
