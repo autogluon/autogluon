@@ -1,6 +1,8 @@
 import pandas as pd
 import pytest
+from ray import tune
 
+from autogluon.core.hpo.ray_tune_constants import SCHEDULER_PRESETS, SEARCHER_PRESETS
 from autogluon.multimodal import MultiModalPredictor
 
 
@@ -31,14 +33,25 @@ def get_data():
         "bert-base-cased",
     ],
 )
-def test_ner(checkpoint_name):
+@pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))
+@pytest.mark.parametrize("scheduler", list(SCHEDULER_PRESETS.keys()))
+def test_ner(checkpoint_name, searcher, scheduler):
     train_data = get_data()
     label_col = "entity_annotations"
+
+    lr = tune.uniform(0.0001, 0.01)
+    predictor = MultiModalPredictor(
+        problem_type="ner",
+        label=label_col,
+        verbosity=5,
+    )
+
     predictor = MultiModalPredictor(problem_type="ner", label=label_col)
     predictor.fit(
         train_data=train_data,
         time_limit=30,
-        hyperparameters={"model.ner.checkpoint_name": checkpoint_name},
+        hyperparameters={"model.ner.checkpoint_name": checkpoint_name, "optimization.learning_rate": lr},
+        hyperparameter_tune_kwargs={"num_trials": 2, "searcher": searcher, "scheduler": scheduler},
     )
 
     scores = predictor.evaluate(train_data)
