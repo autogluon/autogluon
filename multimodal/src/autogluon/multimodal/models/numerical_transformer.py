@@ -463,6 +463,7 @@ class NumericalTransformer(nn.Module):
 
         self.prefix = prefix
         self.out_features = out_features
+        self.row_attention = row_attention
 
         self.numerical_feature_tokenizer = NumEmbeddings(
             in_features=in_features,

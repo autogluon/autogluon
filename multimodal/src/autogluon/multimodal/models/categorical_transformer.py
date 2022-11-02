@@ -184,7 +184,7 @@ class CategoricalTransformer(nn.Module):
         assert token_initialization in ["uniform", "normal"], "initialization must be uniform or normal"
 
         self.num_categories = num_categories
-
+        self.row_attention = row_attention
         self.prefix = prefix
         self.out_features = out_features
 

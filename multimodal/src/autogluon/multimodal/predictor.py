@@ -1876,6 +1876,50 @@ class MultiModalPredictor:
         return ret
 
     def predict(
+            self,
+            data: Union[pd.DataFrame, dict, list],
+            candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
+            as_pandas: Optional[bool] = None,
+            realtime: Optional[bool] = None,
+            seed: Optional[int] = 123,
+    ):
+        if not hasattr(self._model, "row_attention") or not self._model.row_attention:
+            return self.predict_single_round(
+                data=data,
+                candidate_data=candidate_data,
+                as_pandas=as_pandas,
+                realtime=realtime,
+                seed=seed,
+            )
+
+        pred = []
+        for _ in range(self._config.env.test_ensemble_rounds):
+            print(_)
+            data_ = copy.deepcopy(data)
+            data_.reset_index(drop=True, inplace=True)
+            perm = np.random.RandomState().permutation(data_.shape[0])
+            data_ = data_.reindex(perm)
+            data_.reset_index(drop=True, inplace=True)
+
+            per_pred = self.predict_single_round(
+                data=data_,
+                candidate_data=candidate_data,
+                as_pandas=as_pandas,
+                realtime=realtime,
+                seed=seed,
+            )
+
+            inverse_perm = np.argsort(perm)
+            per_pred = per_pred[inverse_perm]
+            pred.append(per_pred)
+
+        pred = np.median(pred, axis=0)
+
+        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
+            pred = self._as_pandas(data=data, to_be_converted=pred)
+        return pred
+
+    def predict_single_round(
         self,
         data: Union[pd.DataFrame, dict, list],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
@@ -1945,12 +1989,64 @@ class MultiModalPredictor:
                 else:
                     pred = logits
 
-        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
-            pred = self._as_pandas(data=data, to_be_converted=pred)
-
         return pred
 
     def predict_proba(
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
+        as_pandas: Optional[bool] = None,
+        as_multiclass: Optional[bool] = True,
+        realtime: Optional[bool] = None,
+        seed: Optional[int] = 123,
+    ):
+        if not hasattr(self._model, "row_attention") or not self._model.row_attention:
+            return self.predict_proba_single_round(
+                data=data,
+                candidate_data=candidate_data,
+                as_pandas=as_pandas,
+                as_multiclass=as_multiclass,
+                realtime=realtime,
+                seed=seed,
+            )
+
+        prob = []
+        for _ in range(self._config.env.test_ensemble_rounds):
+            data_ = copy.deepcopy(data)
+            data_.reset_index(drop=True, inplace=True)
+            perm = np.random.RandomState().permutation(data_.shape[0])
+            data_ = data_.reindex(perm)
+            data_.reset_index(drop=True, inplace=True)
+
+            per_prob = self.predict_proba_single_round(
+                data=data_,
+                candidate_data=candidate_data,
+                as_pandas=as_pandas,
+                as_multiclass=as_multiclass,
+                realtime=realtime,
+                seed=seed,
+            )
+
+            inverse_perm = np.argsort(perm)
+            per_prob = per_prob[inverse_perm]
+            prob.append(per_prob)
+
+        prob = np.median(prob, axis=0)
+
+        if not as_multiclass:
+            if self._problem_type == BINARY:
+                pos_label = try_to_infer_pos_label(
+                    data_config=self._config.data,
+                    label_encoder=self._df_preprocessor.label_generator,
+                    problem_type=self._problem_type,
+                )
+                prob = prob[:, pos_label]
+
+        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
+            prob = self._as_pandas(data=data, to_be_converted=prob)
+        return prob
+
+    def predict_proba_single_round(
         self,
         data: Union[pd.DataFrame, dict, list],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
@@ -2007,18 +2103,6 @@ class MultiModalPredictor:
             logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
 
             prob = logits_to_prob(logits)
-
-        if not as_multiclass:
-            if self._problem_type == BINARY:
-                pos_label = try_to_infer_pos_label(
-                    data_config=self._config.data,
-                    label_encoder=self._df_preprocessor.label_generator,
-                    problem_type=self._problem_type,
-                )
-                prob = prob[:, pos_label]
-
-        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
-            prob = self._as_pandas(data=data, to_be_converted=prob)
 
         return prob
 

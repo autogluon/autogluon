@@ -559,9 +559,9 @@ class FT_Transformer(nn.Module):
         """
         super().__init__()
         if row_attention:
-            assert (
-                row_attention_layer is None
-            ), "If `row_attention` is False, row_attention_layer must be None."
+            row_attention_layer = "last" if row_attention_layer is None else row_attention_layer
+        else:
+            row_attention_layer = None
         if isinstance(last_layer_query_idx, int):
             raise ValueError(
                 "last_layer_query_idx must be None, list[int] or slice. "
@@ -738,9 +738,10 @@ class FT_Transformer(nn.Module):
         assert x.ndim == 3, "The input must have 3 dimensions: (n_objects, n_tokens, d_token)"
         for layer_idx, layer in enumerate(self.blocks):
 
+            layer = cast(nn.ModuleDict, layer)
+
             if self.row_attention_layer == "first" and layer_idx == 0:
                 x = torch.transpose(x, 0, 1)
-
                 x_residual = self._start_residual(layer, "row_attention", x)
                 x_residual, _ = layer["row_attention"](
                     x_residual,
@@ -753,8 +754,6 @@ class FT_Transformer(nn.Module):
                 x = self._end_residual(layer, "row_ffn", x, x_residual)
                 x = layer["row_output"](x)
                 x = torch.transpose(x, 0, 1)
-
-            layer = cast(nn.ModuleDict, layer)
 
             query_idx = self.last_layer_query_idx if layer_idx + 1 == len(self.blocks) else None
             x_residual = self._start_residual(layer, "attention", x)
@@ -774,7 +773,6 @@ class FT_Transformer(nn.Module):
 
             if self.row_attention_layer == "shared" or (self.row_attention_layer == "last" and layer_idx + 1 == len(self.blocks)):
                 x = torch.transpose(x, 0, 1)
-
                 x_residual = self._start_residual(layer, "row_attention", x)
                 x_residual, _ = layer["row_attention"](
                     x_residual,

@@ -25,7 +25,7 @@ model:
     additive_attention: False
     share_qv_weights: False
     row_attention: False
-    test_ensemble_rounds: 1
+    row_attention_layer: "last"
   numerical_mlp:
     hidden_size: 128
     activation: "leaky_relu"
@@ -58,7 +58,7 @@ model:
     additive_attention: False
     share_qv_weights: False
     row_attention: False
-    test_ensemble_rounds: 1
+    row_attention_layer: "last"
   hf_text:
     checkpoint_name: "google/electra-base-discriminator"
     gradient_checkpointing: False
@@ -218,4 +218,4 @@ model:
     additive_attention: False
     share_qv_weights: False
     row_attention: False
-    test_ensemble_rounds: 1
+    row_attention_layer: "last"

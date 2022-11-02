@@ -14,3 +14,4 @@ env:
   strategy: "ddp_spawn"
   deepspeed_allgather_size: 1e9 # DeepSpeed allgather size (number of elements gathered at a time). Limits memory required for allgather on large models.
   deepspeed_allreduce_size: 1e9 # DeepSpeed allreduce size (number of elements reduced at a time). Limits memory required for allreduce on large models.
+  test_ensemble_rounds: 1

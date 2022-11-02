@@ -317,6 +317,7 @@ class MultimodalFusionTransformer(nn.Module):
 
         self.loss_weight = loss_weight
         self.model = nn.ModuleList(models)
+        self.row_attention = row_attention
 
         raw_in_features = [per_model.out_features for per_model in models]
 
