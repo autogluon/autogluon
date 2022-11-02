@@ -190,16 +190,12 @@ class MultiNegativesSoftmaxLoss(nn.Module):
             local_loss=False,
             gather_with_grad=False,
             cache_labels=False,
-            # rank=0,
-            # world_size=1,
             use_horovod=False,
     ):
         super().__init__()
         self.local_loss = local_loss
         self.gather_with_grad = gather_with_grad
         self.cache_labels = cache_labels
-        # self.rank = rank
-        # self.world_size = world_size
         self.use_horovod = use_horovod
 
         # cache state
@@ -208,12 +204,6 @@ class MultiNegativesSoftmaxLoss(nn.Module):
 
     def forward(self, features_a, features_b, logit_scale, rank=0, world_size=1):
         device = features_a.device
-        # logger.debug(f"rank: {rank}")
-        # logger.debug(f"device: {device}")
-        # logger.debug(f"world size: {world_size}")
-        # logger.debug(f"logit_scale: {logit_scale}")
-        # logger.debug(f"features a shape: {features_a.shape}")
-        # logger.debug(f"features b shape: {features_b.shape}")
         if world_size > 1:
             all_features_a, all_features_b = gather_features(
                 features_a, features_b,

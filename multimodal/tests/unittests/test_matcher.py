@@ -68,8 +68,8 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
             response_data=test_response_text_data,
             metrics=[metric_name],
             label_column=test_label_column,
-            query_signature="response",
-            response_signature="query",
+            # query_signature="response",
+            # response_signature="query",
             cutoff=[1, 5, 10],
         )
 
@@ -160,6 +160,18 @@ def test_matcher(
             metric_name=dataset.metric,
             symmetric=symmetric,
         )
+        text_to_image_hits = semantic_search(
+            matcher=matcher,
+            query_data={query: dataset.test_df[query].tolist()},  # need a dict/dataframe instead of a list for a trained matcher
+            response_data={response: dataset.test_df[response].tolist()}, # need a dict/dataframe instead of a list for a trained matcher
+            top_k=5,
+        )
+        image_to_text_hits = semantic_search(
+            matcher=matcher,
+            query_data={response: dataset.test_df[response].tolist()}, # need a dict/dataframe instead of a list for a trained matcher
+            response_data={query: dataset.test_df[query].tolist()}, # need a dict/dataframe instead of a list for a trained matcher
+            top_k=5,
+        )
     else:
         score = matcher.evaluate(dataset.test_df)
     verify_matcher_save_load(matcher, dataset.test_df, cls=MultiModalMatcher)
@@ -225,31 +237,31 @@ def test_text_semantic_search():
 
     hits_gt = [
         [
-            {"corpus_id": 0, "score": 0.7035943269729614},
-            {"corpus_id": 1, "score": 0.527172327041626},
-            {"corpus_id": 3, "score": 0.18880528211593628},
-            {"corpus_id": 6, "score": 0.10461556911468506},
-            {"corpus_id": 8, "score": 0.09811049699783325},
+            {"response_id": 0, "score": 0.7035943269729614},
+            {"response_id": 1, "score": 0.527172327041626},
+            {"response_id": 3, "score": 0.18880528211593628},
+            {"response_id": 6, "score": 0.10461556911468506},
+            {"response_id": 8, "score": 0.09811049699783325},
         ],
         [
-            {"corpus_id": 7, "score": 0.6432060599327087},
-            {"corpus_id": 4, "score": 0.2563084363937378},
-            {"corpus_id": 3, "score": 0.1389961689710617},
-            {"corpus_id": 6, "score": 0.11907944828271866},
-            {"corpus_id": 8, "score": 0.1079183965921402},
+            {"response_id": 7, "score": 0.6432060599327087},
+            {"response_id": 4, "score": 0.2563084363937378},
+            {"response_id": 3, "score": 0.1389961689710617},
+            {"response_id": 6, "score": 0.11907944828271866},
+            {"response_id": 8, "score": 0.1079183965921402},
         ],
         [
-            {"corpus_id": 8, "score": 0.8252813816070557},
-            {"corpus_id": 0, "score": 0.13986822962760925},
-            {"corpus_id": 7, "score": 0.1292111724615097},
-            {"corpus_id": 6, "score": 0.10977005213499069},
-            {"corpus_id": 3, "score": 0.06506325304508209},
+            {"response_id": 8, "score": 0.8252813816070557},
+            {"response_id": 0, "score": 0.13986822962760925},
+            {"response_id": 7, "score": 0.1292111724615097},
+            {"response_id": 6, "score": 0.10977005213499069},
+            {"response_id": 3, "score": 0.06506325304508209},
         ],
     ]
 
     for per_query_hits, per_query_hits_2, per_query_hit_gt in zip(hits, hits_2, hits_gt):
         for per_hit, per_hit_2, per_hit_gt in zip(per_query_hits, per_query_hits_2, per_query_hit_gt):
-            assert per_hit["corpus_id"] == per_hit_2["corpus_id"] == per_hit_gt["corpus_id"]
+            assert per_hit["response_id"] == per_hit_2["response_id"] == per_hit_gt["response_id"]
             npt.assert_almost_equal(per_hit["score"], per_hit_2["score"])
             npt.assert_almost_equal(per_hit["score"], per_hit_gt["score"])
 
@@ -270,10 +282,10 @@ def test_image_text_semantic_search():
         response_data=image_list,
         top_k=5,
     )
-    # print("extract embeddings separately...\n\n")
+
     # extract embeddings first and then do semantic search
-    query_embeddings = matcher.extract_embedding(text_list)
-    response_embeddings = matcher.extract_embedding(image_list)
+    query_embeddings = matcher.extract_embedding(text_list, as_tensor=True)
+    response_embeddings = matcher.extract_embedding(image_list, as_tensor=True)
     text_to_image_hits_2 = semantic_search(
         matcher=matcher,
         query_embeddings=query_embeddings,
@@ -281,16 +293,21 @@ def test_image_text_semantic_search():
         top_k=5,
     )
 
+    for per_query_hits, per_query_hits_2 in zip(text_to_image_hits, text_to_image_hits_2):
+        for per_hit, per_hit_2 in zip(per_query_hits, per_query_hits_2):
+            assert per_hit["response_id"] == per_hit_2["response_id"]
+            npt.assert_almost_equal(per_hit["score"], per_hit_2["score"])
+
     image_to_text_hits = semantic_search(
         matcher=matcher,
         query_data=image_list,
         response_data=text_list,
         top_k=5,
     )
-    # print("extract embeddings separately...\n\n")
+
     # extract embeddings first and then do semantic search
-    query_embeddings = matcher.extract_embedding(image_list)
-    response_embeddings = matcher.extract_embedding(text_list)
+    query_embeddings = matcher.extract_embedding(image_list, as_tensor=True)
+    response_embeddings = matcher.extract_embedding(text_list, as_tensor=True)
     image_to_text_hits_2 = semantic_search(
         matcher=matcher,
         query_embeddings=query_embeddings,
@@ -298,6 +315,17 @@ def test_image_text_semantic_search():
         top_k=5,
     )
 
+    for per_query_hits, per_query_hits_2 in zip(image_to_text_hits, image_to_text_hits_2):
+        for per_hit, per_hit_2 in zip(per_query_hits, per_query_hits_2):
+            assert per_hit["response_id"] == per_hit_2["response_id"]
+            npt.assert_almost_equal(per_hit["score"], per_hit_2["score"])
 
-if __name__ == '__main__':
-    test_image_text_semantic_search()
+
+# if __name__ == '__main__':
+#     # test_image_text_semantic_search()
+#     # test_text_semantic_search()
+#
+#     matcher = MultiModalMatcher(
+#         pipeline="image_text_similarity",
+#         hyperparameters={"model.hf_text.checkpoint_name": "openai/clip-vit-base-patch32"},
+#     )

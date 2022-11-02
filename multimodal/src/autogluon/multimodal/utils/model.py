@@ -103,8 +103,6 @@ def select_model(
             selected_model_names.append(model_name)
         else:
             if any(model_data_status) and not strict:
-                filtered_data_types = [d_type for d_type, d_status in zip(model_config.data_types, model_data_status) if d_status]
-                model_config.data_types = filtered_data_types
                 selected_model_names.append(model_name)
             else:
                 delattr(config.model, model_name)

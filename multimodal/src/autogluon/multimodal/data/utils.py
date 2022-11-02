@@ -202,15 +202,12 @@ def apply_df_preprocessor(
     modality_features = {}
     modality_types = {}
     for per_modality in modalities:
-        # print(f"per_modality: {per_modality}")
         per_modality_features, per_modality_types = getattr(df_preprocessor, f"transform_{per_modality}")(data)
         modality_features[per_modality] = per_modality_features
         modality_types[per_modality] = per_modality_types
-
         if per_modality_features:
-            # print("per_modality_features is not None.")
             lengths.append(len(per_modality_features[next(iter(per_modality_features))]))
-    # print(f"lengths: {lengths}")
+
     assert len(set(lengths)) == 1  # make sure each modality has the same sample num
     sample_num = lengths[0]
 

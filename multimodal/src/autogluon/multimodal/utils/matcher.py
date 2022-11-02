@@ -337,7 +337,7 @@ def semantic_search(
     response_data: Optional[Union[pd.DataFrame, dict, list]] = None,
     query_embeddings: Optional[torch.Tensor] = None,
     response_embeddings: Optional[torch.Tensor] = None,
-    query_chunk_size: int = 100,
+    query_chunk_size: int = 128,
     response_chunk_size: int = 500000,
     top_k: int = 10,
     id_mappings: Optional[Dict[str, Dict]] = None,
@@ -403,11 +403,9 @@ def semantic_search(
     queries_result_list = [[] for _ in range(num_queries)]
 
     for query_start_idx in range(0, num_queries, query_chunk_size):
-        # print(f"query_start_idx: {query_start_idx}")
         if query_embeddings is None:
             batch_query_embeddings = matcher.extract_embedding(
                 query_data[query_start_idx : query_start_idx + query_chunk_size],
-                signature=QUERY,
                 id_mappings=id_mappings,
                 as_tensor=True,
             )
@@ -415,11 +413,9 @@ def semantic_search(
             batch_query_embeddings = query_embeddings[query_start_idx : query_start_idx + query_chunk_size]
         # Iterate over chunks of the corpus
         for response_start_idx in range(0, num_responses, response_chunk_size):
-            # print(f"response_start_idx: {response_start_idx}")
             if response_embeddings is None:
                 batch_response_embeddings = matcher.extract_embedding(
                     response_data[response_start_idx : response_start_idx + response_chunk_size],
-                    signature=RESPONSE,
                     id_mappings=id_mappings,
                     as_tensor=True,
                 )
@@ -460,7 +456,7 @@ def semantic_search(
     for query_id in range(len(queries_result_list)):
         for doc_itr in range(len(queries_result_list[query_id])):
             score, corpus_id = queries_result_list[query_id][doc_itr]
-            queries_result_list[query_id][doc_itr] = {"corpus_id": corpus_id, "score": score}
+            queries_result_list[query_id][doc_itr] = {"response_id": corpus_id, "score": score}
         queries_result_list[query_id] = sorted(queries_result_list[query_id], key=lambda x: x["score"], reverse=True)
 
     return queries_result_list

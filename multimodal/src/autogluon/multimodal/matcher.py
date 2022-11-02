@@ -530,18 +530,6 @@ class MultiModalMatcher:
 
         return query_df_preprocessor, response_df_preprocessor, label_df_preprocessor
 
-    def _filter_data_processors(self, data_processors, config):
-        # print(f"data_processors keys: {list(data_processors.keys())}")
-        filtered_data_processors = dict()
-        for model_name in config.model.names:
-            # print(f"model_name: {model_name}")
-            model_config = getattr(config.model, model_name)
-            # print(f"model_config: {model_config}")
-            for d_type in model_config.data_types:
-                # print(f"d_type: {d_type}")
-                filtered_data_processors[d_type] = data_processors[d_type]
-        return filtered_data_processors
-
     def _get_matcher_data_processors(
         self,
         query_model: Optional[nn.Module] = None,
@@ -559,8 +547,7 @@ class MultiModalMatcher:
                 requires_data=True,
             )
         else:  # continuing training
-            # for models like clip, we need to choose the image or text processor for query model.
-            query_processors = self._filter_data_processors(self._query_processors, query_config)
+            query_processors = self._query_processors
 
         if response_model is None:
             response_processors = None
@@ -572,8 +559,7 @@ class MultiModalMatcher:
                 requires_data=True,
             )
         else:  # continuing training
-            # for models like clip, we need to choose the image or text processor for query model.
-            response_processors = self._filter_data_processors(self._response_processors, response_config)
+            response_processors = self._response_processors
 
         # only need labels for the response model
         if response_model is None:
@@ -892,12 +878,12 @@ class MultiModalMatcher:
                 ".* in the `DataLoader` init to improve performance.*",
             )
             warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
-            # scores = trainer.validate(
-            #     task,
-            #     datamodule=train_dm,
-            #     ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
-            # )
-            # print(f"scores: {scores}")
+            # get the pretrained checkpoint performance on validation data
+            trainer.validate(
+                task,
+                datamodule=train_dm,
+                ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
+            )
 
             trainer.fit(
                 task,
@@ -1051,7 +1037,12 @@ class MultiModalMatcher:
         id_mappings: Dict[str, Dict],
         requires_label: bool,
         signature: Optional[str] = None,
+        seed: Optional[int] = 123,
     ) -> List[Dict]:
+
+        with apply_log_filter(LogFilter("Global seed set to")):  # Ignore the log "Global seed set to"
+            pl.seed_everything(seed, workers=True)
+
         assert signature in [QUERY, RESPONSE, None]
 
         data = data_to_df(data=data, header=signature)
@@ -1104,7 +1095,7 @@ class MultiModalMatcher:
         if signature == QUERY:
             query_config = self._query_config
             query_model = self._query_model
-            query_columns = (self._query if self._query else list(data.columns),)
+            query_columns = self._query if self._query else list(data.columns)
             if isinstance(query_columns, tuple):
                 query_columns = query_columns[0]
         elif signature == RESPONSE:
@@ -1122,10 +1113,10 @@ class MultiModalMatcher:
             query_columns = self._query
             response_columns = self._response
 
-        print(f"signature: {signature}")
-        print(f"column_types: {column_types}")
-        print(f"query_columns: {query_columns}")
-        print(f"response_columns: {response_columns}")
+        logger.debug(f"signature: {signature}")
+        logger.debug(f"column_types: {column_types}")
+        logger.debug(f"query_columns: {query_columns}")
+        logger.debug(f"response_columns: {response_columns}")
         query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._get_matcher_df_preprocessor(
             data=data,
             column_types=column_types,
@@ -1134,15 +1125,6 @@ class MultiModalMatcher:
             query_columns=query_columns,
             response_columns=response_columns,
         )
-        # if query_df_preprocessor is not None:
-        #     query_df_preprocessor._label_generator = None
-        #     # print(f"query_df_preprocessor: {query_df_preprocessor}")
-        # if response_df_preprocessor is not None:
-        #     response_df_preprocessor._label_generator = None
-        #     # print(f"response_df_preprocessor: {response_df_preprocessor}")
-        # if label_df_preprocessor is not None:
-        #     label_df_preprocessor._label_generator = None
-            # print(f"label_df_preprocessor: {label_df_preprocessor}")
 
         query_processors, response_processors, label_processors = self._get_matcher_data_processors(
             query_model=query_model,
@@ -1151,9 +1133,9 @@ class MultiModalMatcher:
             response_config=response_config,
         )
 
-        print(f"query_processors: {query_processors}")
-        print(f"response_processors: {response_processors}")
-        print(f"label_processors: {label_processors}")
+        logger.debug(f"query_processors: {query_processors}")
+        logger.debug(f"response_processors: {response_processors}")
+        logger.debug(f"label_processors: {label_processors}")
 
         # For prediction data with no labels provided.
         df_preprocessors = [query_df_preprocessor, response_df_preprocessor]
@@ -1244,7 +1226,7 @@ class MultiModalMatcher:
             query_column=self._query[0],
             response_column=self._response[0],
         )
-        # print(f"first _evaluate_ranking...\n")
+        logger.debug(f"first _evaluate_ranking...\n")
         score_1 = self._evaluate_ranking(
             qr_relevance=data_with_label,
             query_data=query_data,
@@ -1257,15 +1239,13 @@ class MultiModalMatcher:
             query_column=self._response[0],
             response_column=self._query[0],
         )
-        # print(f"second _evaluate_ranking...\n")
+        logger.debug(f"second _evaluate_ranking...\n")
         score_2 = self._evaluate_ranking(
             qr_relevance=data_with_label,
             query_data=query_data,
             response_data=response_data,
             label_column=label_column,
             cutoff=[1, 5, 10],
-            query_signature=RESPONSE,
-            response_signature=QUERY,
         )
 
         return sum(score_1.values()) + sum(score_2.values())
@@ -1282,23 +1262,13 @@ class MultiModalMatcher:
         similarity_type: Optional[str] = "cosine",
         top_k: Optional[int] = 100,
         cutoff: Optional[List[int]] = [5, 10, 20],
-        query_signature: Optional[str] = None,
-        response_signature: Optional[str] = None,
     ):
         query_column = query_data.columns[0]
         response_column = response_data.columns[0]
-        if query_signature is None:
-            query_signature = QUERY
-        if response_signature is None:
-            response_signature = RESPONSE
 
         qr_relevance = data_to_df(data=qr_relevance)
         assert query_column in qr_relevance.columns
         assert response_column in qr_relevance.columns
-
-        # print(f"query_data: {query_data.head(5)}")
-        # print(f"response_data: {response_data.head(5)}")
-        # print(f"qr_relevance: {qr_relevance.head(5)}")
 
         if metrics is None:
             metrics = [self._eval_metric_name]
@@ -1312,11 +1282,11 @@ class MultiModalMatcher:
             )
 
         rank_results = dict()
-        query_embeddings = self.extract_embedding(query_data, signature=query_signature, id_mappings=id_mappings, as_tensor=True)
+        query_embeddings = self.extract_embedding(query_data, id_mappings=id_mappings, as_tensor=True)
         num_chunks = max(1, len(response_data) // chunk_size)
         for response_chunk in np.array_split(response_data, num_chunks):
             response_embeddings = self.extract_embedding(
-                response_chunk, signature=response_signature, id_mappings=id_mappings, as_tensor=True
+                response_chunk, id_mappings=id_mappings, as_tensor=True
             )
             similarity_scores = compute_semantic_similarity(
                 a=query_embeddings, b=response_embeddings, similarity_type=similarity_type
@@ -1411,8 +1381,6 @@ class MultiModalMatcher:
         top_k: Optional[int] = 100,
         cutoff: Optional[List[int]] = [5, 10, 20],
         label_column: Optional[str] = None,
-        query_signature: Optional[str] = None,
-        response_signature: Optional[str] = None,
     ):
         """
         Evaluate model on a test dataset.
@@ -1476,8 +1444,6 @@ class MultiModalMatcher:
                 similarity_type=similarity_type,
                 top_k=top_k,
                 cutoff=cutoff,
-                query_signature=query_signature,
-                response_signature=response_signature,
             )
         elif data is not None:
             return self._evaluate_matching(
@@ -1620,7 +1586,19 @@ class MultiModalMatcher:
         by the neural network's architecture.
         """
         if signature is None:
-            signature = QUERY
+            if self._query or self._response:
+                if isinstance(data, list):
+                    raise ValueError("data can't be a list. Provide a dict or a dataframe instead.")
+                else:
+                    data = data_to_df(data=data)
+                    if self._query and all(c in data.columns for c in self._query):
+                        signature = QUERY
+                    elif self._response and all(c in data.columns for c in self._response):
+                        signature = RESPONSE
+                    else:
+                        raise ValueError(f"Both query `{self._query}` and response `{self._response}` are not within the data headers `{data.columns}`.")
+            else:
+                signature = QUERY
 
         outputs = self._predict(
             data=data,

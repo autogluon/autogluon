@@ -230,29 +230,16 @@ class MatcherLitModule(pl.LightningModule):
         self,
         batch: Dict,
     ):
-        # logger.debug("forward query model")
         query_outputs = self.query_model(batch)[self.query_model.prefix]
         query_embeddings = query_outputs[FEATURES]
 
-        # logger.debug("forward response model")
         response_outputs = self.response_model(batch)[self.response_model.prefix]
         response_embeddings = response_outputs[FEATURES]
 
         logit_scale = response_outputs[LOGIT_SCALE] if LOGIT_SCALE in response_outputs else None,
 
-        # logger.debug(f"matcher module logit_scale: {logit_scale}")
-        # logger.debug(f"matcher module logit_scale type: {type(logit_scale)}")
-        # logger.debug(f"matcher module logit_scale[0] type: {type(logit_scale[0])}")
-        # logger.debug(f"query_embeddings shape: {query_embeddings.shape}")
-        # logger.debug(f"response_embeddings shape: {response_embeddings.shape}")
-        # exit()
         if isinstance(logit_scale, tuple):
             logit_scale = logit_scale[0]
-
-        # logger.debug(f"matcher module logit_scale: {logit_scale}")
-        # logger.debug(f"matcher module logit_scale type: {type(logit_scale)}")
-        # print(f"logit_scale shape: {logit_scale.shape}")
-        # print(f"logit_scale shape[0]: {logit_scale.shape[0]}")
 
         loss = self._compute_loss(
             query_embeddings=query_embeddings,

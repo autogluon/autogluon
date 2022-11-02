@@ -161,11 +161,6 @@ class CustomHitRate(torchmetrics.Metric):
         self.query_embeddings.append(batch_query_embeds)
         self.response_embeddings.append(batch_response_embeds)
         if logit_scale is not None:
-            # print(f"batch_logit_scale: {batch_logit_scale}")
-            # if batch_logit_scale.shape[0] == 1:
-            #     batch_logit_scale = batch_logit_scale.repeat(batch_query_embeds.shape[0])
-            # if batch_logit_scale.ndim == 1:
-            #     batch_logit_scale = batch_logit_scale[:, None]
             self.logit_scale.append(logit_scale)
 
     def compute(self):
@@ -180,11 +175,7 @@ class CustomHitRate(torchmetrics.Metric):
 
 
 def compute_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
-    print(f"features_a shape: {features_a.shape}")
-    print(f"features_b shape: {features_b.shape}")
-    print(f"logit_scale: {logit_scale}")
 
-    # metrics = {}
     assert len(features_a) == len(features_b)
     hit_rate = 0
     logits_per_a = (logit_scale * features_a @ features_b.t()).detach().cpu()
@@ -194,16 +185,10 @@ def compute_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
     ground_truth = torch.arange(len(features_b)).view(-1, 1)
 
     for name, logit in logits.items():
-        print(f"name: {name}")
         ranking = torch.argsort(logit, descending=True)
         preds = torch.where(ranking == ground_truth)[1]
-        # print(f"preds: {preds}")
-        # preds = preds.detach().cpu()
-        # metrics[f"{name}_mean_rank"] = preds.mean() + 1
-        # metrics[f"{name}_median_rank"] = np.floor(np.median(preds)) + 1
+
         for k in top_ks:
-            # print(f"k: {k}")
-            print(f"(preds < k).float().mean(): {(preds < k).float().mean()}")
             hit_rate += (preds < k).float().mean()
 
     return hit_rate
@@ -866,7 +851,7 @@ def get_matcher_loss_func(
         return MultiNegativesSoftmaxLoss(
             local_loss=True,
             gather_with_grad=True,
-            cache_labels=True,
+            cache_labels=False,
         )
     else:
         raise ValueError(f"Unknown metric learning loss: {loss_type}")
