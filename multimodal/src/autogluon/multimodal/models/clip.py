@@ -196,11 +196,7 @@ class CLIPForImageText(nn.Module):
 
             ret[LOGITS] = logits
 
-        # logger.debug(f"logit_scale: {self.model.logit_scale}")
-        # logger.debug(f"logit_scale type: {type(self.model.logit_scale)}")
-        # logger.debug(f"logit_scale exp: {self.model.logit_scale.exp()}")
         ret[LOGIT_SCALE] = self.model.logit_scale.exp()
-        # logger.debug(f"ret[LOGIT_SCALE] type: {type(ret[LOGIT_SCALE])}")
 
         return {self.prefix: ret}
 

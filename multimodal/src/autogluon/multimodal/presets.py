@@ -161,6 +161,8 @@ def text_similarity():
         "model.names": ["hf_text"],
         "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
         "model.hf_text.pooling_mode": "mean",
+        "data.categorical.convert_to_text": True,
+        "data.numerical.convert_to_text": True,
     }
 
 
