@@ -247,6 +247,9 @@ class MultimodalFusionTransformer(nn.Module):
         share_qv_weights: Optional[bool] = False,
         row_attention: Optional[bool] = False,
         row_attention_layer: Optional[str] = None,
+        num_numerical_columns: Optional[int] = None,
+        num_categories: Optional[List[int]] = None,
+        pretrain_objective: Optional[str] = "both",
     ):
         """
         Parameters
@@ -362,12 +365,41 @@ class MultimodalFusionTransformer(nn.Module):
             row_attention_layer=row_attention_layer,
         )
 
-        self.head = FT_Transformer.Head(
-            d_in=in_features,
-            d_out=num_classes,
-            bias=True,
-            activation=head_activation,
-            normalization=head_normalization,
+        self.heads = nn.ModuleDict(
+            {
+                "target": FT_Transformer.Head(
+                    d_in=in_features,
+                    d_out=num_classes,
+                    bias=True,
+                    activation=head_activation,
+                    normalization=head_normalization,
+                ),
+                "contrastive_1": FT_Transformer.ContrastiveHead(
+                    d_in=in_features,
+                    d_out=in_features,
+                    bias=True,
+                    activation=head_activation,
+                    normalization=head_normalization,
+                ) if pretrain_objective in ["contrastive", "both"]
+                else None,
+                "contrastive_2": FT_Transformer.ContrastiveHead(
+                    d_in=in_features,
+                    d_out=in_features,
+                    bias=True,
+                    activation=head_activation,
+                    normalization=head_normalization,
+                ) if pretrain_objective in ["contrastive", "both"]
+                else None,
+                "reconstruction": FT_Transformer.ReconstructionHead(
+                    d_in=in_features,
+                    bias=True,
+                    activation=head_activation,
+                    normalization=head_normalization,
+                    n_num_features=num_numerical_columns,
+                    category_sizes=num_categories,
+                ) if pretrain_objective in ["reconstruction", "both"]
+                else None,
+            }
         )
 
         self.cls_token = CLSToken(
@@ -379,7 +411,7 @@ class MultimodalFusionTransformer(nn.Module):
 
         # init weights
         self.adapter.apply(init_weights)
-        self.head.apply(init_weights)
+        self.heads.apply(init_weights)
 
         self.prefix = prefix
 
@@ -393,6 +425,7 @@ class MultimodalFusionTransformer(nn.Module):
     def forward(
         self,
         batch: dict,
+        head: Optional[str] = "target",
     ):
         multimodal_features = []
         output = {}
@@ -411,7 +444,7 @@ class MultimodalFusionTransformer(nn.Module):
         multimodal_features = self.cls_token(multimodal_features)
         features = self.fusion_transformer(multimodal_features)
 
-        logits = self.head(features)
+        logits = self.heads[head](features)
         fusion_output = {
             self.prefix: {
                 LOGITS: logits,

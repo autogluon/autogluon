@@ -330,6 +330,8 @@ def create_model(
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
             row_attention=OmegaConf.select(model_config, "row_attention", default=False),
             row_attention_layer=OmegaConf.select(model_config, "row_attention_layer", default=None),
+            num_categories=num_categories,
+            num_numerical_columns=num_numerical_columns,
         )
     else:
         raise ValueError(f"unknown model name: {model_name}")

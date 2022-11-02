@@ -473,14 +473,87 @@ class FT_Transformer(nn.Module):
             super().__init__()
             self.normalization = _make_nn_module(normalization, d_in)
             self.activation = _make_nn_module(activation)
-            self.linear = nn.Linear(d_in, d_out, bias)
+            self.linear_first = nn.Linear(d_in, d_in, bias)
+            self.linear_second = nn.Linear(d_in, d_out, bias)
 
         def forward(self, x: Tensor) -> Tensor:
             x = x[:, -1]
+            x = self.linear_first(x)
             x = self.normalization(x)
             x = self.activation(x)
-            x = self.linear(x)
+            x = self.linear_second(x)
             return x
+
+    class ContrastiveHead(nn.Module):
+        """The final module of the `Transformer` that performs BERT-like inference."""
+
+        def __init__(
+            self,
+            *,
+            d_in: int,
+            bias: bool,
+            activation: ModuleType,
+            normalization: ModuleType,
+            d_out: int,
+        ):
+            super().__init__()
+            self.normalization = _make_nn_module(normalization, d_in)
+            self.activation = _make_nn_module(activation)
+            self.linear1 = nn.Linear(d_in, d_in, bias)
+            self.linear2 = nn.Linear(d_in, d_out, bias)
+
+        def forward(self, x: Tensor) -> Tensor:
+            x = x[:, :-1]
+            x = self.linear1(x)
+            x = self.normalization(x)
+            x = self.activation(x)
+            x = self.linear2(x)
+            return x
+
+    class ReconstructionHead(nn.Module):
+        """The final module of the `Transformer` that performs BERT-like inference."""
+
+        def __init__(
+            self,
+            *,
+            d_in: int,
+            bias: bool,
+            activation: ModuleType,
+            normalization: ModuleType,
+            n_num_features: Optional[int] = 0,
+            category_sizes: Optional[List[int]] = None,
+        ):
+            super().__init__()
+            self.normalization = _make_nn_module(normalization, d_in)
+            self.activation = _make_nn_module(activation)
+            self.linear = nn.Linear(d_in, d_in, bias)
+
+            self.num_out = nn.ModuleList([nn.Linear(d_in, 1) for _ in range(n_num_features)])
+
+            if category_sizes:
+                self.cat_out = nn.ModuleList([nn.Linear(d_in, o) for o in category_sizes])
+            else:
+                self.cat_out = None
+            self.category_sizes = category_sizes
+
+        def forward(self, x: Tensor):
+            x = x[:, :-1]
+            x = self.linear(x)
+            x = self.normalization(x)
+            x = self.activation(x)
+
+            if self.cat_out:
+                x_cat = x[:, :len(self.category_sizes), :]
+                cat_out = [f(x_cat[:, i]) for i, f in enumerate(self.cat_out)]
+            else:
+                cat_out = None
+
+            x_num = x
+            if self.category_sizes:
+                x_num = x[:, len(self.category_sizes):, :]
+            num_out = [f(x_num[:, i]) for i, f in enumerate(self.num_out)]
+            num_out = torch.concat(num_out, dim=1)
+            return {"num_out": num_out, "cat_out": cat_out}
 
     def __init__(
         self,

@@ -87,6 +87,7 @@ from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_mmdet import MMDetLitModule
 from .optimization.lit_module import LitModule
+from .optimization.lit_pretrainer import PretrainLitModule
 from .optimization.lit_ner import NerLitModule
 from .optimization.losses import RKDLoss
 from .optimization.utils import (
@@ -870,11 +871,19 @@ class MultiModalPredictor:
         if self._config is not None:  # continuous training
             config = self._config
 
+        is_pretrain = hyperparameters.pop("pretrainer") if "pretrainer" in hyperparameters else False
+
+        extra = []
+        if teacher_predictor is not None:
+            extra.append("distiller")
+        if is_pretrain:
+            extra.append("pretrainer")
+
         config = get_config(
             presets=presets,
             config=config,
             overrides=hyperparameters,
-            extra=["distiller"] if teacher_predictor is not None else None,
+            extra=extra if extra else None,
         )
 
         config = update_config_by_rules(
@@ -1085,6 +1094,25 @@ class MultiModalPredictor:
         elif self._pipeline == OBJECT_DETECTION:
             task = MMDetLitModule(
                 model=model,
+                **metrics_kwargs,
+                **optimization_kwargs,
+            )
+        elif is_pretrain:
+            task = PretrainLitModule(
+                model=model,
+                loss_func=loss_func,
+                efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+                mixup_fn=mixup_fn,
+                mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
+                model_postprocess_fn=model_postprocess_fn,
+                trainable_param_names=trainable_param_names,
+                pretrain_epochs=config.pretrainer.pretrain_epochs,
+                problem_type=self.problem_type,
+                augmentation_mode=config.pretrainer.augmentation_type,
+                corruption_rate=config.pretrainer.corruption_rate,
+                start_loss_coefficient=config.pretrainer.start_pretrain_coefficient,
+                end_loss_coefficient=config.pretrainer.end_pretrain_coefficient,
+                loss_mixup=config.pretrainer.loss_mixup,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
