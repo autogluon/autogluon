@@ -92,6 +92,7 @@ class DeepARMXNetModel(AbstractGluonTSMXNetModel):
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = DeepAREstimator
+    default_num_samples: int = 250
 
     def _get_estimator_init_args(self) -> dict:
         init_kwargs = super()._get_estimator_init_args()

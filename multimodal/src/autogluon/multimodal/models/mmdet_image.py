@@ -37,6 +37,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         prefix: str,
         checkpoint_name: str,
         num_classes: Optional[int] = None,
+        classes: Optional[list] = None,
         pretrained: Optional[bool] = True,
     ):
         """
@@ -50,6 +51,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             Name of the mmdet checkpoint.
         num_classes
             The number of classes.
+        classes
+            All classes in this dataset.
         pretrained
             Whether using the pretrained mmdet models. If pretrained=True, download the pretrained model.
         """
@@ -58,6 +61,13 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.pretrained = pretrained
         self.num_classes = num_classes
+        self.classes = classes
+
+        if self.classes:
+            if self.num_classes:
+                assert len(self.classes) == self.num_classes
+            else:
+                self.num_classes = len(self.classes)
 
         checkpoint, config_file = self._load_checkpoint_and_config()
 
@@ -84,22 +94,39 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
         self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
 
-        if self.pretrained and checkpoint is not None:
+        if self.pretrained and checkpoint is not None:  # TODO: enable training from scratch
             checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
 
-        if num_classes == 20:  # TODO: remove hardcode
-            self.model.CLASSES = get_classes("voc")
-        elif "CLASSES" in checkpoint.get("meta", {}):
-            self.model.CLASSES = checkpoint["meta"]["CLASSES"]
+        if self.classes:
+            self.model.CLASSES = self.classes
         else:
-            warnings.simplefilter("once")
-            warnings.warn("Class names are not saved in the checkpoint's " "meta data, use COCO classes by default.")
-            self.model.CLASSES = get_classes("coco")
+            if num_classes == 20:  # TODO: remove hardcode
+                warnings.simplefilter("once")
+                warnings.warn(
+                    f"Using VOC classes because num_classes = {num_classes}. Provide data while init MultiModalPredictor if this is not VOC."
+                )
+                self.model.CLASSES = get_classes("voc")
+            elif num_classes == 80:
+                warnings.simplefilter("once")
+                warnings.warn(
+                    f"Using COCO classes because num_classes = {num_classes}. Provide data while init MultiModalPredictor if this is not COCO."
+                )
+                self.model.CLASSES = get_classes("coco")
+            elif "CLASSES" in checkpoint.get("meta", {}):
+                warnings.simplefilter("once")
+                warnings.warn(
+                    f"Using classes provided in checkpoints: {checkpoint['meta']['CLASSES']}. Provide data while init MultiModalPredictor if this is not expected."
+                )
+                self.model.CLASSES = checkpoint["meta"]["CLASSES"]
+            else:
+                raise ValueError("Classes need to be specified.")
+
         self.model.cfg = self.config  # save the config in the model for convenience
 
         self.prefix = prefix
 
         self.name_to_id = self.get_layer_ids()
+        self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
     def _load_checkpoint_and_config(self, checkpoint_name=None):
         if not checkpoint_name:
@@ -218,12 +245,18 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
         Setting all layers as the same id 0 for now.
         TODO: Need to investigate mmdetection's model definitions
+        Currently only head to 0 others to 1.
 
         Returns
         -------
         A dictionary mapping the layer names (keys) to their ids (values).
         """
         name_to_id = {}
+        # now support: yolov3, faster_rcnn
+        head_layers_patterns = ["bbox_head.fc_cls", "bbox_head.fc_reg", "bbox_head.convs_pred"]
         for n, _ in self.named_parameters():
-            name_to_id[n] = 0
+            name_to_id[n] = 1
+            for pattern in head_layers_patterns:
+                if pattern in n:
+                    name_to_id[n] = 0
         return name_to_id

@@ -1,13 +1,17 @@
 import argparse
+import os.path
 
 from autogluon.multimodal import MultiModalPredictor
 
 
 def load_and_evaluate(
     load_path,
-    test_path="/media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_test.json",
+    test_path,
 ):
     predictor = MultiModalPredictor.load(load_path)
+
+    if os.path.isdir(load_path):
+        predictor.set_num_gpus(num_gpus=1)
 
     import time
 
@@ -20,7 +24,7 @@ def load_and_evaluate(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--load_path", type=str)
-    parser.add_argument("--test_path", default="/media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_test.json", type=str)
+    parser.add_argument("--test_path", type=str)
     args = parser.parse_args()
 
     load_and_evaluate(

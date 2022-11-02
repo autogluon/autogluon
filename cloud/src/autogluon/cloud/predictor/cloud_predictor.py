@@ -221,7 +221,7 @@ class CloudPredictor(ABC):
         if path is None:
             utcnow = datetime.utcnow()
             timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-            path = f'AutogluonCloudPredictor/ag-{timestamp}{os.path.sep}'
+            path = f'AutogluonCloudPredictor{os.path.sep}ag-{timestamp}{os.path.sep}'
         path = setup_outputdir(path)
         util_path = os.path.join(path, 'utils')
         try:
