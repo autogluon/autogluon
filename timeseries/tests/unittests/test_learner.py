@@ -6,23 +6,20 @@ from collections import defaultdict
 from unittest import mock
 
 import numpy as np
+import pandas as pd
 import pytest
 
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.models import DeepARModel, ETSModel
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_single_time_series
 
-from .common import (
-    DUMMY_TS_DATAFRAME,
-    DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC,
-    get_data_frame_with_variable_lengths,
-    get_static_features,
-)
+from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_variable_lengths, get_static_features
 
 TEST_HYPERPARAMETER_SETTINGS = [
-    {"SimpleFeedForward": {"epochs": 1}},
-    {"DeepAR": {"epochs": 1}, "ETS": {}},
+    {"SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
+    {"DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}, "Naive": {}},
 ]
 TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS = [1, 2]
 
@@ -286,3 +283,103 @@ def test_when_train_data_has_static_feat_but_pred_data_has_no_static_feat_then_e
     learner.fit(train_data=train_data, hyperparameters={"ETS": {"maxiter": 1}})
     with pytest.raises(ValueError, match="Provided data has no static_features"):
         learner.predict(pred_data)
+
+
+ITEM_ID_TO_LENGTH = {"B": 15, "A": 23, "C": 17}
+HYPERPARAMETERS_DUMMY = {"Naive": {}}
+
+
+def test_given_expected_known_covariates_missing_from_train_data_when_learner_fits_then_exception_is_raised(
+    temp_model_path,
+):
+    learner = TimeSeriesLearner(path_context=temp_model_path, known_covariates_names=["Y", "Z", "X"])
+    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["X", "Z"])
+    with pytest.raises(ValueError, match="\\['Y'\\] provided as known_covariates_names are missing from train_data"):
+        learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
+
+
+def test_given_extra_covariates_are_present_in_dataframe_when_learner_fits_then_they_are_ignored(temp_model_path):
+    learner = TimeSeriesLearner(path_context=temp_model_path, known_covariates_names=["Y", "X"])
+    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["X", "Y", "Z"])
+    with mock.patch("autogluon.timeseries.trainer.auto_trainer.AutoTimeSeriesTrainer.fit") as mock_fit:
+        learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
+        passed_train = mock_fit.call_args[1]["train_data"]
+        assert len(passed_train.columns.symmetric_difference(["Y", "X", "target"])) == 0
+
+
+def test_given_known_covariates_have_non_numeric_dtypes_when_learner_fits_then_exception_is_raised(temp_model_path):
+    learner = TimeSeriesLearner(path_context=temp_model_path, known_covariates_names=["Y", "Z", "X"])
+    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["X", "Z", "Y"])
+    train_data["Y"] = np.random.choice(["foo", "bar", "baz"], size=len(train_data)).astype("O")
+    with pytest.raises(ValueError, match="must all have numeric \(float or int\) dtypes"):
+        learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
+
+
+def test_given_expected_known_covariates_missing_from_data_when_learner_predicts_then_exception_is_raised(
+    temp_model_path,
+):
+    prediction_length = 5
+    learner = TimeSeriesLearner(
+        path_context=temp_model_path, known_covariates_names=["X", "Y"], prediction_length=prediction_length
+    )
+    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Y", "X"])
+    learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
+
+    pred_data = train_data.slice_by_timestep(None, -prediction_length)
+    known_covariates = train_data.slice_by_timestep(-prediction_length, None).drop("target", axis=1)
+    known_covariates.drop("X", axis=1, inplace=True)
+    with pytest.raises(
+        ValueError, match="\\['X'\\] provided as known_covariates_names are missing from known_covariates."
+    ):
+        learner.predict(data=pred_data, known_covariates=known_covariates)
+
+
+def test_given_extra_covariates_are_present_in_dataframe_when_learner_predicts_then_they_are_ignored(temp_model_path):
+    prediction_length = 5
+    learner = TimeSeriesLearner(
+        path_context=temp_model_path, known_covariates_names=["Y", "X"], prediction_length=prediction_length
+    )
+    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Y", "X"])
+    learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
+
+    data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Z", "Y", "X"])
+    pred_data = data.slice_by_timestep(None, -prediction_length)
+    known_covariates = data.slice_by_timestep(-prediction_length, None).drop("target", axis=1)
+    with mock.patch("autogluon.timeseries.trainer.auto_trainer.AutoTimeSeriesTrainer.predict") as mock_predict:
+        learner.predict(data=pred_data, known_covariates=known_covariates)
+        passed_data = mock_predict.call_args[1]["data"]
+        passed_known_covariates = mock_predict.call_args[1]["known_covariates"]
+        assert len(passed_data.columns.symmetric_difference(["Y", "X", "target"])) == 0
+        assert len(passed_known_covariates.columns.symmetric_difference(["Y", "X"])) == 0
+
+
+@pytest.mark.parametrize("prediction_length", [5, 2])
+def test_given_extra_items_and_timestamps_are_present_in_dataframe_when_learner_predicts_then_correct_subset_is_selected(
+    temp_model_path,
+    prediction_length,
+):
+    learner = TimeSeriesLearner(
+        path_context=temp_model_path, known_covariates_names=["Y", "X"], prediction_length=prediction_length
+    )
+    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Y", "X"])
+    learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
+
+    data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Y", "X"])
+    pred_data = data.slice_by_timestep(None, -prediction_length)
+
+    # known_covariates includes additional item_ids and additional timestamps
+    extended_item_id_to_length = {"D": 25, "E": 37, "F": 14}
+    for item_id, length in ITEM_ID_TO_LENGTH.items():
+        extended_item_id_to_length[item_id] = length + 7
+    extended_data = get_data_frame_with_variable_lengths(extended_item_id_to_length, known_covariates_names=["Y", "X"])
+    known_covariates = extended_data.drop("target", axis=1)
+
+    with mock.patch("autogluon.timeseries.trainer.auto_trainer.AutoTimeSeriesTrainer.predict") as mock_predict:
+        learner.predict(data=pred_data, known_covariates=known_covariates)
+        passed_known_covariates = mock_predict.call_args[1]["known_covariates"]
+        assert len(passed_known_covariates.item_ids.symmetric_difference(pred_data.item_ids)) == 0
+        for item_id in pred_data.item_ids:
+            expected_forecast_timestamps = get_forecast_horizon_index_single_time_series(
+                pred_data.loc[item_id].index, freq=pred_data.freq, prediction_length=prediction_length
+            )
+            assert (passed_known_covariates.loc[item_id].index == expected_forecast_timestamps).all()

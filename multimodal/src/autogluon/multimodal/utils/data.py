@@ -264,7 +264,7 @@ def assign_feature_column_names(
     The data processors with feature column names added.
     """
     for per_modality in data_processors:
-        if per_modality == LABEL:
+        if per_modality == LABEL or per_modality == NER:
             continue
         for per_model_processor in data_processors[per_modality]:
             # requires_column_info=True is used for feature column distillation.

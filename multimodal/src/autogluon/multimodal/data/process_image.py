@@ -432,7 +432,8 @@ class ImageProcessor:
                         )
                         is_zero_img = False
                         try:
-                            img = PIL.Image.open(img_path).convert("RGB")
+                            with PIL.Image.open(img_path) as img:
+                                img = img.convert("RGB")
                         except Exception as e:
                             if self.missing_value_strategy.lower() == "zero":
                                 logger.debug(f"Using a zero image due to '{e}'")
