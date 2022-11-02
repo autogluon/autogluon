@@ -1,7 +1,7 @@
 # AutoMM Detection - Evaluate Pretrained YOLOv3 on COCO Format Dataset
 :label:`sec_automm_detection_eval_yolov3_coco`
 
-In this section, our goal is to evaluate YOLOv3 model on VOC2007 dataset in COCO format. We start with yolov3 because it's extremely fast and accurate, and is a good choice to deploy with strict time and computational restrictions.
+In this section, our goal is to evaluate YOLOv3 model on COCO17 dataset in COCO format. We start with yolov3 because it's extremely fast and accurate, and is a good choice to deploy with strict time and computational restrictions.
 
 To start, import MultiModalPredictor:
 

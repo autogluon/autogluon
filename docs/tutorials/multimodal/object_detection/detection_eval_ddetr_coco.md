@@ -1,7 +1,7 @@
 # AutoMM Detection - Evaluate Pretrained Deformable DETR on COCO Format Dataset
 :label:`sec_automm_detection_eval_ddetr_coco`
 
-In this section, our goal is to evaluate Deformable DETR model on VOC2007 dataset in COCO format. 
+In this section, our goal is to evaluate Deformable DETR model on COCO17 dataset in COCO format. 
 Previously we introduced 2 classic models: :ref:`sec_automm_detection_eval_yolov3_coco` and :ref:`sec_automm_detection_eval_fasterrcnn_coco`.
 Recent years Transformer models become more and more popular in Computer Vision, and Deformable DEtection TRansformer (Deformable DETR) reached the SOTA performance in detection task.
 In terms of speed, it's slower than YOLOv3 and Faster-RCNN, but it also has higher performance.

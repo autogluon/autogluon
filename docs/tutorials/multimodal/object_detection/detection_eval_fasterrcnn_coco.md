@@ -1,7 +1,7 @@
 # AutoMM Detection - Evaluate Pretrained Faster R-CNN on COCO Format Dataset
 :label:`sec_automm_detection_eval_fasterrcnn_coco`
 
-In this section, our goal is to evaluate Faster-RCNN model on VOC2007 dataset in COCO format.
+In this section, our goal is to evaluate Faster-RCNN model on COCO17 dataset in COCO format.
 In previous section :ref:`sec_automm_detection_eval_yolov3_coco`, we evaluated YOLOv3 which is small and fast. But if higher performance is required, we need a bigger model.
 And Faster R-CNN has a balance in speed and performance trade-offs.
 
