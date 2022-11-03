@@ -141,7 +141,8 @@ predictor.fit(train_en_df.sample(200, random_state=123),
                   "optimization.end_lr": 3e-03,
                   "optimization.max_epochs": 1,
                   "optimization.warmup_steps": 0,
-                  "env.batch_size": 32,
+                  "env.batch_size": 16,
+                  "env.eval_batch_size_ratio": 1
               })
 
 ```
