@@ -53,7 +53,15 @@ extras_require = {
     'vowpalwabbit': [
         'vowpalwabbit>=8.10,<8.11'
     ],
+    'onnxruntime': [
+        'onnxruntime>=1.12.0,<1.13.0',
+    ],
     'skl2onnx': [
+        'skl2onnx>=1.12.0,<1.13.0',
+        # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
+        # Therefore, we install onnxruntime explicitly here just for macOS.
+        'onnxruntime>=1.12.0,<1.13.0'
+    ] if sys.platform == 'darwin' else [
         'skl2onnx>=1.12.0,<1.13.0'
     ]
 }
@@ -67,7 +75,7 @@ extras_require['all'] = all_requires
 
 
 test_requires = []
-for test_package in ['imodels', 'vowpalwabbit', 'skl2onnx']:
+for test_package in ['imodels', 'vowpalwabbit', 'onnxruntime', 'skl2onnx']:
     test_requires += extras_require[test_package]
 extras_require['tests'] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
