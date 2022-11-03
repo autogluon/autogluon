@@ -155,6 +155,7 @@ class CustomHitRate(torchmetrics.Metric):
     Compute the hit rate when doing semantic search between two group of embeddings.
     We assume that (a_i, p_i) are a positive pair and (a_i, p_j) for i!=j a negative pair.
     """
+
     def __init__(
         self,
     ):

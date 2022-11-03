@@ -211,6 +211,7 @@ class MultiNegativesSoftmaxLoss(nn.Module):
         It then minimizes the negative log-likehood for softmax normalized scores.
         It can also support gather negatives across processes.
     """
+
     def __init__(
         self,
         local_loss=False,
