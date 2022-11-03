@@ -371,7 +371,7 @@ def compute_ranking_score(
     evaluator = RankingMetrics(pred=results, target=qrel_dict)
     for k in cutoff:
         scores.update(evaluator.compute(k=k))
- 
+
     metric_results = dict()
     for k in cutoff:
         for per_metric in metrics:
