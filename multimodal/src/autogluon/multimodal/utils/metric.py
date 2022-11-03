@@ -17,15 +17,21 @@ from ..constants import (
     BINARY,
     DIRECT_LOSS,
     F1,
+    HIT_RATE,
+    IMAGE_TEXT_SIMILARITY,
     MAP,
     METRIC_MODE_MAP,
     MULTICLASS,
+    NDCG,
     NER,
     OBJECT_DETECTION,
     OVERALL_ACCURACY,
+    PRECISION,
+    RECALL,
     REGRESSION,
     RMSE,
     ROC_AUC,
+    TEXT_SIMILARITY,
     VALID_METRICS,
     Y_PRED,
     Y_PRED_PROB,
@@ -72,7 +78,10 @@ def infer_metrics(
             raise ValueError(f"Metric {eval_metric_name} is only supported for binary classification.")
 
         if eval_metric_name in VALID_METRICS:
-            validation_metric_name = eval_metric_name
+            if pipeline == IMAGE_TEXT_SIMILARITY:
+                validation_metric_name = HIT_RATE
+            else:
+                validation_metric_name = eval_metric_name
             return validation_metric_name, eval_metric_name
 
         warnings.warn(
@@ -100,6 +109,8 @@ def infer_metrics(
                 raise ValueError(
                     f"Problem type: {problem_type}, pipeline: {pipeline}, validation_metric_name: {validation_metric_name} is not supported!"
                 )
+        elif pipeline == IMAGE_TEXT_SIMILARITY:
+            return HIT_RATE, NDCG
         else:
             raise NotImplementedError(f"Problem type: {problem_type}, pipeline: {pipeline} is not supported yet!")
     else:
@@ -335,43 +346,53 @@ class RankingMetrics:
 
 
 def compute_ranking_score(
-    results: Dict[str, Dict], qrel_dict: Dict[str, Dict], cutoff: Optional[List[int]] = [5, 10, 20]
+    results: Dict[str, Dict], qrel_dict: Dict[str, Dict], metrics: List[str], cutoff: Optional[List[int]] = [5, 10, 20]
 ):
     """
-    Compute NDCG, MAP, Recall, and Precision.
+    Compute the ranking metrics, e.g., NDCG, MAP, Recall, and Precision.
     TODO: Consider MRR.
 
     Parameters
     ----------
-    qrel_dict:
-        the groundtruth query and document relavance
     results:
-        the query/document ranking list by the model
+        The query/document ranking list by the model.
+    qrel_dict:
+        The groundtruth query and document relevance.
+    metrics
+        A list of metrics to compute.
     cutoff:
-        the cutoff value for NDCG, MAP, Recall, and Precision
-    """
-    ndcg = {}
-    _map = {}
-    mrr = {}
-    recall = {}
-    precision = {}
-    for k in cutoff:
-        ndcg[f"ndcg@{k}"] = 0.0
-        _map[f"map@{k}"] = 0.0
-        mrr[f"mrr@{k}"] = 0.0
-        recall[f"recall@{k}"] = 0.0
-        precision[f"precision@{k}"] = 0.0
+        The cutoff values for NDCG, MAP, Recall, and Precision.
 
+    Returns
+    -------
+    A dict of metric scores.
+    """
     scores = {}
     evaluator = RankingMetrics(pred=results, target=qrel_dict)
     for k in cutoff:
         scores.update(evaluator.compute(k=k))
+ 
+    metric_results = dict()
+    for k in cutoff:
+        for per_metric in metrics:
+            if per_metric.lower() == NDCG:
+                metric_results[f"{NDCG}@{k}"] = 0.0
+            elif per_metric.lower() == MAP:
+                metric_results[f"{MAP}@{k}"] = 0.0
+            elif per_metric.lower() == RECALL:
+                metric_results[f"{RECALL}@{k}"] = 0.0
+            elif per_metric.lower() == PRECISION:
+                metric_results[f"{PRECISION}@{k}"] = 0.0
 
     for k in cutoff:
-        ndcg[f"ndcg@{k}"] = round(scores[f"ndcg@{k}"], 5)
-        _map[f"map@{k}"] = round(scores[f"map@{k}"], 5)
-        recall[f"recall@{k}"] = round(scores[f"recall@{k}"], 5)
-        mrr[f"mrr@{k}"] = round(scores[f"mrr@{k}"], 5)
-        precision[f"precision@{k}"] = round(scores[f"precision@{k}"], 5)
+        for per_metric in metrics:
+            if per_metric.lower() == NDCG:
+                metric_results[f"{NDCG}@{k}"] = round(scores[f"{NDCG}@{k}"], 5)
+            elif per_metric.lower() == MAP:
+                metric_results[f"{MAP}@{k}"] = round(scores[f"{MAP}@{k}"], 5)
+            elif per_metric.lower() == RECALL:
+                metric_results[f"{RECALL}@{k}"] = round(scores[f"{RECALL}@{k}"], 5)
+            elif per_metric.lower() == PRECISION:
+                metric_results[f"{PRECISION}@{k}"] = round(scores[f"{PRECISION}@{k}"], 5)
 
-    return ndcg, _map, recall, precision
+    return metric_results
