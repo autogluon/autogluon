@@ -141,7 +141,7 @@ predictor.fit(train_en_df.sample(200, random_state=123),
                   "optimization.end_lr": 3e-03,
                   "optimization.max_epochs": 1,
                   "optimization.warmup_steps": 0,
-                  "env.batch_size": 16,
+                  "env.batch_size": 8,
                   "env.eval_batch_size_ratio": 1
               })
 
@@ -150,11 +150,7 @@ predictor.fit(train_en_df.sample(200, random_state=123),
 
 ```{.python .input}
 score_in_en = predictor.evaluate(test_en_df)
-score_in_de = predictor.evaluate(test_de_df)
-score_in_jp = predictor.evaluate(test_jp_df)
 print('Score in the English Testset:', score_in_en)
-print('Score in the German Testset:', score_in_de)
-print('Score in the Japanese Testset:', score_in_jp)
 ```
 
 ```{.python .input}
