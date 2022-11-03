@@ -42,7 +42,8 @@ While using VOC format dataset, the input is the root path of the dataset, and c
 Annotations  ImageSets  JPEGImages labels.txt
 ```
 
-Where `labels.txt` shall be added to include all the labels in the dataset:
+Here `labels.txt` shall be added manually to include all the labels in the dataset. 
+In this example, the content of `labels.txt` is shown as below:
 
 ```
 aeroplane

@@ -1,9 +1,8 @@
-# AutoMM Detection - Evaluate Pretrained Faster R-CNN on COCO Format Dataset
-:label:`sec_automm_detection_eval_fasterrcnn_coco`
+# AutoMM Detection - Prepare COCO2017 Dataset
+:label:`sec_automm_detection_prepare_coco17`
 
-In this section, our goal is to evaluate Faster-RCNN model on COCO17 dataset in COCO format.
-In previous section :ref:`sec_automm_detection_eval_yolov3_coco`, we evaluated YOLOv3 which is small and fast. But if higher performance is required, we need a bigger model.
-And Faster R-CNN has a balance in speed and performance trade-offs.
+[COCO](https://cocodataset.org/#home) is a large-scale object detection, segmentation, and captioning dataset. 
+This tutorial will walk through the steps of preparing this dataset for Autogluon MultiModalPredictor.
 
 To start, import MultiModalPredictor:
 
