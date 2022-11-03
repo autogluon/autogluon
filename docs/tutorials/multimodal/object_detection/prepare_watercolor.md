@@ -61,7 +61,7 @@ And after it finished, VOC datasets are extracted in folder `watercolor`, it con
 
 ```
 
-###Dataset Format
+### Dataset Format
 
 Watercolor is in VOC format. **In Autogluon MultiModalPredictor, we strongly recommend using COCO as your data format instead.
 Check :label:`sec_automm_detection_prepare_coco17` and \[Convert VOC to COCO] for more information
