@@ -33,6 +33,17 @@ directly evaluate its performance on the German and Japanese test set.
 !unzip -q -o amazon_review_sentiment_cross_lingual.zip -d .
 ```
 
+```{.python .input}
+import os
+import shutil
+os.environ["TRANSFORMERS_CACHE"] = "cache"
+
+def clear_cache():
+    if os.path.exists("cache"):
+        shutil.rmtree("cache")
+
+clear_cache()
+```
 
 ```{.python .input}
 import pandas as pd
@@ -108,11 +119,17 @@ To turn on gradient checkpointing, all you need is to set `"model.hf_text.gradie
 To accelerate the training speed of this tutorial, we will use [google/flan-t5-large](https://huggingface.co/google/flan-t5-large). You can change it to [google/flan-t5-xl](https://huggingface.co/google/flan-t5-xl) when running the code. 
 
 ```{.python .input}
+# Just for clean the space
+clear_cache()
+shutil.rmtree("multilingual_ia3")
+```
+
+```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
 
 predictor = MultiModalPredictor(label="label",
                                 path="multilingual_ia3_gradient_checkpoint")
-predictor.fit(train_en_df,
+predictor.fit(train_en_df.sample(200, random_state=123),
               presets="multilingual",
               hyperparameters={
                   "model.hf_text.checkpoint_name": "google/flan-t5-xl",
@@ -137,6 +154,12 @@ score_in_jp = predictor.evaluate(test_jp_df)
 print('Score in the English Testset:', score_in_en)
 print('Score in the German Testset:', score_in_de)
 print('Score in the Japanese Testset:', score_in_jp)
+```
+
+```{.python .input}
+# Just for clean the space
+clear_cache()
+shutil.rmtree("multilingual_ia3_gradient_checkpoint")
 ```
 
 ## Other Examples
