@@ -33,8 +33,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         exceeds ``max_train_size``, then ``max_train_size`` many rows are subsampled from the dataframe.
     tabular_hyperparmeters : Dict[Dict[str, Any]], optional
         Hyperparameters dictionary passed to `TabularPredictor.fit`. Contains the names of models that should be fit.
-        Defaults to ``AutoGluonTabularModel.default_tabular_hyperparameters``.
-        Note that the selected models must support ``problem_type="quantile"``.
+        Defaults to ``{"XGB": {}, "CAT": {}, "GBM" :{}}``.
     """
 
     default_tabular_hyperparameters = {
