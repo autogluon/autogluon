@@ -1,5 +1,5 @@
-from typing import Optional
 import logging
+from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -8,6 +8,7 @@ import torch.nn.functional as F
 try:
     import torch.distributed.nn
     from torch import distributed as dist
+
     has_distributed = True
 except ImportError:
     has_distributed = False
@@ -137,17 +138,11 @@ class SoftTargetCrossEntropy(nn.Module):
 
 
 def gather_features(
-        image_features,
-        text_features,
-        local_loss=False,
-        gather_with_grad=False,
-        rank=0,
-        world_size=1,
-        use_horovod=False
+    image_features, text_features, local_loss=False, gather_with_grad=False, rank=0, world_size=1, use_horovod=False
 ):
-    assert has_distributed, 'torch.distributed did not import correctly, please use a PyTorch version with support.'
+    assert has_distributed, "torch.distributed did not import correctly, please use a PyTorch version with support."
     if use_horovod:
-        assert hvd is not None, 'Please install horovod'
+        assert hvd is not None, "Please install horovod"
         if gather_with_grad:
             all_image_features = hvd.allgather(image_features)
             all_text_features = hvd.allgather(text_features)
@@ -184,13 +179,12 @@ def gather_features(
 
 
 class MultiNegativesSoftmaxLoss(nn.Module):
-
     def __init__(
-            self,
-            local_loss=False,
-            gather_with_grad=False,
-            cache_labels=False,
-            use_horovod=False,
+        self,
+        local_loss=False,
+        gather_with_grad=False,
+        cache_labels=False,
+        use_horovod=False,
     ):
         super().__init__()
         self.local_loss = local_loss
@@ -206,8 +200,8 @@ class MultiNegativesSoftmaxLoss(nn.Module):
         device = features_a.device
         if world_size > 1:
             all_features_a, all_features_b = gather_features(
-                features_a, features_b,
-                self.local_loss, self.gather_with_grad, rank, world_size, self.use_horovod)
+                features_a, features_b, self.local_loss, self.gather_with_grad, rank, world_size, self.use_horovod
+            )
 
             if self.local_loss:
                 logits_per_a = logit_scale * features_a @ all_features_b.T
@@ -231,8 +225,5 @@ class MultiNegativesSoftmaxLoss(nn.Module):
         else:
             labels = self.labels[device]
 
-        total_loss = (
-            F.cross_entropy(logits_per_a, labels) +
-            F.cross_entropy(logits_per_b, labels)
-            ) / 2
+        total_loss = (F.cross_entropy(logits_per_a, labels) + F.cross_entropy(logits_per_b, labels)) / 2
         return total_loss

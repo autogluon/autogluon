@@ -6,12 +6,12 @@ import tempfile
 
 import numpy.testing as npt
 import pytest
-from unittest_datasets import IDChangeDetectionDataset, Flickr30kDataset
+from unittest_datasets import Flickr30kDataset, IDChangeDetectionDataset
 from utils import get_home_dir
 
 from autogluon.multimodal import MultiModalMatcher
 from autogluon.multimodal.constants import BINARY, MULTICLASS, QUERY, RESPONSE, UNIFORM_SOUP
-from autogluon.multimodal.utils import semantic_search, convert_data_for_ranking
+from autogluon.multimodal.utils import convert_data_for_ranking, semantic_search
 
 ALL_DATASETS = {
     "id_change_detection": IDChangeDetectionDataset,
@@ -57,7 +57,12 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
     )
 
     if symmetric:
-        test_df_with_label, test_query_image_data, test_response_text_data, test_label_column = convert_data_for_ranking(
+        (
+            test_df_with_label,
+            test_query_image_data,
+            test_response_text_data,
+            test_label_column,
+        ) = convert_data_for_ranking(
             data=test_df,
             query_column=response_column,
             response_column=query_column,
@@ -162,14 +167,22 @@ def test_matcher(
         )
         text_to_image_hits = semantic_search(
             matcher=matcher,
-            query_data={query: dataset.test_df[query].tolist()},  # need a dict/dataframe instead of a list for a trained matcher
-            response_data={response: dataset.test_df[response].tolist()}, # need a dict/dataframe instead of a list for a trained matcher
+            query_data={
+                query: dataset.test_df[query].tolist()
+            },  # need a dict/dataframe instead of a list for a trained matcher
+            response_data={
+                response: dataset.test_df[response].tolist()
+            },  # need a dict/dataframe instead of a list for a trained matcher
             top_k=5,
         )
         image_to_text_hits = semantic_search(
             matcher=matcher,
-            query_data={response: dataset.test_df[response].tolist()}, # need a dict/dataframe instead of a list for a trained matcher
-            response_data={query: dataset.test_df[query].tolist()}, # need a dict/dataframe instead of a list for a trained matcher
+            query_data={
+                response: dataset.test_df[response].tolist()
+            },  # need a dict/dataframe instead of a list for a trained matcher
+            response_data={
+                query: dataset.test_df[query].tolist()
+            },  # need a dict/dataframe instead of a list for a trained matcher
             top_k=5,
         )
     else:

@@ -462,10 +462,12 @@ def semantic_search(
     return queries_result_list
 
 
-def convert_data_for_ranking(data: pd.DataFrame, query_column: str, response_column: str, label_column: Optional[str] = None):
+def convert_data_for_ranking(
+    data: pd.DataFrame, query_column: str, response_column: str, label_column: Optional[str] = None
+):
     data_with_label = data.copy()
     if label_column is None:
-        data_with_label["relevance"] = [1]*len(data)
+        data_with_label["relevance"] = [1] * len(data)
         label_column = "relevance"
 
     query_data = pd.DataFrame({query_column: data[query_column].unique().tolist()})

@@ -12,11 +12,11 @@ from ..constants import (
     IMAGE,
     IMAGE_VALID_NUM,
     LABEL,
+    LOGIT_SCALE,
     LOGITS,
     MASKS,
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
-    LOGIT_SCALE,
 )
 from .utils import assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
 

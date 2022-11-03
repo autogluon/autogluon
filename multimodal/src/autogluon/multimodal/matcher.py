@@ -34,6 +34,7 @@ from .constants import (
     CLASSIFICATION,
     FEATURES,
     GREEDY_SOUP,
+    IMAGE_TEXT_SIMILARITY,
     LABEL,
     LAST_CHECKPOINT,
     MAX,
@@ -50,7 +51,6 @@ from .constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    IMAGE_TEXT_SIMILARITY,
 )
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
@@ -72,6 +72,7 @@ from .utils import (
     compute_ranking_score,
     compute_score,
     compute_semantic_similarity,
+    convert_data_for_ranking,
     create_fusion_data_processors,
     create_siamese_model,
     customize_model_names,
@@ -92,7 +93,6 @@ from .utils import (
     select_model,
     tensor_to_ndarray,
     try_to_infer_pos_label,
-    convert_data_for_ranking,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -507,7 +507,9 @@ class MultiModalMatcher:
 
         if response_columns is None:
             response_df_preprocessor = None
-        elif self._response_df_preprocessor is None and all(v is not None for v in [response_columns, response_config]):
+        elif self._response_df_preprocessor is None and all(
+            v is not None for v in [response_columns, response_config]
+        ):
             response_df_preprocessor = init_df_preprocessor(
                 config=response_config,
                 column_types={k: column_types[k] for k in response_columns},
@@ -518,7 +520,9 @@ class MultiModalMatcher:
 
         if self._label_column is None:
             label_df_preprocessor = None
-        elif self._label_df_preprocessor is None and response_config is not None and self._label_column in column_types:
+        elif (
+            self._label_df_preprocessor is None and response_config is not None and self._label_column in column_types
+        ):
             label_df_preprocessor = init_df_preprocessor(
                 config=response_config,
                 column_types={self._label_column: column_types[self._label_column]},
@@ -973,7 +977,9 @@ class MultiModalMatcher:
                         if self._pipeline == IMAGE_TEXT_SIMILARITY:
                             cand_score = self._evaluate_symmetric_ranking(val_df)
                         else:
-                            cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
+                            cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[
+                                validation_metric_name
+                            ]
                         if monitor_op(cand_score, best_score):
                             # Add new ingredient
                             ingredients.append(top_k_model_paths[i])
@@ -1277,17 +1283,13 @@ class MultiModalMatcher:
 
         rank_labels = {}
         for i, per_row in qr_relevance.iterrows():
-            rank_labels.setdefault(per_row[query_column], {})[per_row[response_column]] = int(
-                per_row[label_column]
-            )
+            rank_labels.setdefault(per_row[query_column], {})[per_row[response_column]] = int(per_row[label_column])
 
         rank_results = dict()
         query_embeddings = self.extract_embedding(query_data, id_mappings=id_mappings, as_tensor=True)
         num_chunks = max(1, len(response_data) // chunk_size)
         for response_chunk in np.array_split(response_data, num_chunks):
-            response_embeddings = self.extract_embedding(
-                response_chunk, id_mappings=id_mappings, as_tensor=True
-            )
+            response_embeddings = self.extract_embedding(response_chunk, id_mappings=id_mappings, as_tensor=True)
             similarity_scores = compute_semantic_similarity(
                 a=query_embeddings, b=response_embeddings, similarity_type=similarity_type
             )
@@ -1419,10 +1421,14 @@ class MultiModalMatcher:
         """
         if all(v is not None for v in [data, query_data, response_data]):
             if isinstance(query_data, list):
-                assert self._query is not None, "query_data is a list. Need a dict or dataframe, whose keys or headers should be in data's headers."
+                assert (
+                    self._query is not None
+                ), "query_data is a list. Need a dict or dataframe, whose keys or headers should be in data's headers."
 
             if isinstance(response_data, list):
-                assert self._response is not None, "response_data is a list. Need a dict or dataframe, whose keys or headers should be in data's headers."
+                assert (
+                    self._response is not None
+                ), "response_data is a list. Need a dict or dataframe, whose keys or headers should be in data's headers."
 
             query_header = self._query[0] if self._query else None
             query_data = data_to_df(data=query_data, header=query_header)
@@ -1596,7 +1602,9 @@ class MultiModalMatcher:
                     elif self._response and all(c in data.columns for c in self._response):
                         signature = RESPONSE
                     else:
-                        raise ValueError(f"Both query `{self._query}` and response `{self._response}` are not within the data headers `{data.columns}`.")
+                        raise ValueError(
+                            f"Both query `{self._query}` and response `{self._response}` are not within the data headers `{data.columns}`."
+                        )
             else:
                 signature = QUERY
 

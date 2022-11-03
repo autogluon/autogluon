@@ -9,8 +9,10 @@ from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
-from ..constants import AUTOMM, FEATURES, PROBABILITY, QUERY, RESPONSE, LOGIT_SCALE
+from ..constants import AUTOMM, FEATURES, LOGIT_SCALE, PROBABILITY, QUERY, RESPONSE
+from .losses import MultiNegativesSoftmaxLoss
 from .utils import (
+    CustomHitRate,
     apply_layerwise_lr_decay,
     apply_single_lr,
     apply_two_stages_lr,
@@ -18,9 +20,7 @@ from .utils import (
     generate_metric_learning_labels,
     get_lr_scheduler,
     get_optimizer,
-    CustomHitRate,
 )
-from .losses import MultiNegativesSoftmaxLoss
 
 logger = logging.getLogger(AUTOMM)
 
@@ -236,7 +236,7 @@ class MatcherLitModule(pl.LightningModule):
         response_outputs = self.response_model(batch)[self.response_model.prefix]
         response_embeddings = response_outputs[FEATURES]
 
-        logit_scale = response_outputs[LOGIT_SCALE] if LOGIT_SCALE in response_outputs else None,
+        logit_scale = (response_outputs[LOGIT_SCALE] if LOGIT_SCALE in response_outputs else None,)
 
         if isinstance(logit_scale, tuple):
             logit_scale = logit_scale[0]

@@ -4,6 +4,7 @@ import re
 import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import torch
 import torchmetrics
 from omegaconf import DictConfig, OmegaConf
@@ -12,7 +13,6 @@ from torch import nn, optim
 from torch.nn import functional as F
 from transformers import Adafactor
 from transformers.trainer_pt_utils import get_parameter_names
-import numpy as np
 
 from ..constants import (
     ACC,
@@ -29,6 +29,7 @@ from ..constants import (
     DIRECT_LOSS,
     F1,
     FEATURES,
+    HIT_RATE,
     IA3,
     IA3_BIAS,
     IA3_NORM,
@@ -37,6 +38,7 @@ from ..constants import (
     LORA_BIAS,
     LORA_NORM,
     MAP,
+    MULTI_NEGATIVES_SOFTMAX_LOSS,
     MULTICLASS,
     NER,
     NORM_FIT,
@@ -50,11 +52,9 @@ from ..constants import (
     ROC_AUC,
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
-    HIT_RATE,
-    MULTI_NEGATIVES_SOFTMAX_LOSS,
 )
 from ..utils import MeanAveragePrecision
-from .losses import SoftTargetCrossEntropy, MultiNegativesSoftmaxLoss
+from .losses import MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
@@ -151,13 +151,20 @@ class CustomF1Score(torchmetrics.F1Score):
 
 
 class CustomHitRate(torchmetrics.Metric):
-    def __init__(self,):
+    def __init__(
+        self,
+    ):
         super().__init__()
         self.add_state("query_embeddings", default=[], dist_reduce_fx=None)
         self.add_state("response_embeddings", default=[], dist_reduce_fx=None)
         self.add_state("logit_scale", default=[], dist_reduce_fx=None)
 
-    def update(self, batch_query_embeds: torch.Tensor, batch_response_embeds: torch.Tensor, logit_scale: Optional[torch.Tensor] = None):
+    def update(
+        self,
+        batch_query_embeds: torch.Tensor,
+        batch_response_embeds: torch.Tensor,
+        logit_scale: Optional[torch.Tensor] = None,
+    ):
         self.query_embeddings.append(batch_query_embeds)
         self.response_embeddings.append(batch_response_embeds)
         if logit_scale is not None:
@@ -966,4 +973,3 @@ def compute_probability(
         prob = 1 - prob
 
     return prob
-
