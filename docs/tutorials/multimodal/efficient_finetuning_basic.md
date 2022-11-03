@@ -117,6 +117,7 @@ predictor.fit(train_en_df,
               hyperparameters={
                   "model.hf_text.checkpoint_name": "google/flan-t5-xl",
                   "model.hf_text.gradient_checkpointing": True,
+                  "model.hf_text.low_cpu_mem_usage": True,
                   "optimization.efficient_finetune": "ia3_bias",
                   "optimization.lr_decay": 0.9,
                   "optimization.learning_rate": 3e-03,
