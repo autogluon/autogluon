@@ -22,7 +22,10 @@ def test_preset_to_config():
     all_presets = list_automm_presets()
     for preset in all_presets:
         overrides = get_automm_presets(preset)
-        config = get_config(presets=preset, extra=["matcher", "distiller"],)
+        config = get_config(
+            presets=preset,
+            extra=["matcher", "distiller"],
+        )
         for k, v in overrides.items():
             assert OmegaConf.select(config, k) == v
 
