@@ -1,5 +1,5 @@
-# AutoMM Detection - Prepare COCO2017 Dataset
-:label:`sec_automm_detection_prepare_coco17`
+# AutoMM Detection - Evaluate Pretrained Faster R-CNN on COCO Format Dataset
+:label:`sec_automm_detection_eval_fasterrcnn_coco`
 
 [COCO](https://cocodataset.org/#home) is a large-scale object detection, segmentation, and captioning dataset. 
 This tutorial will walk through the steps of preparing this dataset for Autogluon MultiModalPredictor.

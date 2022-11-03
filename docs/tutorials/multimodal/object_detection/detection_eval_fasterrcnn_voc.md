@@ -1,4 +1,4 @@
-# AutoMM Detection - Evaluate Pretrained Faster R-CNN on COCO Format Dataset
+# AutoMM Detection - Evaluate Pretrained Faster R-CNN on VOC Format Dataset
 :label:`sec_automm_detection_eval_fasterrcnn_voc`
 
 In this section, our goal is to evaluate Faster-RCNN model on VOC2007 dataset in VOC format.
