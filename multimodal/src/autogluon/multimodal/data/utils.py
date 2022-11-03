@@ -377,6 +377,7 @@ def tokenize_ner_text(text, tokenizer):
     """
     # pre-tokenization is required for NER token-level label generation.
     words_with_offsets = tokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+    words_with_offsets = is_space_counted(words_with_offsets)
     words = [word for word, offset in words_with_offsets]
     word_offsets = np.array([[offset[0], offset[1]] for word, offset in words_with_offsets], dtype=np.int32)
     col_tokens = tokenizer(
@@ -394,6 +395,35 @@ def tokenize_ner_text(text, tokenizer):
     offset_mapping = np.array(col_tokens.offset_mapping, dtype=np.int32)
     word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
     return col_tokens, token_to_word_mappings, word_offsets
+
+def is_space_counted(words_with_offsets):
+    """
+    Some tokenizers will count space into words for example.
+    Given text: 'hello world', normal bert will output: [('hello', (0, 5)), ('world', (6, 11))]
+    while some checkpoint will output: [('▁hello', (0, 5)), ('▁world', (5, 11))]
+    This will lead to inconsistency issue during labelling, details can be found here:
+    https://github.com/huggingface/transformers/issues/18111
+
+    This function will check whether space is counted or not and realign the offset.
+    """
+    offset0, offset1 = [], []
+    for word, offset in words_with_offsets:
+        offset0.append(offset[0])
+        offset1.append(offset[1])
+
+    realign = []
+    if offset0[1:] == offset1[:-1]:  # space are counted into words
+        realign = [words_with_offsets[0]]
+        for word, offset in words_with_offsets[1:]:
+            if word.startswith("▁"):  # it is "Lower One Eighth Block" (U+2581) rather than lower line (U+005F).
+                realign.append((word, (offset[0] + 1, offset[1])))
+            else:
+                realign.append((word, offset))
+
+    if realign:
+        return realign
+    else:
+        return words_with_offsets
 
 
 def is_rois_input(sample):
