@@ -908,7 +908,6 @@ class AbstractModel:
         NOTE:
         - The model is assumed to be fitted before compilation.
         - If save_in_pkl attribute of the compiler is False, self.model would be set to None.
-          The compiled model can be loaded via load_model method.
 
         Parameters
         ----------
@@ -942,16 +941,52 @@ class AbstractModel:
                 self.model = None
             self.save(path=self.path, verbose=False)
 
-    def _get_input_types(self, batch_size=None):
+    # FIXME: This won't work for all models, and self._features is not
+    # a trustworthy variable for final input shape
+    def _get_input_types(self, batch_size=None) -> list:
+        """
+        Get input types as a list of tuples, containining shape and dtype.
+        This can be useful for building the input_types argument for
+        model compilation. This method can be overloaded in derived classes,
+        in order to satisfy class-specific requirements.
+
+        Parameters
+        ----------
+        batch_size : int, default=None
+            The batch size for all returned input types.
+
+        Returns
+        -------
+        List of (shape: Tuple[int], dtype: Any)
+        shape: Tuple[int]
+            A tuple that describes input
+        dtype: Any, default=np.float32
+            The element type in numpy dtype.
+        """
         return [((batch_size, len(self._features)), np.float32)]
 
     def _default_compiler(self):
+        """The default compiler for the underlining model."""
         return None
 
-    def _valid_compilers(self):
+    def _valid_compilers(self) -> list:
+        """A list of supported compilers for the underlining model."""
         return []
 
-    def _get_compiler(self, compiler='native', compiler_fallback_to_native=True):
+    def _get_compiler(self, compiler='native', compiler_fallback_to_native=False):
+        """
+        Verify whether the dependencies of the compiler class can be satisfied,
+        and return the specified compiler from _valid_compilers.
+
+        Parameters
+        ----------
+        compiler : str, default='native'
+            The specific compiler for model compilation.
+        compiler_fallback_to_native : bool, default=False
+            If this is True, the method would return native compiler when
+            dependencies of the specified compiler is not installed. The fallback
+            strategy won't be used by default.
+        """
         compilers = self._valid_compilers()
         compiler_names = {c.name: c for c in compilers}
         if compiler is not None and compiler not in compiler_names:
