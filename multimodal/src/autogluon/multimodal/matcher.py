@@ -96,8 +96,6 @@ from .utils import (
 )
 
 logger = logging.getLogger(AUTOMM)
-# logging.basicConfig()
-# logging.getLogger(AUTOMM).setLevel(logging.DEBUG)
 
 
 class MultiModalMatcher:

@@ -207,7 +207,6 @@ def apply_df_preprocessor(
         modality_types[per_modality] = per_modality_types
         if per_modality_features:
             lengths.append(len(per_modality_features[next(iter(per_modality_features))]))
-
     assert len(set(lengths)) == 1  # make sure each modality has the same sample num
     sample_num = lengths[0]
 
