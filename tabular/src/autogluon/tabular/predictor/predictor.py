@@ -1950,7 +1950,7 @@ class TabularPredictor:
             fi_df[low_str] = pd.Series(ci_low_dict)
         return fi_df
 
-    def compile_models(self, models='best', compiler_configs=None):
+    def compile_models(self, models='best', with_ancestors=True, compiler_configs=None):
         """
         Compile models for accelerated prediction.
         This can be helpful to reduce prediction latency and improve throughput.
@@ -1971,7 +1971,7 @@ class TabularPredictor:
                 This comes with an expense of utilizing larger memory for prediction.
         """
         self._assert_is_fit('compile_models')
-        self._trainer.compile_models(model_names=models, compiler_configs=compiler_configs)
+        self._trainer.compile_models(model_names=models, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
 
     def persist_models(self, models='best', with_ancestors=True, max_memory=0.1) -> list:
         """

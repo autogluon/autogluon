@@ -35,11 +35,13 @@ class RFOnnxPredictor:
         self.num_classes = self.sess.get_outputs()[-1].shape[1]
 
     def predict(self, X):
+        """Run the model with the input and return the result."""
         input_name = self.sess.get_inputs()[0].name
         label_name = self.sess.get_outputs()[0].name
         return self.sess.run([label_name], {input_name: X})[0].squeeze()
 
     def predict_proba(self, X):
+        """Run the model with the input, and return probabilities as result."""
         input_name = self.sess.get_inputs()[0].name
         label_name = self.sess.get_outputs()[1].name
         pred_proba = self.sess.run([label_name], {input_name: X})[0]
@@ -53,6 +55,7 @@ class RFOnnxCompiler:
 
     @staticmethod
     def can_compile():
+        """Verify whether the required package has been installed."""
         try:
             import skl2onnx
             return True
@@ -99,14 +102,16 @@ class RFOnnxCompiler:
         RFOnnxCompiler.save(onnx_model, path)
 
     @staticmethod
-    def save(model, path: str):
+    def save(model, path: str) -> str:
+        """Save the compiled model into onnx file format."""
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path + "model.onnx", "wb") as f:
             f.write(model.SerializeToString())
         return path + "model.onnx"
 
     @staticmethod
-    def load(path: str):
+    def load(path: str) -> RFOnnxPredictor:
+        """Load from the path that contains an onnx file."""
         import onnx
         onnx_bytes = onnx.load(path + "model.onnx")
         return RFOnnxPredictor(model=onnx_bytes)

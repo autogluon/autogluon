@@ -1134,7 +1134,7 @@ class AbstractTrainer:
         if self.low_memory:
             self.models = models
 
-    def compile_models(self, model_names='all', compiler_configs=None):
+    def compile_models(self, model_names='all', with_ancestors=False, compiler_configs=None) -> List[str]:
         """
         Compile a list of models for accelerated prediction.
 
@@ -1156,6 +1156,8 @@ class AbstractTrainer:
                 model_names = [self.get_model_best(can_infer=True)]
         if not isinstance(model_names, list):
             raise ValueError(f'model_names must be a list of model names. Invalid value: {model_names}')
+        if with_ancestors:
+            model_names = self.get_minimum_models_set(model_names)
         for model_name in model_names:
             model = self.load_model(model_name)
             # Check if already compiled, or if can't compile due to missing dependencies,

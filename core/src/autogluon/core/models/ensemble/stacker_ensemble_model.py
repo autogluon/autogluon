@@ -229,20 +229,3 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 stacker_feature_metadata = stacker_feature_metadata.keep_features([feature for feature in existing_features if feature in type_map_raw])
                 if set(stacker_feature_metadata.get_features()) != set(existing_stack_features):
                     self.feature_metadata = self.feature_metadata.add_special_types(stacker_feature_metadata.get_type_map_special())
-
-    def can_compile(self, compiler_configs=None):
-        """Verify whether all models can be compiled."""
-        if compiler_configs is None:
-            compiler_configs = {}
-        for model_name in self.base_model_names:
-            model = self.load_base_model(model_name)
-            if not model.can_compile(compiler_configs=compiler_configs):
-                return False
-        return True
-
-    def compile(self, compiler_configs=None):
-        if compiler_configs is None:
-            compiler_configs = {}
-        for model_name in self.base_model_names:
-            model = self.load_base_model(model_name)
-            model.compile(compiler_configs=compiler_configs)
