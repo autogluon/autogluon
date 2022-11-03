@@ -151,6 +151,10 @@ class CustomF1Score(torchmetrics.F1Score):
 
 
 class CustomHitRate(torchmetrics.Metric):
+    """
+    Compute the hit rate when doing semantic search between two group of embeddings.
+    We assume that (a_i, p_i) are a positive pair and (a_i, p_j) for i!=j a negative pair.
+    """
     def __init__(
         self,
     ):
@@ -182,7 +186,24 @@ class CustomHitRate(torchmetrics.Metric):
 
 
 def compute_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
+    """
+    Compute symmetric hit rates between two groups of features.
 
+    Parameters
+    ----------
+    features_a
+        One group of features.
+    features_b
+        The other group of features.
+    logit_scale
+        The scale of logit (Used in CLIP).
+    top_ks
+        Consider only the top k elements for each query.
+
+    Returns
+    -------
+    The accumulated hit rate.
+    """
     assert len(features_a) == len(features_b)
     hit_rate = 0
     logits_per_a = (logit_scale * features_a @ features_b.t()).detach().cpu()

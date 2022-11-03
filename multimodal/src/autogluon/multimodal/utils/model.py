@@ -71,6 +71,8 @@ def select_model(
         A MultiModalFeaturePreprocessor object, which has called .fit() on the training data.
         Column names of the same modality are grouped into one list. If a modality's list is empty,
         it means the training data don't have this modality.
+    strict
+        If False, allow retaining one model when partial modalities are available for that model.
 
     Returns
     -------

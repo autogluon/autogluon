@@ -182,17 +182,23 @@ def compute_ranking_score(
     results: Dict[str, Dict], qrel_dict: Dict[str, Dict], metrics: List[str], cutoff: Optional[List[int]] = [5, 10, 20]
 ):
     """
-    Compute NDCG, MAP, Recall, and Precision.
+    Compute the ranking metrics, e.g., NDCG, MAP, Recall, and Precision.
     TODO: Consider MRR.
 
     Parameters
     ----------
-    qrel_dict:
-        the groundtruth query and document relavance
     results:
-        the query/document ranking list by the model
+        The query/document ranking list by the model.
+    qrel_dict:
+        The groundtruth query and document relevance.
+    metrics
+        A list of metrics to compute.
     cutoff:
-        the cutoff value for NDCG, MAP, Recall, and Precision
+        The cutoff values for NDCG, MAP, Recall, and Precision.
+
+    Returns
+    -------
+    A dict of metric scores.
     """
     metric_strings = set()
     for per_metric in metrics:

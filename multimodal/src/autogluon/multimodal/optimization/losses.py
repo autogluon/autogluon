@@ -140,6 +140,30 @@ class SoftTargetCrossEntropy(nn.Module):
 def gather_features(
     image_features, text_features, local_loss=False, gather_with_grad=False, rank=0, world_size=1, use_horovod=False
 ):
+    """
+    Gather features across GPUs.
+
+    Parameters
+    ----------
+    image_features
+        image features of the current process.
+    text_features
+        text features of the current process.
+    local_loss
+        If False, make sure the features on the current GPU have gradients.
+    gather_with_grad
+        Whether to gather all features with gradients enabled.
+    rank
+        Rank of the current process (it should be a number between 0 and world_size-1).
+    world_size
+        Number of processes participating in the job.
+    use_horovod
+        Whether to use horovod.
+
+    Returns
+    -------
+    Gathered image and text features from all processes.
+    """
     assert has_distributed, "torch.distributed did not import correctly, please use a PyTorch version with support."
     if use_horovod:
         assert hvd is not None, "Please install horovod"
@@ -179,6 +203,14 @@ def gather_features(
 
 
 class MultiNegativesSoftmaxLoss(nn.Module):
+    """
+    This loss expects as input a batch consisting of pairs (a_1, p_1), (a_2, p_2)…, (a_n, p_n) where
+        we assume that (a_i, p_i) are a positive pair and (a_i, p_j) for i!=j a negative pair.
+        For each a_i, it uses all other p_j as negative samples, i.e., for a_i,
+        we have 1 positive example (p_i) and n-1 negative examples (p_j).
+        It then minimizes the negative log-likehood for softmax normalized scores.
+        It can also support gather negatives across processes.
+    """
     def __init__(
         self,
         local_loss=False,
@@ -186,6 +218,18 @@ class MultiNegativesSoftmaxLoss(nn.Module):
         cache_labels=False,
         use_horovod=False,
     ):
+        """
+        Parameters
+        ----------
+        local_loss
+            Whether to compute the loss only for the current process's samples.
+        gather_with_grad
+            Whether to gather all features with gradients enabled.
+        cache_labels
+            Whether to cache labels for loss in next iterations.
+        use_horovod
+            Whether to use horovod.
+        """
         super().__init__()
         self.local_loss = local_loss
         self.gather_with_grad = gather_with_grad

@@ -465,6 +465,33 @@ def semantic_search(
 def convert_data_for_ranking(
     data: pd.DataFrame, query_column: str, response_column: str, label_column: Optional[str] = None
 ):
+    """
+    Extract query and response data from a dataframe.
+    If no label column exists, append one label column with all 1 labels,
+    which assumes (a_i, p_i) are a positive pair and (a_i, p_j) for i!=j a negative pair.
+
+    Parameters
+    ----------
+    data
+        A dataframe with query, response, and label (optional) columns.
+    query_column
+        Name of the query column.
+    response_column
+        Name of the response column.
+    label_column
+        Name of the label column. If None, use `relevance` by default.
+
+    Returns
+    -------
+    data_with_label
+        A dataframe with query, response, and label columns.
+    query_data
+        The unique query data in the dataframe format.
+    response_data
+        The unique response data in the dataframe format.
+    label_column
+        Name of the label column.
+    """
     data_with_label = data.copy()
     if label_column is None:
         data_with_label["relevance"] = [1] * len(data)
