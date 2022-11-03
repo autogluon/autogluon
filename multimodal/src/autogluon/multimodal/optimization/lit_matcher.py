@@ -9,8 +9,10 @@ from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
-from ..constants import AUTOMM, FEATURES, PROBABILITY, QUERY, RESPONSE
+from ..constants import AUTOMM, FEATURES, LOGIT_SCALE, PROBABILITY, QUERY, RESPONSE
+from .losses import MultiNegativesSoftmaxLoss
 from .utils import (
+    CustomHitRate,
     apply_layerwise_lr_decay,
     apply_single_lr,
     apply_two_stages_lr,
@@ -157,24 +159,35 @@ class MatcherLitModule(pl.LightningModule):
         query_embeddings: torch.Tensor,
         response_embeddings: torch.Tensor,
         label: torch.Tensor,
+        logit_scale: Optional[torch.tensor] = None,
     ):
         assert query_embeddings.shape == response_embeddings.shape
-        embeddings = torch.cat([query_embeddings, response_embeddings], dim=0)  # (b*2, d)
 
-        metric_learning_labels = generate_metric_learning_labels(
-            num_samples=len(query_embeddings),
-            match_label=self.match_label,
-            labels=label,
-        )
-        indices_tuple = self.miner_func(
-            embeddings=embeddings,
-            labels=metric_learning_labels,
-        )
-        loss = self.loss_func(
-            embeddings=embeddings,
-            labels=metric_learning_labels,
-            indices_tuple=indices_tuple,
-        )
+        if isinstance(self.loss_func, MultiNegativesSoftmaxLoss):
+            loss = self.loss_func(
+                features_a=query_embeddings,
+                features_b=response_embeddings,
+                logit_scale=logit_scale,
+                rank=self.global_rank,
+                world_size=self.trainer.world_size,
+            )
+        else:
+            embeddings = torch.cat([query_embeddings, response_embeddings], dim=0)  # (b*2, d)
+
+            metric_learning_labels = generate_metric_learning_labels(
+                num_samples=len(query_embeddings),
+                match_label=self.match_label,
+                labels=label,
+            )
+            indices_tuple = self.miner_func(
+                embeddings=embeddings,
+                labels=metric_learning_labels,
+            )
+            loss = self.loss_func(
+                embeddings=embeddings,
+                labels=metric_learning_labels,
+                indices_tuple=indices_tuple,
+            )
 
         return loss
 
@@ -185,11 +198,18 @@ class MatcherLitModule(pl.LightningModule):
         label: torch.Tensor,
         query_embeddings: torch.Tensor,
         response_embeddings: torch.Tensor,
+        logit_scale: Optional[torch.Tensor] = None,
         reverse_prob: Optional[bool] = False,
     ):
 
         if isinstance(metric, BaseAggregator):
             metric.update(custom_metric_func(query_embeddings, response_embeddings, label))
+        elif isinstance(metric, CustomHitRate):
+            metric.update(
+                batch_query_embeds=query_embeddings.cpu(),
+                batch_response_embeds=response_embeddings.cpu(),
+                logit_scale=logit_scale.cpu() if logit_scale else None,
+            )
         else:
             metric.update(
                 compute_probability(
@@ -210,15 +230,24 @@ class MatcherLitModule(pl.LightningModule):
         self,
         batch: Dict,
     ):
-        query_embeddings = self.query_model(batch)[self.query_model.prefix][FEATURES]
-        response_embeddings = self.response_model(batch)[self.response_model.prefix][FEATURES]
+        query_outputs = self.query_model(batch)[self.query_model.prefix]
+        query_embeddings = query_outputs[FEATURES]
+
+        response_outputs = self.response_model(batch)[self.response_model.prefix]
+        response_embeddings = response_outputs[FEATURES]
+
+        logit_scale = (response_outputs[LOGIT_SCALE] if LOGIT_SCALE in response_outputs else None,)
+
+        if isinstance(logit_scale, tuple):
+            logit_scale = logit_scale[0]
 
         loss = self._compute_loss(
             query_embeddings=query_embeddings,
             response_embeddings=response_embeddings,
             label=self._get_label(batch),
+            logit_scale=logit_scale,
         )
-        return query_embeddings, response_embeddings, loss
+        return query_embeddings, response_embeddings, logit_scale, loss
 
     def training_step(self, batch, batch_idx):
         """
@@ -239,7 +268,7 @@ class MatcherLitModule(pl.LightningModule):
         -------
         Average loss of the mini-batch data.
         """
-        _, _, loss = self._shared_step(batch)
+        _, _, _, loss = self._shared_step(batch)
         self.log("train_loss", loss)
         return loss
 
@@ -259,7 +288,7 @@ class MatcherLitModule(pl.LightningModule):
         batch_idx
             Index of mini-batch.
         """
-        query_embeddings, response_embeddings, loss = self._shared_step(batch)
+        query_embeddings, response_embeddings, logit_scale, loss = self._shared_step(batch)
         # By default, on_step=False and on_epoch=True
         self.log("val_loss", loss)
 
@@ -269,6 +298,7 @@ class MatcherLitModule(pl.LightningModule):
             query_embeddings=query_embeddings,
             response_embeddings=response_embeddings,
             label=self._get_label(batch),
+            logit_scale=logit_scale,
             reverse_prob=self.reverse_prob,
         )
 
