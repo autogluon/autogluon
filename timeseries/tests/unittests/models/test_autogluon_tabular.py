@@ -28,19 +28,22 @@ def test_when_feature_df_is_constructed_then_shape_is_correct(data, last_k_value
     assert df.shape == (expected_length, expected_num_features)
 
 
-def test_when_predict_is_called_then_get_features_dataframe_receives_correct_input_with_dummy(temp_model_path):
-    model = AutoGluonTabularModel(path=temp_model_path, prediction_length=1)
+@pytest.mark.parametrize("prediction_length", [1, 5])
+def test_when_predict_is_called_then_get_features_dataframe_receives_correct_input_with_dummy(
+    temp_model_path, prediction_length
+):
+    model = AutoGluonTabularModel(path=temp_model_path, prediction_length=prediction_length)
     model.fit(train_data=DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, time_limit=2)
     with mock.patch.object(model, "_get_features_dataframe") as patch_method:
         try:
             model.predict(DUMMY_VARIABLE_LENGTH_TS_DATAFRAME)
-        except TypeError as e:
-            if "data must be TabularDataset or pandas.DataFrame" in str(e):
+        except ValueError as e:
+            if "No objects to concatenate" in str(e):
                 df_with_dummy = patch_method.call_args.args[0]
                 for item_id in DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.item_ids:
                     original_timestamps = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.loc[item_id].index
                     new_timestamps = df_with_dummy.loc[item_id].index
-                    assert len(new_timestamps.difference(original_timestamps)) == 1
+                    assert len(new_timestamps.difference(original_timestamps)) == prediction_length
 
 
 def test_when_static_features_present_then_shape_is_correct(temp_model_path):
