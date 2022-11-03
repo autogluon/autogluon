@@ -187,29 +187,6 @@ def test_given_hyperparameters_when_learner_called_and_loaded_back_then_all_mode
         assert not np.any(np.isnan(predictions))
 
 
-@pytest.mark.parametrize("random_seed", [None, 1616])
-def test_given_random_seed_when_learner_called_then_random_seed_set_correctly(temp_model_path, random_seed):
-    init_kwargs = dict(path_context=temp_model_path, eval_metric="MAPE")
-    if random_seed is not None:
-        init_kwargs["random_state"] = random_seed
-
-    learner = TimeSeriesLearner(**init_kwargs)
-    learner.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters="local_only",
-        val_data=DUMMY_TS_DATAFRAME,
-        time_limit=2,
-    )
-    if random_seed is None:
-        random_seed = learner.random_state
-        assert random_seed is not None
-    learner.save()
-    del learner
-
-    loaded_learner = TimeSeriesLearner.load(temp_model_path)
-    assert random_seed == loaded_learner.random_state
-
-
 def test_when_static_features_in_tuning_data_are_missing_then_exception_is_raised(temp_model_path):
     train_data = get_data_frame_with_variable_lengths(
         {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2"])
