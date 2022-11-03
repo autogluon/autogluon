@@ -12,6 +12,7 @@ from ..constants import (
     IMAGE,
     IMAGE_VALID_NUM,
     LABEL,
+    LOGIT_SCALE,
     LOGITS,
     MASKS,
     TEXT_TOKEN_IDS,
@@ -151,6 +152,7 @@ class CLIPForImageText(nn.Module):
             ret[COLUMN_FEATURES][MASKS].update(image_column_feature_masks)
 
             image_features = image_features.mean(dim=1)  # (b, num_features)
+            ret[FEATURES] = image_features
 
         if has_text:
             text_token_ids = batch[self.text_token_ids_key]
@@ -181,6 +183,7 @@ class CLIPForImageText(nn.Module):
             )
             ret[COLUMN_FEATURES][FEATURES].update(text_column_features)
             ret[COLUMN_FEATURES][MASKS].update(text_column_feature_masks)
+            ret[FEATURES] = text_features
 
         if has_image and has_text:
             if self.num_classes:
@@ -192,6 +195,8 @@ class CLIPForImageText(nn.Module):
                 logits = torch.sum(image_features * text_features, dim=-1)
 
             ret[LOGITS] = logits
+
+        ret[LOGIT_SCALE] = self.model.logit_scale.exp()
 
         return {self.prefix: ret}
 

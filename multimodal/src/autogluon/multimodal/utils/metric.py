@@ -15,15 +15,21 @@ from ..constants import (
     BINARY,
     DIRECT_LOSS,
     F1,
+    HIT_RATE,
+    IMAGE_TEXT_SIMILARITY,
     MAP,
     METRIC_MODE_MAP,
     MULTICLASS,
+    NDCG,
     NER,
     OBJECT_DETECTION,
     OVERALL_ACCURACY,
+    PRECISION,
+    RECALL,
     REGRESSION,
     RMSE,
     ROC_AUC,
+    TEXT_SIMILARITY,
     VALID_METRICS,
     Y_PRED,
     Y_PRED_PROB,
@@ -70,7 +76,10 @@ def infer_metrics(
             raise ValueError(f"Metric {eval_metric_name} is only supported for binary classification.")
 
         if eval_metric_name in VALID_METRICS:
-            validation_metric_name = eval_metric_name
+            if pipeline == IMAGE_TEXT_SIMILARITY:
+                validation_metric_name = HIT_RATE
+            else:
+                validation_metric_name = eval_metric_name
             return validation_metric_name, eval_metric_name
 
         warnings.warn(
@@ -98,6 +107,8 @@ def infer_metrics(
                 raise ValueError(
                     f"Problem type: {problem_type}, pipeline: {pipeline}, validation_metric_name: {validation_metric_name} is not supported!"
                 )
+        elif pipeline == IMAGE_TEXT_SIMILARITY:
+            return HIT_RATE, NDCG
         else:
             raise NotImplementedError(f"Problem type: {problem_type}, pipeline: {pipeline} is not supported yet!")
     else:
@@ -168,50 +179,78 @@ def compute_score(
 
 
 def compute_ranking_score(
-    results: Dict[str, Dict], qrel_dict: Dict[str, Dict], cutoff: Optional[List[int]] = [5, 10, 20]
+    results: Dict[str, Dict], qrel_dict: Dict[str, Dict], metrics: List[str], cutoff: Optional[List[int]] = [5, 10, 20]
 ):
     """
-    Compute NDCG, MAP, Recall, and Precision.
+    Compute the ranking metrics, e.g., NDCG, MAP, Recall, and Precision.
     TODO: Consider MRR.
 
     Parameters
     ----------
-    qrel_dict:
-        the groundtruth query and document relavance
     results:
-        the query/document ranking list by the model
+        The query/document ranking list by the model.
+    qrel_dict:
+        The groundtruth query and document relevance.
+    metrics
+        A list of metrics to compute.
     cutoff:
-        the cutoff value for NDCG, MAP, Recall, and Precision
+        The cutoff values for NDCG, MAP, Recall, and Precision.
+
+    Returns
+    -------
+    A dict of metric scores.
     """
-    ndcg = {}
-    _map = {}
-    recall = {}
-    precision = {}
-    for k in cutoff:
-        ndcg[f"NDCG@{k}"] = 0.0
-        _map[f"MAP@{k}"] = 0.0
-        recall[f"Recall@{k}"] = 0.0
-        precision[f"P@{k}"] = 0.0
+    metric_strings = set()
+    for per_metric in metrics:
+        if per_metric.lower() == NDCG:
+            per_metric_string = "ndcg_cut." + ",".join([str(k) for k in cutoff])
+        elif per_metric.lower() == MAP:
+            per_metric_string = "map_cut." + ",".join([str(k) for k in cutoff])
+        elif per_metric.lower() == RECALL:
+            per_metric_string = "recall." + ",".join([str(k) for k in cutoff])
+        elif per_metric.lower() == PRECISION:
+            per_metric_string = "P." + ",".join([str(k) for k in cutoff])
+        else:
+            raise ValueError(f"Unknown metric {per_metric}. Consider using `ndcg`, `map`, `recall`, or `precision`.")
 
-    map_string = "map_cut." + ",".join([str(k) for k in cutoff])
-    ndcg_string = "ndcg_cut." + ",".join([str(k) for k in cutoff])
-    recall_string = "recall." + ",".join([str(k) for k in cutoff])
-    precision_string = "P." + ",".join([str(k) for k in cutoff])
+        metric_strings.add(per_metric_string)
 
-    evaluator = pytrec_eval.RelevanceEvaluator(qrel_dict, {map_string, ndcg_string, recall_string, precision_string})
+    evaluator = pytrec_eval.RelevanceEvaluator(qrel_dict, metric_strings)
     scores = evaluator.evaluate(results)
+
+    metric_results = dict()
+    for k in cutoff:
+        for per_metric in metrics:
+            if per_metric.lower() == NDCG:
+                metric_results[f"NDCG@{k}"] = 0.0
+            elif per_metric.lower() == MAP:
+                metric_results[f"MAP@{k}"] = 0.0
+            elif per_metric.lower() == RECALL:
+                metric_results[f"Recall@{k}"] = 0.0
+            elif per_metric.lower() == PRECISION:
+                metric_results[f"Precision@{k}"] = 0.0
 
     for query_id in scores.keys():
         for k in cutoff:
-            ndcg[f"NDCG@{k}"] += scores[query_id]["ndcg_cut_" + str(k)]
-            _map[f"MAP@{k}"] += scores[query_id]["map_cut_" + str(k)]
-            recall[f"Recall@{k}"] += scores[query_id]["recall_" + str(k)]
-            precision[f"P@{k}"] += scores[query_id]["P_" + str(k)]
+            for per_metric in metrics:
+                if per_metric.lower() == NDCG:
+                    metric_results[f"NDCG@{k}"] += scores[query_id]["ndcg_cut_" + str(k)]
+                elif per_metric.lower() == MAP:
+                    metric_results[f"MAP@{k}"] += scores[query_id]["map_cut_" + str(k)]
+                elif per_metric.lower() == RECALL:
+                    metric_results[f"Recall@{k}"] += scores[query_id]["recall_" + str(k)]
+                elif per_metric.lower() == PRECISION:
+                    metric_results[f"P@{k}"] += scores[query_id]["P_" + str(k)]
 
     for k in cutoff:
-        ndcg[f"NDCG@{k}"] = round(ndcg[f"NDCG@{k}"] / len(scores), 5)
-        _map[f"MAP@{k}"] = round(_map[f"MAP@{k}"] / len(scores), 5)
-        recall[f"Recall@{k}"] = round(recall[f"Recall@{k}"] / len(scores), 5)
-        precision[f"P@{k}"] = round(precision[f"P@{k}"] / len(scores), 5)
+        for per_metric in metrics:
+            if per_metric.lower() == NDCG:
+                metric_results[f"NDCG@{k}"] = round(metric_results[f"NDCG@{k}"] / len(scores), 5)
+            elif per_metric.lower() == MAP:
+                metric_results[f"MAP@{k}"] = round(metric_results[f"MAP@{k}"] / len(scores), 5)
+            elif per_metric.lower() == RECALL:
+                metric_results[f"Recall@{k}"] = round(metric_results[f"Recall@{k}"] / len(scores), 5)
+            elif per_metric.lower() == PRECISION:
+                metric_results[f"P@{k}"] = round(metric_results[f"P@{k}"] / len(scores), 5)
 
-    return ndcg, _map, recall, precision
+    return metric_results
