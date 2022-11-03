@@ -23,9 +23,6 @@ An example to finetune an MMDetection model on VOC:
         --lr <learning_rate> \
         --wd <weight_decay> \
         --epochs <epochs>
-
-Note that for now it's required to install nightly build torchmetrics.
-This will be solved in next pr. (MeanAveragePrecision will be moved to AG temporarily.)
 """
 
 import argparse
@@ -33,6 +30,24 @@ import os
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils import get_voc_classes
+
+
+def tutorial_script_for_finetune_fast_coco_format():
+    checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
+    num_gpus = -1
+    predictor = MultiModalPredictor(
+        label="label",
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": num_gpus,
+        },
+        pipeline="object_detection",
+        num_classes=num_classes,
+        classes=classes,
+        val_metric="direct_loss",
+    )
+
+
 
 
 def detection_train(

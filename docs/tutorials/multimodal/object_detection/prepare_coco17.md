@@ -17,7 +17,7 @@ or use the python script that can download all datasets mentioned in our tutoria
 ### Download with Python Script
 
 The python script does not show progress bar, but is promised to work on all major platforms.
-If you are working on a Unix system and wants progress bar, try the bash script!
+If you are working on a Unix system and needs a progress bar, try the bash script!
 
 You could either extract it in coco17 folder under current directory by running:
 

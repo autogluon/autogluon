@@ -15,6 +15,6 @@ if [ -z "$1" ]
     cd $1
 fi
 
-curl -O http://www.hal.t.u-tokyo.ac.jp/~inoue/projects/cross_domain_detection/datasets/${name}.zip
-unzip ${name}.zip
-rm ${name}.zip
+curl -O http://www.hal.t.u-tokyo.ac.jp/~inoue/projects/cross_domain_detection/datasets/watercolor.zip
+unzip watercolor.zip
+rm watercolor.zip

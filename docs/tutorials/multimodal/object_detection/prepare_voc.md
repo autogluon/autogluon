@@ -22,7 +22,7 @@ or use the python script that can download all datasets mentioned in our tutoria
 ### Download with Python Script
 
 The python script does not show progress bar, but is promised to work on all major platforms.
-If you are working on a Unix system and wants progress bar, try the bash script!
+If you are working on a Unix system and needs a progress bar, try the bash script!
 
 You could either extract it under current directory by running:
 
@@ -98,7 +98,7 @@ Annotations  ImageSets  JPEGImages  SegmentationClass  SegmentationObject
 VOC also refers to the specific format (in `.xml` file) the VOC dataset is using.
 
 **In Autogluon MultiModalPredictor, we strongly recommend using COCO as your data format instead.
-Check :label:`sec_automm_detection_prepare_coco17` and \[Convert VOC to COCO] for more information
+Check :label:`sec_automm_detection_prepare_coco17` and :ref:`convert_data_to_coco_format` for more information
 about COCO dataset and how to convert a VOC dataset to COCO.**
 
 However, for fast proof testing we also have limit support for VOC format.

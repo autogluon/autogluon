@@ -15,7 +15,7 @@ or use the python script that can download all datasets mentioned in our tutoria
 ### Download with Python Script
 
 The python script does not show progress bar, but is promised to work on all major platforms.
-If you are working on a Unix system and wants progress bar, try the bash script!
+If you are working on a Unix system and needs a progress bar, try the bash script!
 
 You could either extract it in coco17 folder under current directory by running:
 
@@ -51,20 +51,21 @@ bash download_watercolor.sh ~/data
 The command line output will show the progress bar:
 
 ```
-
-
+% Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                               Dload  Upload   Total   Spent    Left  Speed
+4 3713M    4  170M    0     0  9627k      0  0:06:34  0:00:18  0:06:16 11.2M
 ```
 
 And after it finished, VOC datasets are extracted in folder `watercolor`, it contains
 
 ```
-
+Annotations  ImageSets  JPEGImages
 ```
 
 ### Dataset Format
 
 Watercolor is in VOC format. **In Autogluon MultiModalPredictor, we strongly recommend using COCO as your data format instead.
-Check :label:`sec_automm_detection_prepare_coco17` and \[Convert VOC to COCO] for more information
+Check :label:`sec_automm_detection_prepare_coco17` and :ref:`convert_data_to_coco_format` for more information
 about COCO dataset and how to convert a VOC dataset to COCO.**
 
 However, for fast proof testing we also have limit support for VOC format.
@@ -86,7 +87,7 @@ dog
 person
 ```
 
-You can also generate the `labels.txt` file automatically by running the following command in its root path (under folder `watercolor`)
+In Unix system, you can also generate the `labels.txt` file automatically by running the following command in its root path (under folder `watercolor`)
 
 ```
 grep -ERoh '<name>(.*)</name>' ./Annotations | sort | uniq | sed 's/<name>//g' | sed 's/<\/name>//g' > labels.txt
@@ -98,7 +99,6 @@ You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master
 
 ### Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.
-
 
 ### Citation
 ```
