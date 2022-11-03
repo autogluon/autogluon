@@ -396,6 +396,7 @@ def tokenize_ner_text(text, tokenizer):
     word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
     return col_tokens, token_to_word_mappings, word_offsets
 
+
 def is_space_counted(words_with_offsets):
     """
     Some tokenizers will count space into words for example.
