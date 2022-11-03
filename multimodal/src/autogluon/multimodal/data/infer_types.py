@@ -180,7 +180,8 @@ def is_imagepath_column(
         success = False
         for img_path in image_paths:
             try:
-                img = PIL.Image.open(img_path)
+                with PIL.Image.open(img_path) as img:
+                    pass
                 success = True
                 break
             except:
@@ -192,7 +193,7 @@ def is_imagepath_column(
     # Tolerate high failure rate in case that many image files may be corrupted.
     if failure_ratio <= 0.9:
         if failure_ratio > 0:
-            warnings.warning(
+            warnings.warn(
                 f"Among {sample_num} sampled images in column '{col_name}', "
                 f"{failure_ratio:.0%} images can't be open. "
                 "You may need to thoroughly check your data to see the percentage of missing images, "
@@ -384,7 +385,9 @@ def infer_column_types(
 
         if is_rois_column(data[col_name]):
             column_types[col_name] = ROIS
-        if is_identifier_column(data[col_name], col_name=col_name, id_mappings=id_mappings):
+        # keep the elif here because ROIS need to skip the categorical check
+        # where error occurs due to List type input
+        elif is_identifier_column(data[col_name], col_name=col_name, id_mappings=id_mappings):
             column_types[col_name] = f"{id_mappings_types[col_name]}_{IDENTIFIER}"
         elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns

@@ -140,4 +140,5 @@ cloud/src/autogluon/cloud/version.py
 eda/src/autogluon/eda/version.py
 
 AutogluonModels
+lightning_logs
 VERSION.minor

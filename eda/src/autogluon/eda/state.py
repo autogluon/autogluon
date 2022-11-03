@@ -1,12 +1,13 @@
 import logging
 
-__all__ = ['AnalysisState', 'StateCheckMixin']
+__all__ = ["AnalysisState", "StateCheckMixin"]
 
 from typing import Any
 
 
 class AnalysisState(dict):
     """Enabling dot.notation access to dictionary attributes and dynamic code assist in jupyter"""
+
     _getattr__ = dict.get
     __delattr__ = dict.__delitem__  # type: ignore
 
@@ -58,7 +59,7 @@ class StateCheckMixin:
         for k in keys:
             if k in state:
                 return True
-        self.logger.warning(f'{self.__class__.__name__}: at least one of the following keys must be present: {keys}')
+        self.logger.warning(f"{self.__class__.__name__}: at least one of the following keys must be present: {keys}")
         return False
 
     def all_keys_must_be_present(self, state: AnalysisState, *keys) -> bool:
@@ -80,5 +81,7 @@ class StateCheckMixin:
         can_handle = len(keys_not_present) == 0
         if not can_handle:
             self.logger.warning(
-                f'{self.__class__.__name__}: all of the following keys must be present: {keys}. The following keys are missing: {keys_not_present}')
+                f'{self.__class__.__name__}: all of the following keys must be present: [{", ".join(keys)}]. '
+                f'The following keys are missing: [{", ".join(keys_not_present)}]'
+            )
         return can_handle

@@ -1,14 +1,19 @@
 import pytest
 
+from autogluon.timeseries import MXNET_INSTALLED
+
+if not MXNET_INSTALLED:
+    pytest.skip(allow_module_level=True)
+
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
-from autogluon.timeseries.models.gluonts.callback import (
+from autogluon.timeseries.models.gluonts.mx.callback import (
     GluonTSAdaptiveEarlyStoppingCallback,
     GluonTSEarlyStoppingCallback,
 )
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
-from ..common import DUMMY_TS_DATAFRAME
-from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
+from ....common import DUMMY_TS_DATAFRAME
+from ..test_gluonts import TESTABLE_MX_MODELS
 
 
 @pytest.mark.parametrize(
@@ -61,7 +66,7 @@ def test_adaptive_early_stopping_update_patience(best_round, patience):
     assert es.es._update_patience(best_round) == patience
 
 
-@pytest.mark.parametrize("model_class", GLUONTS_TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", TESTABLE_MX_MODELS)
 def test_model_save_load_with_adaptive_es(model_class, temp_model_path):
     model = model_class(
         path=temp_model_path,
@@ -89,14 +94,24 @@ def test_early_stopping_patience_used_in_hp(temp_model_path):
     patience = 5
 
     hps = {
-        "SimpleFeedForward": {
+        "SimpleFeedForwardMXNet": {
             "epochs": 5,
             "num_batches_per_epoch": 10,
             "context_length": 5,
             "early_stopping_patience": patience,
         },
-        "MQCNN": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5, "early_stopping_patience": patience},
-        "DeepAR": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5, "early_stopping_patience": patience},
+        "MQCNNMXNet": {
+            "epochs": 5,
+            "num_batches_per_epoch": 10,
+            "context_length": 5,
+            "early_stopping_patience": patience,
+        },
+        "DeepARMXNet": {
+            "epochs": 5,
+            "num_batches_per_epoch": 10,
+            "context_length": 5,
+            "early_stopping_patience": patience,
+        },
     }
 
     predictor = TimeSeriesPredictor(path=temp_model_path)
@@ -112,9 +127,9 @@ def test_early_stopping_patience_used_in_hp(temp_model_path):
 def test_early_stopping_patience_not_used_in_hp(temp_model_path):
 
     hps = {
-        "SimpleFeedForward": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
-        "MQCNN": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
-        "DeepAR": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
+        "SimpleFeedForwardMXNet": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
+        "MQCNNMXNet": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
+        "DeepARMXNet": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
     }
 
     predictor = TimeSeriesPredictor(path=temp_model_path, hyperparameters=hps)

@@ -1,3 +1,4 @@
+from .cache import DDPCacheWriter
 from .checkpoint import AutoMMModelCheckpoint, AutoMMModelCheckpointIO, average_checkpoints
 from .config import (
     apply_omegaconf_overrides,
@@ -44,8 +45,10 @@ from .object_detection import (
     bbox_xyxy_to_xywh,
     cocoeval,
     from_coco,
+    from_coco_or_voc,
     from_voc,
     get_image_name_num,
+    get_voc_classes,
     getCOCOCatIDs,
 )
 from .onnx import get_onnx_input

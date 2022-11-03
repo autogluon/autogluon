@@ -7,7 +7,7 @@ def test_datetime_feature_generator(generator_helper, data_helper):
     input_data = data_helper.generate_multi_feature_full()
 
     generator_1 = DatetimeFeatureGenerator()
-    generator_2 = DatetimeFeatureGenerator(features = ['hour'])
+    generator_2 = DatetimeFeatureGenerator(features=['hour'])
 
     expected_feature_metadata_in_full = {
         ('datetime', ()): ['datetime'],
@@ -92,4 +92,3 @@ def test_datetime_feature_generator(generator_helper, data_helper):
     assert list(output_data_2['datetime'].values) == list(output_data_2['datetime_as_object'].values)
     assert expected_output_data_feat_datetime == list(output_data_2['datetime'].values)
     assert expected_output_data_feat_datetime_hour == list(output_data_2['datetime.hour'].values)
-

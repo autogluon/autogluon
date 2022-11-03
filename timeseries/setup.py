@@ -28,27 +28,20 @@ install_requires = [
     "scipy",
     "pandas",
     "psutil>=5.7.3,<5.9",
+    "statsmodels~=0.13.0",
     "gluonts~=0.11.0",
+    "torch>=1.9,<1.13",
+    "pytorch-lightning>=1.7.4,<1.8.0",
+    "networkx",
+    "tqdm",
     f"autogluon.core=={version}",
     f"autogluon.common=={version}",
     f"autogluon.tabular=={version}",
 ]
 
-try:
-    from mxnet import __version__ as mxnet_version
-
-    assert vparse("2.0") > vparse(mxnet_version) >= vparse("1.9")
-except (ImportError, AssertionError):
-    warnings.warn(
-        "autogluon.forecasting depends on Apache MXNet v1.9 or greater (below v2.0). "
-        "Please install a suitable version of MXNet in order to use autogluon.forecasting using "
-        "`pip install mxnet==1.9` or a matching MXNet package for your CUDA driver if you are using "
-        "a GPU. See the MXNet documentation for more info."
-    )
-
 extras_require = {
     "tests": ["pytest", "flake8~=4.0", "flaky~=3.7", "pytest-timeout~=2.1", "isort>=5.10", "black~=22.0,>=22.3"],
-    "sktime": ["sktime~=0.13,>=0.13.1", "pmdarima~=1.8.2", "tbats~=1.1"],
+    "sktime": ["sktime>=0.13.1,<0.14", "pmdarima~=1.8.2", "tbats~=1.1"],
 }
 
 all_requires = []

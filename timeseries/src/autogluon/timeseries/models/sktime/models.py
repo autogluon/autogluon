@@ -10,7 +10,7 @@ from . import AbstractSktimeModel
 logger = logging.getLogger(__name__)
 
 
-class SktimeThetaModel(AbstractSktimeModel):
+class ThetaSktimeModel(AbstractSktimeModel):
     """Theta model for forecasting.
 
     Based on `sktime.forecasting.theta.ThetaForecaster <https://www.sktime.org/en/stable/api_reference/auto_generated/sktime.forecasting.theta.ThetaForecaster.html>`_
@@ -67,7 +67,7 @@ class SktimeThetaModel(AbstractSktimeModel):
         return sktime_init_args
 
 
-class SktimeTBATSModel(AbstractSktimeModel):
+class TBATSSktimeModel(AbstractSktimeModel):
     """TBATS forecaster with multiple seasonalities.
 
     This model automatically tries all combinations of hyperparameters (e.g.,
@@ -133,7 +133,7 @@ class SktimeTBATSModel(AbstractSktimeModel):
         return sktime_init_args
 
 
-class SktimeAutoETSModel(AbstractSktimeModel):
+class AutoETSSktimeModel(AbstractSktimeModel):
     """AutoETS model from sktime.
 
     See `AbstractSktimeModel` for common parameters.
@@ -243,7 +243,7 @@ class SktimeAutoETSModel(AbstractSktimeModel):
         return sktime_init_args
 
 
-class SktimeARIMAModel(AbstractSktimeModel):
+class ARIMASktimeModel(AbstractSktimeModel):
     """ARIMA model from sktime.
 
     See `AbstractSktimeModel` for common parameters.
@@ -328,7 +328,7 @@ class SktimeARIMAModel(AbstractSktimeModel):
         return sktime_init_args
 
 
-class SktimeAutoARIMAModel(AbstractSktimeModel):
+class AutoARIMASktimeModel(AbstractSktimeModel):
     """AutoARIMA model from sktime.
 
     This model automatically selects the (p, d, q) and (P, D, Q) parameters of ARIMA by

@@ -106,7 +106,6 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
     assert list(output_data['datetime'].values) == list(output_data['datetime_as_object'].values)
     assert expected_output_data_feat_datetime == list(output_data['datetime'].values)
 
-
     # text_special checks
     assert expected_output_data_feat_lower_ratio == list(output_data['text.lower_ratio'].values)
 

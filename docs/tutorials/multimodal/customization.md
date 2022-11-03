@@ -62,6 +62,34 @@ predictor.fit(hyperparameters={"optimization.lr_decay": 0.9})
 predictor.fit(hyperparameters={"optimization.lr_decay": 1})
 ```
 
+### optimization.lr_mult
+
+While we are using two_stages lr choice,
+The last/head layer has the largest learning rate `optimization.learning_rate` * `optimization.lr_mult`.
+And other layers has normal learning rate `optimization.learning_rate`.
+To use one uniform learning rate, simply set the learning rate multiple to `1`.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"optimization.lr_mult": 1})
+# turn on two-stage lr for 10 times learning rate in head layer
+predictor.fit(hyperparameters={"optimization.lr_mult": 10})
+```
+
+### optimization.lr_choice
+
+We may want different layers to have different lr,
+here we have strategy `two_stages` lr choice (see `optimization.lr_mult` section for more details),
+or `layerwise_decay` lr choice (see `optimization.lr_decay` section for more details).
+To use one uniform learning rate, simply set this to `""`.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"optimization.lr_choice": "layerwise_decay"})
+# turn on two-stage lr choice
+predictor.fit(hyperparameters={"optimization.lr_choice": "two_stages"})
+```
+
 ### optimization.lr_schedule
 
 Learning rate schedule.
@@ -297,6 +325,18 @@ For more details, see the guideline [here](https://pytorch-lightning.readthedocs
 predictor.fit(hyperparameters={"env.num_workers": 2})
 # use 4 workers in the training dataloader
 predictor.fit(hyperparameters={"env.num_workers": 4})
+```
+
+### env.auto_select_gpus
+
+If enabled and devices is an integer, pick available GPUs automatically. This is especially useful when GPUs are configured to be in “exclusive mode”, such that only one process at a time can access them.
+For more details, see the guideline [here](https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html).
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"env.auto_select_gpus": True})
+# disable auto select gpus
+predictor.fit(hyperparameters={"env.auto_select_gpus": False})
 ```
 
 ### env.num_workers_evaluation

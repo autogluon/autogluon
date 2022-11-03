@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Union, List, Optional
 
 from .. import AnalysisState
 from ..analysis.base import BaseAnalysis, AbstractAnalysis
@@ -7,16 +7,18 @@ from ..visualization.base import AbstractVisualization
 from ..visualization.layouts import SimpleVerticalLinearLayout
 
 
-def analyze(train_data=None,
-            test_data=None,
-            val_data=None,
-            model=None,
-            label: str = None,
-            state: Union[None, dict, AnalysisState] = None,
-            sample: Union[None, int, float] = None,
-            anlz_facets: List[AbstractAnalysis] = [],
-            viz_facets: List[AbstractVisualization] = [],
-            return_state: bool = False):
+def analyze(
+    train_data=None,
+    test_data=None,
+    val_data=None,
+    model=None,
+    label: str = None,
+    state: Union[None, dict, AnalysisState] = None,
+    sample: Union[None, int, float] = None,
+    anlz_facets: Optional[List[AbstractAnalysis]] = None,
+    viz_facets: Optional[List[AbstractVisualization]] = None,
+    return_state: bool = False,
+):
     """
     This helper creates `BaseAnalysis` wrapping passed analyses into
     `Sampler` if needed, then fits and renders produced state with
@@ -54,7 +56,15 @@ def analyze(train_data=None,
 
     """
 
-    assert isinstance(state, (dict, AnalysisState))
+    if viz_facets is None:
+        viz_facets = []
+
+    if anlz_facets is None:
+        anlz_facets = []
+
+    if state is not None:
+        assert isinstance(state, (dict, AnalysisState))
+
     if not isinstance(state, AnalysisState):
         state = AnalysisState(state)
 
@@ -67,7 +77,7 @@ def analyze(train_data=None,
         label=label,
         children=[
             Sampler(sample=sample, children=anlz_facets),
-        ]
+        ],
     )
 
     state = analysis.fit()

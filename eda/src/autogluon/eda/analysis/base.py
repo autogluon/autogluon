@@ -12,12 +12,13 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractAnalysis(ABC, StateCheckMixin):
-
-    def __init__(self,
-                 parent: Optional[AbstractAnalysis] = None,
-                 children: Optional[List[AbstractAnalysis]] = None,
-                 state: Optional[AnalysisState] = None,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        parent: Optional[AbstractAnalysis] = None,
+        children: Optional[List[AbstractAnalysis]] = None,
+        state: Optional[AnalysisState] = None,
+        **kwargs,
+    ) -> None:
 
         self.parent = parent
         self.children: List[AbstractAnalysis] = [] if children is None else children
@@ -36,7 +37,8 @@ class AbstractAnalysis(ABC, StateCheckMixin):
             args = AnalysisState({**args, **node.args})
         return args
 
-    def available_datasets(self, args: AnalysisState) -> Generator[Tuple[str, DataFrame], None, None]:
+    @staticmethod
+    def available_datasets(args: AnalysisState) -> Generator[Tuple[str, DataFrame], None, None]:
         """
         Generator which iterates only through the datasets provided in arguments
 
@@ -51,7 +53,7 @@ class AbstractAnalysis(ABC, StateCheckMixin):
             tuple of dataset name (train_data, test_data or tuning_data) and dataset itself
 
         """
-        for ds in ['train_data', 'test_data', 'tuning_data', 'val_data']:
+        for ds in ["train_data", "test_data", "tuning_data", "val_data"]:
             if ds in args and args[ds] is not None:
                 df: DataFrame = args[ds]
                 yield ds, df
@@ -120,7 +122,9 @@ class AbstractAnalysis(ABC, StateCheckMixin):
         """
         self.state = self._get_state_from_parent()
         if self.parent is not None:
-            assert self.state is not None, "Inner analysis fit() is called while parent has no state. Please call top-level analysis fit instead"
+            assert (
+                self.state is not None
+            ), "Inner analysis fit() is called while parent has no state. Please call top-level analysis fit instead"
         _args = self._gather_args()
         if self.can_handle(self.state, _args):
             self._fit(self.state, _args, **kwargs)
@@ -130,11 +134,9 @@ class AbstractAnalysis(ABC, StateCheckMixin):
 
 
 class BaseAnalysis(AbstractAnalysis):
-
-    def __init__(self,
-                 parent: Optional[AbstractAnalysis] = None,
-                 children: Optional[List[AbstractAnalysis]] = None,
-                 **kwargs) -> None:
+    def __init__(
+        self, parent: Optional[AbstractAnalysis] = None, children: Optional[List[AbstractAnalysis]] = None, **kwargs
+    ) -> None:
         super().__init__(parent, children, **kwargs)
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
@@ -145,20 +147,23 @@ class BaseAnalysis(AbstractAnalysis):
 
 
 class Namespace(AbstractAnalysis):
-
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return True
 
-    def __init__(self,
-                 namespace: Optional[str] = None,
-                 parent: Optional[AbstractAnalysis] = None,
-                 children: Optional[List[AbstractAnalysis]] = None,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        namespace: Optional[str] = None,
+        parent: Optional[AbstractAnalysis] = None,
+        children: Optional[List[AbstractAnalysis]] = None,
+        **kwargs,
+    ) -> None:
         super().__init__(parent, children, **kwargs)
         self.namespace = namespace
 
     def fit(self, **kwargs) -> AnalysisState:
-        assert self.parent is not None, "Namespace must be wrapped into other analysis. You can use BaseAnalysis of one is needed"
+        assert (
+            self.parent is not None
+        ), "Namespace must be wrapped into other analysis. You can use BaseAnalysis of one is needed"
         return super().fit(**kwargs)
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):

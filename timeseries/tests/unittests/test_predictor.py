@@ -9,12 +9,11 @@ import pytest
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
-from autogluon.timeseries.models import DeepARModel
-from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory, MQRNNEstimator
+from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter
 
-from .common import DUMMY_TS_DATAFRAME
+from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
@@ -124,8 +123,8 @@ def test_given_hyperparameters_and_quantiles_when_predictor_called_then_model_ca
         ({DeepARModel: {"epochs": 1}}, 1),
         (
             {
-                GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
                 DeepARModel: {"epochs": 1},
+                SimpleFeedForwardModel: {"epochs": 1},
             },
             2,
         ),
@@ -496,3 +495,11 @@ def test_given_mixed_searchspace_and_hyperparameter_tune_kwargs_when_predictor_f
             "num_trials": 2,
         },
     )
+
+
+@pytest.mark.parametrize("target_column", ["target", "CUSTOM_TARGET"])
+def test_when_target_included_in_known_covariates_then_exception_is_raised(temp_model_path, target_column):
+    with pytest.raises(ValueError, match="cannot be one of the known covariates"):
+        predictor = TimeSeriesPredictor(
+            path_context=temp_model_path, target=target_column, known_covariates_names=["Y", target_column, "X"]
+        )
