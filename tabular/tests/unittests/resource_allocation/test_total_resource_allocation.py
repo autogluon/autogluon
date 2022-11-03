@@ -134,7 +134,10 @@ def test_bagged_model_without_total_resources_but_with_ensemble_resources():
     resources = bagged_model._preprocess_fit_resources(k_fold=kfold)
     resources.pop('k_fold')
     default_model_num_cpus, default_model_num_gpus = model_base._get_default_resources()
-    default_model_resources = {'num_cpus': default_model_num_cpus * kfold, 'num_gpus': default_model_num_gpus * kfold}
+    default_model_resources = {
+        'num_cpus': min(default_model_num_cpus * kfold, get_cpu_count()),
+        'num_gpus': min(default_model_num_gpus * kfold, get_gpu_count_all()),
+    }
     assert resources == default_model_resources
 
 

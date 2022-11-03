@@ -284,15 +284,18 @@ class SequentialLocalFoldFittingStrategy(LocalFoldFittingStrategy):
             X_fold = pd.concat([X_fold, self.X_pseudo], axis=0, ignore_index=True)
             y_fold = pd.concat([y_fold, self.y_pseudo], axis=0, ignore_index=True)
 
-        num_cpus = min(self.num_cpus, self.user_resources_per_job.get('num_cpus', math.inf))
-        num_gpus = min(self.num_gpus, self.user_resources_per_job.get('num_gpus', math.inf))
+        num_cpus = self.num_cpus
+        num_gpus = self.num_gpus
+        if self.user_resources_per_job is not None:
+            num_cpus = min(self.num_cpus, self.user_resources_per_job.get('num_cpus', math.inf))
+            num_gpus = min(self.num_gpus, self.user_resources_per_job.get('num_gpus', math.inf))
         fold_model.fit(
             X=X_fold,
             y=y_fold,
             X_val=X_val_fold,
             y_val=y_val_fold,
             time_limit=time_limit_fold,
-            num_cpus= num_cpus,
+            num_cpus=num_cpus,
             num_gpus=num_gpus,
             **kwargs_fold
         )

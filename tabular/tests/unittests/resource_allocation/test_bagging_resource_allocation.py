@@ -247,4 +247,4 @@ def test_parallel_bagging_no_resources_per_fold():
     )
     assert fold_fitting_strategy.num_cpus == 8
     assert fold_fitting_strategy.num_gpus == 1
-    assert fold_fitting_strategy.user_resources_per_job == None
+    assert fold_fitting_strategy.user_resources_per_job == {}

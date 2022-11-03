@@ -489,7 +489,7 @@ class AbstractModel:
         system_num_gpus = get_gpu_count_all()
         default_num_cpus, default_num_gpus = self._get_default_resources()
         k_fold = kwargs.get('k_fold', None)
-        if k_fold is not None:
+        if k_fold is not None and k_fold > 0:
             # bagged model's default resources should be resources * k_fold if the amount is available
             default_num_cpus = min(default_num_cpus * k_fold, system_num_cpus)
             default_num_gpus = min(default_num_gpus * k_fold, system_num_gpus)
