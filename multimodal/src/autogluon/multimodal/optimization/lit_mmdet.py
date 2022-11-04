@@ -88,6 +88,13 @@ class MMDetLitModule(pl.LightningModule):
             boxes = []
             scores = []
             labels = []
+            if isinstance(img_result[0], list):
+                # has one additional dimention with 2 outputs: img_result=img_result[0], mask_result=img_result[1]
+                raise NotImplementedError(
+                    "Do not support training for models with masks like mask r-cnn, "
+                    "because most custom datasets do not have a ground truth mask."
+                    " However, you can still inference with this model."
+                )
             for category_idx, category_result in enumerate(img_result):
                 for item_idx, item_result in enumerate(category_result):
                     boxes.append(item_result[:4])

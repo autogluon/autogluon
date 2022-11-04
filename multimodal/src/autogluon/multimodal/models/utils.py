@@ -629,3 +629,32 @@ def get_mmocr_config_and_model(checkpoint_name: str):
     if checkpoint is not None:
         checkpoint = load_checkpoint(model, checkpoint, map_location="cpu")
     return config, model
+
+
+def lookup_mmdet_config(key, config):
+    if key in config:
+        return config[key]
+    for subconfig in config.values():
+        if isinstance(subconfig, dict):
+            result = lookup_mmdet_config(key, subconfig)
+            if result is not None:
+                return result
+        elif isinstance(subconfig, list):
+            for subsubconfig in subconfig:
+                if isinstance(subsubconfig, dict):
+                    result = lookup_mmdet_config(key, subsubconfig)
+                    if result is not None:
+                        return result
+    return None
+
+
+def update_mmdet_config(key, value, config):
+    for k, subconfig in config.items():
+        if key == k:
+            config[k] = value
+        elif isinstance(subconfig, dict):
+            update_mmdet_config(key, value, subconfig)
+        elif isinstance(subconfig, list):
+            for subsubconfig in subconfig:
+                if isinstance(subsubconfig, dict):
+                    update_mmdet_config(key, value, subsubconfig)
