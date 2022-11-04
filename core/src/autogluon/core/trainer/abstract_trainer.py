@@ -1160,11 +1160,21 @@ class AbstractTrainer:
             model_names = self.get_minimum_models_set(model_names)
         for model_name in model_names:
             model = self.load_model(model_name)
+
+            # Get model specific compiler options
+            # Model type can be described with either model type, or model name as string
+            if type(model) in compiler_configs:
+                configs = compiler_configs[type(model)]
+            elif model.name in compiler_configs:
+                configs = compiler_configs[model.name]
+            else:
+                configs = compiler_configs
+
             # Check if already compiled, or if can't compile due to missing dependencies,
             # or if model hasn't implemented compiling.
-            if model.can_compile(compiler_configs):
+            if model.can_compile(compiler_configs=configs):
                 compile_start_time = time.time()
-                model.compile(compiler_configs=compiler_configs)
+                model.compile(compiler_configs=configs)
                 compile_end_time = time.time()
                 model.compile_time = compile_end_time - compile_start_time
 

@@ -880,16 +880,8 @@ class AbstractModel:
         """
         if not self.is_fit():
             return False
-        # Get model specific compiler options
-        # Model type can be described with either model type, or model name as string
-        if type(self) in compiler_configs:
-            configs = compiler_configs[type(self)]
-        elif self.name in compiler_configs:
-            configs = compiler_configs[self.name]
-        else:
-            configs = compiler_configs
-        compiler = configs.get("compiler", "native")
-        compiler_fallback_to_native = configs.get('compiler_fallback_to_native', False)
+        compiler = compiler_configs.get("compiler", "native")
+        compiler_fallback_to_native = compiler_configs.get('compiler_fallback_to_native', False)
 
         compilers = self._valid_compilers()
         compiler_names = {c.name: c for c in compilers}
