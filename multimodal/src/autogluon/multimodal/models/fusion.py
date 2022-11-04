@@ -382,7 +382,8 @@ class MultimodalFusionTransformer(nn.Module):
                     bias=True,
                     activation=head_activation,
                     normalization=head_normalization,
-                ) if pretrain_objective in ["contrastive", "both"]
+                )
+                if pretrain_objective in ["contrastive", "both"]
                 else None,
                 "reconstruction": FT_Transformer.ReconstructionHead(
                     d_in=in_features,
@@ -391,7 +392,8 @@ class MultimodalFusionTransformer(nn.Module):
                     normalization=head_normalization,
                     n_num_features=num_numerical_columns,
                     category_sizes=num_categories,
-                ) if pretrain_objective in ["reconstruction", "both"]
+                )
+                if pretrain_objective in ["reconstruction", "both"]
                 else None,
             }
         )

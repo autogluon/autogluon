@@ -1,8 +1,8 @@
+import copy
 import functools
 import logging
 import re
 import warnings
-import copy
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
@@ -427,7 +427,11 @@ def apply_single_lr(
     decay_param_names = get_weight_decay_param_names(model)
     optimizer_grouped_parameters = [
         {
-            "params": [p if return_params else n for n, p in model.named_parameters() if (n in decay_param_names and "row" not in n)],
+            "params": [
+                p if return_params else n
+                for n, p in model.named_parameters()
+                if (n in decay_param_names and "row" not in n)
+            ],
             "weight_decay": weight_decay,
             "lr": lr,
         },
@@ -437,7 +441,11 @@ def apply_single_lr(
             "lr": lr,
         },
         {
-            "params": [p if return_params else n for n, p in model.named_parameters() if (n not in decay_param_names and "row" not in n)],
+            "params": [
+                p if return_params else n
+                for n, p in model.named_parameters()
+                if (n not in decay_param_names and "row" not in n)
+            ],
             "weight_decay": 0.0,
             "lr": lr,
         },
@@ -929,7 +937,7 @@ class ReconstructionLoss:
         self.model = model
 
     def __call__(self, batch, batch_):
-        batch_ = batch_[self.model.prefix]['logits']
+        batch_ = batch_[self.model.prefix]["logits"]
         loss = 0
         for permodel in self.model.model:
             if hasattr(permodel, "categorical_key"):
@@ -940,6 +948,7 @@ class ReconstructionLoss:
                 y_ = batch_["num_out"]
                 loss += F.mse_loss(y_, y)
         return loss
+
 
 class ContrastiveTransformations:
     def __init__(self, model, mode, problem_type, corruption_rate):
@@ -967,7 +976,7 @@ class ContrastiveTransformations:
 
     def random_perm(self, batch):
         corruption_rate = self.corruption_rate
-        batch_size, = batch[self.model.label_key].size()
+        (batch_size,) = batch[self.model.label_key].size()
         batch = copy.deepcopy(batch)
 
         num_features = 0
@@ -978,11 +987,9 @@ class ContrastiveTransformations:
                 _, m = batch[permodel.numerical_key].size()
                 num_features += m
 
-        corruption_mask = torch.zeros(batch_size,
-                                      num_features,
-                                      dtype=torch.bool,
-                                      device=batch[self.model.label_key].device
-                                      )
+        corruption_mask = torch.zeros(
+            batch_size, num_features, dtype=torch.bool, device=batch[self.model.label_key].device
+        )
         corruption_len = int(num_features * corruption_rate)
         for i in range(batch_size):
             corruption_idx = torch.randperm(num_features)[:corruption_len]
@@ -1004,8 +1011,9 @@ class ContrastiveTransformations:
                 _, m = numerical_features.size()
                 indices = torch.randint(high=batch_size, size=(batch_size, m))
                 random_sample = numerical_features[indices, torch.arange(m).unsqueeze(0)].clone()
-                batch[permodel.numerical_key] = torch.where(corruption_mask[:, feature_idx:feature_idx+m],
-                                                            random_sample, numerical_features)
+                batch[permodel.numerical_key] = torch.where(
+                    corruption_mask[:, feature_idx : feature_idx + m], random_sample, numerical_features
+                )
                 feature_idx += m
         return batch
 
@@ -1042,7 +1050,7 @@ class NTXent(nn.Module):
         # mask = (~torch.eye(batch_size * 2, batch_size * 2, dtype=torch.bool)).float().to(z_i.get_device())
         numerator = torch.exp(positives / self.temperature)
 
-        denominator = torch.exp(similarity / self.temperature) # * mask
+        denominator = torch.exp(similarity / self.temperature)  # * mask
         all_losses = -torch.log(numerator / torch.mean(denominator, dim=1))
 
         # all_losses = -torch.log(numerator)

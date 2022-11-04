@@ -543,14 +543,14 @@ class FT_Transformer(nn.Module):
             x = self.activation(x)
 
             if self.cat_out:
-                x_cat = x[:, :len(self.category_sizes), :]
+                x_cat = x[:, : len(self.category_sizes), :]
                 cat_out = [f(x_cat[:, i]) for i, f in enumerate(self.cat_out)]
             else:
                 cat_out = None
 
             x_num = x
             if self.category_sizes:
-                x_num = x[:, len(self.category_sizes):, :]
+                x_num = x[:, len(self.category_sizes) :, :]
             num_out = [f(x_num[:, i]) for i, f in enumerate(self.num_out)]
             num_out = torch.concat(num_out, dim=1)
             return {"num_out": num_out, "cat_out": cat_out}
@@ -758,9 +758,7 @@ class FT_Transformer(nn.Module):
                 else:
                     assert kv_compression_sharing == "key-value", _INTERNAL_ERROR_MESSAGE
             if row_attention:
-                layer.update(
-                    self.row_attention_layers
-                )
+                layer.update(self.row_attention_layers)
             self.blocks.append(layer)
 
         self.head = (
@@ -822,7 +820,6 @@ class FT_Transformer(nn.Module):
             x = x[:, 1:]
         return x
 
-
     def forward(self, x: Tensor) -> Tensor:
         assert x.ndim == 3, "The input must have 3 dimensions: (n_objects, n_tokens, d_token)"
         for layer_idx, layer in enumerate(self.blocks):
@@ -836,7 +833,8 @@ class FT_Transformer(nn.Module):
                 x_residual, _ = layer["row_attention"](
                     x_residual,
                     x_residual,
-                    None, None,
+                    None,
+                    None,
                 )
                 x = self._end_residual(layer, "row_attention", x, x_residual)
                 x_residual = self._start_residual(layer, "row_ffn", x)
@@ -865,14 +863,17 @@ class FT_Transformer(nn.Module):
             x = layer["output"](x)
             x = self._end_global_token(x)
 
-            if self.row_attention_layer == "shared" or (self.row_attention_layer == "last" and layer_idx + 1 == len(self.blocks)):
+            if self.row_attention_layer == "shared" or (
+                self.row_attention_layer == "last" and layer_idx + 1 == len(self.blocks)
+            ):
                 x = torch.transpose(x, 0, 1)
                 x = self._start_global_token(x)
                 x_residual = self._start_residual(layer, "row_attention", x)
                 x_residual, _ = layer["row_attention"](
                     x_residual,
                     x_residual,
-                    None, None,
+                    None,
+                    None,
                 )
                 x = self._end_residual(layer, "row_attention", x, x_residual)
                 x_residual = self._start_residual(layer, "row_ffn", x)

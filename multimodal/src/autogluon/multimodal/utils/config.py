@@ -7,7 +7,16 @@ from typing import Dict, List, Optional, Tuple, Union
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
-from ..constants import AUTOMM, HF_MODELS, NER, REGRESSION, VALID_CONFIG_KEYS, FUSION_TRANSFORMER, CATEGORICAL_TRANSFORMER, NUMERICAL_TRANSFORMER
+from ..constants import (
+    AUTOMM,
+    CATEGORICAL_TRANSFORMER,
+    FUSION_TRANSFORMER,
+    HF_MODELS,
+    NER,
+    NUMERICAL_TRANSFORMER,
+    REGRESSION,
+    VALID_CONFIG_KEYS,
+)
 from ..presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
@@ -495,6 +504,8 @@ def update_pretrain_config(
     ]
     if hasattr(config, "pretrainer"):
         pretrain_objective = config.pretrainer.objective
+        config.optimization.patience += int(config.pretrainer.pretrain_epochs / config.optimization.val_check_interval)
+        config.optimization.max_epochs += config.pretrainer.pretrain_epochs
     else:
         return config
     for model in pretrainer_supported_models:
@@ -530,35 +541,36 @@ def update_config_by_resources(
     -------
     The modified config.
     """
-    # columns_per_model = {
-    #     NUMERICAL_TRANSFORMER: num_numerical_columns,
-    #     CATEGORICAL_TRANSFORMER: num_categorical_columns,
-    #     FUSION_TRANSFORMER: num_categorical_columns+num_numerical_columns,
-    # }
-    #
-    # # Threshold is expected to be ~= batch_size * num_tokens, for additive attention.
-    # # The multiplier 2e4 is a heuristic found from AutoML Benchmark.
-    # # TODO: determine the threshold/batch_size on training data directly
-    # threshold = resource * 2e4
-    # per_gpu_batch_size = config.env.per_gpu_batch_size
-    # for model in columns_per_model:
-    #     if model in config.model.names:
-    #         if columns_per_model[model] > 300:
-    #             model_ = getattr(config.model, model)
-    #             model_.additive_attention = True
-    #             warnings.warn(
-    #                 f"Dataset contains >300 features, using additive attention for efficiency",
-    #                 UserWarning,
-    #             )
-    #         if columns_per_model[model] * per_gpu_batch_size > threshold:
-    #             per_gpu_batch_size = int(threshold / columns_per_model[model])
-    # per_gpu_batch_size = max(per_gpu_batch_size, 1)
-    # if per_gpu_batch_size < config.env.per_gpu_batch_size:
-    #     config.env.per_gpu_batch_size = per_gpu_batch_size
-    #     warnings.warn(
-    #         f"Setting  per_gpu_batch_size to {per_gpu_batch_size} to fit into GPU memory",
-    #         UserWarning,
-    #     )
+    columns_per_model = {
+        NUMERICAL_TRANSFORMER: num_numerical_columns,
+        CATEGORICAL_TRANSFORMER: num_categorical_columns,
+        FUSION_TRANSFORMER: num_categorical_columns + num_numerical_columns,
+    }
+
+    # Threshold is expected to be ~= batch_size * num_tokens, for additive attention.
+    # The multiplier 2e4 is a heuristic found from AutoML Benchmark.
+    # TODO: determine the threshold/batch_size on training data directly
+    threshold = resource * 2e4
+    per_gpu_batch_size = config.env.per_gpu_batch_size
+    for model in columns_per_model:
+        if model in config.model.names:
+            model_ = getattr(config.model, model)
+            if columns_per_model[model] > 300 and model_.additive_attention is None:
+                model_.additive_attention = True
+                model_.share_qv_weights = True if model_.share_qv_weights is None else model_.share_qv_weights
+                warnings.warn(
+                    f"Dataset contains >300 features, using additive attention for efficiency",
+                    UserWarning,
+                )
+            if columns_per_model[model] * per_gpu_batch_size > threshold:
+                per_gpu_batch_size = int(threshold / columns_per_model[model])
+    per_gpu_batch_size = max(per_gpu_batch_size, 1)
+    if per_gpu_batch_size < config.env.per_gpu_batch_size:
+        config.env.per_gpu_batch_size = per_gpu_batch_size
+        warnings.warn(
+            f"Setting  per_gpu_batch_size to {per_gpu_batch_size} to fit into GPU memory",
+            UserWarning,
+        )
 
     config = update_pretrain_config(config)
     return config

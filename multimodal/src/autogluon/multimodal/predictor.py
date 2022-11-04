@@ -87,8 +87,8 @@ from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_mmdet import MMDetLitModule
 from .optimization.lit_module import LitModule
-from .optimization.lit_pretrainer import PretrainLitModule
 from .optimization.lit_ner import NerLitModule
+from .optimization.lit_pretrainer import PretrainLitModule
 from .optimization.losses import RKDLoss
 from .optimization.utils import (
     get_loss_func,
@@ -141,8 +141,8 @@ from .utils import (
     tensor_to_ndarray,
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
-    update_config_by_rules,
     update_config_by_resources,
+    update_config_by_rules,
     use_realtime,
 )
 
@@ -2004,12 +2004,12 @@ class MultiModalPredictor:
         return ret
 
     def predict(
-            self,
-            data: Union[pd.DataFrame, dict, list],
-            candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
-            as_pandas: Optional[bool] = None,
-            realtime: Optional[bool] = None,
-            seed: Optional[int] = 123,
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
+        as_pandas: Optional[bool] = None,
+        realtime: Optional[bool] = None,
+        seed: Optional[int] = 123,
     ):
         if not hasattr(self._model, "row_attention") or not self._model.row_attention:
             return self.predict_single_round(

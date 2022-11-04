@@ -7,8 +7,8 @@ from torch.nn.modules.loss import _Loss
 
 from ..constants import AUTOMM, LM_TARGET, LOGITS, T_FEW, TEMPLATE_LOGITS, WEIGHT
 from ..data.mixup import MixupModule, multimodel_mixup
-from .utils import NTXent, DistillLoss, ContrastiveTransformations, ReconstructionLoss
 from .lit_module import LitModule
+from .utils import ContrastiveTransformations, DistillLoss, NTXent, ReconstructionLoss
 
 logger = logging.getLogger(AUTOMM)
 
@@ -140,11 +140,12 @@ class PretrainLitModule(LitModule):
         )
         self.contrastive_loss = DistillLoss() if pretrain_objective in ["self_distill"] else NTXent()
         self.reconstruction_loss = ReconstructionLoss(model)
-        self.contrastive_fn = ContrastiveTransformations(model,
-                                                         mode=augmentation_mode,
-                                                         problem_type=problem_type,
-                                                         corruption_rate=corruption_rate,
-                                                         )
+        self.contrastive_fn = ContrastiveTransformations(
+            model,
+            mode=augmentation_mode,
+            problem_type=problem_type,
+            corruption_rate=corruption_rate,
+        )
         self.start_loss_coefficient = start_loss_coefficient
         self.end_loss_coefficient = end_loss_coefficient
         self.decay_loss_coefficient = decay_loss_coefficient
@@ -165,11 +166,11 @@ class PretrainLitModule(LitModule):
                 per_positive = positive[per_key]
                 weight = per_output[WEIGHT] if WEIGHT in per_output else 1
                 loss += (
-                        self.contrastive_loss(
-                            z_i=per_output[LOGITS],
-                            z_j=per_positive[LOGITS],
-                        )
-                        * weight
+                    self.contrastive_loss(
+                        z_i=per_output[LOGITS],
+                        z_j=per_positive[LOGITS],
+                    )
+                    * weight
                 )
 
         if reconstruction:
@@ -195,7 +196,7 @@ class PretrainLitModule(LitModule):
             corrupted_view = self.model(corrupted_batch, head="contrastive")
 
         if self.pretrain_objective in ["self_distill"]:
-            original_view = output #self.model(batch, require_grad=True)
+            original_view = output  # self.model(batch, require_grad=True)
             corrupted_view = self.model(corrupted_batch)
 
         pretrain_data = (batch, original_view, corrupted_view, reconstruction)
@@ -230,10 +231,10 @@ class PretrainLitModule(LitModule):
             return pretrain_loss
         else:
             lam = self.start_loss_coefficient * (
-                    self.decay_loss_coefficient ** (self.current_epoch - self.pretrain_epochs))
+                self.decay_loss_coefficient ** (self.current_epoch - self.pretrain_epochs)
+            )
             lam = max(lam, self.end_loss_coefficient)
             return pretrain_loss * lam + loss  # * (1-lam)
-
 
     def validation_step(self, batch, batch_idx):
         """
