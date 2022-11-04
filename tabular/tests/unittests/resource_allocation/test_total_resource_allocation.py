@@ -29,6 +29,10 @@ class DummyBaggedModel(BaggedEnsembleModel):
     pass
 
 
+get_cpu_count.mock = 16
+get_gpu_count_all.mock = 2
+
+
 def test_bagged_model_with_total_resources():
     model_base = DummyModel()
     bagged_model = DummyBaggedModel(model_base)

@@ -18,44 +18,6 @@ class ResourceCalculator(ABC):
         """Type of the resource calculator"""
         raise NotImplementedError
 
-    @staticmethod
-    def get_total_gpu_count(
-        model_default_num_gpus: Union[int, float],
-        user_specified_num_gpus: Optional[Union[int, float]] = None
-    ):
-        """
-        model_minimum_num_gpus
-            Number of gpus needed by the model minimum
-        user_specified_num_gpus
-            Number of gpus specified by the user.
-            This corresponds to the number of gpus used by the hpo experiment(shared by all trials when training a model)
-            or the bagging of the model(shared by all bags)
-        """
-        if user_specified_num_gpus is not None:
-            num_gpus = min(user_specified_num_gpus, get_gpu_count_all())
-            if num_gpus < user_specified_num_gpus:
-                logger.warning(f'Specified num_gpus = {user_specified_num_gpus}, but only {num_gpus} are available')
-        elif model_default_num_gpus > 0:
-            num_gpus = get_gpu_count_all()
-        else:
-            num_gpus = 0
-        return num_gpus
-
-    @staticmethod
-    def get_total_cpu_count(
-        model_default_num_cpus: int,
-        user_specified_num_cpus: Optional[int] = None
-    ):
-        if user_specified_num_cpus is not None:
-            num_cpus = min(user_specified_num_cpus, get_cpu_count())
-            if num_cpus < user_specified_num_cpus:
-                logger.warning(f'Specified num_cpus = {user_specified_num_cpus}, but only {num_cpus} are available')
-        elif model_default_num_cpus > 0:
-            num_cpus = get_cpu_count()
-        else:
-            num_cpus = 0
-        return num_cpus
-
     @abstractmethod
     def get_resources_per_job(self, **kwargs) -> dict:
         """Calculate resources per trial and return additional info"""

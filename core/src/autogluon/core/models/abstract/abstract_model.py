@@ -477,6 +477,11 @@ class AbstractModel:
             self.normalize_pred_probas = False
 
     def _preprocess_fit_resources(self, silent=False, total_resources=None, **kwargs):
+        """
+        This function should be called to process user-specified total resources.
+        Sanity checks will be done to user-specified total resources to make sure it's legit.
+        When user-specified resources are not defined, will instead look at model's default resource requirements.
+        """
         if 'num_cpus' in kwargs and 'num_gpus' in kwargs:
             # This value will only be passed by autogluon through previous layers(i.e. bagged model to model base).
             # We respect this value with highest priority

@@ -540,6 +540,10 @@ class TabularPredictor:
             If True, a WeightedEnsembleModel will be fit in each stack layer.
             A weighted ensemble will often be stronger than an individual model while being very fast to train.
             It is recommended to keep this value set to True to maximize predictive quality.
+        num_cpus: int, default = auto
+            The total amount of cpus you want AutoGluon predictor to use.
+        num_gpus: int, default = auto
+            The total amount of gpus you want AutoGluon predictor to use.
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -928,6 +932,8 @@ class TabularPredictor:
                   time_limit=None,
                   base_model_names=None,
                   fit_weighted_ensemble=True,
+                  num_cpus='auto',
+                  num_gpus='auto',
                   **kwargs):
         """
         Fits additional models after the original :meth:`TabularPredictor.fit` call.
@@ -952,6 +958,10 @@ class TabularPredictor:
             If True, a WeightedEnsembleModel will be fit in each stack layer.
             A weighted ensemble will often be stronger than an individual model while being very fast to train.
             It is recommended to keep this value set to True to maximize predictive quality.
+        num_cpus: int, default = auto
+            The total amount of cpus you want AutoGluon predictor to use.
+        num_gpus: int, default = auto
+            The total amount of gpus you want AutoGluon predictor to use.
         **kwargs :
             Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
             Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:
@@ -1032,8 +1042,16 @@ class TabularPredictor:
             num_stack_levels = highest_level
 
         # TODO: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
-        core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit,
-                       'excluded_model_types': excluded_model_types}
+        core_kwargs = {
+            'total_resources': {
+                'num_cpus': num_cpus,
+                'num_gpus': num_gpus,
+            },
+            'ag_args': ag_args,
+            'ag_args_ensemble': ag_args_ensemble,
+            'ag_args_fit': ag_args_fit,
+            'excluded_model_types': excluded_model_types
+        }
 
         if X_pseudo is not None and y_pseudo is not None:
             core_kwargs['X_pseudo'] = X_pseudo

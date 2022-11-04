@@ -76,16 +76,27 @@ class HpoExecutor(ABC):
         initialized_model: AbstractModel,
         num_cpus: int,
         num_gpus: Union[int, float],
-        k_fold=None,
+        k_fold: Optional[int] = None,
         **kwargs
     ):
         """
-        Register total resources used for the experiment
+        Register total resources used for the experiment, and calculate resources per trial if user specified.
+        User specified resources per trial will be validated against total resources and minimum resources required, and respected directly if legit.
+        When HPO with bagging, user could specify resources per fold as well as resources per trial.
+            Resources per fold will be checked against total resources, minimum resources required, and resources per trial (if specified).
+            Resources per fold will have higher priority than resources per trial, and the corresponding resources per trial will be calculated accordingly.
+        When no user specified resources present, we try to maximize trials running in parallel while respecting the minimum resources required.
         
         Parameters
         ----------
         initialized_model
-            The model that will be performed HPO. This model MUST be initialized
+            The model that will be performed HPO. This model MUST be initialized.
+        num_cpus
+            Total number of cpus available for the experiment.
+        num_gpus
+            Total number of gpus available for the experiment.
+        kfold
+            Number of folds if bagging. Used to check if an individual trial is a bagged model.
         """
         minimum_model_resources = initialized_model.get_minimum_resources(
             is_gpu_available=(num_gpus > 0)
@@ -298,7 +309,7 @@ class RayHpoExecutor(HpoExecutor):
         )
         if 'num_trials' not in hyperparameter_tune_kwargs and default_num_trials is not None:
             hyperparameter_tune_kwargs['num_trials'] = default_num_trials
-        self.hyperparameter_tune_kwargs = hyperparameter_tune_kwargs
+        self.hyperparameter_tune_kwargs = copy.deepcopy(hyperparameter_tune_kwargs)
         
     def validate_search_space(self, search_space, model_name):
         from ray.tune.search.sample import Domain
@@ -430,10 +441,10 @@ class CustomHpoExecutor(HpoExecutor):
         self._time_limit = value
     
     def initialize(self, hyperparameter_tune_kwargs, default_num_trials=None, time_limit=None):
-        self.hyperparameter_tune_kwargs = hyperparameter_tune_kwargs
         if not isinstance(hyperparameter_tune_kwargs, tuple):
             if isinstance(hyperparameter_tune_kwargs, dict):
-                hyperparameter_tune_kwargs = hyperparameter_tune_kwargs.copy()
+                hyperparameter_tune_kwargs = copy.deepcopy(hyperparameter_tune_kwargs)
+                self.hyperparameter_tune_kwargs = hyperparameter_tune_kwargs
             num_trials = default_num_trials  # This will be ignored if hyperparameter_tune_kwargs contains num_trials
             if default_num_trials is None:
                 num_trials = 1 if time_limit is None else 1000

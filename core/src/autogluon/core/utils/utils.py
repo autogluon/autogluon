@@ -24,8 +24,39 @@ from ..metrics import accuracy, root_mean_squared_error, pinball_loss, Scorer
 logger = logging.getLogger(__name__)
 
 
-def get_cpu_count():
-    return multiprocessing.cpu_count()
+
+# TODO: RespirceManager to replace these two hacks
+class _get_cpu_count:
+    def __init__(self):
+        self.mock = None
+
+    def __call__(self):
+        if self.mock is not None:
+            return self.mock
+        return multiprocessing.cpu_count()
+    
+
+class _get_gpu_count_all:
+    """
+    Attempts to get number of GPUs available for use via multiple means.
+    """
+    # FIXME: update to use only torch for TIMM or find a better GPU detection strategy
+    # FIXME: get_gpu_count by itself doesn't always work for Windows
+    def __init__(self):
+        self.mock = None
+
+    def __call__(self):
+        if self.mock is not None:
+            return self.mock
+        num_gpus = _get_gpu_count_cuda()
+        if num_gpus == 0:
+            num_gpus = get_gpu_count_mxnet()
+            if num_gpus == 0:
+                num_gpus = get_gpu_count_torch()
+        return num_gpus
+    
+get_cpu_count = _get_cpu_count()
+get_gpu_count_all = _get_gpu_count_all()
 
 
 def get_memory_size():
@@ -42,20 +73,6 @@ def get_available_disk_size():
         return bytes_to_mega_bytes(available_blocks)
     except Exception:
         return None
-
-
-def get_gpu_count_all():
-    """
-    Attempts to get number of GPUs available for use via multiple means.
-    """
-    # FIXME: update to use only torch for TIMM or find a better GPU detection strategy
-    # FIXME: get_gpu_count by itself doesn't always work for Windows
-    num_gpus = _get_gpu_count_cuda()
-    if num_gpus == 0:
-        num_gpus = get_gpu_count_mxnet()
-        if num_gpus == 0:
-            num_gpus = get_gpu_count_torch()
-    return num_gpus
 
 
 def _get_gpu_count_cuda():
