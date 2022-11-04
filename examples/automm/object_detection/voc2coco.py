@@ -11,8 +11,8 @@ With changes:
 To use:
 1. run in root_dir:
     grep -ERoh '<name>(.*)</name>' ./Annotations | sort | uniq | sed 's/<name>//g' | sed 's/<\/name>//g' > labels.txt
-2. run in root_dir:
-    ls Annotations/* > pathlist.txt
+2. run in root_dir/..:
+    ls Annotations/*.xml > pathlist.txt
 3. run here:
     python3 voc2coco.py --root_dir <root_dir> --train_ratio <train_ratio> --val_ratio <val_ratio>
 """
@@ -131,7 +131,10 @@ def convert_xmls_to_cocojson(
     print("Start converting !")
     for a_path in tqdm(annotation_paths):
         # Read annotation xml
-        ann_tree = ET.parse(os.path.join(root_dir, a_path))
+        try:
+            ann_tree = ET.parse(a_path)
+        except:
+            ann_tree = ET.parse(os.path.join(root_dir, a_path))
         ann_root = ann_tree.getroot()
 
         img_info = get_image_info(annotation_root=ann_root, extract_num_from_imgid=extract_num_from_imgid)
