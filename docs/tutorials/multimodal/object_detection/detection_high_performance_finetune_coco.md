@@ -166,12 +166,20 @@ To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization
 
 ### Citation
 ```
-@misc{redmon2018yolov3,
-    title={YOLOv3: An Incremental Improvement},
-    author={Joseph Redmon and Ali Farhadi},
-    year={2018},
-    eprint={1804.02767},
-    archivePrefix={arXiv},
-    primaryClass={cs.CV}
+@article{DBLP:journals/corr/abs-2008-13367,
+  author    = {Haoyang Zhang and
+               Ying Wang and
+               Feras Dayoub and
+               Niko S{\"{u}}nderhauf},
+  title     = {VarifocalNet: An IoU-aware Dense Object Detector},
+  journal   = {CoRR},
+  volume    = {abs/2008.13367},
+  year      = {2020},
+  url       = {https://arxiv.org/abs/2008.13367},
+  eprinttype = {arXiv},
+  eprint    = {2008.13367},
+  timestamp = {Wed, 16 Sep 2020 11:20:03 +0200},
+  biburl    = {https://dblp.org/rec/journals/corr/abs-2008-13367.bib},
+  bibsource = {dblp computer science bibliography, https://dblp.org}
 }
 ```
