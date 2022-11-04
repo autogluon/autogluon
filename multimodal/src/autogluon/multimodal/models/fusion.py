@@ -247,6 +247,7 @@ class MultimodalFusionTransformer(nn.Module):
         share_qv_weights: Optional[bool] = False,
         row_attention: Optional[bool] = False,
         row_attention_layer: Optional[str] = None,
+        global_token: Optional[bool] = False,
         num_numerical_columns: Optional[int] = None,
         num_categories: Optional[List[int]] = None,
         pretrain_objective: Optional[str] = "both",
@@ -363,6 +364,7 @@ class MultimodalFusionTransformer(nn.Module):
             share_qv_weights=share_qv_weights,
             row_attention=row_attention,
             row_attention_layer=row_attention_layer,
+            global_token=global_token,
         )
 
         self.heads = nn.ModuleDict(
@@ -374,15 +376,7 @@ class MultimodalFusionTransformer(nn.Module):
                     activation=head_activation,
                     normalization=head_normalization,
                 ),
-                "contrastive_1": FT_Transformer.ContrastiveHead(
-                    d_in=in_features,
-                    d_out=in_features,
-                    bias=True,
-                    activation=head_activation,
-                    normalization=head_normalization,
-                ) if pretrain_objective in ["contrastive", "both"]
-                else None,
-                "contrastive_2": FT_Transformer.ContrastiveHead(
+                "contrastive": FT_Transformer.ContrastiveHead(
                     d_in=in_features,
                     d_out=in_features,
                     bias=True,

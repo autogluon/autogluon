@@ -142,6 +142,7 @@ from .utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
+    update_config_by_resources,
     use_realtime,
 )
 
@@ -923,6 +924,11 @@ class MultiModalPredictor:
         else:  # continuing training
             df_preprocessor = self._df_preprocessor
 
+        config = update_config_by_resources(
+            config,
+            num_numerical_columns=len(df_preprocessor.numerical_feature_names),
+            num_categorical_columns=len(df_preprocessor.categorical_num_categories),
+        )
         config = select_model(config=config, df_preprocessor=df_preprocessor)
 
         if self._model is None:
@@ -1067,6 +1073,7 @@ class MultiModalPredictor:
             lr_mult=config.optimization.lr_mult,
             weight_decay=config.optimization.weight_decay,
             warmup_steps=config.optimization.warmup_steps,
+            row_attention_weight_decay=config.optimization.row_attention_weight_decay,
         )
         metrics_kwargs = dict(
             validation_metric=validation_metric,
@@ -1135,7 +1142,8 @@ class MultiModalPredictor:
                 corruption_rate=config.pretrainer.corruption_rate,
                 start_loss_coefficient=config.pretrainer.start_pretrain_coefficient,
                 end_loss_coefficient=config.pretrainer.end_pretrain_coefficient,
-                loss_mixup=config.pretrainer.loss_mixup,
+                decay_loss_coefficient=config.pretrainer.decay_pretrain_coefficient,
+                pretrain_objective=config.pretrainer.objective,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )

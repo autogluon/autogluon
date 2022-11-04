@@ -583,6 +583,7 @@ class FT_Transformer(nn.Module):
         share_qv_weights: Optional[bool] = False,
         row_attention: Optional[bool] = False,
         row_attention_layer: Optional[str] = None,
+        global_token: Optional[bool] = False,
     ) -> None:
         """
         Parameters
@@ -632,7 +633,7 @@ class FT_Transformer(nn.Module):
         """
         super().__init__()
         if row_attention:
-            row_attention_layer = "last" if row_attention_layer is None else row_attention_layer
+            row_attention_layer = row_attention_layer if row_attention_layer else "last"
         else:
             row_attention_layer = None
         if isinstance(last_layer_query_idx, int):
@@ -687,6 +688,7 @@ class FT_Transformer(nn.Module):
         self.last_layer_query_idx = last_layer_query_idx
         self.row_attention = row_attention
         self.row_attention_layer = row_attention_layer
+        self.global_token = global_token
 
         self.blocks = nn.ModuleList([])
         if self.row_attention:
@@ -807,6 +809,20 @@ class FT_Transformer(nn.Module):
             x = layer[f"{stage}_normalization"](x)
         return x
 
+    def _start_global_token(self, x):
+        if self.global_token:
+            x = torch.concat(
+                [torch.mean(x, dim=1).unsqueeze(1), x],
+                dim=1,
+            )
+        return x
+
+    def _end_global_token(self, x):
+        if self.global_token:
+            x = x[:, 1:]
+        return x
+
+
     def forward(self, x: Tensor) -> Tensor:
         assert x.ndim == 3, "The input must have 3 dimensions: (n_objects, n_tokens, d_token)"
         for layer_idx, layer in enumerate(self.blocks):
@@ -815,6 +831,7 @@ class FT_Transformer(nn.Module):
 
             if self.row_attention_layer == "first" and layer_idx == 0:
                 x = torch.transpose(x, 0, 1)
+                x = self._start_global_token(x)
                 x_residual = self._start_residual(layer, "row_attention", x)
                 x_residual, _ = layer["row_attention"](
                     x_residual,
@@ -826,9 +843,12 @@ class FT_Transformer(nn.Module):
                 x_residual = layer["row_ffn"](x_residual)
                 x = self._end_residual(layer, "row_ffn", x, x_residual)
                 x = layer["row_output"](x)
+                x = self._end_global_token(x)
                 x = torch.transpose(x, 0, 1)
 
             query_idx = self.last_layer_query_idx if layer_idx + 1 == len(self.blocks) else None
+
+            x = self._start_global_token(x)
             x_residual = self._start_residual(layer, "attention", x)
             x_residual, _ = layer["attention"](
                 x_residual if query_idx is None else x_residual[:, query_idx],
@@ -843,9 +863,11 @@ class FT_Transformer(nn.Module):
             x_residual = layer["ffn"](x_residual)
             x = self._end_residual(layer, "ffn", x, x_residual)
             x = layer["output"](x)
+            x = self._end_global_token(x)
 
             if self.row_attention_layer == "shared" or (self.row_attention_layer == "last" and layer_idx + 1 == len(self.blocks)):
                 x = torch.transpose(x, 0, 1)
+                x = self._start_global_token(x)
                 x_residual = self._start_residual(layer, "row_attention", x)
                 x_residual, _ = layer["row_attention"](
                     x_residual,
@@ -857,6 +879,7 @@ class FT_Transformer(nn.Module):
                 x_residual = layer["row_ffn"](x_residual)
                 x = self._end_residual(layer, "row_ffn", x, x_residual)
                 x = layer["row_output"](x)
+                x = self._end_global_token(x)
                 x = torch.transpose(x, 0, 1)
 
         x = self.head(x)

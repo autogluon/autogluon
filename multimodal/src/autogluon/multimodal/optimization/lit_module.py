@@ -45,6 +45,7 @@ class LitModule(pl.LightningModule):
         mixup_fn: Optional[MixupModule] = None,
         mixup_off_epoch: Optional[int] = 0,
         model_postprocess_fn: Callable = None,
+        row_attention_weight_decay: Optional[float] = None,
     ):
         """
         Parameters
@@ -229,7 +230,6 @@ class LitModule(pl.LightningModule):
         Average loss of the mini-batch data.
         """
         output, loss = self._shared_step(batch)
-
         if hasattr(self.model.fusion_transformer, "row_attention_layers"):
             res = 0
             row_attention_parameters = self.model.fusion_transformer.row_attention_layers.parameters()
@@ -333,6 +333,7 @@ class LitModule(pl.LightningModule):
         else:
             logger.debug("applying single learning rate...")
             grouped_parameters = apply_single_lr(
+                row_attention_weight_decay=self.hparams.row_attention_weight_decay,
                 **kwargs,
             )
 

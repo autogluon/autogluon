@@ -9,6 +9,7 @@ from .config import (
     parse_dotlist_conf,
     save_pretrained_model_configs,
     update_config_by_rules,
+    update_config_by_resources,
 )
 from .data import (
     assign_feature_column_names,

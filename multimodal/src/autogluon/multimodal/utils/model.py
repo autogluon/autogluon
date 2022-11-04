@@ -228,12 +228,11 @@ def create_model(
             embedding_arch=model_config.embedding_arch,
             num_classes=num_classes,
             ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
-            additive_attention=True
-            if num_numerical_columns > 300
-            else OmegaConf.select(model_config, "additive_attention", default=False),
+            additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
             row_attention=OmegaConf.select(model_config, "row_attention", default=False),
             row_attention_layer=OmegaConf.select(model_config, "row_attention_layer", default=None),
+            global_token=OmegaConf.select(model_config, "global_token", default=False),
         )
     elif model_name.lower().startswith(CATEGORICAL_MLP):
         model = CategoricalMLP(
@@ -265,12 +264,11 @@ def create_model(
             ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
             num_classes=num_classes,
             cls_token=False,
-            additive_attention=True
-            if len(num_categories) > 300
-            else OmegaConf.select(model_config, "additive_attention", default=False),
+            additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
             row_attention=OmegaConf.select(model_config, "row_attention", default=False),
             row_attention_layer=OmegaConf.select(model_config, "row_attention_layer", default=None),
+            global_token=OmegaConf.select(model_config, "global_token", default=False),
         )
     elif model_name.lower().startswith(MMDET_IMAGE):
         model = MMDetAutoModelForObjectDetection(
@@ -329,14 +327,14 @@ def create_model(
             head_activation=model_config.head_activation,
             adapt_in_features=model_config.adapt_in_features,
             loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
-            additive_attention=True
-            if num_numerical_columns + len(num_categories) > 300
-            else OmegaConf.select(model_config, "additive_attention", default=False),
+            additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
             row_attention=OmegaConf.select(model_config, "row_attention", default=False),
             row_attention_layer=OmegaConf.select(model_config, "row_attention_layer", default=None),
             num_categories=num_categories,
             num_numerical_columns=num_numerical_columns,
+            pretrain_objective=OmegaConf.select(model_config, "pretrain_objective", default=None),
+            global_token=OmegaConf.select(model_config, "global_token", default=False),
         )
     else:
         raise ValueError(f"unknown model name: {model_name}")

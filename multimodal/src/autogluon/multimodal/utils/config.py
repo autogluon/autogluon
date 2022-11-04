@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
-from ..constants import AUTOMM, HF_MODELS, NER, REGRESSION, VALID_CONFIG_KEYS
+from ..constants import AUTOMM, HF_MODELS, NER, REGRESSION, VALID_CONFIG_KEYS, FUSION_TRANSFORMER, CATEGORICAL_TRANSFORMER, NUMERICAL_TRANSFORMER
 from ..presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
@@ -472,4 +472,93 @@ def update_config_by_rules(
             )
     if problem_type == NER:
         config.model.names = [NER]
+    return config
+
+
+def update_pretrain_config(
+    config: DictConfig,
+):
+    """
+    Pass the pretrainer config to models to init tensors adaptively.
+
+    Parameters
+    ----------
+    config
+        The config of the project. It is a Dictconfig object.
+
+    Returns
+    -------
+    The modified config.
+    """
+    pretrainer_supported_models = [
+        FUSION_TRANSFORMER,
+    ]
+    if hasattr(config, "pretrainer"):
+        pretrain_objective = config.pretrainer.objective
+    else:
+        return config
+    for model in pretrainer_supported_models:
+        if model in config.model.names:
+            model_ = getattr(config.model, model)
+            setattr(model_, "pretrain_objective", pretrain_objective)
+    return config
+
+
+def update_config_by_resources(
+    config: DictConfig,
+    num_numerical_columns: Optional[int] = 0,
+    num_categorical_columns: Optional[int] = 0,
+    resource: Optional[int] = 16,
+):
+    """
+    Modify configs based on the dataset statistics.
+    Use Additive attention with large column count and tune batch size accordingly.
+
+
+    Parameters
+    ----------
+    config
+        The config of the project. It is a Dictconfig object.
+    num_numerical_columns
+        The number of numerical columns.
+    num_categorical_columns
+        The number of categorical columns.
+    resource
+        The maximum resource (memory in GB) a single GPU has.
+
+    Returns
+    -------
+    The modified config.
+    """
+    columns_per_model = {
+        NUMERICAL_TRANSFORMER: num_numerical_columns,
+        CATEGORICAL_TRANSFORMER: num_categorical_columns,
+        FUSION_TRANSFORMER: num_categorical_columns+num_numerical_columns,
+    }
+
+    # Threshold is expected to be ~= batch_size * num_tokens, for additive attention.
+    # The multiplier 2e4 is a heuristic found from AutoML Benchmark.
+    # TODO: determine the threshold/batch_size on training data directly
+    threshold = resource * 2e4
+    per_gpu_batch_size = config.env.per_gpu_batch_size
+    for model in columns_per_model:
+        if model in config.model.names:
+            if columns_per_model[model] > 300:
+                model_ = getattr(config.model, model)
+                model_.additive_attention = True
+                warnings.warn(
+                    f"Dataset contains >300 features, using additive attention for efficiency",
+                    UserWarning,
+                )
+            if columns_per_model[model] * per_gpu_batch_size > threshold:
+                per_gpu_batch_size = int(threshold / columns_per_model[model])
+    per_gpu_batch_size = max(per_gpu_batch_size, 1)
+    if per_gpu_batch_size < config.env.per_gpu_batch_size:
+        config.env.per_gpu_batch_size = per_gpu_batch_size
+        warnings.warn(
+            f"Setting  per_gpu_batch_size to {per_gpu_batch_size} to fit into GPU memory",
+            UserWarning,
+        )
+
+    config = update_pretrain_config(config)
     return config

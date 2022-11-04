@@ -112,6 +112,7 @@ class CategoricalTransformer(nn.Module):
         share_qv_weights: Optional[bool] = False,
         row_attention: Optional[bool] = False,
         row_attention_layer: Optional[str] = None,
+        global_token: Optional[bool] = False,
     ) -> None:
         """
         Parameters
@@ -238,6 +239,7 @@ class CategoricalTransformer(nn.Module):
             share_qv_weights=share_qv_weights,
             row_attention=row_attention,
             row_attention_layer=row_attention_layer,
+            global_token=global_token,
         )
 
         self.head = FT_Transformer.Head(
