@@ -297,8 +297,8 @@ class MultiModalPredictor:
 
         if self._pipeline == OBJECT_DETECTION:
             self._label_column = "label"
-            if sample_data_path:
-                self._classes = get_detection_classes(sample_data_path)
+            if self._sample_data_path:
+                self._classes = get_detection_classes(self._sample_data_path)
                 self._output_shape = len(self._classes)
 
         if self._pipeline is not None:
@@ -2010,6 +2010,8 @@ class MultiModalPredictor:
         if self._pipeline == OBJECT_DETECTION:
             if isinstance(data, str):
                 data = from_coco_or_voc(data, "test")
+            if self._label_column not in data:
+                self._label_column = None
 
         if self._pipeline == OBJECT_DETECTION or self._pipeline == OCR_TEXT_DETECTION:
             ret_type = BBOX
