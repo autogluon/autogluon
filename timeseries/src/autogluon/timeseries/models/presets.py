@@ -171,6 +171,7 @@ def get_default_hps(key, prediction_length):
         for k in default_model_hps:
             default_model_hps[k] = dict(**default_model_hps[k], **mxnet_default_updates.get(k, {}))
 
+    # For backwards compatibility
     default_model_hps["default"] = default_model_hps["medium_quality"]
     default_model_hps["default_hpo"] = default_model_hps["best_quality"]
 
