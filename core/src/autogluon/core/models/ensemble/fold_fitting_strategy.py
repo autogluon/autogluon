@@ -15,9 +15,8 @@ from typing import Union
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 
-from ...ray.resources_calculator import ResourceCalculatorFactory, ResourceCalculator
+from ...ray.resources_calculator import ResourceCalculatorFactory
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NotEnoughCudaMemoryError
-from ...utils import get_cpu_count, get_gpu_count_all
 from ...utils.try_import import try_import_ray
 
 logger = logging.getLogger(__name__)

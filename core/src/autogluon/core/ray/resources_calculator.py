@@ -3,9 +3,7 @@ import math
 import psutil
 
 from abc import ABC, abstractmethod
-from typing import Optional, Union
 
-from ..utils import get_cpu_count, get_gpu_count_all
 
 logger = logging.getLogger(__name__)
 

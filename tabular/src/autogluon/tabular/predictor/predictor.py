@@ -540,10 +540,14 @@ class TabularPredictor:
             If True, a WeightedEnsembleModel will be fit in each stack layer.
             A weighted ensemble will often be stronger than an individual model while being very fast to train.
             It is recommended to keep this value set to True to maximize predictive quality.
-        num_cpus: int, default = auto
+        num_cpus: int, default = "auto"
             The total amount of cpus you want AutoGluon predictor to use.
-        num_gpus: int, default = auto
+            Auto means AutoGluon will make the decision based on the total number of cpus available and the model requirement for best performance.
+            Users generally don't need to set this value
+        num_gpus: int, default = "auto"
             The total amount of gpus you want AutoGluon predictor to use.
+            Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
+            Users generally don't need to set this value
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -958,10 +962,14 @@ class TabularPredictor:
             If True, a WeightedEnsembleModel will be fit in each stack layer.
             A weighted ensemble will often be stronger than an individual model while being very fast to train.
             It is recommended to keep this value set to True to maximize predictive quality.
-        num_cpus: int, default = auto
+        num_cpus: int, default = "auto"
             The total amount of cpus you want AutoGluon predictor to use.
-        num_gpus: int, default = auto
+            Auto means AutoGluon will make the decision based on the total number of cpus available and the model requirement for best performance.
+            Users generally don't need to set this value
+        num_gpus: int, default = "auto"
             The total amount of gpus you want AutoGluon predictor to use.
+            Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
+            Users generally don't need to set this value
         **kwargs :
             Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
             Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:

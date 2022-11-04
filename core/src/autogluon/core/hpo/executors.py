@@ -95,8 +95,11 @@ class HpoExecutor(ABC):
             Total number of cpus available for the experiment.
         num_gpus
             Total number of gpus available for the experiment.
-        kfold
+        k_fold
             Number of folds if bagging. Used to check if an individual trial is a bagged model.
+        kwargs
+            Any additional parameters being passed to `AbstractModel.hyperparameter_tune()`
+            This function will pass these parameters to initialized model to get estimation of memory usage
         """
         minimum_model_resources = initialized_model.get_minimum_resources(
             is_gpu_available=(num_gpus > 0)
