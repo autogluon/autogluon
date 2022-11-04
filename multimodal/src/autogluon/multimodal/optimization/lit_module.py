@@ -230,12 +230,6 @@ class LitModule(pl.LightningModule):
         Average loss of the mini-batch data.
         """
         output, loss = self._shared_step(batch)
-        if hasattr(self.model.fusion_transformer, "row_attention_layers"):
-            res = 0
-            row_attention_parameters = self.model.fusion_transformer.row_attention_layers.parameters()
-            for param in row_attention_parameters:
-                res += torch.norm(param, 1)
-            print(res)
         self.log("train_loss", loss)
         return loss
 
