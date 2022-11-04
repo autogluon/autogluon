@@ -724,6 +724,35 @@ def process_voc_annotations(
         f.writelines("\n".join(xml_file_names))
 
 
+def read_voc_class_names(voc_annotation_path: str, voc_class_names_output_path: str,
+                         voc_annotation_xml_output_path: str):
+    '''
+    Reads and generate unique class names for dataset fomatted in VOC format.
+    Then dumps the class names into label.txt file.
+    '''
+    files = os.listdir(voc_annotation_path)
+    annotation_path_base_name = os.path.basename(voc_annotation_path)
+    class_names = set()
+    xml_file_names = []
+    for f in files:
+
+        xml_path = os.path.join(voc_annotation_path, f)
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+        for boxes in root.iter('object'):
+            class_names.add(boxes.find("name").text)
+
+        xml_file_names.append(os.path.join(annotation_path_base_name, f))
+
+
+    sorted_class_names = sorted(list(class_names))
+    with open(voc_class_names_output_path, 'w') as f:
+        f.writelines("\n".join(sorted_class_names))
+
+    with open(voc_annotation_xml_output_path, 'w') as f:
+        f.writelines("\n".join(xml_file_names))
+
+
 def from_coco_or_voc(file_path, splits: Optional[str] = None):
     if os.path.isdir(file_path):
         # VOC use dir as input
