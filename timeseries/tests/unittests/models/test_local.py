@@ -3,7 +3,7 @@ import logging
 import pandas as pd
 import pytest
 
-from autogluon.timeseries.models.local import NaiveModel, SeasonalNaiveModel, ETSModel, ARIMAModel, ThetaModel
+from autogluon.timeseries.models.local import ARIMAModel, ETSModel, NaiveModel, SeasonalNaiveModel, ThetaModel
 
 from ..common import (
     DUMMY_TS_DATAFRAME,
