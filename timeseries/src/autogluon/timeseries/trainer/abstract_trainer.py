@@ -850,11 +850,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     model_preds[base_model] = base_model_loaded.predict_for_scoring(
                         data, quantile_levels=self.quantile_levels
                     )
-                except Exception as err:
-                    logger.error(
-                        f"Warning: Model {base_model} failed during prediction and will be ignored by "
-                        f"WeightedEnsemble. Error message: {err}"
-                    )
+                except Exception:
                     model_preds[base_model] = None
             forecasts = model.predict(model_preds)
 

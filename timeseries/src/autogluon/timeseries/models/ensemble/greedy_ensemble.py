@@ -115,5 +115,11 @@ class TimeSeriesEnsembleWrapper(AbstractTimeSeriesModel):
                 "Set of models given for prediction in the weighted ensemble differ from those "
                 "provided during initialization."
             )
+        failed_models = [model_name for (model_name, model_preds) in data.items() if model_preds is None]
+        if len(failed_models) > 0:
+            logger.warning(
+                f"Following models failed during prediction: {failed_models}. "
+                f"{self.name} will ignore these models and re-normalize the weights to sum up to 1 when predicting."
+            )
 
         return self.weighted_ensemble.predict([data[k] for k in self.model_names])
