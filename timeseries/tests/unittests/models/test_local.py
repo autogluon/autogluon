@@ -3,7 +3,7 @@ import logging
 import pandas as pd
 import pytest
 
-from autogluon.timeseries.models.local import NaiveModel, SeasonalNaiveModel
+from autogluon.timeseries.models.local import NaiveModel, SeasonalNaiveModel, ETSModel, ARIMAModel, ThetaModel
 
 from ..common import (
     DUMMY_TS_DATAFRAME,
@@ -13,6 +13,9 @@ from ..common import (
 )
 
 TESTABLE_MODELS = [
+    ARIMAModel,
+    ETSModel,
+    ThetaModel,
     NaiveModel,
     SeasonalNaiveModel,
 ]
@@ -54,7 +57,7 @@ def test_when_local_model_saved_then_n_jobs_is_saved(model_class, n_jobs, temp_m
     "hyperparameters", [{}, {"seasonal_period": 5}, {"seasonal_period": 5, "dummy_argument": "a"}]
 )
 def test_when_local_model_saved_then_local_model_args_are_saved(model_class, hyperparameters, temp_model_path):
-    model = model_class(path=temp_model_path)
+    model = model_class(path=temp_model_path, hyperparameters=hyperparameters)
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model.save()
 
@@ -74,6 +77,17 @@ def test_when_local_model_predicts_then_time_index_is_correct(model_class, predi
         start = cutoff + pd.tseries.frequencies.to_offset(data.freq)
         expected_timestamps = pd.date_range(start, periods=prediction_length, freq=data.freq)
         assert (predictions.loc[item_id].index == expected_timestamps).all()
+
+
+def get_seasonal_period_from_fitted_local_model(model):
+    if model.name == "ARIMA":
+        return model._local_model_args["seasonal_order"][-1]
+    elif model.name == "ETS":
+        return model._local_model_args["seasonal_periods"]
+    elif model.name == "Theta":
+        return model._local_model_args["period"]
+    else:
+        return model._local_model_args["seasonal_period"]
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -100,7 +114,7 @@ def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
     model = model_class(path=temp_model_path, prediction_length=3, hyperparameters=hyperparameters)
 
     model.fit(train_data=train_data)
-    assert model._local_model_args["seasonal_period"] == expected_seasonal_period
+    assert get_seasonal_period_from_fitted_local_model(model) == expected_seasonal_period
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -127,7 +141,7 @@ def test_when_seasonal_period_is_provided_then_inferred_period_is_overriden(
     )
 
     model.fit(train_data=train_data)
-    assert model._local_model_args["seasonal_period"] == provided_seasonal_period
+    assert get_seasonal_period_from_fitted_local_model(model) == provided_seasonal_period
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
