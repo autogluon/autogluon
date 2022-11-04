@@ -4,9 +4,9 @@
 In this section, our goal is to evaluate Faster-RCNN model on VOC2007 dataset in VOC format.
 See \[Convert VOC to COCO] for how to quickly convert a VOC format dataset.
 In previous section :ref:`sec_automm_detection_eval_fasterrcnn_coco`, we evaluated Faster-RCNN on COCO dataset.
-We strongly recommend using COCO format, but still have limited support for VOC format for quick proof testing.
+We strongly recommend using COCO format, but AutoMM still have limited support for VOC format for quick proof testing.
 
-To start, import MultiModalPredictor:
+To start, let's import MultiModalPredictor:
 
 ```python
 from autogluon.multimodal import MultiModalPredictor
@@ -23,7 +23,7 @@ num_gpus = 1  # multi GPU inference is not supported in VOC format
 ```
 
 As before, we create the MultiModalPredictor with selected checkpoint name and number of GPUs.
-We also need to specify the problem_type is `"object_detection"`.
+We also need to specify the problem_type to `"object_detection"`.
 
 ```python
 predictor = MultiModalPredictor(
@@ -35,7 +35,7 @@ predictor = MultiModalPredictor(
 )
 ```
 
-Here we use VOC2007 to test: \[Prepare VOC Dataset].
+Here we use VOC2007 for testing: \[Prepare VOC Dataset].
 While using VOC format dataset, the input is the root path of the dataset, and contains at least:
 
 ```
