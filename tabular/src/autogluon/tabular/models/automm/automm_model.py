@@ -72,6 +72,14 @@ class MultiModalPredictorModel(AbstractModel):
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
+    # FIXME: Enable parallel bagging once AutoMM supports being run within Ray without hanging
+    @classmethod
+    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
+        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
+        extra_ag_args_ensemble = {'fold_fitting_strategy': 'sequential_local'}
+        default_ag_args_ensemble.update(extra_ag_args_ensemble)
+        return default_ag_args_ensemble
+
     def _set_default_params(self):
         super()._set_default_params()
         try_import_autogluon_text()
