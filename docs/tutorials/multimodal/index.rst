@@ -69,7 +69,7 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       How to use AutoMM for entity extraction.
 
    .. card::
-      :title: Single GPU 1B-Scale Model Training with AutoMM via Parameter-Efficient Finetuning
+      :title: Single GPU Billion-scale Model Training via Parameter-Efficient Finetuning
       :link: efficient_finetuning_basic.html
 
       How to take advantage of larger foundation models with the help of parameter-efficient finetuning.

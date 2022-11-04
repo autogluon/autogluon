@@ -1,4 +1,4 @@
-# Single GPU 1B-scale Model Training with AutoMM via Parameter-Efficient Finetuning
+# Single GPU Billion-scale Model Training via Parameter-Efficient Finetuning
 :label:`sec_automm_efficient_finetuning_basic`
 
 As pointed out by [a recent paper from Stanford Institute for Human-Centered Artificial Intelligence](https://arxiv.org/pdf/2108.07258.pdf), 
