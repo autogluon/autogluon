@@ -9,7 +9,7 @@ import defusedxml.ElementTree as ET
 import numpy as np
 import pandas as pd
 
-from ..constants import AUTOMM
+from ..constants import AUTOMM, MAP
 from .download import download, is_url
 
 logger = logging.getLogger(AUTOMM)
@@ -555,6 +555,7 @@ class COCODataset:
                             "score": float(bbox[4]),
                         }
                     )
+
         with open(save_path, "w") as f:
             print(f"saving file at {save_path}")
             json.dump(coco_format_result, f)
@@ -624,8 +625,11 @@ def cocoeval_pycocotools(outputs, data, anno_file, cache_path, metrics):
     cocoEval.accumulate()
     cocoEval.summarize()
 
+    # TODO: support assigning metrics
     if isinstance(metrics, list):
         metrics = metrics[0]
+    elif metrics is None:
+        metrics = MAP
 
     return {metrics: cocoEval.stats[0]}
 
@@ -643,3 +647,23 @@ def from_coco_or_voc(file_path, splits: Optional[str] = None):
         return from_voc(root=file_path, splits=splits)
     else:
         return from_coco(file_path)
+
+
+def get_coco_format_classes(sample_data_path):
+    try:
+        with open(sample_data_path, "r") as f:
+            annotation = json.load(f)
+    except:
+        raise ValueError(f"Failed to load json from provided json file: {sample_data_path}.")
+    return [cat["name"] for cat in annotation["categories"]]
+
+
+def get_voc_format_classes(sample_data_path):
+    return NotImplementedError
+
+
+def get_detection_classes(sample_data_path):
+    if os.path.isdir(sample_data_path):
+        return get_voc_format_classes(sample_data_path)
+    else:
+        return get_coco_format_classes(sample_data_path)
