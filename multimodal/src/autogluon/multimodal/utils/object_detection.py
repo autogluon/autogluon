@@ -641,8 +641,9 @@ def cocoeval(outputs, data, anno_file, cache_path, metrics, tool="pycocotools"):
         return cocoeval_torchmetrics(outputs)
 
 
-def process_voc_annotations(voc_annotation_path: str, voc_class_names_output_path: str,
-                            voc_annotation_xml_output_path: str):
+def process_voc_annotations(voc_annotation_path,
+                            voc_class_names_output_path,
+                            voc_annotation_xml_output_path):
     '''
     Reads annotations for a dataset in VOC format.
     Then
