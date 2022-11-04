@@ -1,7 +1,9 @@
 import logging
+import warnings
 from typing import Any, Callable, Dict, List
 
 import pandas as pd
+from statsmodels.tools.sm_exceptions import ConvergenceWarning, ModelWarning, ValueWarning
 
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_single_time_series
@@ -10,6 +12,10 @@ from autogluon.timeseries.utils.warning_filters import statsmodels_warning_filte
 from .abstract_local_model import AbstractLocalModel
 
 logger = logging.getLogger(__name__)
+
+warnings.simplefilter("ignore", ModelWarning)
+warnings.simplefilter("ignore", ConvergenceWarning)
+warnings.simplefilter("ignore", ValueWarning)
 
 
 def get_quantiles_from_statsmodels(coverage_fn: Callable, quantile_levels: List[float]) -> List[pd.Series]:
@@ -20,8 +26,8 @@ def get_quantiles_from_statsmodels(coverage_fn: Callable, quantile_levels: List[
     Parameters
     ----------
     coverage_fn : Callable
-        Function that returns a pandas Dataframe with lower / upper confidence intervals for each confidence level
-        between 0 and 100.
+        Function that takes as input a coverage level between 0 and 100 and returns a pandas Dataframe with lower /
+        upper values of the confidence interval.
     quantile_levels : List[float]
         List of quantiles between 0.0 and 1.0 to predict
 
