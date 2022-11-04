@@ -455,6 +455,8 @@ class CustomHpoExecutor(HpoExecutor):
             time_limit = hyperparameter_tune_kwargs[1]['time_out']
         self.scheduler_options = hyperparameter_tune_kwargs
         self.time_limit = time_limit
+        if self.hyperparameter_tune_kwargs is None:
+            self.hyperparameter_tune_kwargs = {}
     
     def register_resources(self, initialized_model, **kwargs):
         assert self.scheduler_options is not None, 'Call `initialize()` before register resources'
