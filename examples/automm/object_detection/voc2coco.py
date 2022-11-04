@@ -26,7 +26,7 @@ import re
 import subprocess
 from tqdm import tqdm
 from typing import Dict, List
-from autogluon.multimodal.utils.object_detection import read_voc_class_names
+from autogluon.multimodal.utils.object_detection import process_voc_annotations
 
 
 MIN_AREA = 4  # TODO: put in arg?
@@ -181,9 +181,9 @@ def main():
     annpaths_list_path = os.path.join(args.root_dir, "pathlist.txt")
 
     ## generate labels.txt containing all unique class names
-    read_voc_class_names(voc_annotation_path=os.path.join(args.root_dir, "Annotations"),
-                         voc_class_names_output_path=labels_path,
-                         voc_annotation_xml_output_path=annpaths_list_path)
+    process_voc_annotations(voc_annotation_path=os.path.join(args.root_dir, "Annotations"),
+                            voc_class_names_output_path=labels_path,
+                            voc_annotation_xml_output_path=annpaths_list_path)
 
     assert os.path.exists(labels_path), "FatalError: labels.txt does not exist!"
     assert os.path.exists(annpaths_list_path), "FatalError: pathlist.txt does not exist!"
