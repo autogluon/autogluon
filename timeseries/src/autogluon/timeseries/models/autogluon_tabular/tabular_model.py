@@ -1,5 +1,6 @@
 import logging
 import re
+import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -27,25 +28,27 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
 
     Other Parameters
     ----------------
+    max_train_size : int, default = 1_000_000
+        Maximum number of rows in the training and validation sets. If the number of rows in train or validation data
+        exceeds ``max_train_size``, then ``max_train_size`` many rows are subsampled from the dataframe.
     tabular_hyperparmeters : Dict[Dict[str, Any]], optional
         Hyperparameters dictionary passed to `TabularPredictor.fit`. Contains the names of models that should be fit.
-        Defaults to ``AutoGluonTabularModel.default_tabular_hyperparameters``.
-        Note that the selected models must support ``problem_type="quantile"``.
+        Defaults to ``{"XGB": {}, "CAT": {}, "GBM" :{}}``.
     """
 
     default_tabular_hyperparameters = {
-        "RF": {},
-        "XT": {},
         "XGB": {},
         "CAT": {},
         "GBM": {},
     }
 
+    PREDICTION_BATCH_SIZE = 100_000
+
     TIMESERIES_METRIC_TO_TABULAR_METRIC = {
-        "MASE": "mean_absolute_percentage_error",
+        "MASE": "root_mean_squared_error",
         "MAPE": "mean_absolute_percentage_error",
         "sMAPE": "mean_absolute_percentage_error",
-        "mean_wQuantileLoss": "mean_absolute_percentage_error",
+        "mean_wQuantileLoss": "root_mean_squared_error",
         "MSE": "mean_squared_error",
         "RMSE": "root_mean_squared_error",
     }
@@ -135,6 +138,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         **kwargs,
     ) -> None:
         self._check_fit_params()
+        start_time = time.time()
         if self.tabular_predictor._learner.is_fit:
             raise AssertionError(f"{self.name} predictor has already been fit!")
         verbosity = kwargs.get("verbosity", 2)
@@ -147,6 +151,13 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         train_df.dropna(axis=1, how="all", inplace=True)
         self._available_features = train_df.columns
 
+        model_params = self._get_model_params()
+        tabular_hyperparameters = model_params.get("tabular_hyperparameters", self.default_tabular_hyperparameters)
+        max_train_size = model_params.get("max_train_size", 1_000_000)
+
+        if len(train_df) > max_train_size:
+            train_df = train_df.sample(max_train_size)
+
         if val_data is not None:
             if val_data.freq != train_data.freq:
                 raise ValueError(
@@ -155,6 +166,9 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             val_data, _ = self._normalize_targets(val_data)
             val_df = self._get_features_dataframe(val_data, last_k_values=self.prediction_length)
             val_df = val_df[self._available_features]
+
+            if len(val_df) > max_train_size:
+                val_df = val_df.sample(max_train_size)
         else:
             logger.warning(
                 f"No val_data was provided to {self.name}. "
@@ -162,16 +176,13 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             )
             val_df = None
 
-        # TODO: Other presets for TabularPredictor?
-        tabular_hyperparameters = self._get_model_params().get(
-            "tabular_hyperparameters", self.default_tabular_hyperparameters
-        )
+        time_elapsed = time.time() - start_time
         autogluon_logger = logging.getLogger("autogluon")
         logging_level = autogluon_logger.level
         self.tabular_predictor.fit(
             train_data=train_df,
             tuning_data=val_df,
-            time_limit=time_limit,
+            time_limit=time_limit - time_elapsed if time_limit else None,
             hyperparameters=tabular_hyperparameters,
             verbosity=verbosity - 2,
         )
@@ -203,7 +214,11 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         data, scale_per_item = self._normalize_targets(data)
         data_extended = self._extend_index(data)
         features = self._get_features_dataframe(data_extended, last_k_values=self.prediction_length)
-        predictions = self.tabular_predictor.predict(features[self._available_features])
+        features = features[self._available_features]
+
+        # Predict for batches (instead of using full dataset) to avoid high memory usage
+        batches = features.groupby(np.arange(len(features)) // self.PREDICTION_BATCH_SIZE, sort=False)
+        predictions = pd.concat([self.tabular_predictor.predict(batch) for _, batch in batches])
 
         predictions = predictions.rename("mean").to_frame()
         preds_index = data_extended.slice_by_timestep(-self.prediction_length, None).index

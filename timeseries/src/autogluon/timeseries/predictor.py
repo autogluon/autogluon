@@ -13,12 +13,12 @@ from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
-
-from .configs import TIMESERIES_PRESETS_CONFIGS
-from .dataset import TimeSeriesDataFrame
-from .learner import AbstractLearner, TimeSeriesLearner
-from .splitter import AbstractTimeSeriesSplitter, LastWindowSplitter, MultiWindowSplitter
-from .trainer import AbstractTimeSeriesTrainer
+from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
+from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
+from autogluon.timeseries.splitter import AbstractTimeSeriesSplitter, LastWindowSplitter, MultiWindowSplitter
+from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
+from autogluon.timeseries.utils.random import set_random_seed
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +227,7 @@ class TimeSeriesPredictor:
         hyperparameters: Dict[Union[str, Type], Any] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         enable_ensemble: bool = True,
+        random_seed: Optional[int] = None,
         **kwargs,
     ) -> "TimeSeriesPredictor":
         """Fit probabilistic forecasting models to the given time series dataset.
@@ -366,6 +367,9 @@ class TimeSeriesPredictor:
         enable_ensemble : bool, default = True
             If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
             ``hyperparameters``.
+        random_seed : int, optional
+            If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
+            results for most models (except those trained on GPU because of the non-determinism of GPU operations).
 
         """
         time_start = time.time()
@@ -389,6 +393,7 @@ class TimeSeriesPredictor:
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             enable_ensemble=enable_ensemble,
+            random_seed=random_seed,
             **kwargs,
         )
         logger.info("================ TimeSeriesPredictor ================")
@@ -417,6 +422,9 @@ class TimeSeriesPredictor:
         logger.info(f"Training artifacts will be saved to: {Path(self.path).resolve()}")
         logger.info("=====================================================")
 
+        if random_seed is not None:
+            set_random_seed(random_seed)
+
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
             train_data=train_data,
@@ -440,6 +448,7 @@ class TimeSeriesPredictor:
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[str] = None,
+        random_seed: Optional[int] = 123,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         """Return quantile and mean forecasts for the given dataset, starting from the end of each time series.
@@ -465,6 +474,9 @@ class TimeSeriesPredictor:
         model : str, optional
             Name of the model that you would like to use for prediction. By default, the best model during training
             (with highest validation score) will be used.
+        random_seed : int, optional
+            If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
+            results for most models (except those trained on GPU because of the non-determinism of GPU operations).
         """
         if "quantile_levels" in kwargs:
             warnings.warn(
@@ -475,7 +487,9 @@ class TimeSeriesPredictor:
                 category=DeprecationWarning,
             )
         # TODO: What happens to `known_covariates` if `ignore_index=True`?
-        # TODO: Add example
+        # TODO: Add example with known covariates to the docstring
+        if random_seed is not None:
+            set_random_seed(random_seed)
         data = self._check_and_prepare_data_frame(data)
         return self._learner.predict(data, known_covariates=known_covariates, model=model, **kwargs)
 
