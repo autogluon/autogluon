@@ -98,9 +98,9 @@ from .utils import (
 logger = logging.getLogger(AUTOMM)
 
 
-class MultiModalMatcher:
+class BaseMultiModalMatcher:
     """
-    MultiModalMatcher is a framework to learn/extract embeddings for multimodal data including image, text, and tabular.
+    BaseMultiModalMatcher is a framework to learn/extract embeddings for multimodal data including image, text, and tabular.
     These embeddings can be used e.g. with cosine-similarity to find items with similar semantic meanings.
     This can be useful for computing the semantic similarity of two items, semantic search, paraphrase mining, etc.
     """
@@ -297,7 +297,7 @@ class MultiModalMatcher:
         seed: Optional[int] = 123,
     ):
         """
-        Fit MultiModalMatcher. Train the model to learn embeddings to simultaneously maximize and minimize
+        Fit BaseMultiModalMatcher. Train the model to learn embeddings to simultaneously maximize and minimize
         the semantic similarities of positive and negative pairs.
         The data may contain image, text, numeric, or categorical features.
 
@@ -359,7 +359,7 @@ class MultiModalMatcher:
 
         Returns
         -------
-        An "MultiModalMatcher" object (itself).
+        An "BaseMultiModalMatcher" object (itself).
         """
 
         pl.seed_everything(seed, workers=True)
@@ -1370,7 +1370,7 @@ class MultiModalMatcher:
 
     def evaluate(
         self,
-        data: Optional[Union[pd.DataFrame, dict, list]] = None,
+        data: Union[pd.DataFrame, dict, list],
         query_data: Optional[list] = None,
         response_data: Optional[list] = None,
         id_mappings: Optional[Dict[str, Dict]] = None,
@@ -1729,6 +1729,7 @@ class MultiModalMatcher:
         with open(os.path.join(path, f"assets.json"), "w") as fp:
             json.dump(
                 {
+                    "class_name": self.__class__.__name__,
                     "query": self._query,
                     "response": self._response,
                     "match_label": self._match_label,
@@ -1757,7 +1758,7 @@ class MultiModalMatcher:
 
     @staticmethod
     def _load_metadata(
-        matcher: MultiModalMatcher,
+        matcher: BaseMultiModalMatcher,
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
@@ -1962,3 +1963,7 @@ class MultiModalMatcher:
         else:
             warnings.warn("Accessing class names for a non-classification problem. Return None.")
             return None
+
+    def set_num_gpus(self, num_gpus):
+        assert isinstance(num_gpus, int)
+        self._config.env.num_gpus = num_gpus

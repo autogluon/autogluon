@@ -147,11 +147,11 @@ from .utils import (
 logger = logging.getLogger(AUTOMM)
 
 
-class MultiModalPredictor:
+class BaseMultiModalPredictor:
     """
-    MultiModalPredictor is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that
+    BaseMultiModalPredictor is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that
     are suitable for multimodal datasets. You will only need to preprocess the data in the multimodal dataframe format
-    and the MultiModalPredictor can predict the values of one column conditioned on the features from the other columns.
+    and the BaseMultiModalPredictor can predict the values of one column conditioned on the features from the other columns.
 
     The prediction can be either classification or regression. The feature columns can contain
     image paths, text, numerical, and categorical values.
@@ -339,13 +339,13 @@ class MultiModalPredictor:
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         column_types: Optional[dict] = None,
         holdout_frac: Optional[float] = None,
-        teacher_predictor: Union[str, MultiModalPredictor] = None,
+        teacher_predictor: Union[str, BaseMultiModalPredictor] = None,
         seed: Optional[int] = 123,
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[dict] = None,
     ):
         """
-        Fit MultiModalPredictor predict label column of a dataframe based on the other columns,
+        Fit BaseMultiModalPredictor predict label column of a dataframe based on the other columns,
         which may contain image path, text, numeric, or categorical features.
 
         Parameters
@@ -447,7 +447,7 @@ class MultiModalPredictor:
 
         Returns
         -------
-        An "MultiModalPredictor" object (itself).
+        An "BaseMultiModalPredictor" object (itself).
         """
         if self._pipeline == OBJECT_DETECTION:
             self.detection_anno_train = train_data
@@ -688,7 +688,7 @@ class MultiModalPredictor:
             )
             if best_trial is None:
                 raise ValueError(
-                    "MultiModalPredictor wasn't able to find the best trial."
+                    "BaseMultiModalPredictor wasn't able to find the best trial."
                     "Either all trials failed or"
                     "it's likely that the time is not enough to train a single epoch for trials."
                 )
@@ -697,7 +697,7 @@ class MultiModalPredictor:
             cleanup_trials(save_path, best_trial.trial_id)
             best_trial_path = os.path.join(save_path, best_trial.trial_id)
             # reload the predictor metadata
-            predictor = MultiModalPredictor._load_metadata(predictor=self, path=best_trial_path)
+            predictor = BaseMultiModalPredictor._load_metadata(predictor=self, path=best_trial_path)
             # construct the model
             model = create_fusion_model(
                 config=predictor._config,
@@ -744,7 +744,7 @@ class MultiModalPredictor:
 
     def _setup_distillation(
         self,
-        teacher_predictor: Union[str, MultiModalPredictor],
+        teacher_predictor: Union[str, BaseMultiModalPredictor],
     ):
         """
         Prepare for distillation. It verifies whether the student and teacher predictors have consistent
@@ -778,7 +778,7 @@ class MultiModalPredictor:
         """
         logger.debug("setting up distillation...")
         if isinstance(teacher_predictor, str):
-            teacher_predictor = MultiModalPredictor.load(teacher_predictor)
+            teacher_predictor = BaseMultiModalPredictor.load(teacher_predictor)
 
         # verify that student and teacher configs are consistent.
         assert self._problem_type == teacher_predictor._problem_type
@@ -883,7 +883,7 @@ class MultiModalPredictor:
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
-        teacher_predictor: Union[str, MultiModalPredictor] = None,
+        teacher_predictor: Union[str, BaseMultiModalPredictor] = None,
         hpo_mode: bool = False,
         standalone: bool = True,
         **hpo_kwargs,
@@ -2261,6 +2261,7 @@ class MultiModalPredictor:
         with open(os.path.join(path, f"assets.json"), "w") as fp:
             json.dump(
                 {
+                    "class_name": self.__class__.__name__,
                     "column_types": self._column_types,
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
@@ -2410,7 +2411,7 @@ class MultiModalPredictor:
 
     @staticmethod
     def _load_metadata(
-        predictor: MultiModalPredictor,
+        predictor: BaseMultiModalPredictor,
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
@@ -2630,7 +2631,7 @@ class MultiModalPredictor:
             return self.class_labels[1]
 
 
-class AutoMMPredictor(MultiModalPredictor):
+class AutoMMPredictor(BaseMultiModalPredictor):
     def __init__(self, **kwargs):
         warnings.warn(
             "AutoMMPredictor has been renamed as 'MultiModalPredictor'. "
