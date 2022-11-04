@@ -33,7 +33,6 @@ from autogluon.timeseries.utils.warning_filters import torch_warning_filter
 # PyTorch Lightning. We exclude this model until a future release.
 # from gluonts.torch.model.deep_npts import DeepNPTSEstimator
 
-# TODO: add docstrings for models
 
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
@@ -153,7 +152,7 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
         Whether to automatically scale the target values
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
@@ -198,7 +197,7 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
         Scale the network input by the data mean and the network output by its inverse
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch

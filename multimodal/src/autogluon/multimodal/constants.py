@@ -22,6 +22,9 @@ ZERO_SHOT_IMAGE_CLASSIFICATION = "zero_shot_image_classification"
 OBJECT_DETECTION = "object_detection"
 OCR_TEXT_DETECTION = "ocr_text_detection"
 OCR_TEXT_RECOGNITION = "ocr_text_recognition"
+IMAGE_SIMILARITY = "image_similarity"
+TEXT_SIMILARITY = "text_similarity"
+IMAGE_TEXT_SIMILARITY = "image_text_similarity"
 
 # Input keys
 IMAGE = "image"
@@ -48,6 +51,7 @@ COLUMN_FEATURES = "column_features"
 BBOX = "bbox"
 ROIS = "rois"
 SCORE = "score"
+LOGIT_SCALE = "logit_scale"
 
 # Metric
 MAP = "map"
@@ -70,6 +74,10 @@ CROSS_ENTROPY = "cross_entropy"
 COSINE_EMBEDDING_LOSS = "cosine_embedding_loss"
 F1 = "f1"
 DIRECT_LOSS = "direct_loss"
+HIT_RATE = "hit_rate"
+NDCG = "ndcg"
+PRECISION = "precision"
+RECALL = "recall"
 METRIC_MODE_MAP = {
     ACC: MAX,
     ACCURACY: MAX,
@@ -87,12 +95,14 @@ METRIC_MODE_MAP = {
     MAP: MAX,
     MEAN_AVERAGE_PRECISION: MAX,
     OVERALL_ACCURACY: MAX,
+    HIT_RATE: MAX,
+    NDCG: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
 # Training status
 TRAIN = "train"
-VAL = "val"
+VALIDATE = "validate"
 TEST = "test"
 PREDICT = "predict"
 
@@ -175,6 +185,7 @@ MMLAB_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
 
 # matcher loss type
 CONTRASTIVE_LOSS = "contrastive_loss"
+MULTI_NEGATIVES_SOFTMAX_LOSS = "multi_negatives_softmax_loss"
 
 # matcher distance type
 COSINE_SIMILARITY = "cosine_similarity"

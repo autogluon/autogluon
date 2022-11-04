@@ -53,6 +53,7 @@ class TFewModel(nn.Module):
         unlikely_loss: float = 1.0,  # Adds loss term that lowers probability of incorrect outputs
         mc_loss: float = 1.0,  # Adds multiple choice cross entropy loss
         gradient_checkpointing: Optional[bool] = False,
+        low_cpu_mem_usage: Optional[bool] = False,
         pretrained: Optional[bool] = True,
     ):
         """
@@ -71,14 +72,16 @@ class TFewModel(nn.Module):
                 - 'bigscience/T0pp'
         num_classes
             The number of classes. 1 for a regression task.
-        gradient_checkpointing
-            Whether to enable gradient checkpointing
         length_norm
              Normalizes length to adjust for length bias in target template
         unlikely_loss
             Adds loss term that lowers probability of incorrect outputs
         mc_loss
             Adds multiple choice cross entropy loss
+        gradient_checkpointing
+            Whether to enable gradient checkpointing
+        low_cpu_mem_usage
+            Whether to turn on the optimization of reducing the peak CPU memory usage when loading the pretrained model.
         pretrained
             Whether using the pretrained weights. If pretrained=True, download the pretrained model.
         """
@@ -91,7 +94,7 @@ class TFewModel(nn.Module):
         self.config = AutoConfig.from_pretrained(checkpoint_name)
 
         if pretrained:
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_name)
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_name, low_cpu_mem_usage=low_cpu_mem_usage)
         else:
             self.model = AutoModelForSeq2SeqLM.from_config(self.config)
 

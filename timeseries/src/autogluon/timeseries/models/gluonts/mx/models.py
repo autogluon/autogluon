@@ -83,7 +83,7 @@ class DeepARMXNetModel(AbstractGluonTSMXNetModel):
         Whether to automatically scale the target values
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
@@ -179,7 +179,7 @@ class MQCNNMXNetModel(AbstractGluonTSSeq2SeqModel):
         True otherwise)
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
@@ -233,7 +233,7 @@ class MQRNNMXNetModel(AbstractGluonTSSeq2SeqModel):
         True otherwise)
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
@@ -275,7 +275,7 @@ class SimpleFeedForwardMXNetModel(AbstractGluonTSMXNetModel):
         its inverse
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
@@ -329,7 +329,7 @@ class TemporalFusionTransformerMXNetModel(AbstractGluonTSMXNetModel):
         Dropout regularization parameter
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
@@ -411,7 +411,7 @@ class TransformerMXNetModel(AbstractGluonTSMXNetModel):
         dropout, 'r' for residual connections and 'n' for normalization
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch

@@ -70,6 +70,7 @@ model:
     tokenizer_name: "hf_auto"
     max_text_len: 512  # If None or <=0, then use the max length of pretrained models.
     insert_sep: True
+    low_cpu_mem_usage: False
     text_segment_num: 2
     stochastic_chunk: False
     text_aug_detect_length: 10                # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
@@ -104,6 +105,7 @@ model:
     max_text_len: 512  # If None or <=0, then use the max length of pretrained models.
     text_segment_num: 2
     insert_sep: True
+    low_cpu_mem_usage: False
     stochastic_chunk: False
     text_aug_detect_length: 10                # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
     text_trivial_aug_maxscale: 0.0            # augmentation magnititude randomly drawn from [0, text_trivial_aug_maxscale]

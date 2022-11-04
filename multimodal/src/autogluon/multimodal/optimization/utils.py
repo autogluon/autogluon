@@ -5,6 +5,7 @@ import re
 import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import torch
 import torchmetrics
 from omegaconf import DictConfig, OmegaConf
@@ -29,6 +30,7 @@ from ..constants import (
     DIRECT_LOSS,
     F1,
     FEATURES,
+    HIT_RATE,
     IA3,
     IA3_BIAS,
     IA3_NORM,
@@ -37,6 +39,7 @@ from ..constants import (
     LORA_BIAS,
     LORA_NORM,
     MAP,
+    MULTI_NEGATIVES_SOFTMAX_LOSS,
     MULTICLASS,
     NER,
     NORM_FIT,
@@ -52,7 +55,7 @@ from ..constants import (
     SPEARMANR,
 )
 from ..utils import MeanAveragePrecision
-from .losses import SoftTargetCrossEntropy
+from .losses import MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
@@ -148,6 +151,79 @@ class CustomF1Score(torchmetrics.F1Score):
         return f1_score
 
 
+class CustomHitRate(torchmetrics.Metric):
+    """
+    Compute the hit rate when doing semantic search between two group of embeddings.
+    We assume that (a_i, p_i) are a positive pair and (a_i, p_j) for i!=j a negative pair.
+    """
+
+    def __init__(
+        self,
+    ):
+        super().__init__()
+        self.add_state("query_embeddings", default=[], dist_reduce_fx=None)
+        self.add_state("response_embeddings", default=[], dist_reduce_fx=None)
+        self.add_state("logit_scale", default=[], dist_reduce_fx=None)
+
+    def update(
+        self,
+        batch_query_embeds: torch.Tensor,
+        batch_response_embeds: torch.Tensor,
+        logit_scale: Optional[torch.Tensor] = None,
+    ):
+        self.query_embeddings.append(batch_query_embeds)
+        self.response_embeddings.append(batch_response_embeds)
+        if logit_scale is not None:
+            self.logit_scale.append(logit_scale)
+
+    def compute(self):
+        query_embeddings = torch.cat(self.query_embeddings)
+        response_embeddings = torch.cat(self.response_embeddings)
+        if self.logit_scale:
+            logit_scale = torch.mean(torch.stack(self.logit_scale))
+        else:
+            logit_scale = 1
+
+        return compute_hit_rate(query_embeddings, response_embeddings, logit_scale)
+
+
+def compute_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
+    """
+    Compute symmetric hit rates between two groups of features.
+
+    Parameters
+    ----------
+    features_a
+        One group of features.
+    features_b
+        The other group of features.
+    logit_scale
+        The scale of logit (Used in CLIP).
+    top_ks
+        Consider only the top k elements for each query.
+
+    Returns
+    -------
+    The accumulated hit rate.
+    """
+    assert len(features_a) == len(features_b)
+    hit_rate = 0
+    logits_per_a = (logit_scale * features_a @ features_b.t()).detach().cpu()
+    logits_per_b = logits_per_a.t().detach().cpu()
+
+    logits = {"logits_per_a": logits_per_a, "logits_per_b": logits_per_b}
+    ground_truth = torch.arange(len(features_b)).view(-1, 1)
+
+    for name, logit in logits.items():
+        ranking = torch.argsort(logit, descending=True)
+        preds = torch.where(ranking == ground_truth)[1]
+
+        for k in top_ks:
+            hit_rate += (preds < k).float().mean()
+
+    return hit_rate
+
+
 def get_metric(
     metric_name: str,
     num_classes: Optional[int] = None,
@@ -209,6 +285,8 @@ def get_metric(
             torchmetrics.MeanMetric(nan_strategy="warn"),
             None,
         )  # This only works for detection where custom_metric is not required for BaseAggregator
+    elif metric_name == HIT_RATE:
+        return CustomHitRate(), None
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 
@@ -758,16 +836,16 @@ def infer_matcher_loss(data_format: str, problem_type: str):
     """
     if data_format == "pair":
         if problem_type is None:
-            return ["multi_negatives_softmax_loss"]
+            return [MULTI_NEGATIVES_SOFTMAX_LOSS]
         elif problem_type == BINARY:
-            return ["contrastive_loss"]
+            return [CONTRASTIVE_LOSS]
         elif problem_type == REGRESSION:
             return ["cosine_similarity_loss"]
         else:
             raise ValueError(f"Unsupported data format {data_format} with problem type {problem_type}")
     elif data_format == "triplet":
         if problem_type is None:
-            return ["multi_negatives_softmax_loss"]
+            return [MULTI_NEGATIVES_SOFTMAX_LOSS]
         else:
             raise ValueError(f"Unsupported data format {data_format} with problem type {problem_type}")
     else:
@@ -816,6 +894,12 @@ def get_matcher_loss_func(
             pos_margin=pos_margin,
             neg_margin=neg_margin,
             distance=get_metric_learning_distance_func(distance_type),
+        )
+    elif loss_type.lower() == MULTI_NEGATIVES_SOFTMAX_LOSS:
+        return MultiNegativesSoftmaxLoss(
+            local_loss=True,
+            gather_with_grad=True,
+            cache_labels=False,
         )
     else:
         raise ValueError(f"Unknown metric learning loss: {loss_type}")

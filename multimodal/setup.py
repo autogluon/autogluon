@@ -31,6 +31,7 @@ install_requires = [
     "jsonschema<=4.8.0",
     "seqeval<=1.2.2",
     "evaluate<=0.2.2",
+    "accelerate>=0.9,<0.14",
     "timm<0.7.0",
     "torch>=1.9,<1.13",
     "torchvision<0.14.0",
@@ -54,7 +55,6 @@ install_requires = [
     "openmim>0.1.5,<=0.2.1",
     "pycocotools>=2.0.4,<=2.0.4",
     "defusedxml>=0.7.1,<=0.7.1",
-    "pytrec-eval>=0.5,<=0.5",
     "albumentations>=1.1.0,<=1.2.0",
 ]
 
