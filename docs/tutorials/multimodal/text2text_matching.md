@@ -12,7 +12,7 @@ In this tutorial, we will demonstrate how to use AutoMM for text-to-text matchin
 |  An older and younger man smiling.                        | Two men are smiling and laughing at the cats playing on the   floor. | neutral       |
 | A soccer game with multiple males playing.                | Some men are playing a sport.                                        | entailment    |
 
-Here, we consider sentence pairs with label *entailment* as positive pairs (labeled as $1$) and those with label *contradiction* as negative pairs (labeled as $0$). Sentence pairs with neural relationship are discarded. The following code downloads and loads the corpus into dataframes.
+Here, we consider sentence pairs with label *entailment* as positive pairs (labeled as 1) and those with label *contradiction* as negative pairs (labeled as 0). Sentence pairs with neural relationship are discarded. The following code downloads and loads the corpus into dataframes.
 
 ```{.python .input}
 from autogluon.core.utils.loaders import load_pd
