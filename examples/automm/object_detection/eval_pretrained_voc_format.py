@@ -37,10 +37,8 @@ def eval_pretrained_voc_format(
     test_path="VOCdevkit/VOC2007",
     num_gpus=-1,
 ):
-    # TODO: remove label
     # TODO: replace pipeline with problem type
     predictor = MultiModalPredictor(
-        label="label",
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
