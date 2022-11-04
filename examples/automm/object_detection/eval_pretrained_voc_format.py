@@ -32,7 +32,7 @@ def tutorial_script_for_eval_pretrained_voc_format():
     print(result)
 
 
-def eval_pretrained_coco_format(
+def eval_pretrained_voc_format(
     checkpoint_name="faster_rcnn_r50_fpn_1x_voc0712",
     test_path="VOCdevkit/VOC2007",
     num_gpus=-1,
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_gpus", default=-1, type=int)
     args = parser.parse_args()
 
-    eval_pretrained_coco_format(
+    eval_pretrained_voc_format(
         test_path=args.test_path,
         checkpoint_name=args.checkpoint_name,
         num_gpus=args.num_gpus,
