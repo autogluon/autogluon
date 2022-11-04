@@ -210,6 +210,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""
         args = super()._get_model_params().copy()
+        args.setdefault("batch_size", 64)
         args.update(
             dict(
                 freq=self.freq,
