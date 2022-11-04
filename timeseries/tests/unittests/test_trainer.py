@@ -299,52 +299,31 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
 @pytest.mark.parametrize(
     "hyperparameter_list, expected_number_of_unique_names, expected_suffixes",
     [
-        ([{DeepARModel: {"epochs": 1}}], 1, []),
         (
             [
-                {DeepARModel: {"epochs": 1}},
-                {DeepARModel: {"epochs": 1}},
-            ],
-            2,
-            ["AR_2"],
-        ),
-        (
-            [
-                {DeepARModel: {"epochs": 1}},
                 {DeepARModel: {"epochs": 1}},
                 {DeepARModel: {"epochs": 1}},
             ],
             3,
-            ["AR_2", "AR_3"],
+            ["AR_2"],
         ),
-        # FIXME: model name collision prevention is broken
-        # (
-        #     [
-        #         {DeepARModel: {"epochs": 1}},
-        #         {DeepARModel: {"epochs": 1}},
-        #         {
-        #             DeepARModel: {"epochs": 1},
-        #             DeepARModel: {"epochs": 1},
-        #         },
-        #     ],
-        #     4,
-        #     ["AR_2", "AR_3", "AR_4"],
-        # ),
-        # (
-        #     [
-        #         {
-        #             DeepARModel: {"epochs": 1},
-        #             DeepARModel: {"epochs": 1},
-        #             DeepARModel: {"epochs": 1},
-        #         },
-        #         {
-        #             DeepARModel: {"epochs": 1},
-        #             DeepARModel: {"epochs": 1},
-        #         },
-        #     ],
-        #     5,
-        #     ["AR_2", "AR_3", "AR_4", "AR_5"],
-        # ),
+        (
+            [
+                {DeepARModel: {"epochs": 1}, "ETS": {}},
+                {DeepARModel: {"epochs": 1}},
+                {DeepARModel: {"epochs": 1}},
+            ],
+            7,
+            ["AR_2", "AR_3", "Ensemble_2", "Ensemble_3"],
+        ),
+        (
+            [
+                {DeepARModel: {"epochs": 1}, "DeepAR": {"epochs": 1}, "ETS": {}},
+                {DeepARModel: {"epochs": 1}},
+            ],
+            6,
+            ["AR_2", "AR_3", "Ensemble_2"],
+        ),
     ],
 )
 def test_given_repeating_model_when_trainer_called_incrementally_then_name_collisions_are_prevented(
@@ -366,15 +345,9 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
     model_names = trainer.get_model_names()
 
     # account for the ensemble if it should be fitted, and drop ensemble names
-    if trainer.enable_ensemble and sum(len(hp) for hp in hyperparameter_list) > 1:
-        model_names = [n for n in model_names if "WeightedEnsemble" not in n]
     assert len(model_names) == expected_number_of_unique_names
     for suffix in expected_suffixes:
         assert any(name.endswith(suffix) for name in model_names)
-
-    if not trainer.enable_ensemble:
-        # there should be no edges in the model graph without ensembling
-        assert not trainer.model_graph.edges
 
 
 @pytest.mark.parametrize(
