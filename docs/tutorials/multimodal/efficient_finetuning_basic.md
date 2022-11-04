@@ -1,4 +1,4 @@
-# Parameter-Efficient Finetuning in AutoMM -- Basic Usage
+# Single GPU 1B-scale Model Training with AutoMM via Parameter-Efficient Finetuning
 :label:`sec_automm_efficient_finetuning_basic`
 
 As pointed out by [a recent paper from Stanford Institute for Human-Centered Artificial Intelligence](https://arxiv.org/pdf/2108.07258.pdf), 
@@ -9,16 +9,17 @@ Following is a figure from the [Microsoft research blog](https://www.microsoft.c
 ![Scaling of foundation models](https://www.microsoft.com/en-us/research/uploads/prod/2021/10/model-size-graph.jpg)
 :width:`500px`
 
-The goal of AutoMM is to democratize the publicly available foundation models, whether they are big or not, to every developers. 
-To finetune the giant models, we adopt the recently popularized **parameter-efficient finetuning** technique. 
+The goal of AutoMM is to help anyone solve machine learning problems via open source foundation models, including these giant models. 
+To finetune these large-scale models, we adopt the recently popularized **parameter-efficient finetuning** technique. 
 The idea is to either finetune a small subset of the weights in the foundation model (e.g., [BitFit](https://aclanthology.org/2022.acl-short.1.pdf)), 
 or adding a tiny tunable structure on top of the fixed backbone (e.g., [Prompt Tuning](https://aclanthology.org/2021.emnlp-main.243.pdf),
 [LoRA](https://arxiv.org/pdf/2106.09685.pdf), [Adapter](https://arxiv.org/abs/1902.00751), [MAM Adapter](https://arxiv.org/pdf/2110.04366.pdf), [IA^3](https://arxiv.org/abs/2205.05638)). 
 These techniques can effectively reduce the peak memory usage and model training time, while maintaining the performance.
 
-In this tutorial, we introduce how to apply parameter-efficient finetuning in MultiModalPredictor.
-We will reuse the same multilingual dataset as in :ref:`sec_automm_textprediction_multilingual` and train 
-models with the `"ia3_bias"` algorithm. `"ia3_bias"` is a parameter-efficient finetuning algorithm that combines IA^3 and BitFit.
+In this tutorial, we introduce how to apply parameter-efficient finetuning in MultiModalPredictor. 
+We first introduce how to adopt the `"ia3_bias"` algorithm for parameter-efficient finetuning. Afterwards, we show how you can simply combine `"ia3_bias"` 
+and gradient checkpointing to finetune the XL-variant of Google's [FLAN-T5](https://arxiv.org/abs/2210.11416) via a single NVIDIA T4 GPU. 
+
 
 ## Prepare Dataset
 
@@ -76,7 +77,7 @@ train_en_df.head(5)
 test_jp_df.head(5)
 ```
 
-## Finetuning with IA3 + BitFit
+## Finetuning Multilingual Model with IA3 + BitFit
 
 In AutoMM, to enable efficient finetuning, just specify the `optimization.efficient_finetune` to be `"ia3_bias"`.
 
@@ -111,12 +112,12 @@ print('Score in the German Testset:', score_in_de)
 print('Score in the Japanese Testset:', score_in_jp)
 ```
 
-## Combine Gradient Checkpointing and Parameter-efficient Finetuning
+## Training FLAN-T5-XL on Single GPU
 
 By combining [gradient checkpointing](https://pytorch.org/docs/stable/checkpoint.html) and parameter-efficient finetuning, it is feasible to finetune 
-models that have close to two billion parameters (e.g., [google/flan-t5-xl](https://huggingface.co/google/flan-t5-xl)) with a single GPU in [AWS G4 instances](https://aws.amazon.com/ec2/instance-types/g4/). 
-To turn on gradient checkpointing, all you need is to set `"model.hf_text.gradient_checkpointing"` to `True`.
-To accelerate the training speed of this tutorial, we will use [google/flan-t5-large](https://huggingface.co/google/flan-t5-large). You can change it to [google/flan-t5-xl](https://huggingface.co/google/flan-t5-xl) when running the code. 
+[google/flan-t5-xl](https://huggingface.co/google/flan-t5-xl) that has close to two billion parameterswith a single T4 GPU available in
+[AWS G4 instances](https://aws.amazon.com/ec2/instance-types/g4/). 
+To turn on gradient checkpointing, you just need to set `"model.hf_text.gradient_checkpointing"` to `True`.
 
 ```{.python .input}
 # Just for clean the space

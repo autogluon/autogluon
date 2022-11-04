@@ -69,11 +69,11 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       How to use AutoMM for entity extraction.
 
    .. card::
-      :title: Parameter-Efficient Finetuning in AutoMM -- Basic Usage
+      :title: Single GPU 1B-Scale Model Training with AutoMM via Parameter-Efficient Finetuning
       :link: efficient_finetuning_basic.html
 
       How to take advantage of larger foundation models with the help of parameter-efficient finetuning.
-      In the tutorial, we will use the combination of IA^3 and BitFit to finetune a multilingual backbone.
+      In the tutorial, we will use combine IA^3, BitFit, and gradient checkpointing to finetune FLAN-T5-XL.
 
    .. card::
       :title: Customize AutoMM
