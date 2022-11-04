@@ -52,6 +52,7 @@ logger = logging.getLogger(AUTOMM)
 def select_model(
     config: DictConfig,
     df_preprocessor: MultiModalFeaturePreprocessor,
+    strict: Optional[bool] = True,
 ):
     """
     Filter model config through the detected modalities in the training data.
@@ -70,6 +71,8 @@ def select_model(
         A MultiModalFeaturePreprocessor object, which has called .fit() on the training data.
         Column names of the same modality are grouped into one list. If a modality's list is empty,
         it means the training data don't have this modality.
+    strict
+        If False, allow retaining one model when partial modalities are available for that model.
 
     Returns
     -------
@@ -78,7 +81,7 @@ def select_model(
     data_status = {}
     for per_modality in ALL_MODALITIES:
         data_status[per_modality] = False
-    if len(df_preprocessor.image_path_names) > 0:
+    if len(df_preprocessor.image_feature_names) > 0:
         data_status[IMAGE] = True
     if len(df_preprocessor.text_feature_names) > 0:
         data_status[TEXT] = True
@@ -101,7 +104,10 @@ def select_model(
         if all(model_data_status):
             selected_model_names.append(model_name)
         else:
-            delattr(config.model, model_name)
+            if any(model_data_status) and not strict:
+                selected_model_names.append(model_name)
+            else:
+                delattr(config.model, model_name)
 
     if len(selected_model_names) == 0:
         raise ValueError("No model is available for this dataset.")
@@ -122,6 +128,8 @@ def select_model(
 
     config.model.names = selected_model_names
     logger.debug(f"selected models: {selected_model_names}")
+    for model_name in selected_model_names:
+        logger.debug(f"model dtypes: {getattr(config.model, model_name).data_types}")
 
     return config
 
@@ -181,6 +189,7 @@ def create_model(
             num_classes=num_classes,
             pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
             gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            low_cpu_mem_usage=OmegaConf.select(model_config, "low_cpu_mem_usage", default=False),
             pretrained=pretrained,
         )
     elif model_name.lower().startswith(T_FEW):
@@ -192,6 +201,7 @@ def create_model(
             mc_loss=model_config.mc_loss,  # Adds multiple choice cross entropy loss
             num_classes=num_classes,
             gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            low_cpu_mem_usage=OmegaConf.select(model_config, "low_cpu_mem_usage", default=False),
             pretrained=pretrained,
         )
     elif model_name.lower().startswith(NUMERICAL_MLP):
