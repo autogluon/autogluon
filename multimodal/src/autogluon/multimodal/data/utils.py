@@ -413,7 +413,7 @@ def is_space_counted(words_with_offsets):
         offset1.append(offset[1])
 
     realign = []
-    if offset0[1:] == offset1[:-1]:  # space are counted into words
+    if offset0[1:] == offset1[:-1]:  # space are counted
         realign = [words_with_offsets[0]]
         for word, offset in words_with_offsets[1:]:
             if word.startswith("▁"):  # it is "Lower One Eighth Block" (U+2581) rather than lower line (U+005F).
