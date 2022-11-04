@@ -644,10 +644,10 @@ def cocoeval(outputs, data, anno_file, cache_path, metrics, tool="pycocotools"):
 def read_voc_class_names(voc_annotation_path: str, voc_class_names_output_path: str,
                          voc_annotation_xml_output_path: str):
     '''
-    Reads and generate unique class names for dataset fomatted in VOC format.
+    Reads annotations for a dataset in VOC format.
     Then
-        1. dumps the class names into labels.txt file.
-        2. dumps the xml files into pathlist.txt file.
+        1. dumps the unique class names into labels.txt file.
+        2. dumps the xml annotation file names into pathlist.txt file.
 
     @param voc_annotation_path: root_path for annotations in VOC format
     @param voc_class_names_output_path: output path for the labels.txt
