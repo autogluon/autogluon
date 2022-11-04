@@ -427,7 +427,7 @@ def test_given_base_model_fails_when_trainer_predicts_then_weighted_ensemble_can
     ensemble = TimeSeriesEnsembleWrapper(weights={"Naive": 0.5, "SeasonalNaive": 0.5}, name="WeightedEnsemble")
     trainer._add_model(ensemble, base_models=["Naive", "SeasonalNaive"])
 
-    with mock.patch(f"autogluon.timeseries.models.local.models.{failing_model}.predict") as fail_predict:
+    with mock.patch(f"autogluon.timeseries.models.local.naive.{failing_model}.predict") as fail_predict:
         fail_predict.side_effect = RuntimeError("Numerical error")
         preds = trainer.predict(DUMMY_TS_DATAFRAME, model="WeightedEnsemble")
         fail_predict.assert_called()
@@ -441,7 +441,7 @@ def test_given_base_model_fails_when_trainer_scores_then_weighted_ensemble_can_s
     ensemble = TimeSeriesEnsembleWrapper(weights={"Naive": 0.5, "SeasonalNaive": 0.5}, name="WeightedEnsemble")
     trainer._add_model(ensemble, base_models=["Naive", "SeasonalNaive"])
 
-    with mock.patch(f"autogluon.timeseries.models.local.models.{failing_model}.predict") as fail_predict:
+    with mock.patch(f"autogluon.timeseries.models.local.naive.{failing_model}.predict") as fail_predict:
         fail_predict.side_effect = RuntimeError("Numerical error")
         score = trainer.score(DUMMY_TS_DATAFRAME, model="WeightedEnsemble")
         fail_predict.assert_called()
