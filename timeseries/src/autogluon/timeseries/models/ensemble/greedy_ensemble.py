@@ -119,7 +119,7 @@ class TimeSeriesEnsembleWrapper(AbstractTimeSeriesModel):
         if len(failed_models) > 0:
             logger.warning(
                 f"Following models failed during prediction: {failed_models}. "
-                f"{self.name} will ignore these models and re-normalize the weights to sum up to 1 when predicting."
+                f"{self.name} will set the weight of these models to zero and re-normalize the weights when predicting."
             )
 
         return self.weighted_ensemble.predict([data[k] for k in self.model_names])
