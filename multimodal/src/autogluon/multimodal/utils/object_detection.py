@@ -645,7 +645,15 @@ def read_voc_class_names(voc_annotation_path: str, voc_class_names_output_path: 
                          voc_annotation_xml_output_path: str):
     '''
     Reads and generate unique class names for dataset fomatted in VOC format.
-    Then dumps the class names into label.txt file.
+    Then
+        1. dumps the class names into labels.txt file.
+        2. dumps the xml files into pathlist.txt file.
+
+    @param voc_annotation_path: root_path for annotations in VOC format
+    @param voc_class_names_output_path: output path for the labels.txt
+    @param voc_annotation_xml_output_path: output path for the pathlist.txt
+    @returns None
+
     '''
     files = os.listdir(voc_annotation_path)
     annotation_path_base_name = os.path.basename(voc_annotation_path)
