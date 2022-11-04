@@ -16,10 +16,10 @@ logger = logging.getLogger(AUTOMM)
 
 
 def from_voc(
-    root: str,
-    splits: Optional[Union[str, tuple]] = None,
-    exts: Optional[Union[str, tuple]] = (".jpg", ".jpeg", ".png"),
-    return_class_names: Optional[bool] = False,
+        root: str,
+        splits: Optional[Union[str, tuple]] = None,
+        exts: Optional[Union[str, tuple]] = (".jpg", ".jpeg", ".png"),
+        return_class_names: Optional[bool] = False,
 ):
     """
     Construct dataframe from pascal VOC format. Modified from gluon cv.
@@ -281,9 +281,9 @@ def bbox_xyxy_to_xywh(xyxy: Optional[Union[list, tuple, np.ndarray]]):
 
 
 def bbox_clip_xyxy(
-    xyxy: Optional[Union[list, tuple, np.ndarray]],
-    width: Optional[Union[int, float]],
-    height: Optional[Union[int, float]],
+        xyxy: Optional[Union[list, tuple, np.ndarray]],
+        width: Optional[Union[int, float]],
+        height: Optional[Union[int, float]],
 ):
     """
     Clip bounding box with format (xmin, ymin, xmax, ymax) to specified boundary. Modified from gluon cv.
@@ -327,10 +327,10 @@ def bbox_clip_xyxy(
 
 
 def _check_load_coco_bbox(
-    coco,
-    entry: dict,
-    min_object_area: Optional[Union[int, float]] = 0,
-    use_crowd: Optional[bool] = False,
+        coco,
+        entry: dict,
+        min_object_area: Optional[Union[int, float]] = 0,
+        use_crowd: Optional[bool] = False,
 ):
     """
     Check and load ground-truth labels. Modified from gluon cv.
@@ -390,10 +390,10 @@ def _check_load_coco_bbox(
 
 
 def from_coco(
-    anno_file: Optional[str],
-    root: Optional[str] = None,
-    min_object_area: Optional[Union[int, float]] = 0,
-    use_crowd: Optional[bool] = False,
+        anno_file: Optional[str],
+        root: Optional[str] = None,
+        min_object_area: Optional[Union[int, float]] = 0,
+        use_crowd: Optional[bool] = False,
 ):
     """
     Load dataset from coco format annotations. Modified from gluon cv.
@@ -641,10 +641,10 @@ def cocoeval(outputs, data, anno_file, cache_path, metrics, tool="pycocotools"):
         return cocoeval_torchmetrics(outputs)
 
 
-def process_voc_annotations(voc_annotation_path,
-                            voc_class_names_output_path,
-                            voc_annotation_xml_output_path):
-    '''
+def process_voc_annotations(voc_annotation_path: str,
+                            voc_class_names_output_path: str,
+                            voc_annotation_xml_output_path: str) -> None:
+    """
     Reads annotations for a dataset in VOC format.
     Then
         1. dumps the unique class names into labels.txt file.
@@ -654,8 +654,8 @@ def process_voc_annotations(voc_annotation_path,
     @param voc_class_names_output_path: output path for the labels.txt
     @param voc_annotation_xml_output_path: output path for the pathlist.txt
     @returns None
+    """
 
-    '''
     files = os.listdir(voc_annotation_path)
     annotation_path_base_name = os.path.basename(voc_annotation_path)
     class_names = set()
@@ -665,17 +665,16 @@ def process_voc_annotations(voc_annotation_path,
         xml_path = os.path.join(voc_annotation_path, f)
         tree = ET.parse(xml_path)
         root = tree.getroot()
-        for boxes in root.iter('object'):
+        for boxes in root.iter("object"):
             class_names.add(boxes.find("name").text)
 
         xml_file_names.append(os.path.join(annotation_path_base_name, f))
 
-
     sorted_class_names = sorted(list(class_names))
-    with open(voc_class_names_output_path, 'w') as f:
+    with open(voc_class_names_output_path, "w") as f:
         f.writelines("\n".join(sorted_class_names))
 
-    with open(voc_annotation_xml_output_path, 'w') as f:
+    with open(voc_annotation_xml_output_path, "w") as f:
         f.writelines("\n".join(xml_file_names))
 
 
