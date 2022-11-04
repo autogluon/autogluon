@@ -54,7 +54,6 @@ install_requires = [
     "openmim>0.1.5,<=0.2.1",
     "pycocotools>=2.0.4,<=2.0.4",
     "defusedxml>=0.7.1,<=0.7.1",
-    "pytrec-eval>=0.5,<=0.5",
     "albumentations>=1.1.0,<=1.2.0",
 ]
 
