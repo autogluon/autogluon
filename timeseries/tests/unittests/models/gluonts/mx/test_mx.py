@@ -85,7 +85,7 @@ def test_when_tft_quantiles_are_deciles_then_forecast_contains_correct_quantiles
     assert all(str(q) in predictions.columns for q in quantiles)
 
 
-@pytest.mark.parametrize("preset_key", ["default_hpo", "default"])
+@pytest.mark.parametrize("preset_key", ["high_quality", "best_quality"])
 def test_when_mxnet_installed_then_default_presets_include_mxnet_models(preset_key):
     hps = get_default_hps(key=preset_key, prediction_length=5)
     assert any("MXNet" in model_name for model_name in hps.keys())
