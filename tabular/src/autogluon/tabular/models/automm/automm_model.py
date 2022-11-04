@@ -1,6 +1,5 @@
 """Wrapper of the MultiModalPredictor."""
 
-import copy
 import logging
 import os
 from typing import Dict, Optional
@@ -130,10 +129,10 @@ class MultiModalPredictorModel(AbstractModel):
                            "this model will ignore them in training.")
 
         # Need to deep copy to avoid altering outer context
-        X_train = copy.deepcopy(X_train)
+        X_train = X_train.copy()
         X_train.insert(len(X_train.columns), self._label_column_name, y)
         if X_val is not None:
-            X_val = copy.deepcopy(X_val)
+            X_val = X_val.copy()
             X_val.insert(len(X_val.columns), self._label_column_name, y_val)
 
         verbosity_text = max(0, verbosity - 1)
