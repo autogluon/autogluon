@@ -13,19 +13,18 @@ from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
-
-from .configs import TIMESERIES_PRESETS_CONFIGS
-from .dataset import TimeSeriesDataFrame
-from .learner import AbstractLearner, TimeSeriesLearner
-from .splitter import AbstractTimeSeriesSplitter, LastWindowSplitter, MultiWindowSplitter
-from .trainer import AbstractTimeSeriesTrainer
+from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
+from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
+from autogluon.timeseries.splitter import AbstractTimeSeriesSplitter, LastWindowSplitter, MultiWindowSplitter
+from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
+from autogluon.timeseries.utils.random import set_random_seed
 
 logger = logging.getLogger(__name__)
 
 DEPRECATED_PRESETS_TO_FALLBACK = {
     "low_quality": "fast_training",
-    "high_quality": "medium_quality",
-    "good_quality": "medium_quality",
+    "good_quality": "high_quality",
 }
 
 
@@ -99,8 +98,8 @@ class TimeSeriesPredictor:
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`. If ``tuning_data`` is passed to
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, validation_splitter is ignored. Possible choices:
 
-        - ``"last_window"`` - use last ``prediction_length`` time steps of each time series for validation.
-        - ``"multi_window"`` - use last 3 non-overlapping windows of length ``prediction_length`` of each time series for validation.
+        - ``"last_window"``: use last ``prediction_length`` time steps of each time series for validation.
+        - ``"multi_window"``: use last 3 non-overlapping windows of length ``prediction_length`` of each time series for validation.
         - object of type :class:`~autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` implementing a custom splitting strategy (for advanced users only).
 
     Other Parameters
@@ -227,6 +226,7 @@ class TimeSeriesPredictor:
         hyperparameters: Dict[Union[str, Type], Any] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         enable_ensemble: bool = True,
+        random_seed: Optional[int] = None,
         **kwargs,
     ) -> "TimeSeriesPredictor":
         """Fit probabilistic forecasting models to the given time series dataset.
@@ -280,21 +280,27 @@ class TimeSeriesPredictor:
             Can significantly impact predictive accuracy, memory footprint, inference latency of trained models,
             and various other properties of the returned predictor. It is recommended to specify presets and avoid
             specifying most other :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` arguments or model
-            hyperparameters prior to becoming familiar with AutoGluon. For example, set ``presets="best_quality"``
+            hyperparameters prior to becoming familiar with AutoGluon. For example, set ``presets="high_quality"``
             to get a high-accuracy predictor, or set ``presets="fast_training"`` to quickly fit multiple simple
             statistical models.
             Any user-specified arguments in :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will
             override the values used by presets.
 
-            Available presets are "best_quality", "medium_quality", and "fast_training".
+            Available presets:
+
+            - ``"fast_training"``: fit simple "local" statistical models (``ETS``, ``ARIMA``, ``Theta``, ``Naive``, ``SeasonalNaive``). These models are fast to train, but cannot capture more complex patters in the data.
+            - ``"medium_quality"``: all models mentioned above + tree-based model ``AutoGluonTabular`` + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
+            - ``"high_quality"``: all models mentioned above + hyperparameter optimization for local statistical models + deep learning models ``TemporalFusionTransformerMXNet`` (if MXNet is available) and ``SimpleFeedForward``. Usually more accurate than ``medium_quality``, but takes longer to train.
+            - ``"best_quality"``: all models mentioned above + deep learning model ``TransformerMXNet`` (if MXNet is available) + hyperparameter optimization for deep learning models. Usually better than ``high_quality``, but takes much longer to train.
+
             Details for these presets can be found in ``autogluon/timeseries/configs/presets_configs.py``. If not
             provided, user-provided values for other arguments (specifically, ``hyperparameters`` and
             ``hyperparameter_tune_kwargs`` will be used (defaulting to their default values specified below).
-        hyperparameters : str or dict, default = "default"
+        hyperparameters : str or dict, default = "medium_quality"
             Determines what models are trained and what hyperparameters are used by each model.
 
-            If str is passed, will use a preset hyperparameter configuration. Can be one of "default", "default_hpo",
-            or "local_only". These configurations are defined in ``autogluon/timeseries/trainer/models/presets.py``.
+            If str is passed, will use a preset hyperparameter configuration defined in`
+            `autogluon/timeseries/trainer/models/presets.py``.
 
             If dict is provided, the keys are strings or Types that indicate which models to train. Each value is
             itself a dict containing hyperparameters for each of the trained models. Any omitted hyperparameters not
@@ -325,32 +331,32 @@ class TimeSeriesPredictor:
                     ...
                     hyperparameters={
                         "DeepAR": {
-                            "num_cells": ag.space.Int(20, 100),
-                            "cell_type": ag.space.Categorical("lstm", "gru")
+                            "hidden_size": ag.space.Int(20, 100),
+                            "dropout_rate": ag.space.Categorical(0.1, 0.3),
                         },
                     },
                     hyperparameter_tune_kwargs="auto",
                 )
 
             In the above example, multiple versions of the DeepAR model with different values of the parameters
-            "num_cells" and "cell_type" will be trained.
+            "hidden_size" and "dropout_rate" will be trained.
         hyperparameter_tune_kwargs : str or dict, optional
             Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run). If ``None``, then
             hyperparameter tuning will not be performed.
 
-            Ray Tune backend is used to tune deep-learning forecasting models from GluonTS. All other models use a
-            custom HPO backed based on random search.
+            Ray Tune backend is used to tune deep-learning forecasting models from GluonTS implemented in MXNet. All
+            other models use a custom HPO backed based on random search.
 
             Can be set to a string to choose one of available presets:
 
-            * ``"random"`` - 10 trials of random search
-            * ``"auto"`` - 10 trials of bayesian optimization GluonTS models, 10 trials of random search for other models
+            - ``"random"``: 10 trials of random search
+            - ``"auto"``: 10 trials of bayesian optimization GluonTS MXNet models, 10 trials of random search for other models
 
             Alternatively, a dict can be passed for more fine-grained control. The dict must include the following keys
 
-            * ``"num_trials"`` - int, number of configurations to train for each tuned model
-            * ``"searcher"`` - one of ``"random"`` (random search), ``"bayes"`` (bayesian optimization for GluonTS models, random search for other models) and ``"auto"`` (same as ``"bayes"``).
-            * ``"scheduler"`` - the only supported option is ``"local"`` (all models trained on the same machine)
+            - ``"num_trials"``: int, number of configurations to train for each tuned model
+            - ``"searcher"``: one of ``"random"`` (random search), ``"bayes"`` (bayesian optimization for GluonTS MXNet models, random search for other models) and ``"auto"`` (same as ``"bayes"``).
+            - ``"scheduler"``: the only supported option is ``"local"`` (all models trained on the same machine)
 
             Example::
 
@@ -366,6 +372,9 @@ class TimeSeriesPredictor:
         enable_ensemble : bool, default = True
             If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
             ``hyperparameters``.
+        random_seed : int, optional
+            If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
+            results for most models (except those trained on GPU because of the non-determinism of GPU operations).
 
         """
         time_start = time.time()
@@ -389,6 +398,7 @@ class TimeSeriesPredictor:
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             enable_ensemble=enable_ensemble,
+            random_seed=random_seed,
             **kwargs,
         )
         logger.info("================ TimeSeriesPredictor ================")
@@ -417,6 +427,9 @@ class TimeSeriesPredictor:
         logger.info(f"Training artifacts will be saved to: {Path(self.path).resolve()}")
         logger.info("=====================================================")
 
+        if random_seed is not None:
+            set_random_seed(random_seed)
+
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
             train_data=train_data,
@@ -440,6 +453,7 @@ class TimeSeriesPredictor:
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[str] = None,
+        random_seed: Optional[int] = 123,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         """Return quantile and mean forecasts for the given dataset, starting from the end of each time series.
@@ -465,6 +479,9 @@ class TimeSeriesPredictor:
         model : str, optional
             Name of the model that you would like to use for prediction. By default, the best model during training
             (with highest validation score) will be used.
+        random_seed : int, optional
+            If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
+            results for most models (except those trained on GPU because of the non-determinism of GPU operations).
         """
         if "quantile_levels" in kwargs:
             warnings.warn(
@@ -475,7 +492,9 @@ class TimeSeriesPredictor:
                 category=DeprecationWarning,
             )
         # TODO: What happens to `known_covariates` if `ignore_index=True`?
-        # TODO: Add example
+        # TODO: Add example with known covariates to the docstring
+        if random_seed is not None:
+            set_random_seed(random_seed)
         data = self._check_and_prepare_data_frame(data)
         return self._learner.predict(data, known_covariates=known_covariates, model=model, **kwargs)
 

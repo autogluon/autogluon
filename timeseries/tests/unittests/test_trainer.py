@@ -299,52 +299,31 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
 @pytest.mark.parametrize(
     "hyperparameter_list, expected_number_of_unique_names, expected_suffixes",
     [
-        ([{DeepARModel: {"epochs": 1}}], 1, []),
         (
             [
-                {DeepARModel: {"epochs": 1}},
-                {DeepARModel: {"epochs": 1}},
-            ],
-            2,
-            ["AR_2"],
-        ),
-        (
-            [
-                {DeepARModel: {"epochs": 1}},
                 {DeepARModel: {"epochs": 1}},
                 {DeepARModel: {"epochs": 1}},
             ],
             3,
-            ["AR_2", "AR_3"],
+            ["AR_2"],
         ),
-        # FIXME: model name collision prevention is broken
-        # (
-        #     [
-        #         {DeepARModel: {"epochs": 1}},
-        #         {DeepARModel: {"epochs": 1}},
-        #         {
-        #             DeepARModel: {"epochs": 1},
-        #             DeepARModel: {"epochs": 1},
-        #         },
-        #     ],
-        #     4,
-        #     ["AR_2", "AR_3", "AR_4"],
-        # ),
-        # (
-        #     [
-        #         {
-        #             DeepARModel: {"epochs": 1},
-        #             DeepARModel: {"epochs": 1},
-        #             DeepARModel: {"epochs": 1},
-        #         },
-        #         {
-        #             DeepARModel: {"epochs": 1},
-        #             DeepARModel: {"epochs": 1},
-        #         },
-        #     ],
-        #     5,
-        #     ["AR_2", "AR_3", "AR_4", "AR_5"],
-        # ),
+        (
+            [
+                {DeepARModel: {"epochs": 1}, "ETS": {}},
+                {DeepARModel: {"epochs": 1}},
+                {DeepARModel: {"epochs": 1}},
+            ],
+            7,
+            ["AR_2", "AR_3", "Ensemble_2", "Ensemble_3"],
+        ),
+        (
+            [
+                {DeepARModel: {"epochs": 1}, "DeepAR": {"epochs": 1}, "ETS": {}},
+                {DeepARModel: {"epochs": 1}},
+            ],
+            6,
+            ["AR_2", "AR_3", "Ensemble_2"],
+        ),
     ],
 )
 def test_given_repeating_model_when_trainer_called_incrementally_then_name_collisions_are_prevented(
@@ -366,15 +345,9 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
     model_names = trainer.get_model_names()
 
     # account for the ensemble if it should be fitted, and drop ensemble names
-    if trainer.enable_ensemble and sum(len(hp) for hp in hyperparameter_list) > 1:
-        model_names = [n for n in model_names if "WeightedEnsemble" not in n]
     assert len(model_names) == expected_number_of_unique_names
     for suffix in expected_suffixes:
         assert any(name.endswith(suffix) for name in model_names)
-
-    if not trainer.enable_ensemble:
-        # there should be no edges in the model graph without ensembling
-        assert not trainer.model_graph.edges
 
 
 @pytest.mark.parametrize(
@@ -416,3 +389,33 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
         assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
         assert all(len(predictions.loc[i]) == 2 for i in predicted_item_index)
         assert not np.any(np.isnan(predictions))
+
+
+@pytest.mark.parametrize("failing_model", ["NaiveModel", "SeasonalNaiveModel"])
+def test_given_base_model_fails_when_trainer_predicts_then_weighted_ensemble_can_predict(
+    temp_model_path, failing_model
+):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
+    trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
+    ensemble = TimeSeriesEnsembleWrapper(weights={"Naive": 0.5, "SeasonalNaive": 0.5}, name="WeightedEnsemble")
+    trainer._add_model(ensemble, base_models=["Naive", "SeasonalNaive"])
+
+    with mock.patch(f"autogluon.timeseries.models.local.models.{failing_model}.predict") as fail_predict:
+        fail_predict.side_effect = RuntimeError("Numerical error")
+        preds = trainer.predict(DUMMY_TS_DATAFRAME, model="WeightedEnsemble")
+        fail_predict.assert_called()
+        assert isinstance(preds, TimeSeriesDataFrame)
+
+
+@pytest.mark.parametrize("failing_model", ["NaiveModel", "SeasonalNaiveModel"])
+def test_given_base_model_fails_when_trainer_scores_then_weighted_ensemble_can_score(temp_model_path, failing_model):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
+    trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
+    ensemble = TimeSeriesEnsembleWrapper(weights={"Naive": 0.5, "SeasonalNaive": 0.5}, name="WeightedEnsemble")
+    trainer._add_model(ensemble, base_models=["Naive", "SeasonalNaive"])
+
+    with mock.patch(f"autogluon.timeseries.models.local.models.{failing_model}.predict") as fail_predict:
+        fail_predict.side_effect = RuntimeError("Numerical error")
+        score = trainer.score(DUMMY_TS_DATAFRAME, model="WeightedEnsemble")
+        fail_predict.assert_called()
+        assert isinstance(score, float)

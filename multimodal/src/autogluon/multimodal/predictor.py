@@ -1056,7 +1056,7 @@ class MultiModalPredictor:
             per_gpu_batch_size=config.env.per_gpu_batch_size,
             num_workers=config.env.num_workers,
             train_data=train_df,
-            val_data=val_df,
+            validate_data=val_df,
             val_use_training_mode=val_use_training_mode,
         )
         optimization_kwargs = dict(
