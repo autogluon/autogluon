@@ -73,6 +73,11 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_name)
 
+        # some checkpoint such as deberta does not specify model_max_length
+        # here, we reset it using model config
+        if hasattr(self.model.config, "max_position_embeddings"):
+            self.tokenizer.model_max_length = self.model.config.max_position_embeddings
+
     @property
     def text_token_word_mapping_key(self):
         return f"{self.prefix}_{TOKEN_WORD_MAPPING}"

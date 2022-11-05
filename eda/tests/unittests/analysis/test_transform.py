@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 import pandas as pd
 
@@ -10,6 +12,12 @@ from autogluon.eda.analysis.transform import ApplyFeatureGenerator
 class SomeAnalysis(BaseAnalysis):
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         state.args = args.copy()
+
+
+def __replace_ints(values: List[str]) -> List[str]:
+    # Normalize ints between windows and linux environments
+    # https://stackoverflow.com/questions/36278590/numpy-array-dtype-is-coming-as-int32-by-default-in-a-windows-10-64-bit-machine
+    return ["int" if v in ["int32", "int64"] else v for v in values]
 
 
 def test_ApplyFeatureGenerator():
@@ -40,44 +48,52 @@ def test_ApplyFeatureGenerator():
     )
 
     state = analysis.fit()
-    assert list(df_train.dtypes.apply(str).to_numpy()) == ["object", "int64", "object", "int64"]
-    assert list(df_test.dtypes.apply(str).to_numpy()) == ["object", "int64", "object", "int64"]
+    assert __replace_ints(list(df_train.dtypes.apply(str).to_numpy())) == ["object", "int", "object", "int"]
+    assert __replace_ints(list(df_test.dtypes.apply(str).to_numpy())) == ["object", "int", "object", "int"]
 
-    assert list(state.no_wrapper.args.train_data[df_train.columns].dtypes.apply(str).to_numpy()) == [
+    assert __replace_ints(list(state.no_wrapper.args.train_data[df_train.columns].dtypes.apply(str).to_numpy())) == [
         "object",
-        "int64",
+        "int",
         "object",
-        "int64",
+        "int",
     ]
-    assert list(state.no_wrapper.args.test_data[df_test.columns].dtypes.apply(str).to_numpy()) == [
+    assert __replace_ints(list(state.no_wrapper.args.test_data[df_test.columns].dtypes.apply(str).to_numpy())) == [
         "object",
-        "int64",
+        "int",
         "object",
-        "int64",
-    ]
-
-    assert list(state.feature_generator_default.args.train_data[df_train.columns].dtypes.apply(str).to_numpy()) == [
-        "category",
-        "int64",
-        "category",
-        "int64",
-    ]
-    assert list(state.feature_generator_default.args.test_data[df_test.columns].dtypes.apply(str).to_numpy()) == [
-        "category",
-        "int64",
-        "category",
-        "int64",
+        "int",
     ]
 
-    assert list(state.feature_generator_numbers.args.train_data[df_train.columns].dtypes.apply(str).to_numpy()) == [
-        "int8",
-        "int64",
-        "int8",
-        "int64",
+    assert __replace_ints(
+        list(state.feature_generator_default.args.train_data[df_train.columns].dtypes.apply(str).to_numpy())
+    ) == [
+        "category",
+        "int",
+        "category",
+        "int",
     ]
-    assert list(state.feature_generator_numbers.args.test_data[df_test.columns].dtypes.apply(str).to_numpy()) == [
+    assert __replace_ints(
+        list(state.feature_generator_default.args.test_data[df_test.columns].dtypes.apply(str).to_numpy())
+    ) == [
+        "category",
+        "int",
+        "category",
+        "int",
+    ]
+
+    assert __replace_ints(
+        list(state.feature_generator_numbers.args.train_data[df_train.columns].dtypes.apply(str).to_numpy())
+    ) == [
         "int8",
-        "int64",
+        "int",
         "int8",
-        "int64",
+        "int",
+    ]
+    assert __replace_ints(
+        list(state.feature_generator_numbers.args.test_data[df_test.columns].dtypes.apply(str).to_numpy())
+    ) == [
+        "int8",
+        "int",
+        "int8",
+        "int",
     ]

@@ -522,7 +522,9 @@ def get_model_head(model: nn.Module):
     return head
 
 
-def get_hf_config_and_model(checkpoint_name: str, pretrained: Optional[bool] = True):
+def get_hf_config_and_model(
+    checkpoint_name: str, pretrained: Optional[bool] = True, low_cpu_mem_usage: Optional[bool] = False
+):
     """
     Get a Huggingface config and model based on a checkpoint name.
 
@@ -532,6 +534,8 @@ def get_hf_config_and_model(checkpoint_name: str, pretrained: Optional[bool] = T
         A model checkpoint name.
     pretrained
          Whether using the pretrained weights. If pretrained=True, download the pretrained model.
+    low_cpu_mem_usage
+        Whether to turn on the optimization of reducing the peak CPU memory usage when loading the pretrained model.
 
     Returns
     -------
@@ -540,7 +544,7 @@ def get_hf_config_and_model(checkpoint_name: str, pretrained: Optional[bool] = T
     config = AutoConfig.from_pretrained(checkpoint_name)
 
     if pretrained:
-        model = AutoModel.from_pretrained(checkpoint_name)
+        model = AutoModel.from_pretrained(checkpoint_name, low_cpu_mem_usage=low_cpu_mem_usage)
     else:
         model = AutoModel.from_config(config)
 

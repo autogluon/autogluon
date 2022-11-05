@@ -35,7 +35,7 @@ def trainable_parameters(model) -> int:
     "backbone,efficient_finetuning,pooling_mode,precision,expected_ratio,standalone",
     [
         ("t5-small", LORA_NORM, "mean", "bf16", 0.00557, True),
-        ("t5-small", IA3, "mean", "bf16", 0.00039118, False),
+        ("google/flan-t5-small", IA3, "mean", "bf16", 0.0004201, False),
         ("microsoft/deberta-v3-small", LORA_BIAS, "mean", "16", 0.001422, True),
         ("microsoft/deberta-v3-small", IA3_BIAS, "mean", "16", 0.00044566, False),
     ],

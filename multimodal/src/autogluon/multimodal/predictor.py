@@ -117,6 +117,7 @@ from .utils import (
     from_coco,
     from_coco_or_voc,
     get_config,
+    get_detection_classes,
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_mixup,
@@ -179,6 +180,7 @@ class MultiModalPredictor:
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
+        sample_data_path: Optional[str] = None,
     ):
         """
         Parameters
@@ -247,6 +249,8 @@ class MultiModalPredictor:
         init_scratch
             Whether to init model from scratch. It's useful when we want to load a checkpoints
             without its weights.
+        sample_data_path
+            This is used for automatically inference num_classes, classes, or label.
         """
         if pipeline in matcher_presets.list_keys():
             self._matcher = MultiModalMatcher(
@@ -309,6 +313,7 @@ class MultiModalPredictor:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
         self._init_scratch = init_scratch
+        self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._matcher = None
 
@@ -323,6 +328,12 @@ class MultiModalPredictor:
 
         if problem_type is not None and problem_type.lower() == NER:
             self._pipeline = None
+
+        if self._pipeline == OBJECT_DETECTION:
+            self._label_column = "label"
+            if self._sample_data_path:
+                self._classes = get_detection_classes(self._sample_data_path)
+                self._output_shape = len(self._classes)
 
         if self._pipeline is not None:
             self._config, self._model, self._data_processors = init_pretrained(
@@ -2139,6 +2150,12 @@ class MultiModalPredictor:
                 id_mappings=id_mappings,
                 as_pandas=as_pandas,
             )
+
+        if self._pipeline == OBJECT_DETECTION:
+            if isinstance(data, str):
+                data = from_coco_or_voc(data, "test")
+            if self._label_column not in data:
+                self._label_column = None
 
         if self._pipeline == OBJECT_DETECTION or self._pipeline == OCR_TEXT_DETECTION:
             ret_type = BBOX

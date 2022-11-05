@@ -47,6 +47,7 @@ from .object_detection import (
     from_coco,
     from_coco_or_voc,
     from_voc,
+    get_detection_classes,
     get_image_name_num,
     get_voc_classes,
     getCOCOCatIDs,
