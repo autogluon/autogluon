@@ -1,22 +1,56 @@
 import logging
-from typing import List
+import warnings
+from typing import Any, Callable, Dict, List
 
-import numpy as np
 import pandas as pd
-from statsmodels.tsa.exponential_smoothing.ets import ETSModel as StatsmodelsETS
-from statsmodels.tsa.forecasting.theta import ThetaModel as StatsmodelsTheta
-from statsmodels.tsa.statespace.sarimax import SARIMAX as StatsmodelsSARIMAX
+from statsmodels.tools.sm_exceptions import ConvergenceWarning, ModelWarning, ValueWarning
 
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
-from autogluon.timeseries.utils.seasonality import get_seasonality
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_single_time_series
 from autogluon.timeseries.utils.warning_filters import statsmodels_warning_filter
 
-from .abstract_statsmodels import AbstractStatsmodelsModel, FittedLocalModel
+from .abstract_local_model import AbstractLocalModel
 
 logger = logging.getLogger(__name__)
 
+warnings.simplefilter("ignore", ModelWarning)
+warnings.simplefilter("ignore", ConvergenceWarning)
+warnings.simplefilter("ignore", ValueWarning)
 
-class ETSModel(AbstractStatsmodelsModel):
+
+def get_quantiles_from_statsmodels(coverage_fn: Callable, quantile_levels: List[float]) -> List[pd.Series]:
+    """Obtain quantile forecasts using a fitted Statsmodels model.
+
+    The method for computing quantiles is different for all models in Statsmodels, this method unifies the interface.
+
+    Parameters
+    ----------
+    coverage_fn : Callable
+        Function that takes as input a coverage level between 0 and 100 and returns a pandas Dataframe with lower /
+        upper values of the confidence interval.
+    quantile_levels : List[float]
+        List of quantiles between 0.0 and 1.0 to predict
+
+    Returns
+    -------
+    results : List[pd.Series]
+        List, where each element is a pandas Series containing the predictions for the corresponding quantile level.
+    """
+    results = []
+    for q in quantile_levels:
+        if q < 0.5:
+            coverage = 2 * q
+            column_index = 0
+        else:
+            coverage = 2 * (1 - q)
+            column_index = 1
+        quantile_pred = coverage_fn(coverage)
+        # Select lower bound of the confidence interval if q < 0.5, upper bound otherwise
+        results.append(quantile_pred.iloc[:, column_index].rename(str(q)))
+    return results
+
+
+class ETSModel(AbstractLocalModel):
     """Exponential smoothing with trend and seasonality.
 
     Based on `statsmodels.tsa.exponential_smoothing.ets.ETSModel <https://www.statsmodels.org/stable/generated/statsmodels.tsa.exponential_smoothing.ets.ETSModel.html>`_.
@@ -54,74 +88,71 @@ class ETSModel(AbstractStatsmodelsModel):
         When set to -1, all CPU cores are used.
     """
 
-    quantile_method_name = "pred_int"
-    statsmodels_allowed_init_args = [
+    allowed_local_model_args = [
         "error",
         "trend",
         "damped_trend",
         "seasonal",
         "seasonal_period",
-    ]
-    statsmodels_allowed_fit_args = [
         "maxiter",
     ]
 
-    def _update_sm_model_init_args(self, sm_model_init_args: dict, data: TimeSeriesDataFrame) -> dict:
-        sm_model_init_args = sm_model_init_args.copy()
-        sm_model_init_args["freq"] = data.freq
-        sm_model_init_args.setdefault("trend", "add")
+    def _update_local_model_args(
+        self, local_model_args: Dict[str, Any], data: TimeSeriesDataFrame, **kwargs
+    ) -> Dict[str, Any]:
+        local_model_args.setdefault("trend", "add")
+        local_model_args.setdefault("maxiter", 1000)
 
-        # Infer seasonal_period if seasonal_period is not given / is set to None
-        seasonal_period = sm_model_init_args.pop("seasonal_period", None)
-        if seasonal_period is None:
-            seasonal_period = get_seasonality(data.freq)
-        sm_model_init_args["seasonal_periods"] = seasonal_period
-
-        seasonal = sm_model_init_args.setdefault("seasonal", "add")
-        # Disable seasonality if seasonal_period is too short
+        seasonal_period = local_model_args.pop("seasonal_period")
+        seasonal = local_model_args.setdefault("seasonal", "add")
         if seasonal is not None and seasonal_period <= 1:
             logger.warning(
                 f"{self.name} with seasonal = {seasonal} requires seasonal_period > 1 "
                 f"(received seasonal_period = {seasonal_period}). Disabling seasonality."
             )
-            sm_model_init_args["seasonal"] = None
-            sm_model_init_args["seasonal_periods"] = 1
+            local_model_args["seasonal"] = None
+            local_model_args["seasonal_periods"] = 1
+        else:
+            local_model_args["seasonal_periods"] = seasonal_period
 
-        return sm_model_init_args
+        return local_model_args
 
-    def _fit_local_model(
-        self, timeseries: pd.Series, sm_model_init_args: dict, sm_model_fit_args: dict
-    ) -> FittedLocalModel:
-        # Disable seasonality if timeseries is too short for given seasonal_period
-        if sm_model_init_args["seasonal"] is not None and len(timeseries) < 2 * sm_model_init_args["seasonal_periods"]:
-            sm_model_init_args = sm_model_init_args.copy()
-            sm_model_init_args["seasonal"] = None
-
-        with statsmodels_warning_filter():
-            model = StatsmodelsETS(endog=timeseries, **sm_model_init_args)
-            fit_result = model.fit(full_output=False, disp=False, **sm_model_fit_args)
-        # Only save the parameters of the trained model, not the model itself
-        parameters = dict(zip(fit_result.param_names, fit_result.params))
-        return FittedLocalModel(model_name=self.name, sm_model_init_args=sm_model_init_args, parameters=parameters)
-
+    @staticmethod
     def _predict_with_local_model(
-        self, timeseries: pd.Series, fitted_model: FittedLocalModel, quantile_levels: List[float]
+        time_series: pd.Series,
+        freq: str,
+        prediction_length: int,
+        quantile_levels: List[float],
+        local_model_args: dict,
+        **kwargs,
     ) -> pd.DataFrame:
-        assert fitted_model.model_name == self.name
-        with statsmodels_warning_filter():
-            base_model = StatsmodelsETS(endog=timeseries, **fitted_model.sm_model_init_args)
-            parameters = np.array(list(fitted_model.parameters.values()))
-            # This is a hack that allows us to set the parameters to their estimated values & initialize the model
-            sm_model = base_model.fit(start_params=parameters, maxiter=0, disp=False)
-        return self._get_predictions_from_statsmodels_model(
-            sm_model=sm_model,
-            cutoff=timeseries.index.max(),
-            quantile_levels=quantile_levels,
-            freq=fitted_model.sm_model_init_args["freq"],
+        forecast_timestamps = get_forecast_horizon_index_single_time_series(
+            past_timestamps=time_series.index, freq=freq, prediction_length=prediction_length
         )
+        from statsmodels.tsa.exponential_smoothing.ets import ETSModel
+
+        maxiter = local_model_args.pop("maxiter")
+
+        # Disable seasonality if timeseries is too short for given seasonal_period
+        if local_model_args["seasonal"] is not None and len(time_series) < 2 * local_model_args["seasonal_periods"]:
+            local_model_args["seasonal"] = None
+
+        with statsmodels_warning_filter():
+            model = ETSModel(
+                endog=time_series,
+                freq=freq,
+                **local_model_args,
+            )
+            fit_result = model.fit(disp=False, maxiter=maxiter)
+            predictions = fit_result.get_prediction(start=forecast_timestamps[0], end=forecast_timestamps[-1])
+
+        results = [predictions.predicted_mean.rename("mean")]
+        coverage_fn = lambda alpha: predictions.pred_int(alpha=alpha)
+        results += get_quantiles_from_statsmodels(coverage_fn=coverage_fn, quantile_levels=quantile_levels)
+        return pd.concat(results, axis=1)
 
 
-class ARIMAModel(AbstractStatsmodelsModel):
+class ARIMAModel(AbstractLocalModel):
     """Autoregressive Integrated Moving Average (ARIMA) model.
 
     Based on `statsmodels.tsa.statespace.sarimax.SARIMAX <https://www.statsmodels.org/stable/generated/statsmodels.tsa.statespace.sarimax.SARIMAX.html>`_.
@@ -142,6 +173,9 @@ class ARIMAModel(AbstractStatsmodelsModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
+    trend : {"n", "c", "t", "ct"}, default = "c"
+        Parameter controlling the trend polynomial. Allowed values are "n" (no trend), "c" (constant), "t" (linear) and
+        "ct" (constant plus linear).
     enforce_stationarity : bool, default = True
         Whether to transform the AR parameters to enforce stationarity in the autoregressive component of the model.
         If ARIMA crashes during fitting with an LU decomposition error, you can either set enforce_stationarity to
@@ -157,32 +191,26 @@ class ARIMAModel(AbstractStatsmodelsModel):
         When set to -1, all CPU cores are used.
     """
 
-    quantile_method_name = "conf_int"
-    statsmodels_allowed_init_args = [
+    allowed_local_model_args = [
         "order",
         "seasonal_order",
         "seasonal_period",
+        "trend",
         "enforce_stationarity",
         "enforce_invertibility",
-    ]
-    statsmodels_allowed_fit_args = [
         "maxiter",
     ]
 
-    def _update_sm_model_init_args(self, sm_model_init_args: dict, data: TimeSeriesDataFrame) -> dict:
-        sm_model_init_args = sm_model_init_args.copy()
-        sm_model_init_args["freq"] = data.freq
-        sm_model_init_args["trend"] = "c"
-        sm_model_init_args.setdefault("enforce_stationarity", True)
-        sm_model_init_args.setdefault("order", (1, 1, 1))
-        sm_model_init_args.setdefault("maxiter", 50)
+    def _update_local_model_args(
+        self, local_model_args: Dict[str, Any], data: TimeSeriesDataFrame, **kwargs
+    ) -> Dict[str, Any]:
+        local_model_args.setdefault("trend", "c")
+        local_model_args.setdefault("order", (1, 1, 1))
+        local_model_args.setdefault("maxiter", 50)
 
-        # Infer seasonal_period if seasonal_period is not given / is set to None
-        seasonal_period = sm_model_init_args.pop("seasonal_period", None)
-        if seasonal_period is None:
-            seasonal_period = get_seasonality(data.freq)
+        seasonal_period = local_model_args.pop("seasonal_period")
+        seasonal_order = local_model_args.pop("seasonal_order", (0, 0, 0))
 
-        seasonal_order = sm_model_init_args.pop("seasonal_order", (0, 0, 0))
         seasonal_order_is_valid = len(seasonal_order) == 3 and all(isinstance(p, int) for p in seasonal_order)
         if not seasonal_order_is_valid:
             raise ValueError(
@@ -192,40 +220,44 @@ class ARIMAModel(AbstractStatsmodelsModel):
 
         # Disable seasonality if seasonal_period is too short
         if seasonal_period <= 1:
-            sm_model_init_args["seasonal_order"] = (0, 0, 0, 0)
+            local_model_args["seasonal_order"] = (0, 0, 0, 0)
         else:
-            sm_model_init_args["seasonal_order"] = tuple(seasonal_order) + (seasonal_period,)
+            local_model_args["seasonal_order"] = tuple(seasonal_order) + (seasonal_period,)
 
-        return sm_model_init_args
+        return local_model_args
 
-    def _fit_local_model(
-        self, timeseries: pd.Series, sm_model_init_args: dict, sm_model_fit_args: dict
-    ) -> FittedLocalModel:
-        with statsmodels_warning_filter():
-            model = StatsmodelsSARIMAX(endog=timeseries, **sm_model_init_args)
-            fit_result = model.fit(disp=False, **sm_model_fit_args)
-        # Only save the parameters of the trained model, not the model itself
-        parameters = dict(fit_result.params.iteritems())
-        return FittedLocalModel(model_name=self.name, sm_model_init_args=sm_model_init_args, parameters=parameters)
-
+    @staticmethod
     def _predict_with_local_model(
-        self, timeseries: pd.Series, fitted_model: FittedLocalModel, quantile_levels: List[float]
+        time_series: pd.Series,
+        freq: str,
+        prediction_length: int,
+        quantile_levels: List[float],
+        local_model_args: dict,
+        **kwargs,
     ) -> pd.DataFrame:
-        assert fitted_model.model_name == self.name
-        parameters = np.array(list(fitted_model.parameters.values()))
-        with statsmodels_warning_filter():
-            base_model = StatsmodelsSARIMAX(endog=timeseries, **fitted_model.sm_model_init_args)
-            # This is a hack that allows us to set the parameters to their estimated values & initialize the model
-            sm_model = base_model.fit(start_params=parameters, maxiter=0, disp=False)
-        return self._get_predictions_from_statsmodels_model(
-            sm_model=sm_model,
-            cutoff=timeseries.index.max(),
-            quantile_levels=quantile_levels,
-            freq=fitted_model.sm_model_init_args["freq"],
+        forecast_timestamps = get_forecast_horizon_index_single_time_series(
+            past_timestamps=time_series.index, freq=freq, prediction_length=prediction_length
         )
+        from statsmodels.tsa.statespace.sarimax import SARIMAX as StatsmodelSARIMAX
+
+        maxiter = local_model_args.pop("maxiter")
+
+        with statsmodels_warning_filter():
+            model = StatsmodelSARIMAX(
+                endog=time_series,
+                freq=freq,
+                **local_model_args,
+            )
+            fit_result = model.fit(disp=False, maxiter=maxiter)
+            predictions = fit_result.get_prediction(start=forecast_timestamps[0], end=forecast_timestamps[-1])
+
+        results = [predictions.predicted_mean.rename("mean")]
+        coverage_fn = lambda alpha: predictions.conf_int(alpha=alpha)
+        results += get_quantiles_from_statsmodels(coverage_fn=coverage_fn, quantile_levels=quantile_levels)
+        return pd.concat(results, axis=1)
 
 
-class ThetaModel(AbstractStatsmodelsModel):
+class ThetaModel(AbstractLocalModel):
     """The Theta forecasting model of Assimakopoulos and Nikolopoulos (2000).
 
     Based on `statsmodels.tsa.forecasting.theta.ThetaModel <https://www.statsmodels.org/stable/generated/statsmodels.tsa.forecasting.theta.ThetaModel.html>`_.
@@ -261,55 +293,49 @@ class ThetaModel(AbstractStatsmodelsModel):
         When set to -1, all CPU cores are used.
     """
 
-    statsmodels_allowed_init_args = [
+    allowed_local_model_args = [
         "deseasonalize",
         "seasonal_period",
         "use_test",
         "method",
         "difference",
     ]
-    statsmodels_allowed_fit_args = []
 
-    def _update_sm_model_init_args(self, sm_model_init_args: dict, data: TimeSeriesDataFrame) -> dict:
-        sm_model_init_args = sm_model_init_args.copy()
-        sm_model_init_args.setdefault("deseasonalize", True)
+    def _update_local_model_args(
+        self, local_model_args: Dict[str, Any], data: TimeSeriesDataFrame, **kwargs
+    ) -> Dict[str, Any]:
+        local_model_args.setdefault("deseasonalize", True)
 
-        # Infer seasonal_period if seasonal_period is not given / is set to None
-        seasonal_period = sm_model_init_args.pop("seasonal_period", None)
-        if seasonal_period is None:
-            seasonal_period = get_seasonality(data.freq)
-        sm_model_init_args["period"] = seasonal_period
+        seasonal_period = local_model_args.pop("seasonal_period")
+        local_model_args["period"] = seasonal_period
 
-        return sm_model_init_args
+        return local_model_args
 
-    def _fit_local_model(
-        self, timeseries: pd.Series, sm_model_init_args: dict, sm_model_fit_args: dict
-    ) -> FittedLocalModel:
-        # ThetaModel in statsmodels doesn't provide a way to initialize the model with trained parameters,
-        # so we delegate training to `_predict_with_local_model`
-        if sm_model_init_args["deseasonalize"] and len(timeseries) < 2 * sm_model_init_args["period"]:
-            sm_model_init_args = sm_model_init_args.copy()
-            sm_model_init_args["deseasonalize"] = False
-        return FittedLocalModel(model_name=self.name, sm_model_init_args=sm_model_init_args, parameters=None)
-
+    @staticmethod
     def _predict_with_local_model(
-        self, timeseries: pd.Series, fitted_model: FittedLocalModel, quantile_levels: List[float]
+        time_series: pd.Series,
+        freq: str,
+        prediction_length: int,
+        quantile_levels: List[float],
+        local_model_args: dict,
+        **kwargs,
     ) -> pd.DataFrame:
-        assert fitted_model.model_name == self.name
-        timeseries.index.freq = self.freq
+        from statsmodels.tsa.forecasting.theta import ThetaModel as StatsmodelsTheta
+
+        # Disable seasonality if timeseries is too short for given seasonal_period
+        if local_model_args["deseasonalize"] and len(time_series) < 2 * local_model_args["period"]:
+            local_model_args["deseasonalize"] = False
+
+        time_series.index.freq = freq
+
         with statsmodels_warning_filter():
-            base_model = StatsmodelsTheta(endog=timeseries, **fitted_model.sm_model_init_args)
-            sm_model = base_model.fit(disp=False)
-        # The API is inconsistent with ETS/ARIMA, so we access the predictions differently here
-        results = [sm_model.forecast(self.prediction_length).rename("mean")]
-        for q in quantile_levels:
-            if q < 0.5:
-                coverage = 2 * q
-                column_index = 0
-            else:
-                coverage = 2 * (1 - q)
-                column_index = 1
-            quantile_pred = sm_model.prediction_intervals(steps=self.prediction_length, alpha=coverage)
-            # Select lower bound of the confidence interval if q < 0.5, upper bound otherwise
-            results.append(quantile_pred.iloc[:, column_index].rename(str(q)))
+            model = StatsmodelsTheta(
+                endog=time_series,
+                **local_model_args,
+            )
+            fit_result = model.fit(disp=False)
+
+        results = [fit_result.forecast(prediction_length).rename("mean")]
+        coverage_fn = lambda alpha: fit_result.prediction_intervals(steps=prediction_length, alpha=alpha)
+        results += get_quantiles_from_statsmodels(coverage_fn=coverage_fn, quantile_levels=quantile_levels)
         return pd.concat(results, axis=1)
