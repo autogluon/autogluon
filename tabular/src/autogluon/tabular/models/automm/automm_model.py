@@ -215,10 +215,3 @@ class MultiModalPredictorModel(AbstractModel):
     def _more_tags(self):
         # `can_refit_full=False` because MultiModalPredictor does not communicate how to train until the best epoch in refit_full.
         return {'can_refit_full': False}
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {'fold_fitting_strategy': 'sequential_local'}
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble

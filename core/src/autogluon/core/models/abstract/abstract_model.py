@@ -302,7 +302,6 @@ class AbstractModel:
         Preprocesses the input data into internal form ready for fitting or inference.
         It is not recommended to override this method, as it is closely tied to multi-layer stacking logic. Instead, override `_preprocess`.
         """
-        X = copy.deepcopy(X)
         if preprocess_nonadaptive:
             X = self._preprocess_nonadaptive(X, **kwargs)
         if preprocess_stateful:
