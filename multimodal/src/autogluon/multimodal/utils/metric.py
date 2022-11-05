@@ -179,7 +179,7 @@ def compute_score(
 
 
 def compute_ranking_score(
-    results: Dict[str, Dict], qrel_dict: Dict[str, Dict], metrics: List[str], cutoff: Optional[List[int]] = [5, 10, 20]
+    results: Dict[str, Dict], qrel_dict: Dict[str, Dict], metrics: List[str], cutoffs: Optional[List[int]] = [5, 10, 20]
 ):
     """
     Compute the ranking metrics, e.g., NDCG, MAP, Recall, and Precision.
@@ -193,7 +193,7 @@ def compute_ranking_score(
         The groundtruth query and document relevance.
     metrics
         A list of metrics to compute.
-    cutoff:
+    cutoffs:
         The cutoff values for NDCG, MAP, Recall, and Precision.
 
     Returns
@@ -203,13 +203,13 @@ def compute_ranking_score(
     metric_strings = set()
     for per_metric in metrics:
         if per_metric.lower() == NDCG:
-            per_metric_string = "ndcg_cut." + ",".join([str(k) for k in cutoff])
+            per_metric_string = "ndcg_cut." + ",".join([str(k) for k in cutoffs])
         elif per_metric.lower() == MAP:
-            per_metric_string = "map_cut." + ",".join([str(k) for k in cutoff])
+            per_metric_string = "map_cut." + ",".join([str(k) for k in cutoffs])
         elif per_metric.lower() == RECALL:
-            per_metric_string = "recall." + ",".join([str(k) for k in cutoff])
+            per_metric_string = "recall." + ",".join([str(k) for k in cutoffs])
         elif per_metric.lower() == PRECISION:
-            per_metric_string = "P." + ",".join([str(k) for k in cutoff])
+            per_metric_string = "P." + ",".join([str(k) for k in cutoffs])
         else:
             raise ValueError(f"Unknown metric {per_metric}. Consider using `ndcg`, `map`, `recall`, or `precision`.")
 
@@ -219,7 +219,7 @@ def compute_ranking_score(
     scores = evaluator.evaluate(results)
 
     metric_results = dict()
-    for k in cutoff:
+    for k in cutoffs:
         for per_metric in metrics:
             if per_metric.lower() == NDCG:
                 metric_results[f"NDCG@{k}"] = 0.0
@@ -231,7 +231,7 @@ def compute_ranking_score(
                 metric_results[f"Precision@{k}"] = 0.0
 
     for query_id in scores.keys():
-        for k in cutoff:
+        for k in cutoffs:
             for per_metric in metrics:
                 if per_metric.lower() == NDCG:
                     metric_results[f"NDCG@{k}"] += scores[query_id]["ndcg_cut_" + str(k)]
@@ -242,7 +242,7 @@ def compute_ranking_score(
                 elif per_metric.lower() == PRECISION:
                     metric_results[f"P@{k}"] += scores[query_id]["P_" + str(k)]
 
-    for k in cutoff:
+    for k in cutoffs:
         for per_metric in metrics:
             if per_metric.lower() == NDCG:
                 metric_results[f"NDCG@{k}"] = round(metric_results[f"NDCG@{k}"] / len(scores), 5)
