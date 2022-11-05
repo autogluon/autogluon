@@ -237,7 +237,7 @@ class PretrainLitModule(LitModule):
             return pretrain_loss
         else:
             lam = self.start_loss_coefficient * (
-                self.decay_loss_coefficient ** (self.current_epoch - self.pretrain_epochs)
+                self.decay_loss_coefficient ** (self.current_epoch - self.pretrain_epochs + 1)
             )
             lam = max(lam, self.end_loss_coefficient)
             return pretrain_loss * lam + loss  # * (1-lam)
