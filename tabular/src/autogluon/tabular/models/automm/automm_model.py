@@ -1,9 +1,10 @@
 """Wrapper of the MultiModalPredictor."""
-from typing import Dict, Optional
+
 import logging
 import os
-import pandas as pd
+from typing import Dict, Optional
 
+import pandas as pd
 
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
     S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
@@ -135,8 +136,11 @@ class MultiModalPredictorModel(AbstractModel):
             logger.log(15, "sample_weight not yet supported for MultiModalPredictorModel, "
                            "this model will ignore them in training.")
 
+        # Need to deep copy to avoid altering outer context
+        X_train = X_train.copy()
         X_train.insert(len(X_train.columns), self._label_column_name, y)
         if X_val is not None:
+            X_val = X_val.copy()
             X_val.insert(len(X_val.columns), self._label_column_name, y_val)
 
         verbosity_text = max(0, verbosity - 1)
