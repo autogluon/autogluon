@@ -1,9 +1,10 @@
 """Wrapper of the MultiModalPredictor."""
-from typing import Dict, Optional
+
 import logging
 import os
-import pandas as pd
+from typing import Dict, Optional
 
+import pandas as pd
 
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
     S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
@@ -72,6 +73,14 @@ class MultiModalPredictorModel(AbstractModel):
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
+    # FIXME: Enable parallel bagging once AutoMM supports being run within Ray without hanging
+    @classmethod
+    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
+        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
+        extra_ag_args_ensemble = {'fold_fitting_strategy': 'sequential_local'}
+        default_ag_args_ensemble.update(extra_ag_args_ensemble)
+        return default_ag_args_ensemble
+
     def _set_default_params(self):
         super()._set_default_params()
         try_import_autogluon_text()
@@ -127,8 +136,11 @@ class MultiModalPredictorModel(AbstractModel):
             logger.log(15, "sample_weight not yet supported for MultiModalPredictorModel, "
                            "this model will ignore them in training.")
 
+        # Need to deep copy to avoid altering outer context
+        X_train = X_train.copy()
         X_train.insert(len(X_train.columns), self._label_column_name, y)
         if X_val is not None:
+            X_val = X_val.copy()
             X_val.insert(len(X_val.columns), self._label_column_name, y_val)
 
         verbosity_text = max(0, verbosity - 1)
