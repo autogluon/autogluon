@@ -4,12 +4,10 @@ from .constants import DATA, DISTILLER, ENVIRONMENT, MATCHER, MODEL, OPTIMIZATIO
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")
-predictor_presets = Registry("predictor_presets")
 matcher_presets = Registry("matcher_presets")
 
 
 @automm_presets.register()
-@predictor_presets.register()
 def default():
     return {
         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
@@ -19,7 +17,6 @@ def default():
 
 
 @automm_presets.register()
-@predictor_presets.register()
 def medium_quality_faster_train():
     return {
         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
@@ -30,7 +27,6 @@ def medium_quality_faster_train():
 
 
 @automm_presets.register()
-@predictor_presets.register()
 def high_quality():
     return {
         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
@@ -40,7 +36,6 @@ def high_quality():
 
 
 @automm_presets.register()
-@predictor_presets.register()
 def best_quality():
     return {
         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
@@ -51,7 +46,6 @@ def best_quality():
 
 
 @automm_presets.register()
-@predictor_presets.register()
 def multilingual():
     return {
         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
@@ -63,7 +57,6 @@ def multilingual():
 
 
 @automm_presets.register()
-@predictor_presets.register()
 def few_shot_text_classification():
     return {
         "model.names": ["t_few"],
@@ -90,7 +83,6 @@ def few_shot_text_classification():
 
 
 @automm_presets.register()
-@predictor_presets.register()
 def zero_shot_classification():
     return {
         "model.names": ["hf_text"],
@@ -100,7 +92,6 @@ def zero_shot_classification():
 
 
 @automm_presets.register()
-@predictor_presets.register()
 def zero_shot_image_classification():
     return {
         "model.names": ["clip"],
@@ -111,7 +102,6 @@ def zero_shot_image_classification():
 
 
 @automm_presets.register()
-@predictor_presets.register()
 def object_detection():
     # TODO: add another presets for training detection models from scratch
     return {
@@ -133,7 +123,6 @@ def object_detection():
 
 
 @automm_presets.register()
-@predictor_presets.register()
 def ocr_text_detection():
     return {
         "model.names": ["mmocr_text_detection"],
@@ -145,7 +134,6 @@ def ocr_text_detection():
 
 
 @automm_presets.register()
-@predictor_presets.register()
 def ocr_text_recognition():
     return {
         "model.names": ["mmocr_text_recognition"],
@@ -157,7 +145,6 @@ def ocr_text_recognition():
 
 
 @automm_presets.register()
-@predictor_presets.register()
 def feature_extraction():
     return {
         "model.names": ["hf_text"],

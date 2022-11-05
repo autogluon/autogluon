@@ -346,7 +346,10 @@ class RankingMetrics:
 
 
 def compute_ranking_score(
-    results: Dict[str, Dict], qrel_dict: Dict[str, Dict], metrics: List[str], cutoffs: Optional[List[int]] = [5, 10, 20]
+    results: Dict[str, Dict],
+    qrel_dict: Dict[str, Dict],
+    metrics: List[str],
+    cutoffs: Optional[List[int]] = [5, 10, 20],
 ):
     """
     Compute the ranking metrics, e.g., NDCG, MAP, Recall, and Precision.

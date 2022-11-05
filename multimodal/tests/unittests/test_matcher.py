@@ -332,8 +332,3 @@ def test_image_text_semantic_search():
         for per_hit, per_hit_2 in zip(per_query_hits, per_query_hits_2):
             assert per_hit["response_id"] == per_hit_2["response_id"]
             npt.assert_almost_equal(per_hit["score"], per_hit_2["score"])
-
-
-if __name__ == '__main__':
-    # test_image_text_semantic_search()
-    test_text_semantic_search()

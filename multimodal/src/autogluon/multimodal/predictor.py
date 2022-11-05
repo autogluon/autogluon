@@ -83,6 +83,7 @@ from .data.infer_types import (
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
+from .matcher import MultiModalMatcher
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_mmdet import MMDetLitModule
@@ -95,6 +96,7 @@ from .optimization.utils import (
     get_norm_layer_param_names,
     get_trainable_params_efficient_finetune,
 )
+from .presets import matcher_presets
 from .utils import (
     AutoMMModelCheckpoint,
     AutoMMModelCheckpointIO,
@@ -144,8 +146,6 @@ from .utils import (
     update_config_by_rules,
     use_realtime,
 )
-from .matcher import MultiModalMatcher
-from .presets import matcher_presets
 
 logger = logging.getLogger(AUTOMM)
 
