@@ -9,11 +9,6 @@ With changes:
 5. TODO: remove invalid images?
 
 To use:
-1. run in root_dir:
-    grep -ERoh '<name>(.*)</name>' ./Annotations | sort | uniq | sed 's/<name>//g' | sed 's/<\/name>//g' > labels.txt
-2. run in root_dir/..:
-    ls Annotations/*.xml > pathlist.txt
-3. run here:
     python3 voc2coco.py --root_dir <root_dir> --train_ratio <train_ratio> --val_ratio <val_ratio>
 """
 
@@ -26,7 +21,7 @@ import re
 import subprocess
 from tqdm import tqdm
 from typing import Dict, List
-from autogluon.multimodal.utils.object_detection import process_voc_annotations
+from autogluon.multimodal.utils.object_detection import process_voc_annotations, dump_voc_classes, dump_voc_xml_files
 
 
 MIN_AREA = 4  # TODO: put in arg?
@@ -66,9 +61,27 @@ def get_annpaths(
             ann_ids_path = os.path.join(ann_ids_folder, ann_ids_filename)
             if os.path.isfile(ann_ids_path) and ann_ids_filename[-4:] == ".txt":
                 ann_ids_name = ann_ids_filename[:-4]
+
                 with open(ann_ids_path, "r") as f:
-                    ann_ids = f.read().split()
-                ann_paths[ann_ids_name] = [os.path.join(ann_dir_path, aid + ".xml") for aid in ann_ids]
+                    rows = f.readlines()
+                    if not rows:
+                        print(f"Skipping {ann_ids_path}: file is empty")
+                    else:
+                        ann_ids = []
+                        for r in rows:
+                            data = r.strip().split()
+                            if len(data) == 1:
+                                ann_ids.append(data[0])
+                            elif len(data) == 2:
+                                ann_id, used = data
+                                if int(used) == 1:
+                                    ann_ids.append(ann_id)
+                            else:
+                                print(f"Skipping {ann_ids_path}: file format not recognized. Make sure your annotation follows "
+                                      f"VOC format!")
+                                break
+
+                        ann_paths[ann_ids_name] = [os.path.join(ann_dir_path, aid + ".xml") for aid in ann_ids]
         return ann_paths
 
 
@@ -177,16 +190,18 @@ def main():
         assert args.val_ratio >= 0
         assert args.train_ratio + args.val_ratio <= 1
         annpaths_list_path = os.path.join(args.root_dir, "pathlist.txt")
-    labels_path = os.path.join(args.root_dir, "labels.txt")
-    annpaths_list_path = os.path.join(args.root_dir, "pathlist.txt")
+        ## generate pathlist.txt containing all xml file paths
+        dump_voc_xml_files(voc_annotation_path=os.path.join(args.root_dir, "Annotations"),
+                           voc_annotation_xml_output_path=annpaths_list_path)
 
+        assert os.path.exists(annpaths_list_path), "FatalError: pathlist.txt does not exist!"
+
+    labels_path = os.path.join(args.root_dir, "labels.txt")
     ## generate labels.txt containing all unique class names
-    process_voc_annotations(voc_annotation_path=os.path.join(args.root_dir, "Annotations"),
-                            voc_class_names_output_path=labels_path,
-                            voc_annotation_xml_output_path=annpaths_list_path)
+    dump_voc_classes(voc_annotation_path=os.path.join(args.root_dir, "Annotations"),
+                     voc_class_names_output_path=labels_path)
 
     assert os.path.exists(labels_path), "FatalError: labels.txt does not exist!"
-    assert os.path.exists(annpaths_list_path), "FatalError: pathlist.txt does not exist!"
 
     output_path_fmt = os.path.join(args.root_dir, "Annotations", "coco_%s.json")
 

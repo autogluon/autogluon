@@ -3,10 +3,11 @@ import logging
 import os
 import warnings
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, Iterable
 
 import defusedxml.ElementTree as ET
 import numpy as np
+import pandas
 import pandas as pd
 
 from ..constants import AUTOMM, MAP
@@ -50,7 +51,7 @@ def from_voc(
     rpath = Path(root).expanduser()
     img_list = []
 
-    class_names = get_voc_classes(root)
+    class_names = get_voc_format_classes(root)
 
     NAME_TO_IDX = dict(zip(class_names, range(len(class_names))))
     name_to_index = lambda name: NAME_TO_IDX[name]
@@ -115,26 +116,6 @@ def from_voc(
     df["label"] = df.loc[:, "rois"].copy()
 
     return df.sort_values("image").reset_index(drop=True)
-
-
-def get_voc_classes(root):
-    if is_url(root):
-        root = download(root)
-    rpath = Path(root).expanduser()
-
-    labels_file = os.path.join(rpath, "labels.txt")
-    if os.path.exists(labels_file):
-        with open(labels_file) as f:
-            class_names = [line.rstrip().lower() for line in f]
-        print(f"using class_names in labels.txt: {class_names}")
-    else:
-        logger.warning(
-            "labels.txt does not exist, using default VOC names. "
-            "To create labels.txt, run ls Annotations/* > pathlist.txt in root dir"
-        )
-        class_names = VOC_CLASSES
-
-    return class_names
 
 
 def import_try_install(package: str, extern_url: Optional[str] = None):
@@ -641,6 +622,60 @@ def cocoeval(outputs, data, anno_file, cache_path, metrics, tool="pycocotools"):
         return cocoeval_torchmetrics(outputs)
 
 
+def dump_voc_classes(voc_annotation_path: str, voc_class_names_output_path: str = None) -> [str]:
+    """
+        Reads annotations for a dataset in VOC format.
+        Then
+            dumps the unique class names into a labels.txt file.
+
+        @param voc_annotation_path: root_path for annotations in VOC format
+        @param voc_class_names_output_path: output path for the labels.txt
+        @returns list of strings, [class_name0, class_name1, ...]
+    """
+    files = os.listdir(voc_annotation_path)
+    class_names = set()
+    for f in files:
+        if f.endswith(".xml"):
+            xml_path = os.path.join(voc_annotation_path, f)
+            tree = ET.parse(xml_path)
+            root = tree.getroot()
+            for boxes in root.iter("object"):
+                class_names.add(boxes.find("name").text)
+
+    sorted_class_names = sorted(list(class_names))
+    if voc_class_names_output_path:
+        with open(voc_class_names_output_path, "w") as f:
+            f.writelines("\n".join(sorted_class_names))
+
+    return sorted_class_names
+
+
+def dump_voc_xml_files(voc_annotation_path: str,
+                       voc_annotation_xml_output_path: str = None) -> [str]:
+    """
+        Reads annotations for a dataset in VOC format.
+        Then
+            1. dumps the unique class names into labels.txt file.
+            2. dumps the xml annotation file names into pathlist.txt file.
+
+        @param voc_annotation_path: root_path for annotations in VOC format
+        @param voc_annotation_xml_output_path: output path for the pathlist.txt
+        @returns list of strings, [xml_file0, xml_file1, ...]
+    """
+    files = os.listdir(voc_annotation_path)
+    annotation_path_base_name = os.path.basename(voc_annotation_path)
+    xml_file_names = []
+    for f in files:
+        if f.endswith(".xml"):
+            xml_file_names.append(os.path.join(annotation_path_base_name, f))
+
+    if voc_annotation_xml_output_path:
+        with open(voc_annotation_xml_output_path, "w") as f:
+            f.writelines("\n".join(xml_file_names))
+
+    return xml_file_names
+
+
 def process_voc_annotations(voc_annotation_path: str,
                             voc_class_names_output_path: str,
                             voc_annotation_xml_output_path: str) -> None:
@@ -655,7 +690,6 @@ def process_voc_annotations(voc_annotation_path: str,
     @param voc_annotation_xml_output_path: output path for the pathlist.txt
     @returns None
     """
-
     files = os.listdir(voc_annotation_path)
     annotation_path_base_name = os.path.basename(voc_annotation_path)
     class_names = set()
@@ -695,8 +729,24 @@ def get_coco_format_classes(sample_data_path):
     return [cat["name"] for cat in annotation["categories"]]
 
 
-def get_voc_format_classes(sample_data_path):
-    return NotImplementedError
+def get_voc_format_classes(root):
+    if is_url(root):
+        root = download(root)
+    rpath = Path(root).expanduser()
+
+    labels_file = os.path.join(rpath, "labels.txt")
+    if os.path.exists(labels_file):
+        with open(labels_file) as f:
+            class_names = [line.rstrip().lower() for line in f]
+        print(f"using class_names in labels.txt: {class_names}")
+    else:
+        logger.warning(
+            "labels.txt does not exist, using default VOC names. "
+            "To create labels.txt, run ls Annotations/* > pathlist.txt in root dir"
+        )
+        class_names = VOC_CLASSES
+
+    return class_names
 
 
 def get_detection_classes(sample_data_path):
@@ -704,3 +754,94 @@ def get_detection_classes(sample_data_path):
         return get_voc_format_classes(sample_data_path)
     else:
         return get_coco_format_classes(sample_data_path)
+
+
+def visualize_results(image_pred: Iterable, image_path: str, test_path: str, visualization_result_dir: str) -> np.ndarray:
+    """
+    Construct dataframe from pascal VOC format. Modified from gluon cv.
+
+    Parameters
+    ----------
+    image_pred
+
+    image_path
+
+    test_path
+
+
+    Returns
+    -------
+    an np.ndarray of visualized image
+    """
+    try:
+        import cv2
+    except:
+        raise ImportError("No module named: cv2. Please install cv2 by 'pip install cv2'")
+
+    im = cv2.imread(image_path)
+    tlwhs = []
+    obj_ids = []
+    conf_scores = []
+    detection_classes = get_detection_classes(test_path)
+    idx2classname = {i: classname for (i, classname) in enumerate(detection_classes)}
+    for idx, per_cls_bboxes in enumerate(image_pred):
+        for bbox in per_cls_bboxes:
+            ## x1, y1, x2, y2, conf_score
+            if bbox[4] > 0.3:
+                tlwhs.append(bbox_xyxy_to_xywh(list(bbox[:4])))
+                obj_ids.append(idx)
+                conf_scores.append(bbox[4])
+
+    visualized_im = plot_tracking(im, tlwhs, obj_ids, idx2classname, scores=conf_scores)
+    imgname = os.path.basename(image_path)
+    if not os.path.exists(visualization_result_dir):
+        os.makedirs(visualization_result_dir, exist_ok=True)
+    cv2.imwrite(os.path.join(visualization_result_dir, imgname), visualized_im)
+    return visualized_im
+
+
+def plot_tracking(image, tlwhs, obj_ids, idx2classname, scores=None, frame_id=0, fps=0., ids2=None, line_thickness_unmatched=None,
+                  line_thickness=None):
+    try:
+        import cv2
+    except:
+        raise ImportError("No module named: cv2. Please install cv2 by 'pip install cv2'")
+    im = np.ascontiguousarray(np.copy(image))
+    im_h, im_w = im.shape[:2]
+
+    top_view = np.zeros([im_w, im_w, 3], dtype=np.uint8) + 255
+
+    text_scale = max(1, image.shape[1] / 1600.)
+    text_thickness = 1 if text_scale > 1.1 else 1
+    # line_thickness = max(1, int(image.shape[1] / 500.)) if line_thickness_unmatched is None else line_thickness_unmatched
+    line_thickness = line_thickness if line_thickness_unmatched is None else line_thickness_unmatched
+
+    radius = max(5, int(im_w / 140.))
+    if fps != -1:
+        cv2.putText(im, 'frame: %d fps: %.2f num: %d' % (frame_id, fps, len(tlwhs)),
+                    (0, int(15 * text_scale)), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 0, 255), thickness=2)
+    else:
+        cv2.putText(im, 'frame: %d num: %d' % (frame_id, len(tlwhs)),
+                    (0, int(15 * text_scale)), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 0, 255), thickness=2)
+
+    for i, tlwh in enumerate(tlwhs):
+        x1, y1, w, h = tlwh
+        intbox = tuple(map(int, (x1, y1, x1 + w, y1 + h)))
+        obj_id = int(obj_ids[i])
+        id_text = idx2classname[obj_ids[i]]
+        if ids2 is not None:
+            id_text = id_text + ', {}'.format(int(ids2[i]))
+        if scores is not None:
+            id_text = id_text + ', {:.3f}'.format(float(scores[i]))
+        _line_thickness = 1 if obj_id <= 0 else line_thickness
+        color = get_color(abs(obj_id))
+        cv2.rectangle(im, intbox[0:2], intbox[2:4], color=color, thickness=line_thickness)
+        cv2.putText(im, id_text, (intbox[0], intbox[1] + 30), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 0, 255),
+                    thickness=text_thickness)
+    return im
+
+
+def get_color(idx):
+    idx = idx * 3
+    color = ((37 * idx) % 255, (17 * idx) % 255, (29 * idx) % 255)
+    return color

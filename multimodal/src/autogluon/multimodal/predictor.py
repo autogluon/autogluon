@@ -1980,11 +1980,12 @@ class MultiModalPredictor:
 
     def predict(
         self,
-        data: Union[pd.DataFrame, dict, list],
+        data: Union[pd.DataFrame, dict, list, str],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
         seed: Optional[int] = 123,
+        result_path: Optional[str] = None,
     ):
         """
         Predict values for the label column of new data.
@@ -2002,13 +2003,17 @@ class MultiModalPredictor:
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
+        result_path
+            Where to save the result. Currently only supported in object detection.
 
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
+        detection_data_path = None
         if self._pipeline == OBJECT_DETECTION:
             if isinstance(data, str):
+                detection_data_path = data
                 data = from_coco_or_voc(data, "test")
             if self._label_column not in data:
                 self._label_column = None
@@ -2057,6 +2062,18 @@ class MultiModalPredictor:
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             pred = self._as_pandas(data=data, to_be_converted=pred)
 
+        if result_path:
+            ## Dumping Result
+            if self._pipeline == OBJECT_DETECTION and detection_data_path:
+                if os.path.isdir(detection_data_path):
+                    ## this is for voc format
+                    np.save(result_path, pred)
+                    logger.info(f"Saved detection result to {result_path}")
+                else:
+                    ## this is for coco format
+                    coco_dataset = COCODataset(detection_data_path)
+                    coco_dataset.save_result(pred, from_coco_or_voc(detection_data_path, "test"), save_path=result_path)
+                    logger.info(f"Saved detection result to {result_path}")
         return pred
 
     def predict_proba(

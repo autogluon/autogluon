@@ -49,8 +49,9 @@ from .object_detection import (
     from_voc,
     get_detection_classes,
     get_image_name_num,
-    get_voc_classes,
+    get_voc_format_classes,
     getCOCOCatIDs,
+    visualize_results
 )
 from .onnx import get_onnx_input
 from .pipeline import init_pretrained, init_pretrained_matcher

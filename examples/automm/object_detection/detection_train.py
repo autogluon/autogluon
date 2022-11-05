@@ -32,7 +32,7 @@ import argparse
 import os
 
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.utils import get_voc_classes
+from autogluon.multimodal.utils import get_voc_format_classes
 
 
 def detection_train(
@@ -56,7 +56,7 @@ def detection_train(
     eval_tool = None
     VOC_format = False
     if os.path.isdir(train_path):
-        classes = get_voc_classes(train_path)
+        classes = get_voc_format_classes(train_path)
         eval_tool = "torchmetrics"
         VOC_format = True
 
