@@ -1,6 +1,5 @@
-import numpy as np
-import torch
 import copy
+import torch
 
 
 class ContrastiveTransformations:
@@ -8,6 +7,7 @@ class ContrastiveTransformations:
     Support within-batch tabular data corruption/augmentation.
     Randomly permutate the values across rows with a probability.
     """
+
     def __init__(self, model, mode, problem_type, corruption_rate):
         """
         Parameters
