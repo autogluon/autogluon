@@ -165,6 +165,7 @@ You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.
 
 ### Citation
+
 ```
 @article{DBLP:journals/corr/abs-2008-13367,
   author    = {Haoyang Zhang and
