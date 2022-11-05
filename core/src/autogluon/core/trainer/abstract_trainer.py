@@ -1158,30 +1158,54 @@ class AbstractTrainer:
             raise ValueError(f'model_names must be a list of model names. Invalid value: {model_names}')
         if with_ancestors:
             model_names = self.get_minimum_models_set(model_names)
-        for model_name in model_names:
-            model = self.load_model(model_name)
 
+        logger.log(20, f'Compiling {len(model_names)} Models ...')
+        total_compile_time = 0
+
+        model_names_to_compile = []
+        model_names_to_configs_dict = dict()
+        for model_name in model_names:
+            model_type_inner = self.get_model_attribute(model_name, 'type_inner')
             # Get model specific compiler options
             # Model type can be described with either model type, or model name as string
-            if type(model) in compiler_configs:
-                configs = compiler_configs[type(model)]
-            elif model.name in compiler_configs:
-                configs = compiler_configs[model.name]
+            if model_name in compiler_configs:
+                config = compiler_configs[model_name]
+            elif model_type_inner in compiler_configs:
+                config = compiler_configs[model_type_inner]
             else:
-                configs = compiler_configs
+                config = None
+            if config is not None:
+                model_names_to_compile.append(model_name)
+                model_names_to_configs_dict[model_name] = config
+            else:
+                logger.log(20, f'Skipping compilation for {model_name} ... (No config specified)')
+        for model_name in model_names_to_compile:
+            model = self.load_model(model_name)
+            config = model_names_to_configs_dict[model_name]
 
             # Check if already compiled, or if can't compile due to missing dependencies,
             # or if model hasn't implemented compiling.
-            if model.can_compile(compiler_configs=configs):
+            if 'compiler' in config and model.get_compiler_name() == config['compiler']:
+                logger.log(20, f'Skipping compilation for {model_name} ... (Already compiled with "{model.get_compiler_name()}" backend)')
+            elif model.can_compile(compiler_configs=config):
+                logger.log(20, f'Compiling model: {model.name} ... Config = {config}')
                 compile_start_time = time.time()
-                model.compile(compiler_configs=configs)
+                model.compile(compiler_configs=config)
                 compile_end_time = time.time()
                 model.compile_time = compile_end_time - compile_start_time
+                compile_type = model.get_compiler_name()
+                total_compile_time += model.compile_time
 
                 # Update model_graph in order to put compile_time into leaderboard,
                 # since models are saved right after training.
                 self.model_graph.nodes[model.name]['compile_time'] = model.compile_time
                 self.save_model(model, reduce_memory=False)
+                logger.log(20, f'\tCompiled model with "{compile_type}" backend ...')
+                logger.log(20, f'\t{round(model.compile_time, 2)}s\t = Compile    runtime')
+            else:
+                logger.log(20, f'Skipping compilation for {model.name} ... (Unable to compile with the provided config: {config})')
+        logger.log(20, f'Finished compiling models, total runtime = {round(total_compile_time, 2)}s.')
+        self.save()
         return model_names
 
     def persist_models(self, model_names='all', with_ancestors=False, max_memory=None) -> List[str]:

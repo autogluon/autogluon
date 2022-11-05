@@ -154,6 +154,8 @@ class AbstractModel:
         self._is_fit_metadata_registered = False
         self._fit_metadata = dict()
 
+        self._compiler = None
+
     def _init_params(self):
         """Initializes model hyperparameters"""
         hyperparameters = self._user_params
@@ -771,7 +773,16 @@ class AbstractModel:
         if path is None:
             path = self.path
         file_path = path + self.model_file_name
+        _model = self.model
+        if self.model is not None:
+            if self._compiler is None:
+                self._compiler = self._get_compiler()
+                if self._compiler is not None and not self._compiler.save_in_pkl:
+                    self._compiler.save(model=self.model, path=path)
+            if self._compiler is not None and not self._compiler.save_in_pkl:
+                self.model = None  # Don't save model in pkl
         save_pkl.save(path=file_path, object=self, verbose=verbose)
+        self.model = _model
         return path
 
     @classmethod
@@ -801,6 +812,8 @@ class AbstractModel:
         model = load_pkl.load(path=file_path, verbose=verbose)
         if reset_paths:
             model.set_contexts(path)
+        if model._compiler is not None and not model._compiler.save_in_pkl:
+            model.model = model._compiler.load(path=path)
         return model
 
     def compute_feature_importance(self,
@@ -919,10 +932,7 @@ class AbstractModel:
                                             compiler_fallback_to_native=compiler_fallback_to_native)
         if self._compiler is not None:
             input_types = self._get_input_types(batch_size=batch_size)
-            self._compiler.compile(model=self.model, path=self.path, input_types=input_types)
-            if not self._compiler.save_in_pkl:
-                self.model = None
-            self.save(path=self.path, verbose=False)
+            self.model = self._compiler.compile(model=self.model, path=self.path, input_types=input_types)
 
     # FIXME: This won't work for all models, and self._features is not
     # a trustworthy variable for final input shape
@@ -956,14 +966,14 @@ class AbstractModel:
         """A list of supported compilers for the underlining model."""
         return []
 
-    def _get_compiler(self, compiler='native', compiler_fallback_to_native=False):
+    def _get_compiler(self, compiler: str = None, compiler_fallback_to_native=False):
         """
         Verify whether the dependencies of the compiler class can be satisfied,
         and return the specified compiler from _valid_compilers.
 
         Parameters
         ----------
-        compiler : str, default='native'
+        compiler : str, default=None
             The specific compiler for model compilation.
         compiler_fallback_to_native : bool, default=False
             If this is True, the method would return native compiler when
@@ -983,6 +993,13 @@ class AbstractModel:
                                      ' (potentially lacking dependencies) and "compiler_fallback_to_native==False"')
             compiler_cls = self._default_compiler()
         return compiler_cls
+
+    def get_compiler_name(self) -> str:
+        assert self.is_fit(), "The model must be fit before calling the get_compiler_name method."
+        if self._compiler is not None:
+            return self._compiler.name
+        else:
+            return 'native'
 
     def get_trained_params(self) -> dict:
         """

@@ -369,22 +369,3 @@ class RFModel(AbstractModel):
 
     def _default_compiler(self):
         return RFNativeCompiler
-
-    def save(self, path: str = None, verbose=True) -> str:
-        _model = self.model
-        if self.model is not None:
-            self._compiler = self._get_compiler()
-            self._is_model_saved = True
-            self._compiler.save(self.model, self.path)
-            if self._compiler is not None:
-                self.model = None  # Don't save model in pkl
-        path = super().save(path=path, verbose=verbose)
-        self.model = _model
-        return path
-
-    @classmethod
-    def load(cls, path: str, reset_paths=True, verbose=True):
-        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-        if model._is_model_saved:
-            model.model = model._compiler.load(path=path)
-        return model

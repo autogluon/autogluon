@@ -27,6 +27,7 @@ class AbstractNativeCompiler:
             The compiler would optimize the model to perform best with the given input type.
         """
         AbstractNativeCompiler.save(model, path)
+        return model
 
     @staticmethod
     def save(model, path: str):
@@ -36,7 +37,6 @@ class AbstractNativeCompiler:
 
     @staticmethod
     def load(path: str):
-        pkl = None
         with open(path + 'model_native.pkl', 'rb') as fp:
             pkl = fp.read()
         return pickle.loads(pkl)

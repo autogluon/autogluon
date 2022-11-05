@@ -98,8 +98,9 @@ class RFOnnxCompiler:
 
         # Convert the model to onnx
         onnx_model = convert_sklearn(model, initial_types=initial_type, options=options)
-        predictor =  RFOnnxPredictor(model=onnx_model)
+        predictor = RFOnnxPredictor(model=onnx_model)
         RFOnnxCompiler.save(onnx_model, path)
+        return predictor
 
     @staticmethod
     def save(model, path: str) -> str:
