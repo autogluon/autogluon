@@ -5,7 +5,7 @@ import logging
 import warnings
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 import gluonts
 import numpy as np
@@ -58,7 +58,7 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
 
         return init_kwargs
 
-    def _get_estimator(self) -> GluonTSPyTorchLightningEstimator:
+    def _get_estimator(self, root_dir: Optional[Union[Path, str]], **kwargs) -> GluonTSPyTorchLightningEstimator:
         """Return the GluonTS Estimator object for the model"""
 
         # As GluonTSPyTorchLightningEstimator objects do not implement `from_hyperparameters` convenience
@@ -72,9 +72,12 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
         epochs = init_args.get("max_epochs", init_args.get("epochs"))
         callbacks = init_args.get("callbacks", [])
 
+        # TODO: Provide trainer_kwargs outside the function (e.g., to specify # of GPUs)?
         if epochs is not None:
             trainer_kwargs.update({"max_epochs": epochs})
         trainer_kwargs.update({"callbacks": callbacks, "enable_progress_bar": False})
+        if root_dir is not None:
+            trainer_kwargs["default_root_dir"] = root_dir
 
         return from_hyperparameters(
             self.gluonts_estimator_class,
