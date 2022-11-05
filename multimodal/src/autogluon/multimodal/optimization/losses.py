@@ -272,3 +272,127 @@ class MultiNegativesSoftmaxLoss(nn.Module):
 
         total_loss = (F.cross_entropy(logits_per_a, labels) + F.cross_entropy(logits_per_b, labels)) / 2
         return total_loss
+
+
+class DistillLoss(nn.Module):
+    """
+    Distillation loss to encourage two predictions to be close.
+    In self-distillation, we encourage the predictions from the original sample and the corrupted sample to be close to each other.
+    """
+    def __init__(self, temperature=1):
+        """
+        Parameters
+        ----------
+        temperature (float, optional):
+            scaling factor of the similarity metric.
+        """
+        super().__init__()
+        self.temperature = temperature
+
+    def forward(self, z_i, z_j):
+        """
+        Parameters
+        ----------
+        z_i (torch.tensor)
+            anchor batch of samples
+        z_j (torch.tensor)
+            positive batch of samples
+        Returns:
+            float: loss
+        """
+        z_i, z_j = z_i.flatten(1), z_j.flatten(1)
+
+        if z_i.size(1) == 1:
+            return F.mse_loss(z_i, z_j)
+        else:
+            z_i, z_j = z_i / self.temperature, z_j / self.temperature
+            z_i = F.softmax(z_i, dim=-1)
+            return F.cross_entropy(z_j, z_i)
+
+
+class NTXent(nn.Module):
+    """
+    The contrastive loss as used in the SCARF paper (https://arxiv.org/abs/2106.15147)
+    NT-Xent loss for contrastive learning using cosine distance as similarity metric as used in [SimCLR](https://arxiv.org/abs/2002.05709).
+    Implementation adapted from https://theaisummer.com/simclr/#simclr-loss-implementation
+    """
+    def __init__(self, temperature=0.1):
+        """
+        Parameters
+        ----------
+        temperature (float, optional):
+            scaling factor of the similarity metric.
+        """
+        super().__init__()
+        self.temperature = temperature
+
+    def forward(self, z_i, z_j):
+        """
+        Compute NT-Xent loss using only anchor and positive batches of samples. Negative samples are the 2*(N-1) samples in the batch
+        Parameters
+        ----------
+        z_i (torch.tensor)
+            anchor batch of samples
+        z_j (torch.tensor)
+            positive batch of samples
+        Returns:
+            float: loss
+        """
+        batch_size = z_i.size(0)
+        z_i, z_j = z_i.flatten(1), z_j.flatten(1)
+
+        # compute similarity between the sample's embedding and its corrupted view
+        z = torch.cat([z_i, z_j], dim=0)
+        similarity = F.cosine_similarity(z.unsqueeze(1), z.unsqueeze(0), dim=2)
+
+        sim_ij = torch.diag(similarity, batch_size)
+        sim_ji = torch.diag(similarity, -batch_size)
+        positives = torch.cat([sim_ij, sim_ji], dim=0)
+
+        numerator = torch.exp(positives / self.temperature)
+
+        denominator = torch.exp(similarity / self.temperature)  # * mask
+        all_losses = -torch.log(numerator / torch.mean(denominator, dim=1))
+        loss = torch.sum(all_losses) / (2 * batch_size)
+
+        return loss
+
+
+class ReconstructionLoss:
+    """
+    The reconstruction loss used to measure how well a sample can be reconstructed from a corrupted embedding.
+    For tables,
+        reconstruction loss is cross_entropy() for categorical columns reconstruction;
+        reconstruction loss is mse_loss() for numerical columns reconstruction;
+    """
+    def __init__(self, model):
+        """
+        Parameters
+        ----------
+        model:
+            AutoMM model with categorical_key, numerical_key, or both (FT_transformer).
+        """
+        self.model = model
+
+    def __call__(self, batch, batch_):
+        """
+        Parameters
+        ----------
+        batch
+            original batch
+        batch_
+            reconstructed batch
+        Returns:
+            float: loss
+        """
+        batch_ = batch_[self.model.prefix]["logits"]
+        loss = 0
+        for permodel in self.model.model:
+            if hasattr(permodel, "categorical_key"):
+                for y_, y in zip(batch_["cat_out"], batch[permodel.categorical_key]):
+                    loss += F.cross_entropy(y_, y.long())
+            if hasattr(permodel, "numerical_key"):
+                y = batch[permodel.numerical_key]
+                y_ = batch_["num_out"]
+                loss += F.mse_loss(y_, y)
+        return loss

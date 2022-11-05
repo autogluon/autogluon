@@ -488,6 +488,7 @@ def update_pretrain_config(
     config: DictConfig,
 ):
     """
+    Adapt Optimization config according to the pretrainer config.
     Pass the pretrainer config to models to init tensors adaptively.
 
     Parameters
@@ -555,7 +556,7 @@ def update_config_by_resources(
     for model in columns_per_model:
         if model in config.model.names:
             model_ = getattr(config.model, model)
-            if columns_per_model[model] > 300 and model_.additive_attention is None:
+            if columns_per_model[model] > 0 and model_.additive_attention is None:
                 model_.additive_attention = True
                 model_.share_qv_weights = True if model_.share_qv_weights is None else model_.share_qv_weights
                 warnings.warn(

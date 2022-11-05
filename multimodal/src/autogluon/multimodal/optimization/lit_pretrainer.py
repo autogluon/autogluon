@@ -7,8 +7,9 @@ from torch.nn.modules.loss import _Loss
 
 from ..constants import AUTOMM, LM_TARGET, LOGITS, T_FEW, TEMPLATE_LOGITS, WEIGHT
 from ..data.mixup import MixupModule, multimodel_mixup
+from ..data.tabular_pretrain import ContrastiveTransformations
 from .lit_module import LitModule
-from .utils import ContrastiveTransformations, DistillLoss, NTXent, ReconstructionLoss
+from .losses import DistillLoss, NTXent, ReconstructionLoss
 
 logger = logging.getLogger(AUTOMM)
 
