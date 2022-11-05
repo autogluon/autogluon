@@ -5,4 +5,5 @@ pretrainer:
   start_pretrain_coefficient: 1
   end_pretrain_coefficient: 0.01
   decay_pretrain_coefficient: 0.6
-  objective: "reconstruction" # support "contrastive", "reconstruction" or "self_distill"
+  objective: "reconstruction" # support "contrastive", "reconstruction", "both" or "self_distill"
+  temperature: 1

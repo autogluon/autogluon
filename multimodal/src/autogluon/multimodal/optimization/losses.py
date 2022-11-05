@@ -279,6 +279,7 @@ class DistillLoss(nn.Module):
     Distillation loss to encourage two predictions to be close.
     In self-distillation, we encourage the predictions from the original sample and the corrupted sample to be close to each other.
     """
+
     def __init__(self, temperature=1):
         """
         Parameters
@@ -316,6 +317,7 @@ class NTXent(nn.Module):
     NT-Xent loss for contrastive learning using cosine distance as similarity metric as used in [SimCLR](https://arxiv.org/abs/2002.05709).
     Implementation adapted from https://theaisummer.com/simclr/#simclr-loss-implementation
     """
+
     def __init__(self, temperature=0.1):
         """
         Parameters
@@ -365,6 +367,7 @@ class ReconstructionLoss:
         reconstruction loss is cross_entropy() for categorical columns reconstruction;
         reconstruction loss is mse_loss() for numerical columns reconstruction;
     """
+
     def __init__(self, model):
         """
         Parameters

@@ -1155,6 +1155,7 @@ class MultiModalPredictor:
                 end_loss_coefficient=config.pretrainer.end_pretrain_coefficient,
                 decay_loss_coefficient=config.pretrainer.decay_pretrain_coefficient,
                 pretrain_objective=config.pretrainer.objective,
+                temperature=config.pretrainer.temperature,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )

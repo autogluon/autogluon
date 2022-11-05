@@ -52,6 +52,7 @@ class PretrainLitModule(LitModule):
         decay_loss_coefficient: Optional[float] = 0.6,
         pretrain_objective: Optional[str] = None,
         row_attention_weight_decay: Optional[float] = None,
+        temperature: Optional[float] = 1,
     ):
         """
         Parameters
@@ -139,7 +140,11 @@ class PretrainLitModule(LitModule):
             model_postprocess_fn=model_postprocess_fn,
             row_attention_weight_decay=row_attention_weight_decay,
         )
-        self.contrastive_loss = DistillLoss() if pretrain_objective in ["self_distill"] else NTXent()
+        self.contrastive_loss = (
+            DistillLoss(temperature=temperature)
+            if pretrain_objective in ["self_distill"]
+            else NTXent(temperature=temperature)
+        )
         self.reconstruction_loss = ReconstructionLoss(model)
         self.contrastive_fn = ContrastiveTransformations(
             model,
