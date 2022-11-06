@@ -248,7 +248,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         A dictionary mapping the layer names (keys) to their ids (values).
         """
         name_to_id = {}
-        # now support: yolov3, faster_rcnn, deformable_detr, yolox, vfnet
+        # for some models, use head lr in "head" of bbox_head
+        # now support: yolov3, faster_rcnn, deformable_detr, yolox, vfnet, centernet, cascade_rcnn, detr, htc, atss, ssd
         registered_head_layers_patterns = [
             "bbox_head.fc_cls",
             "bbox_head.fc_reg",
@@ -256,7 +257,11 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             "bbox_head.cls_branches",
             "bbox_head.multi_level_conv_cls",
             "bbox_head.vfnet_cls",
+            "bbox_head.heatmap_head",
+            "bbox_head.atss_cls",
+            "bbox_head.cls_convs",
         ]
+        # for other models, use head lr in whole bbox_head
         default_head_layers_patterns = ["bbox_head"]
 
         head_registered = False
