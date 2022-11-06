@@ -284,9 +284,7 @@ class MultiModalMatcher:
     def fit(
         self,
         train_data: pd.DataFrame,
-        id_mappings: Optional[
-            Dict[str, Dict]
-        ] = None,  # TODO rename it to linked_content and support dict of pd.Series.
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         presets: Optional[str] = None,
         tuning_data: Optional[pd.DataFrame] = None,
         time_limit: Optional[int] = None,
@@ -584,7 +582,7 @@ class MultiModalMatcher:
         self,
         train_df: pd.DataFrame,
         val_df: pd.DataFrame,
-        id_mappings: Dict[str, Dict],
+        id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]],
         validation_metric_name: str,
         minmax_mode: str,
         max_time: timedelta,
@@ -1038,7 +1036,7 @@ class MultiModalMatcher:
     def _predict(
         self,
         data: Union[pd.DataFrame, dict, list],
-        id_mappings: Dict[str, Dict],
+        id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]],
         requires_label: bool,
         signature: Optional[str] = None,
         seed: Optional[int] = 123,
@@ -1260,7 +1258,7 @@ class MultiModalMatcher:
         query_data: Union[pd.DataFrame, dict, list],
         response_data: Union[pd.DataFrame, dict, list],
         label_column: str,
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
         chunk_size: Optional[int] = 1024,
         similarity_type: Optional[str] = "cosine",
@@ -1314,7 +1312,7 @@ class MultiModalMatcher:
     def _evaluate_matching(
         self,
         data: Union[pd.DataFrame, dict, list],
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
     ):
@@ -1373,7 +1371,7 @@ class MultiModalMatcher:
         data: Union[pd.DataFrame, dict, list],
         query_data: Optional[pd.DataFrame, dict, list] = None,
         response_data: Optional[pd.DataFrame, dict, list] = None,
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
         chunk_size: Optional[int] = 1024,
@@ -1463,7 +1461,7 @@ class MultiModalMatcher:
     def predict(
         self,
         data: Union[pd.DataFrame, dict, list],
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
     ):
         """
@@ -1509,7 +1507,7 @@ class MultiModalMatcher:
     def predict_proba(
         self,
         data: Union[pd.DataFrame, dict, list],
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
     ):
@@ -1562,7 +1560,7 @@ class MultiModalMatcher:
         self,
         data: Union[pd.DataFrame, dict, list],
         signature: Optional[str] = None,
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
     ):

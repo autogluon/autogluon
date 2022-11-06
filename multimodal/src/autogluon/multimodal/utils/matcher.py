@@ -340,7 +340,7 @@ def semantic_search(
     query_chunk_size: int = 128,
     response_chunk_size: int = 500000,
     top_k: int = 10,
-    id_mappings: Optional[Dict[str, Dict]] = None,
+    id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
     similarity_type: Optional[str] = "cosine",
 ):
     """
