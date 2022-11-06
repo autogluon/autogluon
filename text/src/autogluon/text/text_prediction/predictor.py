@@ -67,10 +67,17 @@ class TextPredictor:
         warn_if_exist : bool, default = True
             Whether to raise warning if the specified path already exists.
         """
+        warnings.warn(
+            f"AutoGluon TextPredictor will be deprecated in v0.7. "
+            f"Please use AutoGluon MultiModalPredictor instead for more functionalities and better support. "
+            f"Visit https://auto.gluon.ai/stable/tutorials/multimodal/index.html for more details!",
+            DeprecationWarning,
+        )
         self.verbosity = verbosity
         if backend == PYTORCH:
             predictor_cls = MultiModalPredictor
         elif backend == MXNET:
+            raise RuntimeError(f"backend='{MXNET}' is no longer supported. You may switch to use backend='{PYTORCH}'")
             from .mx_predictor import MXTextPredictor
             predictor_cls = MXTextPredictor
         else:
