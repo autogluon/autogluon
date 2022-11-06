@@ -283,8 +283,6 @@ class MultiModalPredictor:
         self._init_scratch = init_scratch
         self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
-        self.best_score = None
-        self.elapsed_time = None
 
         if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
             warnings.warn(
@@ -2662,19 +2660,18 @@ class MultiModalPredictor:
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed.
             verbosity = 0 for no output printing.
-            TODO: Higher levels correspond to more detailed print statements 
+            TODO: Higher levels correspond to more detailed print statements
         show_plot : bool, default = False
             If True, shows the model summary plot in browser when verbosity > 1.
-            
+
         Returns
         -------
-        Dict containing various detailed information. 
+        Dict containing various detailed information.
         We do not recommend directly printing this dict as it may be very large.
         """
-        results = {"val_accuracy": self.best_score,
-                   "training_time": self.elapsed_time}
+        results = {"val_accuracy": self.best_score, "training_time": self.elapsed_time}
         return results
-        
+
 
 class AutoMMPredictor(MultiModalPredictor):
     def __init__(self, **kwargs):
