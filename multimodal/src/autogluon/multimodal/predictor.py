@@ -10,6 +10,7 @@ import pickle
 import shutil
 import sys
 import warnings
+import time
 from datetime import timedelta
 from typing import Callable, Dict, List, Optional, Union
 
@@ -282,6 +283,8 @@ class MultiModalPredictor:
         self._init_scratch = init_scratch
         self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
+        self.best_score = None
+        self.elapsed_time = None
 
         if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
             warnings.warn(
@@ -1280,11 +1283,14 @@ class MultiModalPredictor:
                 ".* in the `DataLoader` init to improve performance.*",
             )
             warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
+            training_start = time.time()
             trainer.fit(
                 task,
                 datamodule=train_dm,
                 ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
             )
+            training_end = time.time()
+            self.elapsed_time = (training_end - training_start) / 60.0
             self._fit_called = True
 
         if trainer.global_rank == 0:
@@ -1368,6 +1374,7 @@ class MultiModalPredictor:
                             strict=strict_loading,
                         )
                         best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                        self.best_score = best_score
                         for i in range(1, len(top_k_model_paths)):
                             cand_avg_state_dict = average_checkpoints(
                                 checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -2646,6 +2653,28 @@ class MultiModalPredictor:
         else:
             return self.class_labels[1]
 
+    def fit_summary(self, verbosity=0, show_plot=False):
+        """
+        Output summary of information about models produced during `fit()`.
+
+        Parameters
+        ----------
+        verbosity : int, default = 2
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            verbosity = 0 for no output printing.
+            TODO: Higher levels correspond to more detailed print statements 
+        show_plot : bool, default = False
+            If True, shows the model summary plot in browser when verbosity > 1.
+            
+        Returns
+        -------
+        Dict containing various detailed information. 
+        We do not recommend directly printing this dict as it may be very large.
+        """
+        results = {"val_accuracy": self.best_score,
+                   "training_time": self.elapsed_time}
+        return results
+        
 
 class AutoMMPredictor(MultiModalPredictor):
     def __init__(self, **kwargs):

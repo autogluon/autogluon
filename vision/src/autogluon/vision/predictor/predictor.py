@@ -714,7 +714,10 @@ class ImagePredictor(object):
             The summary of last `fit` process. Major keys are ('train_acc', 'val_acc', 'total_time',...)
 
         """
-        return copy.copy(self._fit_summary)
+        if self._backend == 'automm':
+            return self._classifier.fit_summary()
+        else:
+            return copy.copy(self._fit_summary)
 
     def save(self, path=None):
         """Dump predictor to disk.
