@@ -227,7 +227,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         `self._get_model_params` for better readability."""
         return self._get_model_params()
 
-    def _get_estimator(self, **kwargs) -> GluonTSEstimator:
+    def _get_estimator(self) -> GluonTSEstimator:
         """Return the GluonTS Estimator object for the model"""
         with warning_filter():
             return self.gluonts_estimator_class.from_hyperparameters(**self._get_estimator_init_args())
@@ -311,13 +311,12 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             dataset=train_data, callbacks=self._get_callbacks(time_limit=time_limit), **kwargs
         )
 
-        with TemporaryDirectory() as temp_dir:
-            estimator = self._get_estimator(root_dir=temp_dir)
-            with warning_filter(), disable_root_logger(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
-                self.gts_predictor = estimator.train(
-                    self._to_gluonts_dataset(train_data),
-                    validation_data=self._to_gluonts_dataset(val_data),
-                )
+        estimator = self._get_estimator()
+        with warning_filter(), disable_root_logger(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
+            self.gts_predictor = estimator.train(
+                self._to_gluonts_dataset(train_data),
+                validation_data=self._to_gluonts_dataset(val_data),
+            )
 
     def _get_callbacks(self, time_limit: int, *args, **kwargs) -> List[Callable]:
         """Retrieve a list of callback objects for the GluonTS trainer"""

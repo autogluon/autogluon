@@ -2,6 +2,7 @@
 Module including wrappers for PyTorch implementations of models in GluonTS
 """
 import logging
+import shutil
 import warnings
 from datetime import timedelta
 from pathlib import Path
@@ -58,7 +59,7 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
 
         return init_kwargs
 
-    def _get_estimator(self, root_dir: Optional[Union[Path, str]], **kwargs) -> GluonTSPyTorchLightningEstimator:
+    def _get_estimator(self) -> GluonTSPyTorchLightningEstimator:
         """Return the GluonTS Estimator object for the model"""
 
         # As GluonTSPyTorchLightningEstimator objects do not implement `from_hyperparameters` convenience
@@ -76,8 +77,7 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
         if epochs is not None:
             trainer_kwargs.update({"max_epochs": epochs})
         trainer_kwargs.update({"callbacks": callbacks, "enable_progress_bar": False})
-        if root_dir is not None:
-            trainer_kwargs["default_root_dir"] = root_dir
+        trainer_kwargs["default_root_dir"] = self.path
 
         return from_hyperparameters(
             self.gluonts_estimator_class,
@@ -99,6 +99,10 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
         for pl_logger in pl_loggers:
             pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
         super()._fit(train_data=train_data, val_data=val_data, time_limit=time_limit, **kwargs)
+        lightning_logs_dir = Path(self.path) / "lightning_logs"
+        if lightning_logs_dir.exists() and lightning_logs_dir.is_dir():
+            logger.debug(f"Removing lightning_logs directory {lightning_logs_dir}")
+            shutil.rmtree(lightning_logs_dir)
 
     def save(self, path: str = None, **kwargs) -> str:
         # we flush callbacks instance variable if it has been set. it can keep weak references
