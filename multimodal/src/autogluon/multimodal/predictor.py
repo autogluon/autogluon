@@ -193,12 +193,12 @@ class MultiModalPredictor:
             If `problem_type = None`, the prediction problem type is inferred
             based on the label-values in provided dataset.
         query
-            Column names of query data.
+            Column names of query data (used for matching).
         response
-            Column names of response data. If no label column is provided,
+            Column names of response data (used for matching). If no label column is provided,
             query and response columns form positive pairs.
         negative
-            Column names of negative data. Query and negative make up negative pairs.
+            Column names of negative data (used for matching). Query and negative make up negative pairs.
         match_label
             If using matcher and the labels are binary, it is the label indicating the query and response should match.
         pipeline
