@@ -4,6 +4,7 @@ from .constants import DATA, DISTILLER, ENVIRONMENT, MATCHER, MODEL, OPTIMIZATIO
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")
+matcher_presets = Registry("matcher_presets")
 
 
 @automm_presets.register()
@@ -154,11 +155,13 @@ def feature_extraction():
 
 
 @automm_presets.register()
+@matcher_presets.register()
 def siamese_network():
     return automm_presets.create("default")
 
 
 @automm_presets.register()
+@matcher_presets.register()
 def image_similarity():
     return {
         "model.names": ["timm_image"],
@@ -167,6 +170,7 @@ def image_similarity():
 
 
 @automm_presets.register()
+@matcher_presets.register()
 def text_similarity():
     return {
         "model.names": ["hf_text"],
@@ -178,6 +182,7 @@ def text_similarity():
 
 
 @automm_presets.register()
+@matcher_presets.register()
 def image_text_similarity():
     return {
         "model.names": ["clip"],
