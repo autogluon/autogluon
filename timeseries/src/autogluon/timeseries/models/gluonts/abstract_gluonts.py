@@ -1,7 +1,6 @@
 import logging
 import re
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Any, Callable, Dict, Iterator, List, Optional, Type
 
 import gluonts
