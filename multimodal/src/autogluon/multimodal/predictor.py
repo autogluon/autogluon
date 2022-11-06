@@ -1925,8 +1925,7 @@ class MultiModalPredictor:
         metrics: Optional[Union[str, List[str]]] = None,
         chunk_size: Optional[int] = 1024,
         similarity_type: Optional[str] = "cosine",
-        top_k: Optional[int] = 100,
-        cutoffs: Optional[List[int]] = [5, 10, 20],
+        cutoffs: Optional[List[int]] = [1, 5, 10],
         label: Optional[str] = None,
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
@@ -1955,8 +1954,6 @@ class MultiModalPredictor:
             Scan the response data by chunk_size each time. Increasing the value increases the speed, but requires more memory.
         similarity_type
             Use what function (cosine/dot_prod) to score the similarity (default: cosine).
-        top_k
-            Retrieve top k matching entries.
         cutoffs
             A list of cutoff values to evaluate ranking.
         label
@@ -1986,7 +1983,6 @@ class MultiModalPredictor:
                 id_mappings=id_mappings,
                 chunk_size=chunk_size,
                 similarity_type=similarity_type,
-                top_k=top_k,
                 cutoffs=cutoffs,
                 label=label,
                 metrics=metrics,

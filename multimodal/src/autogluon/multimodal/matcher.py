@@ -1264,8 +1264,7 @@ class MultiModalMatcher:
         metrics: Optional[Union[str, List[str]]] = None,
         chunk_size: Optional[int] = 1024,
         similarity_type: Optional[str] = "cosine",
-        top_k: Optional[int] = 100,
-        cutoffs: Optional[List[int]] = [5, 10, 20],
+        cutoffs: Optional[List[int]] = [1, 5, 10],
     ):
         query_column = query_data.columns[0]
         response_column = response_data.columns[0]
@@ -1286,6 +1285,7 @@ class MultiModalMatcher:
         rank_results = dict()
         query_embeddings = self.extract_embedding(query_data, id_mappings=id_mappings, as_tensor=True)
         num_chunks = max(1, len(response_data) // chunk_size)
+        top_k = max(cutoffs)
         for response_chunk in np.array_split(response_data, num_chunks):
             response_embeddings = self.extract_embedding(response_chunk, id_mappings=id_mappings, as_tensor=True)
             similarity_scores = compute_semantic_similarity(
@@ -1378,8 +1378,7 @@ class MultiModalMatcher:
         return_pred: Optional[bool] = False,
         chunk_size: Optional[int] = 1024,
         similarity_type: Optional[str] = "cosine",
-        top_k: Optional[int] = 100,
-        cutoffs: Optional[List[int]] = [5, 10, 20],
+        cutoffs: Optional[List[int]] = [1, 5, 10],
         label: Optional[str] = None,
     ):
         """
@@ -1409,8 +1408,6 @@ class MultiModalMatcher:
             Scan the response data by chunk_size each time. Increasing the value increases the speed, but requires more memory.
         similarity_type
             Use what function (cosine/dot_prod) to score the similarity (default: cosine).
-        top_k
-            Retrieve top k matching entries.
         cutoffs
             A list of cutoff values to evaluate ranking.
         label
@@ -1451,7 +1448,6 @@ class MultiModalMatcher:
                 metrics=metrics,
                 chunk_size=chunk_size,
                 similarity_type=similarity_type,
-                top_k=top_k,
                 cutoffs=cutoffs,
             )
         elif data is not None:
