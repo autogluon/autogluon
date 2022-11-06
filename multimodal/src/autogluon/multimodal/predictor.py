@@ -84,6 +84,7 @@ from .data.infer_types import (
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
+from .matcher import MultiModalMatcher
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_mmdet import MMDetLitModule
@@ -96,6 +97,7 @@ from .optimization.utils import (
     get_norm_layer_param_names,
     get_trainable_params_efficient_finetune,
 )
+from .presets import matcher_presets
 from .utils import (
     AutoMMModelCheckpoint,
     AutoMMModelCheckpointIO,
@@ -164,6 +166,10 @@ class MultiModalPredictor:
         self,
         label: Optional[str] = None,
         problem_type: Optional[str] = None,
+        query: Optional[Union[str, List[str]]] = None,
+        response: Optional[Union[str, List[str]]] = None,
+        negative: Optional[Union[str, List[str]]] = None,
+        match_label: Optional[Union[int, str]] = None,
         pipeline: Optional[str] = None,
         val_metric: Optional[str] = None,
         eval_metric: Optional[str] = None,
@@ -187,6 +193,15 @@ class MultiModalPredictor:
             (options: 'binary', 'multiclass', 'regression').
             If `problem_type = None`, the prediction problem type is inferred
             based on the label-values in provided dataset.
+        query
+            Column names of query data (used for matching).
+        response
+            Column names of response data (used for matching). If no label column is provided,
+            query and response columns form positive pairs.
+        negative
+            Column names of negative data (used for matching). Query and negative make up negative pairs.
+        match_label
+            If using matcher and the labels are binary, it is the label indicating the query and response should match.
         pipeline
             This defines inference tasks like FeatureExtraction, ZeroShotClassification, etc.
             TODO: add more pipelines (ref: https://huggingface.co/docs/transformers/main_classes/pipelines)
@@ -238,6 +253,24 @@ class MultiModalPredictor:
         sample_data_path
             This is used for automatically inference num_classes, classes, or label.
         """
+        if pipeline in matcher_presets.list_keys():
+            self._matcher = MultiModalMatcher(
+                query=query,
+                response=response,
+                negative=negative,
+                label=label,
+                match_label=match_label,
+                problem_type=problem_type,
+                pipeline=pipeline,
+                hyperparameters=hyperparameters,
+                eval_metric=eval_metric,
+                path=path,
+                verbosity=verbosity,
+                warn_if_exist=warn_if_exist,
+                enable_progress_bar=enable_progress_bar,
+            )
+            return
+
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
 
@@ -283,6 +316,7 @@ class MultiModalPredictor:
         self._init_scratch = init_scratch
         self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
+        self._matcher = None
 
         if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
             warnings.warn(
@@ -313,19 +347,55 @@ class MultiModalPredictor:
 
     @property
     def path(self):
-        return self._save_path
+        if self._matcher:
+            self._matcher.path
+        else:
+            return self._save_path
 
     @property
     def label(self):
-        return self._label_column
+        if self._matcher:
+            self._matcher.label
+        else:
+            return self._label_column
+
+    @property
+    def query(self):
+        if self._matcher:
+            return self._matcher.query
+        else:
+            warnings.warn("Matcher is not used. No query columns are available.", UserWarning)
+            return None
+
+    @property
+    def response(self):
+        if self._matcher:
+            return self._matcher.response
+        else:
+            warnings.warn("Matcher is not used. No response columns are available.", UserWarning)
+            return None
+
+    @property
+    def match_label(self):
+        if self._matcher:
+            return self._matcher.match_label
+        else:
+            warnings.warn("Matcher is not used. No match_label is available.", UserWarning)
+            return None
 
     @property
     def problem_type(self):
-        return self._problem_type
+        if self._matcher:
+            self._matcher.problem_type
+        else:
+            return self._problem_type
 
     @property
     def column_types(self):
-        return self._column_types
+        if self._matcher:
+            self._matcher.column_types
+        else:
+            return self._column_types
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
@@ -346,6 +416,7 @@ class MultiModalPredictor:
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         tuning_data: Optional[Union[pd.DataFrame, str]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         time_limit: Optional[int] = None,
         save_path: Optional[str] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
@@ -396,6 +467,9 @@ class MultiModalPredictor:
             A dataframe containing validation data, which should have the same columns as the train_data.
             If `tuning_data = None`, `fit()` will automatically
             hold out some random validation examples from `train_data`.
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when the dataframe contains the query/response identifiers instead of their contents.
         time_limit
             How long `fit()` should run for (wall clock time in seconds).
             If not specified, `fit()` will run until the model has completed training.
@@ -461,6 +535,21 @@ class MultiModalPredictor:
         -------
         An "MultiModalPredictor" object (itself).
         """
+        if self._matcher:
+            self._matcher.fit(
+                train_data=train_data,
+                tuning_data=tuning_data,
+                id_mappings=id_mappings,
+                time_limit=time_limit,
+                presets=presets,
+                hyperparameters=hyperparameters,
+                column_types=column_types,
+                holdout_frac=holdout_frac,
+                save_path=save_path,
+                seed=seed,
+            )
+            return self
+
         if self._pipeline == OBJECT_DETECTION:
             self.detection_anno_train = train_data
             train_data = from_coco_or_voc(train_data, "train")
@@ -1835,7 +1924,14 @@ class MultiModalPredictor:
     def evaluate(
         self,
         data: Union[pd.DataFrame, dict, list, str],
+        query_data: Optional[list] = None,
+        response_data: Optional[list] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
+        chunk_size: Optional[int] = 1024,
+        similarity_type: Optional[str] = "cosine",
+        cutoffs: Optional[List[int]] = [1, 5, 10],
+        label: Optional[str] = None,
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
         seed: Optional[int] = 123,
@@ -1849,15 +1945,33 @@ class MultiModalPredictor:
         data
             A dataframe, containing the same columns as the training data.
             Or a str, that is a path of the annotation file for detection.
+        query_data
+            Query data used for ranking.
+        response_data
+            Response data used for ranking.
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when data/query_data/response_data contain the query/response identifiers instead of their contents.
         metrics
             A list of metric names to report.
             If None, we only return the score for the stored `_eval_metric_name`.
+        chunk_size
+            Scan the response data by chunk_size each time. Increasing the value increases the speed, but requires more memory.
+        similarity_type
+            Use what function (cosine/dot_prod) to score the similarity (default: cosine).
+        cutoffs
+            A list of cutoff values to evaluate ranking.
+        label
+            The label column name in data. Some tasks, e.g., image<-->text matching, have no label column in training data,
+            but the label column may be still required in evaluation.
         return_pred
             Whether to return the prediction result of each row.
         realtime
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
+        seed
+            The random seed to use for this evaluation run.
         eval_tool
             The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
 
@@ -1866,6 +1980,19 @@ class MultiModalPredictor:
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
+        if self._matcher:
+            return self._matcher.evaluate(
+                data=data,
+                query_data=query_data,
+                response_data=response_data,
+                id_mappings=id_mappings,
+                chunk_size=chunk_size,
+                similarity_type=similarity_type,
+                cutoffs=cutoffs,
+                label=label,
+                metrics=metrics,
+            )
+
         if self._pipeline == OBJECT_DETECTION:
             if realtime:
                 return NotImplementedError(f"Current pipeline {self._pipeline} does not support realtime predict.")
@@ -1987,6 +2114,7 @@ class MultiModalPredictor:
         self,
         data: Union[pd.DataFrame, dict, list],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
         seed: Optional[int] = 123,
@@ -1997,21 +2125,33 @@ class MultiModalPredictor:
         Parameters
         ----------
         data
-             The data to make predictions for. Should contain same column names as training data and
-              follow same format (except for the `label` column).
+            The data to make predictions for. Should contain same column names as training data and
+            follow same format (except for the `label` column).
         candidate_data
             The candidate data from which to search the query data's matches.
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when data contain the query/response identifiers instead of their contents.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
+        seed
+            The random seed to use for this prediction run.
 
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
+        if self._matcher:
+            return self._matcher.predict(
+                data=data,
+                id_mappings=id_mappings,
+                as_pandas=as_pandas,
+            )
+
         if self._pipeline == OBJECT_DETECTION:
             if isinstance(data, str):
                 data = from_coco_or_voc(data, "test")
@@ -2068,6 +2208,7 @@ class MultiModalPredictor:
         self,
         data: Union[pd.DataFrame, dict, list],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
         realtime: Optional[bool] = None,
@@ -2084,6 +2225,9 @@ class MultiModalPredictor:
               follow same format (except for the `label` column).
         candidate_data
             The candidate data from which to search the query data's matches.
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when data contain the query/response identifiers instead of their contents.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         as_multiclass
@@ -2093,6 +2237,8 @@ class MultiModalPredictor:
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
+        seed
+            The random seed to use for this prediction run.
 
         Returns
         -------
@@ -2100,6 +2246,14 @@ class MultiModalPredictor:
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
+        if self._matcher:
+            return self._matcher.predict_proba(
+                data=data,
+                id_mappings=id_mappings,
+                as_pandas=as_pandas,
+                as_multiclass=as_multiclass,
+            )
+
         assert self._problem_type not in [
             REGRESSION,
             NER,
@@ -2139,10 +2293,12 @@ class MultiModalPredictor:
     def extract_embedding(
         self,
         data: Union[pd.DataFrame, dict, list],
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         return_masks: Optional[bool] = False,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
         realtime: Optional[bool] = None,
+        signature: Optional[str] = None,
     ):
         """
         Extract features for each sample, i.e., one row in the provided dataframe `data`.
@@ -2152,6 +2308,9 @@ class MultiModalPredictor:
         data
             The data to extract embeddings for. Should contain same column names as training dataset and
             follow same format (except for the `label` column).
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when data contain the query/response identifiers instead of their contents.
         return_masks
             If true, returns a mask dictionary, whose keys are the same as those in the features dictionary.
             If a sample has empty input in feature column `image_0`, the sample will has mask 0 under key `image_0`.
@@ -2163,6 +2322,8 @@ class MultiModalPredictor:
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
+        signature
+            When using matcher, it can be query or response.
 
         Returns
         -------
@@ -2170,6 +2331,15 @@ class MultiModalPredictor:
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
+        if self._matcher:
+            return self._matcher.extract_embedding(
+                data=data,
+                signature=signature,
+                id_mappings=id_mappings,
+                as_tensor=as_tensor,
+                as_pandas=as_pandas,
+            )
+
         turn_on_off_feature_column_info(
             data_processors=self._data_processors,
             flag=True,
@@ -2255,6 +2425,9 @@ class MultiModalPredictor:
             and reset the associate model.model_name.checkpoint_name start with `local://` in config.yaml.
             When standalone = False, the saved artifact may require an online environment to process in load().
         """
+        if self._matcher:
+            self._matcher.save(path=path, standalone=standalone)
+            return
 
         config = copy.deepcopy(self._config)
         if standalone and (
@@ -2283,6 +2456,7 @@ class MultiModalPredictor:
         with open(os.path.join(path, f"assets.json"), "w") as fp:
             json.dump(
                 {
+                    "class_name": self.__class__.__name__,
                     "column_types": self._column_types,
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
@@ -2522,6 +2696,17 @@ class MultiModalPredictor:
         path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         predictor = cls(label="dummy_label")
+
+        with open(os.path.join(path, "assets.json"), "r") as fp:
+            assets = json.load(fp)
+        if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
+            predictor._matcher = MultiModalMatcher.load(
+                path=path,
+                resume=resume,
+                verbosity=verbosity,
+            )
+            return predictor
+
         predictor = cls._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)
 
         efficient_finetune = OmegaConf.select(predictor._config, "optimization.efficient_finetune")
