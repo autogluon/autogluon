@@ -52,8 +52,8 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
         query_data=test_query_text_data,
         response_data=test_response_image_data,
         metrics=[metric_name],
-        label_column=test_label_column,
-        cutoff=[1, 5, 10],
+        label=test_label_column,
+        cutoffs=[1, 5, 10],
     )
 
     if symmetric:
@@ -72,10 +72,8 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
             query_data=test_query_image_data,
             response_data=test_response_text_data,
             metrics=[metric_name],
-            label_column=test_label_column,
-            # query_signature="response",
-            # response_signature="query",
-            cutoff=[1, 5, 10],
+            label=test_label_column,
+            cutoffs=[1, 5, 10],
         )
 
 

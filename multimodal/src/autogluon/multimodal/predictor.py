@@ -1927,7 +1927,7 @@ class MultiModalPredictor:
         similarity_type: Optional[str] = "cosine",
         top_k: Optional[int] = 100,
         cutoffs: Optional[List[int]] = [5, 10, 20],
-        label_column: Optional[str] = None,
+        label: Optional[str] = None,
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
         seed: Optional[int] = 123,
@@ -1959,8 +1959,8 @@ class MultiModalPredictor:
             Retrieve top k matching entries.
         cutoffs
             A list of cutoff values to evaluate ranking.
-        label_column
-            The label column in data. Some tasks, e.g., image<-->text matching, have no label column in training data,
+        label
+            The label column name in data. Some tasks, e.g., image<-->text matching, have no label column in training data,
             but the label column may be still required in evaluation.
         return_pred
             Whether to return the prediction result of each row.
@@ -1988,7 +1988,7 @@ class MultiModalPredictor:
                 similarity_type=similarity_type,
                 top_k=top_k,
                 cutoffs=cutoffs,
-                label_column=label_column,
+                label=label,
                 metrics=metrics,
             )
 

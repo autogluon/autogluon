@@ -1380,7 +1380,7 @@ class MultiModalMatcher:
         similarity_type: Optional[str] = "cosine",
         top_k: Optional[int] = 100,
         cutoffs: Optional[List[int]] = [5, 10, 20],
-        label_column: Optional[str] = None,
+        label: Optional[str] = None,
     ):
         """
         Evaluate model on a test dataset.
@@ -1413,9 +1413,9 @@ class MultiModalMatcher:
             Retrieve top k matching entries.
         cutoffs
             A list of cutoff values to evaluate ranking.
-        label_column
-            The label column in data. Some tasks, e.g., image<-->text matching, have no label column in training data,
-            but the label column may be still required in evaluation.
+        label
+            The label column name in data. Some tasks, e.g., image<-->text matching, have no label column in training data,
+            but the label column is still required in evaluation.
 
         Returns
         -------
@@ -1439,14 +1439,14 @@ class MultiModalMatcher:
             response_header = self._response[0] if self._response else None
             response_data = data_to_df(data=response_data, header=response_header)
 
-            if label_column is None:
-                label_column = self._label_column
+            if label is None:
+                label = self._label_column
 
             return self._evaluate_ranking(
                 qr_relevance=data,
                 query_data=query_data,
                 response_data=response_data,
-                label_column=label_column,
+                label_column=label,
                 id_mappings=id_mappings,
                 metrics=metrics,
                 chunk_size=chunk_size,
