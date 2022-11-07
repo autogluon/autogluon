@@ -1,9 +1,11 @@
 import logging
+from typing import Dict, List
 
+from autogluon.core.models import AbstractModel
 from autogluon.core.trainer.abstract_trainer import AbstractTrainer
 from autogluon.core.utils import generate_train_test_split
 
-from .model_presets.presets import get_preset_models
+from .model_presets.presets import get_preset_models, MODEL_TYPES
 from .model_presets.presets_distill import get_preset_models_distillation
 from ..models.lgb.lgb_model import LGBModel
 
@@ -118,3 +120,19 @@ class AutoTrainer(AbstractTrainer):
 
     def _get_default_proxy_model_class(self):
         return LGBModel
+
+    def compile_models(self, model_names='all', with_ancestors=False, compiler_configs: dict = None) -> List[str]:
+        """Ensures that compiler_configs maps to the correct models if the user specified the same keys as in hyperparameters such as RT, XT, etc."""
+        if compiler_configs is not None:
+            model_types_map = self._get_model_types_map()
+            compiler_configs_new = dict()
+            for k in compiler_configs:
+                if k in model_types_map:
+                    compiler_configs_new[model_types_map[k]] = compiler_configs[k]
+                else:
+                    compiler_configs_new[k] = compiler_configs[k]
+            compiler_configs = compiler_configs_new
+        return super().compile_models(model_names=model_names, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
+
+    def _get_model_types_map(self) -> Dict[str, AbstractModel]:
+        return MODEL_TYPES

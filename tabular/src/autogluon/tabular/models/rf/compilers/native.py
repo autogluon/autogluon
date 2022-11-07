@@ -2,7 +2,7 @@ import os
 import pickle
 
 
-class RFNativeCompiler:
+class AbstractNativeCompiler:
     name = 'native'
     save_in_pkl = True
 
@@ -11,21 +11,35 @@ class RFNativeCompiler:
         return True
 
     @staticmethod
-    def compile(obj, path: str):
-        from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-        from sklearn.ensemble import ExtraTreesRegressor, ExtraTreesClassifier
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        if isinstance(obj.model, (RandomForestClassifier, RandomForestRegressor,
-                                  ExtraTreesClassifier, ExtraTreesRegressor)):
-            with open(path + 'model_native.pkl', 'wb') as fp:
-                fp.write(pickle.dumps(obj.model))
-            return obj.model
-        else:
-            return RFNativeCompiler.load(obj=obj, path=path)
+    def compile(model, path: str, input_types=None):
+        """
+        Compile the trained model for faster inference.
+
+        Parameters
+        ----------
+        model
+            The native model that is expected to be compiled.
+        path : str
+            The path for saving the compiled model.
+        input_types : list, default=None
+            A list of tuples containing shape and element type info, e.g. [((1, 14), np.float32),].
+            The list would be used as the input data for the model.
+            The compiler would optimize the model to perform best with the given input type.
+        """
+        AbstractNativeCompiler.save(model, path)
+        return model
 
     @staticmethod
-    def load(obj, path: str):
-        pkl = None
+    def save(model, path: str):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path + 'model_native.pkl', 'wb') as fp:
+            fp.write(pickle.dumps(model))
+
+    @staticmethod
+    def load(path: str):
         with open(path + 'model_native.pkl', 'rb') as fp:
             pkl = fp.read()
         return pickle.loads(pkl)
+
+
+RFNativeCompiler = AbstractNativeCompiler

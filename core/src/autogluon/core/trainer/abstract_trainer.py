@@ -1134,6 +1134,80 @@ class AbstractTrainer:
         if self.low_memory:
             self.models = models
 
+    def compile_models(self, model_names='all', with_ancestors=False, compiler_configs=None) -> List[str]:
+        """
+        Compile a list of models for accelerated prediction.
+
+        Parameters
+        ----------
+        model_names : str or list
+            A list of model names for model compilation. Alternatively, this can be 'all' or 'best'.
+        compiler_configs: dict, default=None
+            Model specific compiler options.
+            This can be useful to specify the compiler backend for a specific model, 
+            e.g. {"RandomForest": {"compiler": "onnx"}}
+        """
+        if model_names == 'all':
+            model_names = self.get_model_names(can_infer=True)
+        elif model_names == 'best':
+            if self.model_best is not None:
+                model_names = [self.model_best]
+            else:
+                model_names = [self.get_model_best(can_infer=True)]
+        if not isinstance(model_names, list):
+            raise ValueError(f'model_names must be a list of model names. Invalid value: {model_names}')
+        if with_ancestors:
+            model_names = self.get_minimum_models_set(model_names)
+
+        logger.log(20, f'Compiling {len(model_names)} Models ...')
+        total_compile_time = 0
+
+        model_names_to_compile = []
+        model_names_to_configs_dict = dict()
+        for model_name in model_names:
+            model_type_inner = self.get_model_attribute(model_name, 'type_inner')
+            # Get model specific compiler options
+            # Model type can be described with either model type, or model name as string
+            if model_name in compiler_configs:
+                config = compiler_configs[model_name]
+            elif model_type_inner in compiler_configs:
+                config = compiler_configs[model_type_inner]
+            else:
+                config = None
+            if config is not None:
+                model_names_to_compile.append(model_name)
+                model_names_to_configs_dict[model_name] = config
+            else:
+                logger.log(20, f'Skipping compilation for {model_name} ... (No config specified)')
+        for model_name in model_names_to_compile:
+            model = self.load_model(model_name)
+            config = model_names_to_configs_dict[model_name]
+
+            # Check if already compiled, or if can't compile due to missing dependencies,
+            # or if model hasn't implemented compiling.
+            if 'compiler' in config and model.get_compiler_name() == config['compiler']:
+                logger.log(20, f'Skipping compilation for {model_name} ... (Already compiled with "{model.get_compiler_name()}" backend)')
+            elif model.can_compile(compiler_configs=config):
+                logger.log(20, f'Compiling model: {model.name} ... Config = {config}')
+                compile_start_time = time.time()
+                model.compile(compiler_configs=config)
+                compile_end_time = time.time()
+                model.compile_time = compile_end_time - compile_start_time
+                compile_type = model.get_compiler_name()
+                total_compile_time += model.compile_time
+
+                # Update model_graph in order to put compile_time into leaderboard,
+                # since models are saved right after training.
+                self.model_graph.nodes[model.name]['compile_time'] = model.compile_time
+                self.save_model(model, reduce_memory=False)
+                logger.log(20, f'\tCompiled model with "{compile_type}" backend ...')
+                logger.log(20, f'\t{round(model.compile_time, 2)}s\t = Compile    runtime')
+            else:
+                logger.log(20, f'Skipping compilation for {model.name} ... (Unable to compile with the provided config: {config})')
+        logger.log(20, f'Finished compiling models, total runtime = {round(total_compile_time, 2)}s.')
+        self.save()
+        return model_names
+
     def persist_models(self, model_names='all', with_ancestors=False, max_memory=None) -> List[str]:
         if model_names == 'all':
             model_names = self.get_model_names()
@@ -1459,6 +1533,7 @@ class AbstractTrainer:
         self.model_graph.add_node(
             model.name,
             fit_time=model.fit_time,
+            compile_time=model.compile_time,
             predict_time=model.predict_time,
             predict_1_time=model.predict_1_time,
             predict_child_time=predict_child_time,
@@ -2270,6 +2345,7 @@ class AbstractTrainer:
                 custom_info['num_models'] = bagged_info.get('num_child_models', 1)
                 custom_info['memory_size'] = bagged_info.get('max_memory_size', model_info[model_name]['memory_size'])
                 custom_info['memory_size_min'] = bagged_info.get('min_memory_size', model_info[model_name]['memory_size'])
+                custom_info['compile_time'] = bagged_info.get('compile_time', model_info[model_name]['compile_time'])
                 custom_info['child_model_type'] = bagged_info.get('child_model_type', None)
                 custom_info['child_hyperparameters'] = bagged_info.get('child_hyperparameters', None)
                 custom_info['child_hyperparameters_fit'] = bagged_info.get('child_hyperparameters_fit', None)
@@ -2284,7 +2360,7 @@ class AbstractTrainer:
                     key_dict = {model_name: model_info[model_name][key] for model_name in model_names}
                     model_info_dict[key + '_full'] = [self.get_model_attribute_full(model=model_name, attribute=key_dict) for model_name in model_names]
 
-            model_info_keys = ['num_models', 'memory_size', 'memory_size_min', 'child_model_type', 'child_hyperparameters', 'child_hyperparameters_fit', 'child_ag_args_fit']
+            model_info_keys = ['num_models', 'memory_size', 'memory_size_min', 'compile_time', 'child_model_type', 'child_hyperparameters', 'child_hyperparameters_fit', 'child_ag_args_fit']
             model_info_full_keys = {'memory_size': [('memory_size_w_ancestors', sum)], 'memory_size_min': [('memory_size_min_w_ancestors', max)], 'num_models': [('num_models_w_ancestors', sum)]}
             for key in model_info_keys:
                 model_info_dict[key] = [custom_model_info[model_name][key] for model_name in model_names]

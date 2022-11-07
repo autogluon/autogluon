@@ -701,11 +701,31 @@ class BaggedEnsembleModel(AbstractModel):
                 model = self.load_child(model=model_name, verbose=False)
             self._add_child_times_to_bag(model=model)
 
-    def save_child(self, model: Union[AbstractModel, str], verbose=False):
+    def save_child(self, model: Union[AbstractModel, str], path=None, verbose=False):
         """Save child model to disk."""
+        if path is None:
+            path = self.path
         child = self.load_child(model)
-        child.set_contexts(self.path + child.name + os.path.sep)
+        child.set_contexts(path + child.name + os.path.sep)
         child.save(verbose=verbose)
+
+    def can_compile(self, compiler_configs=None):
+        """Check if child models can compile"""
+        if not self.is_fit():
+            return False
+        return self.load_child(self.models[0]).can_compile(compiler_configs=compiler_configs)
+
+    def compile(self, compiler_configs=None):
+        """Compile all child models"""
+        assert self.is_fit(), "The model must be fit before calling the compile method."
+        for child in self.models:
+            child = self.load_child(child)
+            child.compile(compiler_configs=compiler_configs)
+            self.save_child(child)
+
+    def get_compiler_name(self) -> str:
+        assert self.is_fit(), "The model must be fit before calling the get_compiler_name method."
+        return self.load_child(self.models[0]).get_compiler_name()
 
     # TODO: Multiply epochs/n_iterations by some value (such as 1.1) to account for having more training data than bagged models
     def convert_to_refit_full_template(self):
@@ -814,7 +834,7 @@ class BaggedEnsembleModel(AbstractModel):
             self.predict_1_time = model.predict_1_time
         else:
             self.predict_1_time += model.predict_1_time
-    
+
     def _add_parallel_child_times(self, fit_time, predict_time, predict_1_time):
         if self.fit_time is None:
             self.fit_time = fit_time
@@ -868,6 +888,18 @@ class BaggedEnsembleModel(AbstractModel):
                 child_model = self._child_type.load(path=child_path, reset_paths=reset_paths, verbose=True)
                 self.models[i] = child_model
 
+    def unpersist_child_models(self):
+        self.models = self._get_child_model_names(models=self.models)
+
+    def _get_child_model_names(self, models: list) -> list:
+        model_names = []
+        for i, model in enumerate(models):
+            if isinstance(model, str):
+                model_names.append(model)
+            else:
+                model_names.append(model.name)
+        return model_names
+
     def load_model_base(self):
         return load_pkl.load(path=os.path.join(self.path + 'utils', 'model_template.pkl'))
 
@@ -879,13 +911,8 @@ class BaggedEnsembleModel(AbstractModel):
             path = self.path
 
         if save_children:
-            model_names = []
             for child in self.models:
-                child = self.load_child(child)
-                child.set_contexts(path + child.name + os.path.sep)
-                child.save(verbose=False)
-                model_names.append(child.name)
-            self.models = model_names
+                self.save_child(model=child, path=path, verbose=False)
 
         if save_oof and self._oof_pred_proba is not None:
             save_pkl.save(path=os.path.join(path + 'utils', self._oof_filename), object={
@@ -895,7 +922,12 @@ class BaggedEnsembleModel(AbstractModel):
             self._oof_pred_proba = None
             self._oof_pred_model_repeats = None
 
-        return super().save(path=path, verbose=verbose)
+        _models = self.models
+        if self.low_memory:
+            self.models = self._get_child_model_names(self.models)
+        path = super().save(path=path, verbose=verbose)
+        self.models = _models
+        return path
 
     # If `remove_fit_stack=True`, variables will be removed that are required to fit more folds and to fit new stacker models which use this model as a base model.
     #  This includes OOF variables.

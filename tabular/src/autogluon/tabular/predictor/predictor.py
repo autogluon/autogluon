@@ -1982,6 +1982,57 @@ class TabularPredictor:
             fi_df[low_str] = pd.Series(ci_low_dict)
         return fi_df
 
+    def compile_models(self, models='best', with_ancestors=True, compiler_configs="auto"):
+        """
+        Compile models for accelerated prediction.
+        This can be helpful to reduce prediction latency and improve throughput.
+
+        Note that this is currently an experimental feature, the supported compilers can be ['native', 'onnx'].
+
+        In order to compile with a specific compiler, that compiler must be installed in the Python environment.
+
+        Parameters
+        ----------
+        models : list of str or str, default = 'best'
+            Model names of models to compile.
+            If 'best' then the model with the highest validation score is compiled (this is the model used for prediction by default).
+            If 'all' then all models are compiled.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+        with_ancestors : bool, default = True
+            If True, all ancestor models of the provided models will also be compiled.
+        compiler_configs : dict or str, default = "auto"
+            If "auto", defaults to the following:
+                compiler_configs = {
+                    "RF": {"compiler": "onnx"},
+                    "XT": {"compiler": "onnx"},
+                }
+            Otherwise, specify a compiler_configs dictionary manually. Keys can be exact model names or model types.
+            Exact model names take priority over types if both are valid for a model.
+            Types can be either the true type such as RandomForestModel or the shorthand "RF".
+            The dictionary key logic for types is identical to the logic in the hyperparameters argument of `predictor.fit`
+
+            Example values within the configs:
+                compiler : str, default = None
+                    The compiler that is used for model compilation.
+                batch_size : int, default = None
+                    The batch size that is optimized for model prediction.
+                    By default, the batch size is None. This means the compiler would try to leverage dynamic shape for prediction.
+                    Using batch_size=1 would be more suitable for online prediction, which expects a result from one data point.
+                    However, it can be slow for batch processing, because of the overhead of multiple kernel execution.
+                    Increasing batch size to a number that is larger than 1 would help increase the prediction throughput.
+                    This comes with an expense of utilizing larger memory for prediction.
+        """
+        self._assert_is_fit('compile_models')
+        if isinstance(compiler_configs, str):
+            if compiler_configs == 'auto':
+                compiler_configs = {
+                    "RF": {"compiler": "onnx"},
+                    "XT": {"compiler": "onnx"},
+                }
+            else:
+                raise ValueError(f'Unknown compiler_configs preset: "{compiler_configs}"')
+        self._trainer.compile_models(model_names=models, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
+
     def persist_models(self, models='best', with_ancestors=True, max_memory=0.1) -> list:
         """
         Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online-inference where low latency is critical.
