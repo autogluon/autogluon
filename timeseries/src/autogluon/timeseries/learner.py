@@ -224,7 +224,7 @@ class TimeSeriesLearner(AbstractLearner):
         ]
         if len(different_dtype_columns) > 0:
             raise ValueError(
-                f"Columns {different_dtype_columns.to_list()} in tuning_data.static_features have dtypes that don't "
+                f"Columns {different_dtype_columns.to_list()} in {other_name}.static_features have dtypes that don't "
                 "match train_data.static_features. " + fix_message
             )
 
@@ -324,6 +324,7 @@ class TimeSeriesLearner(AbstractLearner):
                 "Please make sure that data has static_features with columns and dtypes exactly matching "
                 "train_data.static_features. "
             )
+            data = data.copy(deep=False)
             self._check_static_feature_compatibility(data.static_features, fix_message=fix_message, other_name="data")
             data.static_features = self.static_feature_pipeline.transform(data.static_features)
             data.static_features = convert_numerical_features_to_float(data.static_features)
@@ -340,10 +341,28 @@ class TimeSeriesLearner(AbstractLearner):
     def score(
         self, data: TimeSeriesDataFrame, model: AbstractTimeSeriesModel = None, metric: Optional[str] = None
     ) -> float:
+        if self.static_feature_pipeline.is_fit():
+            fix_message = (
+                "Please make sure that data has static_features with columns and dtypes exactly matching "
+                "train_data.static_features. "
+            )
+            data = data.copy(deep=False)
+            self._check_static_feature_compatibility(data.static_features, fix_message=fix_message, other_name="data")
+            data.static_features = self.static_feature_pipeline.transform(data.static_features)
+            data.static_features = convert_numerical_features_to_float(data.static_features)
         data = self._preprocess_target_and_covariates(data, data_frame_name="data")
         return self.load_trainer().score(data=data, model=model, metric=metric)
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
+        if self.static_feature_pipeline.is_fit():
+            fix_message = (
+                "Please make sure that data has static_features with columns and dtypes exactly matching "
+                "train_data.static_features. "
+            )
+            data = data.copy(deep=False)
+            self._check_static_feature_compatibility(data.static_features, fix_message=fix_message, other_name="data")
+            data.static_features = self.static_feature_pipeline.transform(data.static_features)
+            data.static_features = convert_numerical_features_to_float(data.static_features)
         data = self._preprocess_target_and_covariates(data, data_frame_name="data")
         return self.load_trainer().leaderboard(data)
 
