@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.core.learner import AbstractLearner
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.evaluator import TimeSeriesEvaluator
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.splitter import AbstractTimeSeriesSplitter, LastWindowSplitter
