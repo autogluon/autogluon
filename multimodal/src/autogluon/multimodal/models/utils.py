@@ -510,6 +510,9 @@ def get_model_head(model: nn.Module):
     -------
     The model's head.
     """
+    print("we reach here for model defnitnion")
+    print(model)
+    sys.exit()
     if hasattr(model, "head"):
         head = model.head  # move the head outside
     elif hasattr(model, "last_linear"):

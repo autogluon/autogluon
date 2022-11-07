@@ -27,16 +27,6 @@ def medium_quality_faster_train():
 
 
 @automm_presets.register()
-def image_classification_medium_quality_faster_train():
-    return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
-        "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
-        "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
-        "optimization.learning_rate": 4e-4,
-    }
-
-
-@automm_presets.register()
 def high_quality():
     return {
         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
