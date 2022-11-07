@@ -424,7 +424,7 @@ class TimeSeriesPredictor:
                 f"Provided tuning data set with {len(tuning_data)} rows, {tuning_data.num_items} items. "
                 f"Average time series length is {len(tuning_data) / tuning_data.num_items:.1f}."
             )
-        logger.info(f"Training artifacts will be saved to: {Path(self.path).resolve()}")
+        logger.info(f"AutoGluon will save models to {Path(self.path).resolve()}")
         logger.info("=====================================================")
 
         if random_seed is not None:

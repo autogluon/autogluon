@@ -87,7 +87,6 @@ class TimeSeriesLearner(AbstractLearner):
             "Beginning AutoGluon training with TimeSeriesLearner "
             + (f"Time limit = {time_limit}" if time_limit else "")
         )
-        logger.info(f"AutoGluon will save models to {self.path}")
 
         logger.info(f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric}'")
         if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:

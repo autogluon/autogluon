@@ -767,6 +767,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     model_info[model_name]["score_test"] = float("nan")
                     model_info[model_name]["pred_time_test"] = float("nan")
 
+        if len(model_info) == 0:
+            raise ValueError("Trainer has no fit models that can predict.")
+
         df = pd.DataFrame(model_info.values())
 
         sort_column = "score_test" if "score_test" in df.columns else "score_val"
