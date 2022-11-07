@@ -9,8 +9,8 @@ import os
 import pickle
 import shutil
 import sys
-import warnings
 import time
+import warnings
 from datetime import timedelta
 from typing import Callable, Dict, List, Optional, Union
 
@@ -146,6 +146,7 @@ from .utils import (
     turn_on_off_feature_column_info,
     update_config_by_rules,
     use_realtime,
+    list_timm_models,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -2856,6 +2857,12 @@ class MultiModalPredictor:
         """
         results = {"val_accuracy": self.best_score, "training_time": self.elapsed_time}
         return results
+
+    def list_supported_models(self):
+        if self._problem_type == "classification":
+            return list_timm_models(pretrained=True)
+        else:
+            raise ValueError(f"list_supported_models() is not available for problem type: {self._problem_type}")
 
 
 class AutoMMPredictor(MultiModalPredictor):

@@ -39,7 +39,7 @@ from .matcher import compute_semantic_similarity, convert_data_for_ranking, crea
 from .metric import compute_ranking_score, compute_score, get_minmax_mode, infer_metrics
 from .misc import logits_to_prob, tensor_to_ndarray
 from .mmcv import CollateMMCV, send_datacontainers_to_device, unpack_datacontainers
-from .model import create_fusion_model, create_model, modify_duplicate_model_names, select_model
+from .model import create_fusion_model, create_model, modify_duplicate_model_names, select_model, list_timm_models
 from .object_detection import (
     COCODataset,
     bbox_xyxy_to_xywh,
