@@ -333,7 +333,7 @@ def assign_layer_ids(
         )
     except Exception as e:
         logger.debug(
-            f"When calling assign_layer_ids(), it catches exception: {e}. All the layers will use layer_id 1."
+            f"When calling assign_layer_ids(), it catches exception: {e}. All the layers will use the same layer_id."
         )
         name_to_id = dict()
         left_names = names
