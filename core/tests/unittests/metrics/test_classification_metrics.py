@@ -204,6 +204,24 @@ def test_roc_auc_score_with_sklearn():
     assert np.isclose(actual_score, expected_score)
 
 
+def test_roc_auc_score_with_sklearn_single_raise():
+    y_true = np.array([1])
+    y_score = np.array([0.9])
+    with pytest.raises(ValueError):
+        sklearn.metrics.roc_auc_score(y_true, y_score)
+    with pytest.raises(ValueError):
+        roc_auc(y_true, y_score)
+
+
+def test_roc_auc_score_with_sklearn_zero_raise():
+    y_true = np.array([])
+    y_score = np.array([])
+    with pytest.raises(ValueError):
+        sklearn.metrics.roc_auc_score(y_true, y_score)
+    with pytest.raises(ValueError):
+        roc_auc(y_true, y_score)
+
+
 def test_quadratic_kappa():
     actuals = np.array([4, 4, 3, 4, 4, 4, 1, 1, 2, 1])
     preds = np.array([0, 2, 1, 0, 0, 0, 1, 1, 2, 1])

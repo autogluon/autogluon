@@ -1,5 +1,5 @@
 import logging
-import warnings
+from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -370,7 +370,7 @@ def quadratic_kappa(y_true, y_pred):
     return cohen_kappa_score(y_true, y_pred, labels=labels, weights='quadratic')
 
 
-def customized_binary_roc_auc_score(y_true, y_score, **kwargs) -> float:
+def customized_binary_roc_auc_score(y_true: Union[np.array, pd.Series], y_score: Union[np.array, pd.Series], **kwargs) -> float:
     """
     Functionally identical to sklearn.metrics.roc_auc_score for binary classification.
     Streamlined for binary classification to be faster by ~5x by avoiding validation checks of the inputs.
@@ -378,13 +378,13 @@ def customized_binary_roc_auc_score(y_true, y_score, **kwargs) -> float:
 
     Parameters
     ----------
-    y_true : array-like of int
+    y_true : Union[np.array, pd.Series] of type int
         Ground truth (correct) labels for n_samples samples. shape = (n_samples,)
         Valid sample values are 1 and 0.
-    y_score : array-like of float
+    y_score : Union[np.array, pd.Series] of type float
         The prediction probabilities. shape = (n_samples,)
     **kwargs :
-        Any additional arguments. If not empty, will fallback to sklearn's implementation
+        Any additional arguments. If not empty, will fall back to sklearn's implementation
 
     Returns
     -------
@@ -395,6 +395,8 @@ def customized_binary_roc_auc_score(y_true, y_score, **kwargs) -> float:
         y_true = y_true.values
     if isinstance(y_score, pd.Series):
         y_score = y_score.values
+    if y_true.size == 0 or y_score.size == 0:
+        raise ValueError("Found array with 0 sample(s) (shape=(0,)) while a minimum of 1 is required.")
     if kwargs:
         return sklearn.metrics.roc_auc_score(y_true, y_score, **kwargs)
 
@@ -404,6 +406,7 @@ def customized_binary_roc_auc_score(y_true, y_score, **kwargs) -> float:
 
     # keep only indices that have different values to speed up future computation
     distinct_value_indices = np.where(np.diff(y_score))[0]
+    # np.r_ is an optimized way to merge two or more arrays and/or singular values into one array
     threshold_idxs = np.r_[distinct_value_indices, y_true.size - 1]
 
     # keep track of how many true positives and false positives have occurred at each threshold
@@ -421,17 +424,8 @@ def customized_binary_roc_auc_score(y_true, y_score, **kwargs) -> float:
     # to make sure that the curve starts at (0, 0)
     tps = np.r_[0, tps]
     fps = np.r_[0, fps]
-
-    if fps[-1] <= 0:
-        warnings.warn("No negative samples in y_true, false positive value should be meaningless",)
-        fpr = np.repeat(np.nan, fps.shape)
-    else:
-        fpr = fps / fps[-1]
-
-    if tps[-1] <= 0:
-        warnings.warn("No positive samples in y_true, true positive value should be meaningless",)
-        tpr = np.repeat(np.nan, tps.shape)
-    else:
-        tpr = tps / tps[-1]
+    if fps[-1] <= 0 or tps[-1] <= 0:
+        raise ValueError("Only one class present in y_true. ROC AUC score is not defined in that case.")
+    fpr = fps / fps[-1]
+    tpr = tps / tps[-1]
     return np.trapz(tpr, fpr)
-
