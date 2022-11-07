@@ -248,7 +248,7 @@ class TimeSeriesPredictor:
             For example, to ensure that column "store_id" with dtype ``int`` is interpreted as a category,
             we need to change its type to ``category``::
 
-                train_data.static_features["store_id"] = train_data.static_features["store_id"].astype("category")
+                data.static_features["store_id"] = data.static_features["store_id"].astype("category")
 
         tuning_data : TimeSeriesDataFrame, optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
@@ -294,8 +294,8 @@ class TimeSeriesPredictor:
             - ``"best_quality"``: all models mentioned above + deep learning model ``TransformerMXNet`` (if MXNet is available) + hyperparameter optimization for deep learning models. Usually better than ``high_quality``, but takes much longer to train.
 
             Details for these presets can be found in ``autogluon/timeseries/configs/presets_configs.py``. If not
-            provided, user-provided values for other arguments (specifically, ``hyperparameters`` and
-            ``hyperparameter_tune_kwargs`` will be used (defaulting to their default values specified below).
+            provided, user-provided values for ``hyperparameters`` and ``hyperparameter_tune_kwargs`` will be used
+            (defaulting to their default values specified below).
         hyperparameters : str or dict, default = "medium_quality"
             Determines what models are trained and what hyperparameters are used by each model.
 
@@ -476,12 +476,41 @@ class TimeSeriesPredictor:
             - The ``item_id`` index must include all item ids present in ``data``
             - The ``timestamp`` index must include the values for ``prediction_length`` many time steps into the future from the end of each time series in ``data``
 
+            See example below.
         model : str, optional
             Name of the model that you would like to use for prediction. By default, the best model during training
             (with highest validation score) will be used.
-        random_seed : int, optional
+        random_seed : int or None, default = 123
             If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
             results for most models (except those trained on GPU because of the non-determinism of GPU operations).
+
+
+        Examples
+        --------
+        >>> print(data)
+                            target  promotion  price
+        item_id timestamp
+        A       2020-01-05      20          0   19.9
+                2020-01-06      40          1    9.9
+                2020-01-07      32          0   15.0
+        B       2020-03-01      13          0    5.0
+                2020-03-02      44          1    2.9
+                2020-03-03      72          1    2.9
+        >>> predictor = TimeSeriesPredictor(prediction_length=2, known_covariates_names=["promotion", "price"]).fit(data)
+        >>> print(known_covariates)
+                            promotion  price
+        item_id timestamp
+        A       2020-01-08          1   12.9
+                2020-01-09          1   12.9
+        B       2020-03-04          0    5.0
+                2020-03-05          0    7.0
+        >>> predictor.predict(data, known_covariates=known_covariates)
+                            target
+        item_id timestamp
+        A       2020-01-08      30
+                2020-01-09      27
+        B       2020-03-04      17
+                2020-03-05       8
         """
         if "quantile_levels" in kwargs:
             warnings.warn(
@@ -491,8 +520,6 @@ class TimeSeriesPredictor:
                 "`TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
                 category=DeprecationWarning,
             )
-        # TODO: What happens to `known_covariates` if `ignore_index=True`?
-        # TODO: Add example with known covariates to the docstring
         if random_seed is not None:
             set_random_seed(random_seed)
         data = self._check_and_prepare_data_frame(data)
