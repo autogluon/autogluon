@@ -276,7 +276,7 @@ class ImageProcessor:
             if "img_scale" in config.test_pipeline[1]:
                 image_size = config.test_pipeline[1]["img_scale"][0]
             else:
-                image_size = (320, 320)  #TODO: remove self.size for mmdet since it's not used
+                image_size = (320, 320)  # TODO: remove self.size for mmdet since it's not used
             if "mean" in config.test_pipeline[1]["transforms"][2]:
                 mean = config.test_pipeline[1]["transforms"][2]["mean"]
                 std = config.test_pipeline[1]["transforms"][2]["std"]
