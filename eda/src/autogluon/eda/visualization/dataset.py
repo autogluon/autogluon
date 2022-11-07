@@ -63,7 +63,7 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
     def __init__(
         self,
         headers: bool = False,
-        namespace: str = None,
+        namespace: Optional[str] = None,
         sort_by: Optional[str] = None,
         sort_asc: bool = True,
         **kwargs,
@@ -160,7 +160,7 @@ class DatasetTypeMismatch(AbstractVisualization, JupyterMixin, StateCheckMixin):
     :py:class:`~autogluon.eda.analysis.dataset.RawTypesAnalysis`
     """
 
-    def __init__(self, headers: bool = False, namespace: str = None, **kwargs) -> None:
+    def __init__(self, headers: bool = False, namespace: Optional[str] = None, **kwargs) -> None:
         super().__init__(namespace, **kwargs)
         self.headers = headers
 

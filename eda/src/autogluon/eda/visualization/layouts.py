@@ -1,4 +1,4 @@
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Optional
 
 from IPython.display import display, Markdown
 from ipywidgets import HBox, Output, Layout, Tab
@@ -15,7 +15,10 @@ class SimpleVerticalLinearLayout(AbstractVisualization):
     """
 
     def __init__(
-        self, facets: Union[AbstractVisualization, List[AbstractVisualization]], namespace: str = None, **kwargs
+        self,
+        facets: Union[AbstractVisualization, List[AbstractVisualization]],
+        namespace: Optional[str] = None,
+        **kwargs,
     ) -> None:
         super().__init__(namespace, **kwargs)
         if not isinstance(facets, list):
@@ -53,7 +56,7 @@ class TabLayout(SimpleVerticalLinearLayout):
 
     """
 
-    def __init__(self, facets: Dict[str, AbstractVisualization], namespace: str = None, **kwargs) -> None:
+    def __init__(self, facets: Dict[str, AbstractVisualization], namespace: Optional[str] = None, **kwargs) -> None:
 
         self.facet_tab_names = list(facets.keys())
         super().__init__(list(facets.values()), namespace, **kwargs)
@@ -76,7 +79,7 @@ class MarkdownSectionComponent(AbstractVisualization):
     documentation for details.
     """
 
-    def __init__(self, markdown: str, namespace: str = None, **kwargs) -> None:
+    def __init__(self, markdown: str, namespace: Optional[str] = None, **kwargs) -> None:
         super().__init__(namespace, **kwargs)
         self.markdown = markdown
 
