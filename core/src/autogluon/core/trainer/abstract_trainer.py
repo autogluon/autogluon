@@ -1285,15 +1285,27 @@ class AbstractTrainer:
                         self.model_best = weighted_ensemble_model_name
         return models
 
-    def _train_single(self, X, y, model: AbstractModel, X_val=None, y_val=None, **model_fit_kwargs) -> AbstractModel:
+    def _train_single(self, X, y, model: AbstractModel, X_val=None, y_val=None, total_resources=None, **model_fit_kwargs) -> AbstractModel:
         """
         Trains model but does not add the trained model to this Trainer.
         Returns trained model object.
         """
-        model = model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
+        model = model.fit(X=X, y=y, X_val=X_val, y_val=y_val, total_resources=total_resources, **model_fit_kwargs)
         return model
 
-    def _train_and_save(self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=1, compute_score=True, **model_fit_kwargs) -> List[str]:
+    def _train_and_save(
+        self,
+        X,
+        y,
+        model: AbstractModel,
+        X_val=None,
+        y_val=None,
+        stack_name='core',
+        level=1,
+        compute_score=True,
+        total_resources=None,
+        **model_fit_kwargs
+    ) -> List[str]:
         """
         Trains model and saves it to disk, returning a list with a single element: The name of the model, or no elements if training failed.
         If the model name is returned:
@@ -1333,7 +1345,7 @@ class AbstractTrainer:
                 logger.log(15, f'{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {model.name}')
                 model = self._train_single(X_w_pseudo, y_w_pseudo, model, X_val, y_val, **model_fit_kwargs)
             else:
-                model = self._train_single(X, y, model, X_val, y_val, **model_fit_kwargs)
+                model = self._train_single(X, y, model, X_val, y_val, total_resources=total_resources, **model_fit_kwargs)
 
             fit_end_time = time.time()
             if self.weight_evaluation:
@@ -1553,6 +1565,7 @@ class AbstractTrainer:
                            time_limit=None,
                            fit_kwargs=None,
                            compute_score=True,
+                           total_resources=None,
                            **kwargs) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
@@ -1594,6 +1607,7 @@ class AbstractTrainer:
                         level=level,
                         compute_score=compute_score,
                         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                        total_resources=total_resources,
                         **model_fit_kwargs
                     )
                 else:
@@ -1603,6 +1617,7 @@ class AbstractTrainer:
                         X_val=X_val,
                         y_val=y_val,
                         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                        total_resources=total_resources,
                         **model_fit_kwargs
                     )
                 if len(hpo_models) == 0:
@@ -1640,6 +1655,7 @@ class AbstractTrainer:
                 stack_name=stack_name,
                 level=level,
                 compute_score=compute_score,
+                total_resources=total_resources,
                 **model_fit_kwargs
             )
         self.save()

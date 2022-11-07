@@ -218,7 +218,7 @@ class MultiModalPredictorModel(AbstractModel):
         num_gpus = min(get_gpu_count_torch(), 1)  # Use single gpu training by default. Consider to revise it later.
         return num_cpus, num_gpus
 
-    def get_minimum_resources(self) -> Dict[str, int]:
+    def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:
         return {
             'num_cpus': 1,
             'num_gpus': 1,

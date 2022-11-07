@@ -3,9 +3,11 @@ import os
 import shutil
 import uuid
 import pytest
+
+from contextlib import contextmanager
 from typing import List
 
-from autogluon.core.utils import download, unzip
+from autogluon.core.utils import download, unzip, get_cpu_count, get_gpu_count_all
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.utils import infer_problem_type, generate_train_test_split
@@ -233,6 +235,17 @@ class ModelFitHelper:
 
         model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **fit_args)
         return model, label_cleaner, feature_generator
+    
+    
+@contextmanager
+def mock_system_resourcses(**kwargs):
+    if 'num_cpus' in kwargs:
+        get_cpu_count.mock = kwargs['num_cpus']
+    if 'num_gpus' in kwargs:
+        get_gpu_count_all.mock = kwargs['num_gpus']
+    yield
+    get_cpu_count.mock = None
+    get_gpu_count_all.mock = None
 
 
 @pytest.fixture
@@ -248,3 +261,18 @@ def fit_helper():
 @pytest.fixture
 def model_fit_helper():
     return ModelFitHelper
+
+
+@pytest.fixture
+def mock_system_resources_ctx_mgr():
+    return mock_system_resourcses
+
+
+@pytest.fixture
+def mock_num_cpus():
+    return 16
+
+
+@pytest.fixture
+def mock_num_gpus():
+    return 2

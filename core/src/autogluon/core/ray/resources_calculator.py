@@ -3,9 +3,7 @@ import math
 import psutil
 
 from abc import ABC, abstractmethod
-from typing import Optional
 
-from ..utils import get_cpu_count, get_gpu_count_all
 
 logger = logging.getLogger(__name__)
 
@@ -17,30 +15,6 @@ class ResourceCalculator(ABC):
     def calc_type(self):
         """Type of the resource calculator"""
         raise NotImplementedError
-
-    @staticmethod
-    def get_total_gpu_count(user_specified_num_gpus: int, model_default_num_gpus: int, num_gpus_available: Optional[float] = None):
-        if user_specified_num_gpus is not None:
-            total_gpu = get_gpu_count_all() if num_gpus_available is None else min(get_gpu_count_all(), num_gpus_available)
-            num_gpus = min(user_specified_num_gpus, total_gpu)
-        elif model_default_num_gpus > 0:
-            num_gpus = get_gpu_count_all() if num_gpus_available is None else min(get_gpu_count_all(), num_gpus_available)
-        else:
-            num_gpus = 0
-        return num_gpus
-
-    @staticmethod
-    def get_total_cpu_count(user_specified_num_cpus: int, model_default_num_cpus: int, num_cpus_available: Optional[int] = None):
-        if num_cpus_available is not None:
-            assert num_cpus_available > 0
-        if user_specified_num_cpus is not None:
-            total_cpu = get_cpu_count() if num_cpus_available is None else min(get_cpu_count(), num_cpus_available)
-            num_cpus = min(user_specified_num_cpus, total_cpu)
-        elif model_default_num_cpus > 0:
-            num_cpus = get_cpu_count() if num_cpus_available is None else min(get_cpu_count(), num_cpus_available)
-        else:
-            num_cpus = 0
-        return num_cpus
 
     @abstractmethod
     def get_resources_per_job(self, **kwargs) -> dict:
@@ -71,32 +45,42 @@ class CpuResourceCalculator(ResourceCalculator):
         minimum_cpu_per_job,
         model_estimate_memory_usage=None,
         wrap_resources_per_job_into_placement_group=False,
+        user_resources_per_job=None,
         **kwargs,
     ):
-        cpu_per_job = max(minimum_cpu_per_job, int(total_num_cpus // num_jobs))
-        max_jobs_in_parallel_memory = num_jobs
+        if user_resources_per_job is not None:
+            cpu_per_job = user_resources_per_job.get('num_cpus', 0)
+            assert cpu_per_job <= total_num_cpus, \
+                f"Detected model level cpu requirement = {cpu_per_job} > total cpu granted to AG predictor = {total_num_cpus}"
+            assert cpu_per_job >= minimum_cpu_per_job, \
+                f"The model requires minimum cpu {minimum_cpu_per_job}, but you only specified {cpu_per_job}"
+            num_parallel_jobs = total_num_cpus // cpu_per_job
+            batches = math.ceil(num_jobs / num_parallel_jobs)
+        else:
+            cpu_per_job = max(minimum_cpu_per_job, int(total_num_cpus // num_jobs))
+            max_jobs_in_parallel_memory = num_jobs
 
-        if model_estimate_memory_usage is not None:
-            mem_available = psutil.virtual_memory().available
-            # calculate how many jobs can run in parallel given memory available
-            max_jobs_in_parallel_memory = max(1, int(mem_available // model_estimate_memory_usage))
-        num_parallel_jobs = min(num_jobs, total_num_cpus // cpu_per_job, max_jobs_in_parallel_memory)
-        if num_parallel_jobs == 0:
-            error_msg = ('Cannot train model with provided resources! '
-                         f'num_cpus=={total_num_cpus} | '
-                         f'min_cpus=={minimum_cpu_per_job}')
             if model_estimate_memory_usage is not None:
-                error_msg += (
-                    f' | mem_available=={mem_available} | '
-                    f'model_estimate_memory_usage=={model_estimate_memory_usage}'
-                )
-            raise AssertionError(error_msg)
-        cpu_per_job = int(total_num_cpus // num_parallel_jobs)  # update cpu_per_job in case memory is not enough and can use more cores for each job
+                mem_available = psutil.virtual_memory().available
+                # calculate how many jobs can run in parallel given memory available
+                max_jobs_in_parallel_memory = max(1, int(mem_available // model_estimate_memory_usage))
+            num_parallel_jobs = min(num_jobs, total_num_cpus // cpu_per_job, max_jobs_in_parallel_memory)
+            if num_parallel_jobs == 0:
+                error_msg = ('Cannot train model with provided resources! '
+                                f'num_cpus=={total_num_cpus} | '
+                                f'min_cpus=={minimum_cpu_per_job}')
+                if model_estimate_memory_usage is not None:
+                    error_msg += (
+                        f' | mem_available=={mem_available} | '
+                        f'model_estimate_memory_usage=={model_estimate_memory_usage}'
+                    )
+                raise AssertionError(error_msg)
+            cpu_per_job = int(total_num_cpus // num_parallel_jobs)  # update cpu_per_job in case memory is not enough and can use more cores for each job
+            batches = math.ceil(num_jobs / num_parallel_jobs)
 
         resources_per_job = dict(cpu=cpu_per_job)
         if wrap_resources_per_job_into_placement_group:
             resources_per_job = self.wrap_resources_per_job_into_placement_group(resources_per_job)
-        batches = math.ceil(num_jobs / num_parallel_jobs)
 
         resources_info = dict(
             resources_per_job=resources_per_job,
@@ -123,26 +107,41 @@ class GpuResourceCalculator(ResourceCalculator):
         minimum_cpu_per_job,
         minimum_gpu_per_job,
         wrap_resources_per_job_into_placement_group=False,
+        user_resources_per_job=None,
         **kwargs,
     ):
-        cpu_per_job = max(minimum_cpu_per_job, int(total_num_cpus // num_jobs))
-        gpu_per_job = max(minimum_gpu_per_job, total_num_gpus / num_jobs)
-        num_parallel_jobs = num_jobs
-        if cpu_per_job:
-            num_parallel_jobs = min(num_parallel_jobs, total_num_cpus // cpu_per_job)
-        if gpu_per_job:
-            num_parallel_jobs = min(num_parallel_jobs, total_num_gpus // gpu_per_job)
-        if num_parallel_jobs == 0:
-            raise AssertionError('Cannot train model with provided resources! '
-                                 f'(num_cpus, num_gpus)==({total_num_cpus}, {total_num_gpus}) | '
-                                 f'(min_cpus, min_gpus)==({minimum_cpu_per_job}, {minimum_gpu_per_job})')
-        cpu_per_job = int(total_num_cpus // num_parallel_jobs)
-        gpu_per_job = total_num_gpus / num_parallel_jobs
+        if user_resources_per_job is not None:
+            cpu_per_job = user_resources_per_job.get('num_cpus', minimum_cpu_per_job)
+            assert cpu_per_job <= total_num_cpus, \
+                f"Detected model level cpu requirement = {cpu_per_job} > total cpu granted to AG predictor = {total_num_cpus}"
+            assert cpu_per_job >= minimum_cpu_per_job, \
+                f"The model requires minimum cpu {minimum_cpu_per_job}, but you only specified {cpu_per_job}"
+            gpu_per_job = user_resources_per_job.get('num_gpus', minimum_gpu_per_job)
+            assert gpu_per_job <= total_num_gpus, \
+                f"Detected model level gpu requirement = {gpu_per_job} > total cpu granted to AG predictor = {total_num_gpus}"
+            assert gpu_per_job >= minimum_gpu_per_job, \
+                f"The model requires minimum gpu {minimum_gpu_per_job}, but you only specified {gpu_per_job}"
+            num_parallel_jobs = min(total_num_cpus // cpu_per_job, total_num_gpus / gpu_per_job)
+            batches = math.ceil(num_jobs / num_parallel_jobs)
+        else:
+            cpu_per_job = max(minimum_cpu_per_job, int(total_num_cpus // num_jobs))
+            gpu_per_job = max(minimum_gpu_per_job, total_num_gpus / num_jobs)
+            num_parallel_jobs = num_jobs
+            if cpu_per_job:
+                num_parallel_jobs = min(num_parallel_jobs, total_num_cpus // cpu_per_job)
+            if gpu_per_job:
+                num_parallel_jobs = min(num_parallel_jobs, total_num_gpus // gpu_per_job)
+            if num_parallel_jobs == 0:
+                raise AssertionError('Cannot train model with provided resources! '
+                                        f'(num_cpus, num_gpus)==({total_num_cpus}, {total_num_gpus}) | '
+                                        f'(min_cpus, min_gpus)==({minimum_cpu_per_job}, {minimum_gpu_per_job})')
+            cpu_per_job = int(total_num_cpus // num_parallel_jobs)
+            gpu_per_job = total_num_gpus / num_parallel_jobs
+            batches = math.ceil(num_jobs / num_parallel_jobs)
 
         resources_per_job = dict(cpu=cpu_per_job, gpu=gpu_per_job)
         if wrap_resources_per_job_into_placement_group:
             resources_per_job = self.wrap_resources_per_job_into_placement_group(resources_per_job)
-        batches = math.ceil(num_jobs / num_parallel_jobs)
 
         resources_info = dict(
             resources_per_job=resources_per_job,

@@ -111,7 +111,7 @@ class RayTuneAdapter(ABC):
         assert isinstance(minimum_gpu_per_trial, (int, float)) and minimum_gpu_per_trial >= 0, 'minimum_gpu_per_trial must be an integer or float that is equal to or larger than 0'
         num_cpus = total_resources.get('num_cpus', psutil.cpu_count())
         num_gpus = total_resources.get('num_gpus', 0)
-        assert num_gpus >= minimum_gpu_per_trial, 'Total num_gpus available must be greater or equal to minimum_gpu_per_trial'
+        assert num_gpus >= minimum_gpu_per_trial, f'Total num_gpus available: {num_gpus} must be greater or equal to minimum_gpu_per_trial: {minimum_gpu_per_trial}'
         
         if minimum_gpu_per_trial > 0:
             resources_calculator = self.get_resource_calculator(num_gpus=num_gpus)
@@ -124,6 +124,7 @@ class RayTuneAdapter(ABC):
             minimum_cpu_per_job=minimum_cpu_per_trial,
             minimum_gpu_per_job=minimum_gpu_per_trial,
             model_estimate_memory_usage=model_estimate_memory_usage,
+            user_resources_per_job=resources_per_trial,
             **kwargs,
         )
         
@@ -262,7 +263,6 @@ def run(
         tune_config_kwargs = dict()
     if run_config_kwargs is None:
         run_config_kwargs = dict()
-    
     tuner = tune.Tuner(
         tune.with_resources(
             tune.with_parameters(trainable, **trainable_args),
@@ -427,10 +427,6 @@ class TabularRayTuneAdapter(RayTuneAdapter):
     @property
     def adapter_type(self):
         return 'tabular'
-    
-    def check_user_provided_resources_per_trial(self, resources_per_trial: Optional[dict] = None):
-        if resources_per_trial is not None:
-            return resources_per_trial 
     
     def get_resource_calculator(self, num_gpus, **kwargs) -> ResourceCalculator:
         return ResourceCalculatorFactory.get_resource_calculator(calculator_type='cpu' if num_gpus == 0 else 'gpu')

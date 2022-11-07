@@ -485,7 +485,7 @@ class BaggedEnsembleModel(AbstractModel):
             bagged_ensemble_model=self, X=X, y=y, X_pseudo=X_pseudo, y_pseudo=y_pseudo, sample_weight=sample_weight,
             time_limit=time_limit, time_start=time_start, models=models,
             oof_pred_proba=oof_pred_proba, oof_pred_model_repeats=oof_pred_model_repeats,
-            save_folds=save_folds, num_cpus=num_cpus, num_gpus=num_gpus,
+            save_folds=save_folds, num_cpus=num_cpus, num_gpus=num_gpus
         )
         # noinspection PyCallingNonCallable
         if fold_fitting_strategy == ParallelLocalFoldFittingStrategy:
@@ -996,8 +996,8 @@ class BaggedEnsembleModel(AbstractModel):
     def validate_fit_resources(self, **kwargs):
         self._get_model_base().validate_fit_resources(**kwargs)
 
-    def get_minimum_resources(self) -> Dict[str, int]:
-        return self._get_model_base().get_minimum_resources()
+    def get_minimum_resources(self, **kwargs) -> Dict[str, int]:
+        return self._get_model_base().get_minimum_resources(**kwargs)
 
     def _get_default_resources(self):
         return self._get_model_base()._get_default_resources()
@@ -1074,9 +1074,14 @@ class BaggedEnsembleModel(AbstractModel):
             init_params['model_base_kwargs'] = model_base.get_params()
         # Here the hyperparameters are unprocessed search space.
         # HPO Executor will handle passing in the correct parameters.
-        init_params['model_base_kwargs'].pop('hyperparameters', None)
+        # But we need to keep the ag_args_fit being passed to the base model
+        if 'hyperparameters' in init_params['model_base_kwargs']:
+            model_base_ag_args_fit = init_params['model_base_kwargs']['hyperparameters'].get('ag_args_fit', {})
+            init_params['model_base_kwargs']['hyperparameters'] = {'ag_args_fit': model_base_ag_args_fit}
         # We set soft time limit to avoid trials being terminated directly by ray tune
-        trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
+        trial_soft_time_limit = None
+        if hpo_executor.time_limit is not None:
+            trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
 
         fit_kwargs = copy.deepcopy(kwargs)
         fit_kwargs['k_fold'] = k_fold
@@ -1096,40 +1101,19 @@ class BaggedEnsembleModel(AbstractModel):
             hpo_executor=hpo_executor,
             is_bagged_model=True,
         )
-
-        total_cpu_available = hpo_executor.resources.get('num_cpus')  # We should always have num_cpus in resources
-        total_gpu_available = hpo_executor.resources.get('num_gpus', 0)
-        minimum_resources_per_fold = self.get_minimum_resources()
+            
+        minimum_resources_per_fold = self.get_minimum_resources(
+            is_gpu_available=(hpo_executor.resources.get('num_gpus', 0) > 0)
+        )
         minimum_cpu_per_fold = minimum_resources_per_fold.get('num_cpus', 1)
         minimum_gpu_per_fold = minimum_resources_per_fold.get('num_gpus', 0)
-        fold_estimate_memory_usage = None
-        num_folds_in_parallel_with_mem = math.inf
-
-        if initialized_model_base.estimate_memory_usage is not None:
-            fold_estimate_memory_usage = initialized_model_base.estimate_memory_usage(X=X, **kwargs)
-            total_memory_available = psutil.virtual_memory().available
-            num_folds_in_parallel_with_mem = total_memory_available // fold_estimate_memory_usage
-
-        num_folds_in_parallel_with_cpu = total_cpu_available // minimum_cpu_per_fold
-        num_folds_in_parallel_with_gpu = math.inf
-        if minimum_gpu_per_fold > 0:
-            num_folds_in_parallel_with_gpu = total_gpu_available // minimum_gpu_per_fold
-        num_folds_in_parallel = min(num_folds_in_parallel_with_mem, num_folds_in_parallel_with_cpu, num_folds_in_parallel_with_gpu)
-        if num_folds_in_parallel // k_fold < 1:
-            # We can only train 1 trial in parallel
-            num_trials_in_parallel = 1
-        else:
-            num_trials_in_parallel = num_folds_in_parallel // k_fold
-        # We control how many trials run in parallel with minimum_cpu_per_trial and minimum_gpu_per_trial
-        minimum_cpu_per_trial = total_cpu_available // num_trials_in_parallel
-        minimum_gpu_per_trial = total_gpu_available // num_trials_in_parallel
 
         hpo_executor.execute(
             model_trial=model_trial,
             train_fn_kwargs=train_fn_kwargs,
             directory=directory,
-            minimum_cpu_per_trial=minimum_cpu_per_trial,
-            minimum_gpu_per_trial=minimum_gpu_per_trial,
+            minimum_cpu_per_trial=minimum_cpu_per_fold,
+            minimum_gpu_per_trial=minimum_gpu_per_fold,
             model_estimate_memory_usage=None,  # Not needed as we've already calculated it above
             adapter_type='tabular',
             trainable_is_parallel=True,
