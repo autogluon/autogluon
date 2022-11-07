@@ -1,8 +1,10 @@
 import logging
+import warnings
 
 import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix
+import sklearn
 from sklearn.utils.multiclass import unique_labels
 from sklearn.utils import check_consistent_length
 from sklearn.metrics import cohen_kappa_score
@@ -366,3 +368,70 @@ def quadratic_kappa(y_true, y_pred):
             labels = np.arange(y_pred.shape[1])
         y_pred = np.argmax(y_pred, axis=-1)
     return cohen_kappa_score(y_true, y_pred, labels=labels, weights='quadratic')
+
+
+def customized_binary_roc_auc_score(y_true, y_score, **kwargs) -> float:
+    """
+    Functionally identical to sklearn.metrics.roc_auc_score for binary classification.
+    Streamlined for binary classification to be faster by ~5x by avoiding validation checks of the inputs.
+    We can do this in AutoGluon because we guarantee the data is of proper form when entering this logic.
+
+    Parameters
+    ----------
+    y_true : array-like of int
+        Ground truth (correct) labels for n_samples samples. shape = (n_samples,)
+        Valid sample values are 1 and 0.
+    y_score : array-like of float
+        The prediction probabilities. shape = (n_samples,)
+    **kwargs :
+        Any additional arguments. If not empty, will fallback to sklearn's implementation
+
+    Returns
+    -------
+    roc_auc_score : float
+        The roc_auc_score in higher_is_better format.
+    """
+    if isinstance(y_true, pd.Series):
+        y_true = y_true.values
+    if isinstance(y_score, pd.Series):
+        y_score = y_score.values
+    if kwargs:
+        return sklearn.metrics.roc_auc_score(y_true, y_score, **kwargs)
+
+    desc_score_indices = np.argsort(y_score, kind="mergesort")[::-1]
+    y_score = y_score[desc_score_indices]
+    y_true = y_true[desc_score_indices]
+
+    # keep only indices that have different values to speed up future computation
+    distinct_value_indices = np.where(np.diff(y_score))[0]
+    threshold_idxs = np.r_[distinct_value_indices, y_true.size - 1]
+
+    # keep track of how many true positives and false positives have occurred at each threshold
+    tps = np.cumsum(y_true)[threshold_idxs]
+    fps = 1 + threshold_idxs - tps
+
+    if len(tps) > 2:
+        optimal_idxs = np.where(
+            np.r_[True, np.logical_or(np.diff(fps, 2), np.diff(tps, 2)), True]
+        )[0]
+        fps = fps[optimal_idxs]
+        tps = tps[optimal_idxs]
+
+    # Add an extra threshold position
+    # to make sure that the curve starts at (0, 0)
+    tps = np.r_[0, tps]
+    fps = np.r_[0, fps]
+
+    if fps[-1] <= 0:
+        warnings.warn("No negative samples in y_true, false positive value should be meaningless",)
+        fpr = np.repeat(np.nan, fps.shape)
+    else:
+        fpr = fps / fps[-1]
+
+    if tps[-1] <= 0:
+        warnings.warn("No positive samples in y_true, true positive value should be meaningless",)
+        tpr = np.repeat(np.nan, tps.shape)
+    else:
+        tpr = tps / tps[-1]
+    return np.trapz(tpr, fpr)
+

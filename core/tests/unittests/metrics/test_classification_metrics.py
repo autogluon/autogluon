@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 import sklearn
-from autogluon.core.metrics import confusion_matrix, log_loss, quadratic_kappa
+from autogluon.core.metrics import confusion_matrix, log_loss, quadratic_kappa, roc_auc
 from autogluon.core.metrics.softclass_metrics import soft_log_loss
 
 def test_confusion_matrix_with_valid_inputs_without_labels_and_weights():
@@ -190,6 +190,18 @@ def test_log_loss_with_sklearn(gt, probs):
 
     ag_loss_as_sklearn = log_loss.convert_score_to_original(ag_loss)
     np.testing.assert_allclose(ag_loss_as_sklearn, sklearn_log_loss)
+
+
+def test_roc_auc_score_with_sklearn():
+    """
+    Ensure AutoGluon's custom fast roc_auc_score produces the same result as sklearn's roc_auc_score.
+    """
+    y_true = np.array([0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1])
+    y_score = np.array([0, 1, 0, 1, 0.1, 0.81, 0.76, 0.1, 0.31, 0.32, 0.34, 0.9])
+    expected_score = sklearn.metrics.roc_auc_score(y_true, y_score)
+    actual_score = roc_auc(y_true, y_score)
+
+    assert np.isclose(actual_score, expected_score)
 
 
 def test_quadratic_kappa():
