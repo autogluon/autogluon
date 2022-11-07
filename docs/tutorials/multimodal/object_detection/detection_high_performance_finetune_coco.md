@@ -43,7 +43,7 @@ test_path = "./VOCdevkit/VOCCOCO/voc07_test.json"
 We create the MultiModalPredictor with selected checkpoint name, val_metric, and number of GPUs.
 We need to specify the problem_type to `"object_detection"`,
 and also provide a `sample_data_path` for the predictor to infer the catgories of the dataset.
-Here we provide the `training_path`, and it also works using any other split of this dataset.
+Here we provide the `train_path`, and it also works using any other split of this dataset.
 
 ```python
 predictor = MultiModalPredictor(
@@ -75,6 +75,9 @@ predictor = MultiModalPredictor(
 We set the learning rate to be `1e-5` and epoch to be 20 for fast finetuning.
 Note that we use a two-stage learning rate option during finetuning by default,
 and the model head will have 100x learning rate.
+Using a two-stage learning rate with high learning rate only on head layers makes
+the model converge faster during finetuning. It usually gives better performance as well,
+especially on small datasets with hundreds or thousands of images.
 We also set the batch_size to be 2, because this model is too huge to run with larger batch size.
 For more information about how to tune those hyperparameters,
 see :ref:`sec_automm_detection_tune_hyperparameters`.
@@ -155,7 +158,8 @@ And the evaluation results are shown in command line output. The first value `0.
 
 Under this high performance finetune setting, it took 5 hours but reached `mAP50 = 0.932` on VOC!
 For how to finetune faster,
-see :ref:`sec_automm_detection_fast_finetune_coco`.
+see :ref:`sec_automm_detection_fast_finetune_coco`, where we finetuned a YOLOv3 model with
+100 seconds and reached `mAP50 = 0.755` on VOC.
 
 ### Other Examples
 
