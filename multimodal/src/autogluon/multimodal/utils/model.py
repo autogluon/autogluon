@@ -2,9 +2,9 @@ import functools
 import logging
 from typing import Dict, List, Optional, Tuple, Union
 
+import timm
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
-import timm
 
 from ..constants import (
     ALL_MODALITIES,

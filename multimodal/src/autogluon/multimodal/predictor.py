@@ -134,6 +134,7 @@ from .utils import (
     infer_scarcity_mode_by_data_size,
     init_df_preprocessor,
     init_pretrained,
+    list_timm_models,
     load_text_tokenizers,
     logits_to_prob,
     modify_duplicate_model_names,
@@ -146,7 +147,6 @@ from .utils import (
     turn_on_off_feature_column_info,
     update_config_by_rules,
     use_realtime,
-    list_timm_models,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -2858,9 +2858,23 @@ class MultiModalPredictor:
         results = {"val_accuracy": self.best_score, "training_time": self.elapsed_time}
         return results
 
-    def list_supported_models(self):
+    def list_supported_models(self, pretrained=True):
+        """
+        List supported models for each problem_type to let users know
+        options of checkpoint name to choose during fit().
+
+        Parameters
+        ----------
+        pretrained : bool, default = True
+            If True, only return the models with pretrained weights.
+            If False, return all the models as long as there is model definition.
+
+        Returns
+        -------
+        a list of model names
+        """
         if self._problem_type == "classification":
-            return list_timm_models(pretrained=True)
+            return list_timm_models(pretrained=pretrained)
         else:
             raise ValueError(f"list_supported_models() is not available for problem type: {self._problem_type}")
 
