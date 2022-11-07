@@ -16,6 +16,7 @@ Here, we consider sentence pairs with label *entailment* as positive pairs (labe
 
 ```{.python .input}
 from autogluon.core.utils.loaders import load_pd
+import pandas as pd
 
 snli_train = load_pd.load('https://automl-mm-bench.s3.amazonaws.com/snli/snli_train.csv', delimiter="|")
 snli_test = load_pd.load('https://automl-mm-bench.s3.amazonaws.com/snli/snli_test.csv', delimiter="|")
@@ -29,11 +30,11 @@ Ideally, we want to obtain a model that can return high/low scores for positive/
 With AutoMM, you just need to specify the query, response, and label column names and fit the model on the training dataset without worrying the implementation details.
 
 ```{.python .input}
-from autogluon.multimodal import MultiModalMatcher
+from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import BINARY, MULTICLASS, QUERY, RESPONSE, UNIFORM_SOUP
 
 # Initialize the model
-matcher = MultiModalMatcher(
+matcher = MultiModalPredictor(
         query="premise", # the column name of the first sentence
         response="hypothesis", # the column name of the second sentence
         label="label", # the label column name
