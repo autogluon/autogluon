@@ -34,6 +34,7 @@ class TimeSeriesLearner(AbstractLearner):
         eval_metric: Optional[str] = None,
         prediction_length: int = 1,
         validation_splitter: AbstractTimeSeriesSplitter = LastWindowSplitter(),
+        ignore_time_index: bool = False,
         **kwargs,
     ):
         super().__init__(path_context=path_context)
@@ -47,6 +48,8 @@ class TimeSeriesLearner(AbstractLearner):
             kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
         self.validation_splitter = validation_splitter
+        self.ignore_time_index = ignore_time_index
+
         self.static_feature_pipeline = ContinuousAndCategoricalFeatureGenerator()
         self._train_static_feature_columns: pd.Index = None
         self._train_static_feature_dtypes: pd.Series = None
@@ -284,7 +287,6 @@ class TimeSeriesLearner(AbstractLearner):
         self,
         known_covariates: Optional[TimeSeriesDataFrame],
         data: TimeSeriesDataFrame,
-        ignore_index: bool = False,
     ) -> Optional[TimeSeriesDataFrame]:
         """Select the relevant item_ids and timestamps from the known_covariates dataframe.
 
@@ -307,9 +309,9 @@ class TimeSeriesLearner(AbstractLearner):
             )
 
         forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length=self.prediction_length)
-        if ignore_index:
+        if self.ignore_time_index:
             logger.warning(
-                "Because `ignore_index=True`, the predictor will ignore the time index of `known_covariates`. "
+                "Because `ignore_time_index=True`, the predictor will ignore the time index of `known_covariates`. "
                 "Please make sure that `known_covariates` contain only the future values of the known covariates "
                 "(and the past values are not included)."
             )
@@ -336,7 +338,6 @@ class TimeSeriesLearner(AbstractLearner):
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
-        ignore_index: bool = False,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         if self.static_feature_pipeline.is_fit():
@@ -352,9 +353,7 @@ class TimeSeriesLearner(AbstractLearner):
         known_covariates = self._preprocess_target_and_covariates(
             known_covariates, data_frame_name="known_covariates", must_include_target=False
         )
-        known_covariates = self._align_covariates_with_forecast_index(
-            known_covariates=known_covariates, data=data, ignore_index=ignore_index
-        )
+        known_covariates = self._align_covariates_with_forecast_index(known_covariates=known_covariates, data=data)
         prediction = self.load_trainer().predict(data=data, known_covariates=known_covariates, model=model, **kwargs)
         if prediction is None:
             raise RuntimeError("Prediction failed, please provide a different model to the `predict` method.")

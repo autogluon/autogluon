@@ -186,6 +186,7 @@ class TimeSeriesPredictor:
                 prediction_length=self.prediction_length,
                 quantile_levels=self.quantile_levels,
                 validation_splitter=splitter,
+                ignore_time_index=ignore_time_index,
             )
         )
         self._learner: AbstractLearner = learner_type(**learner_kwargs)
