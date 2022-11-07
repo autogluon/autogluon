@@ -608,6 +608,7 @@ class CloudPredictor(ABC):
         framework_version='latest',
         instance_type='ml.m5.2xlarge',
         initial_instance_count=1,
+        custom_image_uri=None,
         wait=True,
         model_kwargs=dict(),
         **kwargs
@@ -685,6 +686,7 @@ class CloudPredictor(ABC):
             framework_version=framework_version,
             py_version=py_version,
             instance_type=instance_type,
+            custom_image_uri=custom_image_uri,
             entry_point=entry_point,
             predictor_cls=predictor_cls,
             **model_kwargs

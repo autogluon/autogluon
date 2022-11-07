@@ -135,7 +135,6 @@ class TabularCloudPredictor(CloudPredictor):
         if isinstance(test_data, pd.DataFrame):
             if test_data_image_column is not None:
                 test_data = convert_image_path_to_encoded_bytes_in_dataframe(test_data, test_data_image_column)
-
         try:
             return self._predict_real_time(test_data=test_data, accept=accept)
         except ClientError as e:
