@@ -315,6 +315,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             self.gts_predictor = estimator.train(
                 self._to_gluonts_dataset(train_data),
                 validation_data=self._to_gluonts_dataset(val_data),
+                cache_data=True,
             )
 
     def _get_callbacks(self, time_limit: int, *args, **kwargs) -> List[Callable]:

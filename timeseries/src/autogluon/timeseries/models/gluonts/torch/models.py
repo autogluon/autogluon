@@ -79,6 +79,10 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
         trainer_kwargs.update({"callbacks": callbacks, "enable_progress_bar": False})
         trainer_kwargs["default_root_dir"] = self.path
 
+        if torch.cuda.is_available():
+            trainer_kwargs["accelerator"] = "gpu"
+            trainer_kwargs["devices"] = 1
+
         return from_hyperparameters(
             self.gluonts_estimator_class,
             trainer_kwargs=trainer_kwargs,
