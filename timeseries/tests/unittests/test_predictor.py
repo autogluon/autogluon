@@ -451,7 +451,7 @@ def test_given_model_fails_when_predictor_predicts_then_exception_is_caught_by_l
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters={"ARIMA": {"maxiter": 1, "seasonal_period": 1, "seasonal_order": (0, 0, 0)}},
     )
-    with mock.patch("autogluon.timeseries.models.statsmodels.models.ARIMAModel.predict") as arima_predict:
+    with mock.patch("autogluon.timeseries.models.local.statsmodels.ARIMAModel.predict") as arima_predict:
         arima_predict.side_effect = RuntimeError("Numerical error")
         with pytest.raises(RuntimeError, match="Prediction failed, please provide a different model to"):
             predictor.predict(DUMMY_TS_DATAFRAME)

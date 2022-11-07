@@ -27,7 +27,6 @@ from autogluon.multimodal.models import (
 )
 def test_hf_automodel_init(checkpoint_name):
     model = HFAutoModelForTextPrediction(prefix="model", checkpoint_name=checkpoint_name, num_classes=5)
-    # model.get_layer_ids()
 
 
 @pytest.mark.parametrize(
@@ -37,11 +36,11 @@ def test_hf_automodel_init(checkpoint_name):
         "vit_small_patch16_384",
         "resnet18",
         "legacy_seresnet18",
+        "regnety_002",
     ],
 )
 def test_timm_automodel_init(checkpoint_name):
     model = TimmAutoModelForImagePrediction(prefix="model", checkpoint_name=checkpoint_name, num_classes=5)
-    # model.get_layer_ids()
 
 
 @pytest.mark.parametrize(

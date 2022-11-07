@@ -519,5 +519,13 @@ class NNFastAiTabularModel(AbstractModel):
         """Choose which backend(Ray or Custom) to use for hpo"""
         return RAY_BACKEND
 
+    def get_minimum_resources(self, is_gpu_available=False):
+        minimum_resources = {
+            'num_cpus': 1,
+        }
+        if is_gpu_available:
+            minimum_resources['num_gpus'] = 0.5
+        return minimum_resources
+
     def _more_tags(self):
         return {'can_refit_full': True}

@@ -282,7 +282,7 @@ def is_identifier_column(data: pd.Series, col_name: str, id_mappings: Dict[str, 
         return False
 
 
-def infer_id_mappings_types(id_mappings: Dict[str, Dict]) -> Dict:
+def infer_id_mappings_types(id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]]) -> Dict:
     """
     Infer the data types in id_mappings.
 
@@ -300,7 +300,14 @@ def infer_id_mappings_types(id_mappings: Dict[str, Dict]) -> Dict:
         return id_mappings_types
 
     for per_name, per_id_mappings in id_mappings.items():
-        per_id_mappings = pd.Series(per_id_mappings.values())
+        if isinstance(per_id_mappings, dict):
+            per_id_mappings = pd.Series(per_id_mappings.values())
+        elif isinstance(per_id_mappings, pd.Series):
+            pass
+        else:
+            raise ValueError(
+                f"Invalid per_id_mappings type: {type(per_id_mappings)}. Make sure the id_mappings is a dict of dicts or a dict of pd.Series."
+            )
         if is_imagepath_column(per_id_mappings, col_name=per_name):
             id_mappings_types[per_name] = IMAGE_PATH
         elif is_text_column(per_id_mappings):
@@ -319,7 +326,7 @@ def infer_column_types(
     provided_column_types: Optional[Dict] = None,
     allowable_column_types: Optional[List[str]] = None,
     fallback_column_type: Optional[str] = None,
-    id_mappings: Optional[Dict[str, Dict]] = None,
+    id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
 ) -> Dict:
     """
     Infer the column types of a multimodal pd.DataFrame.

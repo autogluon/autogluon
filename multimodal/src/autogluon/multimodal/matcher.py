@@ -125,16 +125,16 @@ class MultiModalMatcher:
         Parameters
         ----------
         query
-            Names of columns that contains the query data.
+            Column names of query data.
         response
-            Names of columns that contains the response data. If no label column is provided,
+            Column names of response data. If no label column is provided,
             query and response columns form positive pairs.
         negative
-            Names of columns that contains the negative data. Query and negative make up negative pairs.
+            Column names of negative data. Query and negative make up negative pairs.
         label
             Name of the label column. Label and negative shouldn't be used simultaneously.
         match_label
-            For binary labels, which label indicates a pair of items match.
+            For binary labels, it is the label indicating the query and response should match.
         problem_type
             Type of matching problem if the label column is available.
             This could be binary, multiclass, or regression
@@ -284,9 +284,7 @@ class MultiModalMatcher:
     def fit(
         self,
         train_data: pd.DataFrame,
-        id_mappings: Optional[
-            Dict[str, Dict]
-        ] = None,  # TODO rename it to linked_content and support dict of pd.Series.
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         presets: Optional[str] = None,
         tuning_data: Optional[pd.DataFrame] = None,
         time_limit: Optional[int] = None,
@@ -311,7 +309,7 @@ class MultiModalMatcher:
             |             | ....       | ....          | ...           | ...             |
         id_mappings
              Id-to-content mappings. The contents can be text, image, etc.
-             This is used when the dataframe contains the query/response indexes instead of their contents.
+             This is used when the dataframe contains the query/response identifiers instead of their contents.
         presets
             Name of the presets. See the available presets in `presets.py`.
         tuning_data
@@ -584,7 +582,7 @@ class MultiModalMatcher:
         self,
         train_df: pd.DataFrame,
         val_df: pd.DataFrame,
-        id_mappings: Dict[str, Dict],
+        id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]],
         validation_metric_name: str,
         minmax_mode: str,
         max_time: timedelta,
@@ -1038,7 +1036,7 @@ class MultiModalMatcher:
     def _predict(
         self,
         data: Union[pd.DataFrame, dict, list],
-        id_mappings: Dict[str, Dict],
+        id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]],
         requires_label: bool,
         signature: Optional[str] = None,
         seed: Optional[int] = 123,
@@ -1236,7 +1234,7 @@ class MultiModalMatcher:
             query_data=query_data,
             response_data=response_data,
             label_column=label_column,
-            cutoff=[1, 5, 10],
+            cutoffs=[1, 5, 10],
         )
         data_with_label, query_data, response_data, label_column = convert_data_for_ranking(
             data=data,
@@ -1249,7 +1247,7 @@ class MultiModalMatcher:
             query_data=query_data,
             response_data=response_data,
             label_column=label_column,
-            cutoff=[1, 5, 10],
+            cutoffs=[1, 5, 10],
         )
 
         return sum(score_1.values()) + sum(score_2.values())
@@ -1260,12 +1258,11 @@ class MultiModalMatcher:
         query_data: Union[pd.DataFrame, dict, list],
         response_data: Union[pd.DataFrame, dict, list],
         label_column: str,
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
         chunk_size: Optional[int] = 1024,
         similarity_type: Optional[str] = "cosine",
-        top_k: Optional[int] = 100,
-        cutoff: Optional[List[int]] = [5, 10, 20],
+        cutoffs: Optional[List[int]] = [1, 5, 10],
     ):
         query_column = query_data.columns[0]
         response_column = response_data.columns[0]
@@ -1286,6 +1283,7 @@ class MultiModalMatcher:
         rank_results = dict()
         query_embeddings = self.extract_embedding(query_data, id_mappings=id_mappings, as_tensor=True)
         num_chunks = max(1, len(response_data) // chunk_size)
+        top_k = max(cutoffs)
         for response_chunk in np.array_split(response_data, num_chunks):
             response_embeddings = self.extract_embedding(response_chunk, id_mappings=id_mappings, as_tensor=True)
             similarity_scores = compute_semantic_similarity(
@@ -1307,14 +1305,14 @@ class MultiModalMatcher:
                     response_idx = response_chunk.iloc[int(sub_response_idx)][response_column]
                     rank_results.setdefault(query_idx, {})[response_idx] = score
 
-        results = compute_ranking_score(results=rank_results, qrel_dict=rank_labels, metrics=metrics, cutoff=cutoff)
+        results = compute_ranking_score(results=rank_results, qrel_dict=rank_labels, metrics=metrics, cutoffs=cutoffs)
 
         return results
 
     def _evaluate_matching(
         self,
         data: Union[pd.DataFrame, dict, list],
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
     ):
@@ -1370,17 +1368,16 @@ class MultiModalMatcher:
 
     def evaluate(
         self,
-        data: Optional[Union[pd.DataFrame, dict, list]] = None,
-        query_data: Optional[list] = None,
-        response_data: Optional[list] = None,
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        data: Union[pd.DataFrame, dict, list],
+        query_data: Optional[pd.DataFrame, dict, list] = None,
+        response_data: Optional[pd.DataFrame, dict, list] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
         chunk_size: Optional[int] = 1024,
         similarity_type: Optional[str] = "cosine",
-        top_k: Optional[int] = 100,
-        cutoff: Optional[List[int]] = [5, 10, 20],
-        label_column: Optional[str] = None,
+        cutoffs: Optional[List[int]] = [1, 5, 10],
+        label: Optional[str] = None,
     ):
         """
         Evaluate model on a test dataset.
@@ -1394,12 +1391,12 @@ class MultiModalMatcher:
             |             | ....       | ....          | ...           | ...             |
             |             | ....       | ....          | ...           | ...             |
         query_data
-            A list of queries.
+            Query data used for ranking.
         response_data
-            A list of response data, in which to match the queries.
+            Response data used for ranking.
         id_mappings
              Id-to-content mappings. The contents can be text, image, etc.
-             This is used when the dataframe contains the query/response indexes instead of their contents.
+             This is used when data/query_data/response_data contain the query/response identifiers instead of their contents.
         metrics
             A list of metric names to report.
             If None, we only return the score for the stored `_eval_metric_name`.
@@ -1409,8 +1406,11 @@ class MultiModalMatcher:
             Scan the response data by chunk_size each time. Increasing the value increases the speed, but requires more memory.
         similarity_type
             Use what function (cosine/dot_prod) to score the similarity (default: cosine).
-        top_k
-            Retrieve top k matching entries.
+        cutoffs
+            A list of cutoff values to evaluate ranking.
+        label
+            The label column name in data. Some tasks, e.g., image<-->text matching, have no label column in training data,
+            but the label column is still required in evaluation.
 
         Returns
         -------
@@ -1434,20 +1434,19 @@ class MultiModalMatcher:
             response_header = self._response[0] if self._response else None
             response_data = data_to_df(data=response_data, header=response_header)
 
-            if label_column is None:
-                label_column = self._label_column
+            if label is None:
+                label = self._label_column
 
             return self._evaluate_ranking(
                 qr_relevance=data,
                 query_data=query_data,
                 response_data=response_data,
-                label_column=label_column,
+                label_column=label,
                 id_mappings=id_mappings,
                 metrics=metrics,
                 chunk_size=chunk_size,
                 similarity_type=similarity_type,
-                top_k=top_k,
-                cutoff=cutoff,
+                cutoffs=cutoffs,
             )
         elif data is not None:
             return self._evaluate_matching(
@@ -1462,7 +1461,7 @@ class MultiModalMatcher:
     def predict(
         self,
         data: Union[pd.DataFrame, dict, list],
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
     ):
         """
@@ -1475,7 +1474,7 @@ class MultiModalMatcher:
               follow same format (except for the `label` column).
         id_mappings
              Id-to-content mappings. The contents can be text, image, etc.
-             This is used when the dataframe contains the query/response indexes instead of their contents.
+             This is used when data contain the query/response identifiers instead of their contents.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
 
@@ -1508,7 +1507,7 @@ class MultiModalMatcher:
     def predict_proba(
         self,
         data: Union[pd.DataFrame, dict, list],
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
     ):
@@ -1523,7 +1522,7 @@ class MultiModalMatcher:
               follow same format (except for the `label` column).
         id_mappings
              Id-to-content mappings. The contents can be text, image, etc.
-             This is used when the dataframe contains the query/response indexes instead of their contents.
+             This is used when data contain the query/response identifiers instead of their contents.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         as_multiclass
@@ -1561,7 +1560,7 @@ class MultiModalMatcher:
         self,
         data: Union[pd.DataFrame, dict, list],
         signature: Optional[str] = None,
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
     ):
@@ -1577,7 +1576,7 @@ class MultiModalMatcher:
             query or response
         id_mappings
              Id-to-content mappings. The contents can be text, image, etc.
-             This is used when the dataframe contains the query/response indexes instead of their contents.
+             This is used when data contain the query/response identifiers instead of their contents.
         as_tensor
             Whether to return a Pytorch tensor.
         as_pandas
@@ -1729,6 +1728,7 @@ class MultiModalMatcher:
         with open(os.path.join(path, f"assets.json"), "w") as fp:
             json.dump(
                 {
+                    "class_name": self.__class__.__name__,
                     "query": self._query,
                     "response": self._response,
                     "match_label": self._match_label,
@@ -1962,3 +1962,7 @@ class MultiModalMatcher:
         else:
             warnings.warn("Accessing class names for a non-classification problem. Return None.")
             return None
+
+    def set_num_gpus(self, num_gpus):
+        assert isinstance(num_gpus, int)
+        self._config.env.num_gpus = num_gpus
