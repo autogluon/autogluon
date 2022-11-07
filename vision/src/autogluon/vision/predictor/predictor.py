@@ -248,6 +248,10 @@ class ImagePredictor(object):
                     Extra options for HPO scheduler, please refer to :class:`autogluon.core.Searcher` for details.
         """
         if self._backend == 'automm':
+            logger.warning(
+                f"automm backend does not support HPO yet. "
+                f"For HPO need, please continue to use default vision backend."
+            )
             max_epochs = hyperparameters['epochs'] if 'epochs' in hyperparameters else 10
             learning_rate = hyperparameters['lr'] if 'lr' in hyperparameters else 1e-4
             self._classifier.fit(train_data=train_data, tuning_data=tuning_data,
@@ -563,6 +567,10 @@ class ImagePredictor(object):
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         
         if self._backend == 'automm':
+            logger.warning(
+                f"automm backend only accepts pd.DataFrame. "
+                f"For other input type, please continue to use default vision backend."
+            )
             prob = self._classifier.predict_proba(data=data, as_pandas=as_pandas)
             return prob
 
@@ -619,6 +627,10 @@ class ImagePredictor(object):
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         
         if self._backend == 'automm':
+            logger.warning(
+                f"automm backend only accepts pd.DataFrame. "
+                f"For other input type, please continue to use default vision backend."
+            )
             pred = self._classifier.predict(data=data, as_pandas=as_pandas)
             return pred
 
@@ -666,6 +678,15 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
+
+        if self._backend == 'automm':
+            logger.warning(
+                f"automm backend only accepts pd.DataFrame. "
+                f"For other input type, please continue to use default vision backend."
+            )
+            ret = self._classifier.extract_embedding(data, as_pandas=as_pandas)
+            return ret
+
         ret = self._classifier.predict_feature(data)
         if as_pandas:
             return ret
@@ -715,6 +736,9 @@ class ImagePredictor(object):
 
         """
         if self._backend == 'automm':
+            logger.warning(
+                f"predictor trained using automm backend only has keys ('training_time' and 'val_accuracy') "
+            )
             return self._classifier.fit_summary()
         else:
             return copy.copy(self._fit_summary)
@@ -729,6 +753,13 @@ class ImagePredictor(object):
             with filename `image_predictor.ag`
 
         """
+        if self._backend == 'automm':
+            logger.warning(
+                f"automm backend will save model to .ckpt, not .ag "
+            )
+            self._classifier.save(path=path)
+            return
+
         if path is None:
             path = os.path.join(self.path, 'image_predictor.ag')
         with open(path, 'wb') as fid:
@@ -750,6 +781,13 @@ class ImagePredictor(object):
             where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
 
         """
+        if not os.path.isdir(path) and path.endswith('.ckpt'):
+            logger.warning(
+                f"predictors trained using automm backend will load model in .ckpt "
+            )
+            obj = cls.load(path=path)
+            return obj
+
         if os.path.isdir(path):
             path = os.path.join(path, 'image_predictor.ag')
         with open(path, 'rb') as fid:

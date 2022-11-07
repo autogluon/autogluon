@@ -536,6 +536,7 @@ class MultiModalPredictor:
         -------
         An "MultiModalPredictor" object (itself).
         """
+        training_start = time.time()
         if self._matcher:
             self._matcher.fit(
                 train_data=train_data,
@@ -729,6 +730,8 @@ class MultiModalPredictor:
             return predictor
 
         self._fit(**_fit_args)
+        training_end = time.time()
+        self.elapsed_time = (training_end - training_start) / 60.0
         return self
 
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
@@ -1371,14 +1374,11 @@ class MultiModalPredictor:
                 ".* in the `DataLoader` init to improve performance.*",
             )
             warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
-            training_start = time.time()
             trainer.fit(
                 task,
                 datamodule=train_dm,
                 ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
             )
-            training_end = time.time()
-            self.elapsed_time = (training_end - training_start) / 60.0
             self._fit_called = True
 
         if trainer.global_rank == 0:
@@ -1462,7 +1462,6 @@ class MultiModalPredictor:
                             strict=strict_loading,
                         )
                         best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
-                        self.best_score = best_score
                         for i in range(1, len(top_k_model_paths)):
                             cand_avg_state_dict = average_checkpoints(
                                 checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -1505,6 +1504,8 @@ class MultiModalPredictor:
             prefix=prefix,
             strict=strict_loading,
         )
+
+        self.best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
 
         if is_distill:
             avg_state_dict = self._replace_model_name_prefix(
