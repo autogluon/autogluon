@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.core.learner import AbstractLearner
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID
 from autogluon.timeseries.evaluator import TimeSeriesEvaluator
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.splitter import AbstractTimeSeriesSplitter, LastWindowSplitter
@@ -284,6 +284,7 @@ class TimeSeriesLearner(AbstractLearner):
         self,
         known_covariates: Optional[TimeSeriesDataFrame],
         data: TimeSeriesDataFrame,
+        ignore_index: bool = False,
     ) -> Optional[TimeSeriesDataFrame]:
         """Select the relevant item_ids and timestamps from the known_covariates dataframe.
 
@@ -296,6 +297,9 @@ class TimeSeriesLearner(AbstractLearner):
                 f"known_covariates {self.known_covariates_names} for the forecast horizon should be provided at prediction time."
             )
 
+        if self.target in known_covariates.columns:
+            known_covariates = known_covariates.drop(self.target, axis=1)
+
         missing_item_ids = data.item_ids.difference(known_covariates.item_ids)
         if len(missing_item_ids) > 0:
             raise ValueError(
@@ -303,13 +307,28 @@ class TimeSeriesLearner(AbstractLearner):
             )
 
         forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length=self.prediction_length)
-        try:
-            known_covariates = known_covariates.loc[forecast_index]
-        except KeyError:
-            raise ValueError(
-                f"known_covariates should include the values for prediction_length={self.prediction_length} "
-                "many time steps into the future."
+        if ignore_index:
+            logger.warning(
+                "Because `ignore_index=True`, the predictor will ignore the time index of `known_covariates`. "
+                "Please make sure that `known_covariates` contain only the future values of the known covariates "
+                "(and the past values are not included)."
             )
+            known_covariates = known_covariates.loc[forecast_index.unique(level=ITEMID)]
+            if (known_covariates.num_timesteps_per_item() < self.prediction_length).any():
+                raise ValueError(
+                    f"known_covariates should include the values for prediction_length={self.prediction_length} "
+                    "many time steps into the future."
+                )
+            known_covariates = known_covariates.slice_by_timestep(None, self.prediction_length)
+            known_covariates.index = forecast_index
+        else:
+            try:
+                known_covariates = known_covariates.loc[forecast_index]
+            except KeyError:
+                raise ValueError(
+                    f"known_covariates should include the values for prediction_length={self.prediction_length} "
+                    "many time steps into the future."
+                )
         return known_covariates
 
     def predict(
@@ -317,6 +336,7 @@ class TimeSeriesLearner(AbstractLearner):
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        ignore_index: bool = False,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         if self.static_feature_pipeline.is_fit():
@@ -332,7 +352,9 @@ class TimeSeriesLearner(AbstractLearner):
         known_covariates = self._preprocess_target_and_covariates(
             known_covariates, data_frame_name="known_covariates", must_include_target=False
         )
-        known_covariates = self._align_covariates_with_forecast_index(known_covariates=known_covariates, data=data)
+        known_covariates = self._align_covariates_with_forecast_index(
+            known_covariates=known_covariates, data=data, ignore_index=ignore_index
+        )
         prediction = self.load_trainer().predict(data=data, known_covariates=known_covariates, model=model, **kwargs)
         if prediction is None:
             raise RuntimeError("Prediction failed, please provide a different model to the `predict` method.")
