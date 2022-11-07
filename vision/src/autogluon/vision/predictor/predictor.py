@@ -755,7 +755,8 @@ class ImagePredictor(object):
         """
         if self._backend == 'automm':
             logger.warning(
-                f"automm backend will save model to .ckpt, not .ag "
+                f"automm backend will save model as .ckpt, not .ag "
+                f"Other meta information will also be saved to the same directory specified by path "
             )
             self._classifier.save(path=path)
             return
@@ -766,7 +767,7 @@ class ImagePredictor(object):
             pickle.dump(self, fid)
 
     @classmethod
-    def load(cls, path, verbosity=2):
+    def load(cls, path, backend='vision', verbosity=2):
         """Load previously saved predictor.
 
         Parameters
@@ -774,6 +775,9 @@ class ImagePredictor(object):
         path : str
             The file name for saved pickle file. If `path` is a directory, will try to load the file `image_predictor.ag` in
             this directory.
+        backend : str, default = 'vision'
+            The backend to provide all the functionalities. If unspecified, default is old vision backend (backend='vision').
+            Or you can try our new MultiModalPredictor for more functionalities and better support (backend='automm').
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed.
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
@@ -781,15 +785,12 @@ class ImagePredictor(object):
             where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
 
         """
-        if not os.path.isdir(path) and path.endswith('.ckpt'):
-            logger.warning(
-                f"predictors trained using automm backend will load model in .ckpt "
-            )
-            obj = cls.load(path=path)
-            return obj
+        if backend == 'automm':
+            return MultiModalPredictor.load(path=path)
 
         if os.path.isdir(path):
             path = os.path.join(path, 'image_predictor.ag')
+                
         with open(path, 'rb') as fid:
             gpu_count = get_gpu_count_all()
             if gpu_count > 0:
