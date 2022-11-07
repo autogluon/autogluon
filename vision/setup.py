@@ -25,7 +25,6 @@ install_requires = [
     'timm',
     'matplotlib',
     f'autogluon.core=={version}',
-    f'autogluon.multimodal=={version}',
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
