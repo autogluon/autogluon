@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractVisualization(ABC, StateCheckMixin):
-
     def __init__(self, namespace: Optional[str] = None, **kwargs) -> None:
         """
         Parameters
@@ -21,7 +20,7 @@ class AbstractVisualization(ABC, StateCheckMixin):
         self.namespace: List[str] = []
         self._kwargs = kwargs
         if namespace is not None:
-            self.namespace = namespace.split('.')
+            self.namespace = namespace.split(".")
 
     def _get_namespace_state(self, state):
         if self.namespace is not None:

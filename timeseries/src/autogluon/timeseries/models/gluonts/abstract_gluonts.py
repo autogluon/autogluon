@@ -124,6 +124,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     # datatype of floating point and integers passed internally to GluonTS
     float_dtype: Type = np.float64
     int_dtype: Type = np.int64
+    # default number of samples for prediction
+    default_num_samples: int = 1000
 
     def __init__(
         self,
@@ -208,6 +210,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""
         args = super()._get_model_params().copy()
+        args.setdefault("batch_size", 64)
         args.update(
             dict(
                 freq=self.freq,
@@ -365,8 +368,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         gts_data = self._to_gluonts_dataset(data, known_covariates=known_covariates)
 
         predictor_kwargs = dict(dataset=gts_data)
-        if "num_samples" in kwargs:
-            predictor_kwargs["num_samples"] = kwargs["num_samples"]
+        predictor_kwargs["num_samples"] = kwargs.get("num_samples", self.default_num_samples)
 
         return list(self.gts_predictor.predict(**predictor_kwargs))
 

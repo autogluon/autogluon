@@ -2,6 +2,7 @@
 Module including wrappers for PyTorch implementations of models in GluonTS
 """
 import logging
+import shutil
 import warnings
 from datetime import timedelta
 from pathlib import Path
@@ -33,7 +34,6 @@ from autogluon.timeseries.utils.warning_filters import torch_warning_filter
 # PyTorch Lightning. We exclude this model until a future release.
 # from gluonts.torch.model.deep_npts import DeepNPTSEstimator
 
-# TODO: add docstrings for models
 
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
@@ -73,9 +73,11 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
         epochs = init_args.get("max_epochs", init_args.get("epochs"))
         callbacks = init_args.get("callbacks", [])
 
+        # TODO: Provide trainer_kwargs outside the function (e.g., to specify # of GPUs)?
         if epochs is not None:
             trainer_kwargs.update({"max_epochs": epochs})
         trainer_kwargs.update({"callbacks": callbacks, "enable_progress_bar": False})
+        trainer_kwargs["default_root_dir"] = self.path
 
         return from_hyperparameters(
             self.gluonts_estimator_class,
@@ -97,6 +99,10 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
         for pl_logger in pl_loggers:
             pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
         super()._fit(train_data=train_data, val_data=val_data, time_limit=time_limit, **kwargs)
+        lightning_logs_dir = Path(self.path) / "lightning_logs"
+        if lightning_logs_dir.exists() and lightning_logs_dir.is_dir():
+            logger.debug(f"Removing lightning_logs directory {lightning_logs_dir}")
+            shutil.rmtree(lightning_logs_dir)
 
     def save(self, path: str = None, **kwargs) -> str:
         # we flush callbacks instance variable if it has been set. it can keep weak references
@@ -153,7 +159,7 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
         Whether to automatically scale the target values
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
@@ -162,6 +168,7 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
     """
 
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DeepAREstimator
+    default_num_samples: int = 250
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
@@ -197,7 +204,7 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
         Scale the network input by the data mean and the network output by its inverse
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch

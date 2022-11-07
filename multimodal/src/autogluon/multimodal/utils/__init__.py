@@ -35,7 +35,7 @@ from .inference import extract_from_output, infer_batch, use_realtime
 from .load import CustomUnpickler, load_text_tokenizers
 from .log import LogFilter, apply_log_filter, make_exp_dir
 from .map import MeanAveragePrecision
-from .matcher import compute_semantic_similarity, create_siamese_model, semantic_search
+from .matcher import compute_semantic_similarity, convert_data_for_ranking, create_siamese_model, semantic_search
 from .metric import compute_ranking_score, compute_score, get_minmax_mode, infer_metrics
 from .misc import logits_to_prob, tensor_to_ndarray
 from .mmcv import CollateMMCV, send_datacontainers_to_device, unpack_datacontainers
@@ -47,6 +47,7 @@ from .object_detection import (
     from_coco,
     from_coco_or_voc,
     from_voc,
+    get_detection_classes,
     get_image_name_num,
     get_voc_classes,
     getCOCOCatIDs,

@@ -4,7 +4,7 @@ import pandas as pd
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
-from ..constants import PREDICT, TEST, TRAIN, VAL
+from ..constants import PREDICT, TEST, TRAIN, VALIDATE
 from .dataset import BaseDataset
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from .utils import get_collate_fn
@@ -26,10 +26,10 @@ class BaseDataModule(LightningDataModule):
         per_gpu_batch_size: int,
         num_workers: int,
         train_data: Optional[pd.DataFrame] = None,
-        val_data: Optional[pd.DataFrame] = None,
+        validate_data: Optional[pd.DataFrame] = None,
         test_data: Optional[pd.DataFrame] = None,
         predict_data: Optional[pd.DataFrame] = None,
-        id_mappings: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         val_use_training_mode: bool = False,
     ):
         """
@@ -50,7 +50,7 @@ class BaseDataModule(LightningDataModule):
             Number of workers for Pytorch DataLoader.
         train_data
             Training data.
-        val_data
+        validate_data
             Validation data.
         test_data
             Test data.
@@ -77,7 +77,7 @@ class BaseDataModule(LightningDataModule):
         self.per_gpu_batch_size = per_gpu_batch_size
         self.num_workers = num_workers
         self.train_data = train_data
-        self.val_data = val_data
+        self.validate_data = validate_data
         self.test_data = test_data
         self.predict_data = predict_data
         self.id_mappings = id_mappings
@@ -86,7 +86,7 @@ class BaseDataModule(LightningDataModule):
     def set_dataset(self, split):
         data_split = getattr(self, f"{split}_data")
         if self.val_use_training_mode:
-            is_training = split in [TRAIN, VAL]
+            is_training = split in [TRAIN, VALIDATE]
         else:
             is_training = split == TRAIN
         dataset = BaseDataset(
@@ -115,7 +115,9 @@ class BaseDataModule(LightningDataModule):
         """
         if stage == "fit":
             self.set_dataset(TRAIN)
-            self.set_dataset(VAL)
+            self.set_dataset(VALIDATE)
+        elif stage == "validate":
+            self.set_dataset(VALIDATE)
         elif stage == "test":
             self.set_dataset(TEST)
         elif stage == "predict":
@@ -158,7 +160,7 @@ class BaseDataModule(LightningDataModule):
         A Pytorch DataLoader object.
         """
         loader = DataLoader(
-            self.val_dataset,
+            self.validate_dataset,
             batch_size=self.per_gpu_batch_size,
             num_workers=self.num_workers,
             pin_memory=False,

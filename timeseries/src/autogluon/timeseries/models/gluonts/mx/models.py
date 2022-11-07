@@ -83,7 +83,7 @@ class DeepARMXNetModel(AbstractGluonTSMXNetModel):
         Whether to automatically scale the target values
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
@@ -92,6 +92,7 @@ class DeepARMXNetModel(AbstractGluonTSMXNetModel):
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = DeepAREstimator
+    default_num_samples: int = 250
 
     def _get_estimator_init_args(self) -> dict:
         init_kwargs = super()._get_estimator_init_args()
@@ -111,12 +112,11 @@ class AbstractGluonTSSeq2SeqModel(AbstractGluonTSMXNetModel):
 
     gluonts_estimator_class: Type[GluonTSEstimator] = None
 
-    def _get_estimator(self):
+    def _get_estimator_init_args(self):
+        init_kwargs = super()._get_estimator_init_args()
         if get_mxnet_context() != mx.context.cpu():
-            self.params["hybridize"] = False
-
-        with warning_filter():
-            return self.gluonts_estimator_class.from_hyperparameters(**self._get_estimator_init_args())
+            init_kwargs["hybridize"] = False
+        return init_kwargs
 
 
 class MQCNNMXNetModel(AbstractGluonTSSeq2SeqModel):
@@ -178,7 +178,7 @@ class MQCNNMXNetModel(AbstractGluonTSSeq2SeqModel):
         True otherwise)
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
@@ -232,7 +232,7 @@ class MQRNNMXNetModel(AbstractGluonTSSeq2SeqModel):
         True otherwise)
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
@@ -274,7 +274,7 @@ class SimpleFeedForwardMXNetModel(AbstractGluonTSMXNetModel):
         its inverse
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
@@ -284,22 +284,19 @@ class SimpleFeedForwardMXNetModel(AbstractGluonTSMXNetModel):
 
     gluonts_estimator_class: Type[GluonTSEstimator] = SimpleFeedForwardEstimator
 
-    def _get_estimator(self) -> GluonTSEstimator:
-        """Return the GluonTS Estimator object for the model"""
-        hyperparameters = self._get_estimator_init_args()
+    def _get_estimator_init_args(self):
+        init_kwargs = super()._get_estimator_init_args()
         # Workaround: Ray Tune doesn't support lists as hyperparameters, so we build `num_hidden_dimensions`
         # from `hidden_dim` and `num_layers`
-        if "num_hidden_dimensions" in hyperparameters:
+        if "num_hidden_dimensions" in init_kwargs:
             logger.warning(
                 f"Hyperparameter 'num_hidden_dimensions' is ignored by {self.name}. "
                 f"Please use hyperparameters 'hidden_dim' and 'num_layers' instead."
             )
-        hidden_dim = hyperparameters.pop("hidden_dim", 40)
-        num_layers = hyperparameters.pop("num_layers", 2)
-        hyperparameters["num_hidden_dimensions"] = [hidden_dim] * num_layers
-
-        with warning_filter():
-            return self.gluonts_estimator_class.from_hyperparameters(**hyperparameters)
+        hidden_dim = init_kwargs.pop("hidden_dim", 40)
+        num_layers = init_kwargs.pop("num_layers", 2)
+        init_kwargs["num_hidden_dimensions"] = [hidden_dim] * num_layers
+        return init_kwargs
 
 
 class TemporalFusionTransformerMXNetModel(AbstractGluonTSMXNetModel):
@@ -328,7 +325,7 @@ class TemporalFusionTransformerMXNetModel(AbstractGluonTSMXNetModel):
         Dropout regularization parameter
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
@@ -345,22 +342,18 @@ class TemporalFusionTransformerMXNetModel(AbstractGluonTSMXNetModel):
             init_kwargs["static_feature_dims"] = {FieldName.FEAT_STATIC_REAL: self.num_feat_static_real}
         if self.num_feat_dynamic_real > 0:
             init_kwargs["dynamic_feature_dims"] = {FieldName.FEAT_DYNAMIC_REAL: self.num_feat_dynamic_real}
-        return init_kwargs
 
-    def _get_estimator(self) -> GluonTSEstimator:
-        """Return the GluonTS Estimator object for the model"""
-        hyperparameters = self._get_estimator_init_args()
         # Turning off hybridization prevents MXNet errors when training on GPU
-        hyperparameters["hybridize"] = False
+        init_kwargs["hybridize"] = False
         # TFT cannot handle arbitrary quantiles, this is a workaround
-        hyperparameters["num_outputs"] = 9
+        init_kwargs["num_outputs"] = 9
+
         if not set(self.quantile_levels).issubset(self.supported_quantiles):
             raise ValueError(
                 f"{self.name} requires that quantile_levels are a subset of "
                 f"{self.supported_quantiles} (received quantile_levels = {self.quantile_levels})"
             )
-        with warning_filter():
-            return self.gluonts_estimator_class.from_hyperparameters(**hyperparameters)
+        return init_kwargs
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
         if quantile_levels is not None and not set(quantile_levels).issubset(self.supported_quantiles):
@@ -410,7 +403,7 @@ class TransformerMXNetModel(AbstractGluonTSMXNetModel):
         dropout, 'r' for residual connections and 'n' for normalization
     epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 32
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
@@ -447,14 +440,11 @@ class GenericGluonTSMXNetModel(AbstractGluonTSMXNetModel):
         params_dict["gluonts_estimator_class"] = self.gluonts_estimator_class
         return params_dict
 
-    def _get_estimator(self):
-        # TODO: temporarily disabling hybridization on GPU due to mxnet issue
-        # TODO: fixed in mxnet v2.0
+    def _get_estimator_init_args(self):
+        init_kwargs = super()._get_estimator_init_args()
         if get_mxnet_context() != mx.context.cpu():
-            self.params["hybridize"] = False
-
-        with warning_filter():
-            return self.gluonts_estimator_class.from_hyperparameters(**self._get_estimator_init_args())
+            init_kwargs["hybridize"] = False
+        return init_kwargs
 
 
 class GenericGluonTSMXNetModelFactory(AbstractTimeSeriesModelFactory):

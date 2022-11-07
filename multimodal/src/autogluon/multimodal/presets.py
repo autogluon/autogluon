@@ -4,6 +4,7 @@ from .constants import DATA, DISTILLER, ENVIRONMENT, MATCHER, MODEL, OPTIMIZATIO
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")
+matcher_presets = Registry("matcher_presets")
 
 
 @automm_presets.register()
@@ -154,16 +155,41 @@ def feature_extraction():
 
 
 @automm_presets.register()
+@matcher_presets.register()
 def siamese_network():
     return automm_presets.create("default")
 
 
 @automm_presets.register()
+@matcher_presets.register()
+def image_similarity():
+    return {
+        "model.names": ["timm_image"],
+        "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
 def text_similarity():
     return {
         "model.names": ["hf_text"],
         "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
         "model.hf_text.pooling_mode": "mean",
+        "data.categorical.convert_to_text": True,
+        "data.numerical.convert_to_text": True,
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def image_text_similarity():
+    return {
+        "model.names": ["clip"],
+        "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
+        "matcher.loss.type": "multi_negatives_softmax_loss",
+        "env.per_gpu_batch_size": 128,
+        "optimization.learning_rate": 1e-5,
     }
 
 

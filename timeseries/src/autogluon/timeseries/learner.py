@@ -22,8 +22,7 @@ logger = logging.getLogger(__name__)
 
 class TimeSeriesLearner(AbstractLearner):
     """TimeSeriesLearner encompasses a full time series learning problem for a
-    training run, and keeps track of datasets, features, random seeds, and the
-    trainer object.
+    training run, and keeps track of datasets, features, and the trainer object.
     """
 
     def __init__(
@@ -31,14 +30,13 @@ class TimeSeriesLearner(AbstractLearner):
         path_context: str,
         target: str = "target",
         known_covariates_names: Optional[List[str]] = None,
-        random_state: int = 0,
         trainer_type: Type[AbstractTimeSeriesTrainer] = AutoTimeSeriesTrainer,
         eval_metric: Optional[str] = None,
         prediction_length: int = 1,
         validation_splitter: AbstractTimeSeriesSplitter = LastWindowSplitter(),
         **kwargs,
     ):
-        super().__init__(path_context=path_context, random_state=random_state)
+        super().__init__(path_context=path_context)
         self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.trainer_type = trainer_type
         self.target = target
@@ -49,7 +47,6 @@ class TimeSeriesLearner(AbstractLearner):
             kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
         self.validation_splitter = validation_splitter
-        logger.info(f"Learner random seed set to {random_state}")
         self.static_feature_pipeline = ContinuousAndCategoricalFeatureGenerator()
         self._train_static_feature_columns: pd.Index = None
         self._train_static_feature_dtypes: pd.Series = None

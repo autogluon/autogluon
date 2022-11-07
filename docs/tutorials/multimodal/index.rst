@@ -69,17 +69,17 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       How to use AutoMM for entity extraction.
 
    .. card::
-      :title: Text-to-text matching with AutoMM - Quick Start
-      :link: text2text_matching.html
-
-      How to use AutoMM for text to text matching.
- 
-   .. card::
-      :title: Parameter-Efficient Finetuning in AutoMM -- Basic Usage
+      :title: Single GPU Billion-scale Model Training via Parameter-Efficient Finetuning
       :link: efficient_finetuning_basic.html
 
       How to take advantage of larger foundation models with the help of parameter-efficient finetuning.
-      In the tutorial, we will use the combination of IA^3 and BitFit to finetune a multilingual backbone.
+      In the tutorial, we will use combine IA^3, BitFit, and gradient checkpointing to finetune FLAN-T5-XL.
+ 
+   .. card::
+      :title: Text-to-text Matching with AutoMM - Quick Start
+      :link: text2text_matching.html
+
+      How to use AutoMM for text to text matching.
 
    .. card::
       :title: Customize AutoMM
@@ -102,4 +102,5 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
    clip_embedding
    semantic_search
    ner
+   text2text_matching
    customization
