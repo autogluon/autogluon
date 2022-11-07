@@ -605,6 +605,15 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         """Choose which backend(Ray or Custom) to use for hpo"""
         return RAY_BACKEND
 
+    def get_minimum_resources(self, is_gpu_available=False):
+        minimum_resources = {
+            'num_cpus': 1,
+        }
+        if is_gpu_available:
+            # Our custom implementation does not support partial GPU. No gpu usage according to nvidia-smi when the `num_gpus` passed to fit is fractional`
+            minimum_resources['num_gpus'] = 1
+        return minimum_resources
+
     def _more_tags(self):
         # `can_refit_full=True` because batch_size and num_epochs is communicated at end of `_fit`:
         #  self.params_trained['batch_size'] = batch_size

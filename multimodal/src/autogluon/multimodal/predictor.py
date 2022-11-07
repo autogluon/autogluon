@@ -349,14 +349,14 @@ class MultiModalPredictor:
     @property
     def path(self):
         if self._matcher:
-            self._matcher.path
+            return self._matcher.path
         else:
             return self._save_path
 
     @property
     def label(self):
         if self._matcher:
-            self._matcher.label
+            return self._matcher.label
         else:
             return self._label_column
 
@@ -387,14 +387,14 @@ class MultiModalPredictor:
     @property
     def problem_type(self):
         if self._matcher:
-            self._matcher.problem_type
+            return self._matcher.problem_type
         else:
             return self._problem_type
 
     @property
     def column_types(self):
         if self._matcher:
-            self._matcher.column_types
+            return self._matcher.column_types
         else:
             return self._column_types
 
@@ -1993,6 +1993,7 @@ class MultiModalPredictor:
                 cutoffs=cutoffs,
                 label=label,
                 metrics=metrics,
+                return_pred=return_pred,
             )
 
         if self._pipeline == OBJECT_DETECTION:

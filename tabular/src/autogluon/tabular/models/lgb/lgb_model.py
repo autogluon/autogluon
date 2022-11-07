@@ -329,6 +329,28 @@ class LGBModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+    
+    def _is_gpu_lgbm_installed(self):
+        # Taken frmo https://github.com/microsoft/LightGBM/issues/3939
+        try_import_lightgbm()
+        import lightgbm
+        try:
+            data = np.random.rand(50, 2)
+            label = np.random.randint(2, size=50)
+            train_data = lightgbm.Dataset(data, label=label)
+            params = {'device': 'gpu'}
+            gbm = lightgbm.train(params, train_set=train_data, verbose=-1)
+            return True
+        except Exception as e:
+            return False
+    
+    def get_minimum_resources(self, is_gpu_available=False):
+        minimum_resources = {
+            'num_cpus': 1,
+        }
+        if is_gpu_available and self._is_gpu_lgbm_installed():
+            minimum_resources['num_gpus'] = 0.5
+        return minimum_resources
 
     def _get_default_resources(self):
         # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
