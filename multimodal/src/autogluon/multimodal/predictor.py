@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import OrderedDict
 import copy
 import json
 import logging
@@ -12,6 +11,7 @@ import shutil
 import sys
 import time
 import warnings
+from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Callable, Dict, List, Optional, Union
