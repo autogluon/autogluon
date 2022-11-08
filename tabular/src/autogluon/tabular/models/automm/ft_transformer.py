@@ -1,5 +1,6 @@
 """Wrapper of the MultiModalPredictor."""
 import logging
+from typing import Dict
 from .automm_model import MultiModalPredictorModel
 
 logger = logging.getLogger(__name__)
@@ -60,3 +61,9 @@ class FTTransformerModel(MultiModalPredictorModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    def get_minimum_resources(self) -> Dict[str, int]:
+        return {
+            'num_cpus': 1,
+            'num_gpus': 1,
+        }

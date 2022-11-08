@@ -142,7 +142,7 @@ from .utils import (
     tensor_to_ndarray,
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
-    update_config_by_resources,
+    update_tabular_config_by_resources,
     update_config_by_rules,
     use_realtime,
 )
@@ -935,7 +935,7 @@ class MultiModalPredictor:
         else:  # continuing training
             df_preprocessor = self._df_preprocessor
 
-        config = update_config_by_resources(
+        config = update_tabular_config_by_resources(
             config,
             num_numerical_columns=len(df_preprocessor.numerical_feature_names),
             num_categorical_columns=len(df_preprocessor.categorical_num_categories),

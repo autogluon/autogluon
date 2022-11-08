@@ -516,7 +516,7 @@ def update_pretrain_config(
     return config
 
 
-def update_config_by_resources(
+def update_tabular_config_by_resources(
     config: DictConfig,
     num_numerical_columns: Optional[int] = 0,
     num_categorical_columns: Optional[int] = 0,
@@ -556,15 +556,15 @@ def update_config_by_resources(
     for model in columns_per_model:
         if model in config.model.names:
             model_ = getattr(config.model, model)
-            if columns_per_model[model] > 0 and model_.additive_attention is None:
+            if columns_per_model[model] > 300 and model_.additive_attention is None:
                 model_.additive_attention = True
                 model_.share_qv_weights = True if model_.share_qv_weights is None else model_.share_qv_weights
                 warnings.warn(
                     f"Dataset contains >300 features, using additive attention for efficiency",
                     UserWarning,
                 )
-            if columns_per_model[model] * per_gpu_batch_size > threshold:
-                per_gpu_batch_size = int(threshold / columns_per_model[model])
+                if columns_per_model[model] * per_gpu_batch_size > threshold:
+                    per_gpu_batch_size = int(threshold / columns_per_model[model])
     per_gpu_batch_size = max(per_gpu_batch_size, 1)
     if per_gpu_batch_size < config.env.per_gpu_batch_size:
         config.env.per_gpu_batch_size = per_gpu_batch_size
