@@ -19,13 +19,13 @@ Text Prediction
 
    .. card::
       :title: AutoMM for Text Prediction - Quick Start
-      :link: beginner_text.html
+      :link: text_prediction/beginner_text.html
 
       How to train high-quality text prediction models with MultiModalPredictor in under 5 minutes.
 
    .. card::
       :title: AutoMM for Text Prediction - Multilingual Problems
-      :link: multilingual_text.html
+      :link: text_prediction/multilingual_text.html
 
       How to use MultiModalPredictor to build models on datasets with languages other than English.
 
@@ -36,13 +36,13 @@ Image Prediction
 
    .. card::
       :title: AutoMM for Image Classification - Quick Start
-      :link: beginner_image_cls.html
+      :link: image_prediction/beginner_image_cls.html
 
       How to train image classification models with MultiModalPredictor.
 
    .. card::
       :title: Zero-Shot Image Classification with CLIP
-      :link: clip_zeroshot.html
+      :link: image_prediction/clip_zeroshot.html
 
       How to enable zero-shot image classification in AutoMM via pretrained CLIP model.
 
@@ -53,7 +53,7 @@ Named Entity Recognition
 
    .. card::
       :title: Named Entity Recognition with AutoMM - Quick Start
-      :link: ner.html
+      :link: named_entity_recognition/ner.html
 
       How to use AutoMM for entity extraction.
 
@@ -69,14 +69,20 @@ Matching
 .. container:: cards
 
    .. card::
+      :title: Text-to-text Matching with AutoMM - Quick Start
+      :link: matching/text2text_matching.html
+
+      How to use AutoMM for text to text matching.
+
+   .. card::
       :title: Semantic Textual Search with AutoGluon Multimodal Matching
-      :link: semantic_search.html
+      :link: matching/semantic_search.html
 
       How to use semantic embeddings to improve search ranking performance.
 
    .. card::
       :title: Extract Image/Text Embeddings in AutoMM for Matching Problems
-      :link: clip_embedding.html
+      :link: matching/clip_embedding.html
 
       How to use CLIP to extract embeddings for retrieval problem.
 
@@ -87,13 +93,14 @@ Multimodal Classification / Regression
 
    .. card::
       :title: AutoMM for Text + Tabular - Quick Start
-      :link: multimodal_text_tabular.html
+      :link: mulitmodal_prediction/multimodal_text_tabular.html
 
-      How MultiModalPredictor can be applied to multimodal data tables with a mix of text, numerical, and categorical columns. Here, we train a model to predict the price of books.
+      How MultiModalPredictor can be applied to multimodal data tables with a mix of text, numerical, and
+      categorical columns. Here, we train a model to predict the price of books.
 
    .. card::
       :title: AutoMM for Image + Text + Tabular - Quick Start
-      :link: beginner_multimodal.html
+      :link: mulitmodal_prediction/beginner_multimodal.html
 
       How to use MultiModalPredictor to train a model that predicts the adoption speed of pets.
 
@@ -104,20 +111,14 @@ Advanced Topics
 
    .. card::
       :title: Single GPU Billion-scale Model Training via Parameter-Efficient Finetuning
-      :link: efficient_finetuning_basic.html
+      :link: advanced_topics/efficient_finetuning_basic.html
 
       How to take advantage of larger foundation models with the help of parameter-efficient finetuning.
       In the tutorial, we will use combine IA^3, BitFit, and gradient checkpointing to finetune FLAN-T5-XL.
  
    .. card::
-      :title: Text-to-text Matching with AutoMM - Quick Start
-      :link: text2text_matching.html
-
-      How to use AutoMM for text to text matching.
-
-   .. card::
       :title: Customize AutoMM
-      :link: customization.html
+      :link: advanced_topics/customization.html
 
       How to customize AutoMM configurations.
 
@@ -126,15 +127,15 @@ Advanced Topics
    :maxdepth: 2
    :hidden:
 
-   beginner_text
-   multilingual_text
-   beginner_image_cls
-   clip_zeroshot
-   ner
-   text2text_matching
-   semantic_search
-   clip_embedding
-   multimodal_text_tabular
-   beginner_multimodal
-   efficient_finetuning_basic
-   customization
+   text_prediction/beginner_text
+   text_prediction/multilingual_text
+   image_prediction/beginner_image_cls
+   image_prediction/clip_zeroshot
+   named_entity_recognition/ner
+   matching/text2text_matching
+   matching/semantic_search
+   matching/clip_embedding
+   multimodal_prediction/multimodal_text_tabular
+   multimodal_prediction/beginner_multimodal
+   advanced_topics/efficient_finetuning_basic
+   advanced_topics/customization
