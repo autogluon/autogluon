@@ -12,14 +12,28 @@ intent detection, paraphrase detection, image classification. Moreover, `AutoMM`
 
 In the following, we prepared a few tutorials to help you learn how to use `AutoMM` to solve problems that involve image, text, and tabular data.
 
+
+Text Prediction
+---------------
 .. container:: cards
 
    .. card::
-      :title: AutoMM for Text - Quick Start
+      :title: AutoMM for Text Prediction - Quick Start
       :link: beginner_text.html
 
       How to train high-quality text prediction models with MultiModalPredictor in under 5 minutes.
-    
+
+   .. card::
+      :title: AutoMM for Text Prediction - Multilingual Problems
+      :link: multilingual_text.html
+
+      How to use MultiModalPredictor to build models on datasets with languages other than English.
+
+
+Image Prediction
+----------------
+.. container:: cards
+
    .. card::
       :title: AutoMM for Image Classification - Quick Start
       :link: beginner_image_cls.html
@@ -27,10 +41,49 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       How to train image classification models with MultiModalPredictor.
 
    .. card::
-      :title: AutoMM for Text - Multilingual Problems
-      :link: multilingual_text.html
+      :title: Zero-Shot Image Classification with CLIP
+      :link: clip_zeroshot.html
 
-      How to use MultiModalPredictor to build models on datasets with languages other than English.
+      How to enable zero-shot image classification in AutoMM via pretrained CLIP model.
+
+
+Named Entity Recognition
+------------------------
+.. container:: cards
+
+   .. card::
+      :title: Named Entity Recognition with AutoMM - Quick Start
+      :link: ner.html
+
+      How to use AutoMM for entity extraction.
+
+
+Object Detection
+----------------
+.. container:: cards
+
+
+
+Matching
+--------
+.. container:: cards
+
+   .. card::
+      :title: Semantic Textual Search with AutoGluon Multimodal Matching
+      :link: semantic_search.html
+
+      How to use semantic embeddings to improve search ranking performance.
+
+   .. card::
+      :title: Extract Image/Text Embeddings in AutoMM for Matching Problems
+      :link: clip_embedding.html
+
+      How to use CLIP to extract embeddings for retrieval problem.
+
+
+Multimodal Classification / Regression
+--------------------------------------
+.. container:: cards
 
    .. card::
       :title: AutoMM for Text + Tabular - Quick Start
@@ -39,34 +92,15 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       How MultiModalPredictor can be applied to multimodal data tables with a mix of text, numerical, and categorical columns. Here, we train a model to predict the price of books.
 
    .. card::
-      :title: AutoMM for Multimodal - Quick Start
+      :title: AutoMM for Image + Text + Tabular - Quick Start
       :link: beginner_multimodal.html
 
       How to use MultiModalPredictor to train a model that predicts the adoption speed of pets.
 
-   .. card::
-      :title: CLIP in AutoMM - Zero-Shot Image Classification 
-      :link: clip_zeroshot.html
 
-      How to use CLIP for zero-shot image classification. 
-
-   .. card::
-      :title: CLIP in AutoMM - Extract Embeddings
-      :link: clip_embedding.html
-
-      How to use CLIP to extract embeddings for retrieval problem.
-
-   .. card::
-      :title: Semantic Search with AutoMM - Extract Embeddings
-      :link: semantic_search.html
-
-      How to use semantic embeddings to improve search ranking performance.
-
-   .. card::
-      :title: Named Entity Recognition with AutoMM - Quick Start
-      :link: ner.html
-
-      How to use AutoMM for entity extraction.
+Advanced Topics
+---------------
+.. container:: cards
 
    .. card::
       :title: Single GPU Billion-scale Model Training via Parameter-Efficient Finetuning
@@ -83,17 +117,17 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
 
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :hidden:
 
    beginner_text
-   beginner_image_cls
    multilingual_text
+   beginner_image_cls
+   clip_zeroshot
+   ner
+   semantic_search
+   clip_embedding
    multimodal_text_tabular
    beginner_multimodal
    efficient_finetuning_basic
-   clip_zeroshot
-   clip_embedding
-   semantic_search
-   ner
    customization
