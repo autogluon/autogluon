@@ -187,11 +187,11 @@ problem_property_dict = OrderedDict(
         ),
         (
             OCR_TEXT_DETECTION,
-            ProblemProperty(OCR_TEXT_DETECTION, support_fit=False, inference_ready=True, experimental=True)
+            ProblemProperty(OCR_TEXT_DETECTION, support_fit=False, inference_ready=True, experimental=True),
         ),
         (
             OCR_TEXT_RECOGNITION,
-            ProblemProperty(OCR_TEXT_RECOGNITION, support_fit=False, inference_ready=True, experimental=True)
+            ProblemProperty(OCR_TEXT_RECOGNITION, support_fit=False, inference_ready=True, experimental=True),
         ),
     ]
 )
