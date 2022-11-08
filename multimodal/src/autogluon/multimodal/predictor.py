@@ -2247,11 +2247,12 @@ class MultiModalPredictor:
         Array of predictions, one corresponding to each row in given dataset.
         """
         if not self._fit_called:
-            if self._problem_type is not None
-            raise RuntimeError(f"We cannot run `predictor.predict()` because you have not called predictor.fit() . "
-                               f"has not "
-                               f"predictor is created via problem_type={self.problem_type} "
-                               f"and does not support running inference .")
+            if self._problem_type is not None:
+                if not problem_property_dict.get(self._problem_type).inference_ready:
+                    raise RuntimeError(
+                        f"problem_type='self._problem_type' does not support running inference directly. "
+                        f"You need to call `predictor.fit()` first before running `predictor.predict()`."
+                    )
 
         if self._matcher:
             return self._matcher.predict(
