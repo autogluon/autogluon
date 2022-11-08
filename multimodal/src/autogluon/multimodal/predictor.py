@@ -2857,7 +2857,7 @@ class MultiModalPredictor:
         Dict containing various detailed information.
         We do not recommend directly printing this dict as it may be very large.
         """
-        results = {"val_accuracy": self.best_score, "training_time": self.elapsed_time}
+        results = {f"val_{self._validation_metric_name}": self.best_score, "training_time": self.elapsed_time}
         return results
 
     def list_supported_models(self, pretrained=True):
