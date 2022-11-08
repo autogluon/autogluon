@@ -201,12 +201,21 @@ class DefaultLearner(AbstractTabularLearner):
             logger.log(20, f'Train Data Class Count: {self.label_cleaner.num_classes}')
 
         if X_val is not None and self.label in X_val.columns:
+            X_val_og = X_val
             X_val = self.cleaner.transform(X_val)
             if len(X_val) == 0:
                 logger.warning('############################################################################################################\n'
                                'WARNING: All X_val data contained low frequency classes, ignoring X_val and generating from subset of X\n'
-                               '\tYour input validation data or training data labels might be corrupted, please manually inspect them for correctness!\n'
-                               '############################################################################################################')
+                               '\tYour input validation data or training data labels might be corrupted, please manually inspect them for correctness!')
+                if self.problem_type in [BINARY, MULTICLASS]:
+                    train_classes = sorted(list(y_uncleaned.unique()))
+                    val_classes = sorted(list(X_val_og[self.label].unique()))
+                    logger.warning(f'\tTraining Classes: {train_classes}')
+                    logger.warning(f'\tTuning   Classes: {val_classes}')
+                    missing_classes = [c for c in val_classes if c not in train_classes]
+                    logger.warning(f'\tClasses missing from Training Data: {missing_classes}')
+                logger.warning('############################################################################################################')
+
                 X_val = None
                 y_val = None
                 w_val = None
