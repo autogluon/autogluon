@@ -168,25 +168,28 @@ class ProblemProperty:
     experimental: bool = False  # Indicate whether the problem is experimental
 
 
-problem_property_dict = OrderedDict([
-    (CLASSIFICATION, ProblemProperty(CLASSIFICATION)),
-    (BINARY, ProblemProperty(BINARY)),
-    (MULTICLASS, ProblemProperty(MULTICLASS)),
-    (REGRESSION, ProblemProperty(REGRESSION)),
-    (OBJECT_DETECTION, ProblemProperty(OBJECT_DETECTION, inference_ready=True)),
-    (TEXT_SIMILARITY, ProblemProperty(TEXT_SIMILARITY, inference_ready=True, is_matching=True)),
-    (IMAGE_SIMILARITY, ProblemProperty(IMAGE_SIMILARITY, inference_ready=True, is_matching=True)),
-    (IMAGE_TEXT_SIMILARITY, ProblemProperty(IMAGE_TEXT_SIMILARITY, inference_ready=True, is_matching=True)),
-    (NER, ProblemProperty(NAMED_ENTITY_RECOGNITION, inference_ready=True)),
-    (NAMED_ENTITY_RECOGNITION, ProblemProperty(NAMED_ENTITY_RECOGNITION, inference_ready=True)),
-    (FEATURE_EXTRACTION, ProblemProperty(FEATURE_EXTRACTION, support_fit=False, inference_ready=True)),
-    (ZERO_SHOT_IMAGE_CLASSIFICATION,
-     ProblemProperty(ZERO_SHOT_IMAGE_CLASSIFICATION, support_fit=False, inference_ready=True)),
-    (OCR_TEXT_DETECTION,
-     ProblemProperty(OCR_TEXT_DETECTION, support_fit=False, inference_ready=True)),
-    (OCR_TEXT_RECOGNITION,
-     ProblemProperty(OCR_TEXT_RECOGNITION, support_fit=False, inference_ready=True))
-])
+problem_property_dict = OrderedDict(
+    [
+        (CLASSIFICATION, ProblemProperty(CLASSIFICATION)),
+        (BINARY, ProblemProperty(BINARY)),
+        (MULTICLASS, ProblemProperty(MULTICLASS)),
+        (REGRESSION, ProblemProperty(REGRESSION)),
+        (OBJECT_DETECTION, ProblemProperty(OBJECT_DETECTION, inference_ready=True)),
+        (TEXT_SIMILARITY, ProblemProperty(TEXT_SIMILARITY, inference_ready=True, is_matching=True)),
+        (IMAGE_SIMILARITY, ProblemProperty(IMAGE_SIMILARITY, inference_ready=True, is_matching=True)),
+        (IMAGE_TEXT_SIMILARITY, ProblemProperty(IMAGE_TEXT_SIMILARITY, inference_ready=True, is_matching=True)),
+        (NER, ProblemProperty(NAMED_ENTITY_RECOGNITION, inference_ready=True)),
+        (NAMED_ENTITY_RECOGNITION, ProblemProperty(NAMED_ENTITY_RECOGNITION, inference_ready=True)),
+        (FEATURE_EXTRACTION, ProblemProperty(FEATURE_EXTRACTION, support_fit=False, inference_ready=True)),
+        (
+            ZERO_SHOT_IMAGE_CLASSIFICATION,
+            ProblemProperty(ZERO_SHOT_IMAGE_CLASSIFICATION, support_fit=False, inference_ready=True),
+        ),
+        (OCR_TEXT_DETECTION, ProblemProperty(OCR_TEXT_DETECTION, support_fit=False, inference_ready=True)),
+        (OCR_TEXT_RECOGNITION, ProblemProperty(OCR_TEXT_RECOGNITION, support_fit=False, inference_ready=True)),
+    ]
+)
+
 
 class MultiModalPredictor:
     """
@@ -322,8 +325,10 @@ class MultiModalPredictor:
         """
         if pipeline is not None:
             pipeline = pipeline.lower()
-            warnings.warn(f"pipeline argument has been deprecated and moved to problem_type. "
-                          f"Use problem_type='{pipeline}' instead.")
+            warnings.warn(
+                f"pipeline argument has been deprecated and moved to problem_type. "
+                f"Use problem_type='{pipeline}' instead."
+            )
             problem_type = pipeline
         # Sanity check of problem_type
         if problem_type is not None:
@@ -335,9 +340,10 @@ class MultiModalPredictor:
                     DeprecationWarning,
                 )
                 problem_type = ZERO_SHOT_IMAGE_CLASSIFICATION
-            assert problem_type in problem_property_dict,\
-                f"problem_type='{problem_type}' is not supported yet. You may pick a problem type from" \
+            assert problem_type in problem_property_dict, (
+                f"problem_type='{problem_type}' is not supported yet. You may pick a problem type from"
                 f" {problem_property_dict.keys()}."
+            )
             problem_property = problem_property_dict.get(problem_type)
             problem_type = problem_property.name
             if problem_property.experimental:
@@ -358,8 +364,10 @@ class MultiModalPredictor:
             "pearsonr",
             "spearmanr",
         ]:
-            logger.debug(f"Infer problem type to be a regression problem "
-                         f"since the evaluation metric is set as {eval_metric}.")
+            logger.debug(
+                f"Infer problem type to be a regression problem "
+                f"since the evaluation metric is set as {eval_metric}."
+            )
             problem_type = REGRESSION
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
@@ -636,8 +644,10 @@ class MultiModalPredictor:
         """
         if self.problem_type is not None:
             if not problem_property_dict.get(self.problem_type).support_fit:
-                raise RuntimeError(f"The problem_type='{self.problem_type}' does not support `predictor.fit()`. "
-                                   f"You may try to use `predictor.predict()` or `predictor.evaluate()`.")
+                raise RuntimeError(
+                    f"The problem_type='{self.problem_type}' does not support `predictor.fit()`. "
+                    f"You may try to use `predictor.predict()` or `predictor.evaluate()`."
+                )
 
         training_start = time.time()
         if self._matcher:
@@ -2096,7 +2106,9 @@ class MultiModalPredictor:
             )
         if self.problem_type == OBJECT_DETECTION:
             if realtime:
-                return NotImplementedError(f"Current problem type {self.problem_type} does not support realtime predict.")
+                return NotImplementedError(
+                    f"Current problem type {self.problem_type} does not support realtime predict."
+                )
             return self.evaluate_coco(
                 anno_file_or_df=data, metrics=metrics, return_pred=return_pred, seed=seed, eval_tool=eval_tool
             )
