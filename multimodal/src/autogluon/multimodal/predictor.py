@@ -18,13 +18,14 @@ import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
+import transformers
 import yaml
 from omegaconf import DictConfig, OmegaConf
 from packaging import version
 from sklearn.model_selection import train_test_split
 from torch import nn
 
-from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.utils.try_import import try_import_ray_lightning
 from autogluon.core.utils.utils import default_holdout_frac
@@ -286,6 +287,8 @@ class MultiModalPredictor:
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
             verbosity = 1  # don't use 3, which doesn't suppress logger.info() in .load().
             enable_progress_bar = False
+            # Also disable progress bar of transformers package
+            transformers.logging.disable_progress_bar()
 
         if verbosity is not None:
             set_logger_verbosity(verbosity, logger=logger)
@@ -405,11 +408,18 @@ class MultiModalPredictor:
         Parameters
         ----------
         verbosity
-            The verbosity level
+            The verbosity level.
+
+            0 --> only errors
+            1 --> only warnings and critical print statements
+            2 --> key print statements which should be shown by default
+            3 --> more-detailed printing
+            4 --> everything
 
         """
         self._verbosity = verbosity
         set_logger_verbosity(verbosity, logger=logger)
+        transformers.logging.set_verbosity(verbosity2loglevel(verbosity))
 
     def fit(
         self,

@@ -19,7 +19,6 @@ submodule = 'text'
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
     f'autogluon.multimodal=={version}',
-    'autogluon-contrib-nlp==0.0.1b20220208',
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
