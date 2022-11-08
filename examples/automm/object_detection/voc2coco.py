@@ -9,7 +9,10 @@ With changes:
 5. TODO: remove invalid images?
 
 To use:
-    python3 voc2coco.py --root_dir <root_dir> --train_ratio <train_ratio> --val_ratio <val_ratio>
+    If you'd like to customize train/val/test ratio. Note test_ratio = 1 - train_ratio - val_ratio.
+        python3 voc2coco.py --root_dir <root_dir> --train_ratio <train_ratio> --val_ratio <val_ratio>
+    If you'd like to use the dataset provided train/val/test splits:
+        python3 voc2coco.py --root_dir <root_dir>
 """
 
 import argparse
