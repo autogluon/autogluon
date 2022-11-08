@@ -740,11 +740,13 @@ def get_voc_format_classes(root):
             class_names = [line.rstrip().lower() for line in f]
         print(f"using class_names in labels.txt: {class_names}")
     else:
+        ## read the class names and save results
         logger.warning(
             "labels.txt does not exist, using default VOC names. "
             "To create labels.txt, run ls Annotations/* > pathlist.txt in root dir"
         )
-        class_names = VOC_CLASSES
+        class_names = dump_voc_classes(voc_annotation_path=os.path.join(root, "Annotations"),
+                                       voc_class_names_output_path=labels_file)
 
     return class_names
 
@@ -756,18 +758,21 @@ def get_detection_classes(sample_data_path):
         return get_coco_format_classes(sample_data_path)
 
 
-def visualize_results(image_pred: Iterable, image_path: str, test_path: str, visualization_result_dir: str) -> np.ndarray:
+def visualize_results(image_pred: Iterable, image_path: str, test_path: str,
+                      visualization_result_dir: str, conf_threshold: float) -> np.ndarray:
     """
-    Construct dataframe from pascal VOC format. Modified from gluon cv.
+    Visualize detection results for one image, and save to visualization_result_dir
 
     Parameters
     ----------
     image_pred
-
+        List containing detection results for one image
     image_path
-
+        The image path for the target image to visualize
     test_path
-
+        Annotation path for the testing dataset (either in VOC or COCO format)
+            - for VOC format: e.g. VOCdevkit/VOC2007/Annotations
+            - for COCO format: e.g. coco17/annotations/instances_val2017.json
 
     Returns
     -------
@@ -787,12 +792,12 @@ def visualize_results(image_pred: Iterable, image_path: str, test_path: str, vis
     for idx, per_cls_bboxes in enumerate(image_pred):
         for bbox in per_cls_bboxes:
             ## x1, y1, x2, y2, conf_score
-            if bbox[4] > 0.3:
+            if bbox[4] > conf_threshold:
                 tlwhs.append(bbox_xyxy_to_xywh(list(bbox[:4])))
                 obj_ids.append(idx)
                 conf_scores.append(bbox[4])
 
-    visualized_im = plot_tracking(im, tlwhs, obj_ids, idx2classname, scores=conf_scores)
+    visualized_im = plot_detections(im, tlwhs, obj_ids, idx2classname, conf_threshold, scores=conf_scores)
     imgname = os.path.basename(image_path)
     if not os.path.exists(visualization_result_dir):
         os.makedirs(visualization_result_dir, exist_ok=True)
@@ -800,8 +805,26 @@ def visualize_results(image_pred: Iterable, image_path: str, test_path: str, vis
     return visualized_im
 
 
-def plot_tracking(image, tlwhs, obj_ids, idx2classname, scores=None, frame_id=0, fps=0., ids2=None, line_thickness_unmatched=None,
-                  line_thickness=None):
+def plot_detections(image, tlwhs, obj_ids, idx2classname, conf_threshold, scores=None, frame_id=0,
+                    text_scale=0.75, text_thickness=1, line_thickness=2, alpha=0.5):
+    """
+    Visualize detection results for one image, and save to visualization_result_dir
+
+    Parameters
+    ----------
+    image_pred
+        List containing detection results for one image
+    image_path
+        The image path for the target image to visualize
+    test_path
+        Annotation path for the testing dataset (either in VOC or COCO format)
+            - for VOC format: e.g. VOCdevkit/VOC2007/Annotations
+            - for COCO format: e.g. coco17/annotations/instances_val2017.json
+
+    Returns
+    -------
+    an np.ndarray of visualized image
+    """
     try:
         import cv2
     except:
@@ -809,35 +832,111 @@ def plot_tracking(image, tlwhs, obj_ids, idx2classname, scores=None, frame_id=0,
     im = np.ascontiguousarray(np.copy(image))
     im_h, im_w = im.shape[:2]
 
-    top_view = np.zeros([im_w, im_w, 3], dtype=np.uint8) + 255
+    font = cv2.FONT_HERSHEY_DUPLEX
+    text_scale = text_scale if im_w > 500 else text_scale * 0.8
 
-    text_scale = max(1, image.shape[1] / 1600.)
-    text_thickness = 1 if text_scale > 1.1 else 1
-    # line_thickness = max(1, int(image.shape[1] / 500.)) if line_thickness_unmatched is None else line_thickness_unmatched
-    line_thickness = line_thickness if line_thickness_unmatched is None else line_thickness_unmatched
-
-    radius = max(5, int(im_w / 140.))
-    if fps != -1:
-        cv2.putText(im, 'frame: %d fps: %.2f num: %d' % (frame_id, fps, len(tlwhs)),
-                    (0, int(15 * text_scale)), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 0, 255), thickness=2)
-    else:
-        cv2.putText(im, 'frame: %d num: %d' % (frame_id, len(tlwhs)),
-                    (0, int(15 * text_scale)), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 0, 255), thickness=2)
+    title = 'num_det: %d conf: %.2f' % (len(tlwhs), conf_threshold)
+    im = add_text_with_bg_color(im=im, text=title, tl=(0, 0), bg_color=(0, 0, 0), alpha=alpha,
+                                font=font, text_scale=text_scale, text_thickness=text_thickness)
 
     for i, tlwh in enumerate(tlwhs):
         x1, y1, w, h = tlwh
         intbox = tuple(map(int, (x1, y1, x1 + w, y1 + h)))
         obj_id = int(obj_ids[i])
         id_text = idx2classname[obj_ids[i]]
-        if ids2 is not None:
-            id_text = id_text + ', {}'.format(int(ids2[i]))
         if scores is not None:
-            id_text = id_text + ', {:.3f}'.format(float(scores[i]))
-        _line_thickness = 1 if obj_id <= 0 else line_thickness
+            id_text = id_text + ',{:.3f}'.format(float(scores[i]))
         color = get_color(abs(obj_id))
-        cv2.rectangle(im, intbox[0:2], intbox[2:4], color=color, thickness=line_thickness)
-        cv2.putText(im, id_text, (intbox[0], intbox[1] + 30), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 0, 255),
-                    thickness=text_thickness)
+        im = add_bbox_with_alpha(im=im, tl=intbox[0:2], br=intbox[2:4], line_color=color, alpha=alpha,
+                                 line_thickness=line_thickness)
+        im = add_text_with_bg_color(im=im, text=id_text, tl=(intbox[0], intbox[1]), bg_color=color, alpha=0.75,
+                                    font=font, text_scale=text_scale, text_thickness=text_thickness)
+    return im
+
+
+def add_bbox_with_alpha(im: np.ndarray, tl: tuple, br: tuple, line_color: tuple, alpha: float, line_thickness: int):
+    """
+    draw one box borders with transparency (alpha)
+
+    Parameters
+    ----------
+    im
+        np.ndarray: the image to draw bbox on
+    tl
+        tuple: bottom right corner of the bounding box: tl = (x1, y1)
+    br
+        tuple: bottom right corner of the bounding box: br = (x1, y1)
+    line_color
+        tuple: the color of the box borders, e.g. (0, 0, 0)
+    alpha
+        float: the opacity of the bbox borders
+    line_thickness:
+        int: thickness of the border
+    Returns
+    -------
+    an np.ndarray of image with added bbox
+    """
+    try:
+        import cv2
+    except:
+        raise ImportError("No module named: cv2. Please install cv2 by 'pip install cv2'")
+    overlay = im.copy()
+    cv2.rectangle(overlay, tl, br, line_color, thickness=line_thickness)
+    im = cv2.addWeighted(overlay, alpha, im, 1 - alpha, 0)
+    return im
+
+def add_text_with_bg_color(im: np.ndarray, text: str, tl: tuple, bg_color: tuple, alpha: float, font, text_scale: float,
+                           text_thickness: int, text_vert_padding: int = None):
+    """
+    Add text to im with background color
+
+    Parameters
+    ----------
+    im
+        np.ndarray: the image to add text on
+    text
+        string: the text content
+    tl
+        tuple: top left corner of the text region, tl = (x1, y1)
+    bg_color
+        tuple: the color of the background, e.g. (0, 0, 0)
+    alpha
+        float: the opacity of the background
+    font
+        the font of the text, e.g. cv2.FONT_HERSHEY_DUPLEX
+    text_scale
+        float: the scale (font size) of the text, e.g. 0.75
+    text_thickness
+        int: the font weight of the text, e.g. 1
+    text_vert_padding
+        int: vertical padding of the text on each side
+    Returns
+    -------
+    an np.ndarray of image with added text
+    """
+    try:
+        import cv2
+    except:
+        raise ImportError("No module named: cv2. Please install cv2 by 'pip install cv2'")
+
+    x1, y1 = tl
+
+    overlay = im.copy()
+    text_size, _ = cv2.getTextSize(text, font, float(text_scale), text_thickness)
+    text_w, text_h = text_size
+
+    text_vert_padding = text_vert_padding if text_vert_padding else int(text_h * 0.1)
+
+    y1 = max(y1 - text_h - text_vert_padding * 2, 0)
+
+    cv2.rectangle(overlay, (x1, y1), (x1 + text_w, y1 + text_h + text_vert_padding * 2), bg_color, -1)
+    im = cv2.addWeighted(overlay, alpha, im, 1 - alpha, 0)
+    cv2.putText(im, text,
+                (x1, y1 + text_h + text_vert_padding),
+                font,
+                text_scale,
+                (255, 255, 255),
+                thickness=text_thickness)
     return im
 
 

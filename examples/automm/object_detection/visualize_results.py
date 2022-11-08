@@ -1,23 +1,20 @@
 """
-The example to evaluate a pretrained object detection model in VOC format.
-An example to evaluate a pretrained model on VOC dataset (VOC format):
-    python inference_pretrained_voc_format.py \
-        --test_path VOCdevkit/VOC2007 \
-        --checkpoint_name faster_rcnn_r50_fpn_1x_voc0712 \
-        --result_path VOCdevkit/VOC2007/results.npy
+The example to visualize detection results in COCO dataset (COCO format):
+    python visualize_results.py \
+    --test_path ~/yongxinw-workspace/tools/coco17/annotations/instances_val2017.json \
+    --checkpoint_name vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco \
+    --visualization_result_dir ~/yongxinw-workspace/tools/VOCdevkit/VOC2007/visualizations \
+    --conf_threshold 0.4
 """
 
 import argparse
-import numpy as np
-import os
-
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.utils import from_voc, visualize_results, from_coco
+from autogluon.multimodal.utils import visualize_results, from_coco_or_voc
 
 
 def tutorial_script_for_visualize_detection_results():
     # this code block is used in tutorial
-    checkpoint_name = "faster_rcnn_r50_fpn_1x_voc0712"
+    checkpoint_name = "vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco"
     num_gpus = -1  # here we use all available GPUs
 
     # construct the predictor
@@ -29,22 +26,27 @@ def tutorial_script_for_visualize_detection_results():
         problem_type="object_detection",
     )
 
-    test_path = "VOCdevkit/VOC2007"
+    test_path = "coco17/annotations/instances_val2017.json"
+    visualization_result_dir = "coco17/visualizations"
+    conf_threshold = 0.4
 
-    df = from_voc(test_path)[:10][["image"]]
+    df = from_coco_or_voc(test_path)[:10][["image"]]
+
     pred = predictor.predict(df, as_pandas=False)
+
+    for result, data in zip(pred, df["image"].to_list()):
+        visualized_image = visualize_results(result, data, test_path, visualization_result_dir,
+                                             conf_threshold=conf_threshold)
 
 
 def visualize_detection_results(
-        checkpoint_name="faster_rcnn_r50_fpn_1x_voc0712",
-        test_path="VOCdevkit/VOC2007",
-        num_gpus=-1,
-        visualization_result_dir="VOCdevkit/VOC2007/visualizations"
+        checkpoint_name: str = "faster_rcnn_r50_fpn_1x_voc0712",
+        test_path: str = "VOCdevkit/VOC2007",
+        num_gpus: int = -1,
+        visualization_result_dir: str = "VOCdevkit/VOC2007/visualizations",
+        conf_threshold: float = 0.3
 ):
-    # TODO: remove label
-    # TODO: replace pipeline with problem type
     predictor = MultiModalPredictor(
-        # label="label",
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
@@ -52,34 +54,29 @@ def visualize_detection_results(
         pipeline="object_detection",
     )
 
-    # result = predictor.evaluate(test_path)
+    df = from_coco_or_voc(test_path)[:10][["image"]]
 
-    # df = from_voc(test_path)[:10][["image"]]
-    df = from_coco(test_path)[:10][["image"]]
     pred = predictor.predict(df, as_pandas=False)
 
-
-    visualized_image = visualize_results(pred[0], df.iloc[0]["image"], test_path, visualization_result_dir)
-
-
-
-    # pred = predictor.predict(test_path, as_pandas=False, result_path=result_path)
-    # dump testing results in npy
-    # np.save(result_path, pred)
+    for result, data in zip(pred, df["image"].to_list()):
+        visualized_image = visualize_results(result, data, test_path, visualization_result_dir,
+                                             conf_threshold=conf_threshold)
 
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--test_path", default="VOCdevkit/VOC2007", type=str)
-    parser.add_argument("--checkpoint_name", default="faster_rcnn_r50_fpn_1x_voc0712", type=str)
+    parser.add_argument("--test_path", default="coco17/annotations/instances_val2017.json", type=str)
+    parser.add_argument("--checkpoint_name", default="vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco", type=str)
     parser.add_argument("--num_gpus", default=1, type=int)
-    parser.add_argument("--visualization_result_dir", default="VOCdevkit/VOC2007/visualizations", type=str)
+    parser.add_argument("--visualization_result_dir", default="coco17/visualizations", type=str)
+    parser.add_argument("--conf_threshold", default=0.3, type=float)
     args = parser.parse_args()
 
     visualize_detection_results(
         test_path=args.test_path,
         checkpoint_name=args.checkpoint_name,
         num_gpus=args.num_gpus,
-        visualization_result_dir=args.visualization_result_dir
+        visualization_result_dir=args.visualization_result_dir,
+        conf_threshold=args.conf_threshold
     )
