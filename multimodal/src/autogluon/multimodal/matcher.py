@@ -134,7 +134,8 @@ class MultiModalMatcher:
         label
             Name of the label column. Label and negative shouldn't be used simultaneously.
         match_label
-            For binary labels, it is the label indicating the query and response should match.
+            For binary labels, it is the label class indicating that the query and response is counted as match.
+            For
         problem_type
             Type of matching problem if the label column is available.
             This could be binary, multiclass, or regression

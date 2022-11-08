@@ -4,13 +4,18 @@ from .constants import DATA, DISTILLER, ENVIRONMENT, MATCHER, MODEL, OPTIMIZATIO
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")
-matcher_presets = Registry("matcher_presets")
+
+# Individual presets registry with problem types
+standard_problem_presets = Registry("standard_problem_presets")  # classification + regression
+ner_presets = Registry("ner_presets")  # named entity recognition
+matching_presets = Registry("matching_presets")  # multimodal matching
+object_detection_presets = Registry("object_detection_presets")
 
 
 @automm_presets.register()
 def default():
     return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
     }
@@ -19,7 +24,7 @@ def default():
 @automm_presets.register()
 def medium_quality_faster_train():
     return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
         "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
         "optimization.learning_rate": 4e-4,
@@ -29,7 +34,7 @@ def medium_quality_faster_train():
 @automm_presets.register()
 def high_quality():
     return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
     }
@@ -238,7 +243,7 @@ def get_basic_automm_config(extra: Optional[List[str]] = None):
     return config
 
 
-def get_automm_presets(presets: str):
+def get_automm_presets(presets: str, problem_type=None):
     """
     Map a AutoMM preset string to its config including a basic config and an overriding dict.
 

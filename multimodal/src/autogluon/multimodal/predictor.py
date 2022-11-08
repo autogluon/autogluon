@@ -172,6 +172,7 @@ class MultiModalPredictor:
         negative: Optional[Union[str, List[str]]] = None,
         match_label: Optional[Union[int, str]] = None,
         pipeline: Optional[str] = None,
+        presets: Optional[str] = None,
         val_metric: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
@@ -183,6 +184,7 @@ class MultiModalPredictor:
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
         sample_data_path: Optional[str] = None,
+        inference_ready: Optional[bool] = None,
     ):
         """
         Parameters
@@ -190,7 +192,7 @@ class MultiModalPredictor:
         label
             Name of the column that contains the target variable to predict.
         problem_type
-            Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem
+            Type of prediction problem. We support simple  i.e. is this a binary/multiclass classification or regression problem
             (options: 'binary', 'multiclass', 'regression').
             If `problem_type = None`, the prediction problem type is inferred
             based on the label-values in provided dataset.
@@ -202,10 +204,15 @@ class MultiModalPredictor:
         negative
             Column names of negative data (used for matching). Query and negative make up negative pairs.
         match_label
-            If using matcher and the labels are binary, it is the label indicating the query and response should match.
+            The label class that indicates the <query, response> pair is counted as "match".
+            This is used when the problem_type is one of the matching problem types, and when the labels are binary.
+            For example, the label column can contain ["match", "not match"]. And match_label can be "match".
+            It is similar as the "pos_label" in F1-score: https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html#sklearn.metrics.f1_score
+            Internally, we will set match_label to self.class_labels[1] by default.
         pipeline
-            This defines inference tasks like FeatureExtraction, ZeroShotClassification, etc.
-            TODO: add more pipelines (ref: https://huggingface.co/docs/transformers/main_classes/pipelines)
+            This argument has been deprecated and has been merged in `problem_type`.
+        presets
+            The presets for loading model parameters / training the model
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
@@ -253,7 +260,29 @@ class MultiModalPredictor:
             without its weights.
         sample_data_path
             This is used for automatically inference num_classes, classes, or label.
+
+        Examples
+        ----------
+        >>> # Object detection example
+        >>> # Load the predictor for inference
+        >>> from autogluon.multimodal import MultiModalPredictor
+        >>> url = "https://raw.githubusercontent.com/open-mmlab/mmdetection/master/demo/demo.jpg"
+        >>> predictor = MultiModalPredictor(problem_type="object_detection",
+        >>>                                 presets="good_quality")
+        >>> predictor.predict()
+        >>>
+        >>> # Named entity recognition example
+        >>> predictor = MultiModalPredictor(problem_type="named_entity_recognition",
+        >>>                                 presets="good_quality",
+        >>>                                 inference_ready=True)
+        >>> predictor.predict()
+        >>> # Matching example
+        >>>
+
         """
+        if pipeline is not None:
+            warnings.warn("The pipeline argument has been deprecated. "
+                          "Use `problem_type={}` rather than `pipeline={}`", DeprecationWarning)
         if pipeline in matcher_presets.list_keys():
             self._matcher = MultiModalMatcher(
                 query=query,
@@ -318,6 +347,7 @@ class MultiModalPredictor:
         self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._matcher = None
+        self._inference_ready = False
 
         if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
             warnings.warn(
@@ -345,6 +375,8 @@ class MultiModalPredictor:
                 classes=self._classes,
                 init_scratch=self._init_scratch,
             )
+        if problem_type in [OBJECT_DETECTION, ZERO_SHOT_IMAGE_CLASSIFICATION]:
+            self._inference_ready = True
 
     @property
     def path(self):
@@ -1380,6 +1412,7 @@ class MultiModalPredictor:
                 ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
             )
             self._fit_called = True
+            self._inference_ready = True
 
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
@@ -1996,7 +2029,7 @@ class MultiModalPredictor:
                 return_pred=return_pred,
             )
 
-        if self._pipeline == OBJECT_DETECTION:
+        if self._problem_type == OBJECT_DETECTION:
             if realtime:
                 return NotImplementedError(f"Current pipeline {self._pipeline} does not support realtime predict.")
             return self.evaluate_coco(
@@ -2790,6 +2823,7 @@ class MultiModalPredictor:
             loss_func=loss_func,
         )
         predictor._model_postprocess_fn = model_postprocess_fn
+        predictor._inference_ready = True
 
         return predictor
 
