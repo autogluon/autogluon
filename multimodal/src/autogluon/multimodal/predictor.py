@@ -176,7 +176,6 @@ class MultiModalPredictor:
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
         sample_data_path: Optional[str] = None,
-        inference_result_path: Optional[str] = None
     ):
         """
         Parameters
@@ -2071,8 +2070,10 @@ class MultiModalPredictor:
                 utcnow = datetime.utcnow()
                 timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
 
-                result_path = f"Result{os.path.sep}ag-{timestamp}{os.path.sep}" \
-                              f"{self._hyperparameters['model.mmdet_image.checkpoint_name']}{os.path.sep}"
+                result_path = (
+                    f"Result{os.path.sep}ag-{timestamp}{os.path.sep}" \
+                    f"{self._hyperparameters['model.mmdet_image.checkpoint_name']}{os.path.sep}"
+                )
                 for i in range(1, 1000):
                     try:
                         os.makedirs(result_path, exist_ok=False)

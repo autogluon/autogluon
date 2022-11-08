@@ -675,7 +675,7 @@ def dump_voc_xml_files(voc_annotation_path: str, voc_annotation_xml_output_path:
 
 
 def process_voc_annotations(
-        voc_annotation_path: str, voc_class_names_output_path: str, voc_annotation_xml_output_path: str
+    voc_annotation_path: str, voc_class_names_output_path: str, voc_annotation_xml_output_path: str
 ) -> None:
     """
     Reads annotations for a dataset in VOC format.
@@ -758,7 +758,7 @@ def get_detection_classes(sample_data_path):
 
 
 def visualize_results(
-        image_pred: Iterable, image_path: str, test_path: str, visualization_result_dir: str, conf_threshold: float
+    image_pred: Iterable, image_path: str, test_path: str, visualization_result_dir: str, conf_threshold: float
 ) -> np.ndarray:
     """
     Visualize detection results for one image, and save to visualization_result_dir
@@ -806,16 +806,16 @@ def visualize_results(
 
 
 def plot_detections(
-        image,
-        tlwhs,
-        obj_ids,
-        idx2classname,
-        conf_threshold,
-        scores=None,
-        text_scale=0.75,
-        text_thickness=1,
-        line_thickness=2,
-        alpha=0.5
+    image,
+    tlwhs,
+    obj_ids,
+    idx2classname,
+    conf_threshold,
+    scores=None,
+    text_scale=0.75,
+    text_thickness=1,
+    line_thickness=2,
+    alpha=0.5
 ):
     """
     Plot the detections on to the corresponding image
@@ -866,7 +866,7 @@ def plot_detections(
         alpha=alpha,
         font=font,
         text_scale=text_scale,
-        text_thickness=text_thickness
+        text_thickness=text_thickness,
     )
 
     for i, tlwh in enumerate(tlwhs):
@@ -878,7 +878,8 @@ def plot_detections(
             id_text = id_text + ",{:.3f}".format(float(scores[i]))
         color = get_color(abs(obj_id))
         im = add_bbox_with_alpha(
-            im=im, tl=intbox[0:2], br=intbox[2:4], line_color=color, alpha=alpha, line_thickness=line_thickness)
+            im=im, tl=intbox[0:2], br=intbox[2:4], line_color=color, alpha=alpha, line_thickness=line_thickness
+        )
         im = add_text_with_bg_color(
             im=im,
             text=id_text,
@@ -887,7 +888,7 @@ def plot_detections(
             alpha=0.75,
             font=font,
             text_scale=text_scale,
-            text_thickness=text_thickness
+            text_thickness=text_thickness,
         )
     return im
 
@@ -925,15 +926,15 @@ def add_bbox_with_alpha(im: np.ndarray, tl: tuple, br: tuple, line_color: tuple,
 
 
 def add_text_with_bg_color(
-        im: np.ndarray,
-        text: str,
-        tl: tuple,
-        bg_color: tuple,
-        alpha: float,
-        font,
-        text_scale: float,
-        text_thickness: int,
-        text_vert_padding: int = None
+    im: np.ndarray,
+    text: str,
+    tl: tuple,
+    bg_color: tuple,
+    alpha: float,
+    font,
+    text_scale: float,
+    text_thickness: int,
+    text_vert_padding: int = None
 ):
     """
     Add text to im with background color
