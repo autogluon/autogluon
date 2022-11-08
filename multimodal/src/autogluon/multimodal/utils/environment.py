@@ -133,11 +133,13 @@ def infer_precision(
                 UserWarning,
             )
             precision = 32
-        elif model.config.torch_dtype is not None:
-            precision = inverse_precision_mapping[model.config.torch_dtype]
+
         elif isinstance(model, HFAutoModelForTextPrediction):
-            torch_dtype = get_state_dict_dtype(model.state_dict())
-            precision = inverse_precision_mapping[torch_dtype]
+            if model.config.torch_dtype is not None:
+                precision = inverse_precision_mapping[model.config.torch_dtype]
+            else:
+                torch_dtype = get_state_dict_dtype(model.state_dict())
+                precision = inverse_precision_mapping[torch_dtype]
 
     if as_torch:
         if precision in precision_mapping:
