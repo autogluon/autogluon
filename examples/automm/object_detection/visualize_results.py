@@ -32,7 +32,7 @@ def tutorial_script_for_visualize_detection_results():
 
     df = from_coco_or_voc(test_path)[:10][["image"]]
 
-    pred = predictor.predict(df, as_pandas=False)
+    pred = predictor.predict(df)
 
     for result, data in zip(pred, df["image"].to_list()):
         visualized_image = visualize_results(result, data, test_path, visualization_result_dir,
@@ -56,7 +56,7 @@ def visualize_detection_results(
 
     df = from_coco_or_voc(test_path)[:10][["image"]]
 
-    pred = predictor.predict(df, as_pandas=False)
+    pred = predictor.predict(df)
 
     for result, data in zip(pred, df["image"].to_list()):
         visualized_image = visualize_results(result, data, test_path, visualization_result_dir,
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint_name", default="vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco", type=str)
     parser.add_argument("--num_gpus", default=1, type=int)
     parser.add_argument("--visualization_result_dir", default="coco17/visualizations", type=str)
-    parser.add_argument("--conf_threshold", default=0.3, type=float)
+    parser.add_argument("--visualization_conf_threshold", default=0.3, type=float)
     args = parser.parse_args()
 
     visualize_detection_results(
@@ -77,5 +77,5 @@ if __name__ == "__main__":
         checkpoint_name=args.checkpoint_name,
         num_gpus=args.num_gpus,
         visualization_result_dir=args.visualization_result_dir,
-        conf_threshold=args.conf_threshold
+        conf_threshold=args.visualization_conf_threshold
     )

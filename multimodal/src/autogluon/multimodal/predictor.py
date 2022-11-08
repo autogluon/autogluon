@@ -10,6 +10,7 @@ import pickle
 import shutil
 import sys
 import warnings
+from datetime import datetime
 from datetime import timedelta
 from typing import Callable, Dict, List, Optional, Union
 
@@ -175,6 +176,7 @@ class MultiModalPredictor:
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
         sample_data_path: Optional[str] = None,
+        inference_result_path: Optional[str] = None
     ):
         """
         Parameters
@@ -282,6 +284,7 @@ class MultiModalPredictor:
         self._init_scratch = init_scratch
         self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
+        self._hyperparameters = hyperparameters
 
         if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
             warnings.warn(
@@ -1985,6 +1988,7 @@ class MultiModalPredictor:
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
         seed: Optional[int] = 123,
+        save_results: bool = False,
         result_path: Optional[str] = None,
     ):
         """
@@ -2062,20 +2066,43 @@ class MultiModalPredictor:
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             pred = self._as_pandas(data=data, to_be_converted=pred)
 
-        if result_path:
-            ## Dumping Result
+        if save_results:
+            if not result_path:
+                utcnow = datetime.utcnow()
+                timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
+
+                result_path = f"Result{os.path.sep}ag-{timestamp}{os.path.sep}" \
+                              f"{self._hyperparameters['model.mmdet_image.checkpoint_name']}{os.path.sep}"
+                for i in range(1, 1000):
+                    try:
+                        os.makedirs(result_path, exist_ok=False)
+                        break
+                    except FileExistsError:
+                        logger.log(25, f"result_path {result_path} already exists")
+                else:
+                    raise RuntimeError("more than 1000 jobs launched in the same second")
+                logger.log(25, f'No result_path specified. Results will be saved in: "{result_path}"')
+                result_path = os.path.join(result_path, "results.ext")
+            ## Dumping Result for detection only now
             if self._pipeline == OBJECT_DETECTION and detection_data_path:
                 if os.path.isdir(detection_data_path):
                     ## this is for voc format
+                    result_name, _ = os.path.splitext(result_path)
+                    result_path = result_name + ".npy"
                     np.save(result_path, pred)
-                    logger.info(f"Saved detection result to {result_path}")
+                    logger.info(25, f"Saved detection result to {result_path}")
+                    print(f"Saved detection result to {result_path}")
                 else:
                     ## this is for coco format
                     coco_dataset = COCODataset(detection_data_path)
+                    result_name, _ = os.path.splitext(result_path)
+                    result_path = result_name + ".json"
                     coco_dataset.save_result(
                         pred, from_coco_or_voc(detection_data_path, "test"), save_path=result_path
                     )
-                    logger.info(f"Saved detection result to {result_path}")
+                    logger.info(25, f"Saved detection result to {result_path}")
+                    print(f"Saved detection result to {result_path}")
+
         return pred
 
     def predict_proba(

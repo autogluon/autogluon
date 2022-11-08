@@ -34,13 +34,16 @@ def tutorial_script_for_eval_pretrained_coco_format():
 
     test_path = "coco17/annotations/instances_val2017.json"
 
-    pred = predictor.predict(test_path, as_pandas=False, result_path="coco17/annotations/instances_val2017_results.json")
+    pred = predictor.predict(
+        test_path, save_results=True, result_path="coco17/annotations/instances_val2017_results.json"
+    )
 
 
 def eval_pretrained_coco_format(
         checkpoint_name="yolov3_mobilenetv2_320_300e_coco",
         test_path="coco17/annotations/instances_val2017.json",
         num_gpus=-1,
+        save_results=True,
         result_path="coco17/annotations/instances_val2017_results.json"
 ):
     # TODO: remove label
@@ -53,7 +56,7 @@ def eval_pretrained_coco_format(
         pipeline="object_detection",
     )
 
-    pred = predictor.predict(test_path, as_pandas=False, result_path=result_path)
+    pred = predictor.predict(test_path, save_results=True, result_path=result_path)
 
 
 if __name__ == "__main__":
@@ -61,12 +64,15 @@ if __name__ == "__main__":
     parser.add_argument("--test_path", default="coco17/annotations/instances_val2017.json", type=str)
     parser.add_argument("--checkpoint_name", default="yolov3_mobilenetv2_320_300e_coco", type=str)
     parser.add_argument("--num_gpus", default=-1, type=int)
-    parser.add_argument("--result_path", default="coco17/annotations/instances_val2017_results.json", type=str)
+    parser.add_argument("--save_results", action="store_true")
+    parser.add_argument("--result_path", default=None, type=str)
     args = parser.parse_args()
 
     eval_pretrained_coco_format(
         test_path=args.test_path,
         checkpoint_name=args.checkpoint_name,
         num_gpus=args.num_gpus,
-        result_path=args.result_path
+        save_results=args.save_results,
+        result_path=args.result_path,
+
     )
