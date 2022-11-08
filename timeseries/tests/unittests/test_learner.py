@@ -370,6 +370,7 @@ def test_given_ignore_index_is_true_and_covariates_too_short_when_learner_predic
         path_context=temp_model_path,
         known_covariates_names=["Y", "X"],
         prediction_length=prediction_length,
+        ignore_time_index=True,
     )
     train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Y", "X"])
     learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
@@ -377,7 +378,7 @@ def test_given_ignore_index_is_true_and_covariates_too_short_when_learner_predic
         {k: 4 for k in ITEM_ID_TO_LENGTH.keys()}, known_covariates_names=["X", "Y"]
     )
     with pytest.raises(ValueError, match=f"should include the values for prediction_length={prediction_length}"):
-        learner.predict(train_data, known_covariates=short_known_covariates, ignore_index=True)
+        learner.predict(train_data, known_covariates=short_known_covariates)
 
 
 def test_when_ignore_index_is_true_and_known_covariates_available_then_learner_can_predict(temp_model_path):
@@ -386,9 +387,10 @@ def test_when_ignore_index_is_true_and_known_covariates_available_then_learner_c
         path_context=temp_model_path,
         known_covariates_names=["Y", "X"],
         prediction_length=prediction_length,
+        ignore_time_index=True,
     )
     train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Y", "X"])
     learner.fit(train_data=train_data, hyperparameters={"DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}})
     known_covariates = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["X", "Y"])
-    preds = learner.predict(train_data, known_covariates=known_covariates, ignore_index=True)
+    preds = learner.predict(train_data, known_covariates=known_covariates)
     assert preds.item_ids.equals(train_data.item_ids)
