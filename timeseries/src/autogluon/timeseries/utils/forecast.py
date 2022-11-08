@@ -21,7 +21,7 @@ def get_forecast_horizon_index_ts_dataframe(
     - level 1 ("timestamp") contains the next prediction_length time steps starting from the end of each time series.
     """
 
-    def get_series_with_timestamps_per_item(group: pd.DataFrame) -> pd.Series:
+    def get_series_with_timestamps_per_item(group: pd.DataFrame) -> pd.DataFrame:
         timestamps = group.index.get_level_values(TIMESTAMP)
         return get_forecast_horizon_index_single_time_series(
             past_timestamps=timestamps, freq=ts_dataframe.freq, prediction_length=prediction_length

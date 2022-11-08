@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.core.learner import AbstractLearner
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.evaluator import TimeSeriesEvaluator
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.splitter import AbstractTimeSeriesSplitter, LastWindowSplitter
@@ -34,6 +34,7 @@ class TimeSeriesLearner(AbstractLearner):
         eval_metric: Optional[str] = None,
         prediction_length: int = 1,
         validation_splitter: AbstractTimeSeriesSplitter = LastWindowSplitter(),
+        ignore_time_index: bool = False,
         **kwargs,
     ):
         super().__init__(path_context=path_context)
@@ -47,6 +48,8 @@ class TimeSeriesLearner(AbstractLearner):
             kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
         self.validation_splitter = validation_splitter
+        self.ignore_time_index = ignore_time_index
+
         self.static_feature_pipeline = ContinuousAndCategoricalFeatureGenerator()
         self._train_static_feature_columns: pd.Index = None
         self._train_static_feature_dtypes: pd.Series = None
@@ -296,6 +299,9 @@ class TimeSeriesLearner(AbstractLearner):
                 f"known_covariates {self.known_covariates_names} for the forecast horizon should be provided at prediction time."
             )
 
+        if self.target in known_covariates.columns:
+            known_covariates = known_covariates.drop(self.target, axis=1)
+
         missing_item_ids = data.item_ids.difference(known_covariates.item_ids)
         if len(missing_item_ids) > 0:
             raise ValueError(
@@ -303,13 +309,28 @@ class TimeSeriesLearner(AbstractLearner):
             )
 
         forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length=self.prediction_length)
-        try:
-            known_covariates = known_covariates.loc[forecast_index]
-        except KeyError:
-            raise ValueError(
-                f"known_covariates should include the values for prediction_length={self.prediction_length} "
-                "many time steps into the future."
+        if self.ignore_time_index:
+            logger.warning(
+                "Because `ignore_time_index=True`, the predictor will ignore the time index of `known_covariates`. "
+                "Please make sure that `known_covariates` contain only the future values of the known covariates "
+                "(and the past values are not included)."
             )
+            known_covariates = known_covariates.loc[forecast_index.unique(level=ITEMID)]
+            if (known_covariates.num_timesteps_per_item() < self.prediction_length).any():
+                raise ValueError(
+                    f"known_covariates should include the values for prediction_length={self.prediction_length} "
+                    "many time steps into the future."
+                )
+            known_covariates = known_covariates.slice_by_timestep(None, self.prediction_length)
+            known_covariates.index = forecast_index
+        else:
+            try:
+                known_covariates = known_covariates.loc[forecast_index]
+            except KeyError:
+                raise ValueError(
+                    f"known_covariates should include the values for prediction_length={self.prediction_length} "
+                    "many time steps into the future."
+                )
         return known_covariates
 
     def predict(
