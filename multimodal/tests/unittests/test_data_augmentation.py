@@ -85,7 +85,6 @@ def test_textagumentor_deepcopy():
         "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
         "model.hf_text.text_trivial_aug_maxscale": 0.05,
         "model.hf_text.text_train_augment_types": ["identity"],
-        "model.timm_image.checkpoint_name": "mobilenetv3_small_100",
         "optimization.top_k_average_method": "uniform_soup",
     }
 
