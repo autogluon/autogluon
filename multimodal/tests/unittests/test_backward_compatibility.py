@@ -39,7 +39,7 @@ def test_load_old_checkpoint(cls):
     predictor.fit(
         dataset.train_df,
         presets="multilingual",
-        time_limit=20,
+        time_limit=10,
         hyperparameters={"optimization.top_k_average_method": "uniform_soup",
                          "env.num_gpus": 1},
     )
