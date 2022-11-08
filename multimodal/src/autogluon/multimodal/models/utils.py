@@ -527,6 +527,8 @@ def get_model_head(model: nn.Module):
         head = model.last_linear
     elif hasattr(model, "fc"):
         head = model.fc
+    elif hasattr(model, "classifier"):
+        head = model.classifier
     else:
         raise ValueError(f"Model {type(model)} doesn't have head. Need to check its implementation.")
 

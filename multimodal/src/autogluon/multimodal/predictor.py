@@ -9,6 +9,7 @@ import os
 import pickle
 import shutil
 import sys
+import time
 import warnings
 from datetime import timedelta
 from typing import Callable, Dict, List, Optional, Union
@@ -133,6 +134,7 @@ from .utils import (
     infer_scarcity_mode_by_data_size,
     init_df_preprocessor,
     init_pretrained,
+    list_timm_models,
     load_text_tokenizers,
     logits_to_prob,
     modify_duplicate_model_names,
@@ -534,6 +536,7 @@ class MultiModalPredictor:
         -------
         An "MultiModalPredictor" object (itself).
         """
+        training_start = time.time()
         if self._matcher:
             self._matcher.fit(
                 train_data=train_data,
@@ -727,6 +730,8 @@ class MultiModalPredictor:
             return predictor
 
         self._fit(**_fit_args)
+        training_end = time.time()
+        self.elapsed_time = (training_end - training_start) / 60.0
         return self
 
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
@@ -1499,6 +1504,8 @@ class MultiModalPredictor:
             prefix=prefix,
             strict=strict_loading,
         )
+
+        self.best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
 
         if is_distill:
             avg_state_dict = self._replace_model_name_prefix(
@@ -2831,6 +2838,47 @@ class MultiModalPredictor:
             return None
         else:
             return self.class_labels[1]
+
+    def fit_summary(self, verbosity=0, show_plot=False):
+        """
+        Output summary of information about models produced during `fit()`.
+
+        Parameters
+        ----------
+        verbosity : int, default = 2
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            verbosity = 0 for no output printing.
+            TODO: Higher levels correspond to more detailed print statements
+        show_plot : bool, default = False
+            If True, shows the model summary plot in browser when verbosity > 1.
+
+        Returns
+        -------
+        Dict containing various detailed information.
+        We do not recommend directly printing this dict as it may be very large.
+        """
+        results = {f"val_{self._validation_metric_name}": self.best_score, "training_time": self.elapsed_time}
+        return results
+
+    def list_supported_models(self, pretrained=True):
+        """
+        List supported models for each problem_type to let users know
+        options of checkpoint name to choose during fit().
+
+        Parameters
+        ----------
+        pretrained : bool, default = True
+            If True, only return the models with pretrained weights.
+            If False, return all the models as long as there is model definition.
+
+        Returns
+        -------
+        a list of model names
+        """
+        if self._problem_type == "classification":
+            return list_timm_models(pretrained=pretrained)
+        else:
+            raise ValueError(f"list_supported_models() is not available for problem type: {self._problem_type}")
 
 
 class AutoMMPredictor(MultiModalPredictor):
