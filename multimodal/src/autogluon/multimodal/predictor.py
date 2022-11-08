@@ -185,8 +185,14 @@ problem_property_dict = OrderedDict(
             ZERO_SHOT_IMAGE_CLASSIFICATION,
             ProblemProperty(ZERO_SHOT_IMAGE_CLASSIFICATION, support_fit=False, inference_ready=True),
         ),
-        (OCR_TEXT_DETECTION, ProblemProperty(OCR_TEXT_DETECTION, support_fit=False, inference_ready=True)),
-        (OCR_TEXT_RECOGNITION, ProblemProperty(OCR_TEXT_RECOGNITION, support_fit=False, inference_ready=True)),
+        (
+            OCR_TEXT_DETECTION,
+            ProblemProperty(OCR_TEXT_DETECTION, support_fit=False, inference_ready=True, experimental=True)
+        ),
+        (
+            OCR_TEXT_RECOGNITION,
+            ProblemProperty(OCR_TEXT_RECOGNITION, support_fit=False, inference_ready=True, experimental=True)
+        ),
     ]
 )
 
