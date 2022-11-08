@@ -13,8 +13,8 @@ intent detection, paraphrase detection, image classification. Moreover, `AutoMM`
 In the following, we prepared a few tutorials to help you learn how to use `AutoMM` to solve problems that involve image, text, and tabular data.
 
 
-Text Prediction
----------------
+Text Prediction and Entity Extraction
+-------------------------------------
 .. container:: cards
 
    .. card::
@@ -28,6 +28,12 @@ Text Prediction
       :link: text_prediction/multilingual_text.html
 
       How to use MultiModalPredictor to build models on datasets with languages other than English.
+
+   .. card::
+      :title: Named Entity Recognition with AutoMM - Quick Start
+      :link: text_prediction/ner.html
+
+      How to use MultiModalPredictor for entity extraction.
 
 
 Image Prediction
@@ -45,17 +51,6 @@ Image Prediction
       :link: image_prediction/clip_zeroshot.html
 
       How to enable zero-shot image classification in AutoMM via pretrained CLIP model.
-
-
-Named Entity Recognition
-------------------------
-.. container:: cards
-
-   .. card::
-      :title: Named Entity Recognition with AutoMM - Quick Start
-      :link: named_entity_recognition/ner.html
-
-      How to use AutoMM for entity extraction.
 
 
 Object Detection
@@ -127,15 +122,8 @@ Advanced Topics
    :maxdepth: 2
    :hidden:
 
-   text_prediction/beginner_text
-   text_prediction/multilingual_text
-   image_prediction/beginner_image_cls
-   image_prediction/clip_zeroshot
-   named_entity_recognition/ner
-   matching/text2text_matching
-   matching/semantic_search
-   matching/clip_embedding
-   multimodal_prediction/multimodal_text_tabular
-   multimodal_prediction/beginner_multimodal
-   advanced_topics/efficient_finetuning_basic
-   advanced_topics/customization
+   text_prediction
+   image_prediction
+   matching
+   multimodal_prediction
+   advanced_topics
