@@ -413,7 +413,9 @@ def customized_binary_roc_auc_score(y_true: Union[np.array, pd.Series], y_score:
     tps = np.cumsum(y_true)[threshold_idxs]
     fps = 1 + threshold_idxs - tps
 
-    if len(tps) > 2:
+    if tps.size > 100000:
+        # optimize indices only when there is enough size to justify
+        # this has no impact on the final score
         optimal_idxs = np.where(
             np.r_[True, np.logical_or(np.diff(fps, 2), np.diff(tps, 2)), True]
         )[0]
