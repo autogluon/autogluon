@@ -411,6 +411,7 @@ class MultiModalPredictor:
         self._init_scratch = init_scratch
         self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
+        self._model_loaded = False  # Whether the model has been loaded
         self._matcher = None
 
         if self._problem_type is not None:
@@ -849,6 +850,16 @@ class MultiModalPredictor:
         training_end = time.time()
         self.elapsed_time = (training_end - training_start) / 60.0
         return self
+
+    def _verify_inference_ready(self):
+        if not self._fit_called and not self._model_loaded:
+            if self._problem_type is not None:
+                if not problem_property_dict.get(self._problem_type).inference_ready:
+                    raise RuntimeError(
+                        f"problem_type='self._problem_type' does not support running inference directly. "
+                        f"You need to call `predictor.fit()`, or load a predictor first before "
+                        f"running `predictor.predict()`, `predictor.evaluate()` or `predictor.extract_embedding()`."
+                    )
 
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
         from ray.air.config import CheckpointConfig
@@ -1870,6 +1881,11 @@ class MultiModalPredictor:
         eval_tool
             The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
         """
+        self._verify_inference_ready()
+        assert self._problem_type == OBJECT_DETECTION, (
+            f"predictor.evaluate_coco() is only supported when problem_type is {OBJECT_DETECTION}. "
+            f"Received problem_type={self.problem_type}."
+        )
         # TODO: refactor this into evaluate()
         if isinstance(anno_file_or_df, str):
             anno_file = anno_file_or_df
@@ -2097,6 +2113,7 @@ class MultiModalPredictor:
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
+        self._verify_inference_ready()
         if self._matcher:
             return self._matcher.evaluate(
                 data=data,
@@ -2264,13 +2281,7 @@ class MultiModalPredictor:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        if not self._fit_called:
-            if self._problem_type is not None:
-                if not problem_property_dict.get(self._problem_type).inference_ready:
-                    raise RuntimeError(
-                        f"problem_type='self._problem_type' does not support running inference directly. "
-                        f"You need to call `predictor.fit()` first before running `predictor.predict()`."
-                    )
+        self._verify_inference_ready()
 
         if self._matcher:
             return self._matcher.predict(
@@ -2373,6 +2384,7 @@ class MultiModalPredictor:
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
+        self._verify_inference_ready()
         if self._matcher:
             return self._matcher.predict_proba(
                 data=data,
@@ -2458,6 +2470,7 @@ class MultiModalPredictor:
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
+        self._verify_inference_ready()
         if self._matcher:
             return self._matcher.extract_embedding(
                 data=data,
@@ -2914,7 +2927,7 @@ class MultiModalPredictor:
             loss_func=loss_func,
         )
         predictor._model_postprocess_fn = model_postprocess_fn
-
+        predictor._model_loaded = True
         return predictor
 
     @property
