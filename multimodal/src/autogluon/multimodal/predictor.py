@@ -769,7 +769,7 @@ class MultiModalPredictor:
         )  # Add as separate hyperparameter somewhere?
         if scarcity_mode == FEW_SHOT and (not presets or FEW_SHOT not in presets):  # TODO: check for data  type
             logger.info(
-                f"Detected data scarcity. Consider running using the preset 'few_shot_text_classification' for better performance."
+                f"Detected data scarcity. Consider running using the preset '{FEW_SHOT_TEXT_CLASSIFICATION}' for better performance."
             )
 
         logger.debug(f"column_types: {column_types}")
