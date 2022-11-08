@@ -32,7 +32,7 @@ def test_mmdet_object_detection_inference(checkpoint_name):
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": 1,  # currently mmdet only support single gpu inference
         },
-        pipeline="object_detection",
+        problem_type="object_detection",
     )
 
     pred = predictor.predict({"image": [mmdet_image_name] * 10})  # test batch inference

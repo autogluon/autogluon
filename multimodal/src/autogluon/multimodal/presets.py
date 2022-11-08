@@ -4,12 +4,7 @@ from .constants import DATA, DISTILLER, ENVIRONMENT, MATCHER, MODEL, OPTIMIZATIO
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")
-
-# Individual presets registry with problem types
-standard_problem_presets = Registry("standard_problem_presets")  # classification + regression
-ner_presets = Registry("ner_presets")  # named entity recognition
-matching_presets = Registry("matching_presets")  # multimodal matching
-object_detection_presets = Registry("object_detection_presets")
+matcher_presets = Registry("matcher_presets")
 
 
 @automm_presets.register()
@@ -87,6 +82,7 @@ def few_shot_text_classification():
     }
 
 
+# TODO: Consider to remove this preset
 @automm_presets.register()
 def zero_shot_classification():
     return {
@@ -243,7 +239,7 @@ def get_basic_automm_config(extra: Optional[List[str]] = None):
     return config
 
 
-def get_automm_presets(presets: str, problem_type=None):
+def get_automm_presets(presets: str):
     """
     Map a AutoMM preset string to its config including a basic config and an overriding dict.
 

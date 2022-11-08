@@ -78,7 +78,7 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
 
 
 @pytest.mark.parametrize(
-    "dataset_name,query,response,presets,text_backbone,image_backbone, is_ranking, symmetric",
+    "dataset_name,query,response,problem_type,text_backbone,image_backbone, is_ranking, symmetric",
     [
         (
             "id_change_detection",
@@ -106,7 +106,7 @@ def test_matcher(
     dataset_name,
     query,
     response,
-    presets,
+    problem_type,
     text_backbone,
     image_backbone,
     is_ranking,
@@ -117,7 +117,7 @@ def test_matcher(
     matcher = MultiModalPredictor(
         query=query,
         response=response,
-        pipeline=presets,
+        problem_type=problem_type,
         label=dataset.label_columns[0] if dataset.label_columns else None,
         match_label=dataset.match_label,
         eval_metric=dataset.metric,
@@ -284,7 +284,7 @@ def test_image_text_semantic_search():
     text_list = dataset.test_df["caption"].tolist()
 
     matcher = MultiModalPredictor(
-        pipeline="image_text_similarity",
+        problem_type="image_text_similarity",
         hyperparameters={"model.hf_text.checkpoint_name": "openai/clip-vit-base-patch32"},
     )
     text_to_image_hits = semantic_search(

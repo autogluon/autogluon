@@ -134,8 +134,11 @@ class MultiModalMatcher:
         label
             Name of the label column. Label and negative shouldn't be used simultaneously.
         match_label
-            For binary labels, it is the label class indicating that the query and response is counted as match.
-            For
+            The label class that indicates the <query, response> pair is counted as "match".
+            This is used when the problem_type is one of the matching problem types, and when the labels are binary.
+            For example, the label column can contain ["match", "not match"]. And match_label can be "match".
+            It is similar as the "pos_label" in F1-score: https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html#sklearn.metrics.f1_score
+            Internally, we will set match_label to self.class_labels[1] by default.
         problem_type
             Type of matching problem if the label column is available.
             This could be binary, multiclass, or regression

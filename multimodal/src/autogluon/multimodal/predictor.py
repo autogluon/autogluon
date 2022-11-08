@@ -50,6 +50,8 @@ from .constants import (
     FEATURES,
     FEW_SHOT,
     GREEDY_SOUP,
+    IMAGE_SIMILARITY,
+    IMAGE_TEXT_SIMILARITY,
     LABEL,
     LAST_CHECKPOINT,
     LOGITS,
@@ -70,6 +72,7 @@ from .constants import (
     REGRESSION,
     SCORE,
     TEXT,
+    TEXT_SIMILARITY,
     UNIFORM_SOUP,
     Y_PRED,
     Y_PRED_PROB,
@@ -153,6 +156,10 @@ from .utils import (
 logger = logging.getLogger(AUTOMM)
 
 
+PROBLEM_TYPES_SUPPORT_INFERENCE = [OBJECT_DETECTION, IMAGE_SIMILARITY, IMAGE_TEXT_SIMILARITY, IMAGE_TEXT_SIMILARITY]
+VALID_PIPELINES = PROBLEM_TYPES_SUPPORT_INFERENCE + [FEATURE_EXTRACTION, ZERO_SHOT_IMAGE_CLASSIFICATION, OCR_TEXT_DETECTION, OCR_TEXT_RECOGNITION]
+
+
 class MultiModalPredictor:
     """
     MultiModalPredictor is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that
@@ -173,7 +180,6 @@ class MultiModalPredictor:
         negative: Optional[Union[str, List[str]]] = None,
         match_label: Optional[Union[int, str]] = None,
         pipeline: Optional[str] = None,
-        presets: Optional[str] = None,
         val_metric: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
@@ -185,7 +191,6 @@ class MultiModalPredictor:
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
         sample_data_path: Optional[str] = None,
-        inference_ready: Optional[bool] = None,
     ):
         """
         Parameters
@@ -193,10 +198,30 @@ class MultiModalPredictor:
         label
             Name of the column that contains the target variable to predict.
         problem_type
-            Type of prediction problem. We support simple  i.e. is this a binary/multiclass classification or regression problem
-            (options: 'binary', 'multiclass', 'regression').
-            If `problem_type = None`, the prediction problem type is inferred
-            based on the label-values in provided dataset.
+            Type of the prediction problem. We support standard problems like
+
+            - 'binary': Binary classification
+            - 'multiclass': Multi-class classification
+            - 'regression': Regression
+            - 'classification': Classification problems include 'binary' and 'multiclass' classification.
+
+            In addition, we support advanced problems such as
+
+            - 'object_detection': Object detection
+            - 'ner' or 'named_entity_recognition': Named entity extraction
+            - 'text_similarity': Text-text similarity problem
+            - 'image_similarity': Image-image similarity problem
+            - 'text_image_similarity': Text-image similarity problem
+
+            For certain problem types, the default behavior is to load a pretrained model based on
+            the presets / hyperparameters and the predictor will be inference_ready. This includes the following
+            problem types:
+
+            - 'object_detection'
+            - 'text_similarity'
+            - 'image_similarity'
+            - 'text_image_similarity'
+
         query
             Column names of query data (used for matching).
         response
@@ -208,10 +233,23 @@ class MultiModalPredictor:
             The label class that indicates the <query, response> pair is counted as "match".
             This is used when the problem_type is one of the matching problem types, and when the labels are binary.
             For example, the label column can contain ["match", "not match"]. And match_label can be "match".
-            It is similar as the "pos_label" in F1-score: https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html#sklearn.metrics.f1_score
+            It is similar as the "pos_label" in F1-score: https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html
             Internally, we will set match_label to self.class_labels[1] by default.
         pipeline
-            This argument has been deprecated and has been merged in `problem_type`.
+            Currently, pipelines are those that supports inference with pretrained models. This includes those in the problem_type that supports inference, such as
+
+            - 'object_detection'
+            - 'text_similarity'
+            - 'image_similarity'
+            - 'image_text_similarity'
+
+            In addition, we support the following pipelines that are inference-only
+
+            - 'feature_extraction'
+            - 'zero_shot_image_classification'
+            - 'ocr_text_detection' (experimental)
+            - 'ocr_text_recognition' (experimental)
+
         presets
             The presets for loading model parameters / training the model
         eval_metric
@@ -262,28 +300,16 @@ class MultiModalPredictor:
         sample_data_path
             This is used for automatically inference num_classes, classes, or label.
 
-        Examples
-        ----------
-        >>> # Object detection example
-        >>> # Load the predictor for inference
-        >>> from autogluon.multimodal import MultiModalPredictor
-        >>> url = "https://raw.githubusercontent.com/open-mmlab/mmdetection/master/demo/demo.jpg"
-        >>> predictor = MultiModalPredictor(problem_type="object_detection",
-        >>>                                 presets="good_quality")
-        >>> predictor.predict()
-        >>>
-        >>> # Named entity recognition example
-        >>> predictor = MultiModalPredictor(problem_type="named_entity_recognition",
-        >>>                                 presets="good_quality",
-        >>>                                 inference_ready=True)
-        >>> predictor.predict()
-        >>> # Matching example
-        >>>
-
         """
-        if pipeline is not None:
-            warnings.warn("The pipeline argument has been deprecated. "
-                          "Use `problem_type={}` rather than `pipeline={}`", DeprecationWarning)
+        # Parse problem_type to pipeline
+        if problem_type in PROBLEM_TYPES_SUPPORT_INFERENCE:
+            if pipeline is None:
+                pipeline = problem_type
+            else:
+                assert pipeline == problem_type, f"Mismatched pipeline and problem_type. " \
+                                                 f"Received pipeline={pipeline}, problem_type={problem_type}. " \
+                                                 f"Consider to revise the flags"
+
         if pipeline in matcher_presets.list_keys():
             self._matcher = MultiModalMatcher(
                 query=query,
@@ -328,6 +354,10 @@ class MultiModalPredictor:
         self._label_column = label
         self._problem_type = problem_type.lower() if problem_type is not None else None
         self._pipeline = pipeline.lower() if pipeline is not None else None
+
+        assert self._pipeline in VALID_PIPELINES,\
+            f"pipeline={self._pipeline} is not supported. Consider to pick one from {VALID_PIPELINES}"
+
         self._eval_metric_name = eval_metric
         self._validation_metric_name = val_metric
         self._output_shape = num_classes
@@ -350,7 +380,6 @@ class MultiModalPredictor:
         self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._matcher = None
-        self._inference_ready = False
 
         if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
             warnings.warn(
@@ -378,8 +407,6 @@ class MultiModalPredictor:
                 classes=self._classes,
                 init_scratch=self._init_scratch,
             )
-        if problem_type in [OBJECT_DETECTION, ZERO_SHOT_IMAGE_CLASSIFICATION]:
-            self._inference_ready = True
 
     @property
     def path(self):
@@ -1422,7 +1449,6 @@ class MultiModalPredictor:
                 ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
             )
             self._fit_called = True
-            self._inference_ready = True
 
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
@@ -2833,7 +2859,6 @@ class MultiModalPredictor:
             loss_func=loss_func,
         )
         predictor._model_postprocess_fn = model_postprocess_fn
-        predictor._inference_ready = True
 
         return predictor
 
