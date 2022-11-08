@@ -55,7 +55,7 @@ from .constants import (
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
     infer_column_types,
-    infer_label_column_type_by_problem_type_and_pipeline,
+    infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
 )
 from .optimization.lit_matcher import MatcherLitModule
@@ -406,7 +406,7 @@ class MultiModalMatcher:
             provided_column_types=column_types,
             id_mappings=id_mappings,
         )
-        column_types = infer_label_column_type_by_problem_type_and_pipeline(
+        column_types = infer_label_column_type_by_problem_type(
             column_types=column_types,
             label_columns=self._label_column,
             problem_type=self._problem_type,
@@ -1077,7 +1077,7 @@ class MultiModalMatcher:
                 id_mappings=id_mappings,
             )
             if self._label_column and self._label_column in data.columns:
-                column_types = infer_label_column_type_by_problem_type_and_pipeline(
+                column_types = infer_label_column_type_by_problem_type(
                     column_types=column_types,
                     label_columns=self._label_column,
                     problem_type=self._problem_type,
