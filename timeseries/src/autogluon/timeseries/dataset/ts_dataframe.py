@@ -4,7 +4,7 @@ import copy
 import itertools
 import warnings
 from collections.abc import Iterable
-from typing import Any, Optional, Tuple, Type, Union
+from typing import Any, Optional, Tuple, Type
 
 import numpy as np
 import pandas as pd
@@ -109,6 +109,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
         super().__init__(data=data, *args, **kwargs)
         self._static_features: Optional[pd.DataFrame] = None
         if static_features is not None:
+            if isinstance(static_features, pd.Series):
+                static_features = static_features.to_frame()
+            if not isinstance(static_features, pd.DataFrame):
+                raise ValueError(
+                    f"static_features must be a pandas DataFrame (received object of type {type(static_features)})"
+                )
             self.static_features = static_features
 
         # internal value for cached frequency values that are inferred. corresponds to either a
@@ -200,7 +206,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 raise ValueError(f"{i}'th time-series in data must be a dict, got{type(ts)}")
             if not ("target" in ts and "start" in ts):
                 raise ValueError(f"{i}'th time-series in data must have 'target' and 'start', got{ts.keys()}")
-            if not isinstance(ts["start"], pd.Timestamp) or ts["start"].freq is None:
+            if not isinstance(ts["start"], (pd.Timestamp, pd.Period)) or ts["start"].freq is None:
                 raise ValueError(
                     f"{i}'th time-series must have timestamp as 'start' with freq specified, got {ts['start']}"
                 )
@@ -258,8 +264,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
         all_ts = []
         for i, ts in enumerate(iterable_dataset):
             start_timestamp = ts["start"]
+            freq = start_timestamp.freq
+            if isinstance(start_timestamp, pd.Period):
+                start_timestamp = start_timestamp.to_timestamp(how="S")
             target = ts["target"]
-            datetime_index = tuple(pd.date_range(start_timestamp, periods=len(target), freq=start_timestamp.freq))
+            datetime_index = tuple(pd.date_range(start_timestamp, periods=len(target), freq=freq))
             idx = pd.MultiIndex.from_product([(i,), datetime_index], names=[ITEMID, TIMESTAMP])
             ts_df = pd.Series(target, name="target", index=idx).to_frame()
             all_ts.append(ts_df)
@@ -426,62 +435,68 @@ class TimeSeriesDataFrame(pd.DataFrame):
         ts_df : TimeSeriesDataFrame
             A new time series dataframe containing entries of the original time series between start and end indices.
 
-        Example
-        -------
-        .. code-block:: python
+        Examples
+        --------
+        >>> print(ts_dataframe)
+                            target
+        item_id timestamp
+        0       2019-01-01       0
+                2019-01-02       1
+                2019-01-03       2
+        1       2019-01-02       3
+                2019-01-03       4
+                2019-01-04       5
+        2       2019-01-03       6
+                2019-01-04       7
+                2019-01-05       8
 
-            >>> print(ts_dataframe)
-                                target
-            item_id timestamp
-            0       2019-01-01       0
-                    2019-01-02       1
-                    2019-01-03       2
-            1       2019-01-02       3
-                    2019-01-03       4
-                    2019-01-04       5
-            2       2019-01-03       6
-                    2019-01-04       7
-                    2019-01-05       8
+        Select the first entry of each time series
 
-            >>> df.slice_by_timestep(0, 1)  # select the first entry of each time series
-                                target
-            item_id timestamp
-            0       2019-01-01       0
-            1       2019-01-02       3
-            2       2019-01-03       6
+        >>> df.slice_by_timestep(0, 1)
+                            target
+        item_id timestamp
+        0       2019-01-01       0
+        1       2019-01-02       3
+        2       2019-01-03       6
 
-            >>> df.slice_by_timestep(-2, None)  # select the last 2 entries of each time series
-                                target
-            item_id timestamp
-            0       2019-01-02       1
-                    2019-01-03       2
-            1       2019-01-03       4
-                    2019-01-04       5
-            2       2019-01-04       7
-                    2019-01-05       8
+        Select the last 2 entries of each time series
 
-            >>> df.slice_by_timestep(None, -1)  # select all except the last entry of each time series
-                                target
-            item_id timestamp
-            0       2019-01-01       0
-                    2019-01-02       1
-            1       2019-01-02       3
-                    2019-01-03       4
-            2       2019-01-03       6
-                    2019-01-04       7
+        >>> df.slice_by_timestep(-2, None)
+                            target
+        item_id timestamp
+        0       2019-01-02       1
+                2019-01-03       2
+        1       2019-01-03       4
+                2019-01-04       5
+        2       2019-01-04       7
+                2019-01-05       8
 
-            >>> df.slice_by_timestep(None, None)  # copy the entire dataframe
-                                target
-            item_id timestamp
-            0       2019-01-01       0
-                    2019-01-02       1
-                    2019-01-03       2
-            1       2019-01-02       3
-                    2019-01-03       4
-                    2019-01-04       5
-            2       2019-01-03       6
-                    2019-01-04       7
-                    2019-01-05       8
+        Select all except the last entry of each time series
+
+        >>> df.slice_by_timestep(None, -1)
+                            target
+        item_id timestamp
+        0       2019-01-01       0
+                2019-01-02       1
+        1       2019-01-02       3
+                2019-01-03       4
+        2       2019-01-03       6
+                2019-01-04       7
+
+        Copy the entire dataframe
+
+        >>> df.slice_by_timestep(None, None)
+                            target
+        item_id timestamp
+        0       2019-01-01       0
+                2019-01-02       1
+                2019-01-03       2
+        1       2019-01-02       3
+                2019-01-03       4
+                2019-01-04       5
+        2       2019-01-03       6
+                2019-01-04       7
+                2019-01-05       8
 
         """
 

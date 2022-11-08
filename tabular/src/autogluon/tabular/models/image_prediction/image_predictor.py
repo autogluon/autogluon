@@ -231,7 +231,7 @@ class ImagePredictorModel(AbstractModel):
         num_gpus = ImagePredictor._get_num_gpus_available()
         return num_cpus, num_gpus
 
-    def get_minimum_resources(self) -> Dict[str, int]:
+    def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:
         return {
             'num_cpus': 1,
             'num_gpus': 1,

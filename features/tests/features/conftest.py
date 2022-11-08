@@ -11,7 +11,8 @@ from autogluon.features.generators import AbstractFeatureGenerator
 
 class GeneratorHelper:
     @staticmethod
-    def fit_transform_assert(input_data: DataFrame, generator: AbstractFeatureGenerator, feature_metadata_in: FeatureMetadata = None, expected_feature_metadata_in_full: dict = None, expected_feature_metadata_full: dict = None):
+    def fit_transform_assert(input_data: DataFrame, generator: AbstractFeatureGenerator, feature_metadata_in: FeatureMetadata = None,
+                             expected_feature_metadata_in_full: dict = None, expected_feature_metadata_full: dict = None):
         # Given
         original_input_data = copy.deepcopy(input_data)
 

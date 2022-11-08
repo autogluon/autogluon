@@ -2,31 +2,41 @@ from abc import ABCMeta, abstractmethod
 from functools import partial
 import json
 
+import numpy as np
 import scipy
 import scipy.stats
 import sklearn.metrics
 
+try:
+    from sklearn.metrics._classification import _check_targets, type_of_target
+except:
+    from sklearn.metrics.classification import _check_targets, type_of_target
+
 from . import classification_metrics
-from ..constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
-from ..utils.miscs import warning_filter
-from .classification_metrics import *
+from .classification_metrics import confusion_matrix
 from . import quantile_metrics
+from ..constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
 
 
 class Scorer(object, metaclass=ABCMeta):
     """
     Scorer wraps an external or custom metric function to align it with AutoGluon's metric logic and API.
+    Scorer will alter the returned metric output to ensure higher_is_better and to allow computing metric error. This greatly simplifies downstream logic.
+    All metric logic within AutoGluon should use Scorer to ensure consistency whenever possible.
 
     Parameters
     ----------
     name : str
         Name of the metric. Used in logs and as a key in dictionaries when multiple metric outputs are computed.
-    score_func :
+    score_func : callable
         Scoring metric function that will be called internally to score.
         Required to be a callable with the first two arguments corresponding to y_true, y_pred that returns a float indicating the metric value.
     optimum : float
         The highest/best value the metric can return. For example, optimal=1 for accuracy, optimal=0 for mean_squared_error.
         This is used to calculate regret / error. For example, a score of 1 for accuracy would have an error of 0.
+        NOTE: This value should be for the original score_func prior to changing the sign of the metric output.
+            For example, if score_func is lower_is_better with an optimum of -2 (aka a value of 0.5 has an error of 2.5),
+            then you should specify `optimum=-2, sign=-1`.
     sign : int
         Valid values are 1 and -1.
         The sign of the metric to ensure greater_is_better.
@@ -36,7 +46,7 @@ class Scorer(object, metaclass=ABCMeta):
         kwargs to pass to score_func when called.
         For example, kwargs = {"beta": 2} when using sklearn.metrics.fbeta_score where beta is a required argument.
     """
-    def __init__(self, name: str, score_func, optimum: float, sign: int, kwargs: dict = None):
+    def __init__(self, name: str, score_func: callable, optimum: float, sign: int, kwargs: dict = None):
         self.name = name
         if kwargs is None:
             kwargs = dict()
@@ -48,7 +58,7 @@ class Scorer(object, metaclass=ABCMeta):
         self._sign = sign
         self.alias = set()
 
-    def __call__(self, y_true, y_pred, sample_weight=None, **kwargs):
+    def __call__(self, y_true, y_pred, sample_weight=None, **kwargs) -> float:
         """
         Evaluate predicted target values for X relative to y_true.
 
@@ -83,7 +93,33 @@ class Scorer(object, metaclass=ABCMeta):
 
         return self._score(y_true=y_true, y_pred=y_pred, **k)
 
-    def _score(self, y_true, y_pred, **kwargs):
+    def error(self, *args, **kwargs) -> float:
+        """
+        Returns error in lower_is_better format.
+        An error of 0 indicates a perfect score.
+
+        Equivalent to `scorer.convert_score_to_error(scorer(*args, **kwargs))`
+        """
+        score = self(*args, **kwargs)
+        return self.convert_score_to_error(score)
+
+    def convert_score_to_error(self, score: float) -> float:
+        """
+        Converts score in higher_is_better format to error in lower_is_better format.
+
+        An error of 0 indicates a perfect score.
+        """
+        return self.optimum - score
+
+    @property
+    def optimum(self) -> float:
+        """
+        The highest/best value the metric can return in higher_is_better format. For example, optimal=1 for accuracy, optimal=0 for mean_squared_error.
+        This is used to calculate regret / error. For example, a score of 1 for accuracy would have an error of 0.
+        """
+        return self.convert_score_to_original(self._optimum)
+
+    def _score(self, y_true, y_pred, **kwargs) -> float:
         y_true, y_pred, kwargs = self._preprocess(y_true=y_true, y_pred=y_pred, **kwargs)
         return self._sign * self._score_func(y_true, y_pred, **kwargs)
 
@@ -95,18 +131,33 @@ class Scorer(object, metaclass=ABCMeta):
 
     @property
     def greater_is_better(self) -> bool:
-        """Return whether the score is greater the better.
-
-        We use the stored `sign` object to decide the property.
+        """
+        Return whether the score returned by scorer(...) is in greater_is_better format.
+        By default, all Scorers are in greater_is_better format.
 
         Returns
         -------
-        flag
+        flag :
             The "greater_is_better" flag.
+        """
+        return True
+
+    @property
+    def greater_is_better_internal(self) -> bool:
+        """
+        Return whether the inner self.score_func returns metric values in greater_is_better format.
+
+        We use the stored `sign` variable to decide the property.
+        Users should not need to access this property during normal usage.
+
+        Returns
+        -------
+        flag :
+            The "greater_is_better_internal" flag.
         """
         return self._sign > 0
 
-    def convert_score_to_sklearn_val(self, score):
+    def convert_score_to_original(self, score: float) -> float:
         """Scores are always greater_is_better, this flips the sign of metrics who were originally lower_is_better."""
         return self._sign * score
 
@@ -114,17 +165,12 @@ class Scorer(object, metaclass=ABCMeta):
     def _preprocess(self, y_true, y_pred, **kwargs):
         raise NotImplementedError
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.name
-
-    def sklearn_scorer(self):
-        with warning_filter():
-            ret = sklearn.metrics.scorer.make_scorer(score_func=self, greater_is_better=True, needs_proba=self.needs_proba, needs_threshold=self.needs_threshold)
-        return ret
 
     @property
     @abstractmethod
-    def needs_pred(self):
+    def needs_pred(self) -> bool:
         raise NotImplementedError
 
     @property
@@ -141,6 +187,8 @@ class Scorer(object, metaclass=ABCMeta):
     @abstractmethod
     def needs_quantile(self) -> bool:
         raise NotImplementedError
+
+    score = __call__
 
 
 class _PredictScorer(Scorer):
@@ -436,7 +484,7 @@ mcc = make_scorer('mcc', sklearn.metrics.matthews_corrcoef)
 
 # Score functions that need decision values
 roc_auc = make_scorer('roc_auc',
-                      sklearn.metrics.roc_auc_score,
+                      classification_metrics.customized_binary_roc_auc_score,
                       greater_is_better=True,
                       needs_threshold=True)
 
@@ -457,7 +505,7 @@ recall = make_scorer('recall',
                      sklearn.metrics.recall_score)
 
 # Register other metrics
-quadratic_kappa = make_scorer('quadratic_kappa', quadratic_kappa, needs_proba=False)
+quadratic_kappa = make_scorer('quadratic_kappa', classification_metrics.quadratic_kappa, needs_proba=False)
 
 
 def customized_log_loss(y_true, y_pred, eps=1e-15):
@@ -500,10 +548,11 @@ log_loss = make_scorer('log_loss',
                        needs_proba=True)
 log_loss.add_alias('nll')
 
-pac_score = make_scorer('pac_score',
-                        classification_metrics.pac_score,
-                        greater_is_better=True,
-                        needs_proba=True)
+pac = make_scorer('pac',
+                  classification_metrics.pac,
+                  greater_is_better=True,
+                  needs_proba=True)
+pac.add_alias('pac_score')
 
 REGRESSION_METRICS = dict()
 for scorer in [
@@ -530,7 +579,7 @@ for scorer in [
     mcc,
     roc_auc_ovo_macro,
     log_loss,
-    pac_score,
+    pac,
     quadratic_kappa,
 ]:
     for metric_dict in [BINARY_METRICS, MULTICLASS_METRICS]:

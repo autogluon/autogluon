@@ -23,7 +23,7 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
     if path is None:
         utcnow = datetime.utcnow()
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        path = f"AutogluonModels/ag-{timestamp}{path_suffix}{os.path.sep}"
+        path = f"AutogluonModels{os.path.sep}ag-{timestamp}{path_suffix}{os.path.sep}"
         for i in range(1, 1000):
             try:
                 if create_dir:
@@ -33,8 +33,8 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
                     if os.path.isdir(path):
                         raise FileExistsError
                     break
-            except FileExistsError as e:
-                path = f"AutogluonModels/ag-{timestamp}-{i:03d}{path_suffix}{os.path.sep}"
+            except FileExistsError:
+                path = f"AutogluonModels{os.path.sep}ag-{timestamp}-{i:03d}{path_suffix}{os.path.sep}"
         else:
             raise RuntimeError("more than 1000 jobs launched in the same second")
         logger.log(25, f'No path specified. Models will be saved in: "{path}"')
@@ -44,7 +44,7 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
                 os.makedirs(path, exist_ok=False)
             elif os.path.isdir(path):
                 raise FileExistsError
-        except FileExistsError as e:
+        except FileExistsError:
             logger.warning(f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"')
     path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
     if path[-1] != os.path.sep:
@@ -62,7 +62,7 @@ def get_python_version(include_micro=True) -> str:
 def get_package_versions() -> Dict[str, str]:
     """Gets a dictionary of package name -> package version for every package installed in the environment"""
     import pkg_resources
-    package_dict = pkg_resources.working_set.by_key
+    package_dict = pkg_resources.working_set.by_key  # type: ignore
     package_version_dict = {key: val.version for key, val in package_dict.items()}
     return package_version_dict
 

@@ -3,29 +3,28 @@ import pprint
 import time
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Type, Union
 
 import pandas as pd
 
+from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
-from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
-
-from .configs import TIMESERIES_PRESETS_CONFIGS
-from .dataset import TimeSeriesDataFrame
-from .learner import AbstractLearner, TimeSeriesLearner
-from .splitter import AbstractTimeSeriesSplitter, LastWindowSplitter, MultiWindowSplitter
-from .trainer import AbstractTimeSeriesTrainer
+from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
+from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
+from autogluon.timeseries.splitter import AbstractTimeSeriesSplitter, LastWindowSplitter, MultiWindowSplitter
+from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
+from autogluon.timeseries.utils.random import set_random_seed
 
 logger = logging.getLogger(__name__)
 
 DEPRECATED_PRESETS_TO_FALLBACK = {
     "low_quality": "fast_training",
-    "high_quality": "medium_quality",
-    "good_quality": "medium_quality",
+    "good_quality": "high_quality",
 }
 
 
@@ -57,8 +56,7 @@ class TimeSeriesPredictor:
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
         metric. Available options:
 
-        - ``"mean_wQuantileLoss"``: mean weighted quantile loss, defined as average of quantile losses for the
-            specified ``quantile_levels`` scaled by the total value of the time series
+        - ``"mean_wQuantileLoss"``: mean weighted quantile loss, defined as average of quantile losses for the specified ``quantile_levels`` scaled by the total value of the time series
         - ``"MAPE"``: mean absolute percentage error
         - ``"sMAPE"``: "symmetric" mean absolute percentage error
         - ``"MASE"``: mean absolute scaled error
@@ -66,6 +64,18 @@ class TimeSeriesPredictor:
         - ``"RMSE"``: root mean squared error
 
         For more information about these metrics, see https://docs.aws.amazon.com/forecast/latest/dg/metrics.html.
+    known_covariates_names: List[str], optional
+        Names of the covariates that are known in advance for all time steps in the forecast horizon. These are also
+        known as dynamic features, exogenous variables, additional regressors or related time series. Examples of such
+        covariates include holidays, promotions or weather forecasts.
+
+        Currently, only numeric (float of integer dtype) are supported.
+
+        If ``known_covariates_names`` are provided, then:
+
+        - :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will expect that ``train_data`` contains the columns listed in ``known_covariates_names``.
+        - :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict` will expect an additional keyword argument ``known_covariates`` containing the future values of the known covariates in ``TimeSeriesDataFrame`` format.
+
     quantile_levels : List[float], optional
         List of increasing decimals that specifies which quantiles should be estimated when making distributional
         forecasts. Defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
@@ -88,11 +98,9 @@ class TimeSeriesPredictor:
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`. If ``tuning_data`` is passed to
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, validation_splitter is ignored. Possible choices:
 
-        - ``"last_window"`` - use last ``prediction_length`` time steps of each time series for validation.
-        - ``"multi_window"`` - use last 3 non-overlapping windows of length ``prediction_length`` of each time series
-            for validation.
-        - object of type :class:`~autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` implementing a custom
-            splitting strategy (for advanced users only).
+        - ``"last_window"``: use last ``prediction_length`` time steps of each time series for validation.
+        - ``"multi_window"``: use last 3 non-overlapping windows of length ``prediction_length`` of each time series for validation.
+        - object of type :class:`~autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` implementing a custom splitting strategy (for advanced users only).
 
     Other Parameters
     ----------------
@@ -109,11 +117,15 @@ class TimeSeriesPredictor:
         Alias for :attr:`quantile_levels`.
     """
 
+    # TODO: Update description of presets after the presets are finalized
+    # TODO: Update docstring for predict
+
     predictor_file_name = "predictor.pkl"
 
     def __init__(
         self,
         target: Optional[str] = None,
+        known_covariates_names: Optional[List[str]] = None,
         prediction_length: int = 1,
         eval_metric: Optional[str] = None,
         path: Optional[str] = None,
@@ -132,26 +144,23 @@ class TimeSeriesPredictor:
             raise ValueError("Both `label` and `target` are specified. Please specify at most one of these arguments.")
         self.target = target or kwargs.get("label", "target")
 
+        if known_covariates_names is None:
+            known_covariates_names = []
+        if isinstance(known_covariates_names, str):
+            known_covariates_names = [known_covariates_names]
+        if not all(isinstance(name, str) for name in known_covariates_names):
+            raise ValueError(
+                "known_covariates_names must be a list of strings (names of columns that are known at prediction time)."
+            )
+        if self.target in known_covariates_names:
+            raise ValueError(f"Target column {self.target} cannot be one of the known covariates.")
+        self.known_covariates_names = known_covariates_names
+
         self.prediction_length = prediction_length
         self.eval_metric = eval_metric
         self.quantile_levels = quantile_levels or kwargs.get(
             "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         )
-
-        learner_type = kwargs.pop("learner_type", TimeSeriesLearner)
-        learner_kwargs = kwargs.pop("learner_kwargs", dict())
-        learner_kwargs = learner_kwargs.copy()
-        learner_kwargs.update(
-            dict(
-                path_context=self.path,
-                eval_metric=eval_metric,
-                target=self.target,
-                prediction_length=self.prediction_length,
-                quantile_levels=self.quantile_levels,
-            )
-        )
-        self._learner: AbstractLearner = learner_type(**learner_kwargs)
-        self._learner_type = type(self._learner)
         if validation_splitter == "last_window":
             splitter = LastWindowSplitter()
         elif validation_splitter == "multi_window":
@@ -164,15 +173,36 @@ class TimeSeriesPredictor:
                 f"`autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` "
                 f"(received {validation_splitter} of type {type(validation_splitter)})."
             )
-        self.validation_splitter: AbstractTimeSeriesSplitter = splitter
+
+        learner_type = kwargs.pop("learner_type", TimeSeriesLearner)
+        learner_kwargs = kwargs.pop("learner_kwargs", dict())
+        learner_kwargs = learner_kwargs.copy()
+        learner_kwargs.update(
+            dict(
+                path_context=self.path,
+                eval_metric=eval_metric,
+                target=self.target,
+                known_covariates_names=self.known_covariates_names,
+                prediction_length=self.prediction_length,
+                quantile_levels=self.quantile_levels,
+                validation_splitter=splitter,
+                ignore_time_index=ignore_time_index,
+            )
+        )
+        self._learner: AbstractLearner = learner_type(**learner_kwargs)
+        self._learner_type = type(self._learner)
 
     @property
     def _trainer(self) -> AbstractTimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
 
+    @property
+    def validation_splitter(self) -> AbstractTimeSeriesSplitter:
+        return self._learner.validation_splitter
+
     def _check_and_prepare_data_frame(self, df: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
-        """Given a sequence of ``TimeSeriesDataFrame``s, replace their time indexes if
-        ``self.ignore_time_index`` is set, and ensure their frequencies are available.
+        """Ensure that TimeSeriesDataFrame has a frequency, or replace its time index with a dummy if
+        ``self.ignore_time_index`` is True.
         """
         if df is None:
             return df
@@ -197,6 +227,7 @@ class TimeSeriesPredictor:
         hyperparameters: Dict[Union[str, Type], Any] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         enable_ensemble: bool = True,
+        random_seed: Optional[int] = None,
         **kwargs,
     ) -> "TimeSeriesPredictor":
         """Fit probabilistic forecasting models to the given time series dataset.
@@ -205,18 +236,40 @@ class TimeSeriesPredictor:
         ----------
         train_data : TimeSeriesDataFrame
             Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
+
+            If ``known_covariates_names`` were specified when creating the predictor, ``train_data`` must include the
+            columns listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+            The known covariates must have a numeric (float or integer) dtype. Columns of ``train_data`` except
+            ``target`` and those listed in ``known_covariates_names`` will be ignored.
+
+            If ``train_data`` has static features (i.e., ``train_data.static_features`` is a pandas DataFrame), the
+            predictor will interpret columns with ``int`` and ``float`` dtypes as continuous (real-valued) features,
+            columns with ``object`` and ``str`` dtypes as categorical features, and will ignore the rest of columns.
+
+            For example, to ensure that column "store_id" with dtype ``int`` is interpreted as a category,
+            we need to change its type to ``category``::
+
+                data.static_features["store_id"] = data.static_features["store_id"].astype("category")
+
         tuning_data : TimeSeriesDataFrame, optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
             time series are used for computing the validation score.
 
+            Leaving this argument empty and letting AutoGluon automatically generate the validation set from
+            ``train_data`` is a good default.
+
             If not provided, AutoGluon will split :attr:`train_data` into training and tuning subsets using
-            ``self.validation_splitter``. If ``tuning_data`` is provided, ``self.validation_splitter`` will be ignored.
+            ``validation_splitter``. If ``tuning_data`` is provided, ``validation_splitter`` will be ignored.
             See the description of ``validation_splitter`` in the docstring for
             :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
 
-            Leaving this argument empty and letting AutoGluon automatically generate the validation set from
-            ``train_data`` is a good default.
+            If ``known_covariates_names`` were specified when creating the predictor, ``tuning_data`` must also include
+            the columns listed in ``known_covariates_names`` with the covariates values aligned with the target time
+            series.
+
+            If ``train_data`` has static features, ``tuning_data`` must have also have static features with the same
+            column names and dtypes.
         time_limit : int, optional
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
             seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models
@@ -228,52 +281,107 @@ class TimeSeriesPredictor:
             Can significantly impact predictive accuracy, memory footprint, inference latency of trained models,
             and various other properties of the returned predictor. It is recommended to specify presets and avoid
             specifying most other :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` arguments or model
-            hyperparameters prior to becoming familiar with AutoGluon. For example, set ``presets="best_quality"``
+            hyperparameters prior to becoming familiar with AutoGluon. For example, set ``presets="high_quality"``
             to get a high-accuracy predictor, or set ``presets="fast_training"`` to quickly fit multiple simple
             statistical models.
             Any user-specified arguments in :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will
             override the values used by presets.
 
-            Available presets are "best_quality", "medium_quality", and "fast_training".
+            Available presets:
+
+            - ``"fast_training"``: fit simple "local" statistical models (``ETS``, ``ARIMA``, ``Theta``, ``Naive``, ``SeasonalNaive``). These models are fast to train, but cannot capture more complex patters in the data.
+            - ``"medium_quality"``: all models mentioned above + tree-based model ``AutoGluonTabular`` + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
+            - ``"high_quality"``: all models mentioned above + hyperparameter optimization for local statistical models + deep learning models ``TemporalFusionTransformerMXNet`` (if MXNet is available) and ``SimpleFeedForward``. Usually more accurate than ``medium_quality``, but takes longer to train.
+            - ``"best_quality"``: all models mentioned above + deep learning model ``TransformerMXNet`` (if MXNet is available) + hyperparameter optimization for deep learning models. Usually better than ``high_quality``, but takes much longer to train.
+
             Details for these presets can be found in ``autogluon/timeseries/configs/presets_configs.py``. If not
-            provided, user-provided values for other arguments (specifically, ``hyperparameters`` and
-            ``hyperparameter_tune_kwargs`` will be used (defaulting to their default values specified below).
-        hyperparameters : str or dict, default = "default"
-            Determines the hyperparameters used by each model.
+            provided, user-provided values for ``hyperparameters`` and ``hyperparameter_tune_kwargs`` will be used
+            (defaulting to their default values specified below).
+        hyperparameters : str or dict, default = "medium_quality"
+            Determines what models are trained and what hyperparameters are used by each model.
 
-            If str is passed, will use a preset hyperparameter configuration, can be one of "default", "default_hpo",
-            or "local_only".
+            If str is passed, will use a preset hyperparameter configuration defined in`
+            `autogluon/timeseries/trainer/models/presets.py``.
 
-            If dict is provided, the keys are strings or Types that indicate which model types to train. In this case,
-            the predictor will only train the given model types. Stable model options include: "DeepAR", "MQCNN", and
-            "SFF" (SimpleFeedForward). See References for more detail on these models.
+            If dict is provided, the keys are strings or Types that indicate which models to train. Each value is
+            itself a dict containing hyperparameters for each of the trained models. Any omitted hyperparameters not
+            specified here will be set to default. For example::
 
-            Values in the ``hyperparameters`` dict are themselves dictionaries of hyperparameter settings for each model
-            type. Each hyperparameter can either be a single fixed value or a search space containing many possible
-            values. A search space should only be provided when ``hyperparameter_tune_kwargs`` is specified (i.e.,
-            hyperparameter-tuning is utilized). Any omitted hyperparameters not specified here will be set to default
-            values which are given in``autogluon/timeseries/trainer/models/presets.py``. Specific hyperparameter
-            choices for each of the recommended models can be found in the references.
+                predictor.fit(
+                    ...
+                    hyperparameters={
+                        "DeepAR": {},
+                        "ETS": {"seasonal_period": 7},
+                    }
+                )
+
+            The above example will only train two models:
+
+            * ``DeepAR`` (with default hyperparameters)
+            * ``ETS`` (with the given `seasonal_period`; all other parameters set to their defaults)
+
+            Full list of available models and their hyperparameters is provided in :ref:`forecasting_zoo`.
+
+            The hyperparameters for each model can be fixed values (as shown above), or search spaces over which
+            hyperparameter optimization is performed. A search space should only be provided when
+            ``hyperparameter_tune_kwargs`` is given (i.e., hyperparameter-tuning is utilized). For example::
+
+                import autogluon.core as ag
+
+                predictor.fit(
+                    ...
+                    hyperparameters={
+                        "DeepAR": {
+                            "hidden_size": ag.space.Int(20, 100),
+                            "dropout_rate": ag.space.Categorical(0.1, 0.3),
+                        },
+                    },
+                    hyperparameter_tune_kwargs="auto",
+                )
+
+            In the above example, multiple versions of the DeepAR model with different values of the parameters
+            "hidden_size" and "dropout_rate" will be trained.
         hyperparameter_tune_kwargs : str or dict, optional
+            Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run). If ``None``, then
+            hyperparameter tuning will not be performed.
+
+            Ray Tune backend is used to tune deep-learning forecasting models from GluonTS implemented in MXNet. All
+            other models use a custom HPO backed based on random search.
+
+            Can be set to a string to choose one of available presets:
+
+            - ``"random"``: 10 trials of random search
+            - ``"auto"``: 10 trials of bayesian optimization GluonTS MXNet models, 10 trials of random search for other models
+
+            Alternatively, a dict can be passed for more fine-grained control. The dict must include the following keys
+
+            - ``"num_trials"``: int, number of configurations to train for each tuned model
+            - ``"searcher"``: one of ``"random"`` (random search), ``"bayes"`` (bayesian optimization for GluonTS MXNet models, random search for other models) and ``"auto"`` (same as ``"bayes"``).
+            - ``"scheduler"``: the only supported option is ``"local"`` (all models trained on the same machine)
+
+            Example::
+
+                predictor.fit(
+                    ...
+                    hyperparameter_tune_kwargs={
+                        "scheduler": "local",
+                        "searcher": "auto",
+                        "num_trials": 5,
+                    }
+                )
+
         enable_ensemble : bool, default = True
             If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
             ``hyperparameters``.
+        random_seed : int, optional
+            If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
+            results for most models (except those trained on GPU because of the non-determinism of GPU operations).
 
-        References
-        ----------
-            - DeepAR: https://ts.gluon.ai/stable/api/gluonts/gluonts.model.deepar.html
-            - MQCNN: https://ts.gluon.ai/stable/api/gluonts/gluonts.model.seq2seq.html
-            - SFF: https://ts.gluon.ai/stable/api/gluonts/gluonts.model.simple_feedforward.html
         """
-        # TODO: Update docstring for presets, hyperparameters and hyperparameter_tune_kwargs
         time_start = time.time()
         if self._learner.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
 
-        if self.target not in train_data.columns:
-            raise ValueError(f"Target column `{self.target}` not found in the training data set.")
-        if tuning_data is not None and self.target not in tuning_data.columns:
-            raise ValueError(f"Target column `{self.target}` not found in the tuning data set.")
         if hyperparameters is None:
             hyperparameters = "default"
 
@@ -281,16 +389,17 @@ class TimeSeriesPredictor:
         tuning_data = self._check_and_prepare_data_frame(tuning_data)
 
         verbosity = kwargs.get("verbosity", self.verbosity)
-        set_logger_verbosity(verbosity, logger=logger)
+        set_logger_verbosity(verbosity)
 
         fit_args = dict(
             prediction_length=self.prediction_length,
-            target_column=self.target,
+            target=self.target,
             time_limit=time_limit,
             evaluation_metric=self.eval_metric,
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             enable_ensemble=enable_ensemble,
+            random_seed=random_seed,
             **kwargs,
         )
         logger.info("================ TimeSeriesPredictor ================")
@@ -308,30 +417,19 @@ class TimeSeriesPredictor:
         logger.info("Fitting with arguments:")
         logger.info(f"{pprint.pformat(fit_args)}")
         logger.info(
-            f"Provided training data set with {len(train_data)} rows, {train_data.num_items} items. "
-            f"Average time series length is {len(train_data) / train_data.num_items}."
+            f"Provided training data set with {len(train_data)} rows, {train_data.num_items} items (item = single time series). "
+            f"Average time series length is {len(train_data) / train_data.num_items:.1f}."
         )
         if tuning_data is not None:
             logger.info(
                 f"Provided tuning data set with {len(tuning_data)} rows, {tuning_data.num_items} items. "
-                f"Average time series length is {len(tuning_data) / tuning_data.num_items}."
+                f"Average time series length is {len(tuning_data) / tuning_data.num_items:.1f}."
             )
         logger.info(f"Training artifacts will be saved to: {Path(self.path).resolve()}")
         logger.info("=====================================================")
 
-        # Inform the user extra columns in dataset will not be used.
-        extra_columns = [c for c in train_data.columns.copy() if c != self.target]
-        if len(extra_columns) > 0:
-            logger.warning(f"Provided columns {extra_columns} will not be used.")
-
-        if tuning_data is None:
-            logger.warning(
-                "Validation data is None. "
-                + self.validation_splitter.describe_validation_strategy(prediction_length=self.prediction_length)
-            )
-            train_data, tuning_data = self.validation_splitter.split(
-                ts_dataframe=train_data, prediction_length=self.prediction_length
-            )
+        if random_seed is not None:
+            set_random_seed(random_seed)
 
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
@@ -347,51 +445,6 @@ class TimeSeriesPredictor:
         self.save()
         return self
 
-    # TODO: to be changed after ray tune integration
-    def _get_scheduler_options(
-        self,
-        hyperparameter_tune_kwargs: Optional[Union[str, Dict]],
-        time_limit: Optional[int] = None,
-    ) -> Tuple[Optional[Type], Optional[Dict[str, Any]]]:
-        """Validation logic for ``hyperparameter_tune_kwargs``. Returns True if ``hyperparameter_tune_kwargs`` is None
-        or can construct a valid scheduler. Returns False if hyperparameter_tune_kwargs results in an invalid scheduler.
-        """
-        if hyperparameter_tune_kwargs is None:
-            return None, None
-
-        num_trials: Optional[int] = None
-        if isinstance(hyperparameter_tune_kwargs, dict):
-            num_trials = hyperparameter_tune_kwargs.get("num_trials")
-            if time_limit is None and num_trials is None:
-                logger.warning(
-                    "None of time_limit and num_trials are set, defaulting to num_trials=2",
-                )
-                num_trials = 2
-            else:
-                num_trials = hyperparameter_tune_kwargs.get("num_trials", 999)
-        elif isinstance(hyperparameter_tune_kwargs, str):
-            num_trials = 999
-
-        scheduler_cls, scheduler_params = scheduler_factory(
-            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-            time_out=time_limit,
-            nthreads_per_trial="auto",
-            ngpus_per_trial="auto",
-            num_trials=num_trials,
-        )
-
-        if scheduler_params["num_trials"] == 1:
-            logger.warning("Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. ")
-            return None, None
-
-        scheduler_ngpus = scheduler_params["resource"].get("num_gpus", 0)
-        if scheduler_ngpus is not None and isinstance(scheduler_ngpus, int) and scheduler_ngpus > 1:
-            logger.warning(
-                f"Warning: TimeSeriesPredictor currently doesn't use >1 GPU per training run. "
-                f"Detected {scheduler_ngpus} GPUs."
-            )
-        return scheduler_cls, scheduler_params
-
     def get_model_names(self) -> List[str]:
         """Returns the list of model names trained by this predictor object."""
         return self._trainer.get_model_names()
@@ -399,7 +452,9 @@ class TimeSeriesPredictor:
     def predict(
         self,
         data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[str] = None,
+        random_seed: Optional[int] = 123,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         """Return quantile and mean forecasts for the given dataset, starting from the end of each time series.
@@ -408,12 +463,68 @@ class TimeSeriesPredictor:
         ----------
         data : TimeSeriesDataFrame
             Time series data to forecast with.
+
+            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
+            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+
+            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
+            static features that have the same columns and dtypes.
+        known_covariates : TimeSeriesDataFrame, optional
+            If ``known_covariates_names`` were specified when creating the predictor, it is necessary to provide the
+            values of the known covariates for each time series during the forecast horizon. That is:
+
+            - The columns must include all columns listed in ``known_covariates_names``
+            - The ``item_id`` index must include all item ids present in ``data``
+            - The ``timestamp`` index must include the values for ``prediction_length`` many time steps into the future from the end of each time series in ``data``
+
+            See example below.
         model : str, optional
             Name of the model that you would like to use for prediction. By default, the best model during training
             (with highest validation score) will be used.
+        random_seed : int or None, default = 123
+            If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
+            results for most models (except those trained on GPU because of the non-determinism of GPU operations).
+
+
+        Examples
+        --------
+        >>> print(data)
+                            target  promotion  price
+        item_id timestamp
+        A       2020-01-05      20          0   19.9
+                2020-01-06      40          1    9.9
+                2020-01-07      32          0   15.0
+        B       2020-03-01      13          0    5.0
+                2020-03-02      44          1    2.9
+                2020-03-03      72          1    2.9
+        >>> predictor = TimeSeriesPredictor(prediction_length=2, known_covariates_names=["promotion", "price"]).fit(data)
+        >>> print(known_covariates)
+                            promotion  price
+        item_id timestamp
+        A       2020-01-08          1   12.9
+                2020-01-09          1   12.9
+        B       2020-03-04          0    5.0
+                2020-03-05          0    7.0
+        >>> predictor.predict(data, known_covariates=known_covariates)
+                            target
+        item_id timestamp
+        A       2020-01-08      30
+                2020-01-09      27
+        B       2020-03-04      17
+                2020-03-05       8
         """
+        if "quantile_levels" in kwargs:
+            warnings.warn(
+                "Passing `quantile_levels` as a keyword argument to `TimeSeriesPredictor.predict` is deprecated and "
+                "will be removed in v0.7. This might also lead to some models not working properly. "
+                "Please specify the desired quantile levels when creating the predictor as "
+                "`TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
+                category=DeprecationWarning,
+            )
+        if random_seed is not None:
+            set_random_seed(random_seed)
         data = self._check_and_prepare_data_frame(data)
-        return self._learner.predict(data, model=model, **kwargs)
+        return self._learner.predict(data, known_covariates=known_covariates, model=model, **kwargs)
 
     def evaluate(self, data: TimeSeriesDataFrame, **kwargs):
         """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``
@@ -422,9 +533,14 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : TimeSeriesDataFrame
-            The data to evaluate the best model on. The last ``prediction_length`` time steps of the
-            data set, for each item, will be held out for prediction and forecast accuracy will be calculated
-            on these time steps.
+            The data to evaluate the best model on. The last ``prediction_length`` time steps of the data set, for each
+            item, will be held out for prediction and forecast accuracy will be calculated on these time steps.
+
+            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
+            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+
+            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
+            static features that have the same columns and dtypes.
 
         Other Parameters
         ----------------
@@ -495,11 +611,10 @@ class TimeSeriesPredictor:
 
         * ``model``: The name of the model.
         * ``score_test``: The test score of the model on ``data``, if provided. Computed according to ``eval_metric``.
-        * ``score_val``: The validation score of the model using the internal validation data. Computed according
-            to ``eval_metric``.
+        * ``score_val``: The validation score of the model using the internal validation data. Computed according to ``eval_metric``.
 
-            **NOTE:** Metrics scores are always shown in higher is better form.
-            This means that metrics such as MASE or MAPE will have their signs `flipped`, and values will be negative.
+            **NOTE:** Metrics scores are always shown in 'higher is better' format.
+            This means that metrics such as MASE or MAPE will be multiplied by -1, so their values will be negative.
             This is necessary to avoid the user needing to know the metric to understand if higher is better when
             looking at leaderboard.
 
@@ -513,6 +628,13 @@ class TimeSeriesPredictor:
         data : TimeSeriesDataFrame, optional
             dataset used for additional evaluation. If not provided, the validation set used during training will be
             used.
+
+            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
+            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+
+            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
+            static features that have the same columns and dtypes.
+
         silent : bool, default = False
             If False, the leaderboard DataFrame will be printed.
 

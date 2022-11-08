@@ -71,15 +71,22 @@ def _check_if_kaggle() -> bool:
     """
     root_logger = logging.getLogger()
     for handler in root_logger.root.handlers[:]:
-        if hasattr(handler, 'baseFilename') and (handler.baseFilename == '/tmp/kaggle.log'):
+        if hasattr(handler, 'baseFilename') and (handler.baseFilename == '/tmp/kaggle.log'):  # type: ignore
             return True
     return False
 
 
 def _add_stream_handler():
-    stream_handler = logging.StreamHandler()
-    # add stream_handler to AG logger
-    _logger_ag.addHandler(stream_handler)
+    # Add stream_handler to AG logger if it doesn't already exist
+    # This is necessary so that the modification of logging level can take effect
+    # Also this adjust the logging format
+    # This function is supposed to be called before any logging from autogluon happens
+    if not any(isinstance(h, logging.StreamHandler) for h in _logger_ag.handlers):
+        stream_handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(message)s')
+        stream_handler.setFormatter(formatter)
+        _logger_ag.addHandler(stream_handler)
+        _logger_ag.propagate = False
 
 
 __FIXED_KAGGLE_LOGGING = False

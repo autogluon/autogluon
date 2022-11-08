@@ -70,7 +70,9 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
     return num_gpus
 
 
-def infer_precision(num_gpus: int, precision: Union[int, str], as_torch: Optional[bool] = False):
+def infer_precision(
+    num_gpus: int, precision: Union[int, str], as_torch: Optional[bool] = False, cpu_only_warning: bool = True
+):
     """
     Infer the proper precision based on the environment setup and the provided precision.
 
@@ -82,18 +84,21 @@ def infer_precision(num_gpus: int, precision: Union[int, str], as_torch: Optiona
         The precision provided in config.
     as_torch
         Whether to convert the precision to the Pytorch format.
+    cpu_only_warning
+        Whether to turn on warning if the instance has only CPU.
 
     Returns
     -------
     The inferred precision.
     """
     if num_gpus == 0:  # CPU only prediction
-        warnings.warn(
-            "Only CPU is detected in the instance. "
-            "This may result in slow speed for MultiModalPredictor. "
-            "Consider using an instance with GPU support.",
-            UserWarning,
-        )
+        if cpu_only_warning:
+            warnings.warn(
+                "Only CPU is detected in the instance. "
+                "This may result in slow speed for MultiModalPredictor. "
+                "Consider using an instance with GPU support.",
+                UserWarning,
+            )
         precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU
     else:
         if precision == "bf16" and not torch.cuda.is_bf16_supported():
@@ -120,7 +125,7 @@ def infer_precision(num_gpus: int, precision: Union[int, str], as_torch: Optiona
     return precision
 
 
-def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List], device: torch.device):
+def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List, Tuple], device: torch.device):
     """
     Move an object to the given device.
 
@@ -145,7 +150,7 @@ def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List], device: torc
         for k, v in obj.items():
             res[k] = move_to_device(v, device)
         return res
-    elif isinstance(obj, list):
+    elif isinstance(obj, list) or isinstance(obj, tuple):
         res = []
         for v in obj:
             res.append(move_to_device(v, device))

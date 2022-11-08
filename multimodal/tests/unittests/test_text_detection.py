@@ -21,6 +21,9 @@ def download_sample_images():
     "checkpoint_name",
     ["textsnake_r50_fpn_unet_1200e_ctw1500"],
 )
+@pytest.mark.skip(
+    reason="Output format of OCR shall be changed to match with Object Detection. Since they both have ret_type=BBOX"
+)
 def test_mmocr_text_detection_inference(checkpoint_name):
     mmocr_image_name = download_sample_images()
 

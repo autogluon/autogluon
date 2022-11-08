@@ -1,4 +1,4 @@
-# Welcome to Contributing to AutoGLuon-AutoMM!
+# Welcome to Contributing to AutoGluon Multimodal!
 
 To guarantee code quality and correctness, we do two kinds of testing:
 

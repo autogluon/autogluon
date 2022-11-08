@@ -28,4 +28,4 @@ def delete_s3_prefix(bucket, prefix):
     # print(delete_keys)
 
     if len(delete_keys['Objects']) != 0:
-      s3.meta.client.delete_objects(Bucket=bucket, Delete=delete_keys)
+        s3.meta.client.delete_objects(Bucket=bucket, Delete=delete_keys)

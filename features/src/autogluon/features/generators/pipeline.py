@@ -19,7 +19,8 @@ logger = logging.getLogger(__name__)
 # TODO: Documentation
 class PipelineFeatureGenerator(BulkFeatureGenerator):
     """
-    PipelineFeatureGenerator is an implementation of BulkFeatureGenerator with various smart defaults and edge case handling functionality to enable robust data handling.
+    PipelineFeatureGenerator is an implementation of BulkFeatureGenerator with various smart defaults and edge case handling functionality to enable
+    robust data handling.
     It is recommended that users base any custom feature generators meant for end-to-end data transformation from PipelineFeatureGenerator.
         Reference AutoMLPipelineFeatureGenerator for an example of extending PipelineFeatureGenerator.
     It is not recommended that PipelineFeatureGenerator be used as a generator within any other generator's pre or post generators.
@@ -30,9 +31,12 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
         if post_generators is None:
             post_generators = [DropUniqueFeatureGenerator()]
 
-        super().__init__(pre_generators=pre_generators, post_generators=post_generators, pre_drop_useless=pre_drop_useless, pre_enforce_types=pre_enforce_types, reset_index=reset_index, verbosity=verbosity, **kwargs)
+        super().__init__(pre_generators=pre_generators, post_generators=post_generators, pre_drop_useless=pre_drop_useless, pre_enforce_types=pre_enforce_types,
+                         reset_index=reset_index, verbosity=verbosity, **kwargs)
 
-        self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
+        # FeatureMetadata object based on the original input features real dtypes
+        # (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
+        self._feature_metadata_in_real: FeatureMetadata = None
 
         self._is_dummy = False  # If True, returns a single dummy feature as output. Occurs if fit with no useful features.
 
@@ -56,7 +60,8 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
     def _fit_transform_custom(self, X_out: DataFrame, type_group_map_special: dict, y=None) -> (DataFrame, dict):
         if len(list(X_out.columns)) == 0:
             self._is_dummy = True
-            self._log(30, f'\tWARNING: No useful features were detected in the data! AutoGluon will train using 0 features, and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
+            self._log(30, '\tWARNING: No useful features were detected in the data! AutoGluon will train using 0 features, '
+                          'and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
             dummy_generator = DummyFeatureGenerator()
             X_out = dummy_generator.fit_transform(X=X_out)
             type_group_map_special = copy.deepcopy(dummy_generator.feature_metadata.type_group_map_special)
@@ -88,9 +93,11 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
         available_mem = psutil.virtual_memory().available
         pre_memory_usage_percent = self.pre_memory_usage / (available_mem + self.pre_memory_usage)
         self._log(20, f'\tAvailable Memory:                    {(round((self.pre_memory_usage + available_mem) / 1e6, 2))} MB')
-        self._log(20, f'\tTrain Data (Original)  Memory Usage: {round(self.pre_memory_usage / 1e6, 2)} MB ({round(pre_memory_usage_percent * 100, 1)}% of available memory)')
+        self._log(20, f'\tTrain Data (Original)  Memory Usage: {round(self.pre_memory_usage / 1e6, 2)} MB '
+                      f'({round(pre_memory_usage_percent * 100, 1)}% of available memory)')
         if pre_memory_usage_percent > 0.05:
-            self._log(30, f'\tWarning: Data size prior to feature transformation consumes {round(pre_memory_usage_percent * 100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
+            self._log(30, f'\tWarning: Data size prior to feature transformation consumes {round(pre_memory_usage_percent * 100, 1)}% of available memory. '
+                          f'Consider increasing memory or subsampling the data to avoid instability.')
 
     @disable_if_lite_mode()
     def _compute_post_memory_usage(self, X: DataFrame):
@@ -101,22 +108,29 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
 
         available_mem = psutil.virtual_memory().available
         post_memory_usage_percent = self.post_memory_usage / (available_mem + self.post_memory_usage + self.pre_memory_usage)
-        self._log(20, f'\tTrain Data (Processed) Memory Usage: {round(self.post_memory_usage / 1e6, 2)} MB ({round(post_memory_usage_percent * 100, 1)}% of available memory)')
+        self._log(20, f'\tTrain Data (Processed) Memory Usage: {round(self.post_memory_usage / 1e6, 2)} MB '
+                      f'({round(post_memory_usage_percent * 100, 1)}% of available memory)')
         if post_memory_usage_percent > 0.15:
-            self._log(30, f'\tWarning: Data size post feature transformation consumes {round(post_memory_usage_percent * 100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
+            self._log(30, f'\tWarning: Data size post feature transformation consumes {round(post_memory_usage_percent * 100, 1)}% of available memory. '
+                          f'Consider increasing memory or subsampling the data to avoid instability.')
 
     def print_feature_metadata_info(self, log_level=20):
         if self._useless_features_in:
             self._log(log_level, f'\tUseless Original Features (Count: {len(self._useless_features_in)}): {list(self._useless_features_in)}')
-            self._log(log_level, f'\t\tThese features carry no predictive signal and should be manually investigated.')  # TODO: What about features with 1 unique value but also np.nan?
-            self._log(log_level, f'\t\tThis is typically a feature which has the same value for all rows.')
-            self._log(log_level, f'\t\tThese features do not need to be present at inference time.')
+            # TODO: What about features with 1 unique value but also np.nan?
+            self._log(log_level, '\t\tThese features carry no predictive signal and should be manually investigated.')
+            self._log(log_level, '\t\tThis is typically a feature which has the same value for all rows.')
+            self._log(log_level, '\t\tThese features do not need to be present at inference time.')
         if self._feature_metadata_in_unused.get_features():
-            # TODO: Consider highlighting why a feature was unused (complex to implement, can check if was valid input to any generator in a generator group through feature chaining)
-            self._log(log_level, f'\tUnused Original Features (Count: {len(self._feature_metadata_in_unused.get_features())}): {self._feature_metadata_in_unused.get_features()}')
-            self._log(log_level, f'\t\tThese features were not used to generate any of the output features. Add a feature generator compatible with these features to utilize them.')
-            self._log(log_level, f'\t\tFeatures can also be unused if they carry very little information, such as being categorical but having almost entirely unique values or being duplicates of other features.')
-            self._log(log_level, f'\t\tThese features do not need to be present at inference time.')
+            # TODO: Consider highlighting why a feature was unused
+            #  (complex to implement, can check if was valid input to any generator in a generator group through feature chaining)
+            self._log(log_level, f'\tUnused Original Features (Count: {len(self._feature_metadata_in_unused.get_features())}): '
+                                 f'{self._feature_metadata_in_unused.get_features()}')
+            self._log(log_level, '\t\tThese features were not used to generate any of the output features. '
+                                 'Add a feature generator compatible with these features to utilize them.')
+            self._log(log_level, '\t\tFeatures can also be unused if they carry very little information, '
+                                 'such as being categorical but having almost entirely unique values or being duplicates of other features.')
+            self._log(log_level, '\t\tThese features do not need to be present at inference time.')
             self._feature_metadata_in_unused.print_feature_metadata_full(self.log_prefix + '\t\t', log_level=log_level)
         self._log(log_level-5, '\tTypes of features in original data (exact raw dtype, raw dtype):')
         self._feature_metadata_in_real.print_feature_metadata_full(self.log_prefix + '\t\t', print_only_one_special=True, log_level=log_level-5)

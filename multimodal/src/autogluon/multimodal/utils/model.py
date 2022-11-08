@@ -2,6 +2,7 @@ import functools
 import logging
 from typing import Dict, List, Optional, Tuple, Union
 
+import timm
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
@@ -19,6 +20,7 @@ from ..constants import (
     MMDET_IMAGE,
     MMOCR_TEXT_DET,
     MMOCR_TEXT_RECOG,
+    NER,
     NUMERICAL,
     NUMERICAL_MLP,
     NUMERICAL_TRANSFORMER,
@@ -31,6 +33,7 @@ from ..models import (
     CategoricalMLP,
     CategoricalTransformer,
     CLIPForImageText,
+    HFAutoModelForNER,
     HFAutoModelForTextPrediction,
     MMDetAutoModelForObjectDetection,
     MMOCRAutoModelForTextDetection,
@@ -50,6 +53,7 @@ logger = logging.getLogger(AUTOMM)
 def select_model(
     config: DictConfig,
     df_preprocessor: MultiModalFeaturePreprocessor,
+    strict: Optional[bool] = True,
 ):
     """
     Filter model config through the detected modalities in the training data.
@@ -68,6 +72,8 @@ def select_model(
         A MultiModalFeaturePreprocessor object, which has called .fit() on the training data.
         Column names of the same modality are grouped into one list. If a modality's list is empty,
         it means the training data don't have this modality.
+    strict
+        If False, allow retaining one model when partial modalities are available for that model.
 
     Returns
     -------
@@ -76,7 +82,7 @@ def select_model(
     data_status = {}
     for per_modality in ALL_MODALITIES:
         data_status[per_modality] = False
-    if len(df_preprocessor.image_path_names) > 0:
+    if len(df_preprocessor.image_feature_names) > 0:
         data_status[IMAGE] = True
     if len(df_preprocessor.text_feature_names) > 0:
         data_status[TEXT] = True
@@ -99,7 +105,10 @@ def select_model(
         if all(model_data_status):
             selected_model_names.append(model_name)
         else:
-            delattr(config.model, model_name)
+            if any(model_data_status) and not strict:
+                selected_model_names.append(model_name)
+            else:
+                delattr(config.model, model_name)
 
     if len(selected_model_names) == 0:
         raise ValueError("No model is available for this dataset.")
@@ -120,6 +129,8 @@ def select_model(
 
     config.model.names = selected_model_names
     logger.debug(f"selected models: {selected_model_names}")
+    for model_name in selected_model_names:
+        logger.debug(f"model dtypes: {getattr(config.model, model_name).data_types}")
 
     return config
 
@@ -127,7 +138,8 @@ def select_model(
 def create_model(
     model_name: str,
     model_config: DictConfig,
-    num_classes: Optional[int] = None,
+    num_classes: Optional[int] = 0,
+    classes: Optional[list] = None,
     num_numerical_columns: Optional[int] = None,
     num_categories: Optional[List[int]] = None,
     pretrained: Optional[bool] = True,
@@ -143,6 +155,8 @@ def create_model(
         Config of the model.
     num_classes
         The class number for a classification task. It should be 1 for a regression task.
+    classes
+        All classes in this dataset.
     num_numerical_columns
         The number of numerical columns in the training dataframe.
     num_categories
@@ -176,6 +190,7 @@ def create_model(
             num_classes=num_classes,
             pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
             gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            low_cpu_mem_usage=OmegaConf.select(model_config, "low_cpu_mem_usage", default=False),
             pretrained=pretrained,
         )
     elif model_name.lower().startswith(T_FEW):
@@ -187,6 +202,7 @@ def create_model(
             mc_loss=model_config.mc_loss,  # Adds multiple choice cross entropy loss
             num_classes=num_classes,
             gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            low_cpu_mem_usage=OmegaConf.select(model_config, "low_cpu_mem_usage", default=False),
             pretrained=pretrained,
         )
     elif model_name.lower().startswith(NUMERICAL_MLP):
@@ -223,6 +239,8 @@ def create_model(
             embedding_arch=model_config.embedding_arch,
             num_classes=num_classes,
             ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
+            additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
+            share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
         )
     elif model_name.lower().startswith(CATEGORICAL_MLP):
         model = CategoricalMLP(
@@ -254,11 +272,16 @@ def create_model(
             ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
             num_classes=num_classes,
             cls_token=False,
+            additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
+            share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
         )
     elif model_name.lower().startswith(MMDET_IMAGE):
         model = MMDetAutoModelForObjectDetection(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            classes=classes,
+            pretrained=pretrained,
         )
     elif model_name.lower().startswith(MMOCR_TEXT_DET):
         model = MMOCRAutoModelForTextDetection(
@@ -269,6 +292,14 @@ def create_model(
         model = MMOCRAutoModelForTextRecognition(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
+        )
+    elif model_name.lower().startswith(NER):
+        model = HFAutoModelForNER(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            pretrained=pretrained,
         )
     elif model_name.lower().startswith(FUSION_MLP):
         model = functools.partial(
@@ -301,6 +332,8 @@ def create_model(
             head_activation=model_config.head_activation,
             adapt_in_features=model_config.adapt_in_features,
             loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
+            additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
+            share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
         )
     else:
         raise ValueError(f"unknown model name: {model_name}")
@@ -311,6 +344,7 @@ def create_model(
 def create_fusion_model(
     config: DictConfig,
     num_classes: Optional[int] = None,
+    classes: Optional[list] = None,
     num_numerical_columns: Optional[int] = None,
     num_categories: Optional[List[int]] = None,
     pretrained: Optional[bool] = True,
@@ -326,6 +360,8 @@ def create_fusion_model(
         A DictConfig object. The model config should be accessible by "config.model".
     num_classes
         The class number for a classification task. It should be 1 for a regression task.
+    classes
+        All classes in this dataset.
     num_numerical_columns
         The number of numerical columns in the training dataframe.
     num_categories
@@ -354,6 +390,7 @@ def create_fusion_model(
             model_name=model_name,
             model_config=model_config,
             num_classes=num_classes,
+            classes=classes,
             num_numerical_columns=num_numerical_columns,
             num_categories=num_categories,
             pretrained=pretrained,
@@ -467,3 +504,7 @@ def modify_duplicate_model_names(
     predictor._config.model.names = model_names
 
     return predictor
+
+
+def list_timm_models(pretrained=True):
+    return timm.list_models(pretrained=pretrained)

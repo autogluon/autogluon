@@ -298,6 +298,15 @@ class CatBoostModel(AbstractModel):
                 raise NotEnoughMemoryError
             elif ratio > (0.75 * max_memory_usage_ratio):
                 logger.warning('\tWarning: Potentially not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+                
+    def get_minimum_resources(self, is_gpu_available=False):
+        minimum_resources = {
+            'num_cpus': 1,
+        }
+        if is_gpu_available:
+            # Our custom implementation does not support partial GPU. No gpu usage according to nvidia-smi when the `num_gpus` passed to fit is fractional`
+            minimum_resources['num_gpus'] = 0.5
+        return minimum_resources
 
     @disable_if_lite_mode(ret=(1, 0))
     def _get_default_resources(self):

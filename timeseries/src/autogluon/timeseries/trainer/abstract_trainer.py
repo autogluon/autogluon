@@ -72,7 +72,7 @@ class SimpleAbstractTrainer:
         """Return the name of the best model by model performance on the validation set."""
         models = self.get_model_names()
         if not models:
-            raise ValueError("Trainer has no fit models that can infer.")
+            raise ValueError("Trainer has no fit models that can predict.")
         model_performances = self.get_models_attribute_dict(attribute="val_score")
         performances_list = [(m, model_performances[m]) for m in models if model_performances[m] is not None]
 
@@ -427,18 +427,19 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         ):
             default_num_trials = 10
 
+        tuning_start_time = time.time()
         with disable_tqdm():
-            hpo_models, hpo_results = model.hyperparameter_tune(
+            hpo_models, _ = model.hyperparameter_tune(
                 train_data=train_data,
                 val_data=val_data,
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 time_limit=time_limit,
                 default_num_trials=default_num_trials,
             )
+        total_tuning_time = time.time() - tuning_start_time
 
-        self.hpo_results[model.name] = hpo_results
+        self.hpo_results[model.name] = hpo_models
         model_names_trained = []
-        # TODO: Does this code still work if all model configurations failed?
         # add each of the trained HPO configurations to the trained models
         for model_hpo_name, model_info in hpo_models.items():
             model_path = model_info["path"]
@@ -450,18 +451,21 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         logger.info(f"\tTrained {len(model_names_trained)} models while tuning {model.name}.")
 
-        # TODO: log result for ray backend
-        if hpo_results and isinstance(hpo_results, dict):
+        if len(model_names_trained) > 0:
             if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
                 sign_str = "-"
             else:
                 sign_str = ""
+
+            trained_model_results = [hpo_models[model_name] for model_name in model_names_trained]
+            best_model_result = max(trained_model_results, key=lambda x: x["val_score"])
+
             logger.info(
-                f"\t{hpo_results.get('best_reward'):<7.4f}".ljust(15)
+                f"\t{best_model_result['val_score']:<7.4f}".ljust(15)
                 + f"= Validation score ({sign_str}{self.eval_metric})"
             )
-            logger.info(f"\t{hpo_results.get('total_time'):<7.2f} s".ljust(15) + "= Total tuning time")
-            logger.debug(f"\tBest hyperparameter configuration: {hpo_results.get('best_config')}")
+            logger.info(f"\t{total_tuning_time:<7.2f} s".ljust(15) + "= Total tuning time")
+            logger.debug(f"\tBest hyperparameter configuration: {best_model_result['hyperparameters']}")
 
         return model_names_trained
 
@@ -808,15 +812,16 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def predict(
         self,
         data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         **kwargs,
     ) -> Union[TimeSeriesDataFrame, None]:
         model_was_selected_automatically = model is None
         model = self._get_model_for_prediction(model)
         try:
-            return self._predict_model(data, model, **kwargs)
+            return self._predict_model(data, model, known_covariates=known_covariates, **kwargs)
         except Exception as err:
-            logger.error(f"\tWarning: Model {model.name} failed during prediction with exception: {err}")
+            logger.error(f"Warning: Model {model.name} failed during prediction with exception: {err}")
             other_models = [m for m in self.get_model_names() if m != model.name]
             if len(other_models) > 0 and model_was_selected_automatically:
                 logger.info(f"\tYou can call predict(data, model) with one of other available models: {other_models}")
@@ -840,10 +845,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             model_preds = {}
             base_models = self.get_minimum_model_set(model, include_self=False)
             for base_model in base_models:
-                base_model_loaded = self._get_model_for_prediction(base_model)
-                model_preds[base_model] = base_model_loaded.predict_for_scoring(
-                    data, quantile_levels=self.quantile_levels
-                )
+                try:
+                    base_model_loaded = self._get_model_for_prediction(base_model)
+                    model_preds[base_model] = base_model_loaded.predict_for_scoring(
+                        data, quantile_levels=self.quantile_levels
+                    )
+                except Exception:
+                    model_preds[base_model] = None
             forecasts = model.predict(model_preds)
 
             model_score = evaluator(data, forecasts) * evaluator.coefficient
@@ -855,12 +863,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self,
         data: TimeSeriesDataFrame,
         model: Union[str, AbstractTimeSeriesModel],
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         if isinstance(model, str):
             model = self.load_model(model)
         data = self.get_inputs_to_model(model=model, X=data)
-        return model.predict(data, **kwargs)
+        return model.predict(data, known_covariates=known_covariates, **kwargs)
 
     # TODO: experimental
     def refit_single_full(self, train_data=None, val_data=None, models=None):

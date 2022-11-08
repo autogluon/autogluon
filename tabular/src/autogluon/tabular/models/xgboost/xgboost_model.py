@@ -137,7 +137,6 @@ class XGBoostModel(AbstractModel):
             X=X,
             y=y,
             eval_set=eval_set,
-            eval_metric=eval_metric,
             verbose=False,
             callbacks=callbacks,
             sample_weight=sample_weight
@@ -196,6 +195,14 @@ class XGBoostModel(AbstractModel):
                 raise NotEnoughMemoryError
             elif ratio > (0.75 * max_memory_usage_ratio):
                 logger.warning('\tWarning: Potentially not enough memory to safely train XGBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+                
+    def get_minimum_resources(self, is_gpu_available=False):
+        minimum_resources = {
+            'num_cpus': 1,
+        }
+        if is_gpu_available:
+            minimum_resources['num_gpus'] = 0.5
+        return minimum_resources
 
     @disable_if_lite_mode(ret=(1, 0))
     def _get_default_resources(self):

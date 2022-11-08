@@ -1,5 +1,7 @@
+import json
 import logging
 import os
+import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -7,7 +9,7 @@ import defusedxml.ElementTree as ET
 import numpy as np
 import pandas as pd
 
-from ..constants import AUTOMM
+from ..constants import AUTOMM, MAP
 from .download import download, is_url
 
 logger = logging.getLogger(AUTOMM)
@@ -17,6 +19,7 @@ def from_voc(
     root: str,
     splits: Optional[Union[str, tuple]] = None,
     exts: Optional[Union[str, tuple]] = (".jpg", ".jpeg", ".png"),
+    return_class_names: Optional[bool] = False,
 ):
     """
     Construct dataframe from pascal VOC format. Modified from gluon cv.
@@ -46,7 +49,12 @@ def from_voc(
         root = download(root)
     rpath = Path(root).expanduser()
     img_list = []
-    class_names = set()
+
+    class_names = get_voc_classes(root)
+
+    NAME_TO_IDX = dict(zip(class_names, range(len(class_names))))
+    name_to_index = lambda name: NAME_TO_IDX[name]
+
     if splits:
         logger.debug("Use splits: %s for root: %s", str(splits), root)
         if isinstance(splits, str):
@@ -67,8 +75,8 @@ def from_voc(
             exts = [exts]
         for ext in exts:
             img_list.extend([rp.stem for rp in rpath.glob("JPEGImages/*" + ext)])
-    print(len(img_list))
-    d = {"image": [], "rois": [], "image_attr": []}
+    d = {"image": [], "rois": []}
+    logger.info(f"Number of Images: {len(img_list)}")
     for stem in img_list:
         basename = stem + ".xml"
         anno_file = (rpath / "Annotations" / basename).resolve()
@@ -76,33 +84,57 @@ def from_voc(
         xml_root = tree.getroot()
         size = xml_root.find("size")
         im_path = xml_root.find("filename").text
+        if "." not in im_path:
+            im_path += ".jpg"
         width = float(size.find("width").text)
         height = float(size.find("height").text)
         rois = []
         for obj in xml_root.iter("object"):
-            try:
-                difficult = int(obj.find("difficult").text)
-            except ValueError:
-                difficult = 0
-            cls_name = obj.find("name").text.strip().lower()
+            class_label = name_to_index(obj.find("name").text.strip().lower())
             xml_box = obj.find("bndbox")
-            xmin = max(0, float(xml_box.find("xmin").text) - 1) / width
-            ymin = max(0, float(xml_box.find("ymin").text) - 1) / height
-            xmax = min(width, float(xml_box.find("xmax").text) - 1) / width
-            ymax = min(height, float(xml_box.find("ymax").text) - 1) / height
+            xmin = max(0, float(xml_box.find("xmin").text) - 1)
+            ymin = max(0, float(xml_box.find("ymin").text) - 1)
+            xmax = min(width, float(xml_box.find("xmax").text) - 1)
+            ymax = min(height, float(xml_box.find("ymax").text) - 1)
             if xmin >= xmax or ymin >= ymax:
                 logger.warning("Invalid bbox: {%s} for {%s}", str(xml_box), anno_file.name)
             else:
                 rois.append(
-                    {"class": cls_name, "xmin": xmin, "ymin": ymin, "xmax": xmax, "ymax": ymax, "difficult": difficult}
+                    [
+                        xmin,
+                        ymin,
+                        xmax,
+                        ymax,
+                        class_label,
+                    ]
                 )
-                class_names.update((cls_name,))
         if rois:
             d["image"].append(str(rpath / "JPEGImages" / im_path))
             d["rois"].append(rois)
-            d["image_attr"].append({"width": width, "height": height})
     df = pd.DataFrame(d)
+    df["label"] = df.loc[:, "rois"].copy()
+
     return df.sort_values("image").reset_index(drop=True)
+
+
+def get_voc_classes(root):
+    if is_url(root):
+        root = download(root)
+    rpath = Path(root).expanduser()
+
+    labels_file = os.path.join(rpath, "labels.txt")
+    if os.path.exists(labels_file):
+        with open(labels_file) as f:
+            class_names = [line.rstrip().lower() for line in f]
+        print(f"using class_names in labels.txt: {class_names}")
+    else:
+        logger.warning(
+            "labels.txt does not exist, using default VOC names. "
+            "To create labels.txt, run ls Annotations/* > pathlist.txt in root dir"
+        )
+        class_names = VOC_CLASSES
+
+    return class_names
 
 
 def import_try_install(package: str, extern_url: Optional[str] = None):
@@ -295,7 +327,10 @@ def bbox_clip_xyxy(
 
 
 def _check_load_coco_bbox(
-    coco, entry: dict, min_object_area: Optional[Union[int, float]] = 0, use_crowd: Optional[bool] = False
+    coco,
+    entry: dict,
+    min_object_area: Optional[Union[int, float]] = 0,
+    use_crowd: Optional[bool] = False,
 ):
     """
     Check and load ground-truth labels. Modified from gluon cv.
@@ -321,7 +356,8 @@ def _check_load_coco_bbox(
     ann_ids = coco.getAnnIds(imgIds=entry_id, iscrowd=None)
     objs = coco.loadAnns(ann_ids)
     # check valid bboxes
-    valid_objs = []
+    rois = []
+    is_crowds = []
     width = entry["width"]
     height = entry["height"]
     for obj in objs:
@@ -336,18 +372,21 @@ def _check_load_coco_bbox(
         xmin, ymin, xmax, ymax = bbox_clip_xyxy(bbox_xywh_to_xyxy(obj["bbox"]), width, height)
         # require non-zero box area
         if obj["area"] > 0 and xmax > xmin and ymax > ymin:
-            cname = coco.loadCats(obj["category_id"])[0]["name"]
-            valid_objs.append(
-                {
-                    "xmin": xmin / width,
-                    "ymin": ymin / height,
-                    "xmax": xmax / width,
-                    "ymax": ymax / height,
-                    "class": cname,
-                    "is_crowd": is_crowd,
-                }
+            # TODO: remove hardcoding here
+            cat_ids = coco.getCatIds()
+            id_to_idx = dict(zip(cat_ids, range(len(cat_ids))))
+            class_label = id_to_idx[coco.loadCats(obj["category_id"])[0]["id"]]
+            rois.append(
+                [
+                    float(xmin),
+                    float(ymin),
+                    float(xmax),
+                    float(ymax),
+                    class_label,
+                ]
             )
-    return valid_objs
+            is_crowds.append(is_crowd)
+    return rois, is_crowds
 
 
 def from_coco(
@@ -405,7 +444,7 @@ def from_coco(
     # synsets
     classes = [c["name"] for c in coco.loadCats(coco.getCatIds())]
     # load entries
-    d = {"image": [], "rois": [], "image_attr": []}
+    d = {"image": [], "rois": []}
     image_ids = sorted(coco.getImgIds())
     for entry in coco.loadImgs(image_ids):
         if "coco_url" in entry:
@@ -415,15 +454,216 @@ def from_coco(
             abs_path = os.path.join(root, entry["file_name"])
         if not os.path.exists(abs_path):
             raise IOError("Image: {} not exists.".format(abs_path))
-        label = _check_load_coco_bbox(coco, entry, min_object_area=min_object_area, use_crowd=use_crowd)
-        if not label:
+        rois, _ = _check_load_coco_bbox(
+            coco,
+            entry,
+            min_object_area=min_object_area,
+            use_crowd=use_crowd,
+        )
+        if not rois:
             continue
-        d["image_attr"].append({"width": entry["width"], "height": entry["height"]})
         d["image"].append(abs_path)
-        d["rois"].append(label)
+        d["rois"].append(rois)
     df = pd.DataFrame(d)
+    df["label"] = df.loc[:, "rois"].copy()
     return df.sort_values("image").reset_index(drop=True)
 
 
-def getCOCOCatIDs():
-    return [e for e in range(1, 91) if e not in {12, 26, 29, 30, 45, 66, 68, 69, 71, 83}]
+def getCOCOCatIDs(is_voc=False):
+    if is_voc:
+        return range(20)
+    else:
+        return [e for e in range(1, 91) if e not in {12, 26, 29, 30, 45, 66, 68, 69, 71, 83}]
+
+
+COCO_ID_TO_IDX = dict(zip(getCOCOCatIDs(), range(80)))
+
+
+def COCOId2Idx(id):
+    return COCO_ID_TO_IDX[id]
+
+
+VOC_CLASSES = [
+    "aeroplane",
+    "bicycle",
+    "bird",
+    "boat",
+    "bottle",
+    "bus",
+    "car",
+    "cat",
+    "chair",
+    "cow",
+    "diningtable",
+    "dog",
+    "horse",
+    "motorbike",
+    "person",
+    "pottedplant",
+    "sheep",
+    "sofa",
+    "train",
+    "tvmonitor",
+]
+
+VOC_NAME_TO_IDX = dict(zip(VOC_CLASSES, range(20)))
+
+
+def VOCName2Idx(name):
+    return VOC_NAME_TO_IDX[name]
+
+
+def get_image_name_num(path):
+    start_idx = path.rfind("/") + 1
+    end_idx = path.rindex(".")
+    return int(path[start_idx:end_idx])
+
+
+class COCODataset:
+    # refactor data loading into here
+    def __init__(self, anno_file):
+        self.anno_file = anno_file
+
+        with open(anno_file, "r") as f:
+            d = json.load(f)
+        image_list = d["images"]
+        img_namenum_list = []
+        img_id_list = []
+        for img in image_list:
+            img_namenum_list.append(get_image_name_num(img["file_name"]))
+            img_id_list.append(int(img["id"]))
+        self.image_namenum_to_id = dict(zip(img_namenum_list, img_id_list))
+
+        self.category_ids = [cat["id"] for cat in d["categories"]]
+
+    def get_image_id_from_path(self, image_path):
+        return self.image_namenum_to_id[get_image_name_num(image_path)]
+
+    def save_result(self, ret, data, save_path):
+        coco_format_result = []
+
+        for i, row in data.reset_index(drop=True).iterrows():
+            image_id = self.get_image_id_from_path(row["image"])
+            for j, res in enumerate(ret[i]):
+                category_id = self.category_ids[j]
+                for bbox in res:
+                    coco_format_result.append(
+                        {
+                            "image_id": image_id,
+                            "category_id": category_id,
+                            "bbox": bbox_xyxy_to_xywh(bbox[:4].astype(float).tolist()),
+                            "score": float(bbox[4]),
+                        }
+                    )
+
+        with open(save_path, "w") as f:
+            print(f"saving file at {save_path}")
+            json.dump(coco_format_result, f)
+
+
+def cocoeval_torchmetrics(outputs):
+    import torch
+
+    from . import MeanAveragePrecision
+
+    map_metric = MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False)
+
+    preds = []
+    target = []
+    for img_idx, img_output in enumerate(outputs):  # TODO: refactor here
+        img_result = img_output["bbox"]
+        boxes = []
+        scores = []
+        labels = []
+        for category_idx, category_result in enumerate(img_result):
+            for item_idx, item_result in enumerate(category_result):
+                boxes.append(item_result[:4])
+                scores.append(float(item_result[4]))
+                labels.append(category_idx)
+        preds.append(
+            dict(
+                boxes=torch.tensor(np.array(boxes).astype(float)).float().to("cpu"),
+                scores=torch.tensor(scores).float().to("cpu"),
+                labels=torch.tensor(labels).long().to("cpu"),
+            )
+        )
+
+        img_gt = np.array(img_output["label"])
+        boxes = img_gt[:, :4]
+        labels = img_gt[:, 4]
+        target.append(
+            dict(
+                boxes=torch.tensor(boxes).float().to("cpu"),
+                labels=torch.tensor(labels).long().to("cpu"),
+            )
+        )
+
+    map_metric.update(preds, target)
+
+    return map_metric.compute()
+
+
+def cocoeval_pycocotools(outputs, data, anno_file, cache_path, metrics):
+    from pycocotools.coco import COCO
+    from pycocotools.cocoeval import COCOeval
+
+    from ..constants import BBOX
+    from . import extract_from_output
+
+    coco_dataset = COCODataset(anno_file)
+
+    ret = extract_from_output(ret_type=BBOX, outputs=outputs)
+
+    coco_dataset.save_result(ret, data, cache_path)
+
+    cocoGt = COCO(anno_file)
+    cocoDt = cocoGt.loadRes(cache_path)
+    annType = "bbox"
+
+    cocoEval = COCOeval(cocoGt, cocoDt, annType)
+    cocoEval.evaluate()
+    cocoEval.accumulate()
+    cocoEval.summarize()
+
+    # TODO: support assigning metrics
+    if isinstance(metrics, list):
+        metrics = metrics[0]
+    elif metrics is None:
+        metrics = MAP
+
+    return {metrics: cocoEval.stats[0]}
+
+
+def cocoeval(outputs, data, anno_file, cache_path, metrics, tool="pycocotools"):
+    if (not tool) or tool == "pycocotools":
+        return cocoeval_pycocotools(outputs, data, anno_file, cache_path, metrics)
+    elif tool == "torchmetrics":
+        return cocoeval_torchmetrics(outputs)
+
+
+def from_coco_or_voc(file_path, splits: Optional[str] = None):
+    if os.path.isdir(file_path):
+        # VOC use dir as input
+        return from_voc(root=file_path, splits=splits)
+    else:
+        return from_coco(file_path)
+
+
+def get_coco_format_classes(sample_data_path):
+    try:
+        with open(sample_data_path, "r") as f:
+            annotation = json.load(f)
+    except:
+        raise ValueError(f"Failed to load json from provided json file: {sample_data_path}.")
+    return [cat["name"] for cat in annotation["categories"]]
+
+
+def get_voc_format_classes(sample_data_path):
+    return NotImplementedError
+
+
+def get_detection_classes(sample_data_path):
+    if os.path.isdir(sample_data_path):
+        return get_voc_format_classes(sample_data_path)
+    else:
+        return get_coco_format_classes(sample_data_path)

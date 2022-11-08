@@ -704,3 +704,10 @@ SAMPLE_DATAFRAME_WITH_MIXED_INDEX = pd.DataFrame(
 def test_when_item_id_index_has_mixed_dtype_then_value_error_is_raied(input_df):
     with pytest.raises(ValueError, match="must be of integer or string dtype"):
         TimeSeriesDataFrame(input_df)
+
+
+def test_when_static_features_are_modified_on_shallow_copy_then_original_df_doesnt_change():
+    old_df = SAMPLE_TS_DATAFRAME_STATIC
+    new_df = old_df.copy(deep=False)
+    new_df.static_features = None
+    assert old_df.static_features is not None

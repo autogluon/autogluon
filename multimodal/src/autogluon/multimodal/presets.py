@@ -1,9 +1,10 @@
-from typing import Optional
+from typing import List, Optional
 
-from .constants import DATA, DISTILLER, ENVIRONMENT, MODEL, OPTIMIZATION
+from .constants import DATA, DISTILLER, ENVIRONMENT, MATCHER, MODEL, OPTIMIZATION, QUERY, RESPONSE
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")
+matcher_presets = Registry("matcher_presets")
 
 
 @automm_presets.register()
@@ -60,7 +61,7 @@ def few_shot_text_classification():
     return {
         "model.names": ["t_few"],
         "model.t_few.checkpoint_name": "bigscience/T0_3B",
-        "model.t_few.gradient_checkpointing": False,  # Currently instable.
+        "model.t_few.gradient_checkpointing": True,
         "optimization.learning_rate": 3e-3,
         "optimization.lr_decay": 1.0,
         "optimization.efficient_finetune": "ia3",
@@ -74,7 +75,8 @@ def few_shot_text_classification():
         "optimization.top_k": 1,
         "optimization.max_epochs": -1,
         "env.batch_size": 8,
-        "env.per_gpu_batch_size": 1,
+        "env.per_gpu_batch_size": 8,
+        "env.eval_batch_size_ratio": 2,
         "env.precision": "bf16",
         "data.templates.turn_on": True,
     }
@@ -101,11 +103,22 @@ def zero_shot_image_classification():
 
 @automm_presets.register()
 def object_detection():
+    # TODO: add another presets for training detection models from scratch
     return {
         "model.names": ["mmdet_image"],
         "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
         "env.eval_batch_size_ratio": 1,
         "env.precision": 32,
+        "env.strategy": "ddp",  # TODO: support ddp_spawn for detection
+        "env.auto_select_gpus": False,  # Have to turn off for detection!
+        "optimization.learning_rate": 5e-5,
+        "optimization.lr_decay": 0.95,
+        "optimization.lr_mult": 100,
+        "optimization.lr_choice": "two_stages",
+        "optimization.top_k": 1,
+        "optimization.top_k_average_method": "best",
+        "optimization.warmup_steps": 0.0,
+        "optimization.patience": 40,
     }
 
 
@@ -141,6 +154,45 @@ def feature_extraction():
     }
 
 
+@automm_presets.register()
+@matcher_presets.register()
+def siamese_network():
+    return automm_presets.create("default")
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def image_similarity():
+    return {
+        "model.names": ["timm_image"],
+        "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def text_similarity():
+    return {
+        "model.names": ["hf_text"],
+        "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
+        "model.hf_text.pooling_mode": "mean",
+        "data.categorical.convert_to_text": True,
+        "data.numerical.convert_to_text": True,
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def image_text_similarity():
+    return {
+        "model.names": ["clip"],
+        "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
+        "matcher.loss.type": "multi_negatives_softmax_loss",
+        "env.per_gpu_batch_size": 128,
+        "optimization.learning_rate": 1e-5,
+    }
+
+
 def list_automm_presets(verbose: bool = False):
     """
     List all available presets.
@@ -160,14 +212,14 @@ def list_automm_presets(verbose: bool = False):
     return preset_details
 
 
-def get_basic_automm_config(is_distill: Optional[bool] = False):
+def get_basic_automm_config(extra: Optional[List[str]] = None):
     """
     Get the basic config of AutoMM.
 
     Parameters
     ----------
-    is_distill
-        Whether in the distillation mode.
+    extra
+        A list of extra config keys.
 
     Returns
     -------
@@ -179,8 +231,9 @@ def get_basic_automm_config(is_distill: Optional[bool] = False):
         OPTIMIZATION: "adamw",
         ENVIRONMENT: "default",
     }
-    if is_distill:
-        config[DISTILLER] = "default"
+    if extra:
+        for k in extra:
+            config[k] = "default"
 
     return config
 

@@ -12,42 +12,50 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: Add parameter to add prefix to each generator to guarantee no name collisions: 'G1_', 'G2_', etc.
-# TODO: Add argument keep_unused, which creates an identity feature generator at each stage to pipe unused input features into the next stage instead of dropping them.
+# TODO: Add argument keep_unused, which creates an identity feature generator at each stage to pipe unused
+#  input features into the next stage instead of dropping them.
 class BulkFeatureGenerator(AbstractFeatureGenerator):
     """
-    BulkFeatureGenerator is used for complex feature generation pipelines where multiple generators are required, with some generators requiring the output of other generators as input (multi-stage generation).
-    For ML problems, it is expected that the user uses a feature generator that is an instance of or is inheriting from BulkFeatureGenerator, as single feature generators typically will not satisfy the feature generation needs of all input data types.
+    BulkFeatureGenerator is used for complex feature generation pipelines where multiple generators are required,
+    with some generators requiring the output of other generators as input (multi-stage generation).
+    For ML problems, it is expected that the user uses a feature generator that is an instance of or is inheriting from BulkFeatureGenerator,
+    as single feature generators typically will not satisfy the feature generation needs of all input data types.
     Unless you are an expert user, we recommend you create custom FeatureGenerators based off of PipelineFeatureGenerator instead of BulkFeatureGenerator.
 
     Parameters
     ----------
     generators : List[List[:class:`AbstractFeatureGenerator`]]
         generators is a list of generator groups, where a generator group is a list of generators.
-        Feature generators within generators[i] (generator group) are all fit on the same data, and their outputs are then concatenated to form the output of generators[i].
+        Feature generators within generators[i] (generator group) are all fit on the same data,
+        and their outputs are then concatenated to form the output of generators[i].
         generators[i+1] are then fit on the output of generators[i].
         The last generator group's output is the output of _fit_transform and _transform methods.
-        Due to the flexibility of generators, at the time of initialization, generators will prepend pre_generators and append post_generators if they are not None.
+        Due to the flexibility of generators, at the time of initialization, generators will prepend pre_generators and append post_generators
+        if they are not None.
             If pre/post generators are specified, the supplied generators will be extended like this:
                 pre_generators = [[pre_generator] for pre_generator in pre_generators]
                 post_generators = [[post_generator] for post_generator in self._post_generators]
                 self.generators: List[List[AbstractFeatureGenerator]] = pre_generators + generators + post_generators
                 self._post_generators = []
             This means that self._post_generators will be empty as post_generators will be incorporated into self.generators instead.
-        Note that if generators within a generator group produce a feature with the same name, an AssertionError will be raised as features with the same name cannot be present within a valid DataFrame output.
+        Note that if generators within a generator group produce a feature with the same name, an AssertionError will be raised as features
+        with the same name cannot be present within a valid DataFrame output.
             If both features are desired, specify a name_prefix parameter in one of the generators to prevent name collisions.
-            If experimenting with different generator groups, it is encouraged to try fitting your experimental feature-generators to the data without any ML model training to ensure validity and avoid name collisions.
+            If experimenting with different generator groups, it is encouraged to try fitting your experimental
+            feature-generators to the data without any ML model training to ensure validity and avoid name collisions.
     pre_generators: List[AbstractFeatureGenerator], optional
         pre_generators are generators which are sequentially fit prior to generators.
         Functions identically to post_generators argument, but pre_generators are called before generators, while post_generators are called after generators.
         Provided for convenience to classes inheriting from BulkFeatureGenerator.
-        Common pre_generator's include :class:`AsTypeFeatureGenerator` and :class:`FillNaFeatureGenerator`, which act to prune and clean the data instead of generating entirely new features.
+        Common pre_generator's include :class:`AsTypeFeatureGenerator` and :class:`FillNaFeatureGenerator`, which act to prune and clean the data instead
+        of generating entirely new features.
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
 
     Examples
     --------
     >>> from autogluon.tabular import TabularDataset
-    >>> from autogluon.features.generators import AsTypeFeatureGenerator, BulkFeatureGenerator, CategoryFeatureGenerator, DropDuplicatesFeatureGenerator, FillNaFeatureGenerator, IdentityFeatureGenerator
+    >>> from autogluon.features.generators import AsTypeFeatureGenerator, BulkFeatureGenerator, CategoryFeatureGenerator, DropDuplicatesFeatureGenerator, FillNaFeatureGenerator, IdentityFeatureGenerator  # noqa
     >>> from autogluon.common.features.types import R_INT, R_FLOAT
     >>>
     >>> generators = [
@@ -55,8 +63,11 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
     >>>     [FillNaFeatureGenerator()],  # Fill all NA values in the data
     >>>     [
     >>>         CategoryFeatureGenerator(),  # Convert object types to category types and minimize their memory usage
-    >>>         IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT])),  # Carry over all features that are not objects and categories (without this, the int features would be dropped).
-    >>>     ],  # CategoryFeatureGenerator and IdentityFeatureGenerator will have their outputs concatenated together before being fed into DropDuplicatesFeatureGenerator
+    >>>         # Carry over all features that are not objects and categories (without this, the int features would be dropped).
+    >>>         IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT])),
+    >>>     ],
+    >>>     # CategoryFeatureGenerator and IdentityFeatureGenerator will have their outputs concatenated together
+    >>>     # before being fed into DropDuplicatesFeatureGenerator
     >>>     [DropDuplicatesFeatureGenerator()]  # Drops any features which are duplicates of each-other
     >>> ]
     >>> feature_generator = BulkFeatureGenerator(generators=generators, verbosity=3)
@@ -101,7 +112,8 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
                 if not isinstance(generator, AbstractFeatureGenerator):
                     raise AssertionError(f'generators contains an object which is not an instance of AbstractFeatureGenerator. Invalid generator: {generator}')
 
-        self._feature_metadata_in_unused: FeatureMetadata = None  # FeatureMetadata object based on the original input features that were unused by any feature generator.
+        # FeatureMetadata object based on the original input features that were unused by any feature generator.
+        self._feature_metadata_in_unused: FeatureMetadata = None
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         feature_metadata = self.feature_metadata_in
@@ -121,7 +133,8 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
 
             self.generators[i] = generator_group_valid
 
-            self.generators[i] = [generator for j, generator in enumerate(self.generators[i]) if feature_df_list[j] is not None and len(feature_df_list[j].columns) > 0]
+            self.generators[i] = [generator for j, generator in enumerate(self.generators[i]) if
+                                  feature_df_list[j] is not None and len(feature_df_list[j].columns) > 0]
             feature_df_list = [feature_df for feature_df in feature_df_list if feature_df is not None and len(feature_df.columns) > 0]
 
             if self.generators[i]:
@@ -207,7 +220,8 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
             stage = i + 1
             if stage > 1:
                 if self.generators[stage - 2]:
-                    features_in = FeatureMetadata.join_metadatas([generator.feature_metadata for generator in self.generators[stage - 2]], shared_raw_features='error').get_features()
+                    features_in = FeatureMetadata.join_metadatas([generator.feature_metadata for generator in self.generators[stage - 2]],
+                                                                 shared_raw_features='error').get_features()
                 else:
                     features_in = []
             else:

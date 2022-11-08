@@ -5,6 +5,7 @@ from autogluon.multimodal.utils import from_voc
 from autogluon.multimodal.utils import from_coco
 
 
+# TODO: update inference API
 def test_inference(dataset, checkpoint_name):
     assert dataset in ["coco", "voc"]
 

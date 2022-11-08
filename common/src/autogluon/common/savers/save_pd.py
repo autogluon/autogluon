@@ -1,5 +1,9 @@
-import multiprocessing, os, json, logging
+import json
+import logging
+import multiprocessing
+import os
 from io import StringIO
+
 import numpy as np
 
 from ..utils import s3_utils, multiprocessing_utils
@@ -48,14 +52,14 @@ def save(path, df, index=False, verbose=True, type=None, sep=',', compression='g
             s3_resource = boto3.resource('s3')
             s3_resource.Object(bucket, prefix).put(Body=buffer.getvalue(), ACL='bucket-owner-full-control')
         if verbose:
-            logger.log(15, "Saved " +str(path)+" | Columns = "+str(column_count)+" | Rows = "+str(row_count))
+            logger.log(15, "Saved " + str(path) + " | Columns = " + str(column_count) + " | Rows = " + str(row_count))
     elif type == 'parquet':
         try:
             df.to_parquet(path, compression=compression, engine='fastparquet')  # TODO: Might be slower than pyarrow in multiprocessing
         except:
             df.to_parquet(path, compression=compression, engine='pyarrow')
         if verbose:
-            logger.log(15, "Saved "+str(path)+" | Columns = "+str(column_count)+" | Rows = "+str(row_count))
+            logger.log(15, "Saved " + str(path) + " | Columns = " + str(column_count) + " | Rows = " + str(row_count))
     elif type == 'multipart_s3':
         bucket, prefix = s3_utils.s3_path_to_bucket_prefix(s3_path=path)
         s3_utils.delete_s3_prefix(bucket=bucket, prefix=prefix)  # TODO: Might only delete the first 1000!
@@ -84,7 +88,7 @@ def save_multipart(path, df, index=False, verbose=True, type=None, sep=',', comp
     workers_count = int(round(cpu_count))
     parts = workers_count
 
-    logger.log(15, 'Save_multipart running pool with '+str(workers_count)+' workers')
+    logger.log(15, 'Save_multipart running pool with ' + str(workers_count) + ' workers')
 
     paths = [path + 'part-' + '0' * (5 - min(5, len(str(i)))) + str(i) + '.parquet' for i in range(parts)]
     df_parts = np.array_split(df, parts)
@@ -95,4 +99,4 @@ def save_multipart(path, df, index=False, verbose=True, type=None, sep=',', comp
 
     multiprocessing_utils.execute_multiprocessing(workers_count=workers_count, transformer=save_multipart_child, chunks=full_chunks)
 
-    logger.log(15, "Saved multipart file to "+str(path))
+    logger.log(15, "Saved multipart file to " + str(path))

@@ -3,8 +3,7 @@ import logging
 import os
 import warnings
 from copy import deepcopy
-from lib2to3.pgen2.token import OP
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 from nptyping import NDArray
@@ -12,7 +11,17 @@ from omegaconf import DictConfig
 from torch import nn
 from transformers import AutoConfig, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 
-from ..constants import AUTOMM, CHOICES_IDS, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH
+from ..constants import (
+    AUTOMM,
+    CHOICES_IDS,
+    COLUMN,
+    TEXT,
+    TEXT_SEGMENT_IDS,
+    TEXT_TOKEN_IDS,
+    TEXT_VALID_LENGTH,
+    TOKEN_WORD_MAPPING,
+    WORD_OFFSETS,
+)
 from .collator import Pad, Stack
 from .template_engine import TemplateEngine
 from .trivial_augmenter import TrivialAugment
@@ -127,10 +136,14 @@ class TextProcessor:
         self.prefix = model.prefix
         self.tokenizer_name = tokenizer_name
         self.requires_column_info = requires_column_info
-        self.tokenizer = self.get_pretrained_tokenizer(
-            tokenizer_name=tokenizer_name,
-            checkpoint_name=model.checkpoint_name,
-        )
+        # Use the model's tokenizer if it exists.
+        if hasattr(model, "tokenizer"):
+            self.tokenizer = model.tokenizer
+        else:
+            self.tokenizer = self.get_pretrained_tokenizer(
+                tokenizer_name=tokenizer_name,
+                checkpoint_name=model.checkpoint_name,
+            )
         if hasattr(self.tokenizer, "deprecation_warnings"):
             # Disable the warning "Token indices sequence length is longer than the specified maximum sequence..."
             # See https://github.com/huggingface/transformers/blob/6ac77534bfe97c00e0127bb4fc846ae0faf1c9c5/src/transformers/tokenization_utils_base.py#L3362
@@ -357,8 +370,8 @@ class TextProcessor:
             if col_name == CHOICES_IDS:
                 answer_ids = self.tokenizer(
                     col_text,
-                    return_tensors="pt",
-                    padding=True,
+                    padding="max_length",
+                    max_length=20,  # TODO: Currently hardcoded max_length for textual choices.
                 )["input_ids"]
                 tokens[col_name] = answer_ids
                 continue
@@ -478,8 +491,8 @@ class TextProcessor:
 
     def __call__(
         self,
-        all_text: Dict[str, List[str]],
-        idx: int,
+        texts: Dict[str, str],
+        feature_modalities: Dict[str, Union[int, float, list]],
         is_training: bool,
     ) -> Dict:
         """
@@ -487,10 +500,10 @@ class TextProcessor:
 
         Parameters
         ----------
-        all_text
-            All the raw text data in a dataset.
-        idx
-            The sample index in a dataset.
+        texts
+            Texts of one sample.
+        feature_modalities
+            The modality of the feature columns.
         is_training
             Whether to do processing in the training mode.
 
@@ -498,17 +511,10 @@ class TextProcessor:
         -------
         A dictionary containing one sample's text tokens, valid length, and segment ids.
         """
-
         if self.normalize_text:
-            per_sample_text = {
-                per_column_name: normalize_txt(per_column_text[idx])
-                for per_column_name, per_column_text in all_text.items()
-            }
-        else:
-            per_sample_text = {
-                per_column_name: per_column_text[idx] for per_column_name, per_column_text in all_text.items()
-            }
-        return self.build_one_token_sequence_from_text(per_sample_text, is_training)
+            texts = {col_name: normalize_txt(col_text) for col_name, col_text in texts.items()}
+
+        return self.build_one_token_sequence_from_text(texts, is_training)
 
     def __deepcopy__(self, memo):
         cls = self.__class__

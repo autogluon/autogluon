@@ -1,5 +1,6 @@
 import boto3
 import copy
+import json
 import os
 import yaml
 import tarfile
@@ -10,6 +11,7 @@ import sagemaker
 from abc import ABC, abstractmethod
 from botocore.exceptions import ClientError
 from datetime import datetime
+from typing import Optional
 
 from autogluon.common.loaders import load_pd
 from autogluon.common.loaders import load_pkl
@@ -27,8 +29,21 @@ from ..utils.ag_sagemaker import (
     AutoGluonRealtimePredictor,
     AutoGluonBatchPredictor
 )
-from ..utils.aws_utils import setup_sagemaker_role_and_policy, setup_sagemaker_session
-from ..utils.constants import SAGEMAKER_TRUST_REPLATIONSHIP, SAGEMAKER_POLICIES, VALID_ACCEPT
+from ..utils.aws_utils import setup_sagemaker_session
+from ..utils.constants import (
+    VALID_ACCEPT,
+    SAGEMAKER_RESOURCE_PREFIX
+)
+from ..utils.iam import (
+    TRUST_RELATIONSHIP_FILE_NAME,
+    IAM_POLICY_FILE_NAME,
+    SAGEMAKER_TRUST_RELATIONSHIP,
+    SAGEMAKER_CLOUD_POLICY
+)
+from ..utils.iam import (
+    replace_iam_policy_place_holder,
+    replace_trust_relationship_place_holder
+)
 from ..utils.misc import MostRecentInsertedOrderedDict
 from ..utils.sagemaker_utils import (
     retrieve_available_framework_versions,
@@ -54,7 +69,6 @@ class CloudPredictor(ABC):
     def __init__(
         self,
         cloud_output_path,
-        role_arn=None,
         local_output_path=None,
         verbosity=2
     ):
@@ -69,10 +83,6 @@ class CloudPredictor(ABC):
             Note: To call `fit()` twice and save all results of each fit,
             you must either specify different `cloud_output_path` locations or only provide the bucket but not the subfolder.
             Otherwise files from first `fit()` will be overwritten by second `fit()`.
-        role_arn: str
-            The role_arn you want to use to grant cloud predictor necessary permission. 
-            This role must have permission on AmazonS3FullAccess and AmazonSageMakerFullAccess.
-            If None, CloudPredictor will create one with name "ag_cloud_predictor_role".
         local_output_path: str
             Path to directory where downloaded trained predictor, batch transform results, and intermediate outputs should be saved
             If unspecified, a time-stamped folder called "AutogluonCloudPredictor/ag-[TIMESTAMP]" will be created in the working directory to store all downloaded trained predictor, batch transform results, and intermediate outputs.
@@ -86,13 +96,19 @@ class CloudPredictor(ABC):
         """
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
-        self.role_arn = role_arn
-        if not self.role_arn:
-            self.role_arn = setup_sagemaker_role_and_policy(
-                role_name='ag_cloud_predictor_role',
-                trust_relationship=SAGEMAKER_TRUST_REPLATIONSHIP,
-                policies=SAGEMAKER_POLICIES
+        try:
+            self.role_arn = sagemaker.get_execution_role()
+        except ClientError as e:
+            logger.warning(
+                'Failed to get IAM role. Did you configure and authenticate the IAM role?',
+                'For more information, https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html',
+                f'If you do not have a role created yet, \
+                You can use {self.__class__.__name__}.generate_trust_relationship_and_iam_policy_file() to get the required trust relationship and iam policy',
+                'You can then use the generated trust relationship and IAM policy to create an IAM role',
+                'For more information, https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create.html',
+                'IMPORTANT: Please review the generated trust relationship and IAM policy before you create an IAM role with them'
             )
+            raise e
         self.sagemaker_session = setup_sagemaker_session()
         self.local_output_path = self._setup_local_output_path(local_output_path)
         self.cloud_output_path = self._setup_cloud_output_path(cloud_output_path)
@@ -127,6 +143,62 @@ class CloudPredictor(ABC):
             return self.endpoint.endpoint_name
         return None
 
+    @staticmethod
+    def generate_trust_relationship_and_iam_policy_file(
+        account_id: str,
+        cloud_output_bucket: str,
+        output_path: Optional[str] = None
+    ):
+        """
+        Generate required trust relationship and IAM policy file in json format for CloudPredictor with SageMaker backend.
+        Users can use the generated files to create an IAM role for themselves.
+        IMPORTANT: Make sure you review both files before creating the role!
+
+        Parameters
+        ----------
+        account_id: str
+            The AWS account ID you plan to use for CloudPredictor.
+        cloud_output_bucket: str
+            s3 bucket name where intermediate artifacts will be uploaded and trained models should be saved.
+            You need to create this bucket beforehand and we would put this bucket in the policy being created.
+        output_path: str
+            Where you would like the generated file being written to.
+            If not specified, will write to the current folder.
+
+        Return
+        ------
+        A dict containing the trust relationship and IAM policy files paths
+        """
+        if output_path is None:
+            output_path = '.'
+        trust_relationship_file_path = os.path.join(output_path, TRUST_RELATIONSHIP_FILE_NAME)
+        iam_policy_file_path = os.path.join(output_path, IAM_POLICY_FILE_NAME)
+
+        trust_relationship = replace_trust_relationship_place_holder(
+            trust_relationship_document=SAGEMAKER_TRUST_RELATIONSHIP,
+            account_id=account_id
+        )
+        iam_policy = replace_iam_policy_place_holder(
+            policy_document=SAGEMAKER_CLOUD_POLICY,
+            account_id=account_id,
+            bucket=cloud_output_bucket
+        )
+        with open(trust_relationship_file_path, 'w') as file:
+            json.dump(trust_relationship, file, indent=4)
+
+        with open(iam_policy_file_path, 'w') as file:
+            json.dump(iam_policy, file, indent=4)
+
+        logger.info(f'Generated trust relationship to {trust_relationship_file_path}')
+        logger.info(f'Generated iam policy to {iam_policy_file_path}')
+        logger.info('IMPORTANT: Please review the trust relationship and iam policy before you use them to create an IAM role')
+        logger.info('Please refer to AWS documentation on how to create an IAM role: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create.html')
+
+        return {
+            'trust_relationship': trust_relationship_file_path,
+            'iam_policy': iam_policy_file_path
+        }
+
     def info(self):
         """
         Return general info about CloudPredictor
@@ -149,7 +221,7 @@ class CloudPredictor(ABC):
         if path is None:
             utcnow = datetime.utcnow()
             timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-            path = f'AutogluonCloudPredictor/ag-{timestamp}{os.path.sep}'
+            path = f'AutogluonCloudPredictor{os.path.sep}ag-{timestamp}{os.path.sep}'
         path = setup_outputdir(path)
         util_path = os.path.join(path, 'utils')
         try:
@@ -355,7 +427,7 @@ class CloudPredictor(ABC):
             If provided a specific version, will use this version.
         job_name: str, default = None
             Name of the launched training job.
-            If None, CloudPredictor will create one with prefix ag-CloudPredictor
+            If None, CloudPredictor will create one with prefix ag-cloudpredictor
         instance_type: str, default = 'ml.m5.2xlarge'
             Instance type the predictor will be trained on with SageMaker.
         instance_count: int, default = 1
@@ -386,11 +458,11 @@ class CloudPredictor(ABC):
         logger.log(20, f'Training with framework_version=={framework_version}')
 
         if not job_name:
-            job_name = sagemaker.utils.unique_name_from_base("ag-CloudPredictor")
+            job_name = sagemaker.utils.unique_name_from_base(SAGEMAKER_RESOURCE_PREFIX)
 
         autogluon_sagemaker_estimator_kwargs = copy.deepcopy(autogluon_sagemaker_estimator_kwargs)
         autogluon_sagemaker_estimator_kwargs.pop('output_path', None)
-        output_path = self.cloud_output_path + '/output'
+        output_path = self.cloud_output_path + '/model'
         cloud_bucket, _ = s3_path_to_bucket_prefix(self.cloud_output_path)
 
         self._train_script_path = ScriptManager.get_train_script(self.predictor_type, framework_version)
@@ -551,7 +623,7 @@ class CloudPredictor(ABC):
             If None, will deploy the most recent trained predictor trained with `fit()`.
         endpoint_name: str
             The endpoint name to use for the deployment.
-            If None, CloudPredictor will create one
+            If None, CloudPredictor will create one with prefix `ag-cloudpredictor`
         framework_version: str, default = `latest`
             Inference container version of autogluon.
             If `latest`, will use the latest available container version.
@@ -577,7 +649,7 @@ class CloudPredictor(ABC):
         predictor_path = self._upload_predictor(predictor_path, f'endpoints/{endpoint_name}/predictor')
 
         if not endpoint_name:
-            endpoint_name = sagemaker.utils.unique_name_from_base("sagemaker-autogluon-serving-trained-model")
+            endpoint_name = sagemaker.utils.unique_name_from_base(SAGEMAKER_RESOURCE_PREFIX)
         framework_version, py_version = self._parse_framework_version(framework_version, 'inference')
         logger.log(20, f'Deploying with framework_version=={framework_version}')
 
@@ -761,7 +833,7 @@ class CloudPredictor(ABC):
             If provided a specific version, will use this version.
         job_name: str, default = None
             Name of the launched training job.
-            If None, CloudPredictor will create one with prefix ag-CloudPredictor-batch-transform.
+            If None, CloudPredictor will create one with prefix ag-cloudpredictor.
         instance_count: int, default = 1,
             Number of instances used to do batch transform.
         instance_type: str, default = 'ml.m5.2xlarge'
@@ -799,7 +871,7 @@ class CloudPredictor(ABC):
         predictor_path = self._upload_predictor(predictor_path, cloud_key_prefix + '/predictor')
 
         if not job_name:
-            job_name = sagemaker.utils.unique_name_from_base("ag-CloudPredictor-batch-transform")
+            job_name = sagemaker.utils.unique_name_from_base(SAGEMAKER_RESOURCE_PREFIX)
 
         if test_data_image_column is not None:
             logger.warning('Batch inference with image modality could be slow because of some technical details.')

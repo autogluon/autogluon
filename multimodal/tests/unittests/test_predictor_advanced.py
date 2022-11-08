@@ -8,7 +8,7 @@ from torch import Tensor
 from unittest_datasets import AmazonReviewSentimentCrossLingualDataset
 
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.constants import BIT_FIT, LORA_BIAS, LORA_NORM, NORM_FIT
+from autogluon.multimodal.constants import BIT_FIT, IA3, IA3_BIAS, LORA_BIAS, LORA_NORM, NORM_FIT
 
 
 def _is_lazy_weight_tensor(p: Tensor) -> bool:
@@ -32,13 +32,17 @@ def trainable_parameters(model) -> int:
 
 
 @pytest.mark.parametrize(
-    "backbone,efficient_finetuning,pooling_mode,precision,expected_ratio",
+    "backbone,efficient_finetuning,pooling_mode,precision,expected_ratio,standalone",
     [
-        ("t5-small", LORA_NORM, "mean", "bf16", 0.00557),
-        ("microsoft/deberta-v3-small", LORA_BIAS, "mean", "16", 0.001422),
+        ("t5-small", LORA_NORM, "mean", "bf16", 0.00557, True),
+        ("google/flan-t5-small", IA3, "mean", "bf16", 0.0004201, False),
+        ("microsoft/deberta-v3-small", LORA_BIAS, "mean", "16", 0.001422, True),
+        ("microsoft/deberta-v3-small", IA3_BIAS, "mean", "16", 0.00044566, False),
     ],
 )
-def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, pooling_mode, precision, expected_ratio):
+def test_predictor_gradient_checkpointing(
+    backbone, efficient_finetuning, pooling_mode, precision, expected_ratio, standalone
+):
     dataset = AmazonReviewSentimentCrossLingualDataset()
     train_data = dataset.train_df.sample(200)
     test_data = dataset.test_df.sample(50)
@@ -48,6 +52,7 @@ def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, poolin
     predictor = MultiModalPredictor(label=dataset.label_columns[0], path=save_path)
     predictor.fit(
         train_data,
+        standalone=standalone,
         hyperparameters={
             "model.names": ["hf_text"],
             "model.hf_text.checkpoint_name": backbone,
@@ -69,7 +74,7 @@ def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, poolin
     save_path = save_path + "_new"
     if os.path.isdir(save_path):
         shutil.rmtree(save_path)
-    predictor.save(save_path)
+    predictor.save(save_path, standalone=standalone)
     new_predictor = MultiModalPredictor.load(save_path)
     new_predictions = new_predictor.predict(test_data, as_pandas=False)
     npt.assert_allclose(new_predictions, predictions)

@@ -22,14 +22,17 @@ def test_preset_to_config():
     all_presets = list_automm_presets()
     for preset in all_presets:
         overrides = get_automm_presets(preset)
-        config = get_config(presets=preset)
+        config = get_config(
+            presets=preset,
+            extra=["matcher", "distiller"],
+        )
         for k, v in overrides.items():
             assert OmegaConf.select(config, k) == v
 
 
 def test_basic_config():
-    basic_config = get_basic_automm_config(is_distill=False)
+    basic_config = get_basic_automm_config()
     assert list(basic_config.keys()).sort() == [MODEL, DATA, OPTIMIZATION, ENVIRONMENT].sort()
 
-    basic_config = get_basic_automm_config(is_distill=True)
+    basic_config = get_basic_automm_config(extra=[DISTILLER])
     assert list(basic_config.keys()).sort() == [MODEL, DATA, OPTIMIZATION, ENVIRONMENT, DISTILLER].sort()

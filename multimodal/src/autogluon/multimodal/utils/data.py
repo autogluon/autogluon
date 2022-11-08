@@ -10,13 +10,28 @@ from torch import nn
 
 from autogluon.core.utils.loaders import load_pd
 
-from ..constants import AUTOMM, BINARY, CATEGORICAL, DEFAULT_SHOT, FEW_SHOT, IMAGE, LABEL, NUMERICAL, TEXT
+from ..constants import (
+    AUTOMM,
+    BINARY,
+    CATEGORICAL,
+    DEFAULT_SHOT,
+    FEW_SHOT,
+    IMAGE,
+    LABEL,
+    NER,
+    NER_ANNOTATION,
+    NUMERICAL,
+    ROIS,
+    TEXT,
+)
 from ..data import (
     CategoricalProcessor,
     ImageProcessor,
     LabelProcessor,
     MixupModule,
     MultiModalFeaturePreprocessor,
+    NerLabelEncoder,
+    NerProcessor,
     NumericalProcessor,
     TextProcessor,
 )
@@ -54,10 +69,16 @@ def init_df_preprocessor(
     -------
     Initialized dataframe preprocessor.
     """
+    if label_column is not None and column_types[label_column] == NER_ANNOTATION:
+        label_generator = NerLabelEncoder(config)
+    else:
+        label_generator = None
+
     df_preprocessor = MultiModalFeaturePreprocessor(
-        config=config,
+        config=config.data,
         column_types=column_types,
         label_column=label_column,
+        label_generator=label_generator,
     )
     df_preprocessor.fit(
         X=train_df_x,
@@ -126,6 +147,10 @@ def create_data_processor(
         )
     elif data_type == LABEL:
         data_processor = LabelProcessor(model=model)
+    elif data_type == NER:
+        data_processor = NerProcessor(
+            model=model,
+        )
     else:
         raise ValueError(f"unknown data type: {data_type}")
 
@@ -165,6 +190,7 @@ def create_fusion_data_processors(
         CATEGORICAL: [],
         NUMERICAL: [],
         LABEL: [],
+        NER: [],
     }
 
     model_dict = {model.prefix: model}
@@ -176,6 +202,25 @@ def create_fusion_data_processors(
     assert sorted(list(model_dict.keys())) == sorted(config.model.names)
 
     for per_name, per_model in model_dict.items():
+        model_config = getattr(config.model, per_model.prefix)
+        if model_config.data_types is not None:
+            data_types = model_config.data_types.copy()
+        else:
+            data_types = None
+
+        if per_name == NER:
+            # create a multimodal processor for NER.
+            data_processors[NER].append(
+                create_data_processor(
+                    data_type=NER,
+                    config=config,
+                    model=per_model,
+                )
+            )
+            requires_label = False
+            if data_types is not None and TEXT in data_types:
+                data_types.remove(TEXT)
+
         if requires_label:
             # each model has its own label processor
             label_processor = create_data_processor(
@@ -184,9 +229,9 @@ def create_fusion_data_processors(
                 model=per_model,
             )
             data_processors[LABEL].append(label_processor)
-        model_config = getattr(config.model, per_model.prefix)
-        if requires_data and model_config.data_types:
-            for data_type in model_config.data_types:
+
+        if requires_data and data_types:
+            for data_type in data_types:
                 per_data_processor = create_data_processor(
                     data_type=data_type,
                     model=per_model,
@@ -219,7 +264,7 @@ def assign_feature_column_names(
     The data processors with feature column names added.
     """
     for per_modality in data_processors:
-        if per_modality == LABEL:
+        if per_modality == LABEL or per_modality == NER:
             continue
         for per_model_processor in data_processors[per_modality]:
             # requires_column_info=True is used for feature column distillation.
@@ -336,7 +381,7 @@ def get_mixup(
             mixup_config.mixup_alpha > 0 or mixup_config.cutmix_alpha > 0.0 or mixup_config.cutmix_minmax is not None
         )
 
-    mixup_state = model_active & mixup_active & (num_classes > 1)
+    mixup_state = model_active & mixup_active & ((num_classes is not None) and (num_classes > 1))
     mixup_fn = None
     if mixup_state:
         mixup_args = dict(
@@ -357,6 +402,7 @@ def data_to_df(
     data: Union[pd.DataFrame, Dict, List],
     required_columns: Optional[List] = None,
     all_columns: Optional[List] = None,
+    header: Optional[str] = None,
 ):
     """
     Convert the input data to a dataframe.
@@ -376,8 +422,13 @@ def data_to_df(
     """
     if isinstance(data, pd.DataFrame):
         pass
-    elif isinstance(data, (list, dict)):
+    elif isinstance(data, dict):
         data = pd.DataFrame(data)
+    elif isinstance(data, list):
+        if header is None:
+            data = pd.DataFrame(data)
+        else:
+            data = pd.DataFrame({header: data})
     elif isinstance(data, str):
         data = load_pd.load(data)
     else:
