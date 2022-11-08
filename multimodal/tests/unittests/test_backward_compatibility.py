@@ -40,6 +40,7 @@ def test_load_old_checkpoint(cls):
         dataset.train_df,
         presets="multilingual",
         time_limit=20,
-        hyperparameters={"optimization.top_k_average_method": "uniform_soup"},
+        hyperparameters={"optimization.top_k_average_method": "uniform_soup",
+                         "env.num_gpus": 1},
     )
     verify_predictor_save_load(predictor, dataset.test_df.sample(4), cls=cls)
