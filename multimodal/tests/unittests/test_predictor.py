@@ -100,7 +100,7 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
             "hateful_memes",
             ["timm_image", "t_few", "clip", "fusion_mlp"],
             "t5-small",
-            "swin_tiny_patch4_window7_224",
+            "mobilenetv3_small_100",
             BEST,
             IA3,
             "auto",
@@ -109,7 +109,7 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
             "hateful_memes",
             ["timm_image", "hf_text", "clip", "fusion_mlp"],
             "monsoon-nlp/hindi-bert",
-            "swin_tiny_patch4_window7_224",
+            "mobilenetv3_small_100",
             UNIFORM_SOUP,
             LORA_NORM,
             "auto",
@@ -118,7 +118,7 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
             "petfinder",
             ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
             None,
-            "swin_tiny_patch4_window7_224",
+            "mobilenetv3_small_100",
             GREEDY_SOUP,
             None,
             "auto",
@@ -145,7 +145,7 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
             "hateful_memes",
             ["timm_image"],
             None,
-            "swin_tiny_patch4_window7_224",
+            "mobilenetv3_small_100",
             UNIFORM_SOUP,
             NORM_FIT,
             "auto",
@@ -227,7 +227,7 @@ def test_predictor(
     predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=30,
+        time_limit=20,
         save_path=save_path,
     )
 
@@ -239,7 +239,7 @@ def test_predictor(
     predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=30,
+        time_limit=20,
     )
     verify_predictor_save_load(predictor, dataset.test_df)
 
@@ -250,7 +250,7 @@ def test_predictor(
         predictor.fit(
             train_data=dataset.train_df,
             hyperparameters=hyperparameters,
-            time_limit=30,
+            time_limit=10,
         )
 
 
@@ -326,19 +326,14 @@ def test_standalone():  # test standalone feature in MultiModalPredictor.save()
     [
         {
             "model.names": ["timm_image_0", "timm_image_1", "fusion_mlp"],
-            "model.timm_image_0.checkpoint_name": "swin_tiny_patch4_window7_224",
-            "model.timm_image_1.checkpoint_name": "swin_small_patch4_window7_224",
-        },
-        {
-            "model.names": "[timm_image_0, timm_image_1, fusion_mlp]",
-            "model.timm_image_0.checkpoint_name": "swin_tiny_patch4_window7_224",
-            "model.timm_image_1.checkpoint_name": "swin_small_patch4_window7_224",
+            "model.timm_image_0.checkpoint_name": "mobilenetv3_small_100",
+            "model.timm_image_1.checkpoint_name": "mobilenetv3_small_100",
         },
         {
             "model.names": ["hf_text_abc", "hf_text_def", "hf_text_xyz", "fusion_mlp_123"],
             "model.hf_text_def.checkpoint_name": "monsoon-nlp/hindi-bert",
             "model.hf_text_xyz.checkpoint_name": "prajjwal1/bert-tiny",
-            "model.hf_text_abc.checkpoint_name": "roberta-base",
+            "model.hf_text_abc.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
         },
         {
             "model.names": ["timm_image_haha", "hf_text_hello", "numerical_mlp_456", "fusion_mlp"],
