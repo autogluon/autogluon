@@ -241,7 +241,7 @@ class MultiModalMatcher:
                 self._response_model,
                 self._query_processors,
                 self._response_processors,
-            ) = init_pretrained_matcher(pipeline=self._pipeline, hyperparameters=hyperparameters)
+            ) = init_pretrained_matcher(presets=self._pipeline, hyperparameters=hyperparameters)
 
     @property
     def query(self):
@@ -449,7 +449,6 @@ class MultiModalMatcher:
             validation_metric_name, eval_metric_name = infer_metrics(
                 problem_type=problem_type,
                 eval_metric_name=self._eval_metric_name,
-                pipeline=self._pipeline,
             )
         else:
             validation_metric_name = self._validation_metric_name
@@ -599,7 +598,7 @@ class MultiModalMatcher:
         hpo_mode: bool = False,
         **hpo_kwargs,
     ):
-        if presets == None:
+        if presets is None:
             presets = "siamese_network"
 
         if presets == "siamese_network":
@@ -1735,7 +1734,6 @@ class MultiModalMatcher:
                     "column_types": self._column_types,
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
-                    "pipeline": self._pipeline,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
@@ -1832,7 +1830,6 @@ class MultiModalMatcher:
         matcher._match_label = assets["match_label"]
         matcher._label_column = assets["label_column"]
         matcher._problem_type = assets["problem_type"]
-        matcher._pipeline = assets["pipeline"]
         matcher._eval_metric_name = assets["eval_metric_name"]
         matcher._verbosity = verbosity
         matcher._resume = resume

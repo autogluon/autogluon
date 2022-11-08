@@ -428,7 +428,7 @@ class MultiModalPredictor:
                     negative=negative,
                     label=label,
                     match_label=match_label,
-                    problem_type=None,
+                    problem_type=problem_type,
                     pipeline=problem_type,
                     hyperparameters=hyperparameters,
                     eval_metric=eval_metric,

@@ -57,7 +57,7 @@ def init_pretrained(
 
 
 def init_pretrained_matcher(
-    pipeline: Optional[str],
+    presets: Optional[str],
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
 ):
     """
@@ -65,7 +65,7 @@ def init_pretrained_matcher(
 
     Parameters
     ----------
-    pipeline
+    presets
         Name of the pipeline.
     hyperparameters
         The customized hyperparameters used to override the default.
@@ -88,7 +88,7 @@ def init_pretrained_matcher(
         The data processors associated with the response model.
     """
     config = get_config(
-        presets=pipeline,
+        presets=presets,
         overrides=hyperparameters,
         extra=["matcher"],
     )
