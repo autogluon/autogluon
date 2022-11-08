@@ -117,7 +117,8 @@ print('Score in the Japanese Testset:', score_in_jp)
 By combining [gradient checkpointing](https://pytorch.org/docs/stable/checkpoint.html) and parameter-efficient finetuning, it is feasible to finetune 
 [google/flan-t5-xl](https://huggingface.co/google/flan-t5-xl) that has close to two billion parameterswith a single T4 GPU available in
 [AWS G4 instances](https://aws.amazon.com/ec2/instance-types/g4/). 
-To turn on gradient checkpointing, you just need to set `"model.hf_text.gradient_checkpointing"` to `True`.
+To turn on gradient checkpointing, you just need to set `"model.hf_text.gradient_checkpointing"` to `True`. 
+To accelerate the training, we downsample the number of training sampels to be 200.
 
 ```{.python .input}
 # Just for clean the space
@@ -128,9 +129,11 @@ shutil.rmtree("multilingual_ia3")
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
 
+train_en_df_downsample = train_en_df.sample(200, random_state=123) 
+
 predictor = MultiModalPredictor(label="label",
                                 path="multilingual_ia3_gradient_checkpoint")
-predictor.fit(train_en_df.sample(200, random_state=123),
+predictor.fit(train_en_df_downsample,
               presets="multilingual",
               hyperparameters={
                   "model.hf_text.checkpoint_name": "google/flan-t5-xl",
@@ -142,7 +145,7 @@ predictor.fit(train_en_df.sample(200, random_state=123),
                   "optimization.end_lr": 3e-03,
                   "optimization.max_epochs": 1,
                   "optimization.warmup_steps": 0,
-                  "env.batch_size": 8,
+                  "env.batch_size": 4,
                   "env.eval_batch_size_ratio": 1
               })
 
