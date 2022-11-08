@@ -87,7 +87,7 @@ def get_state_dict_dtype(state_dict):
 
 
 def infer_precision(
-    num_gpus: int, precision: Union[int, str], as_torch: Optional[bool] = False, cpu_only_warning: bool = True
+    num_gpus: int, precision: Union[int, str], model, as_torch: Optional[bool] = False, cpu_only_warning: bool = True
 ):
     """
     Infer the proper precision based on the environment setup and the provided precision.
@@ -98,6 +98,8 @@ def infer_precision(
         GPU number.
     precision
         The precision provided in config.
+    model
+        The created model.
     as_torch
         Whether to convert the precision to the Pytorch format.
     cpu_only_warning
