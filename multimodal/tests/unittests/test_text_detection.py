@@ -6,7 +6,7 @@ from mim.commands.download import download
 try:
     import mmocr
     from mmocr.utils.ocr import MMOCR
-except ImportError:
+except (ImportError, ModuleNotFoundError):
     pytest.skip("MMOCR is not installed. Skip this test.", allow_module_level=True)
 
 from PIL import Image
