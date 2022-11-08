@@ -301,6 +301,8 @@ class TabularPredictor:
             infer_limit=None,
             infer_limit_batch_size=None,
             fit_weighted_ensemble=True,
+            num_cpus='auto',
+            num_gpus='auto',
             **kwargs):
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
@@ -538,6 +540,14 @@ class TabularPredictor:
             If True, a WeightedEnsembleModel will be fit in each stack layer.
             A weighted ensemble will often be stronger than an individual model while being very fast to train.
             It is recommended to keep this value set to True to maximize predictive quality.
+        num_cpus: int, default = "auto"
+            The total amount of cpus you want AutoGluon predictor to use.
+            Auto means AutoGluon will make the decision based on the total number of cpus available and the model requirement for best performance.
+            Users generally don't need to set this value
+        num_gpus: int, default = "auto"
+            The total amount of gpus you want AutoGluon predictor to use.
+            Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
+            Users generally don't need to set this value
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -833,6 +843,10 @@ class TabularPredictor:
                            f'\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `presets` and `hyperparameters` configuration.')
 
         core_kwargs = {
+            'total_resources': {
+                'num_cpus': num_cpus,
+                'num_gpus': num_gpus,
+            },
             'ag_args': ag_args,
             'ag_args_ensemble': ag_args_ensemble,
             'ag_args_fit': ag_args_fit,
@@ -922,6 +936,8 @@ class TabularPredictor:
                   time_limit=None,
                   base_model_names=None,
                   fit_weighted_ensemble=True,
+                  num_cpus='auto',
+                  num_gpus='auto',
                   **kwargs):
         """
         Fits additional models after the original :meth:`TabularPredictor.fit` call.
@@ -946,6 +962,14 @@ class TabularPredictor:
             If True, a WeightedEnsembleModel will be fit in each stack layer.
             A weighted ensemble will often be stronger than an individual model while being very fast to train.
             It is recommended to keep this value set to True to maximize predictive quality.
+        num_cpus: int, default = "auto"
+            The total amount of cpus you want AutoGluon predictor to use.
+            Auto means AutoGluon will make the decision based on the total number of cpus available and the model requirement for best performance.
+            Users generally don't need to set this value
+        num_gpus: int, default = "auto"
+            The total amount of gpus you want AutoGluon predictor to use.
+            Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
+            Users generally don't need to set this value
         **kwargs :
             Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
             Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:
@@ -1026,8 +1050,16 @@ class TabularPredictor:
             num_stack_levels = highest_level
 
         # TODO: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
-        core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit,
-                       'excluded_model_types': excluded_model_types}
+        core_kwargs = {
+            'total_resources': {
+                'num_cpus': num_cpus,
+                'num_gpus': num_gpus,
+            },
+            'ag_args': ag_args,
+            'ag_args_ensemble': ag_args_ensemble,
+            'ag_args_fit': ag_args_fit,
+            'excluded_model_types': excluded_model_types
+        }
 
         if X_pseudo is not None and y_pseudo is not None:
             core_kwargs['X_pseudo'] = X_pseudo
@@ -1949,6 +1981,57 @@ class TabularPredictor:
             fi_df[high_str] = pd.Series(ci_high_dict)
             fi_df[low_str] = pd.Series(ci_low_dict)
         return fi_df
+
+    def compile_models(self, models='best', with_ancestors=True, compiler_configs="auto"):
+        """
+        Compile models for accelerated prediction.
+        This can be helpful to reduce prediction latency and improve throughput.
+
+        Note that this is currently an experimental feature, the supported compilers can be ['native', 'onnx'].
+
+        In order to compile with a specific compiler, that compiler must be installed in the Python environment.
+
+        Parameters
+        ----------
+        models : list of str or str, default = 'best'
+            Model names of models to compile.
+            If 'best' then the model with the highest validation score is compiled (this is the model used for prediction by default).
+            If 'all' then all models are compiled.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+        with_ancestors : bool, default = True
+            If True, all ancestor models of the provided models will also be compiled.
+        compiler_configs : dict or str, default = "auto"
+            If "auto", defaults to the following:
+                compiler_configs = {
+                    "RF": {"compiler": "onnx"},
+                    "XT": {"compiler": "onnx"},
+                }
+            Otherwise, specify a compiler_configs dictionary manually. Keys can be exact model names or model types.
+            Exact model names take priority over types if both are valid for a model.
+            Types can be either the true type such as RandomForestModel or the shorthand "RF".
+            The dictionary key logic for types is identical to the logic in the hyperparameters argument of `predictor.fit`
+
+            Example values within the configs:
+                compiler : str, default = None
+                    The compiler that is used for model compilation.
+                batch_size : int, default = None
+                    The batch size that is optimized for model prediction.
+                    By default, the batch size is None. This means the compiler would try to leverage dynamic shape for prediction.
+                    Using batch_size=1 would be more suitable for online prediction, which expects a result from one data point.
+                    However, it can be slow for batch processing, because of the overhead of multiple kernel execution.
+                    Increasing batch size to a number that is larger than 1 would help increase the prediction throughput.
+                    This comes with an expense of utilizing larger memory for prediction.
+        """
+        self._assert_is_fit('compile_models')
+        if isinstance(compiler_configs, str):
+            if compiler_configs == 'auto':
+                compiler_configs = {
+                    "RF": {"compiler": "onnx"},
+                    "XT": {"compiler": "onnx"},
+                }
+            else:
+                raise ValueError(f'Unknown compiler_configs preset: "{compiler_configs}"')
+        self._trainer.compile_models(model_names=models, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
 
     def persist_models(self, models='best', with_ancestors=True, max_memory=0.1) -> list:
         """

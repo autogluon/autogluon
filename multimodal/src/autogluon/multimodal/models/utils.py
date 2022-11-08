@@ -1,3 +1,4 @@
+import logging
 import re
 from typing import Dict, List, Optional, Tuple
 
@@ -6,8 +7,10 @@ from torch import nn
 from torch.nn.modules.loss import _Loss
 from transformers import AutoConfig, AutoModel
 
-from ..constants import LOGITS, REGRESSION
+from ..constants import AUTOMM, LOGITS, REGRESSION
 from .adaptation_layers import IA3Linear, LoRALinear
+
+logger = logging.getLogger(AUTOMM)
 
 
 class DummyLayer(nn.Module):
@@ -302,31 +305,39 @@ def assign_layer_ids(
     left_names
         The layer names not starting with the "model_pre".
     """
-    left_names, encoder_names, pre_encoder_names, post_encoder_names = group_param_names(
-        names=names,
-        pre_encoder_patterns=pre_encoder_patterns,
-        post_encoder_patterns=post_encoder_patterns,
-        model_prefix=model_pre,
-    )
-    # add a constraint
-    if len(encoder_names) == 0 and len(pre_encoder_names) != 0:
-        raise ValueError(f"encoder_names is empty, but pre_encoder_names has values: {pre_encoder_names}")
+    try:
+        left_names, encoder_names, pre_encoder_names, post_encoder_names = group_param_names(
+            names=names,
+            pre_encoder_patterns=pre_encoder_patterns,
+            post_encoder_patterns=post_encoder_patterns,
+            model_prefix=model_pre,
+        )
+        # add a constraint
+        if len(encoder_names) == 0 and len(pre_encoder_names) != 0:
+            raise ValueError(f"encoder_names is empty, but pre_encoder_names has values: {pre_encoder_names}")
 
-    encoder_name_to_id, encoder_layer_num = assign_encoder_layer_ids(
-        encoder_names=encoder_names,
-    )
+        encoder_name_to_id, encoder_layer_num = assign_encoder_layer_ids(
+            encoder_names=encoder_names,
+        )
 
-    pre_encoder_name_to_id = assign_non_encoder_layer_ids(non_encoder_names=pre_encoder_names, layer_id=0)
+        pre_encoder_name_to_id = assign_non_encoder_layer_ids(non_encoder_names=pre_encoder_names, layer_id=0)
 
-    post_encoder_name_to_id = assign_non_encoder_layer_ids(
-        non_encoder_names=post_encoder_names, layer_id=encoder_layer_num + 1
-    )
+        post_encoder_name_to_id = assign_non_encoder_layer_ids(
+            non_encoder_names=post_encoder_names, layer_id=encoder_layer_num + 1
+        )
 
-    name_to_id = reverse_layer_ids(
-        encoder_name_to_id=encoder_name_to_id,
-        pre_enocder_name_to_id=pre_encoder_name_to_id,
-        post_enocder_name_to_id=post_encoder_name_to_id,
-    )
+        name_to_id = reverse_layer_ids(
+            encoder_name_to_id=encoder_name_to_id,
+            pre_enocder_name_to_id=pre_encoder_name_to_id,
+            post_enocder_name_to_id=post_encoder_name_to_id,
+        )
+    except Exception as e:
+        logger.debug(
+            f"When calling assign_layer_ids(), it catches exception: {e}. All the layers will use the same layer_id."
+        )
+        name_to_id = dict()
+        left_names = names
+
     return name_to_id, left_names
 
 

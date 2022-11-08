@@ -340,7 +340,7 @@ def semantic_search(
     query_chunk_size: int = 128,
     response_chunk_size: int = 500000,
     top_k: int = 10,
-    id_mappings: Optional[Dict[str, Dict]] = None,
+    id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
     similarity_type: Optional[str] = "cosine",
 ):
     """
@@ -384,10 +384,10 @@ def semantic_search(
     ), "Both response_data and response_embeddings are None."
 
     if query_embeddings is None:
-        query_header = matcher._query[0] if matcher._query is not None else QUERY
+        query_header = matcher.query[0] if matcher.query is not None else QUERY
         query_data = data_to_df(query_data, header=query_header)
     if response_embeddings is None:
-        response_header = matcher._response[0] if matcher._response else RESPONSE
+        response_header = matcher.response[0] if matcher.response else RESPONSE
         response_data = data_to_df(response_data, header=response_header)
 
     if query_embeddings is None:

@@ -9,7 +9,7 @@ import pytest
 from unittest_datasets import Flickr30kDataset, IDChangeDetectionDataset
 from utils import get_home_dir
 
-from autogluon.multimodal import MultiModalMatcher
+from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import BINARY, MULTICLASS, QUERY, RESPONSE, UNIFORM_SOUP
 from autogluon.multimodal.utils import convert_data_for_ranking, semantic_search
 
@@ -19,7 +19,7 @@ ALL_DATASETS = {
 }
 
 
-def verify_matcher_save_load(matcher, df, verify_embedding=True, cls=MultiModalMatcher):
+def verify_matcher_save_load(matcher, df, verify_embedding=True, cls=MultiModalPredictor):
     with tempfile.TemporaryDirectory() as root:
         matcher.save(root)
         predictions = matcher.predict(df, as_pandas=False)
@@ -52,8 +52,8 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
         query_data=test_query_text_data,
         response_data=test_response_image_data,
         metrics=[metric_name],
-        label_column=test_label_column,
-        cutoff=[1, 5, 10],
+        label=test_label_column,
+        cutoffs=[1, 5, 10],
     )
 
     if symmetric:
@@ -72,10 +72,8 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
             query_data=test_query_image_data,
             response_data=test_response_text_data,
             metrics=[metric_name],
-            label_column=test_label_column,
-            # query_signature="response",
-            # response_signature="query",
-            cutoff=[1, 5, 10],
+            label=test_label_column,
+            cutoffs=[1, 5, 10],
         )
 
 
@@ -116,7 +114,7 @@ def test_matcher(
 ):
     dataset = ALL_DATASETS[dataset_name]()
 
-    matcher = MultiModalMatcher(
+    matcher = MultiModalPredictor(
         query=query,
         response=response,
         pipeline=presets,
@@ -187,7 +185,7 @@ def test_matcher(
         )
     else:
         score = matcher.evaluate(dataset.test_df)
-    verify_matcher_save_load(matcher, dataset.test_df, cls=MultiModalMatcher)
+    verify_matcher_save_load(matcher, dataset.test_df, cls=MultiModalPredictor)
 
     # Test for continuous fit
     matcher.fit(
@@ -196,12 +194,12 @@ def test_matcher(
         hyperparameters=hyperparameters,
         time_limit=30,
     )
-    verify_matcher_save_load(matcher, dataset.test_df, cls=MultiModalMatcher)
+    verify_matcher_save_load(matcher, dataset.test_df, cls=MultiModalPredictor)
 
     # Saving to folder, loading the saved model and call fit again (continuous fit)
     with tempfile.TemporaryDirectory() as root:
         matcher.save(root)
-        matcher = MultiModalMatcher.load(root)
+        matcher = MultiModalPredictor.load(root)
         matcher.fit(
             train_data=dataset.train_df,
             tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
@@ -228,7 +226,7 @@ def test_text_semantic_search():
         "A cheetah chases prey on across a field.",
     ]
 
-    matcher = MultiModalMatcher(
+    matcher = MultiModalPredictor(
         pipeline="text_similarity",
         hyperparameters={"model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2"},
     )
@@ -285,7 +283,7 @@ def test_image_text_semantic_search():
     image_list = dataset.test_df["image"].tolist()
     text_list = dataset.test_df["caption"].tolist()
 
-    matcher = MultiModalMatcher(
+    matcher = MultiModalPredictor(
         pipeline="image_text_similarity",
         hyperparameters={"model.hf_text.checkpoint_name": "openai/clip-vit-base-patch32"},
     )
