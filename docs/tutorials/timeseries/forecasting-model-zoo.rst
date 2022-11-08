@@ -27,7 +27,7 @@ For example, the following code will train a ``TimeSeriesPredictor`` with ``Deep
    )
 
 Note that we don't include the ``Model`` suffix when specifying the model name in ``hyperparameters``
-(i.e., the class :class:`~autogluon.timeseries.models.DeepARModel` corresponds to the name ``"DeepAR"`` in the ``hyperparameters`` dictionary).
+(e.g., the class :class:`~autogluon.timeseries.models.DeepARModel` corresponds to the name ``"DeepAR"`` in the ``hyperparameters`` dictionary).
 
 
 Also note that some of the models' hyperparameters have names and default values that
@@ -109,17 +109,15 @@ Default models
 
 MXNet Models
 ------------
-Using the models listed below requires installing Apache MXNet v1.9. This can be done as follows:
+Using the models listed below requires installing Apache MXNet v1.9. This can be done as follows::
 
-```shell
-python -m pip install mxnet~=1.9
-```
+   python -m pip install mxnet~=1.9
 
 If you want to use a GPU, install the version of MXNet that matches your CUDA version. See the
 MXNet [documentation](https://mxnet.apache.org/versions/1.9.1/get_started?) for more info.
 
 If a GPU is available and MXNet version with CUDA is installed, all the MXNet models will be trained using the GPU.
-Otherwise, the models will train on CPU.
+Otherwise, the models will be trained on CPU.
 
 
 .. automodule:: autogluon.timeseries.models.gluonts.mx
@@ -167,14 +165,14 @@ Otherwise, the models will train on CPU.
 
 
 :hidden:`DeepARMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: DeepARMXNetModel
    :members: init
 
 
 :hidden:`SimpleFeedForwardMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: SimpleFeedForwardMXNetModel
    :members: init
