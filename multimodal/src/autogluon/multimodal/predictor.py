@@ -157,7 +157,12 @@ logger = logging.getLogger(AUTOMM)
 
 
 PROBLEM_TYPES_SUPPORT_INFERENCE = [OBJECT_DETECTION, IMAGE_SIMILARITY, IMAGE_TEXT_SIMILARITY, IMAGE_TEXT_SIMILARITY]
-VALID_PIPELINES = PROBLEM_TYPES_SUPPORT_INFERENCE + [FEATURE_EXTRACTION, ZERO_SHOT_IMAGE_CLASSIFICATION, OCR_TEXT_DETECTION, OCR_TEXT_RECOGNITION]
+VALID_PIPELINES = PROBLEM_TYPES_SUPPORT_INFERENCE + [
+    FEATURE_EXTRACTION,
+    ZERO_SHOT_IMAGE_CLASSIFICATION,
+    OCR_TEXT_DETECTION,
+    OCR_TEXT_RECOGNITION,
+]
 
 
 class MultiModalPredictor:
@@ -306,9 +311,11 @@ class MultiModalPredictor:
             if pipeline is None:
                 pipeline = problem_type
             else:
-                assert pipeline == problem_type, f"Mismatched pipeline and problem_type. " \
-                                                 f"Received pipeline={pipeline}, problem_type={problem_type}. " \
-                                                 f"Consider to revise the flags"
+                assert pipeline == problem_type, (
+                    f"Mismatched pipeline and problem_type. "
+                    f"Received pipeline={pipeline}, problem_type={problem_type}. "
+                    f"Consider to revise the flags"
+                )
 
         if pipeline in matcher_presets.list_keys():
             self._matcher = MultiModalMatcher(
@@ -355,8 +362,9 @@ class MultiModalPredictor:
         self._problem_type = problem_type.lower() if problem_type is not None else None
         self._pipeline = pipeline.lower() if pipeline is not None else None
 
-        assert self._pipeline in VALID_PIPELINES,\
-            f"pipeline={self._pipeline} is not supported. Consider to pick one from {VALID_PIPELINES}"
+        assert (
+            self._pipeline in VALID_PIPELINES
+        ), f"pipeline={self._pipeline} is not supported. Consider to pick one from {VALID_PIPELINES}"
 
         self._eval_metric_name = eval_metric
         self._validation_metric_name = val_metric
