@@ -1,17 +1,17 @@
-# Convert Data to MSCOCO Format
+# Convert Data to COCO Format
 
-:label:`convert_data_to_coco_format`
+:label:`sec_automm_detection_convert_to_coco`
 
-MSCOCO is one of the most popular datasets for object detection
-and its annotation format, usually referred to as the "MSCOCO format", has also been widely adopted.
-The "MSCOCO format" is a json structure that governs how labels and metadata are formatted for a dataset.
-We use MSCOCO format as the standard data format for training and inference in object detection tasks, and 
-require that all data related to object detection tasks should conform to the "MSCOCO format".  
-For details regarding MSCOCO dataset, please see this page.
+COCO is one of the most popular datasets for object detection
+and its annotation format, usually referred to as the "COCO format", has also been widely adopted.
+The "COCO format" is a json structure that governs how labels and metadata are formatted for a dataset.
+We use COCO format as the standard data format for training and inference in object detection tasks, and 
+require that all data related to object detection tasks should conform to the "COCO format".  
+For details regarding COCO dataset, please see this page.
 
-## How to prepare MSCOCO format
+## How to prepare COCO format
 ### 1. Formatting folder Structure
-Under the MSCOCO format, the overall folder structure of a dataset should follow:
+Under the COCO format, the overall folder structure of a dataset should follow:
 ```
 <dataset_dir>/
     images/
@@ -87,8 +87,8 @@ For the sole purpose of running AutoMM, the fields ``"info"`` and ``"licenses"``
 
 ```json
 {
-  "info": {...},
-"licenses": [
+    "info": {...},
+    "licenses": [
         {
             "url": "http://creativecommons.org/licenses/by-nc-sa/2.0/", 
             "id": 1, 
@@ -130,7 +130,7 @@ For the sole purpose of running AutoMM, the fields ``"info"`` and ``"licenses"``
 
 The following is an example of one sample annotated with COCO format
 
-## Converting Pascal VOC dataset to MSCOCO format
+## Converting Pascal VOC dataset to COCO format
 Pascal VOC is another very popular dataset for object detection, and it also follows its own data format. 
 We provide an example script to easily convert VOC dataset to COCO format.
 
@@ -143,9 +143,15 @@ Assuming your VOC dataset has the following structure
 ```
 <path_to_VOCdevkit>/
     VOC2007/
-        ...
+        Annotations/
+        ImageSets/
+        JPEGImages/
+        labels.txt
     VOC2012/
-        ...
+        Annotations/
+        ImageSets/
+        JPEGImages/
+        labels.txt
     ...
 ```
 
@@ -156,14 +162,15 @@ cd ./examples/automm/object_detection/
 
 #### 2. Run the following command:
 ```
-python voc2coco.py <path_to_VOCdevkit> \
--o <path_to_VOCdevkit>/<output_folder_name> \
---out-format coco
+# If you'd like to customize train/val/test ratio. Note test_ratio = 1 - train_ratio - val_ratio.
+python3 voc2coco.py --root_dir <root_dir> --train_ratio <train_ratio> --val_ratio <val_ratio>  
+# If you'd like to use the dataset provided train/val/test splits:
+python3 voc2coco.py --root_dir <root_dir>
 ```
 
-## Converting other formats to MSCOCO format
-We have demonstrated the MSCOCO format and feel free to write your own code to convert your data into the MSCOCO format.
-As long as your data conforms to MSCOCO format, it'll work perfectly with the AutoMM pipelines.
-In addition, there are a number of 3rd party tools to convert data into MSCOCO format. 
+## Converting other formats to COCO format
+We have demonstrated the COCO format and feel free to write your own code to convert your data into the COCO format.
+As long as your data conforms to COCO format, it'll work perfectly with the AutoMM pipelines.
+In addition, there are a number of 3rd party tools to convert data into COCO format. 
 For example, [FiftyOne](https://github.com/voxel51/fiftyone) provides functionalities to convert other formats such as CVAT, YOLO, 
-and KITTI etc. into MSCOCO format.
+and KITTI etc. into COCO format.
