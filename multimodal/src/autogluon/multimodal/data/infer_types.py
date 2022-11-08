@@ -582,7 +582,7 @@ def infer_problem_type_output_shape(
                 f"Problem type '{provided_problem_type}' doesn't have a valid output shape "
                 f"for training. The supported problem types are"
                 f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}',"
-                f" '{CLASSIFICATION}', '{NAMED_ENTITY_RECOGNITION}',"
+                f" '{CLASSIFICATION}', '{NER}',"
                 f" '{OBJECT_DETECTION}'"
             )
     else:
