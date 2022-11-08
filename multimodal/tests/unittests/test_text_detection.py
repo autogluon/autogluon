@@ -4,6 +4,7 @@ import requests
 from mim.commands.download import download
 
 try:
+    import mmocr
     from mmocr.utils.ocr import MMOCR
 except ImportError:
     pytest.skip("MMOCR is not installed. Skip this test.", allow_module_level=True)
