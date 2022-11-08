@@ -33,13 +33,13 @@ def test_load_old_checkpoint(cls):
         folder=save_path,
     )
     predictor = cls.load(checkpoint_path)
-    verify_predictor_save_load(predictor, dataset.test_df, cls=cls)
+    verify_predictor_save_load(predictor, dataset.test_df.sample(4), cls=cls)
 
     # continuous training
     predictor.fit(
         dataset.train_df,
         presets="multilingual",
-        time_limit=30,
+        time_limit=20,
         hyperparameters={"optimization.top_k_average_method": "uniform_soup"},
     )
-    verify_predictor_save_load(predictor, dataset.test_df, cls=cls)
+    verify_predictor_save_load(predictor, dataset.test_df.sample(4), cls=cls)
