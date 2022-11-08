@@ -17,12 +17,12 @@ import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
+import transformers
 import yaml
 from omegaconf import DictConfig, OmegaConf
 from packaging import version
 from sklearn.model_selection import train_test_split
 from torch import nn
-import transformers
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.common.utils.utils import setup_outputdir
