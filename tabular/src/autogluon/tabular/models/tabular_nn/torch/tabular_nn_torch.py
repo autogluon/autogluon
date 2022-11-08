@@ -18,6 +18,8 @@ from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetwo
 
 from ..hyperparameters.parameters import get_default_param
 from ..hyperparameters.searchspaces import get_default_searchspace
+from ..compilers.native import TabularNeuralNetTorchNativeCompiler
+from ..compilers.tvm import TabularNeuralNetTorchTvmCompiler
 from ..utils.data_preprocessor import create_preprocessor, get_feature_arraycol_map, get_feature_type_map
 from ..utils.nn_architecture_utils import infer_y_range
 
@@ -566,10 +568,32 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         num_gpus = 0
         return num_cpus, num_gpus
 
+    def _get_input_types(self, batch_size=None) -> list:
+        """Get input types as a list of tuples, containining shape and dtype."""
+        input_types = []
+        if self.model.has_vector_features:
+            input_types = [((batch_size, self.model.architecture_desc['vector_dims']), np.float32)]
+        if self.model.has_embed_features:
+            embed_dims = self.model.architecture_desc['embed_dims']
+            for embed_dim in embed_dims:
+                input_types.append(((batch_size, embed_dim), np.int32))
+        return input_types
+
+    def _valid_compilers(self):
+        return [TabularNeuralNetTorchNativeCompiler,
+                TabularNeuralNetTorchTvmCompiler]
+
+    def _default_compiler(self):
+        return TabularNeuralNetTorchNativeCompiler
+
     def save(self, path: str = None, verbose=True) -> str:
         if self.model is not None:
             self._architecture_desc = self.model.architecture_desc
         temp_model = self.model
+        if self.model is not None:
+            self._compiler = self._get_compiler()
+            self._is_model_saved = True
+            self._compiler.save(self.model, self.path)
         self.model = None
         path_final = super().save(path=path, verbose=verbose)
         self.model = temp_model
@@ -600,6 +624,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                                    device=model.device)
             model._architecture_desc = None
             model.model = torch.load(model.path + model.params_file_name)
+        if model._is_model_saved:
+            model.model = model._compiler.load(path=path)
         return model
     
     def _get_hpo_backend(self):
