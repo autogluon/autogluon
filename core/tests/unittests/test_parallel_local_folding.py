@@ -50,8 +50,8 @@ def _construct_dummy_fold_strategy(num_jobs, time_limit=None, num_folds_parallel
 
 
 def _test_resource_allocation_and_time_limit(num_jobs, num_folds_parallel, time_limit):
-    num_cpus = get_cpu_count()
-    num_gpus = get_gpu_count_all()
+    num_cpus = ResourceManager.get_cpu_count()
+    num_gpus = ResourceManager.get_gpu_count_all()
     time_start = time.time()
     fold_fitting_strategy = _construct_dummy_fold_strategy(num_jobs=num_jobs, time_limit=time_limit, num_folds_parallel=num_folds_parallel)
     for i in range(num_jobs):
