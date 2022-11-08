@@ -842,7 +842,8 @@ class MultiModalMatcher:
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
-                gpus=num_gpus,
+                accelerator="gpu" if num_gpus > 0 else None,
+                devices=num_gpus if num_gpus > 0 else None,
                 auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
                 num_nodes=config.env.num_nodes,
                 precision=precision,
@@ -878,12 +879,6 @@ class MultiModalMatcher:
                 ".* in the `DataLoader` init to improve performance.*",
             )
             warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
-            # get the pretrained checkpoint performance on validation data
-            trainer.validate(
-                task,
-                datamodule=train_dm,
-                ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
-            )
 
             trainer.fit(
                 task,
@@ -1196,7 +1191,8 @@ class MultiModalMatcher:
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
-                gpus=num_gpus,
+                accelerator="gpu" if num_gpus > 0 else None,
+                devices=num_gpus if num_gpus > 0 else None,
                 auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
