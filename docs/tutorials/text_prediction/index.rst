@@ -1,9 +1,10 @@
 Text Prediction
 ===============
 
-AutoGluon Text will be deprecated in the v0.7 of AutoGluon. In the current version, all functionalities in AutoGluon
-Text can be supported via `AutoGluon Multimodal <https://auto.gluon.ai/stable/tutorials/multimodal/index.html>`_.
-Check AutoGluon Multimodal for more details on how to automatically tune foundational models for text prediction problems.
+AutoGluon Text will be deprecated in AutoGluon v0.7. In the current version (v0.6), all functionalities in AutoGluon
+Text have been supported via `AutoGluon Multimodal <https://auto.gluon.ai/stable/tutorials/multimodal/index.html>`_.
+You are recommended to switch to AutoGluon Multimodal and may check the relevant tutorials about how to use it for
+text prediction problems.
 
 .. container:: cards
 
