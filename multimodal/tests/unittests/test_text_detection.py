@@ -2,7 +2,12 @@ import numpy as np
 import pytest
 import requests
 from mim.commands.download import download
-from mmocr.utils.ocr import MMOCR
+
+try:
+    from mmocr.utils.ocr import MMOCR
+except ImportError:
+    pytest.skip("MMOCR is not installed. Skip this test.", allow_module_level=True)
+
 from PIL import Image
 
 from autogluon.multimodal import MultiModalPredictor
