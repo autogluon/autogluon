@@ -178,8 +178,8 @@ problem_property_dict = OrderedDict(
         (TEXT_SIMILARITY, ProblemProperty(TEXT_SIMILARITY, inference_ready=True, is_matching=True)),
         (IMAGE_SIMILARITY, ProblemProperty(IMAGE_SIMILARITY, inference_ready=True, is_matching=True)),
         (IMAGE_TEXT_SIMILARITY, ProblemProperty(IMAGE_TEXT_SIMILARITY, inference_ready=True, is_matching=True)),
-        (NER, ProblemProperty(NAMED_ENTITY_RECOGNITION, inference_ready=True)),
-        (NAMED_ENTITY_RECOGNITION, ProblemProperty(NAMED_ENTITY_RECOGNITION, inference_ready=True)),
+        (NER, ProblemProperty(NER, inference_ready=True)),
+        (NAMED_ENTITY_RECOGNITION, ProblemProperty(NER, inference_ready=True)),
         (FEATURE_EXTRACTION, ProblemProperty(FEATURE_EXTRACTION, support_fit=False, inference_ready=True)),
         (
             ZERO_SHOT_IMAGE_CLASSIFICATION,
@@ -1314,7 +1314,7 @@ class MultiModalPredictor:
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
-        elif self._problem_type == NAMED_ENTITY_RECOGNITION:
+        elif self._problem_type == NER:
             task = NerLitModule(
                 model=model,
                 loss_func=loss_func,
@@ -1717,7 +1717,7 @@ class MultiModalPredictor:
                 pred_writer = DDPCacheWriter(pipeline=self._problem_type, write_interval="epoch")
                 callbacks = [pred_writer]
 
-        if self._problem_type == NAMED_ENTITY_RECOGNITION:
+        if self._problem_type == NER:
             task = NerLitModule(
                 model=self._model,
                 model_postprocess_fn=self._model_postprocess_fn,
@@ -2119,7 +2119,7 @@ class MultiModalPredictor:
                 anno_file_or_df=data, metrics=metrics, return_pred=return_pred, seed=seed, eval_tool=eval_tool
             )
 
-        if self._problem_type == NAMED_ENTITY_RECOGNITION:
+        if self._problem_type == NER:
             ret_type = NER_RET
         else:
             ret_type = LOGITS
@@ -2146,7 +2146,7 @@ class MultiModalPredictor:
             inverse_categorical=True,
         )
 
-        if self._problem_type == NAMED_ENTITY_RECOGNITION:
+        if self._problem_type == NER:
             y_true = self._df_preprocessor.transform_label_for_metric(df=data, tokenizer=self._model.tokenizer)
         else:
             y_true = self._df_preprocessor.transform_label_for_metric(df=data)
@@ -2167,7 +2167,7 @@ class MultiModalPredictor:
             metrics = [metrics]
 
         results = {}
-        if self._problem_type == NAMED_ENTITY_RECOGNITION:
+        if self._problem_type == NER:
             score = compute_score(
                 metric_data=metric_data,
                 metric_name=self._eval_metric_name.lower(),
@@ -2292,7 +2292,7 @@ class MultiModalPredictor:
         else:
             ret_type = LOGITS
 
-        if self._problem_type == NAMED_ENTITY_RECOGNITION:
+        if self._problem_type == NER:
             ret_type = NER_RET
 
         if candidate_data:

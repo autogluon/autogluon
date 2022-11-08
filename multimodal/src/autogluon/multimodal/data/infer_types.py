@@ -490,7 +490,7 @@ def infer_label_column_type_by_problem_type(
             column_types[col_name] = CATEGORICAL
         elif problem_type == REGRESSION:
             column_types[col_name] = NUMERICAL
-        elif problem_type == NAMED_ENTITY_RECOGNITION:
+        elif problem_type == NER:
             column_types[col_name] = NER_ANNOTATION
         elif problem_type == OBJECT_DETECTION:
             column_types[col_name] = ROIS
@@ -568,7 +568,7 @@ def infer_problem_type_output_shape(
                 return MULTICLASS, class_num
         elif provided_problem_type == REGRESSION:
             return provided_problem_type, 1
-        elif provided_problem_type == NAMED_ENTITY_RECOGNITION:
+        elif provided_problem_type == NER:
             unique_entity_groups = [
                 annot[ENTITY_GROUP]
                 for annotation in data[label_column].iteritems()
