@@ -172,6 +172,7 @@ class DefaultLearner(AbstractTabularLearner):
             logger.warning(f"Warning: Ignoring {len(missinglabel_inds)} (out of {len(X)}) training examples for which the label value in column '{self.label}' is missing")
             X = X.drop(missinglabel_inds, axis=0)
 
+        holdout_frac_og = holdout_frac
         if X_val is not None and self.label in X_val.columns:
             holdout_frac = 1
 
@@ -202,10 +203,14 @@ class DefaultLearner(AbstractTabularLearner):
         if X_val is not None and self.label in X_val.columns:
             X_val = self.cleaner.transform(X_val)
             if len(X_val) == 0:
-                logger.warning('All X_val data contained low frequency classes, ignoring X_val and generating from subset of X')
+                logger.warning('############################################################################################################\n'
+                               'WARNING: All X_val data contained low frequency classes, ignoring X_val and generating from subset of X\n'
+                               '\tYour input validation data or training data labels might be corrupted, please manually inspect them for correctness!\n'
+                               '############################################################################################################')
                 X_val = None
                 y_val = None
                 w_val = None
+                holdout_frac = holdout_frac_og
             else:
                 X_val, y_val = self.extract_label(X_val)
                 y_val = self.label_cleaner.transform(y_val)
