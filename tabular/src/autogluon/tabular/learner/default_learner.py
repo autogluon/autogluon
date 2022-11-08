@@ -201,7 +201,7 @@ class DefaultLearner(AbstractTabularLearner):
             logger.log(20, f'Train Data Class Count: {self.label_cleaner.num_classes}')
 
         if X_val is not None and self.label in X_val.columns:
-            X_val_og = X_val
+            y_val_og = X_val[self.label]
             X_val = self.cleaner.transform(X_val)
             if len(X_val) == 0:
                 logger.warning('############################################################################################################\n'
@@ -209,9 +209,11 @@ class DefaultLearner(AbstractTabularLearner):
                                '\tYour input validation data or training data labels might be corrupted, please manually inspect them for correctness!')
                 if self.problem_type in [BINARY, MULTICLASS]:
                     train_classes = sorted(list(y_uncleaned.unique()))
-                    val_classes = sorted(list(X_val_og[self.label].unique()))
+                    val_classes = sorted(list(y_val_og.unique()))
                     logger.warning(f'\tTraining Classes: {train_classes}')
                     logger.warning(f'\tTuning   Classes: {val_classes}')
+                    logger.warning(f'\tTraining Class Dtype: {y_uncleaned.dtype}')
+                    logger.warning(f'\tTuning   Class Dtype: {y_val_og.dtype}')
                     missing_classes = [c for c in val_classes if c not in train_classes]
                     logger.warning(f'\tClasses missing from Training Data: {missing_classes}')
                 logger.warning('############################################################################################################')
