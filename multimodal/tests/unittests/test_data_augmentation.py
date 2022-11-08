@@ -140,6 +140,7 @@ def test_trivialaugment():
         "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
         "model.hf_text.text_trivial_aug_maxscale": 0.1,
         "model.hf_text.text_aug_detect_length": 10,
+        "model.timm_image.checkpoint_name": "mobilenetv3_small_100",
         "model.timm_image.train_transform_types": ["resize_shorter_side", "center_crop", "trivial_augment"],
     }
 
