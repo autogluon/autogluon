@@ -273,9 +273,16 @@ class ImageProcessor:
             Image normalizaiton std.
         """
         if self.prefix.lower().startswith(MMDET_IMAGE):
-            image_size = config.test_pipeline[1]["img_scale"][0]
-            mean = config.test_pipeline[1]["transforms"][2]["mean"]
-            std = config.test_pipeline[1]["transforms"][2]["std"]
+            if "img_scale" in config.test_pipeline[1]:
+                image_size = config.test_pipeline[1]["img_scale"][0]
+            else:
+                image_size = (320, 320)  # TODO: remove self.size for mmdet since it's not used
+            if "mean" in config.test_pipeline[1]["transforms"][2]:
+                mean = config.test_pipeline[1]["transforms"][2]["mean"]
+                std = config.test_pipeline[1]["transforms"][2]["std"]
+            else:  # yolox does not need normalization
+                mean = 0
+                std = 1
         elif self.prefix.lower().startswith(MMOCR_TEXT_DET):
             image_size = config.data.test.pipeline[1]["img_scale"][0]
             mean = config.data.test.pipeline[1]["transforms"][1]["mean"]
@@ -408,16 +415,18 @@ class ImageProcessor:
         """
         images = []
         zero_images = []
-        mm_data = dict(img_prefix=None, bbox_fields=[])
+        mm_data = dict(img_prefix=None, bbox_fields=[], mask_fields=[])
         ret = {}
         column_start = 0
         if self.prefix.lower().startswith(MMLAB_MODELS):
             for per_col_name, per_col_content in image_paths.items():
                 if is_rois_input(per_col_content):
                     rois = np.array(per_col_content)
-                    mm_data["ann_info"] = dict(bboxes=rois[:, :4], labels=rois[:, 4])
+                    # TODO: add gt masks
+                    mm_data["ann_info"] = dict(bboxes=rois[:, :4], labels=rois[:, 4], masks=[])
                 else:
-                    mm_data["img_info"] = dict(filename=per_col_content[0])
+                    with PIL.Image.open(per_col_content[0]) as img:
+                        mm_data["img_info"] = dict(filename=per_col_content[0], height=img.height, width=img.width)
             if self.requires_column_info:
                 pass  # TODO
         else:

@@ -22,6 +22,7 @@ except ImportError:
     mmdet = None
 
 from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
+from .utils import lookup_mmdet_config, update_mmdet_config
 
 logger = logging.getLogger(AUTOMM)
 
@@ -76,18 +77,13 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         if isinstance(config_file, str):
             self.config = mmcv.Config.fromfile(config_file)
 
-        if "bbox_head" in self.config.model.keys():  # yolov3
-            if self.num_classes:
-                self.config.model["bbox_head"]["num_classes"] = self.num_classes
-            else:
-                self.num_classes = self.config.model["bbox_head"]["num_classes"]
-        elif "roi_head" in self.config.model.keys():  # faster_rcnn
-            if self.num_classes:
-                self.config.model["roi_head"]["bbox_head"]["num_classes"] = self.num_classes
-            else:
-                self.num_classes = self.config.model["roi_head"]["bbox_head"]["num_classes"]
+        if self.num_classes:
+            update_mmdet_config(key="num_classes", value=self.num_classes, config=self.config)
         else:
-            raise ValueError("Cannot retrieve num_classes for current model structure.")
+            self.num_classes = lookup_mmdet_config(key="num_classes", config=self.config)
+            if not self.num_classes:
+                raise ValueError("Cannot retrieve num_classes for current model structure.")
+
         self.id2label = dict(zip(range(self.num_classes), range(self.num_classes)))
 
         # build model and load pretrained weights
@@ -252,13 +248,20 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         A dictionary mapping the layer names (keys) to their ids (values).
         """
         name_to_id = {}
-        # now support: yolov3, faster_rcnn, deformable_detr
+        # for some models, use head lr in "head" of bbox_head
+        # now support: yolov3, faster_rcnn, deformable_detr, yolox, vfnet, centernet, cascade_rcnn, detr, htc, atss, ssd
         registered_head_layers_patterns = [
             "bbox_head.fc_cls",
             "bbox_head.fc_reg",
             "bbox_head.convs_pred",
             "bbox_head.cls_branches",
+            "bbox_head.multi_level_conv_cls",
+            "bbox_head.vfnet_cls",
+            "bbox_head.heatmap_head",
+            "bbox_head.atss_cls",
+            "bbox_head.cls_convs",
         ]
+        # for other models, use head lr in whole bbox_head
         default_head_layers_patterns = ["bbox_head"]
 
         head_registered = False
