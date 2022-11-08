@@ -126,9 +126,10 @@ class XGBoostModel(AbstractModel):
                 callbacks.append(EvaluationMonitor(period=log_period))
             callbacks.append(EarlyStoppingCustom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
 
+        import xgboost
         from xgboost import XGBClassifier, XGBRegressor
         model_type = XGBClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else XGBRegressor
-        if 'eval_metric' not in params and params.get('objective') == 'binary:logistic':
+        if 'eval_metric' not in params and params.get('objective') == 'binary:logistic' and xgboost.__version__ == '1.3.0':
             # avoid unnecessary warning from XGBoost v1.3.0
             params['eval_metric'] = 'logloss'
         self.model = model_type(**params)

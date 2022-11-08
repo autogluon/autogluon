@@ -12,6 +12,7 @@ import shutil
 from pathlib import Path
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.utils.utils import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
 
 from .utils import process_hyperparameters
@@ -1153,22 +1154,28 @@ class AbstractTrainer:
             logger.log(30, f'No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.')
             return []
         if max_memory is not None:
-            info = self.get_models_info(model_names)
-            model_mem_size_map = {model: info[model]['memory_size'] for model in model_names}
-            for model in model_mem_size_map:
-                if 'children_info' in info[model]:
-                    for child in info[model]['children_info'].values():
-                        model_mem_size_map[model] += child['memory_size']
-            total_mem_required = sum(model_mem_size_map.values())
-            import psutil
-            available_mem = psutil.virtual_memory().available
-            memory_proportion = total_mem_required / available_mem
-            if memory_proportion > max_memory:
-                logger.log(30, f'Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory*100, 2)}%.')
-                logger.log(30, f'\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.')
+            @disable_if_lite_mode(ret=True)
+            def _check_memory():
+                info = self.get_models_info(model_names)
+                model_mem_size_map = {model: info[model]['memory_size'] for model in model_names}
+                for model in model_mem_size_map:
+                    if 'children_info' in info[model]:
+                        for child in info[model]['children_info'].values():
+                            model_mem_size_map[model] += child['memory_size']
+                total_mem_required = sum(model_mem_size_map.values())
+                import psutil
+                available_mem = psutil.virtual_memory().available
+                memory_proportion = total_mem_required / available_mem
+                if memory_proportion > max_memory:
+                    logger.log(30, f'Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory*100, 2)}%.')
+                    logger.log(30, f'\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.')
+                    return False
+                else:
+                    logger.log(20, f'Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion*100, 2)}% of memory.')
+                return True
+
+            if not _check_memory():
                 return []
-            else:
-                logger.log(20, f'Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion*100, 2)}% of memory.')
 
         models = []
         for model_name in model_names:

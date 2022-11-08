@@ -8,6 +8,7 @@ import numpy as np
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
 from autogluon.common.utils.utils import disable_if_lite_mode
+from autogluon.common.utils.ps_utils import available_virtual_mem
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from autogluon.core.utils.utils import normalize_pred_probas
@@ -200,7 +201,7 @@ class RFModel(AbstractModel):
                 for estimator in model.estimators_:  # Uses far less memory than pickling the entire forest at once
                     model_size_bytes += sys.getsizeof(pickle.dumps(estimator))
                 expected_final_model_size_bytes = model_size_bytes * (n_estimators_final / model.n_estimators)
-                available_mem = psutil.virtual_memory().available
+                available_mem = available_virtual_mem()
                 model_memory_ratio = expected_final_model_size_bytes / available_mem
 
                 ideal_memory_ratio = 0.15 * max_memory_usage_ratio
