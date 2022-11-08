@@ -6,7 +6,7 @@ from pandas import DataFrame
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.infer_types import get_type_map_real
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.utils import disable_if_lite_mode
+from autogluon.common.utils.lite import disable_if_lite_mode
 
 from .bulk import BulkFeatureGenerator
 from .dummy import DummyFeatureGenerator

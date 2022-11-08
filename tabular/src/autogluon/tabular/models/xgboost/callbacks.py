@@ -3,7 +3,7 @@ import logging
 
 from xgboost.callback import EarlyStopping
 
-from autogluon.common.utils.utils import disable_if_lite_mode
+from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.core.utils.early_stopping import SimpleES
 
 logger = logging.getLogger(__name__)

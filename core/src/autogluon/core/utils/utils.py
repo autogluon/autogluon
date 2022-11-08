@@ -16,7 +16,7 @@ from pandas import DataFrame, Series
 from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold, LeaveOneGroupOut
 from sklearn.model_selection import train_test_split
 
-from autogluon.common.utils.utils import disable_if_lite_mode
+from autogluon.common.utils.lite import disable_if_lite_mode
 
 from .miscs import warning_filter
 from ..constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS, QUANTILE

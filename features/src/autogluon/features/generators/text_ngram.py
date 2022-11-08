@@ -7,7 +7,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 
-from autogluon.common.utils.utils import disable_if_lite_mode
+from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.features.types import S_IMAGE_PATH, S_TEXT, S_TEXT_NGRAM
 
 from .abstract import AbstractFeatureGenerator

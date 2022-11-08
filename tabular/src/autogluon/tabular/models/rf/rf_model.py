@@ -8,7 +8,7 @@ import time
 import numpy as np
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
-from autogluon.common.utils.utils import disable_if_lite_mode
+from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.ps_utils import available_virtual_mem
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded

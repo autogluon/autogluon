@@ -5,7 +5,7 @@ import math
 import time
 
 from autogluon.common.features.types import R_INT, R_FLOAT, S_BOOL
-from autogluon.common.utils.utils import disable_if_lite_mode
+from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.utils import get_cpu_count
 from autogluon.core.utils.exceptions import NotEnoughMemoryError

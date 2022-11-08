@@ -80,19 +80,6 @@ def get_autogluon_metadata() -> Dict[str, Any]:
     return metadata
 
 
-def disable_if_lite_mode(ret=None):
-    def inner(func):
-        def do_nothing(*args, **kwargs):
-            if callable(ret):
-                return ret(*args, **kwargs)
-            return ret
-        metadata = get_autogluon_metadata()
-        if metadata['lite']:
-            return do_nothing
-        return func
-    return inner
-
-
 def compare_autogluon_metadata(*, original: dict, current: dict, check_packages=True) -> list:
     logs = []
     og = original

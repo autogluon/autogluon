@@ -11,7 +11,7 @@ from numpy import ndarray
 from pandas import DataFrame, Series
 from typing import Union
 
-from autogluon.common.utils.utils import disable_if_lite_mode
+from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 
 from ...ray.resources_calculator import ResourceCalculatorFactory

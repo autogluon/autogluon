@@ -15,7 +15,8 @@ import scipy
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.utils import setup_outputdir, disable_if_lite_mode
+from autogluon.common.utils.utils import setup_outputdir
+from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
 
 from .model_trial import model_trial, skip_hpo

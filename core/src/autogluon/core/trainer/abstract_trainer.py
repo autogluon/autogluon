@@ -12,7 +12,7 @@ import shutil
 from pathlib import Path
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
-from autogluon.common.utils.utils import disable_if_lite_mode
+from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
 
 from .utils import process_hyperparameters

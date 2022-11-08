@@ -1,4 +1,4 @@
-from .utils import disable_if_lite_mode
+from .lite import disable_if_lite_mode
 
 
 @disable_if_lite_mode(ret=1073741824)

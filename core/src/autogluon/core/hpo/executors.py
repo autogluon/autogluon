@@ -4,7 +4,6 @@ import copy
 import logging
 import math
 import os
-import psutil
 import time
 
 from abc import ABC, abstractmethod
@@ -185,6 +184,7 @@ class HpoExecutor(ABC):
             num_jobs_in_parallel_with_mem = math.inf
 
             if initialized_model.estimate_memory_usage is not None:
+                import psutil
                 model_estimate_memory_usage = initialized_model.estimate_memory_usage(**kwargs)
                 total_memory_available = psutil.virtual_memory().available
                 num_jobs_in_parallel_with_mem = total_memory_available // model_estimate_memory_usage
