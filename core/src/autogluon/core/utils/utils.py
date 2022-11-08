@@ -33,14 +33,20 @@ class ResourceManager():
         return multiprocessing.cpu_count()
     
     @staticmethod
+    def get_cpu_count_psutil(logical=True):
+        return psutil.cpu_count(logical=logical)
+    
+    @staticmethod
     def get_gpu_count_all():
         num_gpus = ResourceManager._get_gpu_count_cuda()
         if num_gpus == 0:
+            # Get num gpus from mxnet first because of https://github.com/awslabs/autogluon/issues/2042
+            # TODO: stop using mxnet to determine num gpus once mxnet is removed from AG
             num_gpus = ResourceManager.get_gpu_count_mxnet()
             if num_gpus == 0:
                 num_gpus = ResourceManager.get_gpu_count_torch()
         return num_gpus
-    
+
     @staticmethod
     def get_gpu_count_mxnet():
         # TODO: Remove this once AG get rid off mxnet

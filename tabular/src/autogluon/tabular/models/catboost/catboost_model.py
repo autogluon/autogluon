@@ -10,6 +10,7 @@ from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, S
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
+from autogluon.core.utils import ResourceManager
 from autogluon.core.utils import try_import_catboost
 
 from .callbacks import EarlyStoppingCallback, MemoryCheckCallback, TimeCheckCallback
@@ -307,8 +308,8 @@ class CatBoostModel(AbstractModel):
         return minimum_resources
 
     def _get_default_resources(self):
-        # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
-        num_cpus = psutil.cpu_count(logical=False)
+        # logical=False is faster in training
+        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
         num_gpus = 0
         return num_cpus, num_gpus
 
