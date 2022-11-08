@@ -122,8 +122,8 @@ Advanced Topics
    :maxdepth: 2
    :hidden:
 
-   text_prediction
-   image_prediction
-   matching
-   multimodal_prediction
-   advanced_topics
+   text_prediction/index
+   image_prediction/index
+   matching/index
+   multimodal_prediction/index
+   advanced_topics/index
