@@ -306,11 +306,11 @@ class MultiModalMatcher:
         Parameters
         ----------
         train_data
-            A dataframe, containing the query data, response data, and their relevance. For example,
+            A dataframe, containing the query data, response data, and their relevance scores. For example,
             | query_col1  | query_col2 | response_col1 | response_col2 | relevance_score |
             |-------------|------------|---------------|---------------|-----------------|
-            |             | ....       | ....          | ...           | ...             |
-            |             | ....       | ....          | ...           | ...             |
+            | ....        | ....       | ....          | ...           | ...             |
+            | ....        | ....       | ....          | ...           | ...             |
         id_mappings
              Id-to-content mappings. The contents can be text, image, etc.
              This is used when the dataframe contains the query/response identifiers instead of their contents.

@@ -339,7 +339,7 @@ class MultiModalPredictor:
             pipeline = pipeline.lower()
             warnings.warn(
                 f"pipeline argument has been deprecated and moved to problem_type. "
-                f"Use problem_type='{pipeline}' instead."
+                f"Use problem_type='{pipeline}' instead.", DeprecationWarning
             )
             if problem_type is not None:
                 assert pipeline == problem_type, (
@@ -428,7 +428,7 @@ class MultiModalPredictor:
                     negative=negative,
                     label=label,
                     match_label=match_label,
-                    problem_type=problem_type,
+                    problem_type=None,  # Ensure that matcher will always infer problem type.
                     pipeline=problem_type,
                     hyperparameters=hyperparameters,
                     eval_metric=eval_metric,
@@ -498,10 +498,7 @@ class MultiModalPredictor:
 
     @property
     def problem_type(self):
-        if self._matcher:
-            return self._matcher.problem_type
-        else:
-            return self._problem_type
+        return self._problem_type
 
     @property
     def column_types(self):
