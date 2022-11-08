@@ -815,7 +815,7 @@ def plot_detections(
     text_scale=0.75,
     text_thickness=1,
     line_thickness=2,
-    alpha=0.5
+    alpha=0.5,
 ):
     """
     Plot the detections on to the corresponding image
@@ -934,7 +934,7 @@ def add_text_with_bg_color(
     font,
     text_scale: float,
     text_thickness: int,
-    text_vert_padding: int = None
+    text_vert_padding: int = None,
 ):
     """
     Add text to im with background color

@@ -2071,7 +2071,7 @@ class MultiModalPredictor:
                 timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
 
                 result_path = (
-                    f"Result{os.path.sep}ag-{timestamp}{os.path.sep}" \
+                    f"Result{os.path.sep}ag-{timestamp}{os.path.sep}"
                     f"{self._hyperparameters['model.mmdet_image.checkpoint_name']}{os.path.sep}"
                 )
                 for i in range(1, 1000):
