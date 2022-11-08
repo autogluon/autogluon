@@ -8,6 +8,7 @@ from .config import (
     get_local_pretrained_config_paths,
     parse_dotlist_conf,
     save_pretrained_model_configs,
+    update_tabular_config_by_resources,
     update_config_by_rules,
 )
 from .data import (
