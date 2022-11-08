@@ -1,7 +1,7 @@
 # Text Prediction - Quick Start
 :label:`sec_textprediction_beginner`
 
-*Starting from AutoGluon 0.6, we recommend to adopt `MultiModalPredictor` if you are looking for automatically finetuning foundational models for text problems. See more in :ref:`sec_`* 
+*Starting from AutoGluon 0.6, we recommend to adopt `MultiModalPredictor` if you are looking for automatically finetuning foundational models for text problems. See more in :ref:`sec_automm_textprediction_beginner_`* 
 
 Here we briefly demonstrate the `TextPredictor`, which helps you automatically train and deploy models for various Natural Language Processing (NLP) tasks.
 This tutorial presents two examples of NLP tasks:
