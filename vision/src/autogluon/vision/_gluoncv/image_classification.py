@@ -17,7 +17,7 @@ import pandas as pd
 import autogluon.core as ag
 from autocfg import dataclass
 from autogluon.core.constants import MULTICLASS
-from autogluon.core.utils import get_cpu_count, get_gpu_count_all
+from autogluon.core.utils import ResourceManager
 from autogluon.core.task.base import BaseTask
 from autogluon.core.searcher import DummySearcher
 
@@ -229,8 +229,8 @@ class ImageClassification(BaseTask):
 
 
         # cpu and gpu setting
-        cpu_count = get_cpu_count()
-        gpu_count = get_gpu_count_all()
+        cpu_count = ResourceManager.get_cpu_count()
+        gpu_count = ResourceManager.get_gpu_count_all()
 
         # default settings
         if not config:
