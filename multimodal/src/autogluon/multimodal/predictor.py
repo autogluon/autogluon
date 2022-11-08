@@ -1293,7 +1293,7 @@ class MultiModalPredictor:
 
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
 
-        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
+        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision, model=self._model)
 
         if num_gpus == 0:  # CPU only training
             grad_steps = max(
@@ -1894,7 +1894,9 @@ class MultiModalPredictor:
         if num_gpus == 1:
             strategy = None
 
-        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False)
+        precision = infer_precision(
+            num_gpus=num_gpus, precision=self._config.env.precision, model=self._model, cpu_only_warning=False
+        )
 
         if not realtime:
             batch_size = compute_inference_batch_size(

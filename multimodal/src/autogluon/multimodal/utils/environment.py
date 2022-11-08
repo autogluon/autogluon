@@ -8,6 +8,8 @@ from typing import Dict, List, Optional, Tuple, Union
 import torch
 from torch import nn
 
+from .model import HFAutoModelForTextPrediction
+
 try:
     from mmcv.parallel import DataContainer
 except:
@@ -70,6 +72,20 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
     return num_gpus
 
 
+def get_state_dict_dtype(state_dict):
+    """
+    Returns the first found floating dtype in `state_dict` if there is one, otherwise returns the first dtype.
+    """
+    for t in state_dict.values():
+
+        if t.is_floating_point():
+            return t.dtype
+
+    # if no floating dtype was found return whatever the first dtype is
+    else:
+        return next(state_dict.values()).dtype
+
+
 def infer_precision(
     num_gpus: int, precision: Union[int, str], as_torch: Optional[bool] = False, cpu_only_warning: bool = True
 ):
@@ -91,6 +107,14 @@ def infer_precision(
     -------
     The inferred precision.
     """
+    precision_mapping = {
+        16: torch.float16,
+        "bf16": torch.bfloat16,
+        32: torch.float32,
+        64: torch.float64,
+    }
+    inverse_precision_mapping = {value: key for key, value in precision_mapping.items()}
+
     if num_gpus == 0:  # CPU only prediction
         if cpu_only_warning:
             warnings.warn(
@@ -109,14 +133,13 @@ def infer_precision(
                 UserWarning,
             )
             precision = 32
+        elif model.config.torch_dtype is not None:
+            precision = inverse_precision_mapping[model.config.torch_dtype]
+        elif isinstance(model, HFAutoModelForTextPrediction):
+            torch_dtype = get_state_dict_dtype(model.state_dict())
+            precision = inverse_precision_mapping[torch_dtype]
 
     if as_torch:
-        precision_mapping = {
-            16: torch.float16,
-            "bf16": torch.bfloat16,
-            32: torch.float32,
-            64: torch.float64,
-        }
         if precision in precision_mapping:
             precision = precision_mapping[precision]
         else:
