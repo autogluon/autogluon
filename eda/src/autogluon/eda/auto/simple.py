@@ -12,7 +12,7 @@ def analyze(
     test_data=None,
     val_data=None,
     model=None,
-    label: str = None,
+    label: Optional[str] = None,
     state: Union[None, dict, AnalysisState] = None,
     sample: Union[None, int, float] = None,
     anlz_facets: Optional[List[AbstractAnalysis]] = None,

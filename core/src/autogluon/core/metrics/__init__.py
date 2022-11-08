@@ -2,14 +2,20 @@ from abc import ABCMeta, abstractmethod
 from functools import partial
 import json
 
+import numpy as np
 import scipy
 import scipy.stats
 import sklearn.metrics
 
+try:
+    from sklearn.metrics._classification import _check_targets, type_of_target
+except:
+    from sklearn.metrics.classification import _check_targets, type_of_target
+
 from . import classification_metrics
-from ..constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
-from .classification_metrics import *
+from .classification_metrics import confusion_matrix
 from . import quantile_metrics
+from ..constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
 
 
 class Scorer(object, metaclass=ABCMeta):
@@ -478,7 +484,7 @@ mcc = make_scorer('mcc', sklearn.metrics.matthews_corrcoef)
 
 # Score functions that need decision values
 roc_auc = make_scorer('roc_auc',
-                      sklearn.metrics.roc_auc_score,
+                      classification_metrics.customized_binary_roc_auc_score,
                       greater_is_better=True,
                       needs_threshold=True)
 
@@ -499,7 +505,7 @@ recall = make_scorer('recall',
                      sklearn.metrics.recall_score)
 
 # Register other metrics
-quadratic_kappa = make_scorer('quadratic_kappa', quadratic_kappa, needs_proba=False)
+quadratic_kappa = make_scorer('quadratic_kappa', classification_metrics.quadratic_kappa, needs_proba=False)
 
 
 def customized_log_loss(y_true, y_pred, eps=1e-15):
