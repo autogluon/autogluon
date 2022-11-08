@@ -64,7 +64,6 @@ def visualize_detection_results(
         visualization_result_dir=visualization_result_dir,
     )
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_path", default="coco17/annotations/instances_val2017.json", type=str)
