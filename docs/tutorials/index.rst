@@ -130,30 +130,6 @@ Object Detection
 
       5 min tutorial on detecting objects in images.
 
-Text Prediction
----------------
-.. container:: cards
-
-   .. card::
-      :title: Quick Start Tutorial
-      :link: text_prediction/beginner.html
-
-      5 min tutorial on fitting prediction models with text in the dataset.
-
-   .. card::
-      :title: Text Prediction for Multimodal Tables with Text
-      :link: text_prediction/multimodal_text.html
-
-      Learning how AutoGluon Text can be used to train model for multimodal data table with text.
-
-
-   .. card::
-      :title: Customize Search Space and HPO
-      :link: text_prediction/customization.html
-
-      In-depth tutorial on learning how to customize the search space and try different
-      HPO algorithms.
-
 
 Time Series Forecasting
 -----------------------
@@ -209,7 +185,6 @@ Cloud Training and Deployment
 
    image_prediction/index
    object_detection/index
-   text_prediction/index
    tabular_prediction/index
    multimodal/index
    cloud_fit_deploy/index

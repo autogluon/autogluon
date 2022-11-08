@@ -10,6 +10,7 @@ from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSer
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
 from autogluon.timeseries.utils.seasonality import get_seasonality
+from autogluon.timeseries.utils.warning_filters import statsmodels_joblib_warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         if "seasonal_period" not in local_model_args or local_model_args["seasonal_period"] is None:
             local_model_args["seasonal_period"] = get_seasonality(train_data.freq)
-        local_model_args["freq"] = train_data.freq
         self.freq = train_data.freq
 
         self._local_model_args = self._update_local_model_args(local_model_args=local_model_args, data=train_data)
@@ -79,7 +79,9 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         logger.debug(f"{self.name} is a local model, so the model will be fit at prediction time.")
         return self
 
-    def _update_local_model_args(self, local_model_args: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    def _update_local_model_args(
+        self, local_model_args: Dict[str, Any], data: TimeSeriesDataFrame, **kwargs
+    ) -> Dict[str, Any]:
         return local_model_args
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
@@ -108,16 +110,17 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         if len(items_to_fit) > 0:
             logger.debug(f"{self.name} received {len(items_to_fit)} new items to predict, generating predictions")
             time_series_to_fit = [data.loc[item_id][self.target] for item_id in items_to_fit]
-            predictions = Parallel(n_jobs=self.n_jobs, prefer="threads")(
-                delayed(self._predict_with_local_model)(
-                    time_series=ts,
-                    prediction_length=self.prediction_length,
-                    freq=self.freq,
-                    quantile_levels=quantile_levels,
-                    local_model_args=self._local_model_args,
+            with statsmodels_joblib_warning_filter():
+                predictions = Parallel(n_jobs=self.n_jobs)(
+                    delayed(self._predict_with_local_model)(
+                        time_series=ts,
+                        prediction_length=self.prediction_length,
+                        freq=self.freq,
+                        quantile_levels=quantile_levels,
+                        local_model_args=self._local_model_args.copy(),
+                    )
+                    for ts in time_series_to_fit
                 )
-                for ts in time_series_to_fit
-            )
             for item_id, preds in zip(items_to_fit, predictions):
                 self._cached_predictions[data_hash.loc[item_id]] = preds
 

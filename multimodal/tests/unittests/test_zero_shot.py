@@ -3,7 +3,7 @@ import pytest
 import requests
 from PIL import Image
 
-from autogluon.multimodal import MultiModalMatcher, MultiModalPredictor
+from autogluon.multimodal import MultiModalPredictor
 
 
 def download_sample_images():
@@ -148,7 +148,7 @@ def test_timm_zero_shot(checkpoint_name):
 
 
 def test_matcher_text_similarity():
-    matcher = MultiModalMatcher(pipeline="text_similarity")
+    matcher = MultiModalPredictor(pipeline="text_similarity")
     corpus = [
         "A man is eating food.",
         "A man is eating a piece of bread.",

@@ -346,7 +346,10 @@ class RankingMetrics:
 
 
 def compute_ranking_score(
-    results: Dict[str, Dict], qrel_dict: Dict[str, Dict], metrics: List[str], cutoff: Optional[List[int]] = [5, 10, 20]
+    results: Dict[str, Dict],
+    qrel_dict: Dict[str, Dict],
+    metrics: List[str],
+    cutoffs: Optional[List[int]] = [5, 10, 20],
 ):
     """
     Compute the ranking metrics, e.g., NDCG, MAP, Recall, and Precision.
@@ -360,7 +363,7 @@ def compute_ranking_score(
         The groundtruth query and document relevance.
     metrics
         A list of metrics to compute.
-    cutoff:
+    cutoffs:
         The cutoff values for NDCG, MAP, Recall, and Precision.
 
     Returns
@@ -369,11 +372,11 @@ def compute_ranking_score(
     """
     scores = {}
     evaluator = RankingMetrics(pred=results, target=qrel_dict)
-    for k in cutoff:
+    for k in cutoffs:
         scores.update(evaluator.compute(k=k))
 
     metric_results = dict()
-    for k in cutoff:
+    for k in cutoffs:
         for per_metric in metrics:
             if per_metric.lower() == NDCG:
                 metric_results[f"{NDCG}@{k}"] = 0.0
@@ -384,7 +387,7 @@ def compute_ranking_score(
             elif per_metric.lower() == PRECISION:
                 metric_results[f"{PRECISION}@{k}"] = 0.0
 
-    for k in cutoff:
+    for k in cutoffs:
         for per_metric in metrics:
             if per_metric.lower() == NDCG:
                 metric_results[f"{NDCG}@{k}"] = round(scores[f"{NDCG}@{k}"], 5)

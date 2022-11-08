@@ -78,6 +78,7 @@ HIT_RATE = "hit_rate"
 NDCG = "ndcg"
 PRECISION = "precision"
 RECALL = "recall"
+MRR = "mrr"
 METRIC_MODE_MAP = {
     ACC: MAX,
     ACCURACY: MAX,
@@ -97,6 +98,9 @@ METRIC_MODE_MAP = {
     OVERALL_ACCURACY: MAX,
     HIT_RATE: MAX,
     NDCG: MAX,
+    PRECISION: MAX,
+    RECALL: MAX,
+    MRR: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 

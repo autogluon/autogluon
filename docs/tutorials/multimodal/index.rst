@@ -12,88 +12,118 @@ intent detection, paraphrase detection, image classification. Moreover, `AutoMM`
 
 In the following, we prepared a few tutorials to help you learn how to use `AutoMM` to solve problems that involve image, text, and tabular data.
 
+
+Text Prediction and Entity Extraction
+-------------------------------------
 .. container:: cards
 
    .. card::
-      :title: AutoMM for Text - Quick Start
-      :link: beginner_text.html
+      :title: AutoMM for Text Prediction - Quick Start
+      :link: text_prediction/beginner_text.html
 
       How to train high-quality text prediction models with MultiModalPredictor in under 5 minutes.
-    
-   .. card::
-      :title: AutoMM for Image Classification - Quick Start
-      :link: beginner_image_cls.html
-
-      How to train image classification models with MultiModalPredictor.
 
    .. card::
-      :title: AutoMM for Text - Multilingual Problems
-      :link: multilingual_text.html
+      :title: AutoMM for Text Prediction - Multilingual Problems
+      :link: text_prediction/multilingual_text.html
 
       How to use MultiModalPredictor to build models on datasets with languages other than English.
 
    .. card::
-      :title: AutoMM for Text + Tabular - Quick Start
-      :link: multimodal_text_tabular.html
+      :title: Named Entity Recognition with AutoMM - Quick Start
+      :link: text_prediction/ner.html
 
-      How MultiModalPredictor can be applied to multimodal data tables with a mix of text, numerical, and categorical columns. Here, we train a model to predict the price of books.
+      How to use MultiModalPredictor for entity extraction.
 
-   .. card::
-      :title: AutoMM for Multimodal - Quick Start
-      :link: beginner_multimodal.html
 
-      How to use MultiModalPredictor to train a model that predicts the adoption speed of pets.
-
-   .. card::
-      :title: CLIP in AutoMM - Zero-Shot Image Classification 
-      :link: clip_zeroshot.html
-
-      How to use CLIP for zero-shot image classification. 
+Image Prediction
+----------------
+.. container:: cards
 
    .. card::
-      :title: CLIP in AutoMM - Extract Embeddings
-      :link: clip_embedding.html
+      :title: AutoMM for Image Classification - Quick Start
+      :link: image_prediction/beginner_image_cls.html
 
-      How to use CLIP to extract embeddings for retrieval problem.
+      How to train image classification models with MultiModalPredictor.
 
    .. card::
-      :title: Semantic Search with AutoMM - Extract Embeddings
-      :link: semantic_search.html
+      :title: Zero-Shot Image Classification with CLIP
+      :link: image_prediction/clip_zeroshot.html
+
+      How to enable zero-shot image classification in AutoMM via pretrained CLIP model.
+
+
+Object Detection
+----------------
+.. container:: cards
+
+
+
+Matching
+--------
+.. container:: cards
+
+   .. card::
+      :title: Text-to-text Matching with AutoMM - Quick Start
+      :link: matching/text2text_matching.html
+
+      How to use AutoMM for text to text matching.
+
+   .. card::
+      :title: Semantic Textual Search with AutoGluon Multimodal Matching
+      :link: matching/semantic_search.html
 
       How to use semantic embeddings to improve search ranking performance.
 
    .. card::
-      :title: Named Entity Recognition with AutoMM - Quick Start
-      :link: ner.html
+      :title: Extract Image/Text Embeddings in AutoMM for Matching Problems
+      :link: matching/clip_embedding.html
 
-      How to use AutoMM for entity extraction.
+      How to use CLIP to extract embeddings for retrieval problem.
+
+
+Multimodal Classification / Regression
+--------------------------------------
+.. container:: cards
+
+   .. card::
+      :title: AutoMM for Text + Tabular - Quick Start
+      :link: mulitmodal_prediction/multimodal_text_tabular.html
+
+      How MultiModalPredictor can be applied to multimodal data tables with a mix of text, numerical, and
+      categorical columns. Here, we train a model to predict the price of books.
+
+   .. card::
+      :title: AutoMM for Image + Text + Tabular - Quick Start
+      :link: mulitmodal_prediction/beginner_multimodal.html
+
+      How to use MultiModalPredictor to train a model that predicts the adoption speed of pets.
+
+
+Advanced Topics
+---------------
+.. container:: cards
 
    .. card::
       :title: Single GPU Billion-scale Model Training via Parameter-Efficient Finetuning
-      :link: efficient_finetuning_basic.html
+      :link: advanced_topics/efficient_finetuning_basic.html
 
       How to take advantage of larger foundation models with the help of parameter-efficient finetuning.
       In the tutorial, we will use combine IA^3, BitFit, and gradient checkpointing to finetune FLAN-T5-XL.
-
+ 
    .. card::
       :title: Customize AutoMM
-      :link: customization.html
+      :link: advanced_topics/customization.html
 
       How to customize AutoMM configurations.
 
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :hidden:
 
-   beginner_text
-   beginner_image_cls
-   multilingual_text
-   multimodal_text_tabular
-   beginner_multimodal
-   efficient_finetuning_basic
-   clip_zeroshot
-   clip_embedding
-   semantic_search
-   ner
-   customization
+   text_prediction/index
+   image_prediction/index
+   matching/index
+   multimodal_prediction/index
+   advanced_topics/index

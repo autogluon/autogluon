@@ -28,32 +28,29 @@ def test_xt_regression(fit_helper):
 
 def test_xt_binary_compile_onnx(fit_helper):
     fit_args = dict(
-        hyperparameters={XTModel: [
-            {}, # defaults to native compiler
-            {'ag_args_fit': {'compiler': "onnx", 'compiler_fallback_to_native': False}},
-        ]},
+        hyperparameters={XTModel: {}},
     )
     dataset_name = 'adult'
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3)
+    compiler_configs = {XTModel: {'compiler': 'onnx'}}
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args,
+                                        compile_models=True, compiler_configs=compiler_configs)
 
 
 def test_xt_multiclass_compile_onnx(fit_helper):
     fit_args = dict(
-        hyperparameters={XTModel: [
-            {}, # defaults to native compiler
-            {'ag_args_fit': {'compiler': "onnx", 'compiler_fallback_to_native': False}},
-        ]},
+        hyperparameters={XTModel: {}},
     )
     dataset_name = 'covertype_small'
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3)
+    compiler_configs = {XTModel: {'compiler': 'onnx'}}
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args,
+                                        compile_models=True, compiler_configs=compiler_configs)
 
 
 def test_xt_regression_compile_onnx(fit_helper):
     fit_args = dict(
-        hyperparameters={XTModel: [
-            {}, # defaults to native compiler
-            {'ag_args_fit': {'compiler': "onnx", 'compiler_fallback_to_native': False}},
-        ]},
+        hyperparameters={XTModel: {}},
     )
+    compiler_configs = {XTModel: {'compiler': 'onnx'}}
     dataset_name = 'ames'
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3)
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args,
+                                        compile_models=True, compiler_configs=compiler_configs)

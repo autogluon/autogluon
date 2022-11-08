@@ -1,4 +1,4 @@
-# AutoMM for Named Entity Recognition
+# Named Entity Recognition with AutoMM - Quick Start
 
 Named entity recognition (NER) refers to identifying and categorizing key information (entities) from unstructured text. An entity can be a word or a series of words which correspond to categories such as cities, time expressions, monetary values, facilities, person, organization, etc. An NER model usually takes as input an unannotated block of text and output an annotated block of text that highlights the named entities with predefined categories. For example, given the following sentences, 
 

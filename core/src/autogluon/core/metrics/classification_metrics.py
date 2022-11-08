@@ -1,8 +1,10 @@
 import logging
+from typing import Union
 
 import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix
+import sklearn
 from sklearn.utils.multiclass import unique_labels
 from sklearn.utils import check_consistent_length
 from sklearn.metrics import cohen_kappa_score
@@ -366,3 +368,74 @@ def quadratic_kappa(y_true, y_pred):
             labels = np.arange(y_pred.shape[1])
         y_pred = np.argmax(y_pred, axis=-1)
     return cohen_kappa_score(y_true, y_pred, labels=labels, weights='quadratic')
+
+
+# Refer to https://github.com/scikit-learn/scikit-learn/blame/f3f51f9b611bf873bd5836748647221480071a87/sklearn/metrics/_ranking.py#L985-L1000
+#  for the original logic and full explanation of what this does. This number has no impact on the score calculated, and is purely for speed.
+#  This value was chosen as having a lower value simply slows down the majority of function calls more than it speeds them up.
+#  It was observed that function calls were sped up by 25% by increasing this from 2 to 100000.
+#  Values greater than this were not tested but would be marginal difference as large samples get less speed up.
+_OPTIMIZE_INDICES_THRESHOLD = 100000
+
+
+def customized_binary_roc_auc_score(y_true: Union[np.array, pd.Series], y_score: Union[np.array, pd.Series], **kwargs) -> float:
+    """
+    Functionally identical to sklearn.metrics.roc_auc_score for binary classification.
+    Streamlined for binary classification to be faster by ~5x by avoiding validation checks of the inputs.
+    We can do this in AutoGluon because we guarantee the data is of proper form when entering this logic.
+
+    Parameters
+    ----------
+    y_true : Union[np.array, pd.Series] of type int
+        Ground truth (correct) labels for n_samples samples. shape = (n_samples,)
+        Valid sample values are 1 and 0.
+    y_score : Union[np.array, pd.Series] of type float
+        The prediction probabilities. shape = (n_samples,)
+    **kwargs :
+        Any additional arguments. If not empty, will fall back to sklearn's implementation
+
+    Returns
+    -------
+    roc_auc_score : float
+        The roc_auc_score in higher_is_better format.
+    """
+    if isinstance(y_true, pd.Series):
+        y_true = y_true.values
+    if isinstance(y_score, pd.Series):
+        y_score = y_score.values
+    if y_true.size == 0 or y_score.size == 0:
+        raise ValueError("Found array with 0 sample(s) (shape=(0,)) while a minimum of 1 is required.")
+    if kwargs:
+        return sklearn.metrics.roc_auc_score(y_true, y_score, **kwargs)
+
+    desc_score_indices = np.argsort(y_score, kind="mergesort")[::-1]
+    y_score = y_score[desc_score_indices]
+    y_true = y_true[desc_score_indices]
+
+    # keep only indices that have different values to speed up future computation
+    distinct_value_indices = np.where(np.diff(y_score))[0]
+    # np.r_ is an optimized way to merge two or more arrays and/or singular values into one array
+    threshold_idxs = np.r_[distinct_value_indices, y_true.size - 1]
+
+    # keep track of how many true positives and false positives have occurred at each threshold
+    tps = np.cumsum(y_true)[threshold_idxs]
+    fps = 1 + threshold_idxs - tps
+
+    if tps.size > _OPTIMIZE_INDICES_THRESHOLD:
+        # optimize indices only when there is enough size to justify
+        # this has no impact on the final score
+        optimal_idxs = np.where(
+            np.r_[True, np.logical_or(np.diff(fps, 2), np.diff(tps, 2)), True]
+        )[0]
+        fps = fps[optimal_idxs]
+        tps = tps[optimal_idxs]
+
+    # Add an extra threshold position
+    # to make sure that the curve starts at (0, 0)
+    tps = np.r_[0, tps]
+    fps = np.r_[0, fps]
+    if fps[-1] <= 0 or tps[-1] <= 0:
+        raise ValueError("Only one class present in y_true. ROC AUC score is not defined in that case.")
+    fpr = fps / fps[-1]
+    tpr = tps / tps[-1]
+    return np.trapz(tpr, fpr)

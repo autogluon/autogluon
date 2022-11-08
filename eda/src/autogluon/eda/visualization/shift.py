@@ -1,3 +1,5 @@
+from typing import Optional
+
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
 from .. import AnalysisState
@@ -12,7 +14,7 @@ class XShiftSummary(AbstractVisualization, JupyterMixin):
     statistic, pvalue), and the feature importances for the detection.
     """
 
-    def __init__(self, headers: bool = False, namespace: str = None, **kwargs) -> None:
+    def __init__(self, headers: bool = False, namespace: Optional[str] = None, **kwargs) -> None:
         super().__init__(namespace, **kwargs)
         self.headers = headers
 

@@ -8,7 +8,7 @@ from autogluon.core.utils import try_import
 import psutil
 import sys
 import time
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -27,8 +27,9 @@ from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.constants import RAY_BACKEND, CUSTOM_BACKEND
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
+from ...ray.resources_calculator import ResourceCalculator
 from ...scheduler import LocalSequentialScheduler
-from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
+from ...utils import get_cpu_count, get_gpu_count_all, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMemoryError
 from ...utils.loaders import load_pkl
@@ -131,6 +132,7 @@ class AbstractModel:
         self.fit_time = None  # Time taken to fit in seconds (Training data)
         self.predict_time = None  # Time taken to predict in seconds (Validation data)
         self.predict_1_time = None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
+        self.compile_time = None  # Time taken to compile the model in seconds
         self.val_score = None  # Score with eval_metric (Validation data)
 
         self.params = {}
@@ -152,6 +154,8 @@ class AbstractModel:
         self._is_initialized = False
         self._is_fit_metadata_registered = False
         self._fit_metadata = dict()
+
+        self._compiler = None
 
     def _init_params(self):
         """Initializes model hyperparameters"""
@@ -250,7 +254,6 @@ class AbstractModel:
             get_features_kwargs_extra=None,  # If not None, applies an additional feature filter to the result of get_feature_kwargs. This should be reserved for users and be None by default. | Currently undocumented in task.
             predict_1_batch_size=None,  # If not None, calculates `self.predict_1_time` at end of fit call by predicting on this many rows of data.
             temperature_scalar=None,  # Temperature scaling parameter that is set post-fit if calibrate=True during TabularPredictor.fit() on the model with the best validation score and eval_metric="log_loss".
-            compiler='native', # The compiler backend that is used for prediction. This defaults to 'native' backend for all models. A list of supported compilers can be found via calling _valid_compilers.
         )
         return default_auxiliary_params
 
@@ -475,16 +478,53 @@ class AbstractModel:
         else:
             self.normalize_pred_probas = False
 
-    def _preprocess_fit_resources(self, silent=False, **kwargs):
+    def _preprocess_fit_resources(self, silent=False, total_resources=None, **kwargs):
+        """
+        This function should be called to process user-specified total resources.
+        Sanity checks will be done to user-specified total resources to make sure it's legit.
+        When user-specified resources are not defined, will instead look at model's default resource requirements.
+        """
+        if 'num_cpus' in kwargs and 'num_gpus' in kwargs:
+            # This value will only be passed by autogluon through previous layers(i.e. bagged model to model base).
+            # We respect this value with highest priority
+            # They should always be set to valid values
+            enforced_num_cpus = kwargs.get('num_cpus', None)
+            enforced_num_gpus = kwargs.get('num_gpus', None)
+            assert enforced_num_cpus is not None and enforced_num_cpus != 'auto' and enforced_num_gpus is not None and enforced_num_gpus != 'auto'
+            return kwargs
+        system_num_cpus = get_cpu_count()
+        system_num_gpus = get_gpu_count_all()
         default_num_cpus, default_num_gpus = self._get_default_resources()
-        num_cpus = self.params_aux.get('num_cpus', 'auto')
-        num_gpus = self.params_aux.get('num_gpus', 'auto')
-        kwargs['num_cpus'] = kwargs.get('num_cpus', num_cpus)
-        kwargs['num_gpus'] = kwargs.get('num_gpus', num_gpus)
-        if kwargs['num_cpus'] == 'auto':
-            kwargs['num_cpus'] = default_num_cpus
-        if kwargs['num_gpus'] == 'auto':
-            kwargs['num_gpus'] = default_num_gpus
+        k_fold = kwargs.get('k_fold', None)
+        if k_fold is not None and k_fold > 0:
+            # bagged model's default resources should be resources * k_fold if the amount is available
+            default_num_cpus = min(default_num_cpus * k_fold, system_num_cpus)
+            default_num_gpus = min(default_num_gpus * k_fold, system_num_gpus)
+        if total_resources is None:
+            total_resources = {}
+        num_cpus = total_resources.get('num_cpus', 'auto')
+        num_gpus = total_resources.get('num_gpus', 'auto')
+        if num_cpus != 'auto' and num_cpus > system_num_cpus:
+            logger.warning(f'Specified total num_cpus: {num_cpus}, but only {system_num_cpus} are available. Will use {system_num_cpus} instead')
+            num_cpus = system_num_cpus
+        if num_gpus != 'auto' and num_gpus > system_num_gpus:
+            logger.warning(f'Specified total num_gpus: {num_gpus}, but only {system_num_gpus} are available. Will use {system_num_gpus} instead')
+            num_gpus = system_num_gpus
+        if num_cpus == 'auto':
+            num_cpus = default_num_cpus
+        if num_gpus == 'auto':
+            num_gpus = default_num_gpus
+        # This will be ag_args_ensemble when bagging, and ag_args_fit when non-bagging
+        params_aux_num_cpus = self._user_params_aux.get('num_cpus', None)
+        params_aux_num_gpus = self._user_params_aux.get('num_gpus', None)
+        if params_aux_num_cpus is not None:
+            assert params_aux_num_cpus <= num_cpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total: {num_cpus}'
+        if params_aux_num_gpus is not None:
+            assert params_aux_num_gpus <= num_gpus, f'Specified num_gpus per {self.__class__.__name__} is more than the total: {num_gpus}'
+        
+        kwargs['num_cpus'] = num_cpus
+        kwargs['num_gpus'] = num_gpus
+        
         if not silent:
             logger.log(15, f"\tFitting {self.name} with 'num_gpus': {kwargs['num_gpus']}, 'num_cpus': {kwargs['num_cpus']}")
         return kwargs
@@ -771,7 +811,16 @@ class AbstractModel:
         if path is None:
             path = self.path
         file_path = path + self.model_file_name
+        _model = self.model
+        if self.model is not None:
+            if self._compiler is None:
+                self._compiler = self._get_compiler()
+                if self._compiler is not None and not self._compiler.save_in_pkl:
+                    self._compiler.save(model=self.model, path=path)
+            if self._compiler is not None and not self._compiler.save_in_pkl:
+                self.model = None  # Don't save model in pkl
         save_pkl.save(path=file_path, object=self, verbose=verbose)
+        self.model = _model
         return path
 
     @classmethod
@@ -801,6 +850,8 @@ class AbstractModel:
         model = load_pkl.load(path=file_path, verbose=verbose)
         if reset_paths:
             model.set_contexts(path)
+        if model._compiler is not None and not model._compiler.save_in_pkl:
+            model.model = model._compiler.load(path=path)
         return model
 
     def compute_feature_importance(self,
@@ -867,35 +918,106 @@ class AbstractModel:
             transform_func=transform_func, transform_func_kwargs=transform_func_kwargs, silent=silent, **kwargs
         )
 
-    # TODO: PoC, refactor prior to v0.6 release
-    #  Add Documentation
-    #  Define when this should be called
-    #  Is it called during fit? Is it called after fit?
-    #  Can it be called as a post-fit operation on an already fit predictor on a per-model basis?
-    #  Does this call overwrite the existing model or make a new one?
-    def compile(self, path: str = None, verbose=True) -> str:
-        if path is None:
-            path = self.path
-        file_path = path + self.model_file_name
+    def can_compile(self, compiler_configs=None):
+        """
+        Verify whether the model can be compiled with the compiler configuration.
 
-        save_in_pkl = True
-        if self.model is not None:
-            self._compiler = self._get_compiler()
-            if self._compiler is not None:
-                self.model = self._compiler.compile(obj=self, path=path)
-                save_in_pkl = self._compiler.save_in_pkl
-        _model = self.model
-        if not save_in_pkl:
-            self.model = None
-        save_pkl.save(path=file_path, object=self, verbose=verbose)
-        self.model = _model
-        return path
+        Parameters
+        ----------
+        compiler_configs : dict, default=None
+            Model specific compiler options.
+            This can be useful to specify the compiler backend for a specific model,
+            e.g. {"RandomForest": {"compiler": "onnx"}}
+        """
+        if not self.is_fit():
+            return False
+        compiler = compiler_configs.get("compiler", "native")
+        compiler_fallback_to_native = compiler_configs.get('compiler_fallback_to_native', False)
+
+        compilers = self._valid_compilers()
+        compiler_names = {c.name: c for c in compilers}
+        if compiler is not None and compiler not in compiler_names:
+            return False
+        compiler_cls = compiler_names[compiler]
+        if not compiler_cls.can_compile():
+            if not compiler_fallback_to_native:
+                return False
+        return True
+
+    def compile(self, compiler_configs=None):
+        """
+        Compile the trained model for faster inference.
+
+        NOTE:
+        - The model is assumed to be fitted before compilation.
+        - If save_in_pkl attribute of the compiler is False, self.model would be set to None.
+
+        Parameters
+        ----------
+        compiler_configs : dict, default=None
+            Model specific compiler options.
+            This can be useful to specify the compiler backend for a specific model,
+            e.g. {"RandomForest": {"compiler": "onnx"}}
+        """
+        assert self.is_fit(), "The model must be fit before calling the compile method."
+        if compiler_configs is None:
+            compiler_configs = {}
+        compiler = compiler_configs.get("compiler", "native")
+        batch_size = compiler_configs.get("batch_size", None)
+        compiler_fallback_to_native = compiler_configs.get('compiler_fallback_to_native', False)
+
+        self._compiler = self._get_compiler(compiler=compiler,
+                                            compiler_fallback_to_native=compiler_fallback_to_native)
+        if self._compiler is not None:
+            input_types = self._get_input_types(batch_size=batch_size)
+            self.model = self._compiler.compile(model=self.model, path=self.path, input_types=input_types)
+
+    # FIXME: This won't work for all models, and self._features is not
+    # a trustworthy variable for final input shape
+    def _get_input_types(self, batch_size=None) -> list:
+        """
+        Get input types as a list of tuples, containining shape and dtype.
+        This can be useful for building the input_types argument for
+        model compilation. This method can be overloaded in derived classes,
+        in order to satisfy class-specific requirements.
+
+        Parameters
+        ----------
+        batch_size : int, default=None
+            The batch size for all returned input types.
+
+        Returns
+        -------
+        List of (shape: Tuple[int], dtype: Any)
+        shape: Tuple[int]
+            A tuple that describes input
+        dtype: Any, default=np.float32
+            The element type in numpy dtype.
+        """
+        return [((batch_size, len(self._features)), np.float32)]
 
     def _default_compiler(self):
+        """The default compiler for the underlining model."""
         return None
 
-    def _get_compiler(self):
-        compiler = self.params_aux.get('compiler', None)
+    def _valid_compilers(self) -> list:
+        """A list of supported compilers for the underlining model."""
+        return []
+
+    def _get_compiler(self, compiler: str = None, compiler_fallback_to_native=False):
+        """
+        Verify whether the dependencies of the compiler class can be satisfied,
+        and return the specified compiler from _valid_compilers.
+
+        Parameters
+        ----------
+        compiler : str, default=None
+            The specific compiler for model compilation.
+        compiler_fallback_to_native : bool, default=False
+            If this is True, the method would return native compiler when
+            dependencies of the specified compiler is not installed. The fallback
+            strategy won't be used by default.
+        """
         compilers = self._valid_compilers()
         compiler_names = {c.name: c for c in compilers}
         if compiler is not None and compiler not in compiler_names:
@@ -903,13 +1025,19 @@ class AbstractModel:
         if compiler is None:
             return self._default_compiler()
         compiler_cls = compiler_names[compiler]
-        compiler_fallback_to_native = self.params_aux.get('compiler_fallback_to_native', True)
         if not compiler_cls.can_compile():
             if not compiler_fallback_to_native:
                 raise AssertionError(f'Specified compiler ({compiler}) is unable to compile'
                                      ' (potentially lacking dependencies) and "compiler_fallback_to_native==False"')
             compiler_cls = self._default_compiler()
         return compiler_cls
+
+    def get_compiler_name(self) -> str:
+        assert self.is_fit(), "The model must be fit before calling the get_compiler_name method."
+        if self._compiler is not None:
+            return self._compiler.name
+        else:
+            return 'native'
 
     def get_trained_params(self) -> dict:
         """
@@ -974,7 +1102,7 @@ class AbstractModel:
         return template
 
     def hyperparameter_tune(self,
-                            hyperparameter_tune_kwargs='auto',
+                            hyperparameter_tune_kwargs = 'auto',
                             hpo_executor: HpoExecutor = None,
                             time_limit: float = None,
                             **kwargs):
@@ -1041,7 +1169,9 @@ class AbstractModel:
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
-        hpo_executor.register_resources(self)
+        kwargs = self._preprocess_fit_resources(**kwargs)
+        self.validate_fit_resources(**kwargs)
+        hpo_executor.register_resources(self, **kwargs)
         return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
 
     def _hyperparameter_tune(self, X, y, X_val, y_val, hpo_executor, **kwargs):
@@ -1075,7 +1205,9 @@ class AbstractModel:
         model_cls = self.__class__
         init_params = self.get_params()
         # We set soft time limit to avoid trials being terminated directly by ray tune
-        trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
+        trial_soft_time_limit = None
+        if hpo_executor.time_limit is not None:
+            trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
 
         fit_kwargs = dict()
         fit_kwargs['feature_metadata'] = self.feature_metadata
@@ -1095,7 +1227,9 @@ class AbstractModel:
         model_estimate_memory_usage = None
         if self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(X=X, **kwargs)
-        minimum_resources = self.get_minimum_resources()
+        minimum_resources = self.get_minimum_resources(
+            is_gpu_available=(hpo_executor.resources.get('num_gpus', 0) > 0)
+        )
         hpo_executor.execute(
             model_trial=model_trial,
             train_fn_kwargs=train_fn_kwargs,
@@ -1147,6 +1281,7 @@ class AbstractModel:
     def reset_metrics(self):
         self.fit_time = None
         self.predict_time = None
+        self.compile_time = None
         self.val_score = None
         self.params_trained = dict()
 
@@ -1179,12 +1314,12 @@ class AbstractModel:
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
         return self._estimate_memory_usage(**kwargs)
 
-    def validate_fit_resources(self, num_cpus='auto', num_gpus='auto', **kwargs):
+    def validate_fit_resources(self, num_cpus='auto', num_gpus='auto', total_resources=None, **kwargs):
         """
         Verifies that the provided num_cpus and num_gpus (or defaults if not provided) are sufficient to train the model.
         Raises an AssertionError if not sufficient.
         """
-        resources = self._preprocess_fit_resources(num_cpus=num_cpus, num_gpus=num_gpus, silent=True)
+        resources = self._preprocess_fit_resources(num_cpus=num_cpus, num_gpus=num_gpus, total_resources=total_resources, silent=True)
         self._validate_fit_resources(**resources)
 
     def _validate_fit_resources(self, **resources):
@@ -1194,9 +1329,21 @@ class AbstractModel:
                 raise AssertionError(f'Model requires {res_min[resource_name]} {resource_name} to fit, but no available amount was defined.')
             elif res_min[resource_name] > resources[resource_name]:
                 raise AssertionError(f'Model requires {res_min[resource_name]} {resource_name} to fit, but {resources[resource_name]} are available.')
+        total_resources = resources.get('total_resources', None)
+        if total_resources is None:
+            total_resources = {}
+        for resource_name, resource_value in total_resources.items():
+            if resources[resource_name] > resource_value:
+                raise AssertionError(f'Specified {resources[resource_name]} {resource_name} to fit, but only {resource_value} are available in total.')
 
-    def get_minimum_resources(self) -> Dict[str, int]:
+    def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:
         """
+        Parameters
+        ----------
+        is_gpu_available
+            Whether gpu is availalbe in the system.
+            Model that can be trained both on cpu and gpu can decide the minimum resources based on this.
+
         Returns a dictionary of minimum resource requirements to fit the model.
         Subclass should consider overriding this method if it requires more resources to train.
         If a resource is not part of the output dictionary, it is considered unnecessary.
@@ -1277,6 +1424,7 @@ class AbstractModel:
             'feature_metadata': self.feature_metadata,
             # 'disk_size': self.get_disk_size(),
             'memory_size': self.get_memory_size(),  # Memory usage of model in bytes
+            'compile_time': self.compile_time,
         }
         return info
 

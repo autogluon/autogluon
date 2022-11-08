@@ -3,9 +3,11 @@ import os
 import shutil
 import uuid
 import pytest
+
+from contextlib import contextmanager
 from typing import List
 
-from autogluon.core.utils import download, unzip
+from autogluon.core.utils import download, unzip, get_cpu_count, get_gpu_count_all
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.utils import infer_problem_type, generate_train_test_split
@@ -130,7 +132,11 @@ class FitHelper:
                                  refit_full=True,
                                  delete_directory=True,
                                  extra_metrics=None,
-                                 expected_model_count=2):
+                                 expected_model_count=2,
+                                 compile_models=False,
+                                 compiler_configs=None):
+        if compiler_configs is None:
+            compiler_configs = {}
         directory_prefix = './datasets/'
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
         label = dataset_info['label']
@@ -140,6 +146,9 @@ class FitHelper:
             path=save_path,
         )
         predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)
+        if compile_models:
+            predictor.compile_models(models="all", compiler_configs=compiler_configs)
+            predictor.persist_models(models="all")
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)
         predictor.predict(test_data)
@@ -233,6 +242,17 @@ class ModelFitHelper:
 
         model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **fit_args)
         return model, label_cleaner, feature_generator
+    
+    
+@contextmanager
+def mock_system_resourcses(**kwargs):
+    if 'num_cpus' in kwargs:
+        get_cpu_count.mock = kwargs['num_cpus']
+    if 'num_gpus' in kwargs:
+        get_gpu_count_all.mock = kwargs['num_gpus']
+    yield
+    get_cpu_count.mock = None
+    get_gpu_count_all.mock = None
 
 
 @pytest.fixture
@@ -248,3 +268,18 @@ def fit_helper():
 @pytest.fixture
 def model_fit_helper():
     return ModelFitHelper
+
+
+@pytest.fixture
+def mock_system_resources_ctx_mgr():
+    return mock_system_resourcses
+
+
+@pytest.fixture
+def mock_num_cpus():
+    return 16
+
+
+@pytest.fixture
+def mock_num_gpus():
+    return 2

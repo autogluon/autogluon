@@ -435,62 +435,68 @@ class TimeSeriesDataFrame(pd.DataFrame):
         ts_df : TimeSeriesDataFrame
             A new time series dataframe containing entries of the original time series between start and end indices.
 
-        Example
-        -------
-        .. code-block:: python
+        Examples
+        --------
+        >>> print(ts_dataframe)
+                            target
+        item_id timestamp
+        0       2019-01-01       0
+                2019-01-02       1
+                2019-01-03       2
+        1       2019-01-02       3
+                2019-01-03       4
+                2019-01-04       5
+        2       2019-01-03       6
+                2019-01-04       7
+                2019-01-05       8
 
-            >>> print(ts_dataframe)
-                                target
-            item_id timestamp
-            0       2019-01-01       0
-                    2019-01-02       1
-                    2019-01-03       2
-            1       2019-01-02       3
-                    2019-01-03       4
-                    2019-01-04       5
-            2       2019-01-03       6
-                    2019-01-04       7
-                    2019-01-05       8
+        Select the first entry of each time series
 
-            >>> df.slice_by_timestep(0, 1)  # select the first entry of each time series
-                                target
-            item_id timestamp
-            0       2019-01-01       0
-            1       2019-01-02       3
-            2       2019-01-03       6
+        >>> df.slice_by_timestep(0, 1)
+                            target
+        item_id timestamp
+        0       2019-01-01       0
+        1       2019-01-02       3
+        2       2019-01-03       6
 
-            >>> df.slice_by_timestep(-2, None)  # select the last 2 entries of each time series
-                                target
-            item_id timestamp
-            0       2019-01-02       1
-                    2019-01-03       2
-            1       2019-01-03       4
-                    2019-01-04       5
-            2       2019-01-04       7
-                    2019-01-05       8
+        Select the last 2 entries of each time series
 
-            >>> df.slice_by_timestep(None, -1)  # select all except the last entry of each time series
-                                target
-            item_id timestamp
-            0       2019-01-01       0
-                    2019-01-02       1
-            1       2019-01-02       3
-                    2019-01-03       4
-            2       2019-01-03       6
-                    2019-01-04       7
+        >>> df.slice_by_timestep(-2, None)
+                            target
+        item_id timestamp
+        0       2019-01-02       1
+                2019-01-03       2
+        1       2019-01-03       4
+                2019-01-04       5
+        2       2019-01-04       7
+                2019-01-05       8
 
-            >>> df.slice_by_timestep(None, None)  # copy the entire dataframe
-                                target
-            item_id timestamp
-            0       2019-01-01       0
-                    2019-01-02       1
-                    2019-01-03       2
-            1       2019-01-02       3
-                    2019-01-03       4
-                    2019-01-04       5
-            2       2019-01-03       6
-                    2019-01-04       7
-                    2019-01-05       8
+        Select all except the last entry of each time series
+
+        >>> df.slice_by_timestep(None, -1)
+                            target
+        item_id timestamp
+        0       2019-01-01       0
+                2019-01-02       1
+        1       2019-01-02       3
+                2019-01-03       4
+        2       2019-01-03       6
+                2019-01-04       7
+
+        Copy the entire dataframe
+
+        >>> df.slice_by_timestep(None, None)
+                            target
+        item_id timestamp
+        0       2019-01-01       0
+                2019-01-02       1
+                2019-01-03       2
+        1       2019-01-02       3
+                2019-01-03       4
+                2019-01-04       5
+        2       2019-01-03       6
+                2019-01-04       7
+                2019-01-05       8
 
         """
 
