@@ -51,6 +51,7 @@ from .constants import (
     FEATURE_EXTRACTION,
     FEATURES,
     FEW_SHOT,
+    FEW_SHOT_TEXT_CLASSIFICATION,
     GREEDY_SOUP,
     IMAGE_SIMILARITY,
     IMAGE_TEXT_SIMILARITY,
@@ -186,6 +187,10 @@ problem_property_dict = OrderedDict(
             ProblemProperty(ZERO_SHOT_IMAGE_CLASSIFICATION, support_fit=False, inference_ready=True),
         ),
         (
+            FEW_SHOT_TEXT_CLASSIFICATION,
+            ProblemProperty(FEW_SHOT_TEXT_CLASSIFICATION, support_fit=True, inference_ready=False, experimental=True),
+        ),
+        (
             OCR_TEXT_DETECTION,
             ProblemProperty(OCR_TEXT_DETECTION, support_fit=False, inference_ready=True, experimental=True),
         ),
@@ -260,6 +265,7 @@ class MultiModalPredictor:
             - 'text_image_similarity'
             - 'feature_extraction' (only support inference)
             - 'zero_shot_image_classification' (only support inference)
+            - 'few_shot_text_classification' (experimental)
             - 'ocr_text_detection' (experimental)
             - 'ocr_text_recognition' (experimental)
 
