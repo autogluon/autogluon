@@ -127,7 +127,7 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
 class DeepARModel(AbstractGluonTSPyTorchModel):
     """DeepAR model from GluonTS based on the PyTorch backend.
 
-    The model consists of an RNN encoder (LSTM or GRU) and a decoder that outputs the
+    The model consists of an LSTM encoder and a decoder that outputs the
     distribution of the next target value. Close to the model described in [Salinas2020]_.
 
     .. [Salinas2020] Salinas, David, et al.
