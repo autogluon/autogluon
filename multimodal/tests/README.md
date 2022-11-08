@@ -50,7 +50,6 @@ Every time we add new features/functions, we need to add new unit tests for them
 all the unit tests:
 
 ```
-export CUDA_VISIBLE_DEVICES=0
 pytest unittests/
 ```
 
