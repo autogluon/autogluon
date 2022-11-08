@@ -1,13 +1,11 @@
 import json
 import logging
 import os
-import warnings
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union, Iterable
+from typing import Iterable, Optional, Union
 
 import defusedxml.ElementTree as ET
 import numpy as np
-import pandas
 import pandas as pd
 
 from ..constants import AUTOMM, MAP
