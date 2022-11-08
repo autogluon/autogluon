@@ -2065,7 +2065,7 @@ class MultiModalPredictor:
                 return_pred=return_pred,
             )
 
-        if self._problem_type == OBJECT_DETECTION:
+        if self._pipeline == OBJECT_DETECTION:
             if realtime:
                 return NotImplementedError(f"Current pipeline {self._pipeline} does not support realtime predict.")
             return self.evaluate_coco(
