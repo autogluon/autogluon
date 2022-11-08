@@ -219,7 +219,6 @@ class MultiModalPredictor:
         problem_type: Optional[str] = None,
         query: Optional[Union[str, List[str]]] = None,
         response: Optional[Union[str, List[str]]] = None,
-        negative: Optional[Union[str, List[str]]] = None,
         match_label: Optional[Union[int, str]] = None,
         pipeline: Optional[str] = None,
         val_metric: Optional[str] = None,
@@ -274,8 +273,6 @@ class MultiModalPredictor:
         response
             Column names of response data (used for matching). If no label column is provided,
             query and response columns form positive pairs.
-        negative
-            Column names of negative data (used for matching). Query and negative make up negative pairs.
         match_label
             The label class that indicates the <query, response> pair is counted as "match".
             This is used when the problem_type is one of the matching problem types, and when the labels are binary.
@@ -425,7 +422,6 @@ class MultiModalPredictor:
                 self._matcher = MultiModalMatcher(
                     query=query,
                     response=response,
-                    negative=negative,
                     label=label,
                     match_label=match_label,
                     problem_type=None,  # Ensure that matcher will always infer problem type.
@@ -652,6 +648,8 @@ class MultiModalPredictor:
         -------
         An "MultiModalPredictor" object (itself).
         """
+        self._fit_called = True
+
         if self.problem_type is not None:
             if not problem_property_dict.get(self.problem_type).support_fit:
                 raise RuntimeError(
@@ -859,7 +857,7 @@ class MultiModalPredictor:
             if self._problem_type is not None:
                 if not problem_property_dict.get(self._problem_type).inference_ready:
                     raise RuntimeError(
-                        f"problem_type='self._problem_type' does not support running inference directly. "
+                        f"problem_type='{self._problem_type}' does not support running inference directly. "
                         f"You need to call `predictor.fit()`, or load a predictor first before "
                         f"running `predictor.predict()`, `predictor.evaluate()` or `predictor.extract_embedding()`."
                     )
@@ -1509,7 +1507,6 @@ class MultiModalPredictor:
                 datamodule=train_dm,
                 ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
             )
-            self._fit_called = True
 
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial

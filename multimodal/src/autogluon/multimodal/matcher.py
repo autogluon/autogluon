@@ -109,7 +109,6 @@ class MultiModalMatcher:
         self,
         query: Optional[Union[str, List[str]]] = None,
         response: Optional[Union[str, List[str]]] = None,
-        negative: Optional[Union[str, List[str]]] = None,
         label: Optional[str] = None,
         match_label: Optional[Union[int, str]] = None,
         problem_type: Optional[str] = None,
@@ -129,10 +128,8 @@ class MultiModalMatcher:
         response
             Column names of response data. If no label column is provided,
             query and response columns form positive pairs.
-        negative
-            Column names of negative data. Query and negative make up negative pairs.
         label
-            Name of the label column. Label and negative shouldn't be used simultaneously.
+            Name of the label column.
         match_label
             The label class that indicates the <query, response> pair is counted as "match".
             This is used when the problem_type is one of the matching problem types, and when the labels are binary.
@@ -190,18 +187,9 @@ class MultiModalMatcher:
         if response:
             assert all(isinstance(r, str) for r in response)
 
-        if isinstance(negative, str):
-            negative = [negative]
-        if negative:
-            assert all(isinstance(n, str) for n in negative)
-            data_format = TRIPLET
-        else:
-            data_format = PAIR
-
         self._query = query
         self._response = response
-        self._negative = negative
-        self._data_format = data_format
+        self._data_format = PAIR  # TODO: Support Triplet
         self._match_label = match_label
         self._label_column = label
         self._problem_type = problem_type.lower() if problem_type is not None else None
@@ -217,12 +205,10 @@ class MultiModalMatcher:
         self._response_config = None
         self._query_df_preprocessor = None
         self._response_df_preprocessor = None
-        self._negative_df_preprocessor = None
         self._label_df_preprocessor = None
         self._column_types = None
         self._query_processors = None
         self._response_processors = None
-        self._negative_processors = None
         self._label_processors = None
         self._query_model = None
         self._response_model = None
