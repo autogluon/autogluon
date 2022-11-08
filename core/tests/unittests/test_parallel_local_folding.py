@@ -5,7 +5,7 @@ import pandas as pd
 
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy
-from autogluon.core.utils import get_cpu_count, get_gpu_count_all
+from autogluon.core.utils import ResourceManager
 from autogluon.core.models import AbstractModel
 from autogluon.core.searcher import LocalRandomSearcher
 from autogluon.core.space import Int
@@ -40,8 +40,8 @@ def _construct_dummy_fold_strategy(num_jobs, time_limit=None, num_folds_parallel
         oof_pred_proba=np.array([]),
         oof_pred_model_repeats=np.array([]),
         save_folds=True,
-        num_cpus = get_cpu_count(),
-        num_gpus = get_gpu_count_all(),
+        num_cpus = ResourceManager.get_cpu_count(),
+        num_gpus = ResourceManager.get_gpu_count_all(),
         num_jobs=num_jobs,
         num_folds_parallel=num_folds_parallel,
         time_limit_fold_ratio=1,
