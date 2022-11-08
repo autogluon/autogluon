@@ -63,7 +63,6 @@ def visualize_detection_results(
                                              conf_threshold=conf_threshold)
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_path", default="coco17/annotations/instances_val2017.json", type=str)

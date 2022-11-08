@@ -835,7 +835,7 @@ def plot_detections(image, tlwhs, obj_ids, idx2classname, conf_threshold, scores
     font = cv2.FONT_HERSHEY_DUPLEX
     text_scale = text_scale if im_w > 500 else text_scale * 0.8
 
-    title = 'num_det: %d conf: %.2f' % (len(tlwhs), conf_threshold)
+    title = "num_det: %d conf: %.2f" % (len(tlwhs), conf_threshold)
     im = add_text_with_bg_color(im=im, text=title, tl=(0, 0), bg_color=(0, 0, 0), alpha=alpha,
                                 font=font, text_scale=text_scale, text_thickness=text_thickness)
 
@@ -845,7 +845,7 @@ def plot_detections(image, tlwhs, obj_ids, idx2classname, conf_threshold, scores
         obj_id = int(obj_ids[i])
         id_text = idx2classname[obj_ids[i]]
         if scores is not None:
-            id_text = id_text + ',{:.3f}'.format(float(scores[i]))
+            id_text = id_text + ",{:.3f}".format(float(scores[i]))
         color = get_color(abs(obj_id))
         im = add_bbox_with_alpha(im=im, tl=intbox[0:2], br=intbox[2:4], line_color=color, alpha=alpha,
                                  line_thickness=line_thickness)
@@ -884,6 +884,7 @@ def add_bbox_with_alpha(im: np.ndarray, tl: tuple, br: tuple, line_color: tuple,
     cv2.rectangle(overlay, tl, br, line_color, thickness=line_thickness)
     im = cv2.addWeighted(overlay, alpha, im, 1 - alpha, 0)
     return im
+
 
 def add_text_with_bg_color(im: np.ndarray, text: str, tl: tuple, bg_color: tuple, alpha: float, font, text_scale: float,
                            text_thickness: int, text_vert_padding: int = None):
