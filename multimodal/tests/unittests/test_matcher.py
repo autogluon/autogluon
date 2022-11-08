@@ -227,7 +227,7 @@ def test_text_semantic_search():
     ]
 
     matcher = MultiModalPredictor(
-        pipeline="text_similarity",
+        problem_type="text_similarity",
         hyperparameters={"model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2"},
     )
     hits = semantic_search(

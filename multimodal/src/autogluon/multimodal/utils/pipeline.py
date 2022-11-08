@@ -12,7 +12,7 @@ logger = logging.getLogger(AUTOMM)
 
 
 def init_pretrained(
-    pipeline: Optional[str],
+    presets: Optional[str],
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
     num_classes: Optional[int] = None,
     classes: Optional[list] = None,
@@ -23,8 +23,8 @@ def init_pretrained(
 
     Parameters
     ----------
-    pipeline
-        Name of the pipeline.
+    presets
+        The preset to load
     hyperparameters
         The customized hyperparameters used to override the default.
 
@@ -41,7 +41,8 @@ def init_pretrained(
     classes
         All classes in this dataset.
     """
-    config = get_config(presets=pipeline, overrides=hyperparameters)
+    # TODO: Fix the logic and add presets
+    config = get_config(presets=presets, overrides=hyperparameters)
     assert (
         len(config.model.names) == 1
     ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"

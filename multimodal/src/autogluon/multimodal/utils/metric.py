@@ -43,7 +43,6 @@ logger = logging.getLogger(AUTOMM)
 
 def infer_metrics(
     problem_type: Optional[str] = None,
-    pipeline: Optional[str] = None,
     eval_metric_name: Optional[str] = None,
     validation_metric_name: Optional[str] = None,
 ):
@@ -56,8 +55,6 @@ def infer_metrics(
     ----------
     problem_type
         Type of problem.
-    pipeline
-        Predictor pipeline, used when problem_type is None.
     eval_metric_name
         Name of evaluation metric provided by users.
 
@@ -78,7 +75,7 @@ def infer_metrics(
             raise ValueError(f"Metric {eval_metric_name} is only supported for binary classification.")
 
         if eval_metric_name in VALID_METRICS:
-            if pipeline == IMAGE_TEXT_SIMILARITY:
+            if problem_type == IMAGE_TEXT_SIMILARITY:
                 validation_metric_name = HIT_RATE
             else:
                 validation_metric_name = eval_metric_name
@@ -99,20 +96,17 @@ def infer_metrics(
         eval_metric_name = ROC_AUC
     elif problem_type == REGRESSION:
         eval_metric_name = RMSE
-    elif problem_type is None:
-        if pipeline == OBJECT_DETECTION:
-            if (not validation_metric_name) or validation_metric_name.lower() == DIRECT_LOSS:
-                return DIRECT_LOSS, MAP
-            elif validation_metric_name == MAP:
-                return MAP, MAP
-            else:
-                raise ValueError(
-                    f"Problem type: {problem_type}, pipeline: {pipeline}, validation_metric_name: {validation_metric_name} is not supported!"
-                )
-        elif pipeline == IMAGE_TEXT_SIMILARITY:
-            return HIT_RATE, NDCG
+    elif problem_type == OBJECT_DETECTION:
+        if (not validation_metric_name) or validation_metric_name.lower() == DIRECT_LOSS:
+            return DIRECT_LOSS, MAP
+        elif validation_metric_name == MAP:
+            return MAP, MAP
         else:
-            raise NotImplementedError(f"Problem type: {problem_type}, pipeline: {pipeline} is not supported yet!")
+            raise ValueError(
+                f"Problem type: {problem_type}, validation_metric_name: {validation_metric_name} is not supported!"
+            )
+    elif problem_type == IMAGE_TEXT_SIMILARITY:
+        return HIT_RATE, NDCG
     else:
         raise NotImplementedError(f"Problem type: {problem_type} is not supported yet!")
 

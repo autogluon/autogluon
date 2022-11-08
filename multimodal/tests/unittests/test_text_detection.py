@@ -31,7 +31,7 @@ def test_mmocr_text_detection_inference(checkpoint_name):
         hyperparameters={
             "model.mmocr_text_detection.checkpoint_name": checkpoint_name,
         },
-        pipeline="ocr_text_detection",
+        problem_type="ocr_text_detection",
     )
 
     # two dimensions, (num of text lines, 2 * num of coordinate points)

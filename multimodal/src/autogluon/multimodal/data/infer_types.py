@@ -17,6 +17,7 @@ from ..constants import (
     IMAGE,
     IMAGE_PATH,
     MULTICLASS,
+    NAMED_ENTITY_RECOGNITION,
     NER,
     NER_ANNOTATION,
     NULL,
@@ -433,11 +434,10 @@ def check_missing_values(
         )
 
 
-def infer_label_column_type_by_problem_type_and_pipeline(
+def infer_label_column_type_by_problem_type(
     column_types: Dict,
     label_columns: Union[str, List[str]],
     problem_type: Optional[str],
-    pipeline: Optional[str] = None,
     data: Optional[pd.DataFrame] = None,
     valid_data: Optional[pd.DataFrame] = None,
     allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, NER_ANNOTATION, ROIS),
@@ -454,8 +454,6 @@ def infer_label_column_type_by_problem_type_and_pipeline(
         The label columns in a pd.DataFrame.
     problem_type
         Type of problem.
-    pipeline
-        Predictor pipeline, used when problem_type is None.
     data
         A pd.DataFrame.
     valid_data
@@ -492,12 +490,10 @@ def infer_label_column_type_by_problem_type_and_pipeline(
             column_types[col_name] = CATEGORICAL
         elif problem_type == REGRESSION:
             column_types[col_name] = NUMERICAL
-        elif problem_type == NER:
+        elif problem_type == NAMED_ENTITY_RECOGNITION:
             column_types[col_name] = NER_ANNOTATION
-
-        if problem_type is None:
-            if pipeline == OBJECT_DETECTION:
-                column_types[col_name] = ROIS
+        elif problem_type == OBJECT_DETECTION:
+            column_types[col_name] = ROIS
 
         if column_types[col_name] not in allowable_label_types:
             column_types[col_name] = fallback_label_type
@@ -520,7 +516,6 @@ def infer_problem_type_output_shape(
     column_types: Optional[Dict] = None,
     data: Optional[pd.DataFrame] = None,
     provided_problem_type: Optional[str] = None,
-    pipeline: Optional[str] = None,
 ) -> Tuple[str, int]:
     """
     Infer the problem type and output shape based on the label column type and training data.
@@ -537,8 +532,6 @@ def infer_problem_type_output_shape(
         The multimodal pd.DataFrame for training.
     provided_problem_type
         The provided problem type.
-    pipeline
-        Predictor pipeline, used when problem_type is None.
 
     Returns
     -------
@@ -575,27 +568,22 @@ def infer_problem_type_output_shape(
                 return MULTICLASS, class_num
         elif provided_problem_type == REGRESSION:
             return provided_problem_type, 1
-        elif provided_problem_type == NER:
+        elif provided_problem_type == NAMED_ENTITY_RECOGNITION:
             unique_entity_groups = [
                 annot[ENTITY_GROUP]
                 for annotation in data[label_column].iteritems()
                 for annot in json.loads(annotation[-1])
             ]
             return provided_problem_type, len(set(unique_entity_groups)) + 2
+        elif provided_problem_type == OBJECT_DETECTION:
+            return None, None
         else:
             raise ValueError(
                 f"Problem type '{provided_problem_type}' doesn't have a valid output shape "
                 f"for training. The supported problem types are"
-                f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}', '{CLASSIFICATION}', '{NER}'"
-            )
-    elif pipeline is not None:
-        if pipeline == OBJECT_DETECTION:
-            return None, None
-        else:
-            raise ValueError(
-                f"The label column '{label_column}' has type"
-                f" '{column_types[label_column]}', which is not supported yet while"
-                f" provided problem type is None and pipeline is f{pipeline}."
+                f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}',"
+                f" '{CLASSIFICATION}', '{NAMED_ENTITY_RECOGNITION}',"
+                f" '{OBJECT_DETECTION}'"
             )
     else:
         if column_types[label_column] == CATEGORICAL:

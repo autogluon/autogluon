@@ -15,6 +15,7 @@ FEW_SHOT = "few_shot"
 DEFAULT_SHOT = "default_shot"
 DEPRECATED_ZERO_SHOT = "zero_shot"
 NER = "ner"
+NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
 
 # Pipelines
 FEATURE_EXTRACTION = "feature_extraction"

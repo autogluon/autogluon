@@ -28,7 +28,7 @@ def test_clip_zero_shot():
     bird_text = "a photo of a bird"
 
     predictor = MultiModalPredictor(
-        pipeline="zero_shot_image_classification",
+        problem_type="zero_shot_image_classification",
     )
 
     # compute the cosine similarity of one image-text pair.
@@ -122,7 +122,7 @@ def test_timm_zero_shot(checkpoint_name):
             "model.names": ["timm_image"],
             "model.timm_image.checkpoint_name": checkpoint_name,
         },
-        pipeline="zero_shot_image_classification",
+        problem_type="zero_shot_image_classification",
     )
 
     pred = predictor.predict({"image": [cat_image_name, dog_image_name]})
@@ -148,7 +148,7 @@ def test_timm_zero_shot(checkpoint_name):
 
 
 def test_matcher_text_similarity():
-    matcher = MultiModalPredictor(pipeline="text_similarity")
+    matcher = MultiModalPredictor(problem_type="text_similarity")
     corpus = [
         "A man is eating food.",
         "A man is eating a piece of bread.",
