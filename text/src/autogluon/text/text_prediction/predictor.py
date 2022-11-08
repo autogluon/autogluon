@@ -68,7 +68,7 @@ class TextPredictor:
             Whether to raise warning if the specified path already exists.
         """
         warnings.warn(
-            f"AutoGluon TextPredictor is deprecated in v0.6 and will be removed in 0.7. "
+            f"AutoGluon TextPredictor will be deprecated in v0.7. "
             f"Please use AutoGluon MultiModalPredictor instead for more functionalities and better support. "
             f"Visit https://auto.gluon.ai/stable/tutorials/multimodal/index.html for more details!",
             DeprecationWarning,
