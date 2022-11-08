@@ -2072,7 +2072,9 @@ class MultiModalPredictor:
                 else:
                     ## this is for coco format
                     coco_dataset = COCODataset(detection_data_path)
-                    coco_dataset.save_result(pred, from_coco_or_voc(detection_data_path, "test"), save_path=result_path)
+                    coco_dataset.save_result(
+                        pred, from_coco_or_voc(detection_data_path, "test"), save_path=result_path
+                    )
                     logger.info(f"Saved detection result to {result_path}")
         return pred
 

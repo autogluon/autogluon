@@ -17,10 +17,9 @@ logger = logging.getLogger(AUTOMM)
 
 
 def from_voc(
-        root: str,
-        splits: Optional[Union[str, tuple]] = None,
-        exts: Optional[Union[str, tuple]] = (".jpg", ".jpeg", ".png"),
-        return_class_names: Optional[bool] = False,
+    root: str,
+    splits: Optional[Union[str, tuple]] = None,
+    exts: Optional[Union[str, tuple]] = (".jpg", ".jpeg", ".png"),
 ):
     """
     Construct dataframe from pascal VOC format. Modified from gluon cv.
@@ -262,9 +261,9 @@ def bbox_xyxy_to_xywh(xyxy: Optional[Union[list, tuple, np.ndarray]]):
 
 
 def bbox_clip_xyxy(
-        xyxy: Optional[Union[list, tuple, np.ndarray]],
-        width: Optional[Union[int, float]],
-        height: Optional[Union[int, float]],
+    xyxy: Optional[Union[list, tuple, np.ndarray]],
+    width: Optional[Union[int, float]],
+    height: Optional[Union[int, float]],
 ):
     """
     Clip bounding box with format (xmin, ymin, xmax, ymax) to specified boundary. Modified from gluon cv.
@@ -308,10 +307,10 @@ def bbox_clip_xyxy(
 
 
 def _check_load_coco_bbox(
-        coco,
-        entry: dict,
-        min_object_area: Optional[Union[int, float]] = 0,
-        use_crowd: Optional[bool] = False,
+    coco,
+    entry: dict,
+    min_object_area: Optional[Union[int, float]] = 0,
+    use_crowd: Optional[bool] = False,
 ):
     """
     Check and load ground-truth labels. Modified from gluon cv.
@@ -371,10 +370,10 @@ def _check_load_coco_bbox(
 
 
 def from_coco(
-        anno_file: Optional[str],
-        root: Optional[str] = None,
-        min_object_area: Optional[Union[int, float]] = 0,
-        use_crowd: Optional[bool] = False,
+    anno_file: Optional[str],
+    root: Optional[str] = None,
+    min_object_area: Optional[Union[int, float]] = 0,
+    use_crowd: Optional[bool] = False,
 ):
     """
     Load dataset from coco format annotations. Modified from gluon cv.
@@ -624,13 +623,13 @@ def cocoeval(outputs, data, anno_file, cache_path, metrics, tool="pycocotools"):
 
 def dump_voc_classes(voc_annotation_path: str, voc_class_names_output_path: str = None) -> [str]:
     """
-        Reads annotations for a dataset in VOC format.
-        Then
-            dumps the unique class names into a labels.txt file.
+    Reads annotations for a dataset in VOC format.
+    Then
+        dumps the unique class names into a labels.txt file.
 
-        @param voc_annotation_path: root_path for annotations in VOC format
-        @param voc_class_names_output_path: output path for the labels.txt
-        @returns list of strings, [class_name0, class_name1, ...]
+    @param voc_annotation_path: root_path for annotations in VOC format
+    @param voc_class_names_output_path: output path for the labels.txt
+    @returns list of strings, [class_name0, class_name1, ...]
     """
     files = os.listdir(voc_annotation_path)
     class_names = set()
@@ -650,17 +649,16 @@ def dump_voc_classes(voc_annotation_path: str, voc_class_names_output_path: str 
     return sorted_class_names
 
 
-def dump_voc_xml_files(voc_annotation_path: str,
-                       voc_annotation_xml_output_path: str = None) -> [str]:
+def dump_voc_xml_files(voc_annotation_path: str, voc_annotation_xml_output_path: str = None) -> [str]:
     """
-        Reads annotations for a dataset in VOC format.
-        Then
-            1. dumps the unique class names into labels.txt file.
-            2. dumps the xml annotation file names into pathlist.txt file.
+    Reads annotations for a dataset in VOC format.
+    Then
+        1. dumps the unique class names into labels.txt file.
+        2. dumps the xml annotation file names into pathlist.txt file.
 
-        @param voc_annotation_path: root_path for annotations in VOC format
-        @param voc_annotation_xml_output_path: output path for the pathlist.txt
-        @returns list of strings, [xml_file0, xml_file1, ...]
+    @param voc_annotation_path: root_path for annotations in VOC format
+    @param voc_annotation_xml_output_path: output path for the pathlist.txt
+    @returns list of strings, [xml_file0, xml_file1, ...]
     """
     files = os.listdir(voc_annotation_path)
     annotation_path_base_name = os.path.basename(voc_annotation_path)
@@ -676,9 +674,9 @@ def dump_voc_xml_files(voc_annotation_path: str,
     return xml_file_names
 
 
-def process_voc_annotations(voc_annotation_path: str,
-                            voc_class_names_output_path: str,
-                            voc_annotation_xml_output_path: str) -> None:
+def process_voc_annotations(
+        voc_annotation_path: str, voc_class_names_output_path: str, voc_annotation_xml_output_path: str
+) -> None:
     """
     Reads annotations for a dataset in VOC format.
     Then
@@ -745,8 +743,9 @@ def get_voc_format_classes(root):
             "labels.txt does not exist, using default VOC names. "
             "To create labels.txt, run ls Annotations/* > pathlist.txt in root dir"
         )
-        class_names = dump_voc_classes(voc_annotation_path=os.path.join(root, "Annotations"),
-                                       voc_class_names_output_path=labels_file)
+        class_names = dump_voc_classes(
+            voc_annotation_path=os.path.join(root, "Annotations"), voc_class_names_output_path=labels_file
+        )
 
     return class_names
 
@@ -758,8 +757,9 @@ def get_detection_classes(sample_data_path):
         return get_coco_format_classes(sample_data_path)
 
 
-def visualize_results(image_pred: Iterable, image_path: str, test_path: str,
-                      visualization_result_dir: str, conf_threshold: float) -> np.ndarray:
+def visualize_results(
+        image_pred: Iterable, image_path: str, test_path: str, visualization_result_dir: str, conf_threshold: float
+) -> np.ndarray:
     """
     Visualize detection results for one image, and save to visualization_result_dir
 
@@ -805,21 +805,43 @@ def visualize_results(image_pred: Iterable, image_path: str, test_path: str,
     return visualized_im
 
 
-def plot_detections(image, tlwhs, obj_ids, idx2classname, conf_threshold, scores=None, frame_id=0,
-                    text_scale=0.75, text_thickness=1, line_thickness=2, alpha=0.5):
+def plot_detections(
+        image,
+        tlwhs,
+        obj_ids,
+        idx2classname,
+        conf_threshold,
+        scores=None,
+        text_scale=0.75,
+        text_thickness=1,
+        line_thickness=2,
+        alpha=0.5
+):
     """
-    Visualize detection results for one image, and save to visualization_result_dir
+    Plot the detections on to the corresponding image
 
     Parameters
     ----------
-    image_pred
-        List containing detection results for one image
-    image_path
-        The image path for the target image to visualize
-    test_path
-        Annotation path for the testing dataset (either in VOC or COCO format)
-            - for VOC format: e.g. VOCdevkit/VOC2007/Annotations
-            - for COCO format: e.g. coco17/annotations/instances_val2017.json
+    image
+        np.ndarray: np array containing the image data
+    tlwhs
+        list: list containing the bounding boxes in (x1, y1, x2, y2) format
+    obj_ids
+        list: list containing the class indices of the bounding boxes, length should match tlwhs
+    idx2classname
+        dict: maps obj_ids to class name (str)
+    conf_threshold
+        float: confidence threshold to filter bounding boxes
+    scores
+        list: confidence scores of the bounding boxes, length should match tlwhs
+    text_scale
+        float: font size of the text display
+    text_thickness
+        int: font weight of the text display
+    line_thickness
+        int: line width of the bounding box display
+    alpha
+        float: opacity of the text display background color
 
     Returns
     -------
@@ -836,8 +858,16 @@ def plot_detections(image, tlwhs, obj_ids, idx2classname, conf_threshold, scores
     text_scale = text_scale if im_w > 500 else text_scale * 0.8
 
     title = "num_det: %d conf: %.2f" % (len(tlwhs), conf_threshold)
-    im = add_text_with_bg_color(im=im, text=title, tl=(0, 0), bg_color=(0, 0, 0), alpha=alpha,
-                                font=font, text_scale=text_scale, text_thickness=text_thickness)
+    im = add_text_with_bg_color(
+        im=im,
+        text=title,
+        tl=(0, 0),
+        bg_color=(0, 0, 0),
+        alpha=alpha,
+        font=font,
+        text_scale=text_scale,
+        text_thickness=text_thickness
+    )
 
     for i, tlwh in enumerate(tlwhs):
         x1, y1, w, h = tlwh
@@ -847,10 +877,18 @@ def plot_detections(image, tlwhs, obj_ids, idx2classname, conf_threshold, scores
         if scores is not None:
             id_text = id_text + ",{:.3f}".format(float(scores[i]))
         color = get_color(abs(obj_id))
-        im = add_bbox_with_alpha(im=im, tl=intbox[0:2], br=intbox[2:4], line_color=color, alpha=alpha,
-                                 line_thickness=line_thickness)
-        im = add_text_with_bg_color(im=im, text=id_text, tl=(intbox[0], intbox[1]), bg_color=color, alpha=0.75,
-                                    font=font, text_scale=text_scale, text_thickness=text_thickness)
+        im = add_bbox_with_alpha(
+            im=im, tl=intbox[0:2], br=intbox[2:4], line_color=color, alpha=alpha, line_thickness=line_thickness)
+        im = add_text_with_bg_color(
+            im=im,
+            text=id_text,
+            tl=(intbox[0], intbox[1]),
+            bg_color=color,
+            alpha=0.75,
+            font=font,
+            text_scale=text_scale,
+            text_thickness=text_thickness
+        )
     return im
 
 
@@ -886,8 +924,17 @@ def add_bbox_with_alpha(im: np.ndarray, tl: tuple, br: tuple, line_color: tuple,
     return im
 
 
-def add_text_with_bg_color(im: np.ndarray, text: str, tl: tuple, bg_color: tuple, alpha: float, font, text_scale: float,
-                           text_thickness: int, text_vert_padding: int = None):
+def add_text_with_bg_color(
+        im: np.ndarray,
+        text: str,
+        tl: tuple,
+        bg_color: tuple,
+        alpha: float,
+        font,
+        text_scale: float,
+        text_thickness: int,
+        text_vert_padding: int = None
+):
     """
     Add text to im with background color
 
@@ -932,12 +979,9 @@ def add_text_with_bg_color(im: np.ndarray, text: str, tl: tuple, bg_color: tuple
 
     cv2.rectangle(overlay, (x1, y1), (x1 + text_w, y1 + text_h + text_vert_padding * 2), bg_color, -1)
     im = cv2.addWeighted(overlay, alpha, im, 1 - alpha, 0)
-    cv2.putText(im, text,
-                (x1, y1 + text_h + text_vert_padding),
-                font,
-                text_scale,
-                (255, 255, 255),
-                thickness=text_thickness)
+    cv2.putText(
+        im, text, (x1, y1 + text_h + text_vert_padding), font, text_scale, (255, 255, 255), thickness=text_thickness
+    )
     return im
 
 
