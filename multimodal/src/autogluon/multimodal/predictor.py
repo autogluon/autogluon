@@ -145,8 +145,8 @@ from .utils import (
     tensor_to_ndarray,
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
-    update_tabular_config_by_resources,
     update_config_by_rules,
+    update_tabular_config_by_resources,
     use_realtime,
 )
 
