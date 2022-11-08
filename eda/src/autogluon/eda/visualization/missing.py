@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import missingno as msno
@@ -55,7 +56,9 @@ class MissingValues(AbstractVisualization, JupyterMixin):
 
     MAX_MATRIX_VARIABLES_NUMBER = 50
 
-    def __init__(self, graph_type: str = "matrix", headers: bool = False, namespace: str = None, **kwargs) -> None:
+    def __init__(
+        self, graph_type: str = "matrix", headers: bool = False, namespace: Optional[str] = None, **kwargs
+    ) -> None:
         super().__init__(namespace, **kwargs)
         self.graph_type = graph_type
         assert (
