@@ -335,6 +335,12 @@ class MultiModalPredictor:
                 f"pipeline argument has been deprecated and moved to problem_type. "
                 f"Use problem_type='{pipeline}' instead."
             )
+            if problem_type is not None:
+                assert pipeline == problem_type, (
+                    f"Mismatched pipeline and problem_type. "
+                    f"Received pipeline={pipeline}, problem_type={problem_type}. "
+                    f"Consider to revise the arguments."
+                )
             problem_type = pipeline
         # Sanity check of problem_type
         if problem_type is not None:
@@ -354,12 +360,6 @@ class MultiModalPredictor:
             problem_type = problem_property.name
             if problem_property.experimental:
                 warnings.warn(f"problem_type='{problem_type}' is currently experimental.", UserWarning)
-            if problem_property.inference_ready:
-                assert pipeline == problem_type, (
-                    f"Mismatched pipeline and problem_type. "
-                    f"Received pipeline={pipeline}, problem_type={problem_type}. "
-                    f"Consider to revise the arguments."
-                )
 
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
