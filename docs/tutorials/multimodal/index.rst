@@ -108,6 +108,12 @@ Advanced Topics
 
       How to take advantage of larger foundation models with the help of parameter-efficient finetuning.
       In the tutorial, we will use combine IA^3, BitFit, and gradient checkpointing to finetune FLAN-T5-XL.
+ 
+   .. card::
+      :title: Text-to-text Matching with AutoMM - Quick Start
+      :link: text2text_matching.html
+
+      How to use AutoMM for text to text matching.
 
    .. card::
       :title: Customize AutoMM
@@ -125,6 +131,7 @@ Advanced Topics
    beginner_image_cls
    clip_zeroshot
    ner
+   text2text_matching
    semantic_search
    clip_embedding
    multimodal_text_tabular
