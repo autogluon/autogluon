@@ -1,8 +1,12 @@
-name: autogluon_py3
 dependencies:
-- python=3.9
-- pip
-- pip:
-  - flake8
-  - black>=22.3
-  - isort>=5.10
+  - python=3.8
+  - pip
+  - pip:
+    - sphinx
+    - myst_parser
+    - sphinx-material
+    - furo
+    - git+https://github.com/executablebooks/sphinx-togglebutton # because of https://github.com/executablebooks/sphinx-togglebutton/issues/44
+    - sphinx-copybutton
+    - myst-nb
+    - sphinx-design
