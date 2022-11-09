@@ -48,7 +48,7 @@ def from_voc(
     rpath = Path(root).expanduser()
     img_list = []
 
-    class_names = get_voc_format_classes(root)
+    class_names = get_detection_classes(root)
 
     NAME_TO_IDX = dict(zip(class_names, range(len(class_names))))
     name_to_index = lambda name: NAME_TO_IDX[name]
@@ -988,3 +988,68 @@ def get_color(idx):
     idx = idx * 3
     color = ((37 * idx) % 255, (17 * idx) % 255, (29 * idx) % 255)
     return color
+
+
+def save_result_df(pred: Iterable, data: pd.DataFrame, result_path: str, detection_data_path: str = None):
+    """
+    Add text to im with background color
+
+    Parameters
+    ----------
+    pred
+        List containing detection results for one image
+    data
+        pandas data frame containing the image information to be tested
+    result_path
+        path to save result
+    detection_data_path
+        The data to make predictions for. Should contain same column names as training data and
+        follow same format (except for the `label` column).
+        None if inference on custom data (user provided)
+    Returns
+    -------
+    None
+    """
+    image_names = data["image"].to_list()
+    results = []
+    if detection_data_path:
+        detection_classes = get_detection_classes(detection_data_path)
+        idx2classname = {i: classname for (i, classname) in enumerate(detection_classes)}
+    else:
+        idx2classname = None
+    for image_pred, image_name in zip(pred, image_names):
+        for class_idx, bboxes in enumerate(image_pred):
+            if idx2classname:
+                pred_class = idx2classname[class_idx]
+            else:
+                pred_class = class_idx
+            for bbox in bboxes:
+                row = [image_name, pred_class, list(bbox[:4]), bbox[4]]
+                results.append(row)
+    result_df = pd.DataFrame(results, columns=["image", "class", "bbox", "score"])
+    result_df.to_csv(result_path, index=False)
+    logger.info(25, "Saved detection results to {}".format(result_path))
+    # Mark: Do we want to print to the user and let them know where the results are saved?
+    print("Saved detection results to {}".format(result_path))
+
+
+def save_result_coco_format(detection_data_path, pred, result_path):
+    coco_dataset = COCODataset(detection_data_path)
+    result_name, _ = os.path.splitext(result_path)
+    result_path = result_name + ".json"
+    coco_dataset.save_result(pred, from_coco_or_voc(detection_data_path, "test"), save_path=result_path)
+    logger.info(25, f"Saved detection result to {result_path}")
+    print(f"Saved detection result to {result_path}")
+
+
+def save_voc_result_to_coco_format(pred, data, result_path):
+    # for idx, image in enumerate(pred):
+    pass
+
+
+def save_result_voc_format(pred, result_path):
+    result_name, _ = os.path.splitext(result_path)
+    result_path = result_name + ".npy"
+    np.save(result_path, pred)
+    logger.info(25, f"Saved detection result to {result_path}")
+    print(f"Saved detection result to {result_path}")

@@ -31,17 +31,15 @@ def tutorial_script_for_eval_pretrained_voc_format():
 
     test_path = "VOCdevkit/VOC2007"
 
-    pred = predictor.predict(
-        test_path, save_results=True, result_path="VOCdevkit/VOC2007/results.npy"
-    )
+    pred = predictor.predict(test_path, save_results=True, result_path="VOCdevkit/VOC2007/results.txt")
 
 
 def eval_pretrained_voc_format(
-        checkpoint_name="faster_rcnn_r50_fpn_1x_voc0712",
-        test_path="VOCdevkit/VOC2007",
-        num_gpus=-1,
-        save_results=True,
-        result_path=None
+    checkpoint_name="faster_rcnn_r50_fpn_1x_voc0712",
+    test_path="VOCdevkit/VOC2007",
+    num_gpus=-1,
+    save_results=True,
+    result_path=None,
 ):
     # TODO: remove label
     # TODO: replace pipeline with problem type
@@ -70,5 +68,5 @@ if __name__ == "__main__":
         checkpoint_name=args.checkpoint_name,
         num_gpus=args.num_gpus,
         save_results=args.save_results,
-        result_path=args.result_path
+        result_path=args.result_path,
     )

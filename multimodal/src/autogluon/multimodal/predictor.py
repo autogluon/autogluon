@@ -25,9 +25,10 @@ from sklearn.model_selection import train_test_split
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.common.utils.utils import setup_outputdir
+from autogluon.common.utils.utils import setup_outputdir, setup_result_path
 from autogluon.core.utils.try_import import try_import_ray_lightning
 from autogluon.core.utils.utils import default_holdout_frac
+from autogluon.multimodal.utils import save_result_df
 
 from . import version as ag_version
 from .constants import (
@@ -2187,7 +2188,6 @@ class MultiModalPredictor:
 
         if self._problem_type == NER:
             ret_type = NER_RET
-
         if candidate_data:
             pred = self._match_queries_and_candidates(
                 query_data=data,
@@ -2223,44 +2223,17 @@ class MultiModalPredictor:
             pred = self._as_pandas(data=data, to_be_converted=pred)
 
         if save_results:
-            if not result_path:
-                utcnow = datetime.utcnow()
-                timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-
-                result_path = (
-                    f"Result{os.path.sep}ag-{timestamp}{os.path.sep}"
-                    f"{self._hyperparameters['model.mmdet_image.checkpoint_name']}{os.path.sep}"
-                )
-                for i in range(1, 1000):
-                    try:
-                        os.makedirs(result_path, exist_ok=False)
-                        break
-                    except FileExistsError:
-                        logger.log(25, f"result_path {result_path} already exists")
-                else:
-                    raise RuntimeError("more than 1000 jobs launched in the same second")
-                logger.log(25, f'No result_path specified. Results will be saved in: "{result_path}"')
-                result_path = os.path.join(result_path, "results.ext")
             ## Dumping Result for detection only now
-            if self._pipeline == OBJECT_DETECTION and detection_data_path:
-                if os.path.isdir(detection_data_path):
-                    ## this is for voc format
-                    result_name, _ = os.path.splitext(result_path)
-                    result_path = result_name + ".npy"
-                    np.save(result_path, pred)
-                    logger.info(25, f"Saved detection result to {result_path}")
-                    print(f"Saved detection result to {result_path}")
-                else:
-                    ## this is for coco format
-                    coco_dataset = COCODataset(detection_data_path)
-                    result_name, _ = os.path.splitext(result_path)
-                    result_path = result_name + ".json"
-                    coco_dataset.save_result(
-                        pred, from_coco_or_voc(detection_data_path, "test"), save_path=result_path
-                    )
-                    logger.info(25, f"Saved detection result to {result_path}")
-                    print(f"Saved detection result to {result_path}")
-
+            if self._pipeline == OBJECT_DETECTION:
+                checkpoint_name = self._hyperparameters["model.mmdet_image.checkpoint_name"]
+                if not result_path:
+                    result_path = setup_result_path(checkpoint_name)
+                save_result_df(
+                    pred=pred,
+                    data=data,
+                    result_path=result_path,
+                    detection_data_path=detection_data_path,
+                )
         return pred
 
     def predict_proba(

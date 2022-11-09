@@ -35,16 +35,16 @@ def tutorial_script_for_eval_pretrained_coco_format():
     test_path = "coco17/annotations/instances_val2017.json"
 
     pred = predictor.predict(
-        test_path, save_results=True, result_path="coco17/annotations/instances_val2017_results.json"
+        test_path, save_results=True, result_path="coco17/annotations/instances_val2017_results.txt"
     )
 
 
 def eval_pretrained_coco_format(
-        checkpoint_name="yolov3_mobilenetv2_320_300e_coco",
-        test_path="coco17/annotations/instances_val2017.json",
-        num_gpus=-1,
-        save_results=True,
-        result_path="coco17/annotations/instances_val2017_results.json"
+    checkpoint_name="yolov3_mobilenetv2_320_300e_coco",
+    test_path="coco17/annotations/instances_val2017.json",
+    num_gpus=-1,
+    save_results=True,
+    result_path="coco17/annotations/instances_val2017_results.json",
 ):
     # TODO: remove label
     # TODO: replace pipeline with problem type
@@ -56,7 +56,7 @@ def eval_pretrained_coco_format(
         pipeline="object_detection",
     )
 
-    pred = predictor.predict(test_path, save_results=True, result_path=result_path)
+    pred = predictor.predict(test_path, save_results=save_results, result_path=result_path)
 
 
 if __name__ == "__main__":
@@ -74,5 +74,4 @@ if __name__ == "__main__":
         num_gpus=args.num_gpus,
         save_results=args.save_results,
         result_path=args.result_path,
-
     )
