@@ -443,8 +443,8 @@ def test_model_configs():
                 "ffn_activation": "reglu",
                 "head_activation": "relu",
                 "data_types": ["categorical"],
-                "additive_attention": True,
-                "share_qv_weights": True,
+                "additive_attention": "auto",
+                "share_qv_weights": "auto",
             },
             "numerical_transformer": {
                 "out_features": 192,
@@ -460,8 +460,8 @@ def test_model_configs():
                 "data_types": ["numerical"],
                 "embedding_arch": ["linear", "relu"],
                 "merge": "concat",
-                "additive_attention": True,
-                "share_qv_weights": True,
+                "additive_attention": "auto",
+                "share_qv_weights": "auto",
             },
             "t_few": {
                 "checkpoint_name": "t5-small",
@@ -529,8 +529,8 @@ def test_model_configs():
                 "ffn_activation": "geglu",
                 "head_activation": "relu",
                 "data_types": None,
-                "additive_attention": True,
-                "share_qv_weights": True,
+                "additive_attention": "auto",
+                "share_qv_weights": "auto",
             },
         }
     }
