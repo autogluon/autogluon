@@ -1,8 +1,9 @@
-API Reference
-=============
+TabularDataset
+==============
 
-This API Reference Manual details the usage of functions and objects included in AutoGluon,
-describing what they are and what they do. The APIs are grouped into the following categories:
+.. autosummary:: 
+    :nosignatures:
+    :toctree: _autogen
 
 .. container:: cards
 
