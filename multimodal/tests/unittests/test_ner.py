@@ -34,7 +34,7 @@ def get_data():
     ],
 )
 @pytest.mark.parametrize("searcher", ["bayes"])
-@pytest.mark.parametrize("scheduler", ["ASHA"])
+@pytest.mark.parametrize("scheduler", ["FIFO"])
 def test_ner(checkpoint_name, searcher, scheduler):
     train_data = get_data()
     label_col = "entity_annotations"
@@ -44,7 +44,7 @@ def test_ner(checkpoint_name, searcher, scheduler):
     predictor = MultiModalPredictor(problem_type="ner", label=label_col)
     predictor.fit(
         train_data=train_data,
-        time_limit=30,
+        time_limit=40,
         hyperparameters={"model.ner.checkpoint_name": checkpoint_name, "optimization.learning_rate": lr},
         hyperparameter_tune_kwargs={"num_trials": 2, "searcher": searcher, "scheduler": scheduler},
     )
