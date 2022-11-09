@@ -21,86 +21,95 @@ from .miscs import warning_filter
 from ..constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS, QUANTILE
 from ..metrics import accuracy, root_mean_squared_error, pinball_loss, Scorer
 
+
 logger = logging.getLogger(__name__)
 
 
-
-# TODO: RespirceManager to replace these two hacks
-class _get_cpu_count:
-    def __init__(self):
-        self.mock = None
-
-    def __call__(self):
-        if self.mock is not None:
-            return self.mock
+class ResourceManager():
+    """Manager that fetches system related info"""
+    
+    @staticmethod
+    def get_cpu_count():
         return multiprocessing.cpu_count()
     
-
-class _get_gpu_count_all:
-    """
-    Attempts to get number of GPUs available for use via multiple means.
-    """
-    # FIXME: update to use only torch for TIMM or find a better GPU detection strategy
-    # FIXME: get_gpu_count by itself doesn't always work for Windows
-    def __init__(self):
-        self.mock = None
-
-    def __call__(self):
-        if self.mock is not None:
-            return self.mock
-        num_gpus = _get_gpu_count_cuda()
+    @staticmethod
+    def get_cpu_count_psutil(logical=True):
+        return psutil.cpu_count(logical=logical)
+    
+    @staticmethod
+    def get_gpu_count_all():
+        num_gpus = ResourceManager._get_gpu_count_cuda()
         if num_gpus == 0:
-            num_gpus = get_gpu_count_mxnet()
+            # Get num gpus from mxnet first because of https://github.com/awslabs/autogluon/issues/2042
+            # TODO: stop using mxnet to determine num gpus once mxnet is removed from AG
+            num_gpus = ResourceManager.get_gpu_count_mxnet()
             if num_gpus == 0:
-                num_gpus = get_gpu_count_torch()
+                num_gpus = ResourceManager.get_gpu_count_torch()
+        return num_gpus
+
+    @staticmethod
+    def get_gpu_count_mxnet():
+        # TODO: Remove this once AG get rid off mxnet
+        try:
+            import mxnet
+            num_gpus = mxnet.context.num_gpus()
+        except Exception:
+            num_gpus = 0
         return num_gpus
     
-get_cpu_count = _get_cpu_count()
-get_gpu_count_all = _get_gpu_count_all()
+    @staticmethod
+    def get_gpu_count_torch():
+        try:
+            import torch
+            num_gpus = torch.cuda.device_count()
+        except Exception:
+            num_gpus = 0
+        return num_gpus
+    
+    @staticmethod
+    def get_gpu_free_memory():
+        """Grep gpu free memory from nvidia-smi tool.
+        This function can fail due to many reasons(driver, nvidia-smi tool, envs, etc) so please simply use
+        it as a suggestion, stay away with any rules bound to it.
+        E.g. for a 4-gpu machine, the result can be list of int
+        >>> print(get_gpu_free_memory)
+        >>> [13861, 13859, 13859, 13863]
+        """
+        _output_to_list = lambda x: x.decode('ascii').split('\n')[:-1]
 
-
-def get_memory_size():
-    return bytes_to_mega_bytes(psutil.virtual_memory().total)
-
-
-def get_available_disk_size():
-    # FIXME: os.statvfs doesn't work on Windows... 
-    # Need to find another way to calculate disk on Windows.
-    # Return None for now
-    try:
-        statvfs = os.statvfs(".")
-        available_blocks = statvfs.f_frsize * statvfs.f_bavail
-        return bytes_to_mega_bytes(available_blocks)
-    except Exception:
-        return None
-
-
-def _get_gpu_count_cuda():
-    # FIXME: Sometimes doesn't detect GPU on Windows
-    # FIXME: Doesn't ensure the GPUs are actually usable by the model (MXNet, PyTorch, etc.)
-    from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
-    if not cudaInit(): return 0
-    gpu_count = cudaDeviceGetCount()
-    cudaShutdown()
-    return gpu_count
-
-
-def get_gpu_count_mxnet():
-    try:
-        import mxnet
-        num_gpus = mxnet.context.num_gpus()
-    except Exception:
-        num_gpus = 0
-    return num_gpus
-
-
-def get_gpu_count_torch():
-    try:
-        import torch
-        num_gpus = torch.cuda.device_count()
-    except Exception:
-        num_gpus = 0
-    return num_gpus
+        try:
+            COMMAND = "nvidia-smi --query-gpu=memory.free --format=csv"
+            memory_free_info = _output_to_list(subprocess.check_output(COMMAND.split()))[1:]
+            memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
+        except:
+            memory_free_values = []
+        return memory_free_values
+    
+    @staticmethod
+    def get_memory_size():
+        return bytes_to_mega_bytes(psutil.virtual_memory().total)
+    
+    @staticmethod
+    def get_available_disk_size():
+        # FIXME: os.statvfs doesn't work on Windows... 
+        # Need to find another way to calculate disk on Windows.
+        # Return None for now
+        try:
+            statvfs = os.statvfs(".")
+            available_blocks = statvfs.f_frsize * statvfs.f_bavail
+            return bytes_to_mega_bytes(available_blocks)
+        except Exception:
+            return None
+    
+    @staticmethod
+    def _get_gpu_count_cuda():
+        # FIXME: Sometimes doesn't detect GPU on Windows
+        # FIXME: Doesn't ensure the GPUs are actually usable by the model (MXNet, PyTorch, etc.)
+        from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
+        if not cudaInit(): return 0
+        gpu_count = cudaDeviceGetCount()
+        cudaShutdown()
+        return gpu_count
 
 
 class CVSplitter:
@@ -167,11 +176,11 @@ class CVSplitter:
 
 def setup_compute(nthreads_per_trial, ngpus_per_trial):
     if nthreads_per_trial is None or nthreads_per_trial == 'all':
-        nthreads_per_trial = get_cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
+        nthreads_per_trial = ResourceManager.get_cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
     if ngpus_per_trial is None:
         ngpus_per_trial = 0  # do not use GPU by default
     elif ngpus_per_trial == 'all':
-        ngpus_per_trial = get_gpu_count_all()
+        ngpus_per_trial = ResourceManager.get_gpu_count_all()
     if not isinstance(nthreads_per_trial, int) and nthreads_per_trial != 'auto':
         raise ValueError(f'nthreads_per_trial must be an integer or "auto": nthreads_per_trial = {nthreads_per_trial}')
     if not isinstance(ngpus_per_trial, int) and ngpus_per_trial != 'auto':
@@ -894,25 +903,6 @@ def _get_safe_fi_batch_count(X, num_features, X_transformed=None, max_memory_rat
     feature_batch_count = max(1, min(max_feature_batch_count, feature_batch_count_safe))
     feature_batch_count = min(feature_batch_count, num_features)
     return feature_batch_count
-
-
-def get_gpu_free_memory():
-    """Grep gpu free memory from nvidia-smi tool.
-    This function can fail due to many reasons(driver, nvidia-smi tool, envs, etc) so please simply use
-    it as a suggestion, stay away with any rules bound to it.
-    E.g. for a 4-gpu machine, the result can be list of int
-    >>> print(get_gpu_free_memory)
-    >>> [13861, 13859, 13859, 13863]
-    """
-    _output_to_list = lambda x: x.decode('ascii').split('\n')[:-1]
-
-    try:
-        COMMAND = "nvidia-smi --query-gpu=memory.free --format=csv"
-        memory_free_info = _output_to_list(subprocess.check_output(COMMAND.split()))[1:]
-        memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
-    except:
-        memory_free_values = []
-    return memory_free_values
 
 
 def unevaluated_fi_df_template(features: List[str]) -> pd.DataFrame:

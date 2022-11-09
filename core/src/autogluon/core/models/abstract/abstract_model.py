@@ -29,7 +29,8 @@ from ...hpo.constants import RAY_BACKEND, CUSTOM_BACKEND
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
 from ...ray.resources_calculator import ResourceCalculator
 from ...scheduler import LocalSequentialScheduler
-from ...utils import get_cpu_count, get_gpu_count_all, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
+from ...utils import ResourceManager
+from ...utils import get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMemoryError
 from ...utils.loaders import load_pkl
@@ -492,8 +493,8 @@ class AbstractModel:
             enforced_num_gpus = kwargs.get('num_gpus', None)
             assert enforced_num_cpus is not None and enforced_num_cpus != 'auto' and enforced_num_gpus is not None and enforced_num_gpus != 'auto'
             return kwargs
-        system_num_cpus = get_cpu_count()
-        system_num_gpus = get_gpu_count_all()
+        system_num_cpus = ResourceManager.get_cpu_count()
+        system_num_gpus = ResourceManager.get_gpu_count_all()
         default_num_cpus, default_num_gpus = self._get_default_resources()
         k_fold = kwargs.get('k_fold', None)
         if k_fold is not None and k_fold > 0:
@@ -1454,7 +1455,7 @@ class AbstractModel:
 
         Models may want to override this if they depend heavily on GPUs, as the default sets num_gpus to 0.
         """
-        num_cpus = get_cpu_count()
+        num_cpus = ResourceManager.get_cpu_count()
         num_gpus = 0
         return num_cpus, num_gpus
 

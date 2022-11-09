@@ -1,7 +1,7 @@
 """Presets for vision predictors"""
 import functools
 import warnings
-from autogluon.core.utils import get_gpu_free_memory
+from autogluon.core.utils import ResourceManager
 from autogluon.core import Categorical, Int, Real
 try:
     import timm
@@ -223,7 +223,7 @@ def _check_gpu_memory_presets(bs, ngpus_per_trial, min_batch_size=8, threshold=1
             bs = bs.upper
         if ngpus_per_trial is not None and ngpus_per_trial > 1 and bs > min_batch_size:
             # using gpus, check batch size vs. available gpu memory
-            free_gpu_memory = get_gpu_free_memory()
+            free_gpu_memory = ResourceManager.get_gpu_free_memory()
             if not free_gpu_memory:
                 warnings.warn('Unable to detect free GPU memory, we are unable to verify '
                               'whether your data mini-batches will fit on the GPU for the specified batch_size.')

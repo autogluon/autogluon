@@ -1,6 +1,6 @@
 import pytest
 
-from autogluon.core.utils import get_cpu_count, get_gpu_count_all
+from autogluon.core.utils import ResourceManager
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from autogluon.tabular.models import AbstractModel
 
@@ -45,7 +45,7 @@ def test_bagged_model_with_total_resources(mock_system_resources_ctx_mgr, mock_n
             'num_gpus': 99999,
         }
         resources = bagged_model._preprocess_fit_resources(total_resources=total_resources)
-        assert resources == {'num_cpus': get_cpu_count(), 'num_gpus': get_gpu_count_all()}
+        assert resources == {'num_cpus': ResourceManager.get_cpu_count(), 'num_gpus': ResourceManager.get_gpu_count_all()}
     
 
 def test_bagged_model_with_total_resources_and_ensemble_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus):
@@ -139,8 +139,8 @@ def test_bagged_model_without_total_resources_but_with_ensemble_resources(mock_s
         resources.pop('k_fold')
         default_model_num_cpus, default_model_num_gpus = model_base._get_default_resources()
         default_model_resources = {
-            'num_cpus': min(default_model_num_cpus * k_fold, get_cpu_count()),
-            'num_gpus': min(default_model_num_gpus * k_fold, get_gpu_count_all()),
+            'num_cpus': min(default_model_num_cpus * k_fold, ResourceManager.get_cpu_count()),
+            'num_gpus': min(default_model_num_gpus * k_fold, ResourceManager.get_gpu_count_all()),
         }
         assert resources == default_model_resources
 

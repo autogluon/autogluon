@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from autocfg import dataclass
 import autogluon.core as ag
-from autogluon.core.utils import get_cpu_count, get_gpu_count_all
+from autogluon.core.utils import ResourceManager
 from autogluon.core.task.base import BaseTask
 from autogluon.core.searcher import DummySearcher
 
@@ -159,8 +159,8 @@ class ObjectDetection(BaseTask):
         self._results = {}
 
         # cpu and gpu setting
-        cpu_count = get_cpu_count()
-        gpu_count = get_gpu_count_all()
+        cpu_count = ResourceManager.get_cpu_count()
+        gpu_count = ResourceManager.get_gpu_count_all()
 
         # default settings
         if not config:

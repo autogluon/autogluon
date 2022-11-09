@@ -370,6 +370,14 @@ def quadratic_kappa(y_true, y_pred):
     return cohen_kappa_score(y_true, y_pred, labels=labels, weights='quadratic')
 
 
+# Refer to https://github.com/scikit-learn/scikit-learn/blame/f3f51f9b611bf873bd5836748647221480071a87/sklearn/metrics/_ranking.py#L985-L1000
+#  for the original logic and full explanation of what this does. This number has no impact on the score calculated, and is purely for speed.
+#  This value was chosen as having a lower value simply slows down the majority of function calls more than it speeds them up.
+#  It was observed that function calls were sped up by 25% by increasing this from 2 to 100000.
+#  Values greater than this were not tested but would be marginal difference as large samples get less speed up.
+_OPTIMIZE_INDICES_THRESHOLD = 100000
+
+
 def customized_binary_roc_auc_score(y_true: Union[np.array, pd.Series], y_score: Union[np.array, pd.Series], **kwargs) -> float:
     """
     Functionally identical to sklearn.metrics.roc_auc_score for binary classification.
@@ -413,7 +421,9 @@ def customized_binary_roc_auc_score(y_true: Union[np.array, pd.Series], y_score:
     tps = np.cumsum(y_true)[threshold_idxs]
     fps = 1 + threshold_idxs - tps
 
-    if len(tps) > 2:
+    if tps.size > _OPTIMIZE_INDICES_THRESHOLD:
+        # optimize indices only when there is enough size to justify
+        # this has no impact on the final score
         optimal_idxs = np.where(
             np.r_[True, np.logical_or(np.diff(fps, 2), np.diff(tps, 2)), True]
         )[0]
