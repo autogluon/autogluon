@@ -1,7 +1,7 @@
 # AutoMM Detection - Load A Trained Detector
 :label:`sec_automm_detection_load`
 
-In this section, our goal is to load the predictor trained previously. And evaluate it on VOC data in COCO format.
+In this section, our goal is to load and evaluate the predictor trained previously.
 
 To start, let's import MultiModalPredictor:
 
@@ -10,7 +10,7 @@ from autogluon.multimodal import MultiModalPredictor
 ```
 
 We'll use the predictor we finetuned in previous tutorial :ref:`sec_automm_detection_fast_finetune_coco`.
-Note that you should have a different path. For test, we still use VOC2007 test set in COCO format.
+Note that you should have a different `load_path`. For test, we still use VOC2007 test set in COCO format.
 
 ```python
 load_path = "./AutogluonModels/ag-20221104_185342"
@@ -56,8 +56,8 @@ It's exactly the same as we got in previous training.
 ```
 
 After the predictor is loaded, you can do the evaluation, prediction,
-or finetune it on another dataset. Note the loaded predictor is saved at the same path
-and the save operation will overwrite the previous one.
+or finetune it on another dataset. But note the loaded predictor is saved at the same path
+and the save operation in finetuning will overwrite the previous checkpoint.
 
 ### Other Examples
 
