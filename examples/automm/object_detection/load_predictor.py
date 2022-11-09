@@ -1,24 +1,12 @@
 """
-The example to finetune an object detection model in AutoMM in COCO format.
+The example to load a trained predictor and evaluate.
 
-An example to finetune an MMDetection model on COCO:
-    python finetune_coco_format.py \
-        --train_path coco17/annotations/instances_train2017.json \
-        --test_path coco17/annotations/instances_val2017.json \
-        --checkpoint_name yolov3_mobilenetv2_320_300e_coco \
-        --lr <learning_rate> \
-        --epochs <epochs>
+An example:
+    python load_predictor.py \
+        --test_path <test_path> \
+        --load_path <load_path> \
+        --num_gpus <num_gpus>
 
-An example to finetune an MMDetection model on VOC:
-    First, use this script to convert the VOC dataset to COCO format:
-    https://github.com/open-mmlab/mmdetection/blob/9d3e162459590eee4cfc891218dfbb5878378842/tools/dataset_converters/pascal_voc.py
-    Then, run:
-    python finetune_coco_format.py \
-        --train_path /media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_trainval.json \
-        --test_path /media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_test.json \
-        --checkpoint_name yolov3_mobilenetv2_320_300e_coco \
-        --lr <learning_rate> \
-        --epochs <epochs>
 """
 
 import argparse
@@ -33,13 +21,11 @@ def tutorial_script_for_save_load_predictor():
 
     print("load a predictor from save path...")
     predictor = MultiModalPredictor.load(load_path)
-
     predictor.evaluate(test_path)
 
     print("load a predictor from save path and change num_gpus to 1...")
     predictor_single_gpu = MultiModalPredictor.load(load_path)
     predictor_single_gpu.set_num_gpus(num_gpus=1)
-
     predictor_single_gpu.evaluate(test_path)
 
 
