@@ -42,4 +42,3 @@ def test_load_old_checkpoint(cls):
         time_limit=10,
         hyperparameters={"optimization.top_k_average_method": "uniform_soup", "env.num_gpus": 1},
     )
-    verify_predictor_save_load(predictor, dataset.test_df.sample(4), cls=cls)
