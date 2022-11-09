@@ -4,14 +4,40 @@ import numpy as np
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 
 
+class GraphModuleWrapper:
+    """
+    Wrap around GraphModule in tvm runtime, since it cannot be pickled.
+    """
+    def __init__(self, model):
+        from tvm.contrib import graph_executor
+        self.module = graph_executor.GraphModule(model)
+        self.batch_size = self.module._get_input("input0").shape[0]
+
+    def run(self, *args):
+        return self.module.run(*args)
+
+    def set_input(self, *args):
+        return self.module.set_input(*args)
+
+    def get_output(self, *args):
+        return self.module.get_output(*args)
+
+    def __getstate__(self):
+        # No need to duplicate the model parameters here.
+        return {}
+
+    def __setstate__(self, values):
+        pass
+
+
 class TabularNeuralNetTorchTvmPredictor:
     def __init__(self, model, architecture_desc : dict = None):
         if architecture_desc is None:
             architecture_desc = {}
         import tvm
-        from tvm.contrib import graph_executor
         dev = tvm.cpu()
-        self.module = graph_executor.GraphModule(model["default"](dev))
+        self.module = GraphModuleWrapper(model["default"](dev))
+        self.batch_size = self.module.batch_size
         self.has_vector_features = architecture_desc.get("has_vector_features", False)
         self.has_embed_features = architecture_desc.get("has_embed_features", False)
         self.problem_type = architecture_desc.get("problem_type", None)
@@ -32,7 +58,7 @@ class TabularNeuralNetTorchTvmPredictor:
         input_data = self._get_input_vector(X)
         num_net_outputs = self.architecture_desc['num_net_outputs']
         data_size = input_data[0].shape[0]
-        batch_size = self.module._get_input("input0").shape[0]
+        batch_size = self.batch_size
         out_shape = (batch_size, num_net_outputs)
 
         # Pad the batch if input data is small

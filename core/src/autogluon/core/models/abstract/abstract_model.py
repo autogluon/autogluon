@@ -1425,7 +1425,7 @@ class AbstractModel:
             'features': self.features,
             'feature_metadata': self.feature_metadata,
             # 'disk_size': self.get_disk_size(),
-            'memory_size': 0, # self.get_memory_size(),  # Memory usage of model in bytes
+            'memory_size': self.get_memory_size(),  # Memory usage of model in bytes
             'compile_time': self.compile_time,
         }
         return info
