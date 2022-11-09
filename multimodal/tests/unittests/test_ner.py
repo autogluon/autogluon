@@ -29,8 +29,8 @@ def get_data():
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "t5-small",
-        "bert-base-cased",
+        "google/t5-efficient-tiny",
+        "google/electra-small-discriminator",
     ],
 )
 @pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))
