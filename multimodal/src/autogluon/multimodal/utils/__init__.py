@@ -50,8 +50,8 @@ from .object_detection import (
     get_detection_classes,
     get_image_name_num,
     getCOCOCatIDs,
-    save_result_df,
     save_result_coco_format,
+    save_result_df,
     save_result_voc_format,
     visualize_results,
 )
