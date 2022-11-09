@@ -15,7 +15,7 @@ Yes!
 
 Yes! Most of the models used by AutoGluon support GPU training, including LightGBM, CatBoost, XGBoost, MXNet Neural Network, and FastAI Neural Network.
 
-To enable GPU training, specify in [predictor.fit](../../api/autogluon.predictor.html#autogluon.tabular.TabularPredictor.fit) the argument `ag_args_fit={'num_gpus': 1}`. This will enable GPU training for all models that support it. Multi-GPU training is still experimental.
+To enable GPU training, specify in [predictor.fit](../../api/autogluon.predictor.html#autogluon.tabular.TabularPredictor.fit) the argument `num_gpus=SOME_VALUE`. This will enable GPU training for all models that support it. Multi-GPU training is still experimental.
 
 For most of these models, CUDA will have to be installed and some models may need special installations such as LightGBM and MXNet to be compatible with GPU training. Refer to [installation instructions](../../install.html) for more details.
 
@@ -191,9 +191,9 @@ export OMP_NUM_THREADS=1
 ```
 
 ### How to limit the number of cores AutoGluon will use
-Although it is generally recommended to let AutoGluon to use all the cores, you can limit it by setting the `ag_fit_args`:
+Although it is generally recommended to let AutoGluon to use all the cores, you can limit it by setting the `num_cpus`:
 ```
-predictor = TabularPredictor(...).fit(..., ag_fit_args={'num_cpus': NUM_CORES_YOU_WANT})
+predictor = TabularPredictor(...).fit(..., num_cpus = NUM_CORES_YOU_WANT)
 ```
 You can also limit the number of cores used by a specific model:
 ```
