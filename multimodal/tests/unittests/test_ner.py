@@ -29,27 +29,22 @@ def get_data():
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "t5-small",
-        "bert-base-cased",
+        "microsoft/deberta-v3-small",
+        "google/electra-small-discriminator",
     ],
 )
-@pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))
-@pytest.mark.parametrize("scheduler", list(SCHEDULER_PRESETS.keys()))
+@pytest.mark.parametrize("searcher", ["bayes"])
+@pytest.mark.parametrize("scheduler", ["FIFO"])
 def test_ner(checkpoint_name, searcher, scheduler):
     train_data = get_data()
     label_col = "entity_annotations"
 
     lr = tune.uniform(0.0001, 0.01)
-    predictor = MultiModalPredictor(
-        problem_type="ner",
-        label=label_col,
-        verbosity=5,
-    )
 
     predictor = MultiModalPredictor(problem_type="ner", label=label_col)
     predictor.fit(
         train_data=train_data,
-        time_limit=30,
+        time_limit=40,
         hyperparameters={"model.ner.checkpoint_name": checkpoint_name, "optimization.learning_rate": lr},
         hyperparameter_tune_kwargs={"num_trials": 2, "searcher": searcher, "scheduler": scheduler},
     )

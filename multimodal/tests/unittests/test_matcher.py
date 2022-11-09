@@ -78,7 +78,7 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
 
 
 @pytest.mark.parametrize(
-    "dataset_name,query,response,presets,text_backbone,image_backbone, is_ranking, symmetric",
+    "dataset_name,query,response,problem_type,text_backbone,image_backbone, is_ranking, symmetric",
     [
         (
             "id_change_detection",
@@ -95,8 +95,8 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
             "caption",
             "image",
             "image_text_similarity",
-            None,
-            None,
+            "google/electra-small-discriminator",
+            "swin_tiny_patch4_window7_224",
             True,
             True,
         ),
@@ -106,7 +106,7 @@ def test_matcher(
     dataset_name,
     query,
     response,
-    presets,
+    problem_type,
     text_backbone,
     image_backbone,
     is_ranking,
@@ -117,7 +117,7 @@ def test_matcher(
     matcher = MultiModalPredictor(
         query=query,
         response=response,
-        pipeline=presets,
+        problem_type=problem_type,
         label=dataset.label_columns[0] if dataset.label_columns else None,
         match_label=dataset.match_label,
         eval_metric=dataset.metric,
@@ -127,6 +127,7 @@ def test_matcher(
         "optimization.max_epochs": 1,
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
+        "optimization.top_k_average_method": "greedy_soup",
     }
 
     if text_backbone is not None:
@@ -150,7 +151,7 @@ def test_matcher(
         train_data=dataset.train_df,
         tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
         hyperparameters=hyperparameters,
-        time_limit=30,
+        time_limit=20,
         save_path=save_path,
     )
 
@@ -192,7 +193,7 @@ def test_matcher(
         train_data=dataset.train_df,
         tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
         hyperparameters=hyperparameters,
-        time_limit=30,
+        time_limit=20,
     )
     verify_matcher_save_load(matcher, dataset.test_df, cls=MultiModalPredictor)
 
@@ -204,7 +205,7 @@ def test_matcher(
             train_data=dataset.train_df,
             tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
             hyperparameters=hyperparameters,
-            time_limit=30,
+            time_limit=20,
         )
 
 
@@ -227,7 +228,7 @@ def test_text_semantic_search():
     ]
 
     matcher = MultiModalPredictor(
-        pipeline="text_similarity",
+        problem_type="text_similarity",
         hyperparameters={"model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2"},
     )
     hits = semantic_search(
@@ -273,8 +274,8 @@ def test_text_semantic_search():
     for per_query_hits, per_query_hits_2, per_query_hit_gt in zip(hits, hits_2, hits_gt):
         for per_hit, per_hit_2, per_hit_gt in zip(per_query_hits, per_query_hits_2, per_query_hit_gt):
             assert per_hit["response_id"] == per_hit_2["response_id"] == per_hit_gt["response_id"]
-            npt.assert_allclose(per_hit["score"], per_hit_2["score"], 1e-4, 1e-4)
-            npt.assert_allclose(per_hit["score"], per_hit_gt["score"], 1e-4, 1e-4)
+            npt.assert_allclose(per_hit["score"], per_hit_2["score"], 1e-3, 1e-3)
+            npt.assert_allclose(per_hit["score"], per_hit_gt["score"], 1e-3, 1e-3)
 
 
 def test_image_text_semantic_search():
@@ -284,7 +285,7 @@ def test_image_text_semantic_search():
     text_list = dataset.test_df["caption"].tolist()
 
     matcher = MultiModalPredictor(
-        pipeline="image_text_similarity",
+        problem_type="image_text_similarity",
         hyperparameters={"model.hf_text.checkpoint_name": "openai/clip-vit-base-patch32"},
     )
     text_to_image_hits = semantic_search(

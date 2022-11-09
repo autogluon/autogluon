@@ -10,7 +10,7 @@ from autogluon.multimodal import MultiModalPredictor
 )
 def test_sentence_transformer_embedding(model_name):
     predictor = MultiModalPredictor(
-        pipeline="feature_extraction", hyperparameters={"model.hf_text.checkpoint_name": model_name}
+        problem_type="feature_extraction", hyperparameters={"model.hf_text.checkpoint_name": model_name}
     )
     case1 = {"sentence": ["Hello world"]}
     case2 = {"sentence": ["Hello world", "Test Hello World"]}

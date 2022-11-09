@@ -2,7 +2,13 @@ import numpy as np
 import pytest
 import requests
 from mim.commands.download import download
-from mmocr.utils.ocr import MMOCR
+
+try:
+    import mmocr
+    from mmocr.utils.ocr import MMOCR
+except (ImportError, ModuleNotFoundError):
+    pytest.skip("MMOCR is not installed. Skip this test.", allow_module_level=True)
+
 from PIL import Image
 
 from autogluon.multimodal import MultiModalPredictor
@@ -31,7 +37,7 @@ def test_mmocr_text_detection_inference(checkpoint_name):
         hyperparameters={
             "model.mmocr_text_detection.checkpoint_name": checkpoint_name,
         },
-        pipeline="ocr_text_detection",
+        problem_type="ocr_text_detection",
     )
 
     # two dimensions, (num of text lines, 2 * num of coordinate points)
