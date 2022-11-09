@@ -1,5 +1,5 @@
 # AutoMM Detection - Load A Trained Detector
-:label:`sec_automm_detection_loadr`
+:label:`sec_automm_detection_load`
 
 In this section, our goal is to load the predictor trained previously. And evaluate it on VOC data in COCO format.
 
