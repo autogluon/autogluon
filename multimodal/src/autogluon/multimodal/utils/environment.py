@@ -99,7 +99,7 @@ def infer_precision(
     precision
         The precision provided in config.
     model
-        The created model.
+        The created model
     as_torch
         Whether to convert the precision to the Pytorch format.
     cpu_only_warning
