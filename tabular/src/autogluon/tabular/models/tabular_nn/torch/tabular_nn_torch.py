@@ -586,23 +586,26 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def _default_compiler(self):
         return TabularNeuralNetTorchNativeCompiler
 
+    def compile(self, compiler_configs=None):
+        if compiler_configs is None:
+            compiler_configs = {}
+        super().compile(compiler_configs=compiler_configs)
+        batch_size = compiler_configs.get("batch_size", self.max_batch_size)
+        if self._compiler is not None:
+            self.max_batch_size = batch_size
+
     def save(self, path: str = None, verbose=True) -> str:
+        import torch
         if self.model is not None:
             self._architecture_desc = self.model.architecture_desc
         temp_model = self.model
-        if self.model is not None:
-            self._compiler = self._get_compiler()
-            self._is_model_saved = True
-            self._compiler.save(self.model, self.path)
         self.model = None
         path_final = super().save(path=path, verbose=verbose)
         self.model = temp_model
         self._architecture_desc = None
 
         # Export model
-        if self.model is not None:
-            import torch
-
+        if isinstance(self.model, torch.nn.Module):
             params_filepath = path_final + self.params_file_name
             # TODO: Don't use os.makedirs here, have save_parameters function in tabular_nn_model that checks if local path or S3 path
             os.makedirs(os.path.dirname(path_final), exist_ok=True)
@@ -612,7 +615,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
         model: TabularNeuralNetTorchModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-        if model._architecture_desc is not None:
+
+        # Checking model.model is None here, in order to avoid overwritting
+        # compiled model that is loaded in AbstractModel.
+        if model._architecture_desc is not None and model.model is None:
             import torch
             from .torch_network_modules import EmbedNet
 
@@ -624,8 +630,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                                    device=model.device)
             model._architecture_desc = None
             model.model = torch.load(model.path + model.params_file_name)
-        if model._is_model_saved:
-            model.model = model._compiler.load(path=path)
         return model
     
     def _get_hpo_backend(self):

@@ -971,7 +971,8 @@ class AbstractModel:
                                             compiler_fallback_to_native=compiler_fallback_to_native)
         if self._compiler is not None:
             input_types = self._get_input_types(batch_size=batch_size)
-            self.model = self._compiler.compile(model=self.model, path=self.path, input_types=input_types)
+            self._compiler.compile(model=self.model, path=self.path, input_types=input_types)
+            self.model = self._compiler.load(path=self.path)
 
     # FIXME: This won't work for all models, and self._features is not
     # a trustworthy variable for final input shape
@@ -1424,7 +1425,7 @@ class AbstractModel:
             'features': self.features,
             'feature_metadata': self.feature_metadata,
             # 'disk_size': self.get_disk_size(),
-            'memory_size': self.get_memory_size(),  # Memory usage of model in bytes
+            'memory_size': 0, # self.get_memory_size(),  # Memory usage of model in bytes
             'compile_time': self.compile_time,
         }
         return info

@@ -163,6 +163,7 @@ class EmbedNet(nn.Module):
     def forward(self, *input_data):
         if not isinstance(input_data[0], torch.Tensor):
             input_data = input_data[0]
+        input_data = list(input_data)
         if self.has_embed_features:
             # vector features would potentially take the first tensor
             offset = 1 if self.has_vector_features else 0
