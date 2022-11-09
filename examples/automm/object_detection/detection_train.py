@@ -66,7 +66,7 @@ def detection_train(
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
         },
-        pipeline="object_detection",
+        problem_type="object_detection",
         num_classes=num_classes,
         classes=classes,
         val_metric=val_metric,
