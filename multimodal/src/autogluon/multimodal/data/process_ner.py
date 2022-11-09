@@ -54,13 +54,21 @@ class NerProcessor:
         self.prefix = model.prefix
         self.tokenizer = None
         self.max_len = max_len
+
         if self.prefix == NER:
             self.tokenizer = model.tokenizer
-            if self.tokenizer.model_max_length > max_len:
-                self.max_len = max_len
-                self.tokenizer.model_max_length = max_len
-            else:
+
+            if max_len is None or max_len <= 0:
                 self.max_len = self.tokenizer.model_max_length
+            else:
+                if max_len < self.tokenizer.model_max_length:
+                    warnings.warn(
+                        f"provided max length: {max_len} "
+                        f"is smaller than {model.checkpoint_name}'s default: {self.tokenizer.model_max_length}"
+                    )
+                self.max_len = min(max_len, self.tokenizer.model_max_length)
+
+            self.tokenizer.model_max_length = self.max_len
 
     def collate_fn(self, text_column_names: Optional[List] = None) -> Dict:
         """
