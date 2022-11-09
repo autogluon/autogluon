@@ -45,7 +45,7 @@ def test_hpo(searcher, scheduler):
     predictor = predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=60,
+        time_limit=30,
         save_path=save_path,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
@@ -57,7 +57,7 @@ def test_hpo(searcher, scheduler):
     predictor = predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=60,
+        time_limit=30,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
 
@@ -95,7 +95,7 @@ def test_hpo_distillation(searcher, scheduler):
     teacher_predictor = teacher_predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=60,
+        time_limit=30,
         save_path=teacher_save_path,
     )
 

@@ -2,6 +2,7 @@ import functools
 import logging
 from typing import Dict, List, Optional, Tuple, Union
 
+import timm
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
@@ -503,3 +504,7 @@ def modify_duplicate_model_names(
     predictor._config.model.names = model_names
 
     return predictor
+
+
+def list_timm_models(pretrained=True):
+    return timm.list_models(pretrained=pretrained)

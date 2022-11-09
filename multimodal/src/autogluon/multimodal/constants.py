@@ -12,9 +12,11 @@ BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
 FEW_SHOT = "few_shot"
+FEW_SHOT_TEXT_CLASSIFICATION = "few_shot_text_classification"
 DEFAULT_SHOT = "default_shot"
 DEPRECATED_ZERO_SHOT = "zero_shot"
 NER = "ner"
+NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
 
 # Pipelines
 FEATURE_EXTRACTION = "feature_extraction"
@@ -78,6 +80,7 @@ HIT_RATE = "hit_rate"
 NDCG = "ndcg"
 PRECISION = "precision"
 RECALL = "recall"
+MRR = "mrr"
 METRIC_MODE_MAP = {
     ACC: MAX,
     ACCURACY: MAX,
@@ -97,6 +100,9 @@ METRIC_MODE_MAP = {
     OVERALL_ACCURACY: MAX,
     HIT_RATE: MAX,
     NDCG: MAX,
+    PRECISION: MAX,
+    RECALL: MAX,
+    MRR: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 

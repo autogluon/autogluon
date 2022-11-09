@@ -16,9 +16,10 @@ except ImportError:
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
-from autogluon.core.utils import get_gpu_count_all
+from autogluon.core.utils import ResourceManager
 from autogluon.core.utils.try_import import try_import_d8
 from autogluon.core.utils.utils import generate_train_test_split
+from autogluon.multimodal.predictor import MultiModalPredictor
 
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 from ..utils import sanitize_batch_size
@@ -46,6 +47,9 @@ class ImagePredictor(object):
     path : str, default = None
         The directory for saving logs or intermediate data. If unspecified, will create a sub-directory under
         current working directory.
+    backend : str, default = 'vision'
+        The backend to provide all the functionalities. If unspecified, default is old vision backend (backend='vision').
+        Or you can try our new MultiModalPredictor for more functionalities and better support (backend='automm').
     verbosity : int, default = 2
         Verbosity levels range from 0 to 4 and control how much information is printed.
         Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
@@ -55,20 +59,28 @@ class ImagePredictor(object):
     # Dataset is a subclass of `pd.DataFrame`, with `image` and `label` columns.
     Dataset = ImageClassification.Dataset
 
-    def __init__(self, label='label', problem_type=None, eval_metric=None, path=None, verbosity=2):
-        warnings.warn(
+    def __init__(self, label='label', problem_type=None, eval_metric=None, path=None, backend='vision', verbosity=2):
+        self._verbosity = verbosity
+        logger.warning(
             f"AutoGluon ImagePredictor will be deprecated in v0.7. "
             f"Please use AutoGluon MultiModalPredictor instead for more functionalities and better support. "
-            f"Visit https://auto.gluon.ai/stable/tutorials/multimodal/index.html for more details!",
-            DeprecationWarning,
+            f"Visit https://auto.gluon.ai/stable/tutorials/multimodal/index.html for more details! "
         )
+
+        if backend == 'automm':
+            self._classifier = MultiModalPredictor(label=label, problem_type=problem_type, eval_metric=eval_metric,
+                                                   path=path, verbosity=verbosity)
+        elif backend == 'vision':
+            self._classifier = None
+        else:
+            raise ValueError(f"Unknown backend: {backend}")
+        
+        self._backend = backend
         self._problem_type = problem_type
         self._eval_metric = eval_metric
         if path is None:
             path = os.getcwd()
         self._log_dir = path
-        self._verbosity = verbosity
-        self._classifier = None
         self._label_cleaner = None
         self._fit_summary = {}
         self._label = label
@@ -235,6 +247,18 @@ class ImagePredictor(object):
                 scheduler_options : dict, default = None
                     Extra options for HPO scheduler, please refer to :class:`autogluon.core.Searcher` for details.
         """
+        if self._backend == 'automm':
+            logger.warning(
+                f"automm backend does not support HPO yet. "
+                f"For HPO need, please continue to use default vision backend."
+            )
+            max_epochs = hyperparameters['epochs'] if 'epochs' in hyperparameters else 10
+            learning_rate = hyperparameters['lr'] if 'lr' in hyperparameters else 1e-4
+            self._classifier.fit(train_data=train_data, tuning_data=tuning_data,
+                                 hyperparameters={"optimization.max_epochs": max_epochs,
+                                                  "optimization.learning_rate": learning_rate,})
+            return self
+
         if self._problem_type is None:
             # options: multiclass, binary, regression
             self._problem_type = MULTICLASS
@@ -541,6 +565,15 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
+        
+        if self._backend == 'automm':
+            logger.warning(
+                f"automm backend only accepts pd.DataFrame. "
+                f"For other input type, please continue to use default vision backend."
+            )
+            prob = self._classifier.predict_proba(data=data, as_pandas=as_pandas)
+            return prob
+
         assert self._label_cleaner is not None
 
         try:
@@ -592,6 +625,15 @@ class ImagePredictor(object):
 
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
+        
+        if self._backend == 'automm':
+            logger.warning(
+                f"automm backend only accepts pd.DataFrame. "
+                f"For other input type, please continue to use default vision backend."
+            )
+            pred = self._classifier.predict(data=data, as_pandas=as_pandas)
+            return pred
+
         assert self._label_cleaner is not None
         proba = self._classifier.predict(data)
         if 'image' in proba.columns:
@@ -636,6 +678,15 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
+
+        if self._backend == 'automm':
+            logger.warning(
+                f"automm backend only accepts pd.DataFrame. "
+                f"For other input type, please continue to use default vision backend."
+            )
+            ret = self._classifier.extract_embedding(data, as_pandas=as_pandas)
+            return ret
+
         ret = self._classifier.predict_feature(data)
         if as_pandas:
             return ret
@@ -652,6 +703,11 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier not initialized, try `fit` first.')
+        
+        if self._backend == 'automm':
+            ret = self._classifier.evaluate(data, metrics=self._eval_metric)
+            return ret
+
         assert self._train_classes is not None
         if isinstance(data, pd.DataFrame) and not isinstance(data, ImageClassification.Dataset):
             assert self._label in data.columns, f'{self._label} is not present in evaluation data'
@@ -679,7 +735,13 @@ class ImagePredictor(object):
             The summary of last `fit` process. Major keys are ('train_acc', 'val_acc', 'total_time',...)
 
         """
-        return copy.copy(self._fit_summary)
+        if self._backend == 'automm':
+            logger.warning(
+                f"predictor trained using automm backend only has keys ('training_time' and 'val_accuracy') "
+            )
+            return self._classifier.fit_summary()
+        else:
+            return copy.copy(self._fit_summary)
 
     def save(self, path=None):
         """Dump predictor to disk.
@@ -691,13 +753,21 @@ class ImagePredictor(object):
             with filename `image_predictor.ag`
 
         """
+        if self._backend == 'automm':
+            logger.warning(
+                f"automm backend will save model as .ckpt, not .ag "
+                f"Other meta information will also be saved to the same directory specified by path "
+            )
+            self._classifier.save(path=path)
+            return
+
         if path is None:
             path = os.path.join(self.path, 'image_predictor.ag')
         with open(path, 'wb') as fid:
             pickle.dump(self, fid)
 
     @classmethod
-    def load(cls, path, verbosity=2):
+    def load(cls, path, backend='vision', verbosity=2):
         """Load previously saved predictor.
 
         Parameters
@@ -705,6 +775,9 @@ class ImagePredictor(object):
         path : str
             The file name for saved pickle file. If `path` is a directory, will try to load the file `image_predictor.ag` in
             this directory.
+        backend : str, default = 'vision'
+            The backend to provide all the functionalities. If unspecified, default is old vision backend (backend='vision').
+            Or you can try our new MultiModalPredictor for more functionalities and better support (backend='automm').
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed.
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
@@ -712,10 +785,14 @@ class ImagePredictor(object):
             where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
 
         """
+        if backend == 'automm':
+            return MultiModalPredictor.load(path=path)
+
         if os.path.isdir(path):
             path = os.path.join(path, 'image_predictor.ag')
+                
         with open(path, 'rb') as fid:
-            gpu_count = get_gpu_count_all()
+            gpu_count = ResourceManager.get_gpu_count_all()
             if gpu_count > 0:
                 obj = pickle.load(fid)
             else:
@@ -738,7 +815,7 @@ class ImagePredictor(object):
 
     @staticmethod
     def _get_num_gpus_available():
-        return get_gpu_count_all()
+        return ResourceManager.get_gpu_count_all()
 
 
 def _get_valid_labels(data):

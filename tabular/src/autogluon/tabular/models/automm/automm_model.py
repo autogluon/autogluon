@@ -9,7 +9,8 @@ import pandas as pd
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
     S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
 from autogluon.core.constants import REGRESSION
-from autogluon.core.utils import get_cpu_count, get_gpu_count_torch, try_import_autogluon_text
+from autogluon.core.utils import ResourceManager
+from autogluon.core.utils import try_import_autogluon_text
 from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
@@ -214,8 +215,8 @@ class MultiModalPredictorModel(AbstractModel):
         return total_size
 
     def _get_default_resources(self):
-        num_cpus = get_cpu_count()
-        num_gpus = min(get_gpu_count_torch(), 1)  # Use single gpu training by default. Consider to revise it later.
+        num_cpus = ResourceManager.get_cpu_count()
+        num_gpus = min(ResourceManager.get_gpu_count_torch(), 1)  # Use single gpu training by default. Consider to revise it later.
         return num_cpus, num_gpus
 
     def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:

@@ -270,7 +270,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 if len(feat_dynamic_real.columns) != self.num_feat_dynamic_real:
                     raise ValueError(
                         f"Data must contain {self.num_feat_dynamic_real} columns with known covariates, "
-                        f"(only received {len(feat_dynamic_real.columns)} columns with known covariates)."
+                        f"(received {len(feat_dynamic_real.columns)} columns with known covariates)."
                     )
             else:
                 feat_dynamic_real = None
@@ -315,6 +315,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             self.gts_predictor = estimator.train(
                 self._to_gluonts_dataset(train_data),
                 validation_data=self._to_gluonts_dataset(val_data),
+                cache_data=True,
             )
 
     def _get_callbacks(self, time_limit: int, *args, **kwargs) -> List[Callable]:

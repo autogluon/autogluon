@@ -43,9 +43,9 @@ logger = logging.getLogger(AUTOMM)
 
 def infer_metrics(
     problem_type: Optional[str] = None,
-    pipeline: Optional[str] = None,
     eval_metric_name: Optional[str] = None,
     validation_metric_name: Optional[str] = None,
+    pipeline: Optional[str] = None,
 ):
     """
     Infer the validation metric and the evaluation metric if not provided.
@@ -56,10 +56,12 @@ def infer_metrics(
     ----------
     problem_type
         Type of problem.
-    pipeline
-        Predictor pipeline, used when problem_type is None.
     eval_metric_name
         Name of evaluation metric provided by users.
+    validation_metric_name
+        The provided validation metric name
+    pipeline
+        The pipeline is only used in matching. FIXME! This is a hack. We need to remove it in 0.7.
 
     Returns
     -------
@@ -82,6 +84,9 @@ def infer_metrics(
                 validation_metric_name = HIT_RATE
             else:
                 validation_metric_name = eval_metric_name
+            if validation_metric_name == NDCG:
+                # TODO(?) Currently NDCG is not supported. We may pick a better replacement of NDCG for validation in the future.
+                validation_metric_name = HIT_RATE
             return validation_metric_name, eval_metric_name
 
         warnings.warn(
@@ -99,20 +104,17 @@ def infer_metrics(
         eval_metric_name = ROC_AUC
     elif problem_type == REGRESSION:
         eval_metric_name = RMSE
-    elif problem_type is None:
-        if pipeline == OBJECT_DETECTION:
-            if (not validation_metric_name) or validation_metric_name.lower() == DIRECT_LOSS:
-                return DIRECT_LOSS, MAP
-            elif validation_metric_name == MAP:
-                return MAP, MAP
-            else:
-                raise ValueError(
-                    f"Problem type: {problem_type}, pipeline: {pipeline}, validation_metric_name: {validation_metric_name} is not supported!"
-                )
-        elif pipeline == IMAGE_TEXT_SIMILARITY:
-            return HIT_RATE, NDCG
+    elif problem_type == OBJECT_DETECTION:
+        if (not validation_metric_name) or validation_metric_name.lower() == DIRECT_LOSS:
+            return DIRECT_LOSS, MAP
+        elif validation_metric_name == MAP:
+            return MAP, MAP
         else:
-            raise NotImplementedError(f"Problem type: {problem_type}, pipeline: {pipeline} is not supported yet!")
+            raise ValueError(
+                f"Problem type: {problem_type}, validation_metric_name: {validation_metric_name} is not supported!"
+            )
+    elif pipeline == IMAGE_TEXT_SIMILARITY:
+        return HIT_RATE, NDCG
     else:
         raise NotImplementedError(f"Problem type: {problem_type} is not supported yet!")
 

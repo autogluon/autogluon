@@ -9,7 +9,7 @@ import os
 import pandas as pd
 import numpy as np
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.core.utils import get_gpu_count_all
+from autogluon.core.utils import ResourceManager
 from .._gluoncv import ObjectDetection
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 
@@ -496,4 +496,4 @@ class ObjectDetector(object):
 
     @staticmethod
     def _get_num_gpus_available():
-        return get_gpu_count_all()
+        return ResourceManager.get_gpu_count_all()

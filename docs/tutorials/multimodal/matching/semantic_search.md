@@ -227,7 +227,7 @@ We rank the documents according to cosine similarities between the query embeddi
 
 #### 5.1 Extracting Embedding
 
-AutoGluon's `MultiModalPredictor` provides a nice interface for extracting embeddings with a pretrained model by using the `feature_extraction` pipeline. It extracts the hidden states from the base model, which then can be used to extract embeddings for queries and documents.
+AutoGluon's `MultiModalPredictor` provides a nice interface for extracting embeddings with a pretrained model by using the `feature_extraction` problem_type. It extracts the hidden states from the base model, which then can be used to extract embeddings for queries and documents.
 
 
 ```{.python .input}
@@ -237,7 +237,7 @@ from autogluon.multimodal import MultiModalPredictor
 model_name = "sentence-transformers/all-MiniLM-L6-v2"
 
 predictor = MultiModalPredictor(
-    pipeline="feature_extraction",
+    problem_type="feature_extraction",
     hyperparameters={
         "model.hf_text.checkpoint_name": model_name
     }
