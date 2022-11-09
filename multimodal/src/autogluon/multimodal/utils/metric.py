@@ -57,6 +57,8 @@ def infer_metrics(
         Type of problem.
     eval_metric_name
         Name of evaluation metric provided by users.
+    validation_metric_name
+        The provided validation metric name
 
     Returns
     -------
@@ -79,6 +81,9 @@ def infer_metrics(
                 validation_metric_name = HIT_RATE
             else:
                 validation_metric_name = eval_metric_name
+            if validation_metric_name == NDCG:
+                # TODO(?) Currently NDCG is not supported. We may pick a better replacement of NDCG for validation in the future.
+                validation_metric_name = HIT_RATE
             return validation_metric_name, eval_metric_name
 
         warnings.warn(

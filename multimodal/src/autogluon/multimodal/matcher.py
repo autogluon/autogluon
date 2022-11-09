@@ -433,7 +433,7 @@ class MultiModalMatcher:
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
-                problem_type=problem_type,
+                problem_type=self._pipeline,
                 eval_metric_name=self._eval_metric_name,
             )
         else:
@@ -877,7 +877,7 @@ class MultiModalMatcher:
 
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
-            # We only averaging the checkpoint of the best trial in the end in the master process
+            # We only average the checkpoint of the best trial in the end in the master process
             if not hpo_mode:
                 self._top_k_average(
                     query_model=query_model,
@@ -1720,6 +1720,7 @@ class MultiModalMatcher:
                     "column_types": self._column_types,
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
+                    "pipeline": self._pipeline,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
@@ -1816,6 +1817,7 @@ class MultiModalMatcher:
         matcher._match_label = assets["match_label"]
         matcher._label_column = assets["label_column"]
         matcher._problem_type = assets["problem_type"]
+        matcher._pipeline = assets["pipeline"]
         matcher._eval_metric_name = assets["eval_metric_name"]
         matcher._verbosity = verbosity
         matcher._resume = resume
