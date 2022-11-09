@@ -17,7 +17,7 @@ def test_hpo(searcher, scheduler):
     dataset = PetFinderDataset()
 
     hyperparameters = {
-        "optimization.learningp_rate": tune.uniform(0.0001, 0.01),
+        "optimization.learning_rate": tune.uniform(0.0001, 0.01),
         "optimization.max_epochs": 1,
         "model.names": ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
         "data.categorical.convert_to_text": False,
