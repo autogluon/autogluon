@@ -34,7 +34,7 @@ def get_data():
     ],
 )
 @pytest.mark.parametrize("searcher", ["bayes"])
-@pytest.mark.parametrize("scheduler", ["asha"])
+@pytest.mark.parametrize("scheduler", ["ASHA"])
 def test_ner(checkpoint_name, searcher, scheduler):
     train_data = get_data()
     label_col = "entity_annotations"
