@@ -436,7 +436,7 @@ class MultiModalMatcher:
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
-                problem_type=self._problem_type,
+                problem_type=problem_type,
                 pipeline=self._pipeline,
                 eval_metric_name=self._eval_metric_name,
             )
