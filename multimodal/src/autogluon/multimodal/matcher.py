@@ -405,9 +405,6 @@ class MultiModalMatcher:
             data=train_data,
             provided_problem_type=self._problem_type,
         )
-        print("column_types=", column_types)
-        print("problem_type=", problem_type)
-        print("output_shape=", output_shape)
 
         logger.debug(f"column_types: {column_types}")
         logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
