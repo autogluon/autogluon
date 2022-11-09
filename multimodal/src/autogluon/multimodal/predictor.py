@@ -179,8 +179,8 @@ problem_property_dict = OrderedDict(
         (TEXT_SIMILARITY, ProblemProperty(TEXT_SIMILARITY, inference_ready=True, is_matching=True)),
         (IMAGE_SIMILARITY, ProblemProperty(IMAGE_SIMILARITY, inference_ready=True, is_matching=True)),
         (IMAGE_TEXT_SIMILARITY, ProblemProperty(IMAGE_TEXT_SIMILARITY, inference_ready=True, is_matching=True)),
-        (NER, ProblemProperty(NER, inference_ready=True)),
-        (NAMED_ENTITY_RECOGNITION, ProblemProperty(NER, inference_ready=True)),
+        (NER, ProblemProperty(NER)),
+        (NAMED_ENTITY_RECOGNITION, ProblemProperty(NER)),
         (FEATURE_EXTRACTION, ProblemProperty(FEATURE_EXTRACTION, support_fit=False, inference_ready=True)),
         (
             ZERO_SHOT_IMAGE_CLASSIFICATION,

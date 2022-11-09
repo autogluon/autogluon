@@ -40,11 +40,6 @@ def test_ner(checkpoint_name, searcher, scheduler):
     label_col = "entity_annotations"
 
     lr = tune.uniform(0.0001, 0.01)
-    predictor = MultiModalPredictor(
-        problem_type="ner",
-        label=label_col,
-        verbosity=5,
-    )
 
     predictor = MultiModalPredictor(problem_type="ner", label=label_col)
     predictor.fit(
