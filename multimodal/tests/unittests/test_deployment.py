@@ -42,7 +42,7 @@ def test_onnx_export(checkpoint_name):
     test_df = load_dataset("wietsedv/stsbenchmark", split="test").to_pandas()
 
     predictor = MultiModalPredictor(
-        pipeline="feature_extraction",
+        problem_type="feature_extraction",
         hyperparameters={
             "model.hf_text.checkpoint_name": checkpoint_name,
         },

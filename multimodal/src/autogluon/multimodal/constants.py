@@ -12,9 +12,11 @@ BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
 FEW_SHOT = "few_shot"
+FEW_SHOT_TEXT_CLASSIFICATION = "few_shot_text_classification"
 DEFAULT_SHOT = "default_shot"
 DEPRECATED_ZERO_SHOT = "zero_shot"
 NER = "ner"
+NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
 
 # Pipelines
 FEATURE_EXTRACTION = "feature_extraction"

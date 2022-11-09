@@ -55,7 +55,7 @@ from .constants import (
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
     infer_column_types,
-    infer_label_column_type_by_problem_type_and_pipeline,
+    infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
 )
 from .optimization.lit_matcher import MatcherLitModule
@@ -109,7 +109,6 @@ class MultiModalMatcher:
         self,
         query: Optional[Union[str, List[str]]] = None,
         response: Optional[Union[str, List[str]]] = None,
-        negative: Optional[Union[str, List[str]]] = None,
         label: Optional[str] = None,
         match_label: Optional[Union[int, str]] = None,
         problem_type: Optional[str] = None,
@@ -129,12 +128,14 @@ class MultiModalMatcher:
         response
             Column names of response data. If no label column is provided,
             query and response columns form positive pairs.
-        negative
-            Column names of negative data. Query and negative make up negative pairs.
         label
-            Name of the label column. Label and negative shouldn't be used simultaneously.
+            Name of the label column.
         match_label
-            For binary labels, it is the label indicating the query and response should match.
+            The label class that indicates the <query, response> pair is counted as "match".
+            This is used when the problem_type is one of the matching problem types, and when the labels are binary.
+            For example, the label column can contain ["match", "not match"]. And match_label can be "match".
+            It is similar as the "pos_label" in F1-score: https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html#sklearn.metrics.f1_score
+            Internally, we will set match_label to self.class_labels[1] by default.
         problem_type
             Type of matching problem if the label column is available.
             This could be binary, multiclass, or regression
@@ -186,18 +187,9 @@ class MultiModalMatcher:
         if response:
             assert all(isinstance(r, str) for r in response)
 
-        if isinstance(negative, str):
-            negative = [negative]
-        if negative:
-            assert all(isinstance(n, str) for n in negative)
-            data_format = TRIPLET
-        else:
-            data_format = PAIR
-
         self._query = query
         self._response = response
-        self._negative = negative
-        self._data_format = data_format
+        self._data_format = PAIR  # TODO: Support Triplet
         self._match_label = match_label
         self._label_column = label
         self._problem_type = problem_type.lower() if problem_type is not None else None
@@ -213,12 +205,10 @@ class MultiModalMatcher:
         self._response_config = None
         self._query_df_preprocessor = None
         self._response_df_preprocessor = None
-        self._negative_df_preprocessor = None
         self._label_df_preprocessor = None
         self._column_types = None
         self._query_processors = None
         self._response_processors = None
-        self._negative_processors = None
         self._label_processors = None
         self._query_model = None
         self._response_model = None
@@ -237,7 +227,7 @@ class MultiModalMatcher:
                 self._response_model,
                 self._query_processors,
                 self._response_processors,
-            ) = init_pretrained_matcher(pipeline=self._pipeline, hyperparameters=hyperparameters)
+            ) = init_pretrained_matcher(presets=self._pipeline, hyperparameters=hyperparameters)
 
     @property
     def query(self):
@@ -302,11 +292,11 @@ class MultiModalMatcher:
         Parameters
         ----------
         train_data
-            A dataframe, containing the query data, response data, and their relevance. For example,
+            A dataframe, containing the query data, response data, and their relevance scores. For example,
             | query_col1  | query_col2 | response_col1 | response_col2 | relevance_score |
             |-------------|------------|---------------|---------------|-----------------|
-            |             | ....       | ....          | ...           | ...             |
-            |             | ....       | ....          | ...           | ...             |
+            | ....        | ....       | ....          | ...           | ...             |
+            | ....        | ....       | ....          | ...           | ...             |
         id_mappings
              Id-to-content mappings. The contents can be text, image, etc.
              This is used when the dataframe contains the query/response identifiers instead of their contents.
@@ -402,7 +392,7 @@ class MultiModalMatcher:
             provided_column_types=column_types,
             id_mappings=id_mappings,
         )
-        column_types = infer_label_column_type_by_problem_type_and_pipeline(
+        column_types = infer_label_column_type_by_problem_type(
             column_types=column_types,
             label_columns=self._label_column,
             problem_type=self._problem_type,
@@ -444,8 +434,8 @@ class MultiModalMatcher:
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
                 problem_type=problem_type,
-                eval_metric_name=self._eval_metric_name,
                 pipeline=self._pipeline,
+                eval_metric_name=self._eval_metric_name,
             )
         else:
             validation_metric_name = self._validation_metric_name
@@ -595,7 +585,7 @@ class MultiModalMatcher:
         hpo_mode: bool = False,
         **hpo_kwargs,
     ):
-        if presets == None:
+        if presets is None:
             presets = "siamese_network"
 
         if presets == "siamese_network":
@@ -890,7 +880,7 @@ class MultiModalMatcher:
 
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
-            # We only averaging the checkpoint of the best trial in the end in the master process
+            # We only average the checkpoint of the best trial in the end in the master process
             if not hpo_mode:
                 self._top_k_average(
                     query_model=query_model,
@@ -1075,7 +1065,7 @@ class MultiModalMatcher:
                 id_mappings=id_mappings,
             )
             if self._label_column and self._label_column in data.columns:
-                column_types = infer_label_column_type_by_problem_type_and_pipeline(
+                column_types = infer_label_column_type_by_problem_type(
                     column_types=column_types,
                     label_columns=self._label_column,
                     problem_type=self._problem_type,

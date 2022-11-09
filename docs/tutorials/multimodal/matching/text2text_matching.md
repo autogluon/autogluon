@@ -35,7 +35,7 @@ from autogluon.multimodal.constants import BINARY, MULTICLASS, QUERY, RESPONSE, 
 
 # Initialize the model
 matcher = MultiModalPredictor(
-        pipeline="text_similarity",
+        problem_type="text_similarity",
         query="premise", # the column name of the first sentence
         response="hypothesis", # the column name of the second sentence
         label="label", # the label column name

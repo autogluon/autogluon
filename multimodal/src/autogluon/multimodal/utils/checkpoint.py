@@ -2,7 +2,6 @@ import logging
 import os
 import re
 import shutil
-from symbol import parameters
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pytorch_lightning as pl
