@@ -127,6 +127,7 @@ def test_matcher(
         "optimization.max_epochs": 1,
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
+        "optimization.top_k_average_method": "greedy_soup",
     }
 
     if text_backbone is not None:
@@ -150,7 +151,7 @@ def test_matcher(
         train_data=dataset.train_df,
         tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
         hyperparameters=hyperparameters,
-        time_limit=30,
+        time_limit=20,
         save_path=save_path,
     )
 
@@ -192,7 +193,7 @@ def test_matcher(
         train_data=dataset.train_df,
         tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
         hyperparameters=hyperparameters,
-        time_limit=30,
+        time_limit=20,
     )
     verify_matcher_save_load(matcher, dataset.test_df, cls=MultiModalPredictor)
 
@@ -204,7 +205,7 @@ def test_matcher(
             train_data=dataset.train_df,
             tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
             hyperparameters=hyperparameters,
-            time_limit=30,
+            time_limit=20,
         )
 
 
