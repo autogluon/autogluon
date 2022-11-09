@@ -47,8 +47,11 @@ test_data_nolab.head()
 
 We use our trained models to make predictions on the new data and then evaluate performance:
 
-.. warning::
-    `TabularPredictor.load()` used `pickle` module implicitly, which is known to be insecure. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling. Never load data that could have come from an untrusted source, or that could have been tampered with. **Only load data you trust.**
+:::warning
+
+`TabularPredictor.load()` used `pickle` module implicitly, which is known to be insecure. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling. Never load data that could have come from an untrusted source, or that could have been tampered with. **Only load data you trust.**
+
+:::
 
 ```{.python .input}
 predictor = TabularPredictor.load(save_path)  # unnecessary, just demonstrates how to load previously-trained predictor from file
