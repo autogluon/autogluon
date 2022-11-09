@@ -45,6 +45,7 @@ def infer_metrics(
     problem_type: Optional[str] = None,
     eval_metric_name: Optional[str] = None,
     validation_metric_name: Optional[str] = None,
+    pipeline: Optional[str] = None,
 ):
     """
     Infer the validation metric and the evaluation metric if not provided.
@@ -59,6 +60,8 @@ def infer_metrics(
         Name of evaluation metric provided by users.
     validation_metric_name
         The provided validation metric name
+    pipeline
+        The pipeline is only used in matching. FIXME! This is a hack. We need to remove it in 0.7.
 
     Returns
     -------
@@ -77,7 +80,7 @@ def infer_metrics(
             raise ValueError(f"Metric {eval_metric_name} is only supported for binary classification.")
 
         if eval_metric_name in VALID_METRICS:
-            if problem_type == IMAGE_TEXT_SIMILARITY:
+            if pipeline == IMAGE_TEXT_SIMILARITY:
                 validation_metric_name = HIT_RATE
             else:
                 validation_metric_name = eval_metric_name
@@ -110,7 +113,7 @@ def infer_metrics(
             raise ValueError(
                 f"Problem type: {problem_type}, validation_metric_name: {validation_metric_name} is not supported!"
             )
-    elif problem_type == IMAGE_TEXT_SIMILARITY:
+    elif pipeline == IMAGE_TEXT_SIMILARITY:
         return HIT_RATE, NDCG
     else:
         raise NotImplementedError(f"Problem type: {problem_type} is not supported yet!")
