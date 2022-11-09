@@ -336,7 +336,8 @@ class MultiModalPredictor:
             pipeline = pipeline.lower()
             warnings.warn(
                 f"pipeline argument has been deprecated and moved to problem_type. "
-                f"Use problem_type='{pipeline}' instead.", DeprecationWarning
+                f"Use problem_type='{pipeline}' instead.",
+                DeprecationWarning,
             )
             if problem_type is not None:
                 assert pipeline == problem_type, (
