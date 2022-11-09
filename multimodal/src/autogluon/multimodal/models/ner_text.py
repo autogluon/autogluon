@@ -77,6 +77,8 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
         # here, we reset it using model config
         if hasattr(self.model.config, "max_position_embeddings"):
             self.tokenizer.model_max_length = self.model.config.max_position_embeddings
+        if hasattr(self.model.config, "n_positions"):
+            self.tokenizer.model_max_length = self.model.config.n_positions
 
     @property
     def text_token_word_mapping_key(self):

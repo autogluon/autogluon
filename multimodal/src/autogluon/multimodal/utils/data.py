@@ -150,6 +150,7 @@ def create_data_processor(
     elif data_type == NER:
         data_processor = NerProcessor(
             model=model,
+            max_len=model_config.max_text_len,
         )
     else:
         raise ValueError(f"unknown data type: {data_type}")

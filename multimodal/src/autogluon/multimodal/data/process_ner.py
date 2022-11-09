@@ -42,6 +42,7 @@ class NerProcessor:
     def __init__(
         self,
         model: nn.Module,
+        max_len: Optional[int] = None,
     ):
         """
         Parameters
@@ -51,12 +52,15 @@ class NerProcessor:
         """
         self.model = model
         self.prefix = model.prefix
+        self.tokenizer = None
+        self.max_len = max_len
         if self.prefix == NER:
             self.tokenizer = model.tokenizer
-            self.max_len = self.tokenizer.model_max_length
-        else:
-            self.tokenizer = None
-            self.max_len = None
+            if self.tokenizer.model_max_length > max_len:
+                self.max_len = max_len
+                self.tokenizer.model_max_length = max_len
+            else:
+                self.max_len = self.tokenizer.model_max_length
 
     def collate_fn(self, text_column_names: Optional[List] = None) -> Dict:
         """
