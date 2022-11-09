@@ -109,6 +109,9 @@ def infer_precision(
     -------
     The inferred precision.
     """
+    if not isinstance(model, list):
+        model = [model]
+
     precision_mapping = {
         16: torch.float16,
         "bf16": torch.bfloat16,
@@ -136,12 +139,14 @@ def infer_precision(
             )
             precision = 32
 
-        elif isinstance(model, HFAutoModelForTextPrediction):
-            if model.config.torch_dtype is not None:
-                precision = inverse_precision_mapping[model.config.torch_dtype]
-            else:
-                torch_dtype = get_state_dict_dtype(model.state_dict())
-                precision = inverse_precision_mapping[torch_dtype]
+        else:
+            for m in model:
+                if isinstance(m, HFAutoModelForTextPrediction):
+                    if m.config.torch_dtype is not None:
+                        precision = inverse_precision_mapping[m.config.torch_dtype]
+                    else:
+                        torch_dtype = get_state_dict_dtype(m.state_dict())
+                        precision = inverse_precision_mapping[torch_dtype]
 
     if as_torch:
         if precision in precision_mapping:

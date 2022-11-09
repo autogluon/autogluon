@@ -809,7 +809,9 @@ class MultiModalMatcher:
 
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
 
-        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
+        precision = infer_precision(
+            num_gpus=num_gpus, precision=config.env.precision, model=[self._response_model, self._query_model]
+        )
 
         if num_gpus == 0:  # CPU only training
             grad_steps = max(
@@ -1149,7 +1151,9 @@ class MultiModalMatcher:
         if num_gpus == 1:
             strategy = None
 
-        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision)
+        precision = infer_precision(
+            num_gpus=num_gpus, precision=self._config.env.precision, model=[self._response_model, self._query_model]
+        )
 
         batch_size = compute_inference_batch_size(
             per_gpu_batch_size=self._config.env.per_gpu_batch_size,
