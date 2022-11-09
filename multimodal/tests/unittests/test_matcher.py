@@ -274,8 +274,8 @@ def test_text_semantic_search():
     for per_query_hits, per_query_hits_2, per_query_hit_gt in zip(hits, hits_2, hits_gt):
         for per_hit, per_hit_2, per_hit_gt in zip(per_query_hits, per_query_hits_2, per_query_hit_gt):
             assert per_hit["response_id"] == per_hit_2["response_id"] == per_hit_gt["response_id"]
-            npt.assert_almost_equal(per_hit["score"], per_hit_2["score"], 1e-4, 1e-4)
-            npt.assert_almost_equal(per_hit["score"], per_hit_gt["score"], 1e-4, 1e-4)
+            npt.assert_allclose(per_hit["score"], per_hit_2["score"], 1e-4, 1e-4)
+            npt.assert_allclose(per_hit["score"], per_hit_gt["score"], 1e-4, 1e-4)
 
 
 def test_image_text_semantic_search():
