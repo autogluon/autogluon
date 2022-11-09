@@ -114,7 +114,7 @@ Using the models listed below requires installing Apache MXNet v1.9. This can be
    python -m pip install mxnet~=1.9
 
 If you want to use a GPU, install the version of MXNet that matches your CUDA version. See the
-MXNet [documentation](https://mxnet.apache.org/versions/1.9.1/get_started?) for more info.
+MXNet `documentation <https://mxnet.apache.org/versions/1.9.1/get_started?>`_ for more info.
 
 If a GPU is available and MXNet version with CUDA is installed, all the MXNet models will be trained using the GPU.
 Otherwise, the models will be trained on CPU.
@@ -127,25 +127,17 @@ Otherwise, the models will be trained on CPU.
 .. autosummary::
    :nosignatures:
 
-   TemporalFusionTransformerMXNetModel
-   TransformerMXNetModel
+   DeepARMXNetModel
    MQCNNMXNetModel
    MQRNNMXNetModel
-   DeepARMXNetModel
    SimpleFeedForwardMXNetModel
+   TemporalFusionTransformerMXNetModel
+   TransformerMXNetModel
 
+:hidden:`DeepARMXNetModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:hidden:`TemporalFusionTransformerMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: TemporalFusionTransformerMXNetModel
-   :members: init
-
-
-:hidden:`TransformerMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: TransformerMXNetModel
+.. autoclass:: DeepARMXNetModel
    :members: init
 
 
@@ -163,16 +155,60 @@ Otherwise, the models will be trained on CPU.
    :members: init
 
 
-
-:hidden:`DeepARMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: DeepARMXNetModel
-   :members: init
-
-
 :hidden:`SimpleFeedForwardMXNetModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: SimpleFeedForwardMXNetModel
    :members: init
+
+
+:hidden:`TemporalFusionTransformerMXNetModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TemporalFusionTransformerMXNetModel
+   :members: init
+
+
+:hidden:`TransformerMXNetModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TransformerMXNetModel
+   :members: init
+
+
+
+Additional features
+-------------------
+Overview of the additional features and covariates supported by different models.
+Models not included in this table currently do not support any additional features.
+
+.. list-table::
+   :header-rows: 1
+   :stub-columns: 1
+   :align: left
+   :widths: 40 20 20 20
+
+   * - Model
+     - Static features (continuous)
+     - Static features (categorical)
+     - Known covariates (continuous)
+   * - :class:`~autogluon.timeseries.models.AutoGluonTabularModel`
+     - ✓
+     - ✓
+     -
+   * - :class:`~autogluon.timeseries.models.DeepARModel`
+     - ✓
+     - ✓
+     - ✓
+   * - :class:`~autogluon.timeseries.models.gluonts.mx.DeepARMXNetModel`
+     - ✓
+     - ✓
+     - ✓
+   * - :class:`~autogluon.timeseries.models.gluonts.mx.MQCNNMXNetModel`
+     - ✓
+     - ✓
+     - ✓
+   * - :class:`~autogluon.timeseries.models.gluonts.mx.TemporalFusionTransformerMXNetModel`
+     - ✓
+     -
+     - ✓
