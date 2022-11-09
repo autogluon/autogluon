@@ -67,6 +67,7 @@ def test_predictor_gradient_checkpointing(
             "env.num_workers_evaluation": 0,
             "env.num_gpus": 1,
         },
+        time_limit=30
     )
     predictions = predictor.predict(test_data, as_pandas=False)
     tunable_ratio = trainable_parameters(predictor._model) / total_parameters(predictor._model)
