@@ -7,7 +7,8 @@ import pytest
 from contextlib import contextmanager
 from typing import List
 
-from autogluon.core.utils import download, unzip, get_cpu_count, get_gpu_count_all
+from autogluon.core.utils import ResourceManager
+from autogluon.core.utils import download, unzip
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.utils import infer_problem_type, generate_train_test_split
@@ -245,14 +246,16 @@ class ModelFitHelper:
     
     
 @contextmanager
-def mock_system_resourcses(**kwargs):
-    if 'num_cpus' in kwargs:
-        get_cpu_count.mock = kwargs['num_cpus']
-    if 'num_gpus' in kwargs:
-        get_gpu_count_all.mock = kwargs['num_gpus']
+def mock_system_resourcses(num_cpus=None, num_gpus=None):
+    original_get_cpu_count = ResourceManager.get_cpu_count
+    original_get_gpu_count_all = ResourceManager.get_gpu_count_all
+    if num_cpus is not None:
+        ResourceManager.get_cpu_count = lambda: num_cpus
+    if num_gpus is not None:
+        ResourceManager.get_gpu_count_all = lambda: num_gpus
     yield
-    get_cpu_count.mock = None
-    get_gpu_count_all.mock = None
+    ResourceManager.get_cpu_count = original_get_cpu_count
+    ResourceManager.get_gpu_count_all = original_get_gpu_count_all
 
 
 @pytest.fixture

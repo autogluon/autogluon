@@ -532,7 +532,7 @@ def get_model_head(model: nn.Module):
     else:
         raise ValueError(f"Model {type(model)} doesn't have head. Need to check its implementation.")
 
-    return head
+    return head.fc if hasattr(head, "fc") else head
 
 
 def get_hf_config_and_model(

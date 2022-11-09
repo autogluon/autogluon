@@ -10,7 +10,8 @@ import pandas as pd
 from autogluon.common.features.types import R_OBJECT, S_IMAGE_PATH
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
 from autogluon.core.models import AbstractModel
-from autogluon.core.utils import get_cpu_count, try_import_autogluon_vision
+from autogluon.core.utils import ResourceManager
+from autogluon.core.utils import try_import_autogluon_vision
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +226,7 @@ class ImagePredictorModel(AbstractModel):
         return len(pickle.dumps(self.model._classifier, pickle.HIGHEST_PROTOCOL))
 
     def _get_default_resources(self):
-        num_cpus = get_cpu_count()
+        num_cpus = ResourceManager.get_cpu_count()
         try_import_autogluon_vision()
         from autogluon.vision import ImagePredictor
         num_gpus = ImagePredictor._get_num_gpus_available()
