@@ -16,4 +16,9 @@ install_multimodal
 install_vision
 
 cd vision/
-python3 -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
+if [ -z "$ADDITIONAL_TEST_ARGS" ]
+then
+    python3 -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
+else
+    python3 -m pytest --junitxml=results.xml --runslow tests
+fi
