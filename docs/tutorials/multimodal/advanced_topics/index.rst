@@ -10,15 +10,22 @@ Advanced Topics
       In the tutorial, we will use combine IA^3, BitFit, and gradient checkpointing to finetune FLAN-T5-XL.
 
    .. card::
+      :title: HPO in AutoMM
+      :link: hyperparameter_optimization.html
+
+      How to customize AutoMM configurations.
+
+   .. card::
       :title: Customize AutoMM
       :link: customization.html
 
       How to customize AutoMM configurations.
-
+   
 
 .. toctree::
    :maxdepth: 1
    :hidden:
 
    efficient_finetuning_basic
+   hyperparameter_optimization
    customization
