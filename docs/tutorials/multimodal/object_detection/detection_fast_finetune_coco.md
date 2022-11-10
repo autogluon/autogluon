@@ -40,7 +40,7 @@ predictor = MultiModalPredictor(
         "model.mmdet_image.checkpoint_name": checkpoint_name,
         "env.num_gpus": num_gpus,
     },
-    pipeline="object_detection",
+    problem_type="object_detection",
     sample_data_path=train_path,
 )
 ```
@@ -54,7 +54,7 @@ predictor = MultiModalPredictor(
         "model.mmdet_image.checkpoint_name": checkpoint_name,
         "env.num_gpus": num_gpus,
     },
-    pipeline="object_detection",
+    problem_type="object_detection",
     classes=voc_classes,
 )
 ```
