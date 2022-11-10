@@ -9,8 +9,6 @@ import numpy.testing as npt
 import pytest
 from omegaconf import OmegaConf
 from torch import nn
-from unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
-from utils import get_home_dir
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import (
@@ -32,6 +30,9 @@ from autogluon.multimodal.constants import (
     UNIFORM_SOUP,
 )
 from autogluon.multimodal.utils import modify_duplicate_model_names
+
+from ..others.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
+from ..others.utils import get_home_dir
 
 ALL_DATASETS = {
     "petfinder": PetFinderDataset,

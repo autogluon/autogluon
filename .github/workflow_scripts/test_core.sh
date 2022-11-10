@@ -11,4 +11,9 @@ install_core_all_tests
 python3 -m pip install ray_lightning==0.2.0  # TODO Change this line once we support ray_lightning 0.3.0
 
 cd core/
-python3 -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
+if [ -n "$ADDITIONAL_TEST_ARGS" ]
+then
+    python3 -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
+else
+    python3 -m pytest --junitxml=results.xml --runslow tests
+fi
