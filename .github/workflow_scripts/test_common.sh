@@ -10,4 +10,4 @@ setup_build_env
 install_common
 
 cd common/
-python3 -m pytest --mypy --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
+python3 -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
