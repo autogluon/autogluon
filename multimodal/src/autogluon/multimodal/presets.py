@@ -10,7 +10,7 @@ matcher_presets = Registry("matcher_presets")
 @automm_presets.register()
 def default():
     return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
     }
@@ -19,7 +19,7 @@ def default():
 @automm_presets.register()
 def medium_quality_faster_train():
     return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
         "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
         "optimization.learning_rate": 4e-4,
@@ -29,7 +29,7 @@ def medium_quality_faster_train():
 @automm_presets.register()
 def high_quality():
     return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
     }
@@ -82,6 +82,7 @@ def few_shot_text_classification():
     }
 
 
+# TODO: Consider to remove this preset
 @automm_presets.register()
 def zero_shot_classification():
     return {

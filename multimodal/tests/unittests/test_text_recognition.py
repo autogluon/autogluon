@@ -37,7 +37,7 @@ def test_mmocr_text_recognition_inference(checkpoint_name):
         hyperparameters={
             "model.mmocr_text_recognition.checkpoint_name": checkpoint_name,
         },
-        pipeline="ocr_text_recognition",
+        problem_type="ocr_text_recognition",
     )
 
     pred = predictor.predict({"image": [mmocr_image_name]})

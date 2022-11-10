@@ -30,7 +30,7 @@ def test_distillation():
     student_hyperparameters = {
         "optimization.max_epochs": 1,
         "model.names": ["hf_text", "timm_image", "fusion_mlp"],
-        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
@@ -56,7 +56,7 @@ def test_distillation():
     teacher_predictor = teacher_predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=teacher_hyperparameters,
-        time_limit=30,
+        time_limit=10,
         save_path=teacher_save_path,
     )
 
@@ -75,7 +75,7 @@ def test_distillation():
         train_data=dataset.train_df,
         teacher_predictor=teacher_predictor,
         hyperparameters=student_hyperparameters,
-        time_limit=30,
+        time_limit=10,
         save_path=student_save_path,
     )
     verify_predictor_save_load(predictor, dataset.test_df)
@@ -95,7 +95,7 @@ def test_distillation():
         train_data=dataset.train_df,
         teacher_predictor=teacher_predictor.path,
         hyperparameters=student_hyperparameters,
-        time_limit=30,
+        time_limit=10,
         save_path=student_save_path,
     )
 
