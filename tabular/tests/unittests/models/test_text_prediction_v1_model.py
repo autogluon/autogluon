@@ -3,6 +3,7 @@ import pytest
 
 # FIXME: Post 0.1, refit_full by storing the iteration idx for reaching the best performance.
 @pytest.mark.gpu
+@pytest.skip("Temporary skip the unittest")
 def test_text_prediction_v1_sts(fit_helper):
     fit_args = dict(
         hyperparameters={'AG_TEXT_NN': {
