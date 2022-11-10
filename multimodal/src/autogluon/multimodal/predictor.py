@@ -453,7 +453,9 @@ class MultiModalPredictor:
                     classes=self._classes,
                     init_scratch=self._init_scratch,
                 )
-                self._validation_metric_name = self._config["optimization"]["val_metric"]  # TODO: only object detection is using this
+                self._validation_metric_name = self._config["optimization"][
+                    "val_metric"
+                ]  # TODO: only object detection is using this
 
     @property
     def path(self):
