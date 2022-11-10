@@ -10,7 +10,7 @@ setup_build_env
 install_common
 
 cd common/
-if [ -z "$ADDITIONAL_TEST_ARGS" ]
+if [ -n "$ADDITIONAL_TEST_ARGS" ]
 then
     python3 -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
 else
