@@ -73,7 +73,7 @@ class TimeSeriesPredictor:
 
         If ``known_covariates_names`` are provided, then:
 
-        - :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will expect that ``train_data`` contains the columns listed in ``known_covariates_names``.
+        - :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate`, and :meth:`~autogluon.timeseries.TimeSeriesPredictor.leaderboard` will expect a data frame with columns listed in ``known_covariates_names`` (in addition to the ``target`` column).
         - :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict` will expect an additional keyword argument ``known_covariates`` containing the future values of the known covariates in ``TimeSeriesDataFrame`` format.
 
     quantile_levels : List[float], optional
@@ -116,9 +116,6 @@ class TimeSeriesPredictor:
     quantiles : List[float]
         Alias for :attr:`quantile_levels`.
     """
-
-    # TODO: Update description of presets after the presets are finalized
-    # TODO: Update docstring for predict
 
     predictor_file_name = "predictor.pkl"
 
@@ -498,14 +495,14 @@ class TimeSeriesPredictor:
                 2020-03-02      44          1    2.9
                 2020-03-03      72          1    2.9
         >>> predictor = TimeSeriesPredictor(prediction_length=2, known_covariates_names=["promotion", "price"]).fit(data)
-        >>> print(known_covariates)
+        >>> print(future_known_covariates)
                             promotion  price
         item_id timestamp
         A       2020-01-08          1   12.9
                 2020-01-09          1   12.9
         B       2020-03-04          0    5.0
                 2020-03-05          0    7.0
-        >>> predictor.predict(data, known_covariates=known_covariates)
+        >>> predictor.predict(data, known_covariates=future_known_covariates)
                             target
         item_id timestamp
         A       2020-01-08      30

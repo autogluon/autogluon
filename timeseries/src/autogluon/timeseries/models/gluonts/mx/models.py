@@ -411,6 +411,7 @@ class TransformerMXNetModel(AbstractGluonTSMXNetModel):
         Learning rate used during training
     """
 
+    # TODO: Enable static and dynamic features
     gluonts_estimator_class: Type[GluonTSEstimator] = TransformerEstimator
 
 
