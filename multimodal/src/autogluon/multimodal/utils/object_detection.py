@@ -1,9 +1,8 @@
 import json
 import logging
 import os
-import warnings
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Union
 
 import defusedxml.ElementTree as ET
 import numpy as np
@@ -19,7 +18,6 @@ def from_voc(
     root: str,
     splits: Optional[Union[str, tuple]] = None,
     exts: Optional[Union[str, tuple]] = (".jpg", ".jpeg", ".png"),
-    return_class_names: Optional[bool] = False,
 ):
     """
     Construct dataframe from pascal VOC format. Modified from gluon cv.
@@ -50,7 +48,7 @@ def from_voc(
     rpath = Path(root).expanduser()
     img_list = []
 
-    class_names = get_voc_classes(root)
+    class_names = get_detection_classes(root)
 
     NAME_TO_IDX = dict(zip(class_names, range(len(class_names))))
     name_to_index = lambda name: NAME_TO_IDX[name]
@@ -115,26 +113,6 @@ def from_voc(
     df["label"] = df.loc[:, "rois"].copy()
 
     return df.sort_values("image").reset_index(drop=True)
-
-
-def get_voc_classes(root):
-    if is_url(root):
-        root = download(root)
-    rpath = Path(root).expanduser()
-
-    labels_file = os.path.join(rpath, "labels.txt")
-    if os.path.exists(labels_file):
-        with open(labels_file) as f:
-            class_names = [line.rstrip().lower() for line in f]
-        print(f"using class_names in labels.txt: {class_names}")
-    else:
-        logger.warning(
-            "labels.txt does not exist, using default VOC names. "
-            "To create labels.txt, run ls Annotations/* > pathlist.txt in root dir"
-        )
-        class_names = VOC_CLASSES
-
-    return class_names
 
 
 def import_try_install(package: str, extern_url: Optional[str] = None):
@@ -641,6 +619,111 @@ def cocoeval(outputs, data, anno_file, cache_path, metrics, tool="pycocotools"):
         return cocoeval_torchmetrics(outputs)
 
 
+def dump_voc_classes(voc_annotation_path: str, voc_class_names_output_path: str = None) -> [str]:
+    """
+    Reads annotations for a dataset in VOC format.
+    Then
+        dumps the unique class names into a labels.txt file.
+    Parameters
+    ----------
+    voc_annotation_path
+        root_path for annotations in VOC format
+    voc_class_names_output_path
+        output path for the labels.txt
+    Returns
+    -------
+    list of strings, [class_name0, class_name1, ...]
+    """
+    files = os.listdir(voc_annotation_path)
+    class_names = set()
+    for f in files:
+        if f.endswith(".xml"):
+            xml_path = os.path.join(voc_annotation_path, f)
+            tree = ET.parse(xml_path)
+            root = tree.getroot()
+            for boxes in root.iter("object"):
+                class_names.add(boxes.find("name").text)
+
+    sorted_class_names = sorted(list(class_names))
+    if voc_class_names_output_path:
+        with open(voc_class_names_output_path, "w") as f:
+            f.writelines("\n".join(sorted_class_names))
+
+    return sorted_class_names
+
+
+def dump_voc_xml_files(voc_annotation_path: str, voc_annotation_xml_output_path: str = None) -> [str]:
+    """
+    Reads annotations for a dataset in VOC format.
+    Then
+        1. dumps the unique class names into labels.txt file.
+        2. dumps the xml annotation file names into pathlist.txt file.
+    Parameters
+    ----------
+    voc_annotation_path
+        root_path for annotations in VOC format
+    voc_annotation_xml_output_path
+        output path for the pathlist.txt
+    Returns
+    -------
+        list of strings, [xml_file0, xml_file1, ...]
+    """
+    files = os.listdir(voc_annotation_path)
+    annotation_path_base_name = os.path.basename(voc_annotation_path)
+    xml_file_names = []
+    for f in files:
+        if f.endswith(".xml"):
+            xml_file_names.append(os.path.join(annotation_path_base_name, f))
+
+    if voc_annotation_xml_output_path:
+        with open(voc_annotation_xml_output_path, "w") as f:
+            f.writelines("\n".join(xml_file_names))
+
+    return xml_file_names
+
+
+def process_voc_annotations(
+    voc_annotation_path: str, voc_class_names_output_path: str, voc_annotation_xml_output_path: str
+) -> None:
+    """
+    Reads annotations for a dataset in VOC format.
+    Then
+        1. dumps the unique class names into labels.txt file.
+        2. dumps the xml annotation file names into pathlist.txt file.
+    Parameters
+    ----------
+    voc_annotation_path
+        root_path for annotations in VOC format
+    voc_class_names_output_path
+        output path for the labels.txt
+    voc_annotation_xml_output_path
+        output path for the pathlist.txt
+    Returns
+    -------
+        None
+    """
+    files = os.listdir(voc_annotation_path)
+    annotation_path_base_name = os.path.basename(voc_annotation_path)
+    class_names = set()
+    xml_file_names = []
+    for f in files:
+
+        xml_path = os.path.join(voc_annotation_path, f)
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+        for boxes in root.iter("object"):
+            class_names.add(boxes.find("name").text)
+
+        xml_file_names.append(os.path.join(annotation_path_base_name, f))
+
+    sorted_class_names = sorted(list(class_names))
+    with open(voc_class_names_output_path, "w") as f:
+        f.writelines("\n".join(sorted_class_names))
+
+    with open(voc_annotation_xml_output_path, "w") as f:
+        f.writelines("\n".join(xml_file_names))
+
+
 def from_coco_or_voc(file_path, splits: Optional[str] = None):
     if os.path.isdir(file_path):
         # VOC use dir as input
@@ -658,8 +741,27 @@ def get_coco_format_classes(sample_data_path):
     return [cat["name"] for cat in annotation["categories"]]
 
 
-def get_voc_format_classes(sample_data_path):
-    return NotImplementedError
+def get_voc_format_classes(root):
+    if is_url(root):
+        root = download(root)
+    rpath = Path(root).expanduser()
+
+    labels_file = os.path.join(rpath, "labels.txt")
+    if os.path.exists(labels_file):
+        with open(labels_file) as f:
+            class_names = [line.rstrip().lower() for line in f]
+        print(f"using class_names in labels.txt: {class_names}")
+    else:
+        ## read the class names and save results
+        logger.warning(
+            "labels.txt does not exist, using default VOC names. "
+            "To create labels.txt, run ls Annotations/* > pathlist.txt in root dir"
+        )
+        class_names = dump_voc_classes(
+            voc_annotation_path=os.path.join(root, "Annotations"), voc_class_names_output_path=labels_file
+        )
+
+    return class_names
 
 
 def get_detection_classes(sample_data_path):
@@ -667,3 +769,305 @@ def get_detection_classes(sample_data_path):
         return get_voc_format_classes(sample_data_path)
     else:
         return get_coco_format_classes(sample_data_path)
+
+
+def visualize_detection(
+    pred: Iterable,
+    data: Union[pd.DataFrame, Dict],
+    detection_classes: List[str],
+    conf_threshold: float,
+    visualization_result_dir: str,
+) -> List[np.ndarray]:
+    """
+    Visualize detection results for one image, and save to visualization_result_dir
+
+    Parameters
+    ----------
+    pred
+        List containing detection results
+    data
+        The image info for the testing images
+    detection_classes
+        All classes for detection
+    conf_threshold
+        Bounding box confidence threshold to filter unwanted detections
+    visualization_result_dir
+        Directory to save the visualization results
+    Returns
+    -------
+    an List of np.ndarray of visualized images
+    """
+    try:
+        import cv2
+    except:
+        raise ImportError("No module named: cv2. Please install cv2 by 'pip install cv2'")
+
+    if not os.path.exists(visualization_result_dir):
+        os.makedirs(visualization_result_dir, exist_ok=True)
+
+    if isinstance(data, dict):
+        image_paths = data["image"]
+    else:
+        image_paths = data["image"].to_list()
+    idx2classname = {i: classname for (i, classname) in enumerate(detection_classes)}
+    visualized_images = []
+    for image_pred, image_path in zip(pred, image_paths):
+        im = cv2.imread(image_path)
+        tlwhs = []
+        obj_ids = []
+        conf_scores = []
+        for idx, per_cls_bboxes in enumerate(image_pred):
+            for bbox in per_cls_bboxes:
+                ## x1, y1, x2, y2, conf_score
+                if bbox[4] > conf_threshold:
+                    tlwhs.append(bbox_xyxy_to_xywh(list(bbox[:4])))
+                    obj_ids.append(idx)
+                    conf_scores.append(bbox[4])
+
+        visualized_im = plot_detections(im, tlwhs, obj_ids, idx2classname, conf_threshold, scores=conf_scores)
+        visualized_images.append(visualized_im)
+        imgname = os.path.basename(image_path)
+        cv2.imwrite(os.path.join(visualization_result_dir, imgname), visualized_im)
+    logger.info("Saved visualizations to {}".format(visualization_result_dir))
+    return visualized_images
+
+
+def plot_detections(
+    image,
+    tlwhs,
+    obj_ids,
+    idx2classname,
+    conf_threshold,
+    scores=None,
+    text_scale=0.75,
+    text_thickness=1,
+    line_thickness=2,
+    alpha=0.5,
+):
+    """
+    Plot the detections on to the corresponding image
+
+    Parameters
+    ----------
+    image
+        np.ndarray: np array containing the image data
+    tlwhs
+        list: list containing the bounding boxes in (x1, y1, x2, y2) format
+    obj_ids
+        list: list containing the class indices of the bounding boxes, length should match tlwhs
+    idx2classname
+        dict: maps obj_ids to class name (str)
+    conf_threshold
+        float: confidence threshold to filter bounding boxes
+    scores
+        list: confidence scores of the bounding boxes, length should match tlwhs
+    text_scale
+        float: font size of the text display
+    text_thickness
+        int: font weight of the text display
+    line_thickness
+        int: line width of the bounding box display
+    alpha
+        float: opacity of the text display background color
+
+    Returns
+    -------
+    an np.ndarray of visualized image
+    """
+    # TODO: Convert to use mmdet package
+    try:
+        import cv2
+    except:
+        raise ImportError("No module named: cv2. Please install cv2 by 'pip install cv2'")
+    im = np.ascontiguousarray(np.copy(image))
+    im_h, im_w = im.shape[:2]
+
+    font = cv2.FONT_HERSHEY_DUPLEX
+    text_scale = text_scale if im_w > 500 else text_scale * 0.8
+
+    title = "num_det: %d conf: %.2f" % (len(tlwhs), conf_threshold)
+    im = add_text_with_bg_color(
+        im=im,
+        text=title,
+        tl=(0, 0),
+        bg_color=(0, 0, 0),
+        alpha=alpha,
+        font=font,
+        text_scale=text_scale,
+        text_thickness=text_thickness,
+    )
+
+    for i, tlwh in enumerate(tlwhs):
+        x1, y1, w, h = tlwh
+        intbox = tuple(map(int, (x1, y1, x1 + w, y1 + h)))
+        obj_id = int(obj_ids[i])
+        id_text = idx2classname[obj_ids[i]]
+        if scores is not None:
+            id_text = id_text + ",{:.3f}".format(float(scores[i]))
+        color = get_color(abs(obj_id))
+        im = add_bbox_with_alpha(
+            im=im, tl=intbox[0:2], br=intbox[2:4], line_color=color, alpha=alpha, line_thickness=line_thickness
+        )
+        im = add_text_with_bg_color(
+            im=im,
+            text=id_text,
+            tl=(intbox[0], intbox[1]),
+            bg_color=color,
+            alpha=0.75,
+            font=font,
+            text_scale=text_scale,
+            text_thickness=text_thickness,
+        )
+    return im
+
+
+def add_bbox_with_alpha(im: np.ndarray, tl: tuple, br: tuple, line_color: tuple, alpha: float, line_thickness: int):
+    """
+    draw one box borders with transparency (alpha)
+
+    Parameters
+    ----------
+    im
+        np.ndarray: the image to draw bbox on
+    tl
+        tuple: bottom right corner of the bounding box: tl = (x1, y1)
+    br
+        tuple: bottom right corner of the bounding box: br = (x1, y1)
+    line_color
+        tuple: the color of the box borders, e.g. (0, 0, 0)
+    alpha
+        float: the opacity of the bbox borders
+    line_thickness:
+        int: thickness of the border
+    Returns
+    -------
+    an np.ndarray of image with added bbox
+    """
+    try:
+        import cv2
+    except:
+        raise ImportError("No module named: cv2. Please install cv2 by 'pip install cv2'")
+    overlay = im.copy()
+    cv2.rectangle(overlay, tl, br, line_color, thickness=line_thickness)
+    im = cv2.addWeighted(overlay, alpha, im, 1 - alpha, 0)
+    return im
+
+
+def add_text_with_bg_color(
+    im: np.ndarray,
+    text: str,
+    tl: tuple,
+    bg_color: tuple,
+    alpha: float,
+    font,
+    text_scale: float,
+    text_thickness: int,
+    text_vert_padding: int = None,
+):
+    """
+    Add text to im with background color
+
+    Parameters
+    ----------
+    im
+        np.ndarray: the image to add text on
+    text
+        string: the text content
+    tl
+        tuple: top left corner of the text region, tl = (x1, y1)
+    bg_color
+        tuple: the color of the background, e.g. (0, 0, 0)
+    alpha
+        float: the opacity of the background
+    font
+        the font of the text, e.g. cv2.FONT_HERSHEY_DUPLEX
+    text_scale
+        float: the scale (font size) of the text, e.g. 0.75
+    text_thickness
+        int: the font weight of the text, e.g. 1
+    text_vert_padding
+        int: vertical padding of the text on each side
+    Returns
+    -------
+    an np.ndarray of image with added text
+    """
+    try:
+        import cv2
+    except:
+        raise ImportError("No module named: cv2. Please install cv2 by 'pip install cv2'")
+
+    x1, y1 = tl
+
+    overlay = im.copy()
+    text_size, _ = cv2.getTextSize(text, font, float(text_scale), text_thickness)
+    text_w, text_h = text_size
+
+    text_vert_padding = text_vert_padding if text_vert_padding else int(text_h * 0.1)
+
+    y1 = max(y1 - text_h - text_vert_padding * 2, 0)
+
+    cv2.rectangle(overlay, (x1, y1), (x1 + text_w, y1 + text_h + text_vert_padding * 2), bg_color, -1)
+    im = cv2.addWeighted(overlay, alpha, im, 1 - alpha, 0)
+    cv2.putText(
+        im, text, (x1, y1 + text_h + text_vert_padding), font, text_scale, (255, 255, 255), thickness=text_thickness
+    )
+    return im
+
+
+def get_color(idx):
+    idx = idx * 3
+    color = ((37 * idx) % 255, (17 * idx) % 255, (29 * idx) % 255)
+    return color
+
+
+def save_result_df(pred: Iterable, data: Union[pd.DataFrame, Dict], result_path: str, detection_classes: List[str]):
+    """
+    Saving detection results in pd.DataFrame format (per image)
+
+    Parameters
+    ----------
+    pred
+        List containing detection results for one image
+    data
+        pandas data frame or dict containing the image information to be tested
+    result_path
+        path to save result
+    detection_classes
+        all available classes for this detection
+    Returns
+    -------
+    None
+    """
+    if isinstance(data, dict):
+        image_names = data["image"]
+    else:
+        image_names = data["image"].to_list()
+    results = []
+    idx2classname = {i: classname for (i, classname) in enumerate(detection_classes)}
+
+    for image_pred, image_name in zip(pred, image_names):
+        box_info = []
+        for class_idx, bboxes in enumerate(image_pred):
+            pred_class = idx2classname[class_idx]
+
+            for bbox in bboxes:
+                box_info.append({"class": pred_class, "bbox": list(bbox[:4]), "score": bbox[4]})
+        results.append([image_name, box_info])
+    result_df = pd.DataFrame(results, columns=["image", "bboxes"])
+    result_df.to_csv(result_path, index=False)
+    logger.info("Saved detection results to {}".format(result_path))
+
+
+def save_result_coco_format(detection_data_path, pred, result_path):
+    coco_dataset = COCODataset(detection_data_path)
+    result_name, _ = os.path.splitext(result_path)
+    result_path = result_name + ".json"
+    coco_dataset.save_result(pred, from_coco_or_voc(detection_data_path, "test"), save_path=result_path)
+    logger.info(25, f"Saved detection result to {result_path}")
+
+
+def save_result_voc_format(pred, result_path):
+    result_name, _ = os.path.splitext(result_path)
+    result_path = result_name + ".npy"
+    np.save(result_path, pred)
+    logger.info(25, f"Saved detection result to {result_path}")
