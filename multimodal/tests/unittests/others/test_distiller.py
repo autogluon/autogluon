@@ -1,11 +1,11 @@
 import os
 import shutil
 
-from test_predictor import verify_predictor_save_load
-from unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
-from utils import get_home_dir
-
 from autogluon.multimodal import MultiModalPredictor
+
+from ..predictor.test_predictor import verify_predictor_save_load
+from .unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
+from .utils import get_home_dir
 
 ALL_DATASETS = {
     "petfinder": PetFinderDataset,
