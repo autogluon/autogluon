@@ -31,7 +31,6 @@ With AutoMM, you just need to specify the query, response, and label column name
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.constants import BINARY, MULTICLASS, QUERY, RESPONSE, UNIFORM_SOUP
 
 # Initialize the model
 matcher = MultiModalPredictor(
@@ -46,7 +45,6 @@ matcher = MultiModalPredictor(
 matcher.fit(
     train_data=snli_train,
     time_limit=180,
-    save_path="text_matcher",
 )
 ```
 
