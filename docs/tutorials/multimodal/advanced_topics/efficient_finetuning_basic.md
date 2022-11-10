@@ -155,34 +155,35 @@ predictor.fit(train_en_df_downsample,
 
 ```
 
-    Global seed set to 123
-    Auto select gpus: [0]
-    GPU available: True (cuda), used: True
-    TPU available: False, using: 0 TPU cores
-    IPU available: False, using: 0 IPUs
-    HPU available: False, using: 0 HPUs
-    LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
-    
-      | Name              | Type                         | Params
-    -------------------------------------------------------------------
-    0 | model             | HFAutoModelForTextPrediction | 1.2 B 
-    1 | validation_metric | AUROC                        | 0     
-    2 | loss_func         | CrossEntropyLoss             | 0     
-    -------------------------------------------------------------------
-    203 K     Trainable params
-    1.2 B     Non-trainable params
-    1.2 B     Total params
-    4,894.913 Total estimated model params size (MB)
-    Epoch 0, global step 20: 'val_roc_auc' reached 0.88802 (best 0.88802), saving model to '/home/ubuntu/autogluon/docs/tutorials/multimodal/advanced_topics/multilingual_ia3_gradient_checkpoint/epoch=0-step=20.ckpt' as top 1
-    Epoch 0, global step 40: 'val_roc_auc' reached 0.94531 (best 0.94531), saving model to '/home/ubuntu/autogluon/docs/tutorials/multimodal/advanced_topics/multilingual_ia3_gradient_checkpoint/epoch=0-step=40.ckpt' as top 1
-    `Trainer.fit` stopped: `max_epochs=1` reached.
+```
+Global seed set to 123
+Auto select gpus: [0]
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name              | Type                         | Params
+-------------------------------------------------------------------
+0 | model             | HFAutoModelForTextPrediction | 1.2 B 
+1 | validation_metric | AUROC                        | 0     
+2 | loss_func         | CrossEntropyLoss             | 0     
+-------------------------------------------------------------------
+203 K     Trainable params
+1.2 B     Non-trainable params
+1.2 B     Total params
+4,894.913 Total estimated model params size (MB)
+Epoch 0, global step 20: 'val_roc_auc' reached 0.88802 (best 0.88802), saving model to '/home/ubuntu/autogluon/docs/tutorials/multimodal/advanced_topics/multilingual_ia3_gradient_checkpoint/epoch=0-step=20.ckpt' as top 1
+Epoch 0, global step 40: 'val_roc_auc' reached 0.94531 (best 0.94531), saving model to '/home/ubuntu/autogluon/docs/tutorials/multimodal/advanced_topics/multilingual_ia3_gradient_checkpoint/epoch=0-step=40.ckpt' as top 1
+`Trainer.fit` stopped: `max_epochs=1` reached.
 
 
 
 
 
-    <autogluon.multimodal.predictor.MultiModalPredictor at 0x7fd58c4dbca0>
-
+<autogluon.multimodal.predictor.MultiModalPredictor at 0x7fd58c4dbca0>
+```
 
 
 
@@ -191,8 +192,9 @@ score_in_en = predictor.evaluate(test_en_df)
 print('Score in the English Testset:', score_in_en)
 ```
 
-    Score in the English Testset: {'roc_auc': 0.931263189629183}
-
+```
+Score in the English Testset: {'roc_auc': 0.931263189629183}
+```
 
 
 ```python
