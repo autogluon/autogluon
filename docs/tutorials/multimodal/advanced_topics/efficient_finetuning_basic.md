@@ -130,7 +130,7 @@ shutil.rmtree("multilingual_ia3")
 ```
 
 
-```{.python}
+```python
 from autogluon.multimodal import MultiModalPredictor
 
 train_en_df_downsample = train_en_df.sample(200, random_state=123) 
@@ -186,7 +186,7 @@ predictor.fit(train_en_df_downsample,
 
 
 
-```{.python}
+```python
 score_in_en = predictor.evaluate(test_en_df)
 print('Score in the English Testset:', score_in_en)
 ```
@@ -195,7 +195,7 @@ print('Score in the English Testset:', score_in_en)
 
 
 
-```{.python}
+```python
 # Just for clean the space
 clear_cache()
 shutil.rmtree("multilingual_ia3_gradient_checkpoint")
