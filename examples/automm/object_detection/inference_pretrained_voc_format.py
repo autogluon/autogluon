@@ -41,8 +41,6 @@ def eval_pretrained_voc_format(
     save_results=True,
     result_path=None,
 ):
-    # TODO: remove label
-    # TODO: replace pipeline with problem type
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,

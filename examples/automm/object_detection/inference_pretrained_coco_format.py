@@ -46,8 +46,6 @@ def eval_pretrained_coco_format(
     save_results=True,
     result_path="coco17/annotations/instances_val2017_results.json",
 ):
-    # TODO: remove label
-    # TODO: replace pipeline with problem type
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,

@@ -9,7 +9,7 @@ The example to visualize detection results in COCO dataset (COCO format):
 
 import argparse
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.utils import visualize_results, from_coco_or_voc
+from autogluon.multimodal.utils import from_coco_or_voc
 
 
 def tutorial_script_for_visualize_detection_results():
@@ -32,19 +32,17 @@ def tutorial_script_for_visualize_detection_results():
 
     df = from_coco_or_voc(test_path)[:10][["image"]]
 
-    pred = predictor.predict(df)
-
-    for result, data in zip(pred, df["image"].to_list()):
-        visualized_image = visualize_results(result, data, test_path, visualization_result_dir,
-                                             conf_threshold=conf_threshold)
+    pred = predictor.predict(
+        df, visualize_results=True, visualize_path=visualization_result_dir, visualize_conf_th=conf_threshold
+    )
 
 
 def visualize_detection_results(
-        checkpoint_name: str = "faster_rcnn_r50_fpn_1x_voc0712",
-        test_path: str = "VOCdevkit/VOC2007",
-        num_gpus: int = -1,
-        visualization_result_dir: str = "VOCdevkit/VOC2007/visualizations",
-        conf_threshold: float = 0.3
+    checkpoint_name: str = "faster_rcnn_r50_fpn_1x_voc0712",
+    test_path: str = "VOCdevkit/VOC2007",
+    num_gpus: int = -1,
+    visualization_result_dir: str = "VOCdevkit/VOC2007/visualizations",
+    conf_threshold: float = 0.3,
 ):
     predictor = MultiModalPredictor(
         hyperparameters={
@@ -56,11 +54,9 @@ def visualize_detection_results(
 
     df = from_coco_or_voc(test_path)[:10][["image"]]
 
-    pred = predictor.predict(df)
-
-    for result, data in zip(pred, df["image"].to_list()):
-        visualized_image = visualize_results(result, data, test_path, visualization_result_dir,
-                                             conf_threshold=conf_threshold)
+    pred = predictor.predict(
+        df, visualize_results=True, visualize_path=visualization_result_dir, visualize_conf_th=conf_threshold
+    )
 
 
 if __name__ == "__main__":
@@ -68,7 +64,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_path", default="coco17/annotations/instances_val2017.json", type=str)
     parser.add_argument("--checkpoint_name", default="vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco", type=str)
     parser.add_argument("--num_gpus", default=1, type=int)
-    parser.add_argument("--visualization_result_dir", default="coco17/visualizations", type=str)
+    parser.add_argument("--visualization_result_dir", default=None, type=str)
     parser.add_argument("--visualization_conf_threshold", default=0.3, type=float)
     args = parser.parse_args()
 
@@ -77,5 +73,5 @@ if __name__ == "__main__":
         checkpoint_name=args.checkpoint_name,
         num_gpus=args.num_gpus,
         visualization_result_dir=args.visualization_result_dir,
-        conf_threshold=args.visualization_conf_threshold
+        conf_threshold=args.visualization_conf_threshold,
     )

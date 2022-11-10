@@ -53,7 +53,7 @@ from .object_detection import (
     save_result_coco_format,
     save_result_df,
     save_result_voc_format,
-    visualize_results,
+    visualize_detection,
 )
 from .onnx import get_onnx_input
 from .pipeline import init_pretrained, init_pretrained_matcher

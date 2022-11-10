@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Iterable, Optional, Union
+from typing import Dict, Iterable, List, Optional, Union
 
 import defusedxml.ElementTree as ET
 import numpy as np
@@ -755,52 +755,61 @@ def get_detection_classes(sample_data_path):
         return get_coco_format_classes(sample_data_path)
 
 
-def visualize_results(
-    image_pred: Iterable, image_path: str, test_path: str, visualization_result_dir: str, conf_threshold: float
-) -> np.ndarray:
+def visualize_detection(
+    pred: Iterable,
+    data: Union[pd.DataFrame, Dict],
+    detection_classes: List[str],
+    conf_threshold: float,
+    visualization_result_dir: str,
+) -> List[np.ndarray]:
     """
     Visualize detection results for one image, and save to visualization_result_dir
 
     Parameters
     ----------
-    image_pred
-        List containing detection results for one image
-    image_path
-        The image path for the target image to visualize
-    test_path
-        Annotation path for the testing dataset (either in VOC or COCO format)
-            - for VOC format: e.g. VOCdevkit/VOC2007/Annotations
-            - for COCO format: e.g. coco17/annotations/instances_val2017.json
-
+    pred
+        List containing detection results
+    data
+        The image info for the testing images
+    detection_classes
+        All classes for detection
+    conf_threshold
+        Bounding box confidence threshold to filter unwanted detections
+    visualization_result_dir
+        Directory to save the visualization results
     Returns
     -------
-    an np.ndarray of visualized image
+    an List of np.ndarray of visualized images
     """
     try:
         import cv2
     except:
         raise ImportError("No module named: cv2. Please install cv2 by 'pip install cv2'")
 
-    im = cv2.imread(image_path)
-    tlwhs = []
-    obj_ids = []
-    conf_scores = []
-    detection_classes = get_detection_classes(test_path)
+    if isinstance(data, dict):
+        image_paths = data["image"]
+    else:
+        image_paths = data["image"].to_list()
     idx2classname = {i: classname for (i, classname) in enumerate(detection_classes)}
-    for idx, per_cls_bboxes in enumerate(image_pred):
-        for bbox in per_cls_bboxes:
-            ## x1, y1, x2, y2, conf_score
-            if bbox[4] > conf_threshold:
-                tlwhs.append(bbox_xyxy_to_xywh(list(bbox[:4])))
-                obj_ids.append(idx)
-                conf_scores.append(bbox[4])
+    visualized_images = []
+    for image_pred, image_path in zip(pred, image_paths):
+        im = cv2.imread(image_path)
+        tlwhs = []
+        obj_ids = []
+        conf_scores = []
+        for idx, per_cls_bboxes in enumerate(image_pred):
+            for bbox in per_cls_bboxes:
+                ## x1, y1, x2, y2, conf_score
+                if bbox[4] > conf_threshold:
+                    tlwhs.append(bbox_xyxy_to_xywh(list(bbox[:4])))
+                    obj_ids.append(idx)
+                    conf_scores.append(bbox[4])
 
-    visualized_im = plot_detections(im, tlwhs, obj_ids, idx2classname, conf_threshold, scores=conf_scores)
-    imgname = os.path.basename(image_path)
-    if not os.path.exists(visualization_result_dir):
-        os.makedirs(visualization_result_dir, exist_ok=True)
-    cv2.imwrite(os.path.join(visualization_result_dir, imgname), visualized_im)
-    return visualized_im
+        visualized_im = plot_detections(im, tlwhs, obj_ids, idx2classname, conf_threshold, scores=conf_scores)
+        visualized_images.append(visualized_im)
+        imgname = os.path.basename(image_path)
+        cv2.imwrite(os.path.join(visualization_result_dir, imgname), visualized_im)
+    return visualized_images
 
 
 def plot_detections(
@@ -990,9 +999,48 @@ def get_color(idx):
     return color
 
 
-def save_result_df(pred: Iterable, data: pd.DataFrame, result_path: str, detection_data_path: str = None):
+def save_result_df(pred: Iterable, data: Union[pd.DataFrame, Dict], result_path: str, detection_classes: List[str]):
     """
-    Add text to im with background color
+    Saving detection results in pd.DataFrame format (per image)
+
+    Parameters
+    ----------
+    pred
+        List containing detection results for one image
+    data
+        pandas data frame or dict containing the image information to be tested
+    result_path
+        path to save result
+    detection_classes
+        all available classes for this detection
+    Returns
+    -------
+    None
+    """
+    if isinstance(data, dict):
+        image_names = data["image"]
+    else:
+        image_names = data["image"].to_list()
+    results = []
+    idx2classname = {i: classname for (i, classname) in enumerate(detection_classes)}
+
+    for image_pred, image_name in zip(pred, image_names):
+        box_info = []
+        for class_idx, bboxes in enumerate(image_pred):
+            pred_class = idx2classname[class_idx]
+
+            for bbox in bboxes:
+                box_info.append({"class": pred_class, "bbox": list(bbox[:4]), "score": bbox[4]})
+        results.append([image_name, box_info])
+    result_df = pd.DataFrame(results, columns=["image", "bboxes"])
+    result_df.to_csv(result_path, index=False)
+    logger.info("Saved detection results to {}".format(result_path))
+    print("Saved detection results to {}".format(result_path))
+
+
+def save_result_df_deprecated(pred: Iterable, data: pd.DataFrame, result_path: str, detection_data_path: str = None):
+    """
+    Saving detection results in pd.DataFrame format (per detection)
 
     Parameters
     ----------

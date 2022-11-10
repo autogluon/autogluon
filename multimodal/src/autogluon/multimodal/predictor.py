@@ -25,10 +25,10 @@ from sklearn.model_selection import train_test_split
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.common.utils.utils import setup_outputdir, setup_result_path
+from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.utils.try_import import try_import_ray_lightning
 from autogluon.core.utils.utils import default_holdout_frac
-from autogluon.multimodal.utils import save_result_df
+from autogluon.multimodal.utils import save_result_df, visualize_detection
 
 from . import version as ag_version
 from .constants import (
@@ -321,7 +321,13 @@ class MultiModalPredictor:
         self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._matcher = None
-        self._hyperparameters = hyperparameters
+
+        if not self._save_path:
+            self._save_path = setup_outputdir(
+                path=None,
+                warn_if_exist=self._warn_if_exist,
+            )
+        self._save_path = os.path.abspath(os.path.expanduser(self._save_path))
 
         if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
             warnings.warn(
@@ -2132,8 +2138,11 @@ class MultiModalPredictor:
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
         seed: Optional[int] = 123,
-        save_results: bool = False,
+        save_results: Optional[bool] = False,
         result_path: Optional[str] = None,
+        visualize_results: Optional[bool] = False,
+        visualize_path: Optional[str] = None,
+        visualize_conf_th: Optional[float] = 0.4,
     ):
         """
         Predict values for the label column of new data.
@@ -2157,10 +2166,15 @@ class MultiModalPredictor:
         seed
             The random seed to use for this prediction run.
         save_results
-            whether to save the prediction results (only works for detection now)
+            Whether to save the prediction results (only works for detection now)
         result_path
-            Where to save the result. Currently only supported in object detection.
-
+            Where to save the result. (only works for detection now)
+        visualize_results
+            Whether to visualize the detection results onto the image. (only works for detection now)
+        visualize_path
+            Where to save visualization images. (only works for detection now)
+        visualize_conf_th
+            Confidence threshold used to filter unwanted bounding boxes for visualization
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
@@ -2225,15 +2239,34 @@ class MultiModalPredictor:
         if save_results:
             ## Dumping Result for detection only now
             if self._pipeline == OBJECT_DETECTION:
-                checkpoint_name = self._hyperparameters["model.mmdet_image.checkpoint_name"]
                 if not result_path:
-                    result_path = setup_result_path(checkpoint_name)
+                    result_path = os.path.join(self._save_path, "result.txt")
+
                 save_result_df(
                     pred=pred,
                     data=data,
                     result_path=result_path,
-                    detection_data_path=detection_data_path,
+                    detection_classes=self._model.model.CLASSES,
                 )
+
+        if visualize_results:
+            ## visualize result (for detection only now)
+            if self._pipeline == OBJECT_DETECTION:
+                if not visualize_path:
+                    visualize_path = os.path.join(self._save_path, "visualizations")
+                if not os.path.exists(visualize_path):
+                    os.makedirs(visualize_path, exist_ok=True)
+
+                visualize_detection(
+                    pred=pred,
+                    data=data,
+                    detection_classes=self._model.model.CLASSES,
+                    conf_threshold=visualize_conf_th,
+                    visualization_result_dir=visualize_path,
+                )
+                logger.info("Saved visualizations to {}".format(visualize_path))
+                print("Saved visualizations to {}".format(visualize_path))
+
         return pred
 
     def predict_proba(
