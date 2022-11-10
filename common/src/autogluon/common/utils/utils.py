@@ -10,23 +10,6 @@ from typing import Dict, Any
 logger = logging.getLogger(__name__)
 
 
-def setup_result_path(checkpoint_name):
-    utcnow = datetime.utcnow()
-    timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-    result_path = f"Result{os.path.sep}ag-{timestamp}{os.path.sep}" f"{checkpoint_name}{os.path.sep}"
-    for i in range(1, 1000):
-        try:
-            os.makedirs(result_path, exist_ok=False)
-            break
-        except FileExistsError:
-            logger.log(25, f"result_path {result_path} already exists")
-    else:
-        raise RuntimeError("more than 1000 jobs launched in the same second")
-    logger.log(25, f'No result_path specified. Results will be saved in: "{result_path}"')
-    result_path = os.path.join(result_path, "results.txt")
-    return result_path
-
-
 def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None):
     if path:
         assert isinstance(

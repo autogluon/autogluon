@@ -10,7 +10,7 @@ If you want to specify a folder to save visualizations, add the following:
 
 import argparse
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.utils import from_coco_or_voc
+from autogluon.multimodal.utils import from_coco_or_voc, visualize_detection
 
 
 def tutorial_script_for_visualize_detection_results():
@@ -55,8 +55,14 @@ def visualize_detection_results(
 
     df = from_coco_or_voc(test_path)[:10][["image"]]
 
-    pred = predictor.predict(
-        df, visualize_results=True, visualize_path=visualization_result_dir, visualize_conf_th=conf_threshold
+    pred = predictor.predict(df)
+
+    visualize_detection(
+        pred=pred,
+        data=df,
+        detection_classes=predictor.get_predictor_classes(),
+        conf_threshold=conf_threshold,
+        visualization_result_dir=visualization_result_dir,
     )
 
 
@@ -65,7 +71,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_path", default="coco17/annotations/instances_val2017.json", type=str)
     parser.add_argument("--checkpoint_name", default="vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco", type=str)
     parser.add_argument("--num_gpus", default=1, type=int)
-    parser.add_argument("--visualization_result_dir", default=None, type=str)
+    parser.add_argument("--visualization_result_dir", default="coco17/visualizations/", type=str)
     parser.add_argument("--visualization_conf_threshold", default=0.3, type=float)
     args = parser.parse_args()
 

@@ -30,7 +30,7 @@ from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2log
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.utils.try_import import try_import_ray_lightning
 from autogluon.core.utils.utils import default_holdout_frac
-from autogluon.multimodal.utils import save_result_df, visualize_detection
+from autogluon.multimodal.utils import save_result_df
 
 from . import version as ag_version
 from .constants import (
@@ -2262,6 +2262,17 @@ class MultiModalPredictor:
 
         return ret
 
+    def get_predictor_classes(self):
+        """
+        returns the classes of the detection (only works for detection)
+        Parameters
+        ----------
+        Returns
+        -------
+            List of class names
+        """
+        return self._model.model.CLASSES
+
     def predict(
         self,
         data: Union[pd.DataFrame, dict, list, str],
@@ -2272,9 +2283,6 @@ class MultiModalPredictor:
         seed: Optional[int] = 123,
         save_results: Optional[bool] = False,
         result_path: Optional[str] = None,
-        visualize_results: Optional[bool] = False,
-        visualize_path: Optional[str] = None,
-        visualize_conf_th: Optional[float] = 0.4,
     ):
         """
         Predict values for the label column of new data.
@@ -2301,12 +2309,6 @@ class MultiModalPredictor:
             Whether to save the prediction results (only works for detection now)
         result_path
             Where to save the result. (only works for detection now)
-        visualize_results
-            Whether to visualize the detection results onto the image. (only works for detection now)
-        visualize_path
-            Where to save visualization images. (only works for detection now)
-        visualize_conf_th
-            Confidence threshold used to filter unwanted bounding boxes for visualization
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
@@ -2372,34 +2374,18 @@ class MultiModalPredictor:
 
         if save_results:
             ## Dumping Result for detection only now
-            if self._problem_type == OBJECT_DETECTION:
-                if not result_path:
-                    result_path = os.path.join(self._save_path, "result.txt")
+            assert (
+                self._problem_type == OBJECT_DETECTION
+            ), "Aborting: save results only works for object detection now."
+            if not result_path:
+                result_path = os.path.join(self._save_path, "result.txt")
 
-                save_result_df(
-                    pred=pred,
-                    data=data,
-                    result_path=result_path,
-                    detection_classes=self._model.model.CLASSES,
-                )
-
-        if visualize_results:
-            ## visualize result (for detection only now)
-            if self._problem_type == OBJECT_DETECTION:
-                if not visualize_path:
-                    visualize_path = os.path.join(self._save_path, "visualizations")
-                if not os.path.exists(visualize_path):
-                    os.makedirs(visualize_path, exist_ok=True)
-
-                visualize_detection(
-                    pred=pred,
-                    data=data,
-                    detection_classes=self._model.model.CLASSES,
-                    conf_threshold=visualize_conf_th,
-                    visualization_result_dir=visualize_path,
-                )
-                logger.info("Saved visualizations to {}".format(visualize_path))
-                print("Saved visualizations to {}".format(visualize_path))
+            save_result_df(
+                pred=pred,
+                data=data,
+                result_path=result_path,
+                detection_classes=self._model.model.CLASSES,
+            )
 
         return pred
 
