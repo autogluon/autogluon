@@ -4,12 +4,13 @@ import tempfile
 
 import numpy.testing as npt
 import pytest
-from ..predictor.test_predictor import verify_predictor_save_load
-from .unittest_datasets import AmazonReviewSentimentCrossLingualDataset
-from .utils import get_home_dir, protected_zip_extraction
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils import download
+
+from ..predictor.test_predictor import verify_predictor_save_load
+from .unittest_datasets import AmazonReviewSentimentCrossLingualDataset
+from .utils import get_home_dir, protected_zip_extraction
 
 
 @pytest.mark.parametrize("cls", [MultiModalPredictor])

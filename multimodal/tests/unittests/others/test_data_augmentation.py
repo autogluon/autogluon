@@ -4,9 +4,6 @@ import pickle
 import shutil
 import tempfile
 
-from ..predictor.test_predictor import verify_predictor_save_load
-from .unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
-
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import (
     BEST,
@@ -25,6 +22,9 @@ from autogluon.multimodal.constants import (
     OPTIMIZATION,
     UNIFORM_SOUP,
 )
+
+from ..predictor.test_predictor import verify_predictor_save_load
+from .unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
 
 ALL_DATASETS = {
     "petfinder": PetFinderDataset,

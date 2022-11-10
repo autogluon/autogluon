@@ -1,9 +1,10 @@
 import PIL
 import pytest
-from .unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
 
 from autogluon.multimodal.data.process_image import ImageProcessor
 from autogluon.multimodal.models import TimmAutoModelForImagePrediction
+
+from .unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
 
 ALL_DATASETS = {
     "petfinder": PetFinderDataset,
