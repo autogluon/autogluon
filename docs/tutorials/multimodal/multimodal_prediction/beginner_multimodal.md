@@ -135,6 +135,11 @@ embeddings.shape
 ## Save and Load
 It is also convenient to save a predictor and re-load it.
 
+:::warning
+
+`MultiModalPredictor.load()` used `pickle` module implicitly, which is known to be insecure. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling. Never load data that could have come from an untrusted source, or that could have been tampered with. **Only load data you trust.**
+
+:::
 
 ```{.python .input}
 predictor.save('my_saved_dir')

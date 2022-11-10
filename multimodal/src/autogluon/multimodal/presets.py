@@ -27,6 +27,24 @@ def medium_quality_faster_train():
 
 
 @automm_presets.register()
+def medium_quality_faster_inference_image_classification():
+    return {
+        "model.names": ["timm_image"],
+        "model.timm_image.checkpoint_name": "mobilenetv3_large_100",
+        "optimization.learning_rate": 1e-3,
+    }
+
+
+@automm_presets.register()
+def high_quality_fast_inference_image_classification():
+    return {
+        "model.names": ["timm_image"],
+        "model.timm_image.checkpoint_name": "resnet50",
+        "optimization.learning_rate": 1e-3,
+    }
+
+
+@automm_presets.register()
 def high_quality():
     return {
         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
@@ -42,6 +60,14 @@ def best_quality():
         "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
         "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
         "env.per_gpu_batch_size": 1,
+    }
+
+
+@automm_presets.register()
+def high_quality_image_classification():
+    return {
+        "model.names": ["timm_image"],
+        "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
     }
 
 
