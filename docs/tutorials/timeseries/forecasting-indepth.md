@@ -4,6 +4,7 @@
 This tutorial provides an in-depth overview of the time series forecasting capabilities in AutoGluon.
 
 - What is probabilistic time series forecasting?
+- Forecasting time series with external covariates
 - Which forecasting models are available in AutoGluon?
 - How does AutoGluon evaluate performance of time series models?
 - What functionality does `TimeSeriesPredictor` offer?
@@ -20,7 +21,7 @@ The main objective of time series forecasting is to predict the future values of
 
 A typical example of this task is demand forecasting.
 We can represent the number of daily purchases of a certain product as a time series.
-The goal in this case can be to predict the demand for each of the next 14 days given the historical purchase data.
+The goal in this case could be predicting the demand for each of the next 14 days given the historical purchase data.
 
 In AutoGluon, the `prediction_length` argument of the `TimeSeriesPredictor`
 determines the length of the forecast horizon.
@@ -47,30 +48,51 @@ By default, the predictor outputs the quantiles `[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 
 predictor = TimeSeriesPredictor(quantile_levels=[0.05, 0.5, 0.95])
 ```
 
+## Forecasting time series with external covariates
+In real-world forecasting problems we often have access to additional information, beyond just the raw time series values.
+AutoGluon supports two types of such additional information: static features and known covariates.
+
+### Static features
+Static features are the non-time-varying attributes of a time series.
+In the demand forecasting example, static features may include the category of the product, or its other properties like color and size.
+
+### Known covariates
+Covariates are the time-varying features that may influence the target time series.
+AutoGluon currently supports known covariates --- the time-varying features that are known in advance for the forecast horizon.
+Examples of such features include
+
+- holidays
+- promotions
+- actions taken
+
+
+
+
 ## Which forecasting models are available in AutoGluon?
 Forecasting models in AutoGluon can be divided into three broad categories: local, global, and ensemble models.
 
 **Local models** are simple statistical models that are specifically designed to capture patterns such as trend or seasonality.
 Despite their simplicity, these models often produce reasonable forecasts and serve as a strong baseline.
-Available local models include:
+Some examples of available local models:
 
 - `ETS`
 - `ARIMA`
 - `Theta`
+- `SeasonalNaive`
 
 If the dataset consists of multiple time series, we fit a separate local model to each time series — hence the name "local".
 This means, if we want to make a forecast for a new time series that wasn't part of the training set, all local models will be fit from scratch for the new time series.
 
 **Global models** are machine learning algorithms that learn a single model from the entire training set consisting of multiple time series.
-AutoGluon relies on [GluonTS](https://ts.gluon.ai/stable/) for the implementation of global models in PyTorch and MXNet.
-Available global models include:
+Most global models in AutoGluon are provided by the [GluonTS](https://ts.gluon.ai/stable/) library.
+These are neural-network algorithms (implemented in PyTorch or MXNet), such as:
 
 - `DeepAR`
 - `SimpleFeedForward`
-- `Transformer`
-- `MQRNN`
-- `MQCNN`
-- `TemporalFusionTransformer`
+- `TemporalFusionTransformerMXNet`
+
+AutoGluon also offers a tree-based global model `AutoGluonTabular`.
+Under the hood, this model converts the forecasting task into a regression problem and uses a :class:`autogluon.tabular.TabularPredictor` to fit gradient-boosted tree algorithms like XGBoost, CatBoost, and LightGBM.
 
 Finally, an **ensemble** model works by combining predictions of all other models.
 By default, `TimeSeriesPredictor` always fits a `WeightedEnsemble` on top of other models.
@@ -111,7 +133,7 @@ _, test_data_multi_window = splitter.split(test_data, prediction_length)
 
 predictor.evaluate(test_data_multi_window)
 ```
-The new test set `test_data_multi_window` will now contain `num_windows` time series for each original time series in `test_data`.
+The new test set `test_data_multi_window` will now contain up to `num_windows` time series for each original time series in `test_data`.
 The score will be computed on the last `prediction_length` time steps of each time series (marked in orange).
 
 ![MultiWindowSplitter splits each original time series into multiple evaluation instances. Forecast is evaluated on the last `prediction_length` timesteps (orange).](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth3.png)
@@ -123,7 +145,7 @@ However, this strategy decreases the amount of training data available for fitti
 
 ### How to choose and interpret the evaluation metric?
 Different evaluation metrics capture different properties of the forecast, and therefore depend on the application that the user has in mind.
-For example, weighted quantile loss (`"mean_wQuantileLoss"`) measures how well-calibrated the quantile forecast is; mean absolute scale error (`"MASE"`) compares the mean forecast to a naive baseline.
+For example, weighted quantile loss (`"mean_wQuantileLoss"`) measures how well-calibrated the quantile forecast is; mean absolute scale error (`"MASE"`) compares the mean forecast to the performance of a naive baseline.
 For more details about the available metrics, see the documentation for [autogluon.timeseries.evaluator.TimeSeriesEvaluator](https://github.com/awslabs/autogluon/blob/master/timeseries/src/autogluon/timeseries/evaluator.py#L53).
 
 Note that AutoGluon always reports all metrics in a **higher-is-better** format.
@@ -165,30 +187,28 @@ AutoGluon offers multiple ways to configure the behavior of a `TimeSeriesPredict
 We can fit `TimeSeriesPredictor` with different pre-defined configurations using the `presets` argument of the `fit` method.
 
 ```python
-predictor = TimeSeriesPredictor()
-predictor.fit(train_data=train_data, presets="medium_quality")
+predictor = TimeSeriesPredictor(...)
+predictor.fit(train_data, presets="medium_quality")
 ```
 
-Higher quality presets, in general, result in better forecasts but take longer to train.
+Higher quality presets usually result in better forecasts but take longer to train.
 The following presets are available:
 
-<!-- **TODO: These will be significantly changed by 0.6.0** -->
-
-- `"fast_training"`: train simple statistical models (`"ETS"`, `"ARIMA"`, `"Theta"`). These model are fast to train but can be slow at prediction time for unseen data.
-- `"medium_quality"`: train several selected models (`"ETS"`, `"ARIMA"`, `"DeepAR"`, `"SimpleFeedForward"`, `"TemporalFusionTransformer"`) without hyperparameter optimization. A good baseline setting.
-- `"best_quality"`: Train all available models with hyperparameter optimization.
+- ``"fast_training"``: fit simple "local" statistical models (``ETS``, ``ARIMA``, ``Theta``, ``Naive``, ``SeasonalNaive``). These models are fast to train, but cannot capture more complex patters in the data.
+- ``"medium_quality"``: all models mentioned above + tree-based model ``AutoGluonTabular`` + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
+- ``"high_quality"``: all models mentioned above + hyperparameter optimization for local statistical models + deep learning models ``TemporalFusionTransformerMXNet`` (if MXNet is available) and ``SimpleFeedForward``. Usually more accurate than ``medium_quality``, but takes longer to train.
+- ``"best_quality"``: all models mentioned above + deep learning model ``TransformerMXNet`` (if MXNet is available) + hyperparameter optimization for deep learning models. Usually better than ``high_quality``, but takes much longer to train.
 
 Another way to control the training time is using the `time_limit` argument.
 
 ```python
 predictor.fit(
-    train_data=train_data,
+    train_data,
     time_limit=60 * 60,  # total training time in seconds
 )
 ```
 
 If no `time_limit` is provided, the predictor will train until all models have been fit.
-
 
 
 ### Manually configuring models
@@ -201,20 +221,17 @@ Advanced users can override the presets and manually specify what models should 
 predictor = TimeSeriesPredictor(...)
 
 predictor.fit(
-    train_data=train_data,
+    train_data,
     hyperparameters={
         "DeepAR": {},
-        "ETS": {
-            "seasonality": "add",
-            "seasonal_period": 7,
-        }
+        "ETS": {"seasonal_period": 7},
     }
 )
 ```
 The code above will only train two models:
 
 - `DeepAR` (with default hyperparameters)
-- `ETS` (with the given `seasonality` and `seasonal_period`; all other parameters set to their defaults).
+- `ETS` (with the given `seasonal_period`; all other parameters set to their defaults).
 
 For the full list of available models and the respective hyperparameters, see :ref:`forecasting_zoo`.
 
@@ -229,20 +246,24 @@ import autogluon.core as ag
 predictor = TimeSeriesPredictor()
 
 predictor.fit(
-    train_data=train_data,
+    train_data,
     hyperparameters={
         "DeepAR": {
-            "cell_type": "lstm",
-            "num_layers": ag.space.Categorical(2, 3, 4),
-            "num_cells": ag.space.Int(10, 30),
-        }
+            "hidden_size": ag.space.Int(20, 100),
+            "dropout_rate": ag.space.Categorical(0.1, 0.3),
+        },
     },
-    hyperparameter_tune_kwargs="random",
+    hyperparameter_tune_kwargs="auto",
     enable_ensemble=False,
 )
 ```
 This code will train multiple versions of the `DeepAR` model with 10 different hyperparameter configurations.
 AutGluon will automatically select the best model configuration that achieves the highest validation score and use it for prediction.
+
+AutoGluon uses different hyperparameter optimization (HPO) backends for different models:
+
+- Ray Tune for GluonTS models implemented in `MXNet` (e.g., `DeepARMXNet`, `TemporalFusionTransformerMXNet`)
+- Custom backend implementing random search for all other models
 
 We can change the number of random search runs by passing a dictionary as `hyperparameter_tune_kwargs`
 ```python
@@ -256,6 +277,14 @@ predictor.fit(
     ...
 )
 ```
+The `hyperparameter_tune_kwargs` dict must include the following keys:
+
+- ``"num_trials"``: int, number of configurations to train for each tuned model
+- ``"searcher"``: one of ``"random"`` (random search), ``"bayes"`` (bayesian optimization for GluonTS MXNet models, random search for other models) and ``"auto"`` (same as ``"bayes"``).
+- ``"scheduler"``: the only supported option is ``"local"`` (all models trained on the same machine)
+
+**Note:** HPO significantly increases the training time for most models, but often provides only modest performance gains.
+
 
 ### Forecasting irregularly-sampled time series
 By default, `TimeSeriesPredictor` expects the time series data to be regularly sampled (e.g., measurements done every day).
