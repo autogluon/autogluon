@@ -13,4 +13,4 @@ install_features
 install_multimodal
 
 cd multimodal/
-python3 -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests/predictor/
+python3 -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests/unittests/predictor/
