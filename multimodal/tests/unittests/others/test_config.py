@@ -15,9 +15,13 @@ def test_config():
     model_config = OmegaConf.load(model_config_path)
     data_config_path = os.path.join(cur_path, "../../../src/autogluon/multimodal/configs/data/default.yaml")
     data_config = OmegaConf.load(data_config_path)
-    optimization_config_path = os.path.join(cur_path, "../../../src/autogluon/multimodal/configs/optimization/adamw.yaml")
+    optimization_config_path = os.path.join(
+        cur_path, "../../../src/autogluon/multimodal/configs/optimization/adamw.yaml"
+    )
     optimization_config = OmegaConf.load(optimization_config_path)
-    environemnt_config_path = os.path.join(cur_path, "../../../src/autogluon/multimodal/configs/environment/default.yaml")
+    environemnt_config_path = os.path.join(
+        cur_path, "../../../src/autogluon/multimodal/configs/environment/default.yaml"
+    )
     environemnt_config = OmegaConf.load(environemnt_config_path)
     config_gt = OmegaConf.merge(model_config, data_config, optimization_config, environemnt_config)
 
