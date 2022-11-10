@@ -35,13 +35,16 @@ def test_ner(checkpoint_name, searcher, scheduler):
     label_col = "entity_annotations"
 
     lr = tune.uniform(0.0001, 0.01)
-
+    if searcher is None:
+        hyperparameter_tune_kwargs = None
+    else:
+        hyperparameter_tune_kwargs = {"num_trials": 2, "searcher": searcher, "scheduler": scheduler}
     predictor = MultiModalPredictor(problem_type="ner", label=label_col)
     predictor.fit(
         train_data=train_data,
         time_limit=40,
         hyperparameters={"model.ner.checkpoint_name": checkpoint_name, "optimization.learning_rate": lr},
-        hyperparameter_tune_kwargs={"num_trials": 2, "searcher": searcher, "scheduler": scheduler},
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
 
     scores = predictor.evaluate(train_data)
