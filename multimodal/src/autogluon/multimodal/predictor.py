@@ -395,6 +395,7 @@ class MultiModalPredictor:
         self._label_column = label
         self._problem_type = problem_type if problem_type is not None else None
         self._eval_metric_name = eval_metric
+        self._validation_metric_name = None
         self._output_shape = num_classes
         self._classes = classes
         self._save_path = path
