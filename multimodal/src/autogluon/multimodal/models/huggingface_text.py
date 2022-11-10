@@ -76,7 +76,9 @@ class HFAutoModelForTextPrediction(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.num_classes = num_classes
 
-        self.config, self.model = get_hf_config_and_model(checkpoint_name=checkpoint_name, pretrained=pretrained)
+        self.config, self.model = get_hf_config_and_model(checkpoint_name=checkpoint_name,
+                                                          pretrained=pretrained,
+                                                          low_cpu_mem_usage=low_cpu_mem_usage)
 
         if isinstance(self.model, T5PreTrainedModel):
             self.is_t5 = True
