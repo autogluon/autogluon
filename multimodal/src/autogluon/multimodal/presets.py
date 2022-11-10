@@ -64,7 +64,7 @@ def best_quality():
 
 
 @automm_presets.register()
-def best_quality_image_classification():
+def high_quality_image_classification():
     return {
         "model.names": ["timm_image"],
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
