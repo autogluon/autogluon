@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 import json
 import logging
-import math
 import operator
 import os
 import pickle
@@ -14,7 +13,7 @@ import warnings
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Callable, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -31,6 +30,7 @@ from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2log
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.utils.try_import import try_import_ray_lightning
 from autogluon.core.utils.utils import default_holdout_frac
+from autogluon.multimodal.utils import save_result_df
 
 from . import version as ag_version
 from .constants import (
@@ -423,6 +423,13 @@ class MultiModalPredictor:
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._model_loaded = False  # Whether the model has been loaded
         self._matcher = None
+
+        if not self._save_path:
+            self._save_path = setup_outputdir(
+                path=None,
+                warn_if_exist=self._warn_if_exist,
+            )
+        self._save_path = os.path.abspath(os.path.expanduser(self._save_path))
 
         if self._problem_type is not None:
             if problem_property_dict.get(self._problem_type).is_matching:
@@ -2260,14 +2267,27 @@ class MultiModalPredictor:
 
         return ret
 
+    def get_predictor_classes(self):
+        """
+        returns the classes of the detection (only works for detection)
+        Parameters
+        ----------
+        Returns
+        -------
+            List of class names
+        """
+        return self._model.model.CLASSES
+
     def predict(
         self,
-        data: Union[pd.DataFrame, dict, list],
+        data: Union[pd.DataFrame, dict, list, str],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
         seed: Optional[int] = 123,
+        save_results: Optional[bool] = False,
+        result_path: Optional[str] = None,
     ):
         """
         Predict values for the label column of new data.
@@ -2290,7 +2310,10 @@ class MultiModalPredictor:
             and sample number.
         seed
             The random seed to use for this prediction run.
-
+        save_results
+            Whether to save the prediction results (only works for detection now)
+        result_path
+            Where to save the result. (only works for detection now)
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
@@ -2303,9 +2326,10 @@ class MultiModalPredictor:
                 id_mappings=id_mappings,
                 as_pandas=as_pandas,
             )
-
+        detection_data_path = None
         if self._problem_type == OBJECT_DETECTION:
             if isinstance(data, str):
+                detection_data_path = data
                 data = from_coco_or_voc(data, "test")
             if self._label_column not in data:
                 self._label_column = None
@@ -2319,7 +2343,6 @@ class MultiModalPredictor:
 
         if self._problem_type == NER:
             ret_type = NER_RET
-
         if candidate_data:
             pred = self._match_queries_and_candidates(
                 query_data=data,
@@ -2353,6 +2376,21 @@ class MultiModalPredictor:
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             pred = self._as_pandas(data=data, to_be_converted=pred)
+
+        if save_results:
+            ## Dumping Result for detection only now
+            assert (
+                self._problem_type == OBJECT_DETECTION
+            ), "Aborting: save results only works for object detection now."
+            if not result_path:
+                result_path = os.path.join(self._save_path, "result.txt")
+
+            save_result_df(
+                pred=pred,
+                data=data,
+                result_path=result_path,
+                detection_classes=self._model.model.CLASSES,
+            )
 
         return pred
 

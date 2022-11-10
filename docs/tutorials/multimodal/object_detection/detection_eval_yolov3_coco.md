@@ -10,7 +10,8 @@ from autogluon.multimodal import MultiModalPredictor
 ```
 
 We select the YOLOv3 with MobileNetV2 as backbone, 
-for other yolov3 models see [MMDetection's YOLOV3 models](https://github.com/open-mmlab/mmdetection/tree/master/configs/yolo). 
+this model reached **85.0 Frames Per Second (FPS)** on single A10e GPU with `batch_size=1`.
+For details about model selection, see :ref:`sec_automm_detection_select_models`.
 And we use all the GPUs (if any):
 
 ```python
@@ -62,7 +63,7 @@ And the evaluation results are shown in command line output. The first value `0.
  Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.385
  Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.529
 time usage: 81.76
-```
+``
 
 YOLOv3 is small and fast. For larger model with higher performance, see :ref:`sec_automm_detection_eval_fasterrcnn_coco` or :ref:`sec_automm_detection_eval_ddetr_coco`.
 You can also see other tutorials for \[Fast Finetune on COCO format data] or \[Inference on COCO format data (with Visualization)].

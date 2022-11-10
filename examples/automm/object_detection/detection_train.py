@@ -32,7 +32,7 @@ import argparse
 import os
 
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.utils import get_voc_classes
+from autogluon.multimodal.utils import get_detection_classes
 
 
 def detection_train(
@@ -56,7 +56,7 @@ def detection_train(
     eval_tool = None
     VOC_format = False
     if os.path.isdir(train_path):
-        classes = get_voc_classes(train_path)
+        classes = get_detection_classes(train_path)
         eval_tool = "torchmetrics"
         VOC_format = True
 
@@ -66,7 +66,7 @@ def detection_train(
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
         },
-        pipeline="object_detection",
+        problem_type="object_detection",
         num_classes=num_classes,
         classes=classes,
         val_metric=val_metric,
@@ -79,7 +79,7 @@ def detection_train(
         train_path,
         tuning_data=val_path,
         hyperparameters={
-            "optimization.learning_rate": lr/100, # we use two stage and lr_mult=100 for detection
+            "optimization.learning_rate": lr / 100,  # we use two stage and lr_mult=100 for detection
             "optimization.max_epochs": epochs,
             "env.per_gpu_batch_size": per_gpu_batch_size,  # decrease it when model is large
         },
