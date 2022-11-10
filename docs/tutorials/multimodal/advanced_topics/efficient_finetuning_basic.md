@@ -34,6 +34,7 @@ directly evaluate its performance on the German and Japanese test set.
 !unzip -q -o amazon_review_sentiment_cross_lingual.zip -d .
 ```
 
+
 ```{.python .input}
 import os
 import shutil
@@ -45,6 +46,7 @@ def clear_cache():
 
 clear_cache()
 ```
+
 
 ```{.python .input}
 import pandas as pd
@@ -72,7 +74,6 @@ test_jp_df = pd.read_csv('amazon_review_sentiment_cross_lingual/jp_test.tsv',
 train_en_df.head(5)
 ```
 
-
 ```{.python .input}
 test_jp_df.head(5)
 ```
@@ -80,6 +81,7 @@ test_jp_df.head(5)
 ## Finetuning Multilingual Model with IA3 + BitFit
 
 In AutoMM, to enable efficient finetuning, just specify the `optimization.efficient_finetune` to be `"ia3_bias"`.
+
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
@@ -120,13 +122,15 @@ By combining [gradient checkpointing](https://pytorch.org/docs/stable/checkpoint
 To turn on gradient checkpointing, you just need to set `"model.hf_text.gradient_checkpointing"` to `True`. 
 To accelerate the training, we downsample the number of training sampels to be 200.
 
+
 ```{.python .input}
 # Just for clean the space
 clear_cache()
 shutil.rmtree("multilingual_ia3")
 ```
 
-```{.python .input}
+
+```{.python}
 from autogluon.multimodal import MultiModalPredictor
 
 train_en_df_downsample = train_en_df.sample(200, random_state=123) 
@@ -151,13 +155,47 @@ predictor.fit(train_en_df_downsample,
 
 ```
 
+    Global seed set to 123
+    Auto select gpus: [0]
+    GPU available: True (cuda), used: True
+    TPU available: False, using: 0 TPU cores
+    IPU available: False, using: 0 IPUs
+    HPU available: False, using: 0 HPUs
+    LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+    
+      | Name              | Type                         | Params
+    -------------------------------------------------------------------
+    0 | model             | HFAutoModelForTextPrediction | 1.2 B 
+    1 | validation_metric | AUROC                        | 0     
+    2 | loss_func         | CrossEntropyLoss             | 0     
+    -------------------------------------------------------------------
+    203 K     Trainable params
+    1.2 B     Non-trainable params
+    1.2 B     Total params
+    4,894.913 Total estimated model params size (MB)
+    Epoch 0, global step 20: 'val_roc_auc' reached 0.88802 (best 0.88802), saving model to '/home/ubuntu/autogluon/docs/tutorials/multimodal/advanced_topics/multilingual_ia3_gradient_checkpoint/epoch=0-step=20.ckpt' as top 1
+    Epoch 0, global step 40: 'val_roc_auc' reached 0.94531 (best 0.94531), saving model to '/home/ubuntu/autogluon/docs/tutorials/multimodal/advanced_topics/multilingual_ia3_gradient_checkpoint/epoch=0-step=40.ckpt' as top 1
+    `Trainer.fit` stopped: `max_epochs=1` reached.
 
-```{.python .input}
+
+
+
+
+    <autogluon.multimodal.predictor.MultiModalPredictor at 0x7fd58c4dbca0>
+
+
+
+
+```{.python}
 score_in_en = predictor.evaluate(test_en_df)
 print('Score in the English Testset:', score_in_en)
 ```
 
-```{.python .input}
+    Score in the English Testset: {'roc_auc': 0.931263189629183}
+
+
+
+```{.python}
 # Just for clean the space
 clear_cache()
 shutil.rmtree("multilingual_ia3_gradient_checkpoint")
@@ -169,4 +207,3 @@ You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master
 
 ## Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.
-
