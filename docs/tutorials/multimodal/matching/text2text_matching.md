@@ -68,6 +68,23 @@ predictions = matcher.predict(pred_data)
 print('Predicted entities:', predictions[0])
 ```
 
+## Predict Matching Probabilities
+We can also compute the matching probabilities of sentence pairs.
+```{.python .input}
+probabilities = matcher.predict_proba(pred_data)
+print(probabilities)
+```
+
+## Extract Embeddings
+Moreover, we support extracting embeddings separately for two sentence groups.
+```{.python .input}
+embeddings_1 = matcher.extract_embedding({"premise":["The teacher gave his speech to an empty room."]})
+print(embeddings_1.shape)
+embeddings_2 = matcher.extract_embedding({"hypothesis":["There was almost nobody when the professor was talking."]})
+print(embeddings_2.shape)
+```
+
+
 ## Other Examples
 
 You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
