@@ -10,11 +10,10 @@ import shutil
 import sys
 import time
 import warnings
-from datetime import datetime, timedelta
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Callable, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
