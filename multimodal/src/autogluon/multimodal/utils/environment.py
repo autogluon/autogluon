@@ -139,14 +139,21 @@ def infer_precision(
             )
             precision = 32
 
-        else:
-            for m in model:
-                if isinstance(m, HFAutoModelForTextPrediction):
-                    if m.config.torch_dtype is not None:
-                        precision = inverse_precision_mapping[m.config.torch_dtype]
-                    else:
-                        torch_dtype = get_state_dict_dtype(m.state_dict())
-                        precision = inverse_precision_mapping[torch_dtype]
+        checkpoint_precision = None
+        for m in model:
+            if isinstance(m, HFAutoModelForTextPrediction):
+                if m.config.torch_dtype is not None:
+                    checkpoint_precision = inverse_precision_mapping[m.config.torch_dtype]
+                else:
+                    torch_dtype = get_state_dict_dtype(m.state_dict())
+                    checkpoint_precision = inverse_precision_mapping[torch_dtype]
+        print(checkpoint_precision, precision)
+        if checkpoint_precision is not None and checkpoint_precision != precision:
+            warnings.warn(
+                f"The inferred checkpoint precision: {checkpoint_precision} is different from the given precision: {precision}. ",
+                UserWarning,
+            )
+            precision = checkpoint_precision
 
     if as_torch:
         if precision in precision_mapping:
