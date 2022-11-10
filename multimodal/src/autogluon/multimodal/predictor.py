@@ -221,7 +221,6 @@ class MultiModalPredictor:
         response: Optional[Union[str, List[str]]] = None,
         match_label: Optional[Union[int, str]] = None,
         pipeline: Optional[str] = None,
-        val_metric: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -395,7 +394,6 @@ class MultiModalPredictor:
         self._label_column = label
         self._problem_type = problem_type if problem_type is not None else None
         self._eval_metric_name = eval_metric
-        self._validation_metric_name = val_metric
         self._output_shape = num_classes
         self._classes = classes
         self._save_path = path
@@ -454,6 +452,7 @@ class MultiModalPredictor:
                     classes=self._classes,
                     init_scratch=self._init_scratch,
                 )
+                self._validation_metric_name = self._config["optimization"]["val_metric"]  # TODO: only object detection is using this
 
     @property
     def path(self):
@@ -784,9 +783,12 @@ class MultiModalPredictor:
             if self._problem_type == CLASSIFICATION:
                 # Set the problem type to be inferred problem type
                 self._problem_type = problem_type
-            assert self._problem_type == problem_type, (
-                f"Inferred problem type {problem_type} is different from " f"the previous {self._problem_type}"
-            )
+            if problem_type is not None:
+                assert self._problem_type == problem_type, (
+                    f"Inferred problem type {problem_type} is different from " f"the previous {self._problem_type}"
+                )
+            else:
+                problem_type = self._problem_type
 
         if self._problem_type != OBJECT_DETECTION:
             if self._output_shape is not None:
