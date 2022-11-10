@@ -95,6 +95,12 @@ print('Top-1 test acc: %.3f' % test_acc['top1'])
 
 You can directly save the instances of classifiers:
 
+:::warning
+
+`ImagePredictor.load()` used `pickle` module implicitly, which is known to be insecure. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling. Never load data that could have come from an untrusted source, or that could have been tampered with. **Only load data you trust.**
+
+:::
+
 ```{.python .input}
 filename = 'predictor.ag'
 predictor.save(filename)
