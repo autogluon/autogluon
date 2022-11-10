@@ -8,11 +8,11 @@ from test_predictor import verify_predictor_save_load
 from unittest_datasets import AmazonReviewSentimentCrossLingualDataset
 from utils import get_home_dir, protected_zip_extraction
 
-from autogluon.multimodal import AutoMMPredictor, MultiModalPredictor
+from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils import download
 
 
-@pytest.mark.parametrize("cls", [MultiModalPredictor, AutoMMPredictor])
+@pytest.mark.parametrize("cls", [MultiModalPredictor])
 def test_load_old_checkpoint(cls):
     dataset = AmazonReviewSentimentCrossLingualDataset()
     sha1sum_id = "4ba096cdf6bd76c06386f2c27140db055e59c91b"
@@ -33,13 +33,12 @@ def test_load_old_checkpoint(cls):
         folder=save_path,
     )
     predictor = cls.load(checkpoint_path)
-    verify_predictor_save_load(predictor, dataset.test_df, cls=cls)
+    verify_predictor_save_load(predictor, dataset.test_df.sample(4), cls=cls)
 
     # continuous training
     predictor.fit(
         dataset.train_df,
         presets="multilingual",
-        time_limit=30,
-        hyperparameters={"optimization.top_k_average_method": "uniform_soup"},
+        time_limit=10,
+        hyperparameters={"optimization.top_k_average_method": "uniform_soup", "env.num_gpus": 1},
     )
-    verify_predictor_save_load(predictor, dataset.test_df, cls=cls)

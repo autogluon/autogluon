@@ -3126,9 +3126,6 @@ class TabularPredictor:
             # private
             _save_bag_folds=None,
 
-            # quantile levels
-            quantile_levels=None,
-
             calibrate='auto',
 
             # pseudo label
@@ -3148,7 +3145,7 @@ class TabularPredictor:
                 public_kwarg_options = [kwarg for kwarg in allowed_kwarg_names if kwarg[0] != '_']
                 public_kwarg_options.sort()
                 raise ValueError(
-                    f"Unknown keyword argument specified: {kwarg_name}\nValid kwargs: {public_kwarg_options}")
+                    f"Unknown `.fit` keyword argument specified: '{kwarg_name}'\nValid kwargs: {public_kwarg_options}")
 
         kwargs_sanitized = fit_extra_kwargs_default.copy()
         kwargs_sanitized.update(kwargs)

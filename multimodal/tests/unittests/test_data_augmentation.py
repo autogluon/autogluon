@@ -82,7 +82,7 @@ def test_textagumentor_deepcopy():
         "env.num_workers_evaluation": 0,
         "data.categorical.convert_to_text": False,
         "data.numerical.convert_to_text": False,
-        "model.t_few.checkpoint_name": "t5-small",
+        "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
         "model.hf_text.text_trivial_aug_maxscale": 0.05,
         "model.hf_text.text_train_augment_types": ["identity"],
         "optimization.top_k_average_method": "uniform_soup",
@@ -136,9 +136,10 @@ def test_trivialaugment():
         "data.categorical.convert_to_text": False,
         "data.numerical.convert_to_text": False,
         "data.mixup.turn_on": True,
-        "model.t_few.checkpoint_name": "t5-small",
+        "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
         "model.hf_text.text_trivial_aug_maxscale": 0.1,
         "model.hf_text.text_aug_detect_length": 10,
+        "model.timm_image.checkpoint_name": "mobilenetv3_small_100",
         "model.timm_image.train_transform_types": ["resize_shorter_side", "center_crop", "trivial_augment"],
     }
 
