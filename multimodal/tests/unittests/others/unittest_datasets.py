@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from utils import get_data_home_dir, get_repo_url, path_expander, protected_zip_extraction
+from .utils import get_data_home_dir, get_repo_url, path_expander, protected_zip_extraction
 
 from autogluon.multimodal.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.multimodal.utils import download

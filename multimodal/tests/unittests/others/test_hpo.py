@@ -3,9 +3,9 @@ import shutil
 
 import pytest
 from ray import tune
-from test_predictor import verify_predictor_save_load
-from unittest_datasets import PetFinderDataset
-from utils import get_home_dir
+from ..predictor.test_predictor import verify_predictor_save_load
+from .unittest_datasets import PetFinderDataset
+from .utils import get_home_dir
 
 from autogluon.core.hpo.ray_tune_constants import SCHEDULER_PRESETS, SEARCHER_PRESETS
 from autogluon.multimodal import MultiModalPredictor

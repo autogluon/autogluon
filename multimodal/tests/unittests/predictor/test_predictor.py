@@ -9,8 +9,8 @@ import numpy.testing as npt
 import pytest
 from omegaconf import OmegaConf
 from torch import nn
-from unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
-from utils import get_home_dir
+from ..others.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
+from ..others.utils import get_home_dir
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import (

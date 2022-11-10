@@ -5,7 +5,7 @@ import warnings
 import numpy.testing as npt
 import pytest
 from torch import Tensor
-from unittest_datasets import AmazonReviewSentimentCrossLingualDataset
+from .unittest_datasets import AmazonReviewSentimentCrossLingualDataset
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import BIT_FIT, IA3, IA3_BIAS, LORA_BIAS, LORA_NORM, NORM_FIT

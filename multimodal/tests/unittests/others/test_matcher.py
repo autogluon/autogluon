@@ -6,8 +6,8 @@ import tempfile
 
 import numpy.testing as npt
 import pytest
-from unittest_datasets import Flickr30kDataset, IDChangeDetectionDataset
-from utils import get_home_dir
+from .unittest_datasets import Flickr30kDataset, IDChangeDetectionDataset
+from .utils import get_home_dir
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import BINARY, MULTICLASS, QUERY, RESPONSE, UNIFORM_SOUP
