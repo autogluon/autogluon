@@ -3,34 +3,22 @@
 
 Via a simple `fit()` call, AutoGluon can train and tune
 
-- simple forecasting models (e.g., ARIMA, ETS),
-- powerful deep learning models (e.g., DeepAR, Transformer, MQ-CNN),
+- simple forecasting models (e.g., ARIMA, ETS, Theta),
+- powerful deep learning models (e.g., DeepAR, Temporal Fusion Transformer),
+- tree-based models (e.g., XGBoost, CatBoost, LightGBM),
 - an ensemble that combines prediction of other models
 
 to produce multi-step ahead _probabilistic_ forecasts for univariate time series data.
 
-This tutorial demonstrates how to quickly start using AutoGluon to forecast [the number of COVID-19 cases](https://www.kaggle.com/c/covid19-global-forecasting-week-4) in different countries given historical data.
+This tutorial demonstrates how to quickly start using AutoGluon to generate hourly forecasts for the [M4 forecasting competition](https://www.sciencedirect.com/science/article/pii/S0169207019301128).
 For a short summary of how to train models and make forecasts in a few lines of code with `autogluon.timeseries`, scroll to the [bottom of this page](#summary).
 
----
-**NOTE**
 
-`autogluon.timeseries` depends on Apache MXNet. Please install MXNet by running
-
-```shell
-python -m pip install mxnet~=1.9
-```
-
-If you want to use a GPU, install the version of MXNet that matches your CUDA version. See the
-MXNet [documentation](https://mxnet.apache.org/versions/1.9.1/get_started?) for more info.
-
----
 ## Loading time series data as a `TimeSeriesDataFrame`
-
 First, we make several imports
 ```{.python .input}
 import pandas as pd
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
 
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 ```
@@ -39,30 +27,61 @@ To use `autogluon.timeseries`, we will only need the following two classes:
 - `TimeSeriesDataFrame` stores a dataset consisting of multiple time series.
 - `TimeSeriesPredictor` takes care of fitting, tuning and selecting the best forecasting models.
 
+We start by downloading the M4 hourly dataset from the official website.
 
-In this tutorial we work with COVID case data as of April 2020.
-Our goal is to forecast the cumulative number of confirmed COVID cases for each country in the dataset given the past observations.
+.. raw:: html
 
-We load the dataset from an [AWS S3 bucket](https://aws.amazon.com/s3/) as a `pandas.DataFrame`
+   <details>
+   <summary><a>Loader for the M4 hourly dataset</a></summary>
+
+```{.python .input}
+M4_INFO_URL = "https://github.com/Mcompetitions/M4-methods/raw/master/Dataset/M4-info.csv"
+M4_HOURLY_URL = "https://github.com/Mcompetitions/M4-methods/raw/master/Dataset/Test/Hourly-test.csv"
+
+def download_m4_hourly_dataset(save_path):
+    metadata = pd.read_csv(M4_INFO_URL)
+    metadata = metadata[metadata.M4id.str.startswith("H")].set_index("M4id")
+    data = pd.read_csv(M4_HOURLY_URL, index_col="V1")
+    results = []
+    for item_id, row in data.iterrows():
+        time_series = row.dropna().values
+        start_time = pd.Timestamp(metadata.loc[item_id]["StartingDate"])
+        timestamps = pd.date_range(start_time, freq="H", periods=len(time_series))
+        results.append(pd.DataFrame({"M4id": [item_id] * len(time_series), "Date": timestamps, "Value": time_series}))
+    result = pd.concat(results, ignore_index=True)
+    result.to_csv(save_path, index=False)
+
+download_m4_hourly_dataset("m4_hourly.csv")
+```
+
+.. raw:: html
+
+   </details>
+
+
+The M4 dataset contains time series from various domains like finance, demography and economics.
+Our goal is to forecast the future values of each time series in the dataset given the past observations.
+
+We load the dataset as a `pandas.DataFrame`
 ```{.python .input}
 df = pd.read_csv(
-    "https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv",
+    "m4_hourly.csv",
     parse_dates=["Date"],  # make sure that pandas parses the dates
 )
 df.head()
 ```
 Each row of the data frame contains a single observation (timestep) of a single time series represented by
 
-- unique ID of the time series — in our case, name of the country (`"name"`)
+- unique ID of the time series (`"M4id"`)
 - timestamp of the observation (`"Date"`)
-- value of the time series (`"ConfirmedCases"`)
+- value of the time series (`"Value"`)
 
 The raw dataset should always follow this format (3 columns: unique ID, timestamp, value), but the names of these columns can be arbitrary.
 It is important, however, that we provide the names of the columns when constructing a `TimeSeriesDataFrame` that is used by AutoGluon
 ```{.python .input}
 ts_dataframe = TimeSeriesDataFrame.from_data_frame(
     df,
-    id_column="name",  # column that contains unique ID of each time series
+    id_column="M4id",  # column that contains unique ID of each time series
     timestamp_column="Date",  # column that contains timestamps of each observation
 )
 ts_dataframe
@@ -70,8 +89,7 @@ ts_dataframe
 AutoGluon will raise an exception if the data doesn't match the expected format.
 
 We refer to each individual time series stored in a `TimeSeriesDataFrame` as an _item_.
-In our case, each item corresponds to a country.
-As another example, items might correspond to different products in demand forecasting.
+For example, items might correspond to different products in demand forecasting.
 This setting is also sometimes referred to as a "panel" of time series.
 Note that this is *not* the same as multivariate forecasting — AutoGluon generates forecasts for each time series individually, without modeling interactions between different items (time series).
 
@@ -111,7 +129,7 @@ prediction_length = 7
 
 test_data = ts_dataframe.copy()  # the full data set
 
-# last prediction_length time steps of each time series are excluded, akin to `x[:-7]`
+# last prediction_length timesteps of each time series are excluded, akin to `x[:-7]`
 train_data = ts_dataframe.slice_by_timestep(None, -prediction_length)
 ```
 Below, we plot the training and test parts of the time series for a single country, and mark the test forecast horizon.
@@ -141,8 +159,8 @@ plt.legend()
 ## Training time series models with `TimeSeriesPredictor.fit`
 
 Below we instantiate a `TimeSeriesPredictor` object and instruct AutoGluon to fit models that can forecast up to
-7 time-points into the future (`prediction_length`) and save them in the folder `./autogluon-covidforecast`.
-We also specify that AutoGluon should rank models according to mean absolute percentage error (MAPE) and that data is stored in the column `"ConfirmedCases"` of the `TimeSeriesDataFrame`.
+7 timesteps into the future (`prediction_length`) and save them in the folder `./autogluon-covidforecast`.
+We also specify that AutoGluon should rank models according to mean absolute percentage error (MAPE) and that data that we want to forecast is stored in the column `"ConfirmedCases"` of the `TimeSeriesDataFrame`.
 
 ```{.python .input}
 predictor = TimeSeriesPredictor(
@@ -158,12 +176,12 @@ predictor.fit(
 )
 ```
 Here we used the `"fast_training"` presets to quickly obtain the results.
-Under this setting, AutoGluon fits several local statistical models for forecasting (ARIMA, ETS, Theta).
+Under this setting, AutoGluon fits several local statistical models for forecasting (ARIMA, ETS, Theta) and simple baselines (Naive, SeasonalNaive).
 Moreover, AutoGluon fits a weighted ensemble on top of these models that is capable of predicting the quantiles.
 
 The local models used under the `"fast_training"` presets are quick to train, but may be slow when making predictions for new unseen data.
-In practical scenarios, we can set `presets` to be one of `"medium_quality"` or `"best_quality"`.
-These presets additionally include powerful deep learning models (such as DeepAR, Temporal Fusion Transformer).
+In practical scenarios, we can set `presets` to be one of `"medium_quality"`, `"high_quality"` or `"best_quality"`.
+These presets additionally include tree-based models (XGBoost, CatBoost, LightGBM) based on the :class:`~autogluon.tabular.TabularPredictor` and powerful deep learning models (such as DeepAR, Temporal Fusion Transformer).
 Higher quality presets will usually produce more accurate forecasts but take longer to train and may produce less efficient models.
 
 Note that inside `fit()` the last `prediction_length` steps of each time series in `train_data` were automatically used as a tuning (validation) set.
@@ -236,20 +254,20 @@ df = pd.read_csv(
 )
 ts_dataframe = TimeSeriesDataFrame.from_data_frame(
     df,
-    id_column="name",  # name of the column with unique ID of each time series
+    id_column="M4id",  # name of the column with unique ID of each time series
     timestamp_column="Date",  # name of the column with timestamps of observations
 )
 
 # Create & fit the predictor
 predictor = TimeSeriesPredictor(
-    path="autogluon-covidforecast",  # models will be saved in this folder
+    path="autogluon-forecast",  # models will be saved in this folder
     target="ConfirmedCases",  # name of the column with time series values
     prediction_length=7,  # number of steps into the future to predict
-    eval_metric="MAPE",  # other options: "MASE", "sMAPE", "mean_wQuantileLoss"
+    eval_metric="MAPE",  # other options: "MASE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE"
 )
 predictor.fit(
     train_data=ts_dataframe,
-    presets="fast_training",  # other options: "medium_quality", "best_quality"
+    presets="fast_training",  # other options: "medium_quality", "high_quality", "best_quality"
 )
 
 # Generate the forecasts
