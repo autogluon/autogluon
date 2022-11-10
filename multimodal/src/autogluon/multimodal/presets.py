@@ -103,41 +103,68 @@ def zero_shot_image_classification():
 
 
 @automm_presets.register()
-def medium_quality_faster_inference_object_detection():
+def medium_quality_faster_train_object_detection():
     return {
         "model.names": ["mmdet_image"],
         "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
         "env.eval_batch_size_ratio": 1,
         "env.precision": 32,
-        "env.strategy": "ddp",  # TODO: support ddp_spawn for detection
+        "env.strategy": "ddp",
         "env.auto_select_gpus": False,  # Have to turn off for detection!
-        "optimization.learning_rate": 5e-5,
+        "optimization.learning_rate": 1e-4,
         "optimization.lr_decay": 0.95,
         "optimization.lr_mult": 100,
         "optimization.lr_choice": "two_stages",
         "optimization.top_k": 1,
         "optimization.top_k_average_method": "best",
         "optimization.warmup_steps": 0.0,
-        "optimization.patience": 40,
+        "optimization.patience": 10,
+        "optimization.max_epochs": 10,
+        "optimization.val_metric": "direct_loss",
     }
 
+
 @automm_presets.register()
-def high_quality_fast_inference_object_detection():
+def high_quality_fast_train_object_detection():
     return {
         "model.names": ["mmdet_image"],
-        "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
+        "model.mmdet_image.checkpoint_name": "yolov3_d53_mstrain-416_273e_coco",
         "env.eval_batch_size_ratio": 1,
         "env.precision": 32,
-        "env.strategy": "ddp",  # TODO: support ddp_spawn for detection
+        "env.strategy": "ddp",
         "env.auto_select_gpus": False,  # Have to turn off for detection!
-        "optimization.learning_rate": 5e-5,
+        "optimization.learning_rate": 1e-5,
         "optimization.lr_decay": 0.95,
         "optimization.lr_mult": 100,
         "optimization.lr_choice": "two_stages",
         "optimization.top_k": 1,
         "optimization.top_k_average_method": "best",
         "optimization.warmup_steps": 0.0,
-        "optimization.patience": 40,
+        "optimization.patience": 10,
+        "optimization.max_epochs": 20,
+        "optimization.val_metric": "map",
+    }
+
+
+@automm_presets.register()
+def higher_quality_object_detection():
+    return {
+        "model.names": ["mmdet_image"],
+        "model.mmdet_image.checkpoint_name": "vfnet_r50_fpn_mdconv_c3-c5_mstrain_2x_coco",
+        "env.eval_batch_size_ratio": 1,
+        "env.precision": 32,
+        "env.strategy": "ddp",
+        "env.auto_select_gpus": False,  # Have to turn off for detection!
+        "optimization.learning_rate": 5e-6,
+        "optimization.lr_decay": 0.95,
+        "optimization.lr_mult": 100,
+        "optimization.lr_choice": "two_stages",
+        "optimization.top_k": 1,
+        "optimization.top_k_average_method": "best",
+        "optimization.warmup_steps": 0.0,
+        "optimization.patience": 10,
+        "optimization.max_epochs": 30,
+        "optimization.val_metric": "map",
     }
 
 
@@ -145,20 +172,23 @@ def high_quality_fast_inference_object_detection():
 def best_quality_object_detection():
     return {
         "model.names": ["mmdet_image"],
-        "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
+        "model.mmdet_image.checkpoint_name": "vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco",
         "env.eval_batch_size_ratio": 1,
         "env.precision": 32,
-        "env.strategy": "ddp",  # TODO: support ddp_spawn for detection
+        "env.strategy": "ddp",
         "env.auto_select_gpus": False,  # Have to turn off for detection!
-        "optimization.learning_rate": 5e-5,
+        "optimization.learning_rate": 1e-5,
         "optimization.lr_decay": 0.95,
         "optimization.lr_mult": 100,
         "optimization.lr_choice": "two_stages",
         "optimization.top_k": 1,
         "optimization.top_k_average_method": "best",
         "optimization.warmup_steps": 0.0,
-        "optimization.patience": 40,
+        "optimization.patience": 10,
+        "optimization.max_epochs": 30,
+        "optimization.val_metric": "map",
     }
+
 
 @automm_presets.register()
 def object_detection():

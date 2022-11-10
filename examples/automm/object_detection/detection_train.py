@@ -65,11 +65,11 @@ def detection_train(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
+            "optimization.val_metric": val_metric,
         },
         problem_type="object_detection",
         num_classes=num_classes,
         classes=classes,
-        val_metric=val_metric,
     )
 
     import time

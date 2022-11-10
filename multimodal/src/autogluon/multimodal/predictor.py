@@ -1643,7 +1643,8 @@ class MultiModalPredictor:
             strict=strict_loading,
         )
 
-        self.best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+        if self._problem_type != OBJECT_DETECTION:  # TODO: update detection's evaluation to support this
+            self.best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
 
         if is_distill:
             avg_state_dict = self._replace_model_name_prefix(
@@ -1892,6 +1893,7 @@ class MultiModalPredictor:
         eval_tool
             The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
         """
+        # TODO: support saving results to file
         self._verify_inference_ready()
         assert self._problem_type == OBJECT_DETECTION, (
             f"predictor.evaluate_coco() is only supported when problem_type is {OBJECT_DETECTION}. "
