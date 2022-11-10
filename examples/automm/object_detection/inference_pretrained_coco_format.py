@@ -4,12 +4,14 @@ An example to evaluate a pretrained model on COCO dataset:
     python inference_pretrained_coco_format.py \
         --test_path coco17/annotations/instances_val2017.json \
         --checkpoint_name yolov3_mobilenetv2_320_300e_coco \
-        --result_path coco17/annotations/instances_val2017_results.json
 An example to evaluate a pretrained model on VOC dataset (COCO format):
     python inference_pretrained_coco_format.py \
         --test_path VOCdevkit/VOCCOCO/voc07_test.json \
         --checkpoint_name faster_rcnn_r50_fpn_1x_voc0712 \
-        --result_path VOCdevkit/VOCCOCO/voc07_test_results.json
+If you want to save results, enable the following:
+--save_results
+If you want to specify a save result path, add the following:
+--result_path VOCdevkit/VOC2007/results.txt
 """
 
 import argparse

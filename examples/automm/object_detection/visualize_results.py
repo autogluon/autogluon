@@ -3,8 +3,9 @@ The example to visualize detection results in COCO dataset (COCO format):
     python visualize_results.py \
     --test_path ~/yongxinw-workspace/tools/coco17/annotations/instances_val2017.json \
     --checkpoint_name vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco \
-    --visualization_result_dir ~/yongxinw-workspace/tools/VOCdevkit/VOC2007/visualizations \
     --conf_threshold 0.4
+If you want to specify a folder to save visualizations, add the following:
+--visualization_result_dir VOCdevkit/VOC2007/visualizations
 """
 
 import argparse

@@ -4,7 +4,10 @@ An example to evaluate a pretrained model on VOC dataset (VOC format):
     python inference_pretrained_voc_format.py \
         --test_path VOCdevkit/VOC2007 \
         --checkpoint_name faster_rcnn_r50_fpn_1x_voc0712 \
-        --result_path VOCdevkit/VOC2007/results.npy
+If you want to save results, enable the following:
+--save_results
+If you want to specify a save result path, add the following:
+--result_path VOCdevkit/VOC2007/results.txt
 """
 
 import argparse
