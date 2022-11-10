@@ -28,7 +28,7 @@ def get_data():
 
 @pytest.mark.parametrize(
     "checkpoint_name,searcher,scheduler",
-    [("microsoft/deberta-v3-small", None, None), ("google/electra-small-discriminator", "bayes", "FIFO")],
+    [("google/electra-small-discriminator", "bayes", "FIFO")],
 )
 def test_ner(checkpoint_name, searcher, scheduler):
     train_data = get_data()
