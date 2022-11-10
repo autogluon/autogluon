@@ -154,6 +154,7 @@ from .utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
+    update_tabular_config_by_resources,
     use_realtime,
 )
 
@@ -1148,6 +1149,13 @@ class MultiModalPredictor:
         else:  # continuing training
             df_preprocessor = self._df_preprocessor
 
+        # Avoid passing tabular data with many columns to MultiHeadAttention.
+        # If models have additive_attention="auto", we enable it automatically for large tables.
+        config = update_tabular_config_by_resources(
+            config,
+            num_numerical_columns=len(df_preprocessor.numerical_feature_names),
+            num_categorical_columns=len(df_preprocessor.categorical_num_categories),
+        )
         config = select_model(config=config, df_preprocessor=df_preprocessor)
 
         if self._model is None:
