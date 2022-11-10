@@ -103,7 +103,7 @@ def zero_shot_image_classification():
 
 
 @automm_presets.register()
-def medium_quality_faster_train_object_detection():
+def medium_quality_faster_inference_object_detection():
     return {
         "model.names": ["mmdet_image"],
         "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
@@ -125,7 +125,7 @@ def medium_quality_faster_train_object_detection():
 
 
 @automm_presets.register()
-def high_quality_fast_train_object_detection():
+def high_quality_fast_inference_object_detection():
     return {
         "model.names": ["mmdet_image"],
         "model.mmdet_image.checkpoint_name": "yolov3_d53_mstrain-416_273e_coco",
