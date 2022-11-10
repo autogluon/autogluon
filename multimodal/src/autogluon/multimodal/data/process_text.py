@@ -154,10 +154,12 @@ class TextProcessor:
             self.max_len = self.tokenizer.model_max_length
         else:
             if max_len < self.tokenizer.model_max_length:
-                warnings.warn(
-                    f"provided max length: {max_len} "
-                    f"is smaller than {model.checkpoint_name}'s default: {self.tokenizer.model_max_length}"
-                )
+                # TODO, Consider to fix the logic
+                if self.tokenizer.model_max_length < 10**6:
+                    warnings.warn(
+                        f"provided max length: {max_len} "
+                        f"is smaller than {model.checkpoint_name}'s default: {self.tokenizer.model_max_length}"
+                    )
             self.max_len = min(max_len, self.tokenizer.model_max_length)
         logger.debug(f"text max length: {self.max_len}")
 

@@ -22,8 +22,8 @@ model:
     head_activation: relu
     data_types:
     - categorical
-    additive_attention: False
-    share_qv_weights: False
+    additive_attention: False # Whether to use lightweight additive attention, can be True, False or "auto"
+    share_qv_weights: False # Whether to share weight for query and value, can be True, False or "auto"
   numerical_mlp:
     hidden_size: 128
     activation: "leaky_relu"
@@ -53,8 +53,8 @@ model:
       - 'linear'
       - 'relu'
     merge: "concat"
-    additive_attention: False
-    share_qv_weights: False
+    additive_attention: False # Whether to use lightweight additive attention, can be True, False or "auto"
+    share_qv_weights: False # Whether to share weight for query and value, can be True, False or "auto"
   hf_text:
     checkpoint_name: "google/electra-base-discriminator"
     gradient_checkpointing: False
@@ -213,5 +213,5 @@ model:
     ffn_activation: "geglu"
     head_activation: "relu"
     data_types:
-    additive_attention: False
-    share_qv_weights: False
+    additive_attention: False # Whether to use lightweight additive attention, can be True, False or "auto"
+    share_qv_weights: False # Whether to share weight for query and value, can be True, False or "auto"

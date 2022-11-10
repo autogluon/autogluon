@@ -38,7 +38,7 @@ def tutorial_script_for_finetune_fast_coco_format():
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
         },
-        pipeline="object_detection",
+        problem_type="object_detection",
         sample_data_path=train_path,
     )
 
@@ -73,7 +73,7 @@ def tutorial_script_for_finetune_high_performance_coco_format():
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
         },
-        pipeline="object_detection",
+        problem_type="object_detection",
         sample_data_path=train_path,
         val_metric=val_metric,
     )
@@ -111,7 +111,7 @@ def detection_train(
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
         },
-        pipeline="object_detection",
+        problem_type="object_detection",
         sample_data_path=train_path,
         val_metric=val_metric,
     )

@@ -28,7 +28,7 @@ Normally to solve this task, you need to collect some training data (e.g., [the 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
 
-predictor = MultiModalPredictor(pipeline="zero_shot_image_classification")
+predictor = MultiModalPredictor(problem_type="zero_shot_image_classification")
 prob = predictor.predict_proba({"image": [dog_image]}, {"text": ['This is a Husky', 'This is a Golden Retriever', 'This is a German Sheperd', 'This is a Samoyed.']})
 print("Label probs:", prob)
 ```
