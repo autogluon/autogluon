@@ -46,7 +46,7 @@ def eval_pretrained_coco_format(
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
         },
-        pipeline="object_detection",
+        problem_type="object_detection",
     )
 
     result = predictor.evaluate(test_path)

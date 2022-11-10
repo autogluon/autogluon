@@ -20,6 +20,11 @@ Matching
 
       How to use CLIP to extract embeddings for retrieval problem.
 
+   .. card::
+      :title: Image<-->Text Matching with AutoMM - Quick Start
+      :link: image_text_matching.html
+
+      How to finetune CLIP and use it to do cross-modal retrieval.
 
 .. toctree::
    :maxdepth: 1

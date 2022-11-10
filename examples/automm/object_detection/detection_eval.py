@@ -31,7 +31,7 @@ def detection_evaluation(
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
         },
-        pipeline="object_detection",
+        problem_type="object_detection",
     )
 
     import time

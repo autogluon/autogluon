@@ -11,7 +11,8 @@ from autogluon.multimodal import MultiModalPredictor
 ```
 
 We select the Faster R-CNN with ResNet50 as backbone and Feature Pyramid Network (FPN) as neck,
-for other Faster R-CNN models see [MMDetection's Faster R-CNN models](https://github.com/open-mmlab/mmdetection/tree/master/configs/faster_rcnn). 
+this model has **23.9 frames per second (FPS)** on single A10e GPU with `batch_size=1`.
+For details about model selection, see :ref:`sec_automm_detection_select_models`.
 And we still use all the GPUs (if any):
 
 ```python

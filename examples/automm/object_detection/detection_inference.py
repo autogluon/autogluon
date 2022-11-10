@@ -14,7 +14,7 @@ def test_inference(dataset, checkpoint_name):
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": 1,
         },
-        pipeline="object_detection",
+        problem_type="object_detection",
     )
 
     if dataset == "coco":
@@ -45,7 +45,7 @@ def test_voc_inference(checkpoint_name="faster_rcnn_r50_fpn_1x_voc0712"):
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": 1,
         },
-        pipeline="object_detection",
+        problem_type="object_detection",
     )
 
     df = from_voc("VOCdevkit/VOC2007")[:10][["image"]]

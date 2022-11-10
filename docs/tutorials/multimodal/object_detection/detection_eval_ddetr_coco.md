@@ -13,7 +13,8 @@ from autogluon.multimodal import MultiModalPredictor
 ```
 
 We select the two-stage Deformable DETR with ResNet50 as backbone with bounding box finetune,
-for other Deformable DETR models see [MMDetection's Deformable DETR models](https://github.com/open-mmlab/mmdetection/tree/master/configs/deformable_detr). 
+this model has **15.7 frames per second (FPS)** on single A10e GPU with `batch_size=1`.
+For details about model selection, see :ref:`sec_automm_detection_select_models`.
 And we use all the GPUs (if any):
 
 ```python
