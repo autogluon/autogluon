@@ -253,7 +253,12 @@ class MultiModalPredictor:
             - 'ner' or 'named_entity_recognition': Named entity extraction
             - 'text_similarity': Text-text similarity problem
             - 'image_similarity': Image-image similarity problem
-            - 'text_image_similarity': Text-image similarity problem
+            - 'image_text_similarity': Text-image similarity problem
+            - 'feature_extraction': Extracting feature (only support inference)
+            - 'zero_shot_image_classification': Zero-shot image classification (only support inference)
+            - 'few_shot_text_classification': (experimental) Few-shot text classification
+            - 'ocr_text_detection': (experimental) Extract OCR text
+            - 'ocr_text_recognition': (experimental) Recognize OCR text
 
             For certain problem types, the default behavior is to load a pretrained model based on
             the presets / hyperparameters and the predictor will be inference_ready. This includes the following
@@ -262,9 +267,9 @@ class MultiModalPredictor:
             - 'object_detection'
             - 'text_similarity'
             - 'image_similarity'
-            - 'text_image_similarity'
-            - 'feature_extraction' (only support inference)
-            - 'zero_shot_image_classification' (only support inference)
+            - 'image_text_similarity'
+            - 'feature_extraction'
+            - 'zero_shot_image_classification'
             - 'few_shot_text_classification' (experimental)
             - 'ocr_text_detection' (experimental)
             - 'ocr_text_recognition' (experimental)
