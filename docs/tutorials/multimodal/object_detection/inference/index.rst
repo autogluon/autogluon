@@ -6,7 +6,7 @@ Inference
       :title: Load A Trained Detector
       :link: inference/detection_load_predictor.html
 
-      Load and evaluate a trained predictor
+      How to load and evaluate a trained predictor
 
 
 .. toctree::
