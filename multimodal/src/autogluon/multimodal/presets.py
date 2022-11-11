@@ -194,6 +194,32 @@ def image_text_similarity():
     }
 
 
+@automm_presets.register()
+def best_quality_ner():
+    return {
+        "model.names": ["ner"],
+        "model.ner.checkpoint_name": "google/flan-t5-base",
+        "env.precision": 32,
+    }
+
+
+@automm_presets.register()
+def medium_quality_faster_inference_ner():
+    return {
+        "model.names": ["ner"],
+        "model.ner.checkpoint_name": "google/flan-t5-small",
+        "env.precision": 32,
+    }
+
+
+@automm_presets.register()
+def high_quality_fast_inference_ner():
+    return {
+        "model.names": ["ner"],
+        "model.ner.checkpoint_name": "bert-base-cased",
+    }
+
+
 def list_automm_presets(verbose: bool = False):
     """
     List all available presets.
