@@ -172,6 +172,7 @@ def convert_xmls_to_cocojson(
     with open(output_jsonpath, "w") as f:
         output_json = json.dumps(output_json_dict)
         f.write(output_json)
+        print(f"The COCO format annotation is saved to {output_jsonpath}")
 
 
 def main():

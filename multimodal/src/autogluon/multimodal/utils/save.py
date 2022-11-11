@@ -111,6 +111,9 @@ def process_save_path(path, resume: Optional[bool] = False, raise_if_exist: Opti
                 "Specify a new path to avoid accidentally overwriting a saved predictor."
             )
         else:
+            logger.warning("A new predictor save path is created."
+                           "This could be because you are using multi GPU with DDP strategy."
+                           "You could check current save path at predictor._save_path")
             path = None
 
     return path
@@ -122,23 +125,22 @@ def setup_save_path(
     proposed_save_path: Optional[str] = None,
     hyperparameter_tune_kwargs: Optional[dict] = None,
     warn_if_exist: Optional[bool] = True,
-    num_gpus: Optional[int] = None,
+    raise_if_exist: Optional[bool] = False,
+    model_loaded:Optional[bool] = None,
 ):
     save_path = None
-    raise_if_exist_for_proposed_path = True
-    if num_gpus and num_gpus > 1:
-        raise_if_exist_for_proposed_path = (
-            False  # TODO: Here we allow overwrite previous save_path if we are using multi gpu
-        )
     if resume:
         assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
         save_path = process_save_path(path=old_save_path, resume=True)
     elif (
         proposed_save_path is not None
-    ):  # TODO: for multi gpu case, warn that the save_path is changed and remove extra folders
-        save_path = process_save_path(path=proposed_save_path, raise_if_exist=raise_if_exist_for_proposed_path)
+    ):  # TODO: distinguish DDP and existed predictor
+        save_path = process_save_path(path=proposed_save_path, raise_if_exist=False)
     elif old_save_path is not None:
-        save_path = process_save_path(path=old_save_path, raise_if_exist=False)
+        if model_loaded:
+            save_path = process_save_path(path=old_save_path, raise_if_exist=False)
+        else:
+            save_path = os.path.abspath(os.path.expanduser(old_save_path))
 
     if not resume:
         save_path = setup_outputdir(

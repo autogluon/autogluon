@@ -89,7 +89,7 @@ predictor.fit(
     hyperparameters={
         "optimization.learning_rate": 1e-5, # we use two stage and detection head has 100x lr
         "optimization.max_epochs": 20,
-        "env.per_gpu_batch_size": 2,  # decrease it when model is large
+        "env.per_gpu_batch_size": 1,  # decrease it when model is large
     },
 )
 end = time.time()
