@@ -27,9 +27,9 @@ hide-toc: true
 :child-align: justify
 :class: sd-text-white sd-fs-3
 
-AutoML for Tabular, Text, Image, and Multi-Modal Data
+AutoML for Image, Text, Time Series, and Tabular Data
 
-```{button-link} tabular/quick_start.html
+```{button-link} tutorials/tabular/tabular_quick_start.html
 :outline:
 :color: white
 :class: sd-px-4 sd-fs-5
@@ -43,16 +43,16 @@ Get Started
 ::::::
 
 Quick Prototyping 
-: Build machine learning solutions on your raw data with a few lines of code
+: Build machine learning solutions on raw data in a few lines of code.
 
 State-of-the-art Techniques
 : Automatically utilize SOTA models without expert knowledge.
 
 Easy to Deploy
-: This is a placeholder.
+: Move from experimentation to production with cloud predictors and pre-built containers.
 
 Customizable
-: This is a placeholder.
+: Extensible with custom feature processing, models, and metrics.
 
 ## {octicon}`rocket` Quick Examples
 
@@ -66,13 +66,12 @@ Predict the `class` column on a data table:
 ```python
 from autogluon.tabular import TabularDataset, TabularPredictor
 
-root = 'https://autogluon.s3.amazonaws.com/datasets/Inc/'
-train_data = TabularDataset(root+'train.csv')
+data_root = 'https://autogluon.s3.amazonaws.com/datasets/Inc/'
+train_data = TabularDataset(data_root + 'train.csv')
+test_data = TabularDataset(data_root + 'test.csv')
+
 predictor = TabularPredictor(label='class').fit(train_data=train_data)
-
-test_data = TabularDataset(root+'test.csv')
 predictions = predictor.predict(test_data)
-
 ```
 :::
 
@@ -81,25 +80,39 @@ predictions = predictor.predict(test_data)
 :animate: fade-in-slide-down
 :color: primary
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+Predict sentiment of movie reviews:
 
+```python
+from autogluon.multimodal import MultiModalPredictor
+from autogluon.core.utils.loaders import load_pd
+
+data_root = 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/'
+train_data = load_pd.load(data_root + 'train.parquet')
+test_data = load_pd.load(data_root + 'dev.parquet')
+
+predictor = MultiModalPredictor(label='label').fit(train_data=train_data)
+predictions = predictor.predict(test_data)
+```
 :::
 
 :::{dropdown} Image Classification
 :animate: fade-in-slide-down
 :color: primary
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+Predict clothing article types:
 
+```python
+from autogluon.multimodal import MultiModalPredictor
+from autogluon.vision import ImageDataset
+
+data_zip = 'https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip'
+train_data, _, test_data = ImageDataset.from_folders(data_zip)
+
+predictor = MultiModalPredictor(label='label').fit(train_data=train_data)
+predictions = predictor.predict(test_data)
+```
 :::
 
-
-:::{admonition} Object Detection
-:class: dropdown
-:open:
-
-asdfasf
-:::
 
 ## {octicon}`package` Installation
 
@@ -107,47 +120,13 @@ asdfasf
 ![](https://img.shields.io/pypi/v/autogluon.svg)
 ![](https://img.shields.io/pypi/dm/autogluon)
 
-AutoGluon supports Linux, MacOS (both Intel and Apple M1), and Windows. 
-To install use [pip](https://pip.pypa.io/en/stable/installation/):
+Install AutoGluon using [pip](https://pip.pypa.io/en/stable/installation/):
 
 ```bash
-pip install autogluon
+python -m pip install autogluon
 ```
 
-Check {doc}`./install` for detailed instructions. 
-
-
-## {octicon}`light-bulb` Solutions to ML problems
-
-::::{grid} 3
-:gutter: 3
-
-:::{grid-item-card}  Predicting Columns in a Table
-:link: tabular/quick_start.html
-
-Fitting models with tabular datasets
-:::
-
-:::{grid-item-card}  Example 1
-:link-type: ref
-:link: install
-
-A
-:::
-:::{grid-item-card}  Example 2
-C
-:::
-
-:::{grid-item-card}  Example 3
-D
-:::
-
-:::{grid-item-card}  Example 4
-E
-:::
-
-::::
-
+AutoGluon supports Linux, MacOS, and Windows. See {doc}`./install` for detailed instructions. 
 
 
 ```{toctree}
@@ -155,19 +134,10 @@ E
 :caption: Get Started
 :maxdepth: 1
 
-tabular/quick_start
 install
-```
-
-```{toctree}
-:caption: Tabular
-:hidden:
-:maxdepth: 2
-
-tabular/fit
-tabular/predict
-tabular/applications
-tabular/customization
+tutorials/tabular/tabular_quick_start
+tutorials/multimodal/multimodal_quick_start
+tutorials/timeseries/timeseries_quick_start
 ```
 
 ```{toctree}
