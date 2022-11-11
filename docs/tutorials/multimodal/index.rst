@@ -126,4 +126,5 @@ Advanced Topics
    image_prediction/index
    matching/index
    multimodal_prediction/index
+   object_detection/index
    advanced_topics/index

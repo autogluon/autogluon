@@ -27,7 +27,6 @@ from sklearn.model_selection import train_test_split
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.utils.try_import import try_import_ray_lightning
 from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.multimodal.utils import save_result_df
@@ -150,6 +149,7 @@ from .utils import (
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
+    setup_save_path,
     tensor_to_ndarray,
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
@@ -417,13 +417,6 @@ class MultiModalPredictor:
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._model_loaded = False  # Whether the model has been loaded
         self._matcher = None
-
-        if not self._save_path:
-            self._save_path = setup_outputdir(
-                path=None,
-                warn_if_exist=self._warn_if_exist,
-            )
-        self._save_path = os.path.abspath(os.path.expanduser(self._save_path))
 
         if self._problem_type is not None:
             if problem_property_dict.get(self._problem_type).is_matching:
@@ -710,23 +703,14 @@ class MultiModalPredictor:
 
         pl.seed_everything(seed, workers=True)
 
-        if self._resume:
-            assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
-            save_path = process_save_path(path=self._save_path, resume=True)
-        elif save_path is not None:
-            save_path = process_save_path(path=save_path)
-        elif self._save_path is not None:
-            save_path = process_save_path(path=self._save_path, raise_if_exist=False)
-
-        if not self._resume:
-            save_path = setup_outputdir(
-                path=save_path,
-                warn_if_exist=self._warn_if_exist,
-            )
-
-        save_path = os.path.abspath(os.path.expanduser(save_path))
-        self._save_path = save_path
-        logger.debug(f"save path: {save_path}")
+        self._save_path = setup_save_path(
+            resume=self._resume,
+            old_save_path=self._save_path,
+            proposed_save_path=save_path,
+            num_gpus=self._config.env.num_gpus,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            warn_if_exist=self._warn_if_exist,
+        )
 
         # Generate general info that's not config specific
         if tuning_data is None:
@@ -1929,12 +1913,10 @@ class MultiModalPredictor:
         )  # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
 
         # Cache prediction results as COCO format # TODO: refactor this
-        if not self._save_path:
-            self._save_path = setup_outputdir(
-                path=None,
-                warn_if_exist=self._warn_if_exist,
-            )
-        self._save_path = os.path.abspath(os.path.expanduser(self._save_path))
+        self._save_path = setup_save_path(
+            old_save_path=self._save_path,
+            num_gpus=self._config.env.num_gpus,
+        )
         cocoeval_cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
 
         eval_results = cocoeval(
@@ -2384,6 +2366,10 @@ class MultiModalPredictor:
             assert (
                 self._problem_type == OBJECT_DETECTION
             ), "Aborting: save results only works for object detection now."
+            self._save_path = setup_save_path(
+                old_save_path=self._save_path,
+                num_gpus=self._config.env.num_gpus,
+            )
             if not result_path:
                 result_path = os.path.join(self._save_path, "result.txt")
 
