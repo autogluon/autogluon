@@ -2,7 +2,7 @@
 :label:`sec_automm_detection_prepare_coco17`
 
 [COCO](https://cocodataset.org/#home) is a large-scale object detection, segmentation, and captioning dataset. 
-For detection, the most commonly used version is COCO17 with the largest number of training data.
+For detection, the most commonly used version is COCO2017 with the largest number of training data.
 There are 80 classes, 123,287 images, 886,284 instances, and the median image ratio is 640 x 480.
 This tutorial will walk through the steps of preparing this dataset for Autogluon MultiModalPredictor.
 
