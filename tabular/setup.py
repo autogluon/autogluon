@@ -12,6 +12,8 @@ ag = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ag)
 ###########################
 
+import sys
+
 version = ag.load_version_file()
 version = ag.update_version(version)
 
