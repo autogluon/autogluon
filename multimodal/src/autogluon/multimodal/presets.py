@@ -410,6 +410,7 @@ def high_quality_fast_inference_ner():
         "model.ner.checkpoint_name": "bert-base-cased",
     }
 
+
 @matcher_presets.register()
 def image_text_similarity():
     return automm_presets.create("medium_quality_faster_inference_image_text_similarity")
@@ -418,7 +419,6 @@ def image_text_similarity():
 def list_automm_presets(verbose: bool = False):
     """
     List all available presets.
-
     Returns
     -------
     A list of presets.
@@ -437,12 +437,10 @@ def list_automm_presets(verbose: bool = False):
 def get_basic_automm_config(extra: Optional[List[str]] = None):
     """
     Get the basic config of AutoMM.
-
     Parameters
     ----------
     extra
         A list of extra config keys.
-
     Returns
     -------
     A dict config with keys: MODEL, DATA, OPTIMIZATION, ENVIRONMENT, and their default values.
@@ -463,12 +461,10 @@ def get_basic_automm_config(extra: Optional[List[str]] = None):
 def get_automm_presets(presets: str):
     """
     Map a AutoMM preset string to its config including a basic config and an overriding dict.
-
     Parameters
     ----------
     presets
         Name of a preset.
-
     Returns
     -------
     basic_config
