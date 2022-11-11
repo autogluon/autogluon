@@ -418,8 +418,7 @@ class MultiModalPredictor:
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._model_loaded = False  # Whether the model has been loaded
         self._matcher = None
-        self._is_loaded = False
-
+        
         if path is not None:
             self._save_path = setup_save_path(
                 resume=self._resume,
