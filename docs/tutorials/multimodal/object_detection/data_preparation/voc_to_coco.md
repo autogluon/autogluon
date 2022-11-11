@@ -42,8 +42,8 @@ Start converting !
 Now those splits are converted to COCO format in `Annotations` folder under the root directory:
 ```
 coco_train.json
-coco_val.txt
-coco_test.txt
+coco_val.json
+coco_test.json
 ```
 
 ### Convert Existing Splits

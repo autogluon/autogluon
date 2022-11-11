@@ -25,8 +25,8 @@ And we use all the GPUs (if any):
 checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
 num_gpus = -1  # use all GPUs
 
-train_path = "./VOCdevkit/VOCCOCO/voc12_train.json"
-test_path = "./VOCdevkit/VOCCOCO/voc07_test.json"
+train_path = "./VOCdevkit/VOC2012/Annotations/coco_train.json" 
+test_path = "./VOCdevkit/VOC2007/Annotations/coco_test.json"
 ```
 
 We create the MultiModalPredictor with selected checkpoint name and number of GPUs.

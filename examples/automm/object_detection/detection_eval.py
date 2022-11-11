@@ -8,7 +8,7 @@ An example to evaluate an MMDetection model on COCO:
 
 An example to evaluate an MMDetection model on VOC:
     python detection_eval.py \
-        --test_path VOCdevkit/VOCCOCO/voc07_test.json \
+        --test_path ./VOCdevkit/VOC2007/Annotations/coco_test.json \
         --checkpoint_name faster_rcnn_r50_fpn_1x_voc0712
 
 Note that for now it's required to install nightly build torchmetrics.

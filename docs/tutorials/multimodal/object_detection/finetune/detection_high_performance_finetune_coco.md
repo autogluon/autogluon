@@ -36,8 +36,8 @@ checkpoint_name = "vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco"
 num_gpus = -1  # use all GPUs
 val_metric = "map"
 
-train_path = "./VOCdevkit/VOCCOCO/voc12_train.json"
-test_path = "./VOCdevkit/VOCCOCO/voc07_test.json"
+train_path = "./VOCdevkit/VOC2012/Annotations/coco_train.json" 
+test_path = "./VOCdevkit/VOC2007/Annotations/coco_test.json"
 ```
 
 We create the MultiModalPredictor with selected checkpoint name, val_metric, and number of GPUs.
@@ -50,10 +50,10 @@ predictor = MultiModalPredictor(
     hyperparameters={
         "model.mmdet_image.checkpoint_name": checkpoint_name,
         "env.num_gpus": num_gpus,
+        "optimization.val_metric": val_metric,
     },
     problem_type="object_detection",
     sample_data_path=train_path,
-    val_metric=val_metric,
 )
 ```
 
@@ -65,10 +65,10 @@ predictor = MultiModalPredictor(
     hyperparameters={
         "model.mmdet_image.checkpoint_name": checkpoint_name,
         "env.num_gpus": num_gpus,
+        "optimization.val_metric": val_metric,
     },
     problem_type="object_detection",
     classes=voc_classes,
-    val_metric=val_metric,
 )
 ```
 
