@@ -130,16 +130,13 @@ For the sole purpose of running AutoMM, the fields ``"info"`` and ``"licenses"``
 
 The following is an example of one sample annotated with COCO format
 
-## Converting Pascal VOC dataset to COCO format
-Pascal VOC is another very popular dataset for object detection, and it also follows its own data format. 
-We provide an example script to easily convert VOC dataset to COCO format.
+## Converting VOC format to COCO format
+[Pascal VOC](http://host.robots.ox.ac.uk/pascal/VOC/) is a collection of datasets for object detection. 
+And VOC format refers to the specific format (in `.xml` file) the Pascal VOC dataset is using.
 
-The script can be found in the following directory:
-```
-./examples/automm/object_detection/voc2coco.py
-```
+We have a tutorial guiding you convert your VOC format dataset, i.e. either Pascal VOC Dataset or other datasets in VOC format, to COCO format: :ref:`sec_automm_detection_voc_to_coco`
 
-Assuming your VOC dataset has the following structure
+In short, assuming your VOC dataset has the following structure
 ```
 <path_to_VOCdevkit>/
     VOC2007/
@@ -155,18 +152,15 @@ Assuming your VOC dataset has the following structure
     ...
 ```
 
-#### 1. Go to the script folder:
-```
-cd ./examples/automm/object_detection/
-```
-
-#### 2. Run the following command:
+#### Run the following command:
 ```python
 # If you'd like to customize train/val/test ratio. Note test_ratio = 1 - train_ratio - val_ratio.
-python3 voc2coco.py --root_dir <root_dir> --train_ratio <train_ratio> --val_ratio <val_ratio>  
+python3 -m autogluon.multimodal.cli.voc2coco --root_dir <root_dir> --train_ratio <train_ratio> --val_ratio <val_ratio>  
 # If you'd like to use the dataset provided train/val/test splits:
-python3 voc2coco.py --root_dir <root_dir>
+python3 -m autogluon.multimodal.cli.voc2coco --root_dir <root_dir>
 ```
+
+For more details, please see the tutorial: :ref:`sec_automm_detection_voc_to_coco`.
 
 ## Converting other formats to COCO format
 We have demonstrated the COCO format and feel free to write your own code to convert your data into the COCO format.
