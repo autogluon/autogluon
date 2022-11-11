@@ -14,6 +14,11 @@ However, we strongly recommend using the COCO format, through we provide limited
 
 [//]: # (We strongly recommend using COCO format, but AutoMM still have limited support for VOC format for quick proof testing.)
 
+## Prepare data
+For running this tutorial, you should have VOC dataset prepared. 
+If you haven't already, head over to :label:`sec_automm_detection_prepare_voc` to prepare your VOC data. 
+This tutorial assumes that you have saved VOC data under the folder `~/data/`, i.e. it should appear at `~/data/VOCdevkit`.
+
 ## Creating the `MultiModalPredictor`
 To start, import MultiModalPredictor:
 
@@ -62,7 +67,7 @@ predictor = MultiModalPredictor.load(load_path)
 
 ## Setting up data
 
-Here we use VOC2007 for testing: \[Prepare VOC Dataset].
+Here we use VOC2007 for testing. See :label:`sec_automm_detection_prepare_voc` for VOC data preparation.
 While using VOC format dataset, the input is the root path of the dataset, and contains at least:
 
 ```
@@ -100,7 +105,7 @@ tvmonitor
 For VOC format data, we always use root_path. And the predictor will automatically select the test split.
 
 ```python
-test_path = "VOCdevkit/VOC2007"
+test_path = "~/data/VOCdevkit/VOC2007"
 ```
 
 ## Running inference
@@ -114,12 +119,15 @@ To run inference and save results, run the following:
 ```python
 pred = predictor.predict(test_path, save_results=True)
 ```
-Currently, we support saving results into a `.txt` file as a pandas `DataFrame`.
+Currently, we convert the results to a pandas `DataFrame` and save into a `.txt` file. 
+The `.txt` file has two columns, `image` and `bboxes`, where
+- in `image`, each row contains the image path
+- in `bboxes`, each row is a list of dictionaries, each one representing a bounding box: 
+  - `{"class": <predicted_class_name>, "bbox": [x1, y1, x2, y2], "score": <confidence_score>}`
 
-Again, the test set is selected automatically within `predictor.predict` function.
-
+## Reading results
 The returned value `pred` is a `list` and has the following dimensions:
-```python
+```
 [num_images, num_total_classes, num_detections_per_class, 5]
 ```
 
@@ -142,26 +150,42 @@ for i, image_pred in enumerate(pred):
             ## bbox = [x1, y1, x2, y2, conf_score]
             print("bbox: {}, class: {}, score: {}".format(bbox[:4], classname, bbox[4]))
 ```
+If you prefer to get the results in `pd.DataFrame` format, run the following:
+```python
+pred_df = predictor.predict(test_path, as_pandas=True)
+```
+
+Similar to the `.txt` file, the `pred_df` also has two columns, `image` and `bboxes`, where
+- in `image`, each row contains the image path
+- in `bboxes`, each row is a list of dictionaries, each one representing a bounding box: 
+  - `{"class": <predicted_class_name>, "bbox": [x1, y1, x2, y2], "score": <confidence_score>}`
 
 ## Visualizing Results
+To run visualizations, you'll need to setup `cv2` by running 
+```python
+pip install cv2
+```
+
 To visualize the detection bounding boxes, run the following:
 ```python
 from autogluon.multimodal.utils import from_coco_or_voc, visualize_detection
-
+import matplotlib.pyplot as plt
 conf_threshold = 0.4  # Specify a confidence threshold to filter out unwanted boxes
-visualization_result_dir = "VOCdevkit/VOC2007/visualizations"  # Specify a directory to save visualized images.
+visualization_result_dir = "~/data/VOCdevkit/VOC2007/visualizations"  # Specify a directory to save visualized images.
 
 df = from_coco_or_voc(test_path)[:10][["image"]]  # we took 10 images for this example.
 
 pred = predictor.predict(df)
 
-visualize_detection(
+visualized = visualize_detection(
     pred=pred,
     data=df,
     detection_classes=predictor.get_predictor_classes(),
     conf_threshold=conf_threshold,
     visualization_result_dir=visualization_result_dir,
 )
+
+plt.imshow(visualized[0][:, : ,::-1])
 ```
 Note that we took 10 images to visualize for this example. 
 Please consider your storage situation when deciding the number of images to visualize.  

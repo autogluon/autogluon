@@ -423,6 +423,12 @@ class MultiModalPredictor:
         self._model_loaded = False  # Whether the model has been loaded
         self._matcher = None
 
+        if self._problem_type == OBJECT_DETECTION:
+            warnings.warn(
+                "Running object detection. Make sure that you have installed mmdet and mmcv-full, "
+                "by running 'pip install mmdet', and 'mim install mmcv-full'"
+            )
+
         if self._problem_type is not None:
             if problem_property_dict.get(self._problem_type).is_matching:
                 self._matcher = MultiModalMatcher(
@@ -2368,10 +2374,6 @@ class MultiModalPredictor:
                 else:
                     pred = logits
 
-        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
-            pred = self._as_pandas(data=data, to_be_converted=pred)
-            # TODO: Add support for as_pandas
-
         if save_results:
             ## Dumping Result for detection only now
             assert (
@@ -2388,9 +2390,20 @@ class MultiModalPredictor:
             save_result_df(
                 pred=pred,
                 data=data,
-                result_path=result_path,
                 detection_classes=self._model.model.CLASSES,
+                result_path=result_path,
             )
+
+        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
+            if self._problem_type == OBJECT_DETECTION:
+                pred = save_result_df(
+                    pred=pred,
+                    data=data,
+                    detection_classes=self._model.model.CLASSES,
+                    result_path=None,
+                )
+            else:
+                pred = self._as_pandas(data=data, to_be_converted=pred)
 
         return pred
 

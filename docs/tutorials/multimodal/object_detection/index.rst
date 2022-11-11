@@ -1,6 +1,18 @@
 Tutorials
 =========
 
+Pre-requisite
+-------------
+All detection modules depend on ``mmcv-full`` and ``mmdet`` packages.
+
+
+To install ``mmcv-full``, run:
+
+    ``mim install mmcv-full``
+
+To install ``mmdet``, run:
+
+    ``pip install mmdet``
 
 Data Preparation
 ------------------

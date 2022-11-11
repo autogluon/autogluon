@@ -755,7 +755,7 @@ def get_voc_format_classes(root):
         ## read the class names and save results
         logger.warning(
             "labels.txt does not exist, using default VOC names. "
-            "To create labels.txt, run ls Annotations/* > pathlist.txt in root dir"
+            "Creating labels.txt by scanning the directory: {}".format(os.path.join(root, "Annotations"))
         )
         class_names = dump_voc_classes(
             voc_annotation_path=os.path.join(root, "Annotations"), voc_class_names_output_path=labels_file
@@ -1020,7 +1020,9 @@ def get_color(idx):
     return color
 
 
-def save_result_df(pred: Iterable, data: Union[pd.DataFrame, Dict], result_path: str, detection_classes: List[str]):
+def save_result_df(
+    pred: Iterable, data: Union[pd.DataFrame, Dict], detection_classes: List[str], result_path: Optional[str] = None
+):
     """
     Saving detection results in pd.DataFrame format (per image)
 
@@ -1036,7 +1038,7 @@ def save_result_df(pred: Iterable, data: Union[pd.DataFrame, Dict], result_path:
         all available classes for this detection
     Returns
     -------
-    None
+    The detection results as pandas DataFrame
     """
     if isinstance(data, dict):
         image_names = data["image"]
@@ -1054,8 +1056,10 @@ def save_result_df(pred: Iterable, data: Union[pd.DataFrame, Dict], result_path:
                 box_info.append({"class": pred_class, "bbox": list(bbox[:4]), "score": bbox[4]})
         results.append([image_name, box_info])
     result_df = pd.DataFrame(results, columns=["image", "bboxes"])
-    result_df.to_csv(result_path, index=False)
-    logger.info("Saved detection results to {}".format(result_path))
+    if result_path and os.path.exists(result_path):
+        result_df.to_csv(result_path, index=False)
+        logger.info("Saved detection results to {}".format(result_path))
+    return result_df
 
 
 def save_result_coco_format(detection_data_path, pred, result_path):
