@@ -23,7 +23,7 @@ from autogluon.core.utils.loaders import load_zip
 We have the sample dataset ready in the cloud. Let's download it:
 
 ```python .input
-zip_file = "s3://automl-mm-bench/object_detection_dataset/tiny_motorbike_coco.zip"
+zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection_dataset/tiny_motorbike_coco.zip"
 download_dir = "./tiny_motorbike_coco"
 
 load_zip.unzip(zip_file, unzip_dir=download_dir)

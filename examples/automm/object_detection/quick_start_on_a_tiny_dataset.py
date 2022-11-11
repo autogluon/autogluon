@@ -6,7 +6,7 @@ from autogluon.multimodal import MultiModalPredictor
 
 
 def tutorial_script_for_quick_start():
-    zip_file = "s3://automl-mm-bench/object_detection_dataset/tiny_motorbike_coco.zip"
+    zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection_dataset/tiny_motorbike_coco.zip"
     download_dir = "./tiny_motorbike_coco"
 
     load_zip.unzip(zip_file, unzip_dir=download_dir)
