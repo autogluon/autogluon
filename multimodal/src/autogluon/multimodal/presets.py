@@ -375,6 +375,12 @@ def high_quality_fast_inference_image_text_similarity():
 
 @automm_presets.register()
 @matcher_presets.register()
+def image_text_similarity():
+    return automm_presets.create("medium_quality_faster_inference_image_text_similarity")
+
+
+@automm_presets.register()
+@matcher_presets.register()
 def medium_quality_faster_inference_image_text_similarity():
     return {
         "model.names": ["clip"],
@@ -409,11 +415,6 @@ def high_quality_fast_inference_ner():
         "model.names": ["ner"],
         "model.ner.checkpoint_name": "bert-base-cased",
     }
-
-
-@matcher_presets.register()
-def image_text_similarity():
-    return automm_presets.create("medium_quality_faster_inference_image_text_similarity")
 
 
 def list_automm_presets(verbose: bool = False):
