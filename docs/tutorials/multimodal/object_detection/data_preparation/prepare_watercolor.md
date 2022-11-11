@@ -9,8 +9,11 @@ The total time to prepare the dataset depends on your Internet speed and disk pe
 
 You can download the dataset from its [official project page](https://naoto0804.github.io/cross_domain_detection/).
 We also prepared a bash script for one-step downloading the dataset: 
-[download_watercolor.sh](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/download_watercolor.sh),
-or use the python script that can download all datasets mentioned in our tutorials: [prepare_detection_dataset.py](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/prepare_detection_dataset.sh).
+[download_watercolor.sh](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/download_watercolor.sh).
+Or you can also use our cli tool `prepare_detection_dataset` that can download all datasets mentioned in our tutorials.
+This python script is in our code: 
+[prepare_detection_dataset.py](https://github.com/awslabs/autogluon/tree/master/autogluon/multimodal/src/autogluon/multimodal/cli/prepare_detection_dataset.py),
+and you can also run it as a cli: `python3 -m autogluon.multimodal.cli.prepare_detection_dataset`.
 
 ### Download with Python Script
 
@@ -20,19 +23,19 @@ If you are working on a Unix system and needs a progress bar, try the bash scrip
 You could either extract it in coco17 folder under current directory by running:
 
 ```
-python3 prepare_detection_dataset.py --dataset_name watercolor
+python3 -m autogluon.multimodal.cli.prepare_detection_dataset --dataset_name watercolor
 ```
 
 or extract it in coco17 folder under a provided output path:
 
 ```
-python3 prepare_detection_dataset.py --dataset_name watercolor --output_path ~/data
+python3 -m autogluon.multimodal.cli.prepare_detection_dataset --dataset_name watercolor --output_path ~/data
 ```
 
 or make it shorter:
 
 ```
-python3 prepare_detection_dataset.py -d watercolor -o ~/data
+python3 -m autogluon.multimodal.cli.prepare_detection_dataset -d watercolor -o ~/data
 ```
 
 ### Download with Bash Script
