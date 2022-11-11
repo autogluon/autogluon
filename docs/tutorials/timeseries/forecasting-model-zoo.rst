@@ -12,7 +12,7 @@ Forecasting Time Series - Model Zoo
 
 
 This page contains the list of time series forecasting models available in AutoGluon.
-The available hyperparameters for each model are listed under **Other parameters**.
+The available hyperparameters for each model are listed under **Other Parameters**.
 
 This list is useful if you want to override the default hyperparameters (:ref:`sec_forecasting_indepth_manual_config`)
 or define custom hyperparameter search spaces (:ref:`sec_forecasting_indepth_hpo`), as described in the In-depth Tutorial.
@@ -185,7 +185,7 @@ Models not included in this table currently do not support any additional featur
 .. list-table::
    :header-rows: 1
    :stub-columns: 1
-   :align: left
+   :align: center
    :widths: 40 20 20 20
 
    * - Model
