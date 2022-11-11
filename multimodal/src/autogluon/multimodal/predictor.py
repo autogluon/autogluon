@@ -418,7 +418,7 @@ class MultiModalPredictor:
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._model_loaded = False  # Whether the model has been loaded
         self._matcher = None
-        
+
         if path is not None:
             self._save_path = setup_save_path(
                 resume=self._resume,
@@ -2669,7 +2669,6 @@ class MultiModalPredictor:
                 fp,
                 ensure_ascii=True,
             )
-            print(f"Saving assets to {path}")
 
         # In case that users save to a path, which is not the original save_path.
         if os.path.abspath(path) != os.path.abspath(self._save_path):
