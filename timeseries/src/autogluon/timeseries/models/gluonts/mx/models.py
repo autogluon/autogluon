@@ -43,12 +43,16 @@ class DeepARMXNetModel(AbstractGluonTSMXNetModel):
     The model consists of an RNN encoder (LSTM or GRU) and a decoder that outputs the
     distribution of the next target value. Close to the model described in [Salinas2020]_.
 
-    .. [Salinas2020] Salinas, David, et al.
-        "DeepAR: Probabilistic forecasting with autoregressive recurrent networks."
-        International Journal of Forecasting. 2020.
 
     Based on `gluonts.mx.model.deepar.DeepAREstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.mx.model.deepar.html>`_.
     See GluonTS documentation for additional hyperparameters.
+
+
+    References
+    ----------
+    .. [Salinas2020] Salinas, David, et al.
+        "DeepAR: Probabilistic forecasting with autoregressive recurrent networks."
+        International Journal of Forecasting. 2020.
 
 
     Other Parameters
@@ -125,12 +129,15 @@ class MQCNNMXNetModel(AbstractGluonTSSeq2SeqModel):
     The model consists of a CNN encoder and a decoder that directly predicts the
     quantiles of the future target values' distribution. As described in [Wen2017]_.
 
+    Based on `gluonts.mx.model.seq2seq.MQCNNEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.mx.model.seq2seq.html#gluonts.mx.model.seq2seq.MQCNNEstimator>`_.
+    See GluonTS documentation for additional hyperparameters.
+
+
+    References
+    ----------
     .. [Wen2017] Wen, Ruofeng, et al.
         "A multi-horizon quantile recurrent forecaster."
         arXiv preprint arXiv:1711.11053 (2017)
-
-    Based on `gluonts.mx.model.seq2seq.MQCNNEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.mx.model.seq2seq.html#gluonts.mx.model.seq2seq.MQCNNEstimator>`_.
-    See GluonTS documentation for additional hyperparameters.
 
 
     Other Parameters
@@ -203,12 +210,15 @@ class MQRNNMXNetModel(AbstractGluonTSSeq2SeqModel):
     The model consists of an RNN encoder and a decoder that directly predicts the
     quantiles of the future target values' distribution. As described in [Wen2017]_.
 
+    Based on `gluonts.mx.model.seq2seq.MQRNNEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.mx.model.seq2seq.html#gluonts.mx.model.seq2seq.MQRNNEstimator>`_.
+    See GluonTS documentation for additional hyperparameters.
+
+
+    References
+    ----------
     .. [Wen2017] Wen, Ruofeng, et al.
         "A multi-horizon quantile recurrent forecaster."
         arXiv preprint arXiv:1711.11053 (2017)
-
-    Based on `gluonts.mx.model.seq2seq.MQRNNEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.mx.model.seq2seq.html#gluonts.mx.model.seq2seq.MQRNNEstimator>`_.
-    See GluonTS documentation for additional hyperparameters.
 
 
     Other Parameters
@@ -305,12 +315,16 @@ class TemporalFusionTransformerMXNetModel(AbstractGluonTSMXNetModel):
     The model combines an LSTM encoder, a transformer decoder, and directly predicts
     the quantiles of future target values. As described in [Lim2021]_.
 
+    Based on `gluonts.mx.model.tft.TemporalFusionTransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.mx.model.tft.html>`_.
+    See GluonTS documentation for additional hyperparameters.
+
+
+    References
+    ----------
     .. [Lim2021] Lim, Bryan, et al.
         "Temporal Fusion Transformers for Interpretable Multi-horizon Time Series Forecasting."
         International Journal of Forecasting. 2021.
 
-    Based on `gluonts.mx.model.tft.TemporalFusionTransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.mx.model.tft.html>`_.
-    See GluonTS documentation for additional hyperparameters.
 
     Other Parameters
     ----------------
@@ -371,11 +385,14 @@ class TransformerMXNetModel(AbstractGluonTSMXNetModel):
     distribution of the next target value. The transformer architecture is close to the
     one described in [Vaswani2017]_.
 
-    .. [Vaswani2017] Vaswani, Ashish, et al. "Attention is all you need."
-        Advances in neural information processing systems. 2017.
-
     Based on `gluonts.mx.model.transformer.TransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.mx.model.transformer.html>`_.
     See GluonTS documentation for additional hyperparameters.
+
+
+    References
+    ----------
+    .. [Vaswani2017] Vaswani, Ashish, et al. "Attention is all you need."
+        Advances in neural information processing systems. 2017.
 
 
     Other Parameters
@@ -411,6 +428,7 @@ class TransformerMXNetModel(AbstractGluonTSMXNetModel):
         Learning rate used during training
     """
 
+    # TODO: Enable static and dynamic features
     gluonts_estimator_class: Type[GluonTSEstimator] = TransformerEstimator
 
 

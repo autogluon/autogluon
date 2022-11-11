@@ -20,12 +20,17 @@ logger = logging.getLogger(__name__)
 
 
 class AutoGluonTabularModel(AbstractTimeSeriesModel):
-    """Uses TabularPredictor to forecast future time series values one step at a time.
+    """Predict future time series values using autogluon.tabular.TabularPredictor.
 
     The forecasting is converted to a tabular problem using the following features:
 
     - lag features (observed time series values) based on ``freq`` of the data
     - time features (e.g., day of the week) based on the timestamp of the measurement
+    - static features of each item (if available)
+
+    Quantiles are obtained by assuming that the residuals follow zero-mean normal distribution, scale of which is
+    estimated from the empirical distribution of the residuals.
+
 
     Other Parameters
     ----------------

@@ -46,7 +46,6 @@ class NaiveModel(AbstractLocalModel):
 
     Quantiles are obtained by assuming that the residuals follow zero-mean normal distribution, scale of which is
     estimated from the empirical distribution of the residuals.
-
     As described in https://otexts.com/fpp3/prediction-intervals.html
 
     """
@@ -76,7 +75,6 @@ class SeasonalNaiveModel(AbstractLocalModel):
 
     Quantiles are obtained by assuming that the residuals follow zero-mean normal distribution, scale of which is
     estimated from the empirical distribution of the residuals.
-
     As described in https://otexts.com/fpp3/prediction-intervals.html
 
 
