@@ -33,7 +33,7 @@ With AutoMM, you just need to specify the query, response, and label column name
 from autogluon.multimodal import MultiModalPredictor
 
 # Initialize the model
-matcher = MultiModalPredictor(
+predictor = MultiModalPredictor(
         problem_type="text_similarity",
         query="premise", # the column name of the first sentence
         response="hypothesis", # the column name of the second sentence
@@ -42,7 +42,7 @@ matcher = MultiModalPredictor(
     )
 
 # Fit the model
-matcher.fit(
+predictor.fit(
     train_data=snli_train,
     time_limit=180,
 )
@@ -52,7 +52,7 @@ matcher.fit(
 You can evaluate the macther on the test dataset to see how it performs with the roc_auc score:
 
 ```{.python .input}
-score = matcher.evaluate(snli_test)
+score = predictor.evaluate(snli_test)
 print("evaluation score: ", score)
 ```
 
@@ -62,23 +62,23 @@ We create a new sentence pair with similar meaning (expected to be predicted as 
 pred_data = pd.DataFrame.from_dict({"premise":["The teacher gave his speech to an empty room."], 
                                     "hypothesis":["There was almost nobody when the professor was talking."]})
 
-predictions = matcher.predict(pred_data)
+predictions = predictor.predict(pred_data)
 print('Predicted entities:', predictions[0])
 ```
 
 ## Predict Matching Probabilities
 We can also compute the matching probabilities of sentence pairs.
 ```{.python .input}
-probabilities = matcher.predict_proba(pred_data)
+probabilities = predictor.predict_proba(pred_data)
 print(probabilities)
 ```
 
 ## Extract Embeddings
 Moreover, we support extracting embeddings separately for two sentence groups.
 ```{.python .input}
-embeddings_1 = matcher.extract_embedding({"premise":["The teacher gave his speech to an empty room."]})
+embeddings_1 = predictor.extract_embedding({"premise":["The teacher gave his speech to an empty room."]})
 print(embeddings_1.shape)
-embeddings_2 = matcher.extract_embedding({"hypothesis":["There was almost nobody when the professor was talking."]})
+embeddings_2 = predictor.extract_embedding({"hypothesis":["There was almost nobody when the professor was talking."]})
 print(embeddings_2.shape)
 ```
 

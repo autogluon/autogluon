@@ -1,4 +1,4 @@
-# Image<-->Text Matching with AutoMM - Quick Start
+# Image<-->Text Matching with AutoMM
 :label:`image_text_matching`
 
 Vision and language are two important aspects of human intelligence to understand the real world. Image-text matching, measuring the visual-semantic

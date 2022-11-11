@@ -3,94 +3,130 @@
 
 Computing the similarity between two images is a common task in computer vision, with several practical applications such as detecting same or different product, etc. In general, image similarity models will take two images as input and transform them into vectors, and then similarity scores calculated using cosine similarity, dot product, or Euclidean distances are used to measure how alike or different of the two images. 
 
+```{.python .input}
+import os
+import pandas as pd
+import warnings
+from IPython.display import Image, display
+warnings.filterwarnings('ignore')
+```
+
 ## Prepare your Data
-In this tutorial, we will demonstrate how to use AutoMM for image-to-image matching with the simplified Stanford Online Products dataset ([SOP](https://cvgl.stanford.edu/projects/lifted_struct/)). The data can be downloaded from [here](ftp://cs.stanford.edu/cs/cvgl/Stanford_Online_Products.zip). Directly unzipping the data will be enough. 
+In this tutorial, we will demonstrate how to use AutoMM for image-to-image matching with the simplified Stanford Online Products dataset ([SOP](https://cvgl.stanford.edu/projects/lifted_struct/)). 
 
 Stanford Online Products dataset is introduced for metric learning. There are 12 categories of products in this dataset: bicycle, cabinet, chair, coffee maker, fan, kettle, lamp, mug, sofa, stapler, table and toaster. Each category has some products, and each product has several images captured from different views. Here, we consider different views of the same product as positive pairs (labeled as 1) and images from different products as negative pairs (labeled as 0). 
 
-The following code downloads and loads the annotation into dataframes. Please make sure these annotation files are saved to the same directory where you store the actual data. 
+The following code downloads the dataset and unzip the images and annotation files.
+
 
 ```{.python .input}
-from autogluon.core.utils.loaders import load_pd
-import pandas as pd
-import warnings
-warnings.filterwarnings('ignore')
-
-sop_train = load_pd.load('https://automl-mm-bench.s3.amazonaws.com/stanford_online_products/sop_train.csv')
-sop_test = load_pd.load('https://automl-mm-bench.s3.amazonaws.com/stanford_online_products/sop_test.csv')
-print(sop_train.head())
+download_dir = './ag_automm_tutorial'
+zip_file = 'https://automl-mm-bench.s3.amazonaws.com/Stanford_Online_Products.zip'
+from autogluon.core.utils.loaders import load_zip
+load_zip.unzip(zip_file, unzip_dir=download_dir)
 ```
+
+Then we can load the annotations into dataframes.
+```{.python .input}
+dataset_path = os.path.join(download_dir, 'Stanford_Online_Products')
+train_data = pd.read_csv(f'{dataset_path}/train.csv', index_col=0)
+test_data = pd.read_csv(f'{dataset_path}/test.csv', index_col=0)
+image_col_1 = "Image1"
+image_col_2 = "Image2"
+label_col = "Label"
+```
+
+We need to expand the image paths since the original paths are relative.
+```{.python .input}
+def path_expander(path, base_folder):
+    path_l = path.split(';')
+    return ';'.join([os.path.abspath(os.path.join(base_folder, path)) for path in path_l])
+
+for image_col in [image_col_1, image_col_2]:
+    train_data[image_col] = train_data[image_col].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
+    test_data[image_col] = test_data[image_col].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
+```
+
+The annotations are only image path pairs and their binary labels (1 and 0 mean the image pair matching or not, respectively).
+```{.python .input}
+train_data.head()
+```
+
+Let's visualize a matching image pair.
+
+```{.python .input}
+pil_img = Image(filename=train_data[image_col_1][5])
+display(pil_img)
+```
+```{.python .input}
+pil_img = Image(filename=train_data[image_col_2][5])
+display(pil_img)
+```
+
+Here are two images that do not match.
+```{.python .input}
+pil_img = Image(filename=train_data[image_col_1][0])
+display(pil_img)
+```
+```{.python .input}
+pil_img = Image(filename=train_data[image_col_2][0])
+display(pil_img)
+```
+
 
 ## Train your Model
 
-Ideally, we want to obtain a model that can return high/low scores for positive/negative image pairs. With AutoMM, we can easily train a model that captures the semantic relationship between images. Bascially, it uses [Swin Transformer](https://arxiv.org/abs/2103.14030) to project each image into a high-dimensional vector and treat the matching problem as a classification problem. 
+Ideally, we want to obtain a model that can return high/low scores for positive/negative image pairs. With AutoMM, we can easily train a model that captures the semantic relationship between images. Bascially, it uses [Swin Transformer](https://arxiv.org/abs/2103.14030) to project each image into a high-dimensional vector and compute the cosine similarity of feature vectors. 
 
-With AutoMM, you just need to specify the query, response, and label column names and fit the model on the training dataset without worrying the implementation details.
+With AutoMM, you just need to specify the `query`, `response`, and `label` column names and fit the model on the training dataset without worrying the implementation details.
 
-```python
+```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
-
-# Initialize the model
-matcher = MultiModalPredictor(
+predictor = MultiModalPredictor(
         problem_type="image_similarity",
-        query="Image1", # the column name of the first image
-        response="Image2", # the column name of the second image
-        label="Label", # the label column name
+        query=image_col_1, # the column name of the first image
+        response=image_col_2, # the column name of the second image
+        label=label_col, # the label column name
         eval_metric='auc', # the evaluation metric
     )
-
+    
 # Fit the model
-matcher.fit(
-    train_data=sop_train,
+predictor.fit(
+    train_data=train_data,
     time_limit=180,
 )
 ```
 
-```
-Global seed set to 123
-Auto select gpus: [0, 1, 2, 3]
-Using 16bit native Automatic Mixed Precision (AMP)
-GPU available: True (cuda), used: True
-TPU available: False, using: 0 TPU cores
-IPU available: False, using: 0 IPUs
-HPU available: False, using: 0 HPUs
-Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/4
-Initializing distributed: GLOBAL_RANK: 1, MEMBER: 2/4
-Initializing distributed: GLOBAL_RANK: 2, MEMBER: 3/4
-Initializing distributed: GLOBAL_RANK: 3, MEMBER: 4/4
-
-  | Name              | Type                            | Params
-----------------------------------------------------------------------
-0 | query_model       | TimmAutoModelForImagePrediction | 86.7 M
-1 | response_model    | TimmAutoModelForImagePrediction | 86.7 M
-2 | validation_metric | AUROC                           | 0     
-3 | loss_func         | ContrastiveLoss                 | 0     
-4 | miner_func        | PairMarginMiner                 | 0     
-----------------------------------------------------------------------
-86.7 M    Trainable params
-0         Non-trainable params
-86.7 M    Total params
-173.486   Total estimated model params size (MB)
-
-Epoch 0:   0%|▍                                                                                                                               | 3/779 [00:23<1:39:41,  7.71s/it, loss=0.662, v_num=]
-Epoch 0:  50%|███████████████████████████████████████████████████████████████▉                                                                | 389/779 [02:23<02:23,  2.72it/s, loss=0.671, v_num=Epoch 0, global step 79: 'val_roc_auc' reached 0.87266 (best 0.87266), saving model to '/home/ubuntu/data/img2img_matching/Stanford_Online_Products/AutogluonModels/ag-20221110_195408/epoch=0-step=79.ckpt' as top 3
-Epoch 0:  73%|██████████████████████████████████████████████████████████████████████████████████████████████▋                                  | 572/779 [03:38<01:19,  2.62it/s, loss=0.63, v_num=]
-
-```
-
 ## Evaluate on Test Dataset
-You can evaluate the macther on the test dataset to see how it performs with the roc_auc score:
+You can evaluate the predictor on the test dataset to see how it performs with the roc_auc score:
 
-```python
-score = matcher.evaluate(sop_test)
+```{.python .input}
+score = predictor.evaluate(test_data)
 print("evaluation score: ", score)
 ```
 
+## Predict on Image Pairs
+Given new image pairs, we can predict whether they match or not.
+```{.python .input}
+pred = predictor.predict(test_data.head(3))
+print(pred)
 ```
-Predicting DataLoader 0: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 18/18 [00:12<00:00,  1.46it/s]
-Predicting DataLoader 0: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 18/18 [00:11<00:00,  1.57it/s]
-Predicting DataLoader 0: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 177/177 [01:48<00:00,  1.63it/s]
-evaluation score:  {'roc_auc': 0.8907004748329923}
+The predictions use a naive probability threshold 0.5. That is, we choose the label with the probability larger than 0.5.
+
+## Predict Matching Probabilities
+However, you can do more customized thresholding by getting probabilities.
+```{.python .input}
+proba = predictor.predict_proba(test_data.head(3))
+print(proba)
+```
+
+## Extract Embeddings
+You can also extract embeddings for each image of a pair.
+```{.python .input}
+embeddings_1 = predictor.extract_embedding({image_col_1: test_data[image_col_1][:5].tolist()})
+print(embeddings_1.shape)
+embeddings_2 = predictor.extract_embedding({image_col_2: test_data[image_col_2][:5].tolist()})
+print(embeddings_2.shape)
 ```
 
 
