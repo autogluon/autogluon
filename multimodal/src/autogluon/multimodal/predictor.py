@@ -707,7 +707,7 @@ class MultiModalPredictor:
             resume=self._resume,
             old_save_path=self._save_path,
             proposed_save_path=save_path,
-            num_gpus=self._config.env.num_gpus,
+            num_gpus=self.get_num_gpus(),
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             warn_if_exist=self._warn_if_exist,
         )
@@ -1915,7 +1915,7 @@ class MultiModalPredictor:
         # Cache prediction results as COCO format # TODO: refactor this
         self._save_path = setup_save_path(
             old_save_path=self._save_path,
-            num_gpus=self._config.env.num_gpus,
+            num_gpus=self.get_num_gpus(),
         )
         cocoeval_cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
 
@@ -2058,6 +2058,12 @@ class MultiModalPredictor:
     def set_num_gpus(self, num_gpus):
         assert isinstance(num_gpus, int)
         self._config.env.num_gpus = num_gpus
+
+    def get_num_gpus(self):
+        try:
+            return self._config.env.num_gpus
+        except:
+            return None
 
     def evaluate(
         self,
@@ -2368,7 +2374,7 @@ class MultiModalPredictor:
             ), "Aborting: save results only works for object detection now."
             self._save_path = setup_save_path(
                 old_save_path=self._save_path,
-                num_gpus=self._config.env.num_gpus,
+                num_gpus=self.get_num_gpus(),
             )
             if not result_path:
                 result_path = os.path.join(self._save_path, "result.txt")
