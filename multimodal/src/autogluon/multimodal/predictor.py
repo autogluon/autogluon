@@ -811,7 +811,6 @@ class MultiModalPredictor:
         self._problem_type = problem_type  # In case problem type isn't provided in __init__().
         self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
-        self._save_path = save_path
         self._column_types = column_types
 
         _fit_args = dict(
@@ -820,7 +819,7 @@ class MultiModalPredictor:
             validation_metric_name=validation_metric_name,
             minmax_mode=minmax_mode,
             max_time=time_limit,
-            save_path=save_path,
+            save_path=self._save_path,
             ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
             resume=False if hyperparameter_tune_kwargs is not None else self._resume,
             enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
