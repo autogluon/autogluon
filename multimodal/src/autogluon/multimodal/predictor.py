@@ -664,6 +664,7 @@ class MultiModalPredictor:
         -------
         An "MultiModalPredictor" object (itself).
         """
+        _fit_called = self._fit_called  # used in current function
         self._fit_called = True
 
         if self.problem_type is not None:
@@ -723,6 +724,7 @@ class MultiModalPredictor:
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             warn_if_exist=self._warn_if_exist,
             model_loaded=self._model_loaded,
+            fit_called=fit_called,
         )
 
         # Generate general info that's not config specific
@@ -2989,6 +2991,7 @@ class MultiModalPredictor:
         )
         predictor._model_postprocess_fn = model_postprocess_fn
         predictor._model_loaded = True
+        predictor._fit_called = False
 
         return predictor
 

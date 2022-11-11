@@ -130,6 +130,7 @@ def setup_save_path(
     warn_if_exist: Optional[bool] = True,
     raise_if_exist: Optional[bool] = False,
     model_loaded: Optional[bool] = None,
+    fit_called: Optional[bool] = None,
 ):
     rank = int(os.environ.get("LOCAL_RANK", 0))
     save_path = None
@@ -139,7 +140,7 @@ def setup_save_path(
     elif proposed_save_path is not None:  # TODO: distinguish DDP and existed predictor
         save_path = process_save_path(path=proposed_save_path, raise_if_exist=(raise_if_exist and rank == 0))
     elif old_save_path is not None:
-        if model_loaded:
+        if model_loaded or fit_called:
             save_path = process_save_path(path=old_save_path, raise_if_exist=False)
         else:
             save_path = os.path.abspath(os.path.expanduser(old_save_path))

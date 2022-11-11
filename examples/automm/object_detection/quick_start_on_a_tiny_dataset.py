@@ -15,7 +15,7 @@ def tutorial_script_for_quick_start():
     test_path = os.path.join(data_dir, "Annotations", "coco_test.json")
 
     checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
-    num_gpus = -1
+    num_gpus = 1
 
     # Init predictor
     predictor = MultiModalPredictor(
