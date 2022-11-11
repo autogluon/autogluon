@@ -7,13 +7,13 @@ See :ref:`sec_automm_detection_convert_to_coco` for how to convert other dataset
 
 To start, let's import MultiModalPredictor:
 
-```python
+```python .input
 from autogluon.multimodal import MultiModalPredictor
 ```
 
 And also import some other packages that will be used in this tutorial:
 
-```python
+```python .input
 import os
 import time
 
@@ -22,7 +22,7 @@ from autogluon.core.utils.loaders import load_zip
 
 We have the sample dataset ready in the cloud. Let's download it:
 
-```python
+```python .input
 zip_file = "s3://automl-mm-bench/object_detection_dataset/tiny_motorbike_coco.zip"
 download_dir = "./tiny_motorbike_coco"
 
@@ -42,7 +42,7 @@ and easy to deploy.
 For more model choices, see :label:`sec_automm_detection_selecting_models`.
 And we use all the GPUs (if any):
 
-```python
+```python .input
 checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
 num_gpus = -1  # use all GPUs
 ```
@@ -54,7 +54,7 @@ Here we provide the `train_path`, and it also works using any other split of thi
 And we also provide a `path` to save the predictor. 
 It will be saved to a automatically generated directory with timestamp under `AutogluonModels` if `path` is not specified.
 
-```python
+```python .input
 # Init predictor
 predictor = MultiModalPredictor(
     hyperparameters={
@@ -77,8 +77,10 @@ We also set the epoch to be 15 and batch_size to be 32.
 For more information about how to tune those hyperparameters,
 see :ref:`sec_automm_detection_tune_hyperparameters`.
 We also compute the time of the fit process here for better understanding the speed.
+We run it on a g4.2xlarge EC2 machine on AWS,
+and part of the command outputs are shown below:
 
-```python
+```python .input
 start = time.time()
 # Fit
 predictor.fit(
@@ -92,72 +94,39 @@ predictor.fit(
 train_end = time.time()
 ```
 
-We run it on a g5dn.12xlarge EC2 machine on AWS,
-and part of the command outputs are shown below:
-
-```
-Epoch 0:  50%|█████████████████████████████                             | 2/4 [00:01<00:01,  1.25it/s, loss=1.65e+05, v_num=Epoch 0, global step 1: 'val_direct_loss' reached 31240.10156 (best 31240.10156), saving model to '/media/code/autogluon/examples/automm/object_detection/quick_start_tutorial_temp_save/epoch=0-step=1.ckpt' as top 1                                     
-Epoch 0: 100%|██████████████████████████████████████████████████████████| 4/4 [00:02<00:00,  1.66it/s, loss=8.57e+04, v_num=Epoch 0, global step 2: 'val_direct_loss' reached 19609.82031 (best 19609.82031), saving model to '/media/code/autogluon/examples/automm/object_detection/quick_start_tutorial_temp_save/epoch=0-step=2.ckpt' as top 1
-Epoch 1:  50%|█████████████████████████████                             | 2/4 [00:01<00:01,  1.35it/s, loss=7.93e+04, v_num=Epoch 1, global step 3: 'val_direct_loss' reached 12368.74121 (best 12368.74121), saving model to '/media/code/autogluon/examples/automm/object_detection/quick_start_tutorial_temp_save/epoch=1-step=3.ckpt' as top 1
-Epoch 1: 100%|██████████████████████████████████████████████████████████| 4/4 [00:02<00:00,  1.68it/s, loss=5.99e+04, v_num=Epoch 1, global step 4: 'val_direct_loss' reached 7318.06152 (best 7318.06152), saving model to '/media/code/autogluon/examples/automm/object_detection/quick_start_tutorial_temp_save/epoch=1-step=4.ckpt' as top 1
-Epoch 2:  50%|█████████████████████████████                             | 2/4 [00:01<00:01,  1.37it/s, loss=5.27e+04, v_num=Epoch 2, global step 5: 'val_direct_loss' reached 4694.17773 (best 4694.17773), saving model to '/media/code/autogluon/examples/automm/object_detection/quick_start_tutorial_temp_save/epoch=2-step=5.ckpt' as top 1
-Epoch 2: 100%|██████████████████████████████████████████████████████████| 4/4 [00:02<00:00,  1.74it/s, loss=4.41e+04, v_num=Epoch 2, global step 6: 'val_direct_loss' reached 2747.12524 (best 2747.12524), saving model to '/media/code/autogluon/examples/automm/object_detection/quick_start_tutorial_temp_save/epoch=2-step=6.ckpt' as top 1
-Epoch 3:  50%|█████████████████████████████                             | 2/4 [00:01<00:01,  1.38it/s, loss=3.91e+04, v_num=Epoch 3, global step 7: 'val_direct_loss' reached 1862.42139 (best 1862.42139), saving model to '/media/code/autogluon/examples/automm/object_detection/quick_start_tutorial_temp_save/epoch=3-step=7.ckpt' as top 1
-Epoch 3: 100%|██████████████████████████████████████████████████████████| 4/4 [00:02<00:00,  1.74it/s, loss=3.42e+04, v_num=Epoch 3, global step 8: 'val_direct_loss' reached 1293.18774 (best 1293.18774), saving model to '/media/code/autogluon/examples/automm/object_detection/quick_start_tutorial_temp_save/epoch=3-step=8.ckpt' as top 1
-Epoch 4:  50%|█████████████████████████████                             | 2/4 [00:01<00:01,  1.38it/s, loss=3.08e+04, v_num=Epoch 4, global step 9: 'val_direct_loss' reached 925.55371 (best 925.55371), saving model to '/media/code/autogluon/examples/automm/object_detection/quick_start_tutorial_temp_save/epoch=4-step=9.ckpt' as top 1
-```
-
 Notice that at the end of each progress bar, if the checkpoint at current stage is saved,
 it prints the model's save path.
 In this example, it's `./quick_start_tutorial_temp_save`.
 
-Print out the time and we can see that it only takes 100.42 seconds!
+Print out the time and we can see that it's fast!
 
-```python
+```python .input
 print("This finetuning takes %.2f seconds." % (train_end - start))
 ```
 
-```
-This finetuning takes 100.42 seconds.
-```
+To evaluate the model we just trained, run following code.
 
-To evaluate the model we just trained, run:
+And the evaluation results are shown in command line output. 
+The first line is mAP in COCO standard, and the second line is mAP in VOC standard (or mAP50). 
+For more details about these metrics, see [COCO's evaluation guideline](https://cocodataset.org/#detection-eval).
+Note that for presenting a fast finetuning we use 15 epochs, 
+you could get better result on this dataset by simply increasing the epochs.
 
-```python
+```python .input
 predictor.evaluate(test_path)
 eval_end = time.time()
 ```
 
-And the evaluation results are shown in command line output. 
-The first value `0.117` is mAP in COCO standard, and the second one `0.317` is mAP in VOC standard (or mAP50). 
-For more details about these metrics, see [COCO's evaluation guideline](https://cocodataset.org/#detection-eval).
-Note that for presenting a fast finetuning we use 15 epochs, 
-you could get better result on this dataset by simply increasing the epochs.
-```
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.117
- Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.317
- Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.056
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.014
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.038
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.322
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.108
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.164
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.187
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.059
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.187
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.412
-```
+Print out the evaluation time:
 
-Print out the time and we can see that it only takes 1.62 seconds to evaluate!
-
-```python
+```python .input
 print("The evaluation takes %.2f seconds." % (eval_end - train_end))
 ```
 
 We can load a new predictor with previous save_path,
 and we can also reset the number of GPUs to use if not all the devices are available:
 
-```python
+```python .input
 # Load and reset num_gpus
 new_predictor = MultiModalPredictor.load("./quick_start_tutorial_temp_save")
 new_predictor.set_num_gpus(1)
@@ -165,23 +134,9 @@ new_predictor.set_num_gpus(1)
 
 Evaluating the new predictor gives us exactly the same result:
 
-```python
+```python .input
 # Evaluate new predictor
 new_predictor.evaluate(test_path)
-```
-```
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.117
- Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.317
- Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.056
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.014
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.038
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.322
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.108
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.164
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.187
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.059
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.187
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.412
 ```
 
 ### Other Examples
