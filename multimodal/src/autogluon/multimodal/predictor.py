@@ -718,15 +718,9 @@ class MultiModalPredictor:
             resume=self._resume,
             old_save_path=self._save_path,
             proposed_save_path=save_path,
-<<<<<<< HEAD
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             warn_if_exist=self._warn_if_exist,
             model_loaded=self._model_loaded,
-=======
-            num_gpus=self.get_num_gpus(),
-            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-            warn_if_exist=self._warn_if_exist,
->>>>>>> 34e4e41b3810cc4406bbb2c6cc5a4c37b1a04894
         )
 
         # Generate general info that's not config specific
@@ -1931,11 +1925,7 @@ class MultiModalPredictor:
         # Cache prediction results as COCO format # TODO: refactor this
         self._save_path = setup_save_path(
             old_save_path=self._save_path,
-<<<<<<< HEAD
             model_loaded=self._model_loaded,
-=======
-            num_gpus=self.get_num_gpus(),
->>>>>>> 34e4e41b3810cc4406bbb2c6cc5a4c37b1a04894
         )
         cocoeval_cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
 
