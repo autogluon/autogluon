@@ -427,6 +427,8 @@ class MultiModalPredictor:
                 warn_if_exist=self._warn_if_exist,
                 model_loaded=self._model_loaded,
             )
+        else:
+            self._save_path = None
 
         if self._problem_type is not None:
             if problem_property_dict.get(self._problem_type).is_matching:
