@@ -148,7 +148,10 @@ def test_timm_zero_shot(checkpoint_name):
 
 
 def test_matcher_text_similarity():
-    matcher = MultiModalPredictor(problem_type="text_similarity")
+    matcher = MultiModalPredictor(
+        problem_type="text_similarity",
+        hyperparameters={"model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2"},
+    )
     corpus = [
         "A man is eating food.",
         "A man is eating a piece of bread.",

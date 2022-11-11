@@ -31,7 +31,6 @@ With AutoMM, you just need to specify the query, response, and label column name
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.constants import BINARY, MULTICLASS, QUERY, RESPONSE, UNIFORM_SOUP
 
 # Initialize the model
 matcher = MultiModalPredictor(
@@ -46,7 +45,6 @@ matcher = MultiModalPredictor(
 matcher.fit(
     train_data=snli_train,
     time_limit=180,
-    save_path="text_matcher",
 )
 ```
 
@@ -67,6 +65,23 @@ pred_data = pd.DataFrame.from_dict({"premise":["The teacher gave his speech to a
 predictions = matcher.predict(pred_data)
 print('Predicted entities:', predictions[0])
 ```
+
+## Predict Matching Probabilities
+We can also compute the matching probabilities of sentence pairs.
+```{.python .input}
+probabilities = matcher.predict_proba(pred_data)
+print(probabilities)
+```
+
+## Extract Embeddings
+Moreover, we support extracting embeddings separately for two sentence groups.
+```{.python .input}
+embeddings_1 = matcher.extract_embedding({"premise":["The teacher gave his speech to an empty room."]})
+print(embeddings_1.shape)
+embeddings_2 = matcher.extract_embedding({"hypothesis":["There was almost nobody when the professor was talking."]})
+print(embeddings_2.shape)
+```
+
 
 ## Other Examples
 

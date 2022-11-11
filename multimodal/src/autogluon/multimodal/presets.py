@@ -276,7 +276,16 @@ def siamese_network():
 
 @automm_presets.register()
 @matcher_presets.register()
-def image_similarity():
+def best_quality_image_similarity():
+    return {
+        "model.names": ["timm_image"],
+        "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def high_quality_fast_inference_image_similarity():
     return {
         "model.names": ["timm_image"],
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
@@ -285,7 +294,46 @@ def image_similarity():
 
 @automm_presets.register()
 @matcher_presets.register()
-def text_similarity():
+def medium_quality_faster_inference_image_similarity():
+    return {
+        "model.names": ["timm_image"],
+        "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def image_similarity():
+    return automm_presets.create("high_quality_fast_inference_image_similarity")
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def best_quality_text_similarity():
+    return {
+        "model.names": ["hf_text"],
+        "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",
+        "model.hf_text.pooling_mode": "mean",
+        "data.categorical.convert_to_text": True,
+        "data.numerical.convert_to_text": True,
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def high_quality_fast_inference_text_similarity():
+    return {
+        "model.names": ["hf_text"],
+        "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L12-v2",
+        "model.hf_text.pooling_mode": "mean",
+        "data.categorical.convert_to_text": True,
+        "data.numerical.convert_to_text": True,
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def medium_quality_faster_inference_text_similarity():
     return {
         "model.names": ["hf_text"],
         "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
@@ -297,7 +345,37 @@ def text_similarity():
 
 @automm_presets.register()
 @matcher_presets.register()
-def image_text_similarity():
+def text_similarity():
+    return automm_presets.create("high_quality_fast_inference_text_similarity")
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def best_quality_image_text_similarity():
+    return {
+        "model.names": ["clip"],
+        "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+        "matcher.loss.type": "multi_negatives_softmax_loss",
+        "env.per_gpu_batch_size": 8,
+        "optimization.learning_rate": 1e-5,
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def high_quality_fast_inference_image_text_similarity():
+    return {
+        "model.names": ["clip"],
+        "model.clip.checkpoint_name": "openai/clip-vit-large-patch14",
+        "matcher.loss.type": "multi_negatives_softmax_loss",
+        "env.per_gpu_batch_size": 16,
+        "optimization.learning_rate": 1e-5,
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def medium_quality_faster_inference_image_text_similarity():
     return {
         "model.names": ["clip"],
         "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
@@ -305,6 +383,12 @@ def image_text_similarity():
         "env.per_gpu_batch_size": 128,
         "optimization.learning_rate": 1e-5,
     }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def image_text_similarity():
+    return automm_presets.create("medium_quality_faster_inference_image_text_similarity")
 
 
 def list_automm_presets(verbose: bool = False):
