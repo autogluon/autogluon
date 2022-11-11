@@ -6,12 +6,13 @@ import tempfile
 
 import numpy.testing as npt
 import pytest
-from unittest_datasets import Flickr30kDataset, IDChangeDetectionDataset
-from utils import get_home_dir
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import BINARY, MULTICLASS, QUERY, RESPONSE, UNIFORM_SOUP
 from autogluon.multimodal.utils import convert_data_for_ranking, semantic_search
+
+from .unittest_datasets import Flickr30kDataset, IDChangeDetectionDataset
+from .utils import get_home_dir
 
 ALL_DATASETS = {
     "id_change_detection": IDChangeDetectionDataset,
