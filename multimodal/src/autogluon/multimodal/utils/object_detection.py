@@ -800,7 +800,7 @@ def visualize_detection(
     try:
         import cv2
     except:
-        raise ImportError("No module named: cv2. Please install cv2 by 'pip install cv2'")
+        raise ImportError("No module named: cv2. Please install cv2 by 'pip install opencv-python'")
 
     if not os.path.exists(visualization_result_dir):
         os.makedirs(visualization_result_dir, exist_ok=True)
@@ -878,7 +878,7 @@ def plot_detections(
     try:
         import cv2
     except:
-        raise ImportError("No module named: cv2. Please install cv2 by 'pip install cv2'")
+        raise ImportError("No module named: cv2. Please install cv2 by 'pip install opencv-python'")
     im = np.ascontiguousarray(np.copy(image))
     im_h, im_w = im.shape[:2]
 
@@ -946,7 +946,7 @@ def add_bbox_with_alpha(im: np.ndarray, tl: tuple, br: tuple, line_color: tuple,
     try:
         import cv2
     except:
-        raise ImportError("No module named: cv2. Please install cv2 by 'pip install cv2'")
+        raise ImportError("No module named: cv2. Please install cv2 by 'pip install opencv-python'")
     overlay = im.copy()
     cv2.rectangle(overlay, tl, br, line_color, thickness=line_thickness)
     im = cv2.addWeighted(overlay, alpha, im, 1 - alpha, 0)
@@ -994,7 +994,7 @@ def add_text_with_bg_color(
     try:
         import cv2
     except:
-        raise ImportError("No module named: cv2. Please install cv2 by 'pip install cv2'")
+        raise ImportError("No module named: cv2. Please install cv2 by 'pip install opencv-python'")
 
     x1, y1 = tl
 

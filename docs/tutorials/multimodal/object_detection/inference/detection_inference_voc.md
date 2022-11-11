@@ -1,18 +1,11 @@
-# AutoMM Detection - Inference with Pretrained Faster R-CNN on VOC Format Dataset
+# AutoMM Detection - Inference with Pretrained Faster R-CNN on VOC Dataset
 :label:`sec_automm_detection_infer_voc`
 
-In this section, we show an example to run inference on VOC2007 dataset in VOC Format. 
+In this section, we show an example to run inference on VOC2007 dataset that is in VOC Format. 
 Different from running evaluation, the purpose is to get detection results for potential down-stream tasks. 
 For more details about the VOC format, please see \[Convert VOC to COCO].
 However, we strongly recommend using the COCO format, through we provide limited support for VOC format.
-
-[//]: # (In this section, our goal is to evaluate Faster-RCNN model on VOC2007 dataset in VOC format.)
-
-[//]: # (See \[Convert VOC to COCO] for how to quickly convert a VOC format dataset.)
-
-[//]: # (In previous section :ref:`sec_automm_detection_eval_fasterrcnn_coco`, we evaluated Faster-RCNN on COCO dataset.)
-
-[//]: # (We strongly recommend using COCO format, but AutoMM still have limited support for VOC format for quick proof testing.)
+We use a Faster R-CNN model model pretrained on VOC2007 and VOC2012 dataset
 
 ## Prepare data
 For running this tutorial, you should have VOC dataset prepared. 
@@ -22,7 +15,7 @@ This tutorial assumes that you have saved VOC data under the folder `~/data/`, i
 ## Creating the `MultiModalPredictor`
 To start, import MultiModalPredictor:
 
-```python
+```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
 ```
 
@@ -34,7 +27,7 @@ This is the only model we support that is pretrained on VOC.
 It's always recommended to finetune a model pretrained on COCO which is a larger dataset with more complicated task.
 To test other model structures on VOC, check \[Fast Finetune on COCO format data] and \[Fast Finetune on VOC format data].
 
-```python
+```{.python .input}
 checkpoint_name = "faster_rcnn_r50_fpn_1x_voc0712"
 num_gpus = 1  # multi GPU inference is not supported in VOC format
 ```
@@ -44,7 +37,7 @@ Please refer to :ref: `selecting_models` for details about model selection.
 As before, we create the MultiModalPredictor with selected checkpoint name and number of GPUs.
 We also need to specify the `problem_type` to `"object_detection"`.
 
-```python
+```{.python .input}
 predictor = MultiModalPredictor(
     hyperparameters={
         "model.mmdet_image.checkpoint_name": checkpoint_name,
@@ -57,11 +50,11 @@ predictor = MultiModalPredictor(
 ### Use a finetuned model
 You can also use a previously trained/finetuned predictor to run inference with.
 First specify the predictor path, for example:
-```python
-load_path = "./AutogluonModels/ag-20221104_185342"
+```{.python .input}
+load_path = "./AutogluonModels/ag-20221104_185342"  # replace this with path to your desired predictor
 ```
 Then load the predictor:
-```python
+```{.python .input}
 predictor = MultiModalPredictor.load(load_path)
 ```
 
@@ -75,7 +68,7 @@ Annotations  ImageSets  JPEGImages labels.txt
 ```
 
 [//]: # (Here `labels.txt` shall be added manually to include all the labels in the dataset.)
-Here `labels.txt` includes all the labels in the dataset. If it does not exist, the code will generate it by scanning 
+Here `labels.txt` includes all the labels in the dataset. If not existed, it will be automatically generate it by scanning 
 through all annotation files.
 In this example, the content of `labels.txt` is shown as below:
 
@@ -102,21 +95,22 @@ train
 tvmonitor
 ```
 
-For VOC format data, we always use root_path. And the predictor will automatically select the test split.
+For VOC format data, we always use root_path. And the predictor will automatically select the `test` split.
 
-```python
+```{.python .input}
 test_path = "~/data/VOCdevkit/VOC2007"
 ```
 
 ## Running inference
 To run inference, run:
 
-```python
+```{.python .input}
 pred = predictor.predict(test_path)
 ```
+By default, the `predictor.predict` does not save the detection results into a file.
 
 To run inference and save results, run the following:
-```python
+```{.python .input}
 pred = predictor.predict(test_path, save_results=True)
 ```
 Currently, we convert the results to a pandas `DataFrame` and save into a `.txt` file. 
@@ -126,20 +120,20 @@ The `.txt` file has two columns, `image` and `bboxes`, where
   - `{"class": <predicted_class_name>, "bbox": [x1, y1, x2, y2], "score": <confidence_score>}`
 
 ## Reading results
-The returned value `pred` is a `list` and has the following dimensions:
+By default, the returned value `pred` is a `list` and has the following dimensions:
 ```
 [num_images, num_total_classes, num_detections_per_class, 5]
 ```
 
 where 
 - `num_images` is the number of images used to run inference on. 
-- `num_total_classes` is the total number of classes. In this example, `num_total_classes = 20` for VOC dataset
+- `num_total_classes` is the total number of classes depending on the model specified in `predictor`. In this example, `num_total_classes = 20` for the Faster R-CNN model pretrained on VOC dataset. To get all available classes in the predictor, run `predictor.get_predictor_classes()`
 - `num_detections_per_class` is the number of detections under each class. Note that this number can vary across different classes.
 - The last dimension contains the bounding box information, which follows `[x1, y1, x2, y2, score]` format. `x1, y1` are the top left corner of the bounding box, and `x2, y2` are the bottom right corner. `score` is the confidence score of the prediction
 
 example code to examine bounding box information:
 
-```python
+```{.python .input}
 detection_classes = predictor.get_predictor_classes()
 idx2classname = {idx: classname for (idx, classname) in enumerate(detection_classes)}
 for i, image_pred in enumerate(pred):
@@ -151,7 +145,7 @@ for i, image_pred in enumerate(pred):
             print("bbox: {}, class: {}, score: {}".format(bbox[:4], classname, bbox[4]))
 ```
 If you prefer to get the results in `pd.DataFrame` format, run the following:
-```python
+```{.python .input}
 pred_df = predictor.predict(test_path, as_pandas=True)
 ```
 
@@ -161,13 +155,13 @@ Similar to the `.txt` file, the `pred_df` also has two columns, `image` and `bbo
   - `{"class": <predicted_class_name>, "bbox": [x1, y1, x2, y2], "score": <confidence_score>}`
 
 ## Visualizing Results
-To run visualizations, you'll need to setup `cv2` by running 
-```python
-pip install cv2
+To run visualizations, ensure that you have `opencv` installed. If you haven't already, install `opencv` by running 
+```{.python .input}
+pip install opencv-python
 ```
 
 To visualize the detection bounding boxes, run the following:
-```python
+```{.python .input}
 from autogluon.multimodal.utils import from_coco_or_voc, visualize_detection
 import matplotlib.pyplot as plt
 conf_threshold = 0.4  # Specify a confidence threshold to filter out unwanted boxes
@@ -185,7 +179,7 @@ visualized = visualize_detection(
     visualization_result_dir=visualization_result_dir,
 )
 
-plt.imshow(visualized[0][:, : ,::-1])
+plt.imshow(visualized[0][:, : ,::-1])  # shows the first image with bounding box
 ```
 Note that we took 10 images to visualize for this example. 
 Please consider your storage situation when deciding the number of images to visualize.  
