@@ -27,7 +27,7 @@ To use `autogluon.timeseries`, we will only need the following two classes:
 - `TimeSeriesDataFrame` stores a dataset consisting of multiple time series.
 - `TimeSeriesPredictor` takes care of fitting, tuning and selecting the best forecasting models.
 
-We start by downloading the M4 hourly dataset from the official website.
+We start by downloading the M4 hourly dataset from the official website (click "Details" to show the code).
 
 .. raw:: html
 
@@ -40,7 +40,7 @@ M4_HOURLY_URL = "https://github.com/Mcompetitions/M4-methods/raw/master/Dataset/
 
 def download_m4_hourly_dataset(save_path):
     metadata = pd.read_csv(M4_INFO_URL)
-    metadata = metadata[metadata.M4id.str.startswith("H")].set_index("M4id")
+    metadata = metadata[metadata["SP"] == "Hourly"].set_index("M4id")
     data = pd.read_csv(M4_HOURLY_URL, index_col="V1")
     results = []
     for item_id, row in data.iterrows():
@@ -72,9 +72,9 @@ df.head()
 ```
 Each row of the data frame contains a single observation (timestep) of a single time series represented by
 
-- unique ID of the time series (`"M4id"`) as a string or an integer
+- unique ID of the time series (`"M4id"`)
 - timestamp of the observation (`"Date"`) as a `pandas.Timestamp`
-- value of the time series (`"Value"`) as a number
+- numeric value of the time series (`"Value"`)
 
 The raw dataset should always follow this format (3 columns: unique ID, timestamp, value), but the names of these columns can be arbitrary.
 It is important, however, that we provide the names of the columns when constructing a `TimeSeriesDataFrame` that is used by AutoGluon
@@ -171,10 +171,10 @@ predictor = TimeSeriesPredictor(
 predictor.fit(
     train_data,
     presets="medium_quality",
-    time_limit=120,
+    time_limit=600,
 )
 ```
-Here we used the `"medium_quality"` presets and limited the training time to 120 seconds.
+Here we used the `"medium_quality"` presets and limited the training time to 10 minutes (600 seconds).
 The presets define what models AutoGluon will try to fit.
 For `medium_quality` presets, these are:
 
@@ -273,7 +273,7 @@ predictor = TimeSeriesPredictor(
 ).fit(
     train_data=ts_dataframe,
     presets="medium_quality",  # other options: "fast_training", "high_quality", "best_quality"
-    time_limit=120,  # training time in seconds
+    time_limit=600,  # training time in seconds
 )
 
 # Generate the forecasts

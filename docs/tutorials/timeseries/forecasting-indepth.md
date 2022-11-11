@@ -4,7 +4,7 @@
 This tutorial provides an in-depth overview of the time series forecasting capabilities in AutoGluon.
 
 - What is probabilistic time series forecasting?
-- Forecasting time series with external covariates
+- Forecasting time series with additional information
 - Which forecasting models are available in AutoGluon?
 - How does AutoGluon evaluate performance of time series models?
 - What functionality does `TimeSeriesPredictor` offer?
@@ -27,7 +27,7 @@ In AutoGluon, the `prediction_length` argument of the `TimeSeriesPredictor`
 determines the length of the forecast horizon.
 
 ![Main goal of forecasting is to predict the future values of a time series given the past observations.](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth1.png)
-:width:`600px`
+:width:`800px`
 
 
 The `predict` method of a `TimeSeriesPredictor` generates two types of forecasts:
@@ -41,32 +41,160 @@ For instance, by the definition of the quantiles, the time series is predicted t
 
 
 ![Mean and quantile (P10 and P90) forecasts.](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth2.png)
-:width:`600px`
+:width:`800px`
 
 By default, the predictor outputs the quantiles `[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]`. You can train the predictor with custom quantiles using the `quantile_levels` argument
 ```python
 predictor = TimeSeriesPredictor(quantile_levels=[0.05, 0.5, 0.95])
 ```
 
-## Forecasting time series with external covariates
+## Forecasting time series with additional information
 In real-world forecasting problems we often have access to additional information, beyond just the raw time series values.
 AutoGluon supports two types of such additional information: static features and known covariates.
 
 ### Static features
-Static features are the non-time-varying attributes of a time series.
-In the demand forecasting example, static features may include the category of the product, or its other properties like color and size.
+Static features are the time independent attributes of a time series.
+In the demand forecasting example, these may include information such as:
+
+- country, where the store is located
+- product category
+- brand, color, size, or weight
+
+Recall that in AutoGluon a time series dataset is stored as a :class:`~autogluon.timeseries.TimeSeriesDataFrame`
+```python
+data = TimeSeriesDataFrame.from_data_frame(pd.read_csv("dataset.csv"))
+data
+```
+Static features must be stored in a pandas.DataFrame.
+The index of the static features dataframe must include all the `item_ids` present in the `TimeSeriesDataFrame`.
+```python
+static_features = pd.read_csv("metadata.csv")
+static_features.head()
+```
+We attach the static features to a TimeSeriesDataFrame as follows
+```python
+data.static_features = static_features
+```
+
 
 ### Known covariates
 Covariates are the time-varying features that may influence the target time series.
-AutoGluon currently supports known covariates --- the time-varying features that are known in advance for the forecast horizon.
-Examples of such features include
+They are sometimes also referred to as dynamic features, exogenous regressors, or related time series.
+
+AutoGluon currently supports covariates that are _known in advance_ for the forecast horizon.
+Examples of such covariates include:
 
 - holidays
 - day of the week, month, year
 - promotions
-- weather forecasts
+- weather forecasts (e.g., historic average temperature for the given day)
 
+![Target time series with one known covariate.](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth4.png)
+:width:`800px`
 
+As an example, we will use the Vehicle Trips dataset containing number of daily trips for different taxi companies (click "Details" to show the preprocessing code).
+
+```{.python .input}
+import pandas as pd
+
+from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
+```
+
+.. raw:: html
+
+   <details>
+   <summary><a>Loader for the Vehicle Trips daily dataset</a></summary>
+
+```{.python .input}
+URL = "https://raw.githubusercontent.com/fivethirtyeight/uber-tlc-foil-response/master/other-FHV-data/other-FHV-data-jan-aug-2015.csv"
+
+def load_vehicle_trips_dataset(save_path):
+    df = pd.read_csv(URL, header=5, parse_dates=["Pick Up Date"])[["Base Number", "Pick Up Date", "Number of Trips"]].dropna()
+    df = TimeSeriesDataFrame.from_data_frame(df, id_column="Base Number", timestamp_column="Pick Up Date")
+    # Parse strings as numbers
+    df["Number of Trips"] = pd.to_numeric(df["Number of Trips"].str.replace(r'\D+', ''))
+    df.sort_index(inplace=True)
+
+    def forward_fill_missing(ts: TimeSeriesDataFrame, freq="D") -> TimeSeriesDataFrame:
+        original_index = ts.index.get_level_values("timestamp")
+        start = original_index[0]
+        end = original_index[-1]
+        filled_index = pd.date_range(start=start, end=end, freq=freq)
+        return ts.droplevel("item_id").reindex(filled_index, method="ffill")
+
+    df = df.groupby("item_id").apply(forward_fill_missing)
+    df.to_csv(save_path)
+
+load_vehicle_trips_dataset("vehicle_trips.csv")
+```
+
+.. raw:: html
+
+   </details>
+
+We read the dataset from the CSV file
+
+```{.python .input}
+prediction_length = 30
+
+data = TimeSeriesDataFrame.from_data_frame(
+    pd.read_csv("vehicle_trips.csv", parse_dates=["timestamp"])
+)
+data.head()
+```
+In this example, we will generate a known covariate `Weekend` that equals to 1 if a given day is a weekend, and 0 otherwise.
+First, we generate the covariate for the training set.
+```{.python .input}
+WEEKEND_INDICES = [5, 6]
+timestamps = data.index.get_level_values("timestamp")
+data["Weekend"] = timestamps.weekday.isin(WEEKEND_INDICES).astype(float)
+data.head()
+```
+When creating the TimeSeriesPredictor, we specify that the column `"Number of Trips"` is our prediction target, and the
+column `"Weekend"` contains a covariate that will be known at prediction time.
+```python
+predictor = TimeSeriesPredictor(
+    prediction_length=prediction_length,
+    target="Number of Trips",
+    known_covariates_names=["Weekend"],
+)
+predictor.fit(data)
+```
+If the data frame contained additional columns (other than those specified in `target` and `known_covariates_names`), they would be ignored.
+
+Next, to make predictions, we generate the known covariates for the forecast horizon
+```{.python .input}
+# Time difference between consecutive timesteps
+offset = pd.tseries.frequencies.to_offset(data.freq)
+
+known_covariates_per_item = []
+for item_id in data.item_ids:
+    time_series = data.loc[item_id]
+    last_day = time_series.index[-1]
+    future_timestamps = pd.date_range(start=last_day + offset, freq=offset, periods=prediction_length)
+    weekend = future_timestamps.weekday.isin(WEEKEND_INDICES).astype(float)
+
+    index = pd.MultiIndex.from_product([[item_id], future_timestamps], names=["item_id", "timestamp"])
+    known_covariates_per_item.append(pd.DataFrame(weekend, index=index, columns=["Weekend"]))
+
+known_covariates = TimeSeriesDataFrame(pd.concat(known_covariates_per_item))
+known_covariates
+```
+Note that `known_covariates` must satisfy the following conditions:
+
+- The columns must include all columns listed in ``predictor.known_covariates_names``
+- The ``item_id`` index must include all item ids present in ``data``
+- The ``timestamp`` index must include the values for ``prediction_length`` many time steps into the future from the end of each time series in ``data``
+
+If `known_covariates` contain more information than necessary (e.g., contain additional columns, item_ids, or timestamps),
+AutoGluon will automatically select the necessary rows and columns.
+
+Finally, we pass the `known_covariates` to the `predict` function to generate predictions
+```python
+predictor.predict(data, known_covariates=known_covariates)
+```
+
+The list of models that support static features and covariates is available in :ref:`forecasting_zoo`.
 
 
 ## Which forecasting models are available in AutoGluon?
