@@ -664,7 +664,7 @@ class MultiModalPredictor:
         -------
         An "MultiModalPredictor" object (itself).
         """
-        _fit_called = self._fit_called  # used in current function
+        fit_called = self._fit_called  # used in current function
         self._fit_called = True
 
         if self.problem_type is not None:
