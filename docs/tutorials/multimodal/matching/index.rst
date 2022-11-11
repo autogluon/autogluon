@@ -7,6 +7,12 @@ Matching
       :link: text2text_matching.html
 
       How to use AutoMM for text to text matching.
+   
+   .. card::
+      :title: Image-to-image Matching with AutoMM - Quick Start
+      :link: image2image_matching.html
+
+      How to use AutoMM for text to text matching.
 
    .. card::
       :title: Semantic Textual Search with AutoGluon Multimodal Matching
@@ -33,3 +39,5 @@ Matching
    semantic_search
    clip_embedding
    text2text_matching
+   image_text_matching
+   image2image_matching

@@ -222,7 +222,6 @@ class MultiModalPredictor:
         response: Optional[Union[str, List[str]]] = None,
         match_label: Optional[Union[int, str]] = None,
         pipeline: Optional[str] = None,
-        val_metric: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -253,7 +252,12 @@ class MultiModalPredictor:
             - 'ner' or 'named_entity_recognition': Named entity extraction
             - 'text_similarity': Text-text similarity problem
             - 'image_similarity': Image-image similarity problem
-            - 'text_image_similarity': Text-image similarity problem
+            - 'image_text_similarity': Text-image similarity problem
+            - 'feature_extraction': Extracting feature (only support inference)
+            - 'zero_shot_image_classification': Zero-shot image classification (only support inference)
+            - 'few_shot_text_classification': (experimental) Few-shot text classification
+            - 'ocr_text_detection': (experimental) Extract OCR text
+            - 'ocr_text_recognition': (experimental) Recognize OCR text
 
             For certain problem types, the default behavior is to load a pretrained model based on
             the presets / hyperparameters and the predictor will be inference_ready. This includes the following
@@ -262,9 +266,9 @@ class MultiModalPredictor:
             - 'object_detection'
             - 'text_similarity'
             - 'image_similarity'
-            - 'text_image_similarity'
-            - 'feature_extraction' (only support inference)
-            - 'zero_shot_image_classification' (only support inference)
+            - 'image_text_similarity'
+            - 'feature_extraction'
+            - 'zero_shot_image_classification'
             - 'few_shot_text_classification' (experimental)
             - 'ocr_text_detection' (experimental)
             - 'ocr_text_recognition' (experimental)
@@ -396,7 +400,7 @@ class MultiModalPredictor:
         self._label_column = label
         self._problem_type = problem_type if problem_type is not None else None
         self._eval_metric_name = eval_metric
-        self._validation_metric_name = val_metric
+        self._validation_metric_name = None
         self._output_shape = num_classes
         self._classes = classes
         self._save_path = path
@@ -462,6 +466,9 @@ class MultiModalPredictor:
                     classes=self._classes,
                     init_scratch=self._init_scratch,
                 )
+                self._validation_metric_name = self._config["optimization"][
+                    "val_metric"
+                ]  # TODO: only object detection is using this
 
     @property
     def path(self):
@@ -792,9 +799,12 @@ class MultiModalPredictor:
             if self._problem_type == CLASSIFICATION:
                 # Set the problem type to be inferred problem type
                 self._problem_type = problem_type
-            assert self._problem_type == problem_type, (
-                f"Inferred problem type {problem_type} is different from " f"the previous {self._problem_type}"
-            )
+            if problem_type is not None:
+                assert self._problem_type == problem_type, (
+                    f"Inferred problem type {problem_type} is different from " f"the previous {self._problem_type}"
+                )
+            else:
+                problem_type = self._problem_type
 
         if self._problem_type != OBJECT_DETECTION:
             if self._output_shape is not None:
@@ -1648,7 +1658,8 @@ class MultiModalPredictor:
             strict=strict_loading,
         )
 
-        self.best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+        if self._problem_type != OBJECT_DETECTION:  # TODO: update detection's evaluation to support this
+            self.best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
 
         if is_distill:
             avg_state_dict = self._replace_model_name_prefix(
@@ -1897,6 +1908,7 @@ class MultiModalPredictor:
         eval_tool
             The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
         """
+        # TODO: support saving results to file
         self._verify_inference_ready()
         assert self._problem_type == OBJECT_DETECTION, (
             f"predictor.evaluate_coco() is only supported when problem_type is {OBJECT_DETECTION}. "

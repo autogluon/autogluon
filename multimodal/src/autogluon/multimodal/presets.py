@@ -27,6 +27,24 @@ def medium_quality_faster_train():
 
 
 @automm_presets.register()
+def medium_quality_faster_inference_image_classification():
+    return {
+        "model.names": ["timm_image"],
+        "model.timm_image.checkpoint_name": "mobilenetv3_large_100",
+        "optimization.learning_rate": 1e-3,
+    }
+
+
+@automm_presets.register()
+def high_quality_fast_inference_image_classification():
+    return {
+        "model.names": ["timm_image"],
+        "model.timm_image.checkpoint_name": "resnet50",
+        "optimization.learning_rate": 1e-3,
+    }
+
+
+@automm_presets.register()
 def high_quality():
     return {
         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
@@ -42,6 +60,14 @@ def best_quality():
         "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
         "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
         "env.per_gpu_batch_size": 1,
+    }
+
+
+@automm_presets.register()
+def high_quality_image_classification():
+    return {
+        "model.names": ["timm_image"],
+        "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
     }
 
 
@@ -103,8 +129,95 @@ def zero_shot_image_classification():
 
 
 @automm_presets.register()
+def medium_quality_faster_inference_object_detection():
+    return {
+        "model.names": ["mmdet_image"],
+        "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
+        "env.eval_batch_size_ratio": 1,
+        "env.precision": 32,
+        "env.strategy": "ddp",
+        "env.auto_select_gpus": False,  # Have to turn off for detection!
+        "optimization.learning_rate": 1e-4,
+        "optimization.lr_decay": 0.95,
+        "optimization.lr_mult": 100,
+        "optimization.lr_choice": "two_stages",
+        "optimization.top_k": 1,
+        "optimization.top_k_average_method": "best",
+        "optimization.warmup_steps": 0.0,
+        "optimization.patience": 10,
+        "optimization.max_epochs": 10,
+        "optimization.val_metric": "direct_loss",
+    }
+
+
+@automm_presets.register()
+def high_quality_fast_inference_object_detection():
+    return {
+        "model.names": ["mmdet_image"],
+        "model.mmdet_image.checkpoint_name": "yolov3_d53_mstrain-416_273e_coco",
+        "env.eval_batch_size_ratio": 1,
+        "env.precision": 32,
+        "env.strategy": "ddp",
+        "env.auto_select_gpus": False,  # Have to turn off for detection!
+        "optimization.learning_rate": 1e-5,
+        "optimization.lr_decay": 0.95,
+        "optimization.lr_mult": 100,
+        "optimization.lr_choice": "two_stages",
+        "optimization.top_k": 1,
+        "optimization.top_k_average_method": "best",
+        "optimization.warmup_steps": 0.0,
+        "optimization.patience": 10,
+        "optimization.max_epochs": 20,
+        "optimization.val_metric": "map",
+    }
+
+
+@automm_presets.register()
+def higher_quality_object_detection():
+    return {
+        "model.names": ["mmdet_image"],
+        "model.mmdet_image.checkpoint_name": "vfnet_r50_fpn_mdconv_c3-c5_mstrain_2x_coco",
+        "env.eval_batch_size_ratio": 1,
+        "env.precision": 32,
+        "env.strategy": "ddp",
+        "env.auto_select_gpus": False,  # Have to turn off for detection!
+        "optimization.learning_rate": 5e-6,
+        "optimization.lr_decay": 0.95,
+        "optimization.lr_mult": 100,
+        "optimization.lr_choice": "two_stages",
+        "optimization.top_k": 1,
+        "optimization.top_k_average_method": "best",
+        "optimization.warmup_steps": 0.0,
+        "optimization.patience": 10,
+        "optimization.max_epochs": 30,
+        "optimization.val_metric": "map",
+    }
+
+
+@automm_presets.register()
+def best_quality_object_detection():
+    return {
+        "model.names": ["mmdet_image"],
+        "model.mmdet_image.checkpoint_name": "vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco",
+        "env.eval_batch_size_ratio": 1,
+        "env.precision": 32,
+        "env.strategy": "ddp",
+        "env.auto_select_gpus": False,  # Have to turn off for detection!
+        "optimization.learning_rate": 1e-5,
+        "optimization.lr_decay": 0.95,
+        "optimization.lr_mult": 100,
+        "optimization.lr_choice": "two_stages",
+        "optimization.top_k": 1,
+        "optimization.top_k_average_method": "best",
+        "optimization.warmup_steps": 0.0,
+        "optimization.patience": 10,
+        "optimization.max_epochs": 30,
+        "optimization.val_metric": "map",
+    }
+
+
+@automm_presets.register()
 def object_detection():
-    # TODO: add another presets for training detection models from scratch
     return {
         "model.names": ["mmdet_image"],
         "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
@@ -163,7 +276,16 @@ def siamese_network():
 
 @automm_presets.register()
 @matcher_presets.register()
-def image_similarity():
+def best_quality_image_similarity():
+    return {
+        "model.names": ["timm_image"],
+        "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def high_quality_fast_inference_image_similarity():
     return {
         "model.names": ["timm_image"],
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
@@ -172,7 +294,46 @@ def image_similarity():
 
 @automm_presets.register()
 @matcher_presets.register()
-def text_similarity():
+def medium_quality_faster_inference_image_similarity():
+    return {
+        "model.names": ["timm_image"],
+        "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def image_similarity():
+    return automm_presets.create("high_quality_fast_inference_image_similarity")
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def best_quality_text_similarity():
+    return {
+        "model.names": ["hf_text"],
+        "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",
+        "model.hf_text.pooling_mode": "mean",
+        "data.categorical.convert_to_text": True,
+        "data.numerical.convert_to_text": True,
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def high_quality_fast_inference_text_similarity():
+    return {
+        "model.names": ["hf_text"],
+        "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L12-v2",
+        "model.hf_text.pooling_mode": "mean",
+        "data.categorical.convert_to_text": True,
+        "data.numerical.convert_to_text": True,
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def medium_quality_faster_inference_text_similarity():
     return {
         "model.names": ["hf_text"],
         "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
@@ -184,7 +345,37 @@ def text_similarity():
 
 @automm_presets.register()
 @matcher_presets.register()
-def image_text_similarity():
+def text_similarity():
+    return automm_presets.create("high_quality_fast_inference_text_similarity")
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def best_quality_image_text_similarity():
+    return {
+        "model.names": ["clip"],
+        "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+        "matcher.loss.type": "multi_negatives_softmax_loss",
+        "env.per_gpu_batch_size": 8,
+        "optimization.learning_rate": 1e-5,
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def high_quality_fast_inference_image_text_similarity():
+    return {
+        "model.names": ["clip"],
+        "model.clip.checkpoint_name": "openai/clip-vit-large-patch14",
+        "matcher.loss.type": "multi_negatives_softmax_loss",
+        "env.per_gpu_batch_size": 16,
+        "optimization.learning_rate": 1e-5,
+    }
+
+
+@automm_presets.register()
+@matcher_presets.register()
+def medium_quality_faster_inference_image_text_similarity():
     return {
         "model.names": ["clip"],
         "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
@@ -218,6 +409,10 @@ def high_quality_fast_inference_ner():
         "model.names": ["ner"],
         "model.ner.checkpoint_name": "bert-base-cased",
     }
+
+@matcher_presets.register()
+def image_text_similarity():
+    return automm_presets.create("medium_quality_faster_inference_image_text_similarity")
 
 
 def list_automm_presets(verbose: bool = False):

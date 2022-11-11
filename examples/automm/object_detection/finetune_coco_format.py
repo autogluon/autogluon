@@ -72,10 +72,10 @@ def tutorial_script_for_finetune_high_performance_coco_format():
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
+            "optimization.val_metric": val_metric,
         },
         problem_type="object_detection",
         sample_data_path=train_path,
-        val_metric=val_metric,
     )
 
     start = time.time()
@@ -110,10 +110,10 @@ def detection_train(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
+            "optimization.val_metric": val_metric,
         },
         problem_type="object_detection",
         sample_data_path=train_path,
-        val_metric=val_metric,
     )
 
     import time

@@ -42,6 +42,7 @@ from ..constants import (
     MULTICLASS,
     NER,
     NORM_FIT,
+    OBJECT_DETECTION,
     OVERALL_ACCURACY,
     PAIR_MARGIN_MINER,
     PEARSONR,
@@ -100,6 +101,8 @@ def get_loss_func(
             loss_func = nn.MSELoss()
     elif problem_type == NER:
         loss_func = nn.CrossEntropyLoss(ignore_index=0)
+    elif problem_type == OBJECT_DETECTION:
+        return None
     elif problem_type is None:
         return None
     else:
