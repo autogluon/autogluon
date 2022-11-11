@@ -12,14 +12,14 @@ This tutorial assumes that COCO dataset is under `~/data`, i.e. it is located in
 
 ## Creating the `MultiModalPredictor`
 To start, import MultiModalPredictor:
-```{.python .input}
+```{.python}
 from autogluon.multimodal import MultiModalPredictor
 ```
 ### Use a pretrained model
 You can download a pretrained model and construct a predictor with it. 
 In this example, we use the VFNet with ResNext as backbone and Feature Pyramid Network (FPN) as neck.
 
-```{.python .input}
+```{.python}
 checkpoint_name = "vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco"
 num_gpus = 1  # set to -1 to use all GPUs if available
 ```
@@ -29,7 +29,7 @@ Please refer to :ref: `selecting_models` for details about model selection.
 As before, we create the MultiModalPredictor with selected checkpoint name and number of GPUs.
 We also need to specify the `problem_type` to `"object_detection"`.
 
-```{.python .input}
+```{.python}
 predictor = MultiModalPredictor(
     hyperparameters={
         "model.mmdet_image.checkpoint_name": checkpoint_name,
@@ -42,11 +42,11 @@ predictor = MultiModalPredictor(
 ### Use a finetuned model
 You can also use a previously trained/finetuned predictor to run inference with.
 First specify the predictor path, for example:
-```{.python .input}
+```{.python}
 load_path = "./AutogluonModels/ag-20221104_185342"  # replace this with path to your desired predictor
 ```
 Then load the predictor:
-```{.python .input}
+```{.python}
 predictor = MultiModalPredictor.load(load_path)
 ```
 
@@ -54,20 +54,20 @@ predictor = MultiModalPredictor.load(load_path)
 
 For COCO format data, we need to provide the path for the data split used for inference.
 
-```{.python .input}
+```{.python}
 test_path = "~/data/coco17/annotations/instances_val2017.json"
 ```
 
 ## Running inference
 To run inference, perform:
 
-```{.python .input}
+```{.python}
 pred = predictor.predict(test_path)
 ```
 By default, the `predictor.predict` does not save the detection results into a file.
 
 To run inference and save results, run the following:
-```{.python .input}
+```{.python}
 pred = predictor.predict(test_path, save_results=True)
 ```
 Currently, we convert the results to a pandas `DataFrame` and save into a `.txt` file.
@@ -90,7 +90,7 @@ where
 
 example code to examine bounding box information:
 
-```{.python .input}
+```{.python}
 detection_classes = predictor.get_predictor_classes()
 idx2classname = {idx: classname for (idx, classname) in enumerate(detection_classes)}
 for i, image_pred in enumerate(pred):
@@ -102,7 +102,7 @@ for i, image_pred in enumerate(pred):
             print("bbox: {}, class: {}, score: {}".format(bbox[:4], classname, bbox[4]))
 ```
 If you prefer to get the results in `pd.DataFrame` format, run the following:
-```{.python .input}
+```{.python}
 pred_df = predictor.predict(test_path, as_pandas=True)
 ```
 
@@ -113,12 +113,12 @@ Similar to the `.txt` file, the `pred_df` also has two columns, `image` and `bbo
 
 ## Visualizing Results
 To run visualizations, ensure that you have `opencv` installed. If you haven't already, install `opencv` by running 
-```{.python .input}
+```{.python}
 pip install opencv-python
 ```
 
 To visualize the detection bounding boxes, run the following:
-```{.python .input}
+```{.python}
 from autogluon.multimodal.utils import from_coco_or_voc, visualize_detection
 import matplotlib.pyplot as plt
 
