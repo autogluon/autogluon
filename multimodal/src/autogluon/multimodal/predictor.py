@@ -416,7 +416,7 @@ class MultiModalPredictor:
         self._init_scratch = init_scratch
         self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
-        self._model_loaded = False  # Whether the model has been loaded 
+        self._model_loaded = False  # Whether the model has been loaded
         self._matcher = None
 
         if path is not None:
