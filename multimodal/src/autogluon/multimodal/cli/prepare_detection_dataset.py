@@ -1,7 +1,8 @@
 import argparse
 import os
-import requests
 import shutil
+
+import requests
 
 
 def get_root_dir(output_dir=None, new_folder_name=None):

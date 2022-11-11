@@ -3,7 +3,6 @@ import time
 
 from autogluon.core.utils.loaders import load_zip
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.utils import download
 
 
 def tutorial_script_for_quick_start():
@@ -12,9 +11,9 @@ def tutorial_script_for_quick_start():
 
     load_zip.unzip(zip_file, unzip_dir=download_dir)
     data_dir = os.path.join(download_dir, "tiny_motorbike")
-
     train_path = os.path.join(data_dir, "Annotations", "coco_trainval.json")
     test_path = os.path.join(data_dir, "Annotations", "coco_test.json")
+
     checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
     num_gpus = -1
 

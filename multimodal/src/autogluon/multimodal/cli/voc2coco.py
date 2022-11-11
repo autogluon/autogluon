@@ -16,14 +16,16 @@ To use:
 """
 
 import argparse
-import defusedxml.ElementTree as ET
 import json
 import os
 import random
 import re
 import subprocess
-from tqdm import tqdm
 from typing import Dict, List
+
+import defusedxml.ElementTree as ET
+from tqdm import tqdm
+
 from autogluon.multimodal.utils.object_detection import process_voc_annotations, dump_voc_classes, dump_voc_xml_files
 
 
