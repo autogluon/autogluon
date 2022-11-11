@@ -390,7 +390,7 @@ def best_quality_ner():
     return {
         "model.names": ["ner"],
         "model.ner.checkpoint_name": "google/flan-t5-base",
-        "env.precision": 32,
+        "env.precision": "bf16",
     }
 
 
@@ -399,7 +399,7 @@ def medium_quality_faster_inference_ner():
     return {
         "model.names": ["ner"],
         "model.ner.checkpoint_name": "google/flan-t5-small",
-        "env.precision": 32,
+        "env.precision": "bf16",
     }
 
 
