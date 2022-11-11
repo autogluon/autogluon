@@ -425,7 +425,7 @@ class MultiModalPredictor:
         if self._problem_type == OBJECT_DETECTION:
             warnings.warn(
                 "Running object detection. Make sure that you have installed mmdet and mmcv-full, "
-                "by running 'pip install mmdet', and 'mim install mmcv-full'"
+                "by running 'mim install mmcv-full' and 'pip install mmdet'"
             )
 
         if self._problem_type is not None:

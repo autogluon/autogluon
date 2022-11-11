@@ -23,8 +23,8 @@ download_dir = "./tiny_motorbike_coco"  # specify a target download dir to store
 
 load_zip.unzip(zip_file, unzip_dir=download_dir)
 data_dir = os.path.join(download_dir, "tiny_motorbike")
-train_path = os.path.join(data_dir, "Annotations", "coco_trainval.json")
-test_path = os.path.join(data_dir, "Annotations", "coco_test.json")
+train_path = os.path.join(data_dir, "Annotations", "train_cocoformat.json")
+test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
 ```
 
 ## Creating the `MultiModalPredictor`
@@ -72,7 +72,7 @@ predictor = MultiModalPredictor.load(load_path)
 For COCO format data, we need to provide the path for the data split used for inference.
 
 ```{.python}
-test_path = "./tiny_motorbike_coco/tiny_motorbike/Annotations/coco_test.json"
+test_path = "./tiny_motorbike_coco/tiny_motorbike/Annotations/test_cocoformat.json"
 ```
 
 ## Running inference
