@@ -34,9 +34,11 @@ test_data = pd.read_csv(f'{dataset_path}/test.csv', index_col=0)
 image_col_1 = "Image1"
 image_col_2 = "Image2"
 label_col = "Label"
+match_label = 1
 ```
+Here you need to specify the `match_label`, the label class representing that a pair semantically match. In this demo dataset, we use 1 since we assigned 1 to image pairs from the same product. You may consider your task context to specify `match_label`.
 
-We need to expand the image paths since the original paths are relative.
+Next, we expand the image paths since the original paths are relative.
 ```{.python .input}
 def path_expander(path, base_folder):
     path_l = path.split(';')
@@ -87,6 +89,7 @@ predictor = MultiModalPredictor(
         query=image_col_1, # the column name of the first image
         response=image_col_2, # the column name of the second image
         label=label_col, # the label column name
+        match_label=match_label, # the label indicating that query and response have the same semantic meanings.
         eval_metric='auc', # the evaluation metric
     )
     

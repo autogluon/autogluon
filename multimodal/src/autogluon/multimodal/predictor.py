@@ -281,9 +281,8 @@ class MultiModalPredictor:
         match_label
             The label class that indicates the <query, response> pair is counted as "match".
             This is used when the problem_type is one of the matching problem types, and when the labels are binary.
-            For example, the label column can contain ["match", "not match"]. And match_label can be "match".
-            It is similar as the "pos_label" in F1-score: https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html
-            Internally, we will set match_label to self.class_labels[1] by default.
+            For example, the label column can contain ["duplicate", "not duplicate"]. And match_label can be "duplicate".
+            If match_label is not provided, every sample is assumed to have a unique label.
         pipeline
             Pipeline has been deprecated and merged in problem_type.
         presets

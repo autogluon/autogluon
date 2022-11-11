@@ -27,7 +27,7 @@ snli_train.head()
 
 Ideally, we want to obtain a model that can return high/low scores for positive/negative text pairs. Traditional text similarity methods only work on a lexical level without taking the semantic aspect into account, for example, using term frequency or tf-idf vectors. With AutoMM, we can easily train a model that captures the semantic relationship between sentences. Bascially, it uses [BERT](https://arxiv.org/abs/1810.04805) to project each sentence into a high-dimensional vector and treat the matching problem as a classification problem following the design in [sentence transformers](https://www.sbert.net/). 
 
-With AutoMM, you just need to specify the query, response, and label column names and fit the model on the training dataset without worrying the implementation details.
+With AutoMM, you just need to specify the query, response, and label column names and fit the model on the training dataset without worrying the implementation details. Note that the labels should be binary, and we need to specify the `match_label`, which means two sentences have the same semantic meaning. In practice, your tasks may have different labels, e.g., duplicate or not duplicate. You may need to define the `match_label` by considering your specific task contexts.
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
@@ -38,6 +38,7 @@ predictor = MultiModalPredictor(
         query="premise", # the column name of the first sentence
         response="hypothesis", # the column name of the second sentence
         label="label", # the label column name
+        match_label=1, # the label indicating that query and response have the same semantic meanings.
         eval_metric='auc', # the evaluation metric
     )
 
