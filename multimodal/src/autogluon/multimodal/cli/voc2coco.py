@@ -80,8 +80,10 @@ def get_annpaths(
                                 if int(used) == 1:
                                     ann_ids.append(ann_id)
                             else:
-                                print(f"Skipping {ann_ids_path}: file format not recognized. Make sure your annotation follows "
-                                      f"VOC format!")
+                                print(
+                                    f"Skipping {ann_ids_path}: file format not recognized. Make sure your annotation follows "
+                                    f"VOC format!"
+                                )
                                 break
 
                         ann_paths[ann_ids_name] = [os.path.join(ann_dir_path, aid + ".xml") for aid in ann_ids]
@@ -99,7 +101,7 @@ def get_image_info(annotation_root, extract_num_from_imgid=True):
         filename = filename + ".jpg"
     img_id = os.path.splitext(img_name)[0]
     if extract_num_from_imgid and isinstance(img_id, str):
-        img_id = int(''.join(re.findall(r"\d+", img_id)))
+        img_id = int("".join(re.findall(r"\d+", img_id)))
 
     size = annotation_root.find("size")
     width = int(size.findtext("width"))
@@ -195,15 +197,18 @@ def main():
         assert args.train_ratio + args.val_ratio <= 1
         annpaths_list_path = os.path.join(args.root_dir, "pathlist.txt")
         ## generate pathlist.txt containing all xml file paths
-        dump_voc_xml_files(voc_annotation_path=os.path.join(args.root_dir, "Annotations"),
-                           voc_annotation_xml_output_path=annpaths_list_path)
+        dump_voc_xml_files(
+            voc_annotation_path=os.path.join(args.root_dir, "Annotations"),
+            voc_annotation_xml_output_path=annpaths_list_path,
+        )
 
         assert os.path.exists(annpaths_list_path), "FatalError: pathlist.txt does not exist!"
 
     labels_path = os.path.join(args.root_dir, "labels.txt")
     ## generate labels.txt containing all unique class names
-    dump_voc_classes(voc_annotation_path=os.path.join(args.root_dir, "Annotations"),
-                     voc_class_names_output_path=labels_path)
+    dump_voc_classes(
+        voc_annotation_path=os.path.join(args.root_dir, "Annotations"), voc_class_names_output_path=labels_path
+    )
 
     assert os.path.exists(labels_path), "FatalError: labels.txt does not exist!"
 

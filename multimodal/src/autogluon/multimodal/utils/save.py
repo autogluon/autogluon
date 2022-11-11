@@ -111,9 +111,11 @@ def process_save_path(path, resume: Optional[bool] = False, raise_if_exist: Opti
                 "Specify a new path to avoid accidentally overwriting a saved predictor."
             )
         else:
-            logger.warning("A new predictor save path is created."
-                           "This could be because you are using multi GPU with DDP strategy."
-                           "You could check current save path at predictor._save_path")
+            logger.warning(
+                "A new predictor save path is created."
+                "This could be because you are using multi GPU with DDP strategy."
+                "You could check current save path at predictor._save_path"
+            )
             path = None
 
     return path
@@ -126,16 +128,14 @@ def setup_save_path(
     hyperparameter_tune_kwargs: Optional[dict] = None,
     warn_if_exist: Optional[bool] = True,
     raise_if_exist: Optional[bool] = False,
-    model_loaded:Optional[bool] = None,
+    model_loaded: Optional[bool] = None,
 ):
-    rank = int(os.environ.get('LOCAL_RANK', 0))
+    rank = int(os.environ.get("LOCAL_RANK", 0))
     save_path = None
     if resume:
         assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
         save_path = process_save_path(path=old_save_path, resume=True)
-    elif (
-        proposed_save_path is not None
-    ):  # TODO: distinguish DDP and existed predictor
+    elif proposed_save_path is not None:  # TODO: distinguish DDP and existed predictor
         save_path = process_save_path(path=proposed_save_path, raise_if_exist=raise_if_exist and rank == 0)
     elif old_save_path is not None:
         if model_loaded:
