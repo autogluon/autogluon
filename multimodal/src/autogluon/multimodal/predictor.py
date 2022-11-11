@@ -419,13 +419,6 @@ class MultiModalPredictor:
         self._model_loaded = False  # Whether the model has been loaded
         self._matcher = None
 
-        if not self._save_path:
-            self._save_path = setup_outputdir(
-                path=None,
-                warn_if_exist=self._warn_if_exist,
-            )
-        self._save_path = os.path.abspath(os.path.expanduser(self._save_path))
-
         if self._problem_type is not None:
             if problem_property_dict.get(self._problem_type).is_matching:
                 self._matcher = MultiModalMatcher(
@@ -2273,6 +2266,25 @@ class MultiModalPredictor:
         """
         return self._model.model.CLASSES
 
+    def setup_save_path(self, save_path):
+        """
+        Set up the save path
+
+        Parameters
+        ----------
+        save_path
+            User provided save path
+        Returns
+        -------
+            None
+        """
+        if not self._save_path:
+            self._save_path = setup_outputdir(
+                path=save_path,
+                warn_if_exist=self._warn_if_exist,
+            )
+        self._save_path = os.path.abspath(os.path.expanduser(self._save_path))
+
     def predict(
         self,
         data: Union[pd.DataFrame, dict, list, str],
@@ -2281,8 +2293,7 @@ class MultiModalPredictor:
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
         seed: Optional[int] = 123,
-        save_results: Optional[bool] = False,
-        result_path: Optional[str] = None,
+        save_results: Optional[bool] = None,
     ):
         """
         Predict values for the label column of new data.
@@ -2307,8 +2318,6 @@ class MultiModalPredictor:
             The random seed to use for this prediction run.
         save_results
             Whether to save the prediction results (only works for detection now)
-        result_path
-            Where to save the result. (only works for detection now)
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
@@ -2371,19 +2380,18 @@ class MultiModalPredictor:
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             pred = self._as_pandas(data=data, to_be_converted=pred)
+            # TODO: Add support for as_pandas
 
         if save_results:
             ## Dumping Result for detection only now
             assert (
                 self._problem_type == OBJECT_DETECTION
             ), "Aborting: save results only works for object detection now."
-            if not result_path:
-                result_path = os.path.join(self._save_path, "result.txt")
 
             save_result_df(
                 pred=pred,
                 data=data,
-                result_path=result_path,
+                result_path=self._save_path,
                 detection_classes=self._model.model.CLASSES,
             )
 

@@ -112,10 +112,9 @@ pred = predictor.predict(test_path)
 
 To run inference and save results, run the following:
 ```python
-pred = predictor.predict(test_path, save_results=True, result_path=result_path)
+pred = predictor.predict(test_path, save_results=True)
 ```
-Currently, we support saving results into a `.txt` file as a pandas `DataFrame`. 
-You can specify a desired `result_path` to save result, or set `result_path = None` to use default path. 
+Currently, we support saving results into a `.txt` file as a pandas `DataFrame`.
 
 Again, the test set is selected automatically within `predictor.predict` function.
 
