@@ -167,6 +167,7 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
 .. autoclass:: TimeSeriesPredictor
    :members:
    :inherited-members:
+   :exclude-members: refit_full, score
 
     .. rubric:: Methods
 
