@@ -20,7 +20,7 @@ The following code downloads the dataset and unzip the images and annotation fil
 
 
 ```{.python .input}
-download_dir = './ag_automm_tutorial'
+download_dir = './ag_automm_tutorial_img2img'
 zip_file = 'https://automl-mm-bench.s3.amazonaws.com/Stanford_Online_Products.zip'
 from autogluon.core.utils.loaders import load_zip
 load_zip.unzip(zip_file, unzip_dir=download_dir)

@@ -27,7 +27,7 @@ The Flickr30k dataset is a popular benchmark for sentence-based picture portraya
 ```{.python .input}
 from autogluon.core.utils.loaders import load_pd
 import pandas as pd
-download_dir = './ag_automm_tutorial'
+download_dir = './ag_automm_tutorial_imgtxt'
 zip_file = 'https://automl-mm-bench.s3.amazonaws.com/flickr30k.zip'
 from autogluon.core.utils.loaders import load_zip
 load_zip.unzip(zip_file, unzip_dir=download_dir)
