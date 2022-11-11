@@ -28,13 +28,13 @@ download_dir = "./tiny_motorbike_coco"
 
 load_zip.unzip(zip_file, unzip_dir=download_dir)
 data_dir = os.path.join(download_dir, "tiny_motorbike")
-train_path = os.path.join(data_dir, "Annotations", "coco_trainval.json")
-test_path = os.path.join(data_dir, "Annotations", "coco_test.json")
+train_path = os.path.join(data_dir, "Annotations", "trainval_cocoformat.json")
+test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
 ```
 
 While using COCO format dataset, the input is the json annotation file of the dataset split.
-In this example, `coco_trainval.json` is the annotation file of the train-and-validate split,
-and `coco_test.json` is the annotation file of the test split.
+In this example, `trainval_cocoformat.json` is the annotation file of the train-and-validate split,
+and `test_cocoformat.json` is the annotation file of the test split.
 
 We select the YOLOv3 with MobileNetV2 as backbone,
 and input resolution is 320x320, pretrained on COCO dataset. With this setting, it is fast to finetune or inference,

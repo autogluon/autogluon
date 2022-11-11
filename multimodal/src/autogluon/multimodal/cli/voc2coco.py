@@ -213,7 +213,7 @@ def main():
 
     assert os.path.exists(labels_path), "FatalError: labels.txt does not exist!"
 
-    output_path_fmt = os.path.join(args.root_dir, "Annotations", "coco_%s.json")
+    output_path_fmt = os.path.join(args.root_dir, "Annotations", "%s_cocoformat.json")
 
     label2id = get_label2id(labels_path=labels_path)
     ann_paths = get_annpaths(

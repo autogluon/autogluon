@@ -8,7 +8,7 @@ An example to evaluate a pretrained model on COCO dataset:
 
 An example to evaluate a pretrained model on VOC dataset (COCO format):
     python eval_pretrained_coco_format.py \
-        --test_path ./VOCdevkit/VOC2007/Annotations/coco_test.json \
+        --test_path ./VOCdevkit/VOC2007/Annotations/test_cocoformat.json \
         --checkpoint_name faster_rcnn_r50_fpn_1x_voc0712
 """
 

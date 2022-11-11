@@ -43,9 +43,9 @@ Start converting !
 
 Now those splits are converted to COCO format in `Annotations` folder under the root directory:
 ```
-coco_train.json
-coco_val.json
-coco_test.json
+train_cocoformat.json
+val_cocoformat.json
+test_cocoformat.json
 ```
 
 ### Convert Existing Splits
@@ -67,9 +67,9 @@ Start converting !
 And this will generate user splited COCO format in `Annotations` folder under the root directory:
 
 ```
-coco_usersplit_train.json
-coco_usersplit_val.json
-coco_usersplit_test.json
+usersplit_train_cocoformat.json
+usersplit_val_cocoformat.json
+usersplit_test_cocoformat.json
 ```
 
 ### Other Examples
