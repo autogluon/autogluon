@@ -133,7 +133,7 @@ def setup_save_path(
     if resume:
         assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
         save_path = process_save_path(path=old_save_path, resume=True)
-    elif proposed_save_path is not None:
+    elif proposed_save_path is not None:  # TODO: for multi gpu case, warn that the save_path is changed and remove extra folders
         save_path = process_save_path(path=proposed_save_path, raise_if_exist=raise_if_exist_for_proposed_path)
     elif old_save_path is not None:
         save_path = process_save_path(path=old_save_path, raise_if_exist=False)

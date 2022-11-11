@@ -2033,6 +2033,9 @@ class MultiModalPredictor:
         if realtime is None:
             realtime = use_realtime(data=data, data_processors=data_processors, batch_size=batch_size)
 
+        if self._problem_type and self._problem_type == OBJECT_DETECTION:
+            realtime = False
+
         if realtime:
             outputs = self._realtime_predict(
                 data=data,
