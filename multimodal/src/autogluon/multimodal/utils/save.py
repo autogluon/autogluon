@@ -5,6 +5,8 @@ from typing import Dict, List, Optional, Tuple, Union
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
+from autogluon.common.utils.utils import setup_outputdir
+
 from ..constants import AUTOMM, HF_MODELS, LAST_CHECKPOINT
 from ..data import TextProcessor
 
@@ -112,3 +114,39 @@ def process_save_path(path, resume: Optional[bool] = False, raise_if_exist: Opti
             path = None
 
     return path
+
+
+def setup_save_path(
+    resume: Optional[bool] = None,
+    old_save_path: Optional[str] = None,
+    proposed_save_path: Optional[str] = None,
+    hyperparameter_tune_kwargs: Optional[dict] = None,
+    warn_if_exist: Optional[bool] = True,
+    num_gpus: Optional[int] = None,
+):
+    save_path = None
+    raise_if_exist_for_proposed_path = True
+    if num_gpus and num_gpus > 1:
+        raise_if_exist_for_proposed_path = (
+            False  # TODO: Here we allow overwrite previous save_path if we are using multi gpu
+        )
+    if resume:
+        assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
+        save_path = process_save_path(path=old_save_path, resume=True)
+    elif (
+        proposed_save_path is not None
+    ):  # TODO: for multi gpu case, warn that the save_path is changed and remove extra folders
+        save_path = process_save_path(path=proposed_save_path, raise_if_exist=raise_if_exist_for_proposed_path)
+    elif old_save_path is not None:
+        save_path = process_save_path(path=old_save_path, raise_if_exist=False)
+
+    if not resume:
+        save_path = setup_outputdir(
+            path=save_path,
+            warn_if_exist=warn_if_exist,
+        )
+
+    save_path = os.path.abspath(os.path.expanduser(save_path))
+    logger.debug(f"save path: {save_path}")
+
+    return save_path

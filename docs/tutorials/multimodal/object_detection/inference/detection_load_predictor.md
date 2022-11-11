@@ -14,7 +14,7 @@ Note that you should have a different `load_path`. For test, we still use VOC200
 
 ```python
 load_path = "./AutogluonModels/ag-20221104_185342"
-test_path = "./VOCdevkit/VOCCOCO/voc07_test.json"
+test_path = "./VOCdevkit/VOC2007/Annotations/coco_test.json"
 ```
 
 We load the MultiModalPredictor in one line, with all previous settings recovered.
