@@ -62,8 +62,9 @@ AutoGluon currently supports known covariates --- the time-varying features that
 Examples of such features include
 
 - holidays
+- day of the week, month, year
 - promotions
-- actions taken
+- weather forecasts
 
 
 
