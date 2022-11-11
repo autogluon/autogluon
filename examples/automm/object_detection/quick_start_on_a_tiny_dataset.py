@@ -53,7 +53,7 @@ def tutorial_script_for_quick_start():
     new_predictor = MultiModalPredictor.load("./quick_start_tutorial_temp_save")
     new_predictor.set_num_gpus(1)
 
-    # Evaluate
+    # Evaluate new predictor
     new_predictor.evaluate(test_path)
 
 if __name__ == "__main__":

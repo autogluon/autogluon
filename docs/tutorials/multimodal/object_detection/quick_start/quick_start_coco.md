@@ -114,7 +114,7 @@ In this example, it's `./quick_start_tutorial_temp_save`.
 Print out the time and we can see that it only takes 100.42 seconds!
 
 ```python
-print("This finetuning takes %.2f seconds." % (end - start))
+print("This finetuning takes %.2f seconds." % (train_end - start))
 ```
 
 ```
@@ -125,31 +125,64 @@ To evaluate the model we just trained, run:
 
 ```python
 predictor.evaluate(test_path)
+eval_end = time.time()
 ```
 
 And the evaluation results are shown in command line output. 
-The first value `0.375` is mAP in COCO standard, and the second one `0.755` is mAP in VOC standard (or mAP50). 
+The first value `0.117` is mAP in COCO standard, and the second one `0.317` is mAP in VOC standard (or mAP50). 
 For more details about these metrics, see [COCO's evaluation guideline](https://cocodataset.org/#detection-eval).
-
+Note that for presenting a fast finetuning we use 15 epochs, 
+you could get better result on this dataset by simply increasing the epochs.
 ```
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.375
- Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.755
- Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.311
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.111
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.230
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.431
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.355
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.505
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.515
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.258
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.415
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.556
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.117
+ Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.317
+ Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.056
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.014
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.038
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.322
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.108
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.164
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.187
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.059
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.187
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.412
 ```
 
-Under this fast finetune setting, we reached `mAP50 = 0.755` on VOC with 100 seconds!
-For how to finetune with higher performance,
-see :ref:`sec_automm_detection_high_performance_finetune_coco`, where we finetuned a VFNet model with 
-5 hours and reached `mAP50 = 0.932` on VOC.
+Print out the time and we can see that it only takes 1.62 seconds to evaluate!
+
+```python
+print("The evaluation takes %.2f seconds." % (eval_end - train_end))
+```
+
+We can load a new predictor with previous save_path,
+and we can also reset the number of GPUs to use if not all the devices are available:
+
+```python
+# Load and reset num_gpus
+new_predictor = MultiModalPredictor.load("./quick_start_tutorial_temp_save")
+new_predictor.set_num_gpus(1)
+```
+
+Evaluating the new predictor gives us exactly the same result:
+
+```python
+# Evaluate new predictor
+new_predictor.evaluate(test_path)
+```
+```
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.117
+ Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.317
+ Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.056
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.014
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.038
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.322
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.108
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.164
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.187
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.059
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.187
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.412
+```
 
 ### Other Examples
 
