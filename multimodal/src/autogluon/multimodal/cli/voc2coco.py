@@ -26,7 +26,7 @@ from typing import Dict, List
 import defusedxml.ElementTree as ET
 from tqdm import tqdm
 
-from autogluon.multimodal.utils.object_detection import process_voc_annotations, dump_voc_classes, dump_voc_xml_files
+from autogluon.multimodal.utils.object_detection import dump_voc_classes, dump_voc_xml_files, process_voc_annotations
 
 
 MIN_AREA = 4  # TODO: put in arg?
