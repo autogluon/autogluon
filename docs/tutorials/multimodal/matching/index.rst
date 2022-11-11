@@ -39,4 +39,5 @@ Matching
    semantic_search
    clip_embedding
    text2text_matching
+   image_text_matching
    image2image_matching
