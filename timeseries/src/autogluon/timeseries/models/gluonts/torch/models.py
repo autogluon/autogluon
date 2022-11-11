@@ -130,11 +130,14 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
     The model consists of an LSTM encoder and a decoder that outputs the
     distribution of the next target value. Close to the model described in [Salinas2020]_.
 
+    Based on `gluonts.torch.model.deepar.DeepAREstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.deepar.html>`_.
+
+
+    References
+    ----------
     .. [Salinas2020] Salinas, David, et al.
         "DeepAR: Probabilistic forecasting with autoregressive recurrent networks."
         International Journal of Forecasting. 2020.
-
-    Based on `gluonts.torch.model.deepar.DeepAREstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.deepar.html>`_.
 
 
     Other Parameters
