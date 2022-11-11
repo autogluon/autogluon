@@ -719,6 +719,7 @@ class MultiModalPredictor:
             resume=self._resume,
             old_save_path=self._save_path,
             proposed_save_path=save_path,
+            raise_if_exist=True,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             warn_if_exist=self._warn_if_exist,
             model_loaded=self._model_loaded,
