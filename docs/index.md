@@ -27,7 +27,7 @@ hide-toc: true
 :child-align: justify
 :class: sd-text-white sd-fs-3
 
-AutoML for Tabular, Text, Image, and Multi-Modal Data
+AutoML for Tabular, Text, Image, and Multimodal Data
 
 ```{button-link} tabular/quick_start.html
 :outline:
@@ -43,16 +43,16 @@ Get Started
 ::::::
 
 Quick Prototyping 
-: Build machine learning solutions on your raw data with a few lines of code
+: Build machine learning solutions on raw data in a few lines of code.
 
 State-of-the-art Techniques
 : Automatically utilize SOTA models without expert knowledge.
 
 Easy to Deploy
-: This is a placeholder.
+: Easily deploy to the cloud.
 
 Customizable
-: This is a placeholder.
+: Extensible with custom feature processing, model, and metrics.
 
 ## {octicon}`rocket` Quick Examples
 
@@ -72,7 +72,6 @@ predictor = TabularPredictor(label='class').fit(train_data=train_data)
 
 test_data = TabularDataset(root+'test.csv')
 predictions = predictor.predict(test_data)
-
 ```
 :::
 
