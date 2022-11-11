@@ -14,6 +14,11 @@ To install ``mmdet``, run:
 
     ``pip install mmdet``
 
+For additional support, please refer to official instructions for mmdet_ and mmcv-full_
+
+.. _mmdet: https://mmdetection.readthedocs.io/en/v2.2.1/install.html
+.. _mmcv-full: https://mmcv.readthedocs.io/en/latest/get_started/installation.html
+
 Data Preparation
 ------------------
 .. container:: cards
