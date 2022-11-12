@@ -32,7 +32,7 @@ cd multimodal/
 python3 -m pip install -e .
 # TODO: move mmlab packages installation to better place
 python3 -m pip install mmdet
-python3 -m mim install mmcv-full
+mim install mmcv-full
 cd ..
 
 cd text/
