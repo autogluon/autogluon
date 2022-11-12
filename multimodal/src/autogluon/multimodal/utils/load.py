@@ -4,29 +4,29 @@ import pickle
 from typing import Dict, List, Optional, Tuple, Union
 
 from ..constants import AUTOMM
-from ..data import TextProcessor
+from ..data import NerProcessor, TextProcessor
 
 logger = logging.getLogger(AUTOMM)
 
 
 def load_text_tokenizers(
-    text_processors: List[TextProcessor],
+    text_processors: Union[List[TextProcessor], List[NerProcessor]],
     path: str,
-) -> List[TextProcessor]:
+) -> Union[List[TextProcessor], List[NerProcessor]]:
     """
-    Load saved text tokenizers. If text processors already have tokenizers,
+    Load saved text tokenizers. If text/ner processors already have tokenizers,
     then do nothing.
 
     Parameters
     ----------
     text_processors
-        A list of text processors with tokenizers or their relative paths.
+        A list of text/ner processors with tokenizers or their relative paths.
     path
         The root path.
 
     Returns
     -------
-    A list of text processors with tokenizers loaded.
+    A list of text/ner processors with tokenizers loaded.
     """
     for per_text_processor in text_processors:
         if isinstance(per_text_processor.tokenizer, str):

@@ -54,6 +54,7 @@ class NerProcessor:
         self.model = model
         self.prefix = model.prefix
         self.tokenizer = None
+        self.tokenizer_name = model.prefix
         self.max_len = max_len
 
         if self.prefix == NER_TEXT:
@@ -70,6 +71,14 @@ class NerProcessor:
                 self.max_len = min(max_len, self.tokenizer.model_max_length)
 
             self.tokenizer.model_max_length = self.max_len
+
+    @staticmethod
+    def get_pretrained_tokenizer(
+        tokenizer_name: str,
+        checkpoint_name: str,
+    ):
+        print("hello load tokenizer!!!")
+        return AutoTokenizer.from_pretrained(checkpoint_name)
 
     def collate_fn(self, text_column_names: Optional[List] = None) -> Dict:
         """
