@@ -232,3 +232,4 @@ jobs:
           source .github/workflow_scripts/env_setup.sh
           setup_build_env
           install_all
+          build_all
