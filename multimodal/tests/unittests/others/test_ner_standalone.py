@@ -70,7 +70,7 @@ def test_ner_standalone():
     with requests_gag:
         # No internet connection here. If any command require internet connection, a RuntimeError will be raised!
         with tempfile.TemporaryDirectory() as tmpdirname:
-            torch.hub.set_dir(tmpdirname)  # block reading files in `.cache`
+            torch.hub.set_dir(tmpdirname)  # block reading files in `.cache`.
             loaded_offline_predictor = MultiModalPredictor.load(path=save_path_standalone)
 
     offline_predictions = loaded_offline_predictor.predict(test_data, as_pandas=False)
