@@ -17,6 +17,7 @@ from ..constants import (
     CHOICES_IDS,
     LABEL,
     NER,
+    NER_TEXT,
     NER_ANNOTATION,
     TEXT,
     TEXT_SEGMENT_IDS,
@@ -55,7 +56,7 @@ class NerProcessor:
         self.tokenizer = None
         self.max_len = max_len
 
-        if self.prefix == NER:
+        if self.prefix == NER_TEXT:
             self.tokenizer = model.tokenizer
 
             if max_len is None or max_len <= 0:
@@ -80,7 +81,7 @@ class NerProcessor:
         A dictionary containing one model's collator function for multimodal data.
         """
         fn = {}
-        if self.prefix == NER:
+        if self.prefix == NER_TEXT:
             fn.update(
                 {
                     self.model.text_token_ids_key: Pad(pad_val=self.tokenizer.pad_token_id),
@@ -167,7 +168,7 @@ class NerProcessor:
         A dictionary containing one sample's features and/or labels.
         """
         ret = {}
-        if self.prefix == NER:
+        if self.prefix == NER_TEXT:
             ret = self.process_ner(all_features, feature_modalities, is_training)
 
         return ret

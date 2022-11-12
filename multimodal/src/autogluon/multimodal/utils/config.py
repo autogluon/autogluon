@@ -13,6 +13,7 @@ from ..constants import (
     FUSION_TRANSFORMER,
     HF_MODELS,
     NER,
+    NER_TEXT,
     NUMERICAL_TRANSFORMER,
     REGRESSION,
     VALID_CONFIG_KEYS,
@@ -480,7 +481,7 @@ def update_config_by_rules(
                 UserWarning,
             )
     if problem_type == NER:
-        config.model.names = [NER]
+        config.model.names = [NER_TEXT]
     return config
 
 
