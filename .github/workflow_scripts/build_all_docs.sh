@@ -1,3 +1,4 @@
+
 #!/usr/bin/env bash
 
 # This script build the docs and store the results into a intermediate bucket to prevent our web hosting bucket being manipulated intentionally
