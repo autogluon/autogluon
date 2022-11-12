@@ -68,8 +68,11 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
         pretrained
             Whether using the pretrained weights. If pretrained=True, download the pretrained model.
         """
-        super().__init__(prefix, checkpoint_name, num_classes, pooling_mode, gradient_checkpointing, low_cpu_mem_usage, pretrained)
+        super().__init__(
+            prefix, checkpoint_name, num_classes, pooling_mode, gradient_checkpointing, low_cpu_mem_usage, pretrained
+        )
         logger.debug(f"initializing {checkpoint_name}")
+        print(pretrained)
         if self.config.model_type in {"gpt2", "roberta"}:
             # Refer to this PR: https://github.com/huggingface/transformers/pull/12116
             self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_name, add_prefix_space=True)
