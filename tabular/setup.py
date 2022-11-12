@@ -48,7 +48,7 @@ extras_require = {
     # FIXME: Debug why xgboost 1.6 has 4x+ slower inference on multiclass datasets compared to 1.4
     #  It is possibly only present on MacOS, haven't tested linux.
     'xgboost': [
-        'xgboost>=1.4,<1.5',
+        'xgboost>=1.4,<1.5' if not ag.LITE_MODE else 'xgboost',
     ],
     'fastai': [
         'torch>=1.0,<1.13',
