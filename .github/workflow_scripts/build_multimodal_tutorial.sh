@@ -10,7 +10,5 @@ PR_NUMBER=$4  # For push events, PR_NUMBER will be empty
 
 source $(dirname "$0")/env_setup.sh
 source $(dirname "$0")/build_doc.sh
-source $(dirname "$0")/setup_mmcv.sh
 
-setup_mmcv
 build_doc multimodal $BRANCH $GIT_REPO $COMMIT_SHA $PR_NUMBER
