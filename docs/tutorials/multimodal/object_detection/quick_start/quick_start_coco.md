@@ -11,6 +11,12 @@ To start, let's import MultiModalPredictor:
 from autogluon.multimodal import MultiModalPredictor
 ```
 
+And install a few packages:
+```python .input
+!mim install mmcv-full
+!pip install mmdet
+```
+
 And also import some other packages that will be used in this tutorial:
 
 ```python .input
