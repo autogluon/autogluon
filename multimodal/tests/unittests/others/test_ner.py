@@ -43,8 +43,8 @@ def test_ner(checkpoint_name, searcher, scheduler):
     predictor = MultiModalPredictor(problem_type="ner", label=label_col)
     predictor.fit(
         train_data=train_data,
-        time_limit=80,
-        hyperparameters={"model.ner.checkpoint_name": checkpoint_name, "optimization.learning_rate": lr},
+        time_limit=40,
+        hyperparameters={"model.ner_text.checkpoint_name": checkpoint_name, "optimization.learning_rate": lr},
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
 
