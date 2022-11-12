@@ -77,7 +77,6 @@ class NerProcessor:
         tokenizer_name: str,
         checkpoint_name: str,
     ):
-        print("hello load tokenizer!!!")
         return AutoTokenizer.from_pretrained(checkpoint_name)
 
     def collate_fn(self, text_column_names: Optional[List] = None) -> Dict:
