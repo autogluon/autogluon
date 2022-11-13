@@ -23,7 +23,7 @@ def get_base_params():
         'n_estimators': DEFAULT_NUM_BOOST_ROUND,
         'learning_rate': 0.1,
         'n_jobs': -1,
-        'proc.max_category_levels' : MAX_CATEGORY_LEVELS,
+        'proc.max_category_levels': MAX_CATEGORY_LEVELS,
     }
     return base_params
 
@@ -33,7 +33,6 @@ def get_param_binary_baseline():
     baseline_params = {
         'objective': 'binary:logistic',
         'booster': 'gbtree',
-        'use_label_encoder': False,
     }
     params.update(baseline_params)
     return params
@@ -42,10 +41,9 @@ def get_param_binary_baseline():
 def get_param_multiclass_baseline(num_classes):
     params = get_base_params()
     baseline_params = {
-        'objective': 'multi:softmax',
+        'objective': 'multi:softprob',
         'booster': 'gbtree',
         'num_class': num_classes,
-        'use_label_encoder': False,
     }
     params.update(baseline_params)
     return params
