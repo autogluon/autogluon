@@ -10,14 +10,16 @@ You need 8.4 GB disk space to download and extract this dataset. SSD is preferre
 The total time to prepare the dataset depends on your Internet speed and disk performance. For example, it often takes 10 min on AWS EC2 with EBS.
 
 VOC has an [official webpage](http://host.robots.ox.ac.uk/pascal/VOC/) to download the data, 
-but it's always easier to perform a one-step setup. 
-And we prepare a script to download both VOC2007 and VOC2012 in our examples: 
+but it's always easier to perform a one-step setup.
+We prepared a script to download both VOC2007 and VOC2012 in our examples: 
 [download_voc0712.sh](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/download_voc0712.sh).
 You can also download them separately:
 [download_voc07.sh](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/download_voc07.sh),
-[download_voc12.sh](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/download_voc12.sh),
-or use the python script that can download all datasets mentioned in our tutorials: [prepare_detection_dataset.py](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/prepare_detection_dataset.sh).
-
+[download_voc12.sh](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/download_voc12.sh).
+Or you can also use our cli tool `prepare_detection_dataset` that can download all datasets mentioned in our tutorials.
+This python script is in our code: 
+[prepare_detection_dataset.py](https://github.com/awslabs/autogluon/tree/master/autogluon/multimodal/src/autogluon/multimodal/cli/prepare_detection_dataset.py),
+and you can also run it as a cli: `python3 -m autogluon.multimodal.cli.prepare_detection_dataset`.
 
 ### Download with Python Script
 
@@ -27,26 +29,26 @@ If you are working on a Unix system and needs a progress bar, try the bash scrip
 You could either extract it under current directory by running:
 
 ```
-python3 prepare_detection_dataset.py --dataset_name voc0712
+python3 -m autogluon.multimodal.cli.prepare_detection_dataset --dataset_name voc0712
 ```
 
 or extract it under a provided output path:
 
 ```
-python3 prepare_detection_dataset.py --dataset_name voc0712 --output_path ~/data
+python3 -m autogluon.multimodal.cli.prepare_detection_dataset --dataset_name voc0712 --output_path ~/data
 ```
 
 or make it shorter:
 
 ```
-python3 prepare_detection_dataset.py -d voc -o ~/data
+python3 -m autogluon.multimodal.cli.prepare_detection_dataset -d voc -o ~/data
 ```
 
 or download them separately
 
 ```
-python3 prepare_detection_dataset.py -d voc07 -o ~/data
-python3 prepare_detection_dataset.py -d voc12 -o ~/data
+python3 -m autogluon.multimodal.cli.prepare_detection_dataset -d voc07 -o ~/data
+python3 -m autogluon.multimodal.cli.prepare_detection_dataset -d voc12 -o ~/data
 ```
 
 ### Download with Bash Script

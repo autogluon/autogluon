@@ -10,22 +10,23 @@ With changes:
 
 To use:
     If you'd like to customize train/val/test ratio. Note test_ratio = 1 - train_ratio - val_ratio.
-        python3 voc2coco.py --root_dir <root_dir> --train_ratio <train_ratio> --val_ratio <val_ratio>
+        python3 -m autogluon.multimodal.cli.voc2coco --root_dir <root_dir> --train_ratio <train_ratio> --val_ratio <val_ratio>
     If you'd like to use the dataset provided train/val/test splits:
-        python3 voc2coco.py --root_dir <root_dir>
+        python3 -m autogluon.multimodal.cli.voc2coco --root_dir <root_dir>
 """
 
 import argparse
-import defusedxml.ElementTree as ET
 import json
 import os
 import random
 import re
 import subprocess
-from tqdm import tqdm
 from typing import Dict, List
-from autogluon.multimodal.utils.object_detection import process_voc_annotations, dump_voc_classes, dump_voc_xml_files
 
+import defusedxml.ElementTree as ET
+from tqdm import tqdm
+
+from autogluon.multimodal.utils.object_detection import dump_voc_classes, dump_voc_xml_files, process_voc_annotations
 
 MIN_AREA = 4  # TODO: put in arg?
 
@@ -80,8 +81,10 @@ def get_annpaths(
                                 if int(used) == 1:
                                     ann_ids.append(ann_id)
                             else:
-                                print(f"Skipping {ann_ids_path}: file format not recognized. Make sure your annotation follows "
-                                      f"VOC format!")
+                                print(
+                                    f"Skipping {ann_ids_path}: file format not recognized. Make sure your annotation follows "
+                                    f"VOC format!"
+                                )
                                 break
 
                         ann_paths[ann_ids_name] = [os.path.join(ann_dir_path, aid + ".xml") for aid in ann_ids]
@@ -99,7 +102,7 @@ def get_image_info(annotation_root, extract_num_from_imgid=True):
         filename = filename + ".jpg"
     img_id = os.path.splitext(img_name)[0]
     if extract_num_from_imgid and isinstance(img_id, str):
-        img_id = int(''.join(re.findall(r"\d+", img_id)))
+        img_id = int("".join(re.findall(r"\d+", img_id)))
 
     size = annotation_root.find("size")
     width = int(size.findtext("width"))
@@ -172,6 +175,7 @@ def convert_xmls_to_cocojson(
     with open(output_jsonpath, "w") as f:
         output_json = json.dumps(output_json_dict)
         f.write(output_json)
+        print(f"The COCO format annotation is saved to {output_jsonpath}")
 
 
 def main():
@@ -194,19 +198,22 @@ def main():
         assert args.train_ratio + args.val_ratio <= 1
         annpaths_list_path = os.path.join(args.root_dir, "pathlist.txt")
         ## generate pathlist.txt containing all xml file paths
-        dump_voc_xml_files(voc_annotation_path=os.path.join(args.root_dir, "Annotations"),
-                           voc_annotation_xml_output_path=annpaths_list_path)
+        dump_voc_xml_files(
+            voc_annotation_path=os.path.join(args.root_dir, "Annotations"),
+            voc_annotation_xml_output_path=annpaths_list_path,
+        )
 
         assert os.path.exists(annpaths_list_path), "FatalError: pathlist.txt does not exist!"
 
     labels_path = os.path.join(args.root_dir, "labels.txt")
     ## generate labels.txt containing all unique class names
-    dump_voc_classes(voc_annotation_path=os.path.join(args.root_dir, "Annotations"),
-                     voc_class_names_output_path=labels_path)
+    dump_voc_classes(
+        voc_annotation_path=os.path.join(args.root_dir, "Annotations"), voc_class_names_output_path=labels_path
+    )
 
     assert os.path.exists(labels_path), "FatalError: labels.txt does not exist!"
 
-    output_path_fmt = os.path.join(args.root_dir, "Annotations", "coco_%s.json")
+    output_path_fmt = os.path.join(args.root_dir, "Annotations", "%s_cocoformat.json")
 
     label2id = get_label2id(labels_path=labels_path)
     ann_paths = get_annpaths(
