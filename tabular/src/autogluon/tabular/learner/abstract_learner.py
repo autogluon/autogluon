@@ -283,7 +283,7 @@ class AbstractTabularLearner(AbstractLearner):
         return compute_weighted_metric(y, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
-    def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None, silent=False):
+    def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None, skip_score=False, silent=False):
         leaderboard_df = self.leaderboard(extra_info=extra_info, silent=silent)
         if y is None:
             X, y = self.extract_label(X)
@@ -327,11 +327,14 @@ class AbstractTabularLearner(AbstractLearner):
 
         extra_scores = {}
         for model_name, y_pred_proba_internal in model_pred_proba_dict.items():
-            scores[model_name] = self._score_with_pred_proba(
-                y_pred_proba_internal=y_pred_proba_internal,
-                metric=self.eval_metric,
-                **scoring_args
-            )
+            if skip_score:
+                scores[model_name] = None
+            else:
+                scores[model_name] = self._score_with_pred_proba(
+                    y_pred_proba_internal=y_pred_proba_internal,
+                    metric=self.eval_metric,
+                    **scoring_args
+                )
             for metric in extra_metrics:
                 metric = get_metric(metric, self.problem_type, 'leaderboard_metric')
                 if metric.name not in extra_scores:
@@ -619,9 +622,9 @@ class AbstractTabularLearner(AbstractLearner):
         X = X.drop(self.label, axis=1)
         return X, y
 
-    def leaderboard(self, X=None, y=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, silent=False):
+    def leaderboard(self, X=None, y=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, skip_score=False, silent=False):
         if X is not None:
-            leaderboard = self.score_debug(X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics, silent=True)
+            leaderboard = self.score_debug(X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics, skip_score=skip_score, silent=True)
         else:
             if extra_metrics:
                 raise AssertionError('`extra_metrics` is only valid when data is specified.')
