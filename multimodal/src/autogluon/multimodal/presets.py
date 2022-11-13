@@ -394,8 +394,8 @@ def medium_quality_faster_inference_image_text_similarity():
 @automm_presets.register()
 def best_quality_ner():
     return {
-        "model.names": ["ner"],
-        "model.ner.checkpoint_name": "google/flan-t5-base",
+        "model.names": ["ner_text"],
+        "model.ner_text.checkpoint_name": "google/flan-t5-base",
         "env.precision": "bf16",
     }
 
@@ -403,8 +403,8 @@ def best_quality_ner():
 @automm_presets.register()
 def medium_quality_faster_inference_ner():
     return {
-        "model.names": ["ner"],
-        "model.ner.checkpoint_name": "google/flan-t5-small",
+        "model.names": ["ner_text"],
+        "model.ner_text.checkpoint_name": "google/flan-t5-small",
         "env.precision": "bf16",
     }
 
@@ -412,8 +412,8 @@ def medium_quality_faster_inference_ner():
 @automm_presets.register()
 def high_quality_fast_inference_ner():
     return {
-        "model.names": ["ner"],
-        "model.ner.checkpoint_name": "bert-base-cased",
+        "model.names": ["ner_text"],
+        "model.ner_text.checkpoint_name": "bert-base-cased",
     }
 
 

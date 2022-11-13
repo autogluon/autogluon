@@ -17,7 +17,7 @@ An example to finetune an MMDetection model on VOC:
     Then, run:
     python detection_train.py \
         --train_path ./VOCdevkit/VOC2007/Annotations/cocotrain.json \
-        --test_path ./VOCdevkit/VOC2007/Annotations/coco_test.json \
+        --test_path ./VOCdevkit/VOC2007/Annotations/test_cocoformat.json \
         --checkpoint_name yolov3_mobilenetv2_320_300e_coco \
         --num_classes 20 \
         --lr <learning_rate> \
@@ -96,7 +96,7 @@ def detection_train(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--train_path", default="./VOCdevkit/VOC2007/Annotations/coco_train.json", type=str
+        "--train_path", default="./VOCdevkit/VOC2007/Annotations/train_cocoformat.json", type=str
     )
     parser.add_argument("--val_path", default=None, type=str)
     parser.add_argument("--test_path", default=None, type=str)

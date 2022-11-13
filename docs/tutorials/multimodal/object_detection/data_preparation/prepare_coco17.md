@@ -10,9 +10,13 @@ You need 42.7 GB disk space to download and extract this dataset. SSD is preferr
 The total time to prepare the dataset depends on your Internet speed and disk performance. For example, it often takes 20 min on AWS EC2 with EBS.
 
 COCO has an [official download page](https://cocodataset.org/#download), 
-but it's always easier to perform a one-step setup. 
-You can use the bash script for downloading coco17: [download_coco17.sh](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/download_coco17.sh),
-or use the python script that can download all datasets mentioned in our tutorials: [prepare_detection_dataset.py](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/prepare_detection_dataset.sh).
+but it's always easier to perform a one-step setup.
+We prepared a bash script for one-step downloading the COCO17 dataset: 
+[download_coco17.sh](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/download_coco17.sh).
+Or you can also use our cli tool `prepare_detection_dataset` that can download all datasets mentioned in our tutorials.
+This python script is in our code: 
+[prepare_detection_dataset.py](https://github.com/awslabs/autogluon/tree/master/autogluon/multimodal/src/autogluon/multimodal/cli/prepare_detection_dataset.py),
+and you can also run it as a cli: `python3 -m autogluon.multimodal.cli.prepare_detection_dataset`.
 
 ### Download with Python Script
 
@@ -22,19 +26,19 @@ If you are working on a Unix system and needs a progress bar, try the bash scrip
 You could either extract it in coco17 folder under current directory by running:
 
 ```
-python3 prepare_detection_dataset.py --dataset_name coco2017
+python3 -m autogluon.multimodal.cli.prepare_detection_dataset --dataset_name coco2017
 ```
 
 or extract it in coco17 folder under a provided output path:
 
 ```
-python3 prepare_detection_dataset.py --dataset_name coco2017 --output_path ~/data
+python3 -m autogluon.multimodal.cli.prepare_detection_dataset --dataset_name coco2017 --output_path ~/data
 ```
 
 or make it shorter:
 
 ```
-python3 prepare_detection_dataset.py -d coco17 -o ~/data
+python3 -m autogluon.multimodal.cli.prepare_detection_dataset -d coco17 -o ~/data
 ```
 
 ### Download with Bash Script

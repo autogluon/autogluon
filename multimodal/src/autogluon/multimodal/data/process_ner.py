@@ -18,6 +18,7 @@ from ..constants import (
     LABEL,
     NER,
     NER_ANNOTATION,
+    NER_TEXT,
     TEXT,
     TEXT_SEGMENT_IDS,
     TEXT_TOKEN_IDS,
@@ -53,9 +54,10 @@ class NerProcessor:
         self.model = model
         self.prefix = model.prefix
         self.tokenizer = None
+        self.tokenizer_name = model.prefix
         self.max_len = max_len
 
-        if self.prefix == NER:
+        if self.prefix == NER_TEXT:
             self.tokenizer = model.tokenizer
 
             if max_len is None or max_len <= 0:
@@ -70,6 +72,13 @@ class NerProcessor:
 
             self.tokenizer.model_max_length = self.max_len
 
+    @staticmethod
+    def get_pretrained_tokenizer(
+        tokenizer_name: str,
+        checkpoint_name: str,
+    ):
+        return AutoTokenizer.from_pretrained(checkpoint_name)
+
     def collate_fn(self, text_column_names: Optional[List] = None) -> Dict:
         """
         Collate multimodal features into a batch.
@@ -80,7 +89,7 @@ class NerProcessor:
         A dictionary containing one model's collator function for multimodal data.
         """
         fn = {}
-        if self.prefix == NER:
+        if self.prefix == NER_TEXT:
             fn.update(
                 {
                     self.model.text_token_ids_key: Pad(pad_val=self.tokenizer.pad_token_id),
@@ -167,7 +176,7 @@ class NerProcessor:
         A dictionary containing one sample's features and/or labels.
         """
         ret = {}
-        if self.prefix == NER:
+        if self.prefix == NER_TEXT:
             ret = self.process_ner(all_features, feature_modalities, is_training)
 
         return ret

@@ -16,7 +16,7 @@ from autogluon.multimodal import MultiModalPredictor
 
 
 def tutorial_script_for_save_load_predictor():
-    test_path = "./VOCdevkit/VOC2007/Annotations/coco_test.json"
+    test_path = "./VOCdevkit/VOC2007/Annotations/test_cocoformat.json"
     load_path = "/media/code/autogluon/examples/automm/object_detection/AutogluonModels/ag-20221104_185342"
 
     print("load a predictor from save path...")

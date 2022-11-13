@@ -21,6 +21,7 @@ from ..constants import (
     MMOCR_TEXT_DET,
     MMOCR_TEXT_RECOG,
     NER,
+    NER_TEXT,
     NUMERICAL,
     NUMERICAL_MLP,
     NUMERICAL_TRANSFORMER,
@@ -293,7 +294,7 @@ def create_model(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
         )
-    elif model_name.lower().startswith(NER):
+    elif model_name.lower().startswith(NER_TEXT):
         model = HFAutoModelForNER(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
