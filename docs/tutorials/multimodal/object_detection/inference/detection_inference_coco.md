@@ -128,9 +128,8 @@ df = from_coco_or_voc(test_path)[:10][["image"]]
 
 pred = predictor.predict(df)
 
-visualized = visualize_detection(
+visualize_detection(
     pred=pred,
-    data=df,
     detection_classes=predictor.get_predictor_classes(),
     conf_threshold=conf_threshold,
     visualization_result_dir=visualization_result_dir,
@@ -139,7 +138,10 @@ visualized = visualize_detection(
 plt.imshow(visualized[0][:, : ,::-1])  # shows the first image with bounding box
 ```
 Note that we took 10 images to visualize for this example. 
-Please consider your storage situation when deciding the number of images to visualize.
+Please consider your storage situation when deciding the number of images to visualize. 
+
+The `pred` parameter that `visualize_detection` function takes as input follows the form of a `pandas` `DataFrame`, same as in the `pred_df`. 
+Make sure you have the format when visualizing. 
 
 ### Other Examples
 

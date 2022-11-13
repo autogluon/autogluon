@@ -772,21 +772,18 @@ def get_detection_classes(sample_data_path):
 
 
 def visualize_detection(
-    pred: Iterable,
-    data: Union[pd.DataFrame, Dict],
+    pred: pd.DataFrame,
     detection_classes: List[str],
     conf_threshold: float,
     visualization_result_dir: str,
-) -> List[np.ndarray]:
+):
     """
     Visualize detection results for one image, and save to visualization_result_dir
 
     Parameters
     ----------
     pred
-        List containing detection results
-    data
-        The image info for the testing images
+        Detection results as in pd.DataFrame format
     detection_classes
         All classes for detection
     conf_threshold
@@ -805,25 +802,22 @@ def visualize_detection(
     if not os.path.exists(visualization_result_dir):
         os.makedirs(visualization_result_dir, exist_ok=True)
 
-    if isinstance(data, dict):
-        image_paths = data["image"]
-    else:
-        image_paths = data["image"].to_list()
-    idx2classname = {i: classname for (i, classname) in enumerate(detection_classes)}
+    classname2idx = {classname: i for i, classname in enumerate(detection_classes)}
+    idx2classname = {i: classname for i, classname in enumerate(detection_classes)}
+
     visualized_images = []
-    for image_pred, image_path in zip(pred, image_paths):
+    for i in range(len(pred)):
+        image_path = pred.iloc[i]["image"]
+        image_pred = pred.iloc[i]["bboxes"]
         im = cv2.imread(image_path)
         tlwhs = []
         obj_ids = []
         conf_scores = []
-        for idx, per_cls_bboxes in enumerate(image_pred):
-            for bbox in per_cls_bboxes:
-                ## x1, y1, x2, y2, conf_score
-                if bbox[4] > conf_threshold:
-                    tlwhs.append(bbox_xyxy_to_xywh(list(bbox[:4])))
-                    obj_ids.append(idx)
-                    conf_scores.append(bbox[4])
-
+        for data in image_pred:
+            if data["score"] > conf_threshold:
+                obj_ids.append(classname2idx[data["class"]])
+                tlwhs.append(bbox_xyxy_to_xywh(data["bbox"]))
+                conf_scores.append(data["score"])
         visualized_im = plot_detections(im, tlwhs, obj_ids, idx2classname, conf_threshold, scores=conf_scores)
         visualized_images.append(visualized_im)
         imgname = os.path.basename(image_path)
@@ -1056,9 +1050,10 @@ def save_result_df(
                 box_info.append({"class": pred_class, "bbox": list(bbox[:4]), "score": bbox[4]})
         results.append([image_name, box_info])
     result_df = pd.DataFrame(results, columns=["image", "bboxes"])
-    if result_path and os.path.exists(result_path):
+    if result_path:
         result_df.to_csv(result_path, index=False)
         logger.info("Saved detection results to {}".format(result_path))
+        print("Saved detection results to {}".format(result_path))
     return result_df
 
 

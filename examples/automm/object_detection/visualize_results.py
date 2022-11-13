@@ -59,7 +59,6 @@ def visualize_detection_results(
 
     visualize_detection(
         pred=pred,
-        data=df,
         detection_classes=predictor.get_predictor_classes(),
         conf_threshold=conf_threshold,
         visualization_result_dir=visualization_result_dir,
