@@ -74,7 +74,7 @@ model:
       # - "random_delete(0.05)"        # less than 0.1 based on eda paper
       # - "syn_replacement(0.05)"  # less than 0.1 based on eda paper
       # - "insert_punc(0.05)"
-  ner:
+  ner_text:
     checkpoint_name: "bert-base-cased"
     max_text_len: 512
     gradient_checkpointing: False

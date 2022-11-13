@@ -42,6 +42,7 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
         num_classes: Optional[int] = 0,
         pooling_mode: Optional[str] = "cls",
         gradient_checkpointing: Optional[bool] = False,
+        low_cpu_mem_usage: Optional[bool] = False,
         pretrained: Optional[bool] = True,
     ):
         """
@@ -62,11 +63,16 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
             The pooling mode to be used, it is not used in the NER task.
         gradient_checkpointing
             Whether to enable gradient checkpointing
+        low_cpu_mem_usage
+            Whether to turn on the optimization of reducing the peak CPU memory usage when loading the pretrained model.
         pretrained
             Whether using the pretrained weights. If pretrained=True, download the pretrained model.
         """
-        super().__init__(prefix, checkpoint_name, num_classes, pooling_mode, gradient_checkpointing, pretrained)
+        super().__init__(
+            prefix, checkpoint_name, num_classes, pooling_mode, gradient_checkpointing, low_cpu_mem_usage, pretrained
+        )
         logger.debug(f"initializing {checkpoint_name}")
+
         if self.config.model_type in {"gpt2", "roberta"}:
             # Refer to this PR: https://github.com/huggingface/transformers/pull/12116
             self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_name, add_prefix_space=True)

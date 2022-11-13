@@ -2651,6 +2651,11 @@ class MultiModalPredictor:
                 text_processors=data_processors[TEXT],
                 path=path,
             )
+        if NER in data_processors:
+            data_processors[NER] = save_text_tokenizers(
+                text_processors=data_processors[NER],
+                path=path,
+            )
 
         with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
             pickle.dump(data_processors, fp)
@@ -2834,6 +2839,11 @@ class MultiModalPredictor:
             if TEXT in data_processors:
                 data_processors[TEXT] = load_text_tokenizers(
                     text_processors=data_processors[TEXT],
+                    path=path,
+                )
+            if NER in data_processors:
+                data_processors[NER] = load_text_tokenizers(
+                    text_processors=data_processors[NER],
                     path=path,
                 )
             # backward compatibility. Add feature column names in each data processor.

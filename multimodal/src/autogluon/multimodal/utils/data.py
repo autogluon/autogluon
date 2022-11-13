@@ -20,6 +20,7 @@ from ..constants import (
     LABEL,
     NER,
     NER_ANNOTATION,
+    NER_TEXT,
     NUMERICAL,
     ROIS,
     TEXT,
@@ -209,7 +210,7 @@ def create_fusion_data_processors(
         else:
             data_types = None
 
-        if per_name == NER:
+        if per_name == NER_TEXT:
             # create a multimodal processor for NER.
             data_processors[NER].append(
                 create_data_processor(
