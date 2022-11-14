@@ -11,7 +11,7 @@ To start, let's import MultiModalPredictor:
 from autogluon.multimodal import MultiModalPredictor
 ```
 
-And install a few packages:
+Make sure `mmcv-full` and `mmdet` are installed:
 ```python .input
 !mim install mmcv-full
 !pip install mmdet
@@ -93,7 +93,7 @@ predictor.fit(
     train_path,
     hyperparameters={
         "optimization.learning_rate": 2e-4, # we use two stage and detection head has 100x lr
-        "optimization.max_epochs": 15,
+        "optimization.max_epochs": 30,
         "env.per_gpu_batch_size": 32,  # decrease it when model is large
     },
 )
