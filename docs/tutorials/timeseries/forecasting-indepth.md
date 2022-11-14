@@ -70,7 +70,7 @@ import pandas as pd
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 ```
 
-We download a subset of 1000 time series and the related metadata, similar to the Quickstart tutorial (click on the arrow to show the preprocessing code).
+We download a subset of 100 time series and the related metadata, similar to the Quickstart tutorial (click on the arrow to show the preprocessing code).
 
 .. raw:: html
 
@@ -165,7 +165,7 @@ We can force AutoGluon to interpret it a a categorical feature by changing the d
 ```python
 ts_dataframe.static_features["store_id"] = ts_dataframe.static_features["store_id"].astype("category")
 ```
-**Note:** because training data contained static features, the predictor will expect that data passed to `predictor.predict()`, `predictor.leaderboard()`, and `predictor.evaluate()` also includes static features with the exact same column names and data types.
+**Note:** If training data contained static features, the predictor will expect that data passed to `predictor.predict()`, `predictor.leaderboard()`, and `predictor.evaluate()` also includes static features with the exact same column names and data types.
 
 
 ### Known covariates
@@ -186,8 +186,6 @@ Examples of such covariates include:
 As an example, we will again use the M4 Daily dataset.
 
 ```{.python .input}
-prediction_length = 48
-
 ts_dataframe = TimeSeriesDataFrame.from_data_frame(
     pd.read_csv("m4_daily.csv", parse_dates=["Date"]),
     id_column="M4id",
@@ -206,6 +204,7 @@ ts_dataframe
 When creating the TimeSeriesPredictor, we specify that the column `"Value"` is our prediction target, and the
 column `"Weekend"` contains a covariate that will be known at prediction time.
 ```python
+prediction_length = 48
 predictor = TimeSeriesPredictor(
     prediction_length=prediction_length,
     target="Value",

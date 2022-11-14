@@ -27,7 +27,7 @@ To use `autogluon.timeseries`, we will only need the following two classes:
 - `TimeSeriesDataFrame` stores a dataset consisting of multiple time series.
 - `TimeSeriesPredictor` takes care of fitting, tuning and selecting the best forecasting models.
 
-We start by downloading the M4 Hourly dataset from the official website (click "Details" to show the code).
+We start by downloading the M4 Hourly dataset from the official website (click on the arrow to show the preprocessing code).
 
 .. raw:: html
 
@@ -112,7 +112,7 @@ We can also plot some of the time series in the dataset
 plt.figure(figsize=(20, 3))
 for item_id in ["H1", "H2"]:
     plt.plot(ts_dataframe.loc[item_id], label=item_id)
-plt.legend()
+plt.legend();
 ```
 
 ## Forecasting problem formulation
@@ -152,7 +152,7 @@ plt.fill_betweenx(
     label="Test forecast horizon",
 )
 
-plt.legend()
+plt.legend();
 ```
 
 
