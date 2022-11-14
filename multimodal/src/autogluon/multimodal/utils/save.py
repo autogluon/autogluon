@@ -5,6 +5,8 @@ from typing import Dict, List, Optional, Tuple, Union
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
+from autogluon.common.utils.utils import setup_outputdir
+
 from ..constants import AUTOMM, HF_MODELS, LAST_CHECKPOINT
 from ..data import TextProcessor
 
@@ -109,6 +111,47 @@ def process_save_path(path, resume: Optional[bool] = False, raise_if_exist: Opti
                 "Specify a new path to avoid accidentally overwriting a saved predictor."
             )
         else:
+            logger.warning(
+                "A new predictor save path is created."
+                "This is to prevent you to overwrite previous predictor saved here."
+                "You could check current save path at predictor._save_path."
+                "If you still want to use this path, set resume=True"
+            )
             path = None
 
     return path
+
+
+def setup_save_path(
+    resume: Optional[bool] = None,
+    old_save_path: Optional[str] = None,
+    proposed_save_path: Optional[str] = None,
+    hyperparameter_tune_kwargs: Optional[dict] = None,
+    warn_if_exist: Optional[bool] = True,
+    raise_if_exist: Optional[bool] = False,
+    model_loaded: Optional[bool] = None,
+    fit_called: Optional[bool] = None,
+):
+    rank = int(os.environ.get("LOCAL_RANK", 0))
+    save_path = None
+    if resume:
+        assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
+        save_path = process_save_path(path=old_save_path, resume=True)
+    elif proposed_save_path is not None:  # TODO: distinguish DDP and existed predictor
+        save_path = process_save_path(path=proposed_save_path, raise_if_exist=(raise_if_exist and rank == 0))
+    elif old_save_path is not None:
+        if model_loaded or fit_called:
+            save_path = process_save_path(path=old_save_path, raise_if_exist=False)
+        else:
+            save_path = os.path.abspath(os.path.expanduser(old_save_path))
+
+    if not resume:
+        save_path = setup_outputdir(
+            path=save_path,
+            warn_if_exist=warn_if_exist,
+        )
+
+    save_path = os.path.abspath(os.path.expanduser(save_path))
+    logger.debug(f"save path: {save_path}")
+
+    return save_path

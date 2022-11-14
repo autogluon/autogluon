@@ -266,6 +266,13 @@ class ThetaModel(AbstractLocalModel):
     as multi-CPU training and reducing the disk usage when saving models.
 
 
+    References
+    ----------
+    Assimakopoulos, Vassilis, and Konstantinos Nikolopoulos.
+    "The theta model: a decomposition approach to forecasting."
+    International journal of forecasting 16.4 (2000): 521-530.
+
+
     Other Parameters
     ----------------
     deseasonalize : bool, default = True

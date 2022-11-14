@@ -1478,7 +1478,7 @@ class TabularPredictor:
         return self._learner.evaluate_predictions(y_true=y_true, y_pred=y_pred, sample_weight=sample_weight, silent=silent,
                                                   auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
-    def leaderboard(self, data=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, silent=False):
+    def leaderboard(self, data=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, skip_score=False, silent=False):
         """
         Output summary of information about models produced during `fit()` as a :class:`pd.DataFrame`.
         Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
@@ -1590,6 +1590,10 @@ class TabularPredictor:
             At minimum this will include the model with the highest score and the model with the lowest inference time.
             This is useful when deciding which model to use during inference if inference time is a consideration.
             Models filtered out by this process would never be optimal choices for a user that only cares about model inference time and score.
+        skip_score : bool, default = False
+            [Advanced, primarily for developers]
+            If `True`, will skip computing `score_test` if `data` is specified. `score_test` will be set to NaN for all models.
+            `pred_time_test` and related columns will still be computed.
         silent : bool, default = False
             Should leaderboard DataFrame be printed?
 
@@ -1600,7 +1604,7 @@ class TabularPredictor:
         self._assert_is_fit('leaderboard')
         data = self.__get_dataset(data) if data is not None else data
         return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
-                                         only_pareto_frontier=only_pareto_frontier, silent=silent)
+                                         only_pareto_frontier=only_pareto_frontier, skip_score=skip_score, silent=silent)
 
     def fit_summary(self, verbosity=3, show_plot=False):
         """
@@ -3126,9 +3130,6 @@ class TabularPredictor:
             # private
             _save_bag_folds=None,
 
-            # quantile levels
-            quantile_levels=None,
-
             calibrate='auto',
 
             # pseudo label
@@ -3148,7 +3149,7 @@ class TabularPredictor:
                 public_kwarg_options = [kwarg for kwarg in allowed_kwarg_names if kwarg[0] != '_']
                 public_kwarg_options.sort()
                 raise ValueError(
-                    f"Unknown keyword argument specified: {kwarg_name}\nValid kwargs: {public_kwarg_options}")
+                    f"Unknown `.fit` keyword argument specified: '{kwarg_name}'\nValid kwargs: {public_kwarg_options}")
 
         kwargs_sanitized = fit_extra_kwargs_default.copy()
         kwargs_sanitized.update(kwargs)
@@ -3226,6 +3227,17 @@ class TabularPredictor:
             tuning_features = np.array(tuning_features)
             if np.any(train_features != tuning_features):
                 raise ValueError("Column names must match between training and tuning data")
+
+            if self.label in tuning_data:
+                train_label_type = train_data[self.label].dtype
+                tuning_label_type = tuning_data[self.label].dtype
+
+                if train_label_type != tuning_label_type:
+                    logger.warning(f'WARNING: train_data and tuning_data have mismatched label column dtypes! '
+                                   f'train_label_type={train_label_type}, tuning_data_type={tuning_label_type}.\n'
+                                   f'\tYou should ensure the dtypes match to avoid bugs or instability.\n'
+                                   f'\tAutoGluon will attempt to convert the dtypes to align.')
+
         if unlabeled_data is not None:
             if not isinstance(unlabeled_data, pd.DataFrame):
                 raise AssertionError(

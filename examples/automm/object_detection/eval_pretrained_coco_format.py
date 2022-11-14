@@ -8,7 +8,7 @@ An example to evaluate a pretrained model on COCO dataset:
 
 An example to evaluate a pretrained model on VOC dataset (COCO format):
     python eval_pretrained_coco_format.py \
-        --test_path VOCdevkit/VOCCOCO/voc07_test.json \
+        --test_path ./VOCdevkit/VOC2007/Annotations/test_cocoformat.json \
         --checkpoint_name faster_rcnn_r50_fpn_1x_voc0712
 """
 
@@ -46,7 +46,7 @@ def eval_pretrained_coco_format(
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
         },
-        pipeline="object_detection",
+        problem_type="object_detection",
     )
 
     result = predictor.evaluate(test_path)

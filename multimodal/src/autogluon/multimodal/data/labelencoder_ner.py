@@ -22,7 +22,7 @@ class NerLabelEncoder:
 
     def __init__(self, config: DictConfig, entity_map: Optional[dict] = None):
         self.entity_map = entity_map
-        model_config = config.model.ner
+        model_config = config.model.ner_text
         self.ner_special_tags = OmegaConf.to_object(model_config.special_tags)
         self.prefix = config.model.names[0]
         self.b_prefix = "B-"

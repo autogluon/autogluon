@@ -1,4 +1,4 @@
-# Text-to-Text Matching with AutoMM 
+# Text-to-Text Semantic Matching with AutoMM 
 :label:`text2text_matching`
 
 Computing the similarity between two sentences/passages is a common task in NLP, with several practical applications such as web search, question answering, documents deduplication, plagiarism comparison, natural language inference, recommendation engines, etc. In general, text similarity models will take two sentences/passages as input and transform them into vectors, and then similarity scores calculated using cosine similarity, dot product, or Euclidean distances are used to measure how alike or different of the two text pieces. 
@@ -27,26 +27,25 @@ snli_train.head()
 
 Ideally, we want to obtain a model that can return high/low scores for positive/negative text pairs. Traditional text similarity methods only work on a lexical level without taking the semantic aspect into account, for example, using term frequency or tf-idf vectors. With AutoMM, we can easily train a model that captures the semantic relationship between sentences. Bascially, it uses [BERT](https://arxiv.org/abs/1810.04805) to project each sentence into a high-dimensional vector and treat the matching problem as a classification problem following the design in [sentence transformers](https://www.sbert.net/). 
 
-With AutoMM, you just need to specify the query, response, and label column names and fit the model on the training dataset without worrying the implementation details.
+With AutoMM, you just need to specify the query, response, and label column names and fit the model on the training dataset without worrying the implementation details. Note that the labels should be binary, and we need to specify the `match_label`, which means two sentences have the same semantic meaning. In practice, your tasks may have different labels, e.g., duplicate or not duplicate. You may need to define the `match_label` by considering your specific task contexts.
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.constants import BINARY, MULTICLASS, QUERY, RESPONSE, UNIFORM_SOUP
 
 # Initialize the model
-matcher = MultiModalPredictor(
-        pipeline="text_similarity",
+predictor = MultiModalPredictor(
+        problem_type="text_similarity",
         query="premise", # the column name of the first sentence
         response="hypothesis", # the column name of the second sentence
         label="label", # the label column name
+        match_label=1, # the label indicating that query and response have the same semantic meanings.
         eval_metric='auc', # the evaluation metric
     )
 
 # Fit the model
-matcher.fit(
+predictor.fit(
     train_data=snli_train,
     time_limit=180,
-    save_path="text_matcher",
 )
 ```
 
@@ -54,7 +53,7 @@ matcher.fit(
 You can evaluate the macther on the test dataset to see how it performs with the roc_auc score:
 
 ```{.python .input}
-score = matcher.evaluate(snli_test)
+score = predictor.evaluate(snli_test)
 print("evaluation score: ", score)
 ```
 
@@ -64,9 +63,26 @@ We create a new sentence pair with similar meaning (expected to be predicted as 
 pred_data = pd.DataFrame.from_dict({"premise":["The teacher gave his speech to an empty room."], 
                                     "hypothesis":["There was almost nobody when the professor was talking."]})
 
-predictions = matcher.predict(pred_data)
+predictions = predictor.predict(pred_data)
 print('Predicted entities:', predictions[0])
 ```
+
+## Predict Matching Probabilities
+We can also compute the matching probabilities of sentence pairs.
+```{.python .input}
+probabilities = predictor.predict_proba(pred_data)
+print(probabilities)
+```
+
+## Extract Embeddings
+Moreover, we support extracting embeddings separately for two sentence groups.
+```{.python .input}
+embeddings_1 = predictor.extract_embedding({"premise":["The teacher gave his speech to an empty room."]})
+print(embeddings_1.shape)
+embeddings_2 = predictor.extract_embedding({"hypothesis":["There was almost nobody when the professor was talking."]})
+print(embeddings_2.shape)
+```
+
 
 ## Other Examples
 

@@ -89,6 +89,12 @@ print(feature[0].shape)
 
 The trained predictor is automatically saved at the end of `fit()`, and you can easily reload it.
 
+:::warning
+
+`MultiModalPredictor.load()` used `pickle` module implicitly, which is known to be insecure. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling. Never load data that could have come from an untrusted source, or that could have been tampered with. **Only load data you trust.**
+
+:::
+
 ```{.python .input}
 loaded_predictor = MultiModalPredictor.load('automm_imgcls')
 load_proba = loaded_predictor.predict_proba({'image': [image_path]})

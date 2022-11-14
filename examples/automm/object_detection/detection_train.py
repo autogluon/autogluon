@@ -16,8 +16,8 @@ An example to finetune an MMDetection model on VOC:
     https://github.com/open-mmlab/mmdetection/blob/9d3e162459590eee4cfc891218dfbb5878378842/tools/dataset_converters/pascal_voc.py
     Then, run:
     python detection_train.py \
-        --train_path /media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_trainval.json \
-        --test_path /media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_test.json \
+        --train_path ./VOCdevkit/VOC2007/Annotations/cocotrain.json \
+        --test_path ./VOCdevkit/VOC2007/Annotations/test_cocoformat.json \
         --checkpoint_name yolov3_mobilenetv2_320_300e_coco \
         --num_classes 20 \
         --lr <learning_rate> \
@@ -32,7 +32,7 @@ import argparse
 import os
 
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.utils import get_voc_classes
+from autogluon.multimodal.utils import get_detection_classes
 
 
 def detection_train(
@@ -56,7 +56,7 @@ def detection_train(
     eval_tool = None
     VOC_format = False
     if os.path.isdir(train_path):
-        classes = get_voc_classes(train_path)
+        classes = get_detection_classes(train_path)
         eval_tool = "torchmetrics"
         VOC_format = True
 
@@ -65,11 +65,11 @@ def detection_train(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
+            "optimization.val_metric": val_metric,
         },
-        pipeline="object_detection",
+        problem_type="object_detection",
         num_classes=num_classes,
         classes=classes,
-        val_metric=val_metric,
     )
 
     import time
@@ -79,7 +79,7 @@ def detection_train(
         train_path,
         tuning_data=val_path,
         hyperparameters={
-            "optimization.learning_rate": lr/100, # we use two stage and lr_mult=100 for detection
+            "optimization.learning_rate": lr / 100,  # we use two stage and lr_mult=100 for detection
             "optimization.max_epochs": epochs,
             "env.per_gpu_batch_size": per_gpu_batch_size,  # decrease it when model is large
         },
@@ -96,7 +96,7 @@ def detection_train(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--train_path", default="/media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_trainval.json", type=str
+        "--train_path", default="./VOCdevkit/VOC2007/Annotations/train_cocoformat.json", type=str
     )
     parser.add_argument("--val_path", default=None, type=str)
     parser.add_argument("--test_path", default=None, type=str)

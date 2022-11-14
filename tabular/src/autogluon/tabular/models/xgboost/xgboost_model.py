@@ -7,6 +7,7 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
+from autogluon.core.utils import ResourceManager
 from autogluon.core.utils import try_import_xgboost
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
 
@@ -206,9 +207,8 @@ class XGBoostModel(AbstractModel):
 
     @disable_if_lite_mode(ret=(1, 0))
     def _get_default_resources(self):
-        import psutil
-        # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
-        num_cpus = psutil.cpu_count(logical=False)
+        # logical=False is faster in training
+        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
         num_gpus = 0
         return num_cpus, num_gpus
 

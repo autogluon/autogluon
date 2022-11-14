@@ -20,6 +20,7 @@ from ..constants import (
     LABEL,
     NER,
     NER_ANNOTATION,
+    NER_TEXT,
     NUMERICAL,
     ROIS,
     TEXT,
@@ -150,6 +151,7 @@ def create_data_processor(
     elif data_type == NER:
         data_processor = NerProcessor(
             model=model,
+            max_len=model_config.max_text_len,
         )
     else:
         raise ValueError(f"unknown data type: {data_type}")
@@ -208,7 +210,7 @@ def create_fusion_data_processors(
         else:
             data_types = None
 
-        if per_name == NER:
+        if per_name == NER_TEXT:
             # create a multimodal processor for NER.
             data_processors[NER].append(
                 create_data_processor(

@@ -11,11 +11,10 @@ from pandas import DataFrame, Series
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.utils import get_autogluon_metadata
-from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
+from autogluon.core.utils import ResourceManager
 from autogluon.core.utils import try_import_lightgbm
 
 from . import lgb_utils
@@ -224,12 +223,8 @@ class LGBModel(AbstractModel):
         # FIXME This is a HACK. Passing in value -1, 0, or None will only use 1 cores. Need to pass in a large number instead
         if num_cpus == 0:
             # TODO Avoid using psutil when lgb fixed the mem leak.
-            # psutil.cpu_count() is faster in inference than psutil.cpu_count(logical=False)
-            if get_autogluon_metadata()["lite"]:
-                num_cpus = 1
-            else:
-                import psutil
-                num_cpus = psutil.cpu_count()
+            # logical=True is faster in inference
+            num_cpus = ResourceManager.get_cpu_count_psutil(logical=True)
         if self.problem_type == REGRESSION:
             return self.model.predict(X, num_threads=num_cpus)
 
@@ -357,11 +352,9 @@ class LGBModel(AbstractModel):
             minimum_resources['num_gpus'] = 0.5
         return minimum_resources
 
-    @disable_if_lite_mode(ret=(1, 0))
     def _get_default_resources(self):
-        import psutil
-        # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
-        num_cpus = psutil.cpu_count(logical=False)
+        # logical=False is faster in training
+        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
         num_gpus = 0
         return num_cpus, num_gpus
 

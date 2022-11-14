@@ -102,3 +102,12 @@ function install_all {
     install_eda
     install_autogluon
 }
+
+function build_all {
+    for module in common core features tabular multimodal text vision timeseries autogluon
+    do
+        cd "$module"/
+        python setup.py sdist bdist_wheel
+        cd ..
+    done
+}

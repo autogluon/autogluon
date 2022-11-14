@@ -9,6 +9,7 @@ from .config import (
     parse_dotlist_conf,
     save_pretrained_model_configs,
     update_config_by_rules,
+    update_tabular_config_by_resources,
 )
 from .data import (
     assign_feature_column_names,
@@ -49,9 +50,12 @@ from .object_detection import (
     from_voc,
     get_detection_classes,
     get_image_name_num,
-    get_voc_classes,
     getCOCOCatIDs,
+    save_result_coco_format,
+    save_result_df,
+    save_result_voc_format,
+    visualize_detection,
 )
 from .onnx import get_onnx_input
 from .pipeline import init_pretrained, init_pretrained_matcher
-from .save import process_save_path, save_pretrained_model_configs, save_text_tokenizers
+from .save import process_save_path, save_pretrained_model_configs, save_text_tokenizers, setup_save_path

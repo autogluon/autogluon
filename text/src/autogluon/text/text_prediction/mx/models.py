@@ -29,7 +29,7 @@ from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.utils import in_ipynb
-from autogluon.core.utils.utils import get_cpu_count, get_gpu_count_mxnet
+from autogluon.core.utils.utils import ResourceManager
 from autogluon.core.utils.loaders import load_pd
 from autogluon.core.task.base import compile_scheduler_options_v2
 from autogluon.core.metrics import get_metric
@@ -779,18 +779,18 @@ def get_recommended_resource(nthreads_per_trial=None,
     ngpus_per_trial
     """
     if nthreads_per_trial is None and ngpus_per_trial is None:
-        nthreads_per_trial = get_cpu_count()
+        nthreads_per_trial = ResourceManager.get_cpu_count()
         ngpus_per_trial = 1
     elif nthreads_per_trial is not None and ngpus_per_trial is None:
         ngpus_per_trial = 1
     elif nthreads_per_trial is None and ngpus_per_trial is not None:
         if ngpus_per_trial != 0:
-            num_parallel_jobs = get_gpu_count_mxnet() // ngpus_per_trial
-            nthreads_per_trial = max(get_cpu_count() // num_parallel_jobs, 1)
+            num_parallel_jobs = ResourceManager.get_gpu_count_mxnet() // ngpus_per_trial
+            nthreads_per_trial = max(ResourceManager.get_cpu_count() // num_parallel_jobs, 1)
         else:
-            nthreads_per_trial = get_cpu_count()
-    nthreads_per_trial = min(nthreads_per_trial, get_cpu_count())
-    ngpus_per_trial = min(ngpus_per_trial, get_gpu_count_mxnet())
+            nthreads_per_trial = ResourceManager.get_cpu_count()
+    nthreads_per_trial = min(nthreads_per_trial, ResourceManager.get_cpu_count())
+    ngpus_per_trial = min(ngpus_per_trial, ResourceManager.get_gpu_count_mxnet())
     assert nthreads_per_trial > 0 and ngpus_per_trial >= 0,\
         'Invalid number of threads and number of GPUs.'
     return nthreads_per_trial, ngpus_per_trial
