@@ -59,25 +59,25 @@ Object Detection
 
    .. card::
       :title: Quick Start on a Tiny COCO Format Dataset
-      :link: quick_start/quick_start_coco.html
+      :link: object_detection/quick_start/quick_start_coco.html
 
       How to train high quality object detection model with MultiModalPredictor in under 5 minutes on COCO format dataset.
 
    .. card::
       :title: Fast Finetune on COCO Format Dataset
-      :link: finetune/detection_fast_finetune_coco.html
+      :link: object_detection/finetune/detection_fast_finetune_coco.html
 
       How to fast finetune a pretrained model on a dataset in COCO format.
 
    .. card::
       :title: Evaluate Pretrained YOLOv3 on COCO Format Dataset
-      :link: inference/detection_eval_yolov3_coco.html
+      :link: object_detection/inference/detection_eval_yolov3_coco.html
 
       How to evaluate the very fast pretrained YOLOv3 model on dataset in COCO format.
 
    .. card::
       :title: Load A Trained Detector
-      :link: inference/detection_load_predictor.html
+      :link: object_detection/inference/detection_load_predictor.html
 
       How to load and evaluate a trained predictor.
 

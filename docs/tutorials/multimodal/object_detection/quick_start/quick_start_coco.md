@@ -1,5 +1,5 @@
 # AutoMM Detection - Quick Start on a Tiny COCO Format Dataset
-:label:`sec_automm_detection_fast_finetune_coco`
+:label:`sec_automm_detection_quick_start_coco`
 
 In this section, our goal is to fast finetune a pretrained model on a small dataset in COCO format, 
 and evaluate on its test set. Both training and test sets are in COCO format.

@@ -4,7 +4,7 @@ Inference
 
    .. card::
       :title: Load A Trained Detector
-      :link: inference/detection_load_predictor.html
+      :link: detection_load_predictor.html
 
       How to load and evaluate a trained predictor
 
