@@ -186,6 +186,7 @@ Examples of such covariates include:
 As an example, we will again use the M4 Daily dataset.
 
 ```{.python .input}
+prediction_length = 48
 ts_dataframe = TimeSeriesDataFrame.from_data_frame(
     pd.read_csv("m4_daily.csv", parse_dates=["Date"]),
     id_column="M4id",
@@ -204,7 +205,6 @@ ts_dataframe
 When creating the TimeSeriesPredictor, we specify that the column `"Value"` is our prediction target, and the
 column `"Weekend"` contains a covariate that will be known at prediction time.
 ```python
-prediction_length = 48
 predictor = TimeSeriesPredictor(
     prediction_length=prediction_length,
     target="Value",
