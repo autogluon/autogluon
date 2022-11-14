@@ -78,6 +78,7 @@ To evaluate the pretrained Faster R-CNN model we loaded, run:
 
 ```python
 result = predictor.evaluate(test_path)
+print(result)
 ```
 
 Here the test set is selected automatically in `predictor.evaluate`.
