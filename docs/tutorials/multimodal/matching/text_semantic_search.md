@@ -70,13 +70,13 @@ doc_data.head(1)
 There are 323 queries, 3633 documents, and 12334 relevance scores in the dataset.
 
 
-### 3. `NDCG@10` Evaluation
+### 3. `NDCG` Evaluation
 
 Users pay the most attention to the first result, then the second, and etc. 
 As a result, precision matters the most for the top-ranked results. 
 In this tutorial, we use **Normalized Discounted Cumulative Gain (NDCG)** for measuring the ranking performance.
 
-#### 3.1 Defining CG, DCG, IDCG and NDCG fomulas
+#### 3.1 CG, DCG, IDCG and NDCG Formulas
 
 In order to understand the NDCG metric, we must first understand CG (Cumulative Gain) and DCG (Discounted Cumulative Gain), as well as understanding the two assumptions that we make when we use DCG and its related measures:
 
@@ -109,7 +109,7 @@ cutoffs = [5, 10, 20]
 BM25 (or Okapi BM25) is a popular ranking algorithm currently used by OpenSearch for scoring document relevancy to a query. 
 We will use BM25's NDCG scores as baselines in this tutorial.
 
-#### 4.1 Defining the formula
+#### 4.1 Define the formula
 
 $$ score_{BM25} = \sum_i^n \mathrm{IDF}(q_i) \frac{f(q_i, D) \cdot (k1 + 1)}{f(q_i, D) + k1 \cdot (1 - b + b \cdot \frac{fieldLen}{avgFieldLen})}$$
 
@@ -123,7 +123,7 @@ $b$ is another hyperparameter variable that determines the effect of document le
 
 In this tutorial, we will be using the package `rank_bm25` to avoid the complexity of implementing the algorithm from scratch.
 
-#### 4.2 Defining functions
+#### 4.2 Define functions
 
 
 ```{.python .input}
@@ -261,7 +261,7 @@ $$ normalized\_BM25(q_i, D_j) = \frac{\textsf{BM25}(q_i,D_j) - \min_{a\in \mathc
 
 and $\beta$ is a tunable parameter, which we will default to $0.3$ in our tutorial.
 
-#### 6.1 Defining functions
+#### 6.1 Define functions
 
 
 ```{.python .input}
