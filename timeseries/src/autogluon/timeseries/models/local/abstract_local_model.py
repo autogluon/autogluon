@@ -96,7 +96,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         self._fit_and_cache_predictions(data, quantile_levels=quantile_levels)
         item_id_to_prediction = {}
-        for item_id, ts_hash in hash_ts_dataframe_items(data).iteritems():
+        for item_id, ts_hash in hash_ts_dataframe_items(data).items():
             item_id_to_prediction[item_id] = self._cached_predictions[ts_hash]
         predictions_df = pd.concat(item_id_to_prediction)
         predictions_df.index.rename([ITEMID, TIMESTAMP], inplace=True)
@@ -104,9 +104,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
     def _fit_and_cache_predictions(self, data: TimeSeriesDataFrame, quantile_levels: List[float]):
         data_hash = hash_ts_dataframe_items(data)
-        items_to_fit = [
-            item_id for item_id, ts_hash in data_hash.iteritems() if ts_hash not in self._cached_predictions
-        ]
+        items_to_fit = [item_id for item_id, ts_hash in data_hash.items() if ts_hash not in self._cached_predictions]
         if len(items_to_fit) > 0:
             logger.debug(f"{self.name} received {len(items_to_fit)} new items to predict, generating predictions")
             time_series_to_fit = [data.loc[item_id][self.target] for item_id in items_to_fit]

@@ -19,11 +19,13 @@ class EarlyStoppingCustom(EarlyStopping):
        If int, The possible number of rounds without the trend occurrence.
        If tuple, contains early stopping class as first element and class init kwargs as second element.
     """
-    def __init__(self, rounds, time_limit=None, start_time=None, verbose=False, **kwargs):
+    def __init__(self, rounds, time_limit=None, start_time=None, verbose=False, min_delta=2e-6, **kwargs):
         if rounds is None:
             # Disable early stopping via rounds
             rounds = 999999
-        super().__init__(rounds=999999, **kwargs)
+        # Add a tiny min_delta so training doesn't go on for extremely long if only tiny improvements are being made
+        #  (can occur when validation error is almost 0, such as val log_loss <0.00005)
+        super().__init__(rounds=999999, min_delta=min_delta, **kwargs)
         if isinstance(rounds, int):
             self.es = SimpleES(patience=rounds)
         else:

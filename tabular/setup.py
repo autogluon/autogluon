@@ -45,12 +45,13 @@ extras_require = {
         'lightgbm>=3.3,<3.4',
     ],
     'catboost': [
-        'catboost>=1.0,<1.1',
+        'catboost>=1.0,<1.2',
     ],
     # FIXME: Debug why xgboost 1.6 has 4x+ slower inference on multiclass datasets compared to 1.4
     #  It is possibly only present on MacOS, haven't tested linux.
+    # XGBoost made API breaking changes in 1.6 with custom metric and callback support, so we don't support older versions.
     'xgboost': [
-        'xgboost>=1.4,<1.5' if not ag.LITE_MODE else 'xgboost',
+        'xgboost>=1.6,<1.8',
     ],
     'fastai': [
         'torch>=1.0,<1.13',

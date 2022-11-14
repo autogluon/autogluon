@@ -18,10 +18,10 @@ PYTHON_REQUIRES = '>=3.7, <3.10' if not LITE_MODE else '>=3.7, <3.11'
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
     # note: if python 3.7 is used, the open CVEs are present: CVE-2021-41496 | CVE-2021-34141; fixes are available in 1.22.x, but python 3.8 only
-    'numpy': '>=1.21,<1.23',
-    'pandas': '>=1.2.5,!=1.4.0,<1.5',
-    'scikit-learn': '>=1.0.0,<1.1',
-    'scipy': '>=1.5.4,<1.8.0',
+    'numpy': '>=1.21,<1.24',
+    'pandas': '>=1.2.5,!=1.4.0,<1.6',
+    'scikit-learn': '>=1.0.0,<1.2',
+    'scipy': '>=1.5.4,<1.10.0',
     'psutil': '>=5.7.3,<6',
     'gluoncv': '>=0.10.5,<0.10.6',
     'tqdm': '>=4.38.0',

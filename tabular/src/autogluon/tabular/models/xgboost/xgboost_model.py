@@ -49,7 +49,7 @@ class XGBoostModel(AbstractModel):
     def get_eval_metric(self):
         eval_metric = xgboost_utils.convert_ag_metric_to_xgbm(ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type)
         if eval_metric is None:
-            eval_metric = xgboost_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric.needs_pred, problem_type=self.problem_type)
+            eval_metric = xgboost_utils.func_generator(metric=self.stopping_metric, problem_type=self.problem_type)
         return eval_metric
 
     def _preprocess(self, X, is_train=False, max_category_levels=None, **kwargs):
@@ -99,7 +99,10 @@ class XGBoostModel(AbstractModel):
         num_rows_train = X.shape[0]
 
         eval_set = []
-        eval_metric = self.get_eval_metric()
+        if 'eval_metric' not in params:
+            eval_metric = self.get_eval_metric()
+            if eval_metric is not None:
+                params['eval_metric'] = eval_metric
 
         if X_val is None:
             early_stopping_rounds = None
@@ -121,25 +124,22 @@ class XGBoostModel(AbstractModel):
         try_import_xgboost()
         from .callbacks import EarlyStoppingCustom
         from xgboost.callback import EvaluationMonitor
-        callbacks = []
-        if eval_set is not None:
+        if eval_set is not None and 'callbacks' not in params:
+            callbacks = []
             if log_period is not None:
                 callbacks.append(EvaluationMonitor(period=log_period))
             callbacks.append(EarlyStoppingCustom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
+            params['callbacks'] = callbacks
 
         import xgboost
         from xgboost import XGBClassifier, XGBRegressor
         model_type = XGBClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else XGBRegressor
-        if 'eval_metric' not in params and params.get('objective') == 'binary:logistic' and xgboost.__version__ == '1.3.0':
-            # avoid unnecessary warning from XGBoost v1.3.0
-            params['eval_metric'] = 'logloss'
         self.model = model_type(**params)
         self.model.fit(
             X=X,
             y=y,
             eval_set=eval_set,
             verbose=False,
-            callbacks=callbacks,
             sample_weight=sample_weight
         )
 
@@ -148,6 +148,8 @@ class XGBoostModel(AbstractModel):
         # bst.set_param({"predictor": "gpu_predictor"})
 
         self.params_trained['n_estimators'] = bst.best_ntree_limit
+        # Don't save the callback or eval_metric objects
+        self.model.set_params(callbacks=None, eval_metric=None)
 
     def _predict_proba(self, X, num_cpus=-1, **kwargs):
         X = self.preprocess(X, **kwargs)
