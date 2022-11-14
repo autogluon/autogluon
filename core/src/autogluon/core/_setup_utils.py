@@ -3,7 +3,6 @@
 # Refer to https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/_min_dependencies.py for original implementation
 
 import os
-from wheel.bdist_wheel import bdist_wheel
 
 AUTOGLUON = 'autogluon'
 PACKAGE_NAME = os.getenv('AUTOGLUON_PACKAGE_NAME', AUTOGLUON)
