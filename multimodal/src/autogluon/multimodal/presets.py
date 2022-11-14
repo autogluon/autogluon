@@ -375,6 +375,12 @@ def high_quality_fast_inference_image_text_similarity():
 
 @automm_presets.register()
 @matcher_presets.register()
+def image_text_similarity():
+    return automm_presets.create("medium_quality_faster_inference_image_text_similarity")
+
+
+@automm_presets.register()
+@matcher_presets.register()
 def medium_quality_faster_inference_image_text_similarity():
     return {
         "model.names": ["clip"],
@@ -386,15 +392,34 @@ def medium_quality_faster_inference_image_text_similarity():
 
 
 @automm_presets.register()
-@matcher_presets.register()
-def image_text_similarity():
-    return automm_presets.create("medium_quality_faster_inference_image_text_similarity")
+def best_quality_ner():
+    return {
+        "model.names": ["ner_text"],
+        "model.ner_text.checkpoint_name": "google/flan-t5-base",
+        "env.precision": "bf16",
+    }
+
+
+@automm_presets.register()
+def medium_quality_faster_inference_ner():
+    return {
+        "model.names": ["ner_text"],
+        "model.ner_text.checkpoint_name": "google/flan-t5-small",
+        "env.precision": "bf16",
+    }
+
+
+@automm_presets.register()
+def high_quality_fast_inference_ner():
+    return {
+        "model.names": ["ner_text"],
+        "model.ner_text.checkpoint_name": "bert-base-cased",
+    }
 
 
 def list_automm_presets(verbose: bool = False):
     """
     List all available presets.
-
     Returns
     -------
     A list of presets.
@@ -413,12 +438,10 @@ def list_automm_presets(verbose: bool = False):
 def get_basic_automm_config(extra: Optional[List[str]] = None):
     """
     Get the basic config of AutoMM.
-
     Parameters
     ----------
     extra
         A list of extra config keys.
-
     Returns
     -------
     A dict config with keys: MODEL, DATA, OPTIMIZATION, ENVIRONMENT, and their default values.
@@ -439,12 +462,10 @@ def get_basic_automm_config(extra: Optional[List[str]] = None):
 def get_automm_presets(presets: str):
     """
     Map a AutoMM preset string to its config including a basic config and an overriding dict.
-
     Parameters
     ----------
     presets
         Name of a preset.
-
     Returns
     -------
     basic_config

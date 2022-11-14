@@ -1,6 +1,34 @@
 Object Detection
 =========
 
+Pre-requisite
+-------------
+All detection modules depend on ``mmcv-full`` and ``mmdet`` packages.
+
+
+To install ``mmcv-full``, run:
+
+    ``mim install mmcv-full``
+
+To install ``mmdet``, run:
+
+    ``pip install mmdet``
+
+For additional support, please refer to official instructions for mmdet_ and mmcv-full_
+
+.. _mmdet: https://mmdetection.readthedocs.io/en/v2.2.1/install.html
+.. _mmcv-full: https://mmcv.readthedocs.io/en/latest/get_started/installation.html
+
+Quick Start
+------------------
+.. container:: cards
+
+   .. card::
+      :title: Quick Start on a Tiny COCO Format Dataset
+      :link: quick_start/quick_start_coco.html
+
+      How to train high quality object detection model with MultiModalPredictor in under 5 minutes on COCO format dataset.
+
 
 Quick Start
 ------------------

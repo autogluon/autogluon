@@ -28,8 +28,6 @@ class LabelProcessor:
         self.prefix = model.prefix
         self.tokenizer = None
         self.model = model
-        if self.prefix == NER:
-            self.tokenizer = model.tokenizer
 
     @property
     def label_key(self):
@@ -66,17 +64,10 @@ class LabelProcessor:
         -------
         A dictionary containing one sample's label.
         """
-        if self.prefix == NER:
-            ner_annotation = labels[NER_ANNOTATION]
-            ner_text = labels[TEXT]
-            # online label generation
-            return {
-                self.label_key: process_ner_annotations(ner_annotation, ner_text, self.tokenizer),
-            }
-        else:
-            return {
-                self.label_key: labels[next(iter(labels))],  # get the first key's value
-            }
+
+        return {
+            self.label_key: labels[next(iter(labels))],  # get the first key's value
+        }
 
     def __call__(
         self,

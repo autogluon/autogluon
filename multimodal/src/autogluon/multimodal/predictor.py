@@ -281,9 +281,8 @@ class MultiModalPredictor:
         match_label
             The label class that indicates the <query, response> pair is counted as "match".
             This is used when the problem_type is one of the matching problem types, and when the labels are binary.
-            For example, the label column can contain ["match", "not match"]. And match_label can be "match".
-            It is similar as the "pos_label" in F1-score: https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html
-            Internally, we will set match_label to self.class_labels[1] by default.
+            For example, the label column can contain ["duplicate", "not duplicate"]. And match_label can be "duplicate".
+            If match_label is not provided, every sample is assumed to have a unique label.
         pipeline
             Pipeline has been deprecated and merged in problem_type.
         presets
@@ -429,6 +428,12 @@ class MultiModalPredictor:
             )
         else:
             self._save_path = None
+
+        if self._problem_type == OBJECT_DETECTION:
+            warnings.warn(
+                "Running object detection. Make sure that you have installed mmdet and mmcv-full, "
+                "by running 'mim install mmcv-full' and 'pip install mmdet'"
+            )
 
         if self._problem_type is not None:
             if problem_property_dict.get(self._problem_type).is_matching:
@@ -2293,8 +2298,7 @@ class MultiModalPredictor:
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
         seed: Optional[int] = 123,
-        save_results: Optional[bool] = False,
-        result_path: Optional[str] = None,
+        save_results: Optional[bool] = None,
     ):
         """
         Predict values for the label column of new data.
@@ -2319,8 +2323,6 @@ class MultiModalPredictor:
             The random seed to use for this prediction run.
         save_results
             Whether to save the prediction results (only works for detection now)
-        result_path
-            Where to save the result. (only works for detection now)
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
@@ -2381,27 +2383,36 @@ class MultiModalPredictor:
                 else:
                     pred = logits
 
-        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
-            pred = self._as_pandas(data=data, to_be_converted=pred)
-
         if save_results:
             ## Dumping Result for detection only now
             assert (
                 self._problem_type == OBJECT_DETECTION
             ), "Aborting: save results only works for object detection now."
+
             self._save_path = setup_save_path(
                 old_save_path=self._save_path,
                 model_loaded=self._model_loaded,
             )
-            if not result_path:
-                result_path = os.path.join(self._save_path, "result.txt")
+
+            result_path = os.path.join(self._save_path, "result.txt")
 
             save_result_df(
                 pred=pred,
                 data=data,
-                result_path=result_path,
                 detection_classes=self._model.model.CLASSES,
+                result_path=result_path,
             )
+
+        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
+            if self._problem_type == OBJECT_DETECTION:
+                pred = save_result_df(
+                    pred=pred,
+                    data=data,
+                    detection_classes=self._model.model.CLASSES,
+                    result_path=None,
+                )
+            else:
+                pred = self._as_pandas(data=data, to_be_converted=pred)
 
         return pred
 
@@ -2652,6 +2663,11 @@ class MultiModalPredictor:
                 text_processors=data_processors[TEXT],
                 path=path,
             )
+        if NER in data_processors:
+            data_processors[NER] = save_text_tokenizers(
+                text_processors=data_processors[NER],
+                path=path,
+            )
 
         with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
             pickle.dump(data_processors, fp)
@@ -2835,6 +2851,11 @@ class MultiModalPredictor:
             if TEXT in data_processors:
                 data_processors[TEXT] = load_text_tokenizers(
                     text_processors=data_processors[TEXT],
+                    path=path,
+                )
+            if NER in data_processors:
+                data_processors[NER] = load_text_tokenizers(
+                    text_processors=data_processors[NER],
                     path=path,
                 )
             # backward compatibility. Add feature column names in each data processor.

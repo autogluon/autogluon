@@ -1,5 +1,6 @@
 import codecs
 import random
+import warnings
 from typing import Iterable, List, Optional, Tuple, Union
 
 import numpy as np
@@ -391,7 +392,8 @@ def tokenize_ner_text(text, tokenizer):
     )
     # token to word mappings: it will tell us which token belongs to which word.
     token_to_word_mappings = [i if i != None else -1 for i in col_tokens.word_ids()]
-    assert len(set(token_to_word_mappings)) == len(words) + 1, "The token to word mappings are incorrect!"
+    if len(set(token_to_word_mappings)) != len(words) + 1:
+        warnings.warn(f"The token to word mappings are incorrect!")
     offset_mapping = np.array(col_tokens.offset_mapping, dtype=np.int32)
     word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
     return col_tokens, token_to_word_mappings, word_offsets
