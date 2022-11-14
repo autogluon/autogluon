@@ -3,12 +3,6 @@ Inference
 .. container:: cards
 
    .. card::
-      :title: Load A Trained Detector
-      :link: detection_load_predictor.html
-
-      How to load and evaluate a trained predictor
-
-   .. card::
       :title: Inference using a pretrained model - Quick Start
       :link: detection_inference_quick_start.html
 
@@ -26,11 +20,17 @@ Inference
 
       Download a pretrained model and run inference on VOC dataset
 
+   .. card::
+      :title: Load A Trained Detector
+      :link: detection_load_predictor.html
+
+      How to load and evaluate a trained predictor
+
 .. toctree::
    :maxdepth: 1
    :hidden:
 
-    detection_load_predictor
     detection_inference_quick_start
     detection_inference_coco
     detection_inference_voc
+    detection_load_predictor

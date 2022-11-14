@@ -1,5 +1,5 @@
 # AutoMM Detection - Quick Start on a Tiny COCO Format Dataset
-:label:`sec_automm_detection_fast_finetune_coco`
+:label:`sec_automm_detection_quick_start_coco`
 
 In this section, our goal is to fast finetune a pretrained model on a small dataset in COCO format, 
 and evaluate on its test set. Both training and test sets are in COCO format.
@@ -11,7 +11,7 @@ To start, let's import MultiModalPredictor:
 from autogluon.multimodal import MultiModalPredictor
 ```
 
-And install a few packages:
+Make sure `mmcv-full` and `mmdet` are installed:
 ```python .input
 !mim install mmcv-full
 !pip install mmdet
@@ -93,7 +93,7 @@ predictor.fit(
     train_path,
     hyperparameters={
         "optimization.learning_rate": 2e-4, # we use two stage and detection head has 100x lr
-        "optimization.max_epochs": 15,
+        "optimization.max_epochs": 30,
         "env.per_gpu_batch_size": 32,  # decrease it when model is large
     },
 )

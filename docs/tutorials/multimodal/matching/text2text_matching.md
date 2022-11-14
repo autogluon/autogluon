@@ -1,4 +1,4 @@
-# Text-to-Text Matching with AutoMM 
+# Text-to-Text Semantic Matching with AutoMM 
 :label:`text2text_matching`
 
 Computing the similarity between two sentences/passages is a common task in NLP, with several practical applications such as web search, question answering, documents deduplication, plagiarism comparison, natural language inference, recommendation engines, etc. In general, text similarity models will take two sentences/passages as input and transform them into vectors, and then similarity scores calculated using cosine similarity, dot product, or Euclidean distances are used to measure how alike or different of the two text pieces. 

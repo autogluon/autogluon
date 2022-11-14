@@ -147,9 +147,11 @@ class MultiModalPredictorModel(AbstractModel):
         verbosity_text = max(0, verbosity - 1)
         root_logger = logging.getLogger('autogluon')
         root_log_level = root_logger.level
+        # in self.save(), the model is saved to automm_nn_path
+        automm_nn_path = os.path.join(path, self._NN_MODEL_NAME)
         self.model = MultiModalPredictor(label=self._label_column_name,
                                      problem_type=self.problem_type,
-                                     path=self.path,
+                                     path=automm_nn_path,
                                      eval_metric=self.eval_metric,
                                      verbosity=verbosity_text)
         params = self._get_model_params()

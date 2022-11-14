@@ -1,5 +1,7 @@
 """Wrapper of the MultiModalPredictor."""
 import logging
+from typing import Dict
+
 from .automm_model import MultiModalPredictorModel
 
 logger = logging.getLogger(__name__)
@@ -47,6 +49,9 @@ class FTTransformerModel(MultiModalPredictorModel):
             "model.names": ["categorical_transformer", "numerical_transformer", "fusion_transformer"],
             "model.numerical_transformer.embedding_arch": ["linear"],
             "env.batch_size": 128,
+            "env.per_gpu_batch_size": 128,
+            "env.num_workers": 0,
+            "env.num_workers_evaluation": 0,
             "optimization.max_epochs": 2000,  # Specify a large value to train until convergence
             "optimization.weight_decay": 1.0e-5,
             "optimization.lr_choice": None,
@@ -57,3 +62,9 @@ class FTTransformerModel(MultiModalPredictorModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:
+        return {
+            "num_cpus": 1,
+            "num_gpus": 0,  # allow FT_Transformer to be trained on CPU only
+        }
