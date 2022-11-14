@@ -28,3 +28,4 @@ Inference
     detection_inference_quick_start
     detection_inference_coco
     detection_inference_voc
+    detection_load_predictor

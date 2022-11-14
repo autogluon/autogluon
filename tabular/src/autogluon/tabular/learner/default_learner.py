@@ -167,7 +167,7 @@ class DefaultLearner(AbstractTabularLearner):
         X = copy.deepcopy(X)
 
         # Remove all examples with missing labels from this dataset:
-        missinglabel_inds = [index for index, x in X[self.label].isna().iteritems() if x]
+        missinglabel_inds = list(X[X[self.label].isna()].index)
         if len(missinglabel_inds) > 0:
             logger.warning(f"Warning: Ignoring {len(missinglabel_inds)} (out of {len(X)}) training examples for which the label value in column '{self.label}' is missing")
             X = X.drop(missinglabel_inds, axis=0)
