@@ -14,8 +14,8 @@ An example to finetune an MMDetection model on VOC:
     https://github.com/open-mmlab/mmdetection/blob/9d3e162459590eee4cfc891218dfbb5878378842/tools/dataset_converters/pascal_voc.py
     Then, run:
     python finetune_coco_format.py \
-        --train_path ./VOCdevkit/VOC2007/Annotations/coco_train.json \
-        --test_path ./VOCdevkit/VOC2007/Annotations/coco_test.json \
+        --train_path ./VOCdevkit/VOC2007/Annotations/train_cocoformat.json \
+        --test_path ./VOCdevkit/VOC2007/Annotations/test_cocoformat.json \
         --checkpoint_name yolov3_mobilenetv2_320_300e_coco \
         --lr <learning_rate> \
         --epochs <epochs>
@@ -28,8 +28,8 @@ from autogluon.multimodal import MultiModalPredictor
 
 
 def tutorial_script_for_finetune_fast_coco_format():
-    train_path = "./VOCdevkit/VOC2012/Annotations/coco_train.json"
-    test_path = "./VOCdevkit/VOC2007/Annotations/coco_test.json"
+    train_path = "./VOCdevkit/VOC2012/Annotations/train_cocoformat.json"
+    test_path = "./VOCdevkit/VOC2007/Annotations/test_cocoformat.json"
     checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
     num_gpus = -1
 
@@ -65,8 +65,8 @@ def tutorial_script_for_finetune_high_performance_coco_format():
     num_gpus = -1
     val_metric = "map"
 
-    train_path = "./VOCdevkit/VOC2007/Annotations/coco_train.json"
-    test_path = "./VOCdevkit/VOC2007/Annotations/coco_test.json"
+    train_path = "./VOCdevkit/VOC2007/Annotations/train_cocoformat.json"
+    test_path = "./VOCdevkit/VOC2007/Annotations/test_cocoformat.json"
 
     predictor = MultiModalPredictor(
         hyperparameters={
@@ -138,7 +138,7 @@ def detection_train(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--train_path", default="./VOCdevkit/VOC2007/Annotations/coco_train.json", type=str
+        "--train_path", default="./VOCdevkit/VOC2007/Annotations/train_cocoformat.json", type=str
     )
     parser.add_argument("--val_path", default=None, type=str)
     parser.add_argument("--test_path", default=None, type=str)

@@ -393,16 +393,12 @@ class MultiModalPredictor:
         if verbosity is not None:
             set_logger_verbosity(verbosity, logger=logger)
 
-        if path is not None:
-            path = process_save_path(path=path)
-
         self._label_column = label
         self._problem_type = problem_type if problem_type is not None else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = num_classes
         self._classes = classes
-        self._save_path = path
         self._ckpt_path = None
         self._pretrained_path = None
         self._config = None
@@ -421,6 +417,23 @@ class MultiModalPredictor:
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._model_loaded = False  # Whether the model has been loaded
         self._matcher = None
+
+        if path is not None:
+            self._save_path = setup_save_path(
+                resume=self._resume,
+                proposed_save_path=path,
+                raise_if_exist=True,
+                warn_if_exist=self._warn_if_exist,
+                model_loaded=self._model_loaded,
+            )
+        else:
+            self._save_path = None
+
+        if self._problem_type == OBJECT_DETECTION:
+            warnings.warn(
+                "Running object detection. Make sure that you have installed mmdet and mmcv-full, "
+                "by running 'mim install mmcv-full' and 'pip install mmdet'"
+            )
 
         if self._problem_type is not None:
             if problem_property_dict.get(self._problem_type).is_matching:
@@ -656,6 +669,7 @@ class MultiModalPredictor:
         -------
         An "MultiModalPredictor" object (itself).
         """
+        fit_called = self._fit_called  # used in current function
         self._fit_called = True
 
         if self.problem_type is not None:
@@ -711,9 +725,11 @@ class MultiModalPredictor:
             resume=self._resume,
             old_save_path=self._save_path,
             proposed_save_path=save_path,
-            num_gpus=self.get_num_gpus(),
+            raise_if_exist=True,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             warn_if_exist=self._warn_if_exist,
+            model_loaded=self._model_loaded,
+            fit_called=fit_called,
         )
 
         # Generate general info that's not config specific
@@ -1918,7 +1934,7 @@ class MultiModalPredictor:
         # Cache prediction results as COCO format # TODO: refactor this
         self._save_path = setup_save_path(
             old_save_path=self._save_path,
-            num_gpus=self.get_num_gpus(),
+            model_loaded=self._model_loaded,
         )
         cocoeval_cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
 
@@ -2282,8 +2298,7 @@ class MultiModalPredictor:
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
         seed: Optional[int] = 123,
-        save_results: Optional[bool] = False,
-        result_path: Optional[str] = None,
+        save_results: Optional[bool] = None,
     ):
         """
         Predict values for the label column of new data.
@@ -2308,8 +2323,6 @@ class MultiModalPredictor:
             The random seed to use for this prediction run.
         save_results
             Whether to save the prediction results (only works for detection now)
-        result_path
-            Where to save the result. (only works for detection now)
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
@@ -2370,27 +2383,36 @@ class MultiModalPredictor:
                 else:
                     pred = logits
 
-        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
-            pred = self._as_pandas(data=data, to_be_converted=pred)
-
         if save_results:
             ## Dumping Result for detection only now
             assert (
                 self._problem_type == OBJECT_DETECTION
             ), "Aborting: save results only works for object detection now."
+
             self._save_path = setup_save_path(
                 old_save_path=self._save_path,
-                num_gpus=self.get_num_gpus(),
+                model_loaded=self._model_loaded,
             )
-            if not result_path:
-                result_path = os.path.join(self._save_path, "result.txt")
+
+            result_path = os.path.join(self._save_path, "result.txt")
 
             save_result_df(
                 pred=pred,
                 data=data,
-                result_path=result_path,
                 detection_classes=self._model.model.CLASSES,
+                result_path=result_path,
             )
+
+        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
+            if self._problem_type == OBJECT_DETECTION:
+                pred = save_result_df(
+                    pred=pred,
+                    data=data,
+                    detection_classes=self._model.model.CLASSES,
+                    result_path=None,
+                )
+            else:
+                pred = self._as_pandas(data=data, to_be_converted=pred)
 
         return pred
 
@@ -2990,6 +3012,8 @@ class MultiModalPredictor:
         )
         predictor._model_postprocess_fn = model_postprocess_fn
         predictor._model_loaded = True
+        predictor._fit_called = False
+
         return predictor
 
     @property

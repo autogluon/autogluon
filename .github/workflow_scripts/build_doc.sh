@@ -6,9 +6,11 @@ function build_doc {
     PR_NUMBER="$5"  # For push events, PR_NUMBER will be empty
 
     source $(dirname "$0")/write_to_s3.sh
+    source $(dirname "$0")/setup_mmcv.sh
 
     setup_build_contrib_env
     bash docs/build_pip_install.sh
+    setup_mmcv
     # only build for docs/$DOC
     rm -rf ./docs/tutorials/!($DOC)
     cd docs && rm -rf _build && d2lbook build rst

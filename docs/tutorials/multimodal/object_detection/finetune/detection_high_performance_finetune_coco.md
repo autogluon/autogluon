@@ -36,8 +36,8 @@ checkpoint_name = "vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco"
 num_gpus = -1  # use all GPUs
 val_metric = "map"
 
-train_path = "./VOCdevkit/VOC2012/Annotations/coco_train.json" 
-test_path = "./VOCdevkit/VOC2007/Annotations/coco_test.json"
+train_path = "./VOCdevkit/VOC2012/Annotations/train_cocoformat.json" 
+test_path = "./VOCdevkit/VOC2007/Annotations/test_cocoformat.json"
 ```
 
 We create the MultiModalPredictor with selected checkpoint name, val_metric, and number of GPUs.
@@ -89,7 +89,7 @@ predictor.fit(
     hyperparameters={
         "optimization.learning_rate": 1e-5, # we use two stage and detection head has 100x lr
         "optimization.max_epochs": 20,
-        "env.per_gpu_batch_size": 2,  # decrease it when model is large
+        "env.per_gpu_batch_size": 1,  # decrease it when model is large
     },
 )
 end = time.time()

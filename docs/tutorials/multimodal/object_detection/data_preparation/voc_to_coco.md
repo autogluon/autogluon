@@ -5,7 +5,9 @@
 And VOC format refers to the specific format (in `.xml` file) the Pascal VOC dataset is using.
 
 In this tutorial, we will convert VOC2007 dataset from VOC format to COCO format. See :ref:`sec_automm_detection_prepare_voc` for how to download it.
-We will use our tool `voc_to_coco.py`. This python script is in our example: [voc_to_coco.py](https://github.com/awslabs/autogluon/tree/master/examples/automm/object_detection/voc_to_coco.py) 
+We will use our tool `voc2coco`. This python script is in our code: 
+[voc2coco.py](https://github.com/awslabs/autogluon/tree/master/autogluon/multimodal/src/autogluon/multimodal/cli/voc_to_coco.py),
+and you can also run it as a cli: `python3 -m autogluon.multimodal.cli.voc2coco`.
 
 **Note: In Autogluon MultiModalPredictor, we strongly recommend using COCO as your data format.** However, for fast proof testing we also have limit support for VOC format.
 
@@ -29,7 +31,7 @@ test.txt
 We can convert those splits into COCO format by simply running given the root directory, e.g. `./VOCdevkit/VOC2007`:
 
 ```
-python3 voc2coco.py --root_dir ./VOCdevkit/VOC2007
+python3 -m autogluon.multimodal.cli.voc2coco --root_dir ./VOCdevkit/VOC2007
 ```
 
 The command line output will show the progress:
@@ -41,9 +43,9 @@ Start converting !
 
 Now those splits are converted to COCO format in `Annotations` folder under the root directory:
 ```
-coco_train.json
-coco_val.json
-coco_test.json
+train_cocoformat.json
+val_cocoformat.json
+test_cocoformat.json
 ```
 
 ### Convert Existing Splits
@@ -52,7 +54,7 @@ Instead of using predefined splits, you can also split the data with the train/v
 Note that this does not require any pre-existing split files. To split train/validation/test by 0.6/0.2/0.2, run:
 
 ```
-python3 voc2coco.py --root_dir ./VOCdevkit/VOC2007 --train_ratio 0.6 --val_ratio 0.2
+python3 -m autogluon.multimodal.cli.voc2coco --root_dir ./VOCdevkit/VOC2007 --train_ratio 0.6 --val_ratio 0.2
 ```
 
 The command line output will show the progress:
@@ -65,9 +67,9 @@ Start converting !
 And this will generate user splited COCO format in `Annotations` folder under the root directory:
 
 ```
-coco_usersplit_train.json
-coco_usersplit_val.json
-coco_usersplit_test.json
+usersplit_train_cocoformat.json
+usersplit_val_cocoformat.json
+usersplit_test_cocoformat.json
 ```
 
 ### Other Examples

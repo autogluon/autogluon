@@ -64,7 +64,7 @@ def get_model_true_infer_speed_per_row_batch(
 
     leaderboards = []
     for i in range(repeats):
-        leaderboard = predictor.leaderboard(data_batch, silent=True)
+        leaderboard = predictor.leaderboard(data_batch, skip_score=True, silent=True)
         leaderboard = leaderboard[leaderboard['can_infer']][['model', 'pred_time_test', 'pred_time_test_marginal']]
         leaderboard = leaderboard.set_index('model')
         leaderboards.append(leaderboard)
