@@ -21,16 +21,16 @@ Matching
       How to use semantic embeddings to improve text retrieval performance.
 
    .. card::
-      :title: Image-Text Matching with AutoMM - Zero-Shot
+      :title: Image-Text Semantic Matching with AutoMM - Zero-Shot
       :link: zero_shot_img_txt_matching.html
 
-      How to apply CLIP to zero shot image-text retrieval/matching.
+      How to apply CLIP to zero shot image-text semantic retrieval/matching.
 
    .. card::
       :title: Image-Text Semantic Matching with AutoMM
       :link: image_text_matching.html
 
-      How to finetune CLIP and use it for image-text retrieval/matching.
+      How to finetune CLIP and use it for image-text semantic retrieval/matching.
 
 .. toctree::
    :maxdepth: 1
