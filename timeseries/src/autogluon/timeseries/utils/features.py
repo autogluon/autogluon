@@ -42,7 +42,7 @@ def get_categorical_and_continuous_features(dataframe: pd.DataFrame) -> Tuple[pd
     categorical_column_names = []
     continuous_column_names = []
 
-    for column_name, column_values in dataframe.iteritems():
+    for column_name, column_values in dataframe.items():
         if is_categorical_dtype(column_values):
             categorical_column_names.append(column_name)
         elif is_numeric_dtype(column_values):

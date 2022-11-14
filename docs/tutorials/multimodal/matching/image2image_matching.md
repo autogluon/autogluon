@@ -1,4 +1,4 @@
-# Image-to-Image Matching with AutoMM 
+# Image-to-Image Semantic Matching with AutoMM 
 :label:`image2image_matching`
 
 Computing the similarity between two images is a common task in computer vision, with several practical applications such as detecting same or different product, etc. In general, image similarity models will take two images as input and transform them into vectors, and then similarity scores calculated using cosine similarity, dot product, or Euclidean distances are used to measure how alike or different of the two images. 
