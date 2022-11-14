@@ -211,7 +211,7 @@ If the data frame contained additional columns (other than those specified in `t
 Next, to make predictions, we generate the known covariates for the forecast horizon
 ```{.python .input}
 # Time difference between consecutive timesteps
-offset = pd.tseries.frequencies.to_offset(data.freq)
+offset = pd.tseries.frequencies.to_offset(ts_dataframe.freq)
 
 known_covariates_per_item = []
 for item_id in ts_dataframe.item_ids:
@@ -229,15 +229,15 @@ known_covariates
 Note that `known_covariates` must satisfy the following conditions:
 
 - The columns must include all columns listed in ``predictor.known_covariates_names``
-- The ``item_id`` index must include all item ids present in ``data``
-- The ``timestamp`` index must include the values for ``prediction_length`` many time steps into the future from the end of each time series in ``data``
+- The ``item_id`` index must include all item ids present in ``ts_dataframe``
+- The ``timestamp`` index must include the values for ``prediction_length`` many time steps into the future from the end of each time series in ``ts_dataframe``
 
 If `known_covariates` contain more information than necessary (e.g., contain additional columns, item_ids, or timestamps),
 AutoGluon will automatically select the necessary rows and columns.
 
 Finally, we pass the `known_covariates` to the `predict` function to generate predictions
 ```python
-predictor.predict(data, known_covariates=known_covariates)
+predictor.predict(ts_dataframe, known_covariates=known_covariates)
 ```
 
 The list of models that support static features and covariates is available in :ref:`forecasting_zoo`.
