@@ -7,6 +7,12 @@ For more details about the VOC format, please see \[Convert VOC to COCO].
 However, we strongly recommend using the COCO format, through we provide limited support for VOC format.
 We use a Faster R-CNN model model pretrained on VOC2007 and VOC2012 dataset
 
+AutoMM detection requires `mmcv-full` and `mmdet` packages. Please make sure `mmcv-full` and `mmdet` are installed:
+```{.python}
+!mim install mmcv-full
+!pip install mmdet
+```
+
 ## Prepare data
 For running this tutorial, you should have VOC dataset prepared. 
 If you haven't already, head over to :label:`sec_automm_detection_prepare_voc` to prepare your VOC data. 
@@ -102,54 +108,26 @@ test_path = "~/data/VOCdevkit/VOC2007"
 ```
 
 ## Running inference
-To run inference, run:
+To run inference, perform:
 
 ```{.python}
 pred = predictor.predict(test_path)
+print(pred)
 ```
-By default, the `predictor.predict` does not save the detection results into a file.
+The output `pred` is a `pandas` `DataFrame` that has two columns, `image` and `bboxes`, where
+- in `image`, each row contains the image path
+- in `bboxes`, each row is a list of dictionaries, each one representing a bounding box: 
+  - `{"class": <predicted_class_name>, "bbox": [x1, y1, x2, y2], "score": <confidence_score>}`
+
+Note that, by default, the `predictor.predict` does not save the detection results into a file.
 
 To run inference and save results, run the following:
 ```{.python}
 pred = predictor.predict(test_path, save_results=True)
 ```
-Currently, we convert the results to a pandas `DataFrame` and save into a `.txt` file. 
-The `.txt` file has two columns, `image` and `bboxes`, where
-- in `image`, each row contains the image path
-- in `bboxes`, each row is a list of dictionaries, each one representing a bounding box: 
-  - `{"class": <predicted_class_name>, "bbox": [x1, y1, x2, y2], "score": <confidence_score>}`
 
-## Reading results
-By default, the returned value `pred` is a `list` and has the following dimensions:
-```
-[num_images, num_total_classes, num_detections_per_class, 5]
-```
-
-where 
-- `num_images` is the number of images used to run inference on. 
-- `num_total_classes` is the total number of classes depending on the model specified in `predictor`. In this example, `num_total_classes = 20` for the Faster R-CNN model pretrained on VOC dataset. To get all available classes in the predictor, run `predictor.get_predictor_classes()`
-- `num_detections_per_class` is the number of detections under each class. Note that this number can vary across different classes.
-- The last dimension contains the bounding box information, which follows `[x1, y1, x2, y2, score]` format. `x1, y1` are the top left corner of the bounding box, and `x2, y2` are the bottom right corner. `score` is the confidence score of the prediction
-
-example code to examine bounding box information:
-
-```{.python}
-detection_classes = predictor.get_predictor_classes()
-idx2classname = {idx: classname for (idx, classname) in enumerate(detection_classes)}
-for i, image_pred in enumerate(pred):
-    print("result for image {}".format(i))
-    for j, per_cls_bboxes in enumerate(image_pred):
-        classname = idx2classname[j]
-        for bbox in per_cls_bboxes:
-            ## bbox = [x1, y1, x2, y2, conf_score]
-            print("bbox: {}, class: {}, score: {}".format(bbox[:4], classname, bbox[4]))
-```
-If you prefer to get the results in `pd.DataFrame` format, run the following:
-```{.python}
-pred_df = predictor.predict(test_path, as_pandas=True)
-```
-
-Similar to the `.txt` file, the `pred_df` also has two columns, `image` and `bboxes`, where
+Currently, we save the `pred`, which is a `pandas` `DataFrame`, into a `.txt` file.
+The `.txt` file therefore also has two columns, `image` and `bboxes`, where
 - in `image`, each row contains the image path
 - in `bboxes`, each row is a list of dictionaries, each one representing a bounding box: 
   - `{"class": <predicted_class_name>, "bbox": [x1, y1, x2, y2], "score": <confidence_score>}`

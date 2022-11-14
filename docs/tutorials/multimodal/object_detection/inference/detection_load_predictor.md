@@ -3,6 +3,12 @@
 
 In this section, our goal is to load and evaluate the predictor trained previously.
 
+AutoMM detection requires `mmcv-full` and `mmdet` packages. Please make sure `mmcv-full` and `mmdet` are installed:
+```python
+!mim install mmcv-full
+!pip install mmdet
+```
+
 To start, let's import MultiModalPredictor:
 
 ```python
