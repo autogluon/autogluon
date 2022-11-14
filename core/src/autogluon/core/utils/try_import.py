@@ -166,6 +166,11 @@ def try_import_lightgbm():
 def try_import_xgboost():
     try:
         import xgboost
+        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+        xgboost_version = parse_version(xgboost.__version__)
+        min_version = "1.6"
+        assert xgboost_version >= parse_version(min_version),\
+            f'Currently, we only support "xgboost>={min_version}". Installed version: "xgboost=={xgboost.__version__}".'
     except ImportError:
         raise ImportError("`import xgboost` failed. "
                           f"A quick tip is to install via `pip install autogluon.tabular[xgboost]=={__version__}`.")
