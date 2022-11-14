@@ -63,7 +63,7 @@ These may include information such as:
 Providing this information may, for instance, help forecasting models generate similar demand forecasts for stores located in the same city.
 
 In AutoGluon, static features are stored as an attribute of a `TimeSeriesDataFrame` object.
-As an example, let's have a look at the M4 daily dataset.
+As an example, let's have a look at the M4 Daily dataset.
 
 ```{.python .input}
 import pandas as pd
@@ -78,6 +78,8 @@ We download a subset of 1000 time series and the related metadata, similar to th
    <summary><a>Loader for M4 Daily dataset</a></summary>
 
 ```{.python .input}
+pd.set_option('display.max_rows', 6)  # Save space when printing
+
 M4_INFO_URL = "https://github.com/Mcompetitions/M4-methods/raw/master/Dataset/M4-info.csv"
 M4_DAILY_URL = "https://github.com/Mcompetitions/M4-methods/raw/master/Dataset/Train/Daily-train.csv"
 
@@ -85,7 +87,7 @@ def download_m4_daily_dataset(save_path, metadata_save_path=None, num_items_to_l
     metadata = pd.read_csv(M4_INFO_URL)
     metadata = metadata[metadata["SP"] == "Daily"].set_index("M4id")
     # Select a subset of time series for faster processing
-    metadata = metadata.sample(num_items_to_load, random_state=123)
+    metadata = metadata.sample(num_items_to_load, random_state=42)
     if metadata_save_path is not None:
         metadata["Domain"] = metadata["category"]
         metadata[["Domain"]].to_csv(metadata_save_path)
@@ -126,19 +128,19 @@ static_features = pd.read_csv("m4_daily_metadata.csv", index_col="M4id")
 static_features.index.rename("item_id", inplace=True)
 static_features
 ```
-In the M4 daily dataset, there is a single categorical static feature that denotes the domain of origin for each time series.
+In the M4 Daily dataset, there is a single categorical static feature that denotes the domain of origin for each time series.
 
 We attach the static features to a TimeSeriesDataFrame as follows
 ```python
 ts_dataframe.static_features = static_features
 ```
-If the static features for some `item_id`s are missing, an exception will be raised.
+If `static_features` doesn't contain some `item_id`s that are present in `ts_dataframe`, an exception will be raised.
 
 Now, when we fit the predictor, all models that support static features will automatically use the static features included in `ts_dataframe`.
 ```python
 predictor = TimeSeriesPredictor(target="Value").fit(ts_dataframe)
 ```
-During fitting, the predictor will log how each static feature was interpreted
+During fitting, the predictor will log how each static feature was interpreted as follows:
 ```
 ...
 Following types of static features have been inferred:
@@ -154,11 +156,16 @@ In general, AutoGluon-TimeSeries supports two types of static features:
 - columns with other dtypes are ignored
 
 To override this logic, we need to manually change the columns dtype.
-For example, the following snippet will force the predictor to interpret an integer-valued column `"store_id"` as a categorical feature.
+For example, suppose the static features data frame contained an integer-valued column `"store_id"`.
+```python
+ts_dataframe.static_features["store_id"] = list(range(len(ts_dataframe)))
+```
+By default, this column will be interpreted as a continuous number.
+We can force AutoGluon to interpret it a a categorical feature by changing the dtype to `category`.
 ```python
 ts_dataframe.static_features["store_id"] = ts_dataframe.static_features["store_id"].astype("category")
 ```
-After training on data with static features, the predictor will expect that data passed to `predictor.predict()`, `predictor.leaderboard()`, and `predictor.evaluate()` also includes static features with the exact same column names and data types.
+**Note:** because training data contained static features, the predictor will expect that data passed to `predictor.predict()`, `predictor.leaderboard()`, and `predictor.evaluate()` also includes static features with the exact same column names and data types.
 
 
 ### Known covariates
@@ -194,7 +201,7 @@ First, we generate the covariate for the training set.
 WEEKEND_INDICES = [5, 6]
 timestamps = ts_dataframe.index.get_level_values("timestamp")
 ts_dataframe["Weekend"] = timestamps.weekday.isin(WEEKEND_INDICES).astype(float)
-ts_dataframe.head()
+ts_dataframe
 ```
 When creating the TimeSeriesPredictor, we specify that the column `"Value"` is our prediction target, and the
 column `"Weekend"` contains a covariate that will be known at prediction time.

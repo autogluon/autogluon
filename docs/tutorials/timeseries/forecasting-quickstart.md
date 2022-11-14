@@ -27,14 +27,16 @@ To use `autogluon.timeseries`, we will only need the following two classes:
 - `TimeSeriesDataFrame` stores a dataset consisting of multiple time series.
 - `TimeSeriesPredictor` takes care of fitting, tuning and selecting the best forecasting models.
 
-We start by downloading the M4 hourly dataset from the official website (click "Details" to show the code).
+We start by downloading the M4 Hourly dataset from the official website (click "Details" to show the code).
 
 .. raw:: html
 
    <details>
-   <summary><a>Loader for the M4 hourly dataset</a></summary>
+   <summary><a>Loader for the M4 Hourly dataset</a></summary>
 
 ```{.python .input}
+pd.set_option('display.max_rows', 6)  # Save space when printing
+
 M4_INFO_URL = "https://github.com/Mcompetitions/M4-methods/raw/master/Dataset/M4-info.csv"
 M4_HOURLY_URL = "https://github.com/Mcompetitions/M4-methods/raw/master/Dataset/Train/Hourly-train.csv"
 
@@ -43,8 +45,8 @@ def download_m4_hourly_dataset(save_path):
     metadata = metadata[metadata["SP"] == "Hourly"].set_index("M4id")
     data = pd.read_csv(M4_HOURLY_URL, index_col="V1")
     results = []
-    for item_id, row in data.iterrows():
-        time_series = row.dropna().values
+    for item_id in metadata.index:
+        time_series = data.loc[item_id].dropna().values
         start_time = pd.Timestamp(metadata.loc[item_id]["StartingDate"])
         timestamps = pd.date_range(start_time, freq="H", periods=len(time_series))
         results.append(pd.DataFrame({"M4id": [item_id] * len(time_series), "Date": timestamps, "Value": time_series}))
@@ -68,7 +70,7 @@ df = pd.read_csv(
     "m4_hourly.csv",
     parse_dates=["Date"],  # make sure that pandas parses the dates
 )
-df.head()
+df
 ```
 Each row of the data frame contains a single observation (timestep) of a single time series represented by
 
@@ -246,7 +248,7 @@ plt.legend();
 ```
 
 ## Summary
-We used `autogluon.timeseries` to make probabilistic multi-step forecasts on the M4 hourly dataset.
+We used `autogluon.timeseries` to make probabilistic multi-step forecasts on the M4 Hourly dataset.
 Here is a short summary of the main steps for applying AutoGluon to make forecasts for the entire dataset using a few lines of code.
 ```python
 import pandas as pd
