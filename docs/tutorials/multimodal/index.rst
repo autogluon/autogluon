@@ -81,12 +81,6 @@ Object Detection
 
       How to inference with a pretrained model on COCO dataset
 
-   .. card::
-      :title: Load A Trained Detector
-      :link: object_detection/inference/detection_load_predictor.html
-
-      How to load and use a trained predictor.
-
 
 Matching
 --------
