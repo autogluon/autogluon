@@ -1,4 +1,4 @@
-# Image<-->Text Matching with AutoMM - Zero-Shot
+# Image-Text Matching with AutoMM - Zero-Shot
 :label:`sec_automm_clip_embedding`
 
 The task of image-text matching refers to measuring the visual-semantic similarity between an image and a sentence. AutoMM supports zero-shot image-text matching by leveraging the powerful [CLIP](https://github.com/openai/CLIP). 
