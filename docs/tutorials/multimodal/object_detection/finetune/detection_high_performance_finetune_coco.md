@@ -27,8 +27,8 @@ we did not specify the validation metric and by default the validation loss is u
 Using validation loss is much faster but using mean average precision gives the best performance.
 
 While using COCO format dataset, the input is the json annotation file of the dataset split.
-In this example, `voc12_train.json` is the annotation file of train split of VOC2012 dataset,
-and `voc07_test.json` is the annotation file of train split of VOC2007 dataset.
+In this example, `voc07_train.json` and `voc07_test.json` 
+are the annotation files of train and test split of VOC2007 dataset.
 And we use all the GPUs (if any):
 
 ```python
@@ -36,7 +36,7 @@ checkpoint_name = "vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco"
 num_gpus = -1  # use all GPUs
 val_metric = "map"
 
-train_path = "./VOCdevkit/VOC2012/Annotations/train_cocoformat.json" 
+train_path = "./VOCdevkit/VOC2007/Annotations/train_cocoformat.json" 
 test_path = "./VOCdevkit/VOC2007/Annotations/test_cocoformat.json"
 ```
 
