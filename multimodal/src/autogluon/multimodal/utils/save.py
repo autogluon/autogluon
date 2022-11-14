@@ -132,6 +132,7 @@ def setup_save_path(
     model_loaded: Optional[bool] = None,
     fit_called: Optional[bool] = None,
 ):
+    # TODO: remove redundant folders in DDP mode
     rank = int(os.environ.get("LOCAL_RANK", 0))
     save_path = None
     if resume:

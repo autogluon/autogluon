@@ -1935,6 +1935,7 @@ class MultiModalPredictor:
         self._save_path = setup_save_path(
             old_save_path=self._save_path,
             model_loaded=self._model_loaded,
+            warn_if_exist=False,
         )
         cocoeval_cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
 
@@ -2392,6 +2393,7 @@ class MultiModalPredictor:
             self._save_path = setup_save_path(
                 old_save_path=self._save_path,
                 model_loaded=self._model_loaded,
+                warn_if_exist=False,
             )
 
             result_path = os.path.join(self._save_path, "result.txt")
