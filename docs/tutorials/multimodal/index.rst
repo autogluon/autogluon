@@ -76,10 +76,16 @@ Object Detection
       How to evaluate the very fast pretrained YOLOv3 model on dataset in COCO format.
 
    .. card::
+      :title: Inference using a pretrained model - COCO dataset
+      :link: object_detection/inference/detection_inference_coco.html
+
+      How to inference with a pretrained model on COCO dataset
+
+   .. card::
       :title: Load A Trained Detector
       :link: object_detection/inference/detection_load_predictor.html
 
-      How to load and evaluate a trained predictor.
+      How to load and use a trained predictor.
 
 
 Matching
