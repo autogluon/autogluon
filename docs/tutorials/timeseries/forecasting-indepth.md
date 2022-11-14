@@ -53,28 +53,112 @@ In real-world forecasting problems we often have access to additional informatio
 AutoGluon supports two types of such additional information: static features and known covariates.
 
 ### Static features
-Static features are the time independent attributes of a time series.
-In the demand forecasting example, these may include information such as:
+Static features are the time-independent attributes (metadata) of a time series.
+These may include information such as:
 
-- country, where the store is located
-- product category
-- brand, color, size, or weight
+- location, where the time series was recorded (country, state, city)
+- fixed properties of a product (brand name, color, size, weight)
+- store ID or product ID
 
-Recall that in AutoGluon a time series dataset is stored as a :class:`~autogluon.timeseries.TimeSeriesDataFrame`
-```python
-data = TimeSeriesDataFrame.from_data_frame(pd.read_csv("dataset.csv"))
-data
+Providing this information may, for instance, help forecasting models generate similar demand forecasts for stores located in the same city.
+
+In AutoGluon, static features are stored as an attribute of a `TimeSeriesDataFrame` object.
+As an example, let's have a look at the M4 daily dataset.
+
+```{.python .input}
+import pandas as pd
+from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 ```
-Static features must be stored in a pandas.DataFrame.
-The index of the static features dataframe must include all the `item_ids` present in the `TimeSeriesDataFrame`.
-```python
-static_features = pd.read_csv("metadata.csv")
-static_features.head()
+
+We download a subset of 1000 time series and the related metadata, similar to the Quickstart tutorial (click on the arrow to show the preprocessing code).
+
+.. raw:: html
+
+   <details>
+   <summary><a>Loader for M4 Daily dataset</a></summary>
+
+```{.python .input}
+M4_INFO_URL = "https://github.com/Mcompetitions/M4-methods/raw/master/Dataset/M4-info.csv"
+M4_DAILY_URL = "https://github.com/Mcompetitions/M4-methods/raw/master/Dataset/Train/Daily-train.csv"
+
+def download_m4_daily_dataset(save_path, metadata_save_path=None, num_items_to_load=100):
+    metadata = pd.read_csv(M4_INFO_URL)
+    metadata = metadata[metadata["SP"] == "Daily"].set_index("M4id")
+    # Select a subset of time series for faster processing
+    metadata = metadata.sample(num_items_to_load, random_state=123)
+    if metadata_save_path is not None:
+        metadata["Domain"] = metadata["category"]
+        metadata[["Domain"]].to_csv(metadata_save_path)
+
+    data = pd.read_csv(M4_DAILY_URL, index_col="V1")
+    results = []
+    for item_id in metadata.index:
+        time_series = data.loc[item_id].dropna().values
+        start_time = pd.Timestamp(metadata.loc[item_id]["StartingDate"])
+        timestamps = pd.date_range(start_time, freq="D", periods=len(time_series))
+        results.append(pd.DataFrame({"M4id": [item_id] * len(time_series), "Date": timestamps, "Value": time_series}))
+    result = pd.concat(results, ignore_index=True)
+    result.to_csv(save_path, index=False)
+
+download_m4_daily_dataset(save_path="m4_daily.csv", metadata_save_path="m4_daily_metadata.csv")
 ```
+
+.. raw:: html
+
+   </details>
+
+
+We load the individual time series into a `TimeSeriesDataFrame`:
+```{.python .input}
+ts_dataframe = TimeSeriesDataFrame.from_data_frame(
+    pd.read_csv("m4_daily.csv", parse_dates=["Date"]),
+    id_column="M4id",
+    timestamp_column="Date",
+)
+ts_dataframe
+```
+AutoGluon expects static features as a pandas.DataFrame object, where the index column
+
+- is called `"item_id"`
+- includes all the `item_id`s present in the respective TimeSeriesDataFrame.
+```{.python .input}
+static_features = pd.read_csv("m4_daily_metadata.csv", index_col="M4id")
+static_features.index.rename("item_id", inplace=True)
+static_features
+```
+In the M4 daily dataset, there is a single categorical static feature that denotes the domain of origin for each time series.
+
 We attach the static features to a TimeSeriesDataFrame as follows
 ```python
-data.static_features = static_features
+ts_dataframe.static_features = static_features
 ```
+If the static features for some `item_id`s are missing, an exception will be raised.
+
+Now, when we fit the predictor, all models that support static features will automatically use the static features included in `ts_dataframe`.
+```python
+predictor = TimeSeriesPredictor(target="Value").fit(ts_dataframe)
+```
+During fitting, the predictor will log how each static feature was interpreted
+```
+...
+Following types of static features have been inferred:
+	categorical: ['Domain']
+	continuous (float): []
+...
+```
+This message means that columns `'Domain'` was interpreted as a categorical feature.
+In general, AutoGluon-TimeSeries supports two types of static features:
+
+- `categorical`: columns of dtype `object`, `string` and `category` are interpreted as discrete categories
+- `continuous`: columns of dtype `int` and `float` are interpreted as continuous (real-valued) numbers
+- columns with other dtypes are ignored
+
+To override this logic, we need to manually change the columns dtype.
+For example, the following snippet will force the predictor to interpret an integer-valued column `"store_id"` as a categorical feature.
+```python
+ts_dataframe.static_features["store_id"] = ts_dataframe.static_features["store_id"].astype("category")
+```
+After training on data with static features, the predictor will expect that data passed to `predictor.predict()`, `predictor.leaderboard()`, and `predictor.evaluate()` also includes static features with the exact same column names and data types.
 
 
 ### Known covariates
@@ -92,73 +176,35 @@ Examples of such covariates include:
 ![Target time series with one known covariate.](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth4.png)
 :width:`800px`
 
-As an example, we will use the Vehicle Trips dataset containing number of daily trips for different taxi companies (click "Details" to show the preprocessing code).
+As an example, we will again use the M4 Daily dataset.
 
 ```{.python .input}
-import pandas as pd
+prediction_length = 48
 
-from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
-```
-
-.. raw:: html
-
-   <details>
-   <summary><a>Loader for the Vehicle Trips daily dataset</a></summary>
-
-```{.python .input}
-URL = "https://raw.githubusercontent.com/fivethirtyeight/uber-tlc-foil-response/master/other-FHV-data/other-FHV-data-jan-aug-2015.csv"
-
-def load_vehicle_trips_dataset(save_path):
-    df = pd.read_csv(URL, header=5, parse_dates=["Pick Up Date"])[["Base Number", "Pick Up Date", "Number of Trips"]].dropna()
-    df = TimeSeriesDataFrame.from_data_frame(df, id_column="Base Number", timestamp_column="Pick Up Date")
-    # Parse strings as numbers
-    df["Number of Trips"] = pd.to_numeric(df["Number of Trips"].str.replace(r'\D+', ''))
-    df.sort_index(inplace=True)
-
-    def forward_fill_missing(ts: TimeSeriesDataFrame, freq="D") -> TimeSeriesDataFrame:
-        original_index = ts.index.get_level_values("timestamp")
-        start = original_index[0]
-        end = original_index[-1]
-        filled_index = pd.date_range(start=start, end=end, freq=freq)
-        return ts.droplevel("item_id").reindex(filled_index, method="ffill")
-
-    df = df.groupby("item_id").apply(forward_fill_missing)
-    df.to_csv(save_path)
-
-load_vehicle_trips_dataset("vehicle_trips.csv")
-```
-
-.. raw:: html
-
-   </details>
-
-We read the dataset from the CSV file
-
-```{.python .input}
-prediction_length = 30
-
-data = TimeSeriesDataFrame.from_data_frame(
-    pd.read_csv("vehicle_trips.csv", parse_dates=["timestamp"])
+ts_dataframe = TimeSeriesDataFrame.from_data_frame(
+    pd.read_csv("m4_daily.csv", parse_dates=["Date"]),
+    id_column="M4id",
+    timestamp_column="Date",
 )
-data.head()
+ts_dataframe
 ```
 In this example, we will generate a known covariate `Weekend` that equals to 1 if a given day is a weekend, and 0 otherwise.
 First, we generate the covariate for the training set.
 ```{.python .input}
 WEEKEND_INDICES = [5, 6]
-timestamps = data.index.get_level_values("timestamp")
-data["Weekend"] = timestamps.weekday.isin(WEEKEND_INDICES).astype(float)
-data.head()
+timestamps = ts_dataframe.index.get_level_values("timestamp")
+ts_dataframe["Weekend"] = timestamps.weekday.isin(WEEKEND_INDICES).astype(float)
+ts_dataframe.head()
 ```
-When creating the TimeSeriesPredictor, we specify that the column `"Number of Trips"` is our prediction target, and the
+When creating the TimeSeriesPredictor, we specify that the column `"Value"` is our prediction target, and the
 column `"Weekend"` contains a covariate that will be known at prediction time.
 ```python
 predictor = TimeSeriesPredictor(
     prediction_length=prediction_length,
-    target="Number of Trips",
+    target="Value",
     known_covariates_names=["Weekend"],
 )
-predictor.fit(data)
+predictor.fit(ts_dataframe)
 ```
 If the data frame contained additional columns (other than those specified in `target` and `known_covariates_names`), they would be ignored.
 
@@ -168,8 +214,8 @@ Next, to make predictions, we generate the known covariates for the forecast hor
 offset = pd.tseries.frequencies.to_offset(data.freq)
 
 known_covariates_per_item = []
-for item_id in data.item_ids:
-    time_series = data.loc[item_id]
+for item_id in ts_dataframe.item_ids:
+    time_series = ts_dataframe.loc[item_id]
     last_day = time_series.index[-1]
     future_timestamps = pd.date_range(start=last_day + offset, freq=offset, periods=prediction_length)
     weekend = future_timestamps.weekday.isin(WEEKEND_INDICES).astype(float)
