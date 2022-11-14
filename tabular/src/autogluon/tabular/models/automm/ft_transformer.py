@@ -66,5 +66,5 @@ class FTTransformerModel(MultiModalPredictorModel):
     def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:
         return {
             "num_cpus": 1,
-            "num_gpus": 0,
+            "num_gpus": 0,  # allow FT_Transformer to be trained on CPU only
         }
