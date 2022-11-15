@@ -13,7 +13,7 @@ Advanced Topics
       :title: HPO in AutoMM
       :link: hyperparameter_optimization.html
 
-      How to customize AutoMM configurations.
+      How to do hyperparameter optimization in AutoMM.
 
    .. card::
       :title: Customize AutoMM
