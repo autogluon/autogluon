@@ -300,6 +300,7 @@ def create_model(
             checkpoint_name=model_config.checkpoint_name,
             num_classes=num_classes,
             gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            low_cpu_mem_usage=OmegaConf.select(model_config, "low_cpu_mem_usage", default=False),
             pretrained=pretrained,
         )
     elif model_name.lower().startswith(FUSION_MLP):

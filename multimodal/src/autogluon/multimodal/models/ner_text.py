@@ -121,13 +121,8 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
         if self.is_t5:
             # For the T5 model, we will only use the encoder to encode the sentence. This is adopted in
             # "Sentence-T5 (ST5): Scalable Sentence Encoders from Pre-trained Text-to-Text Models"
-            # (https://aclanthology.org/2022.findings-acl.146.pdf).
+            # (https://aclanthology.org/2022.findings-acl.146.pdf)!
             inputs_embeds = self.model.encoder.embed_tokens(text_token_ids)
-            if self.gradient_checkpointing:
-                # FIXME(?) This is a hack! We added a DummyLayer to ensure that the
-                #  gradient checkpointing will assign output layer as require_grad=True
-                #  Reference: https://discuss.pytorch.org/t/checkpoint-with-no-grad-requiring-inputs-problem/19117/9
-                inputs_embeds = self.dummy_layer(inputs_embeds)
             outputs = self.model.encoder(
                 inputs_embeds=inputs_embeds,
                 attention_mask=text_masks,
