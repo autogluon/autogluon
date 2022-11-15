@@ -727,7 +727,7 @@ class MultiModalPredictor:
             proposed_save_path=save_path,
             raise_if_exist=True,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-            warn_if_exist=self._warn_if_exist,
+            warn_if_exist=False,
             model_loaded=self._model_loaded,
             fit_called=fit_called,
         )
