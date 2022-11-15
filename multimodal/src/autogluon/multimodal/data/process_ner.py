@@ -77,7 +77,10 @@ class NerProcessor:
         tokenizer_name: str,
         checkpoint_name: str,
     ):
-        return AutoTokenizer.from_pretrained(checkpoint_name)
+        tokenizer = AutoTokenizer.from_pretrained(checkpoint_name)
+        if tokenizer.model_max_length > 10**6:
+            tokenizer.model_max_length = 512 # force it to be 512 if not specified.
+        return tokenizer
 
     def collate_fn(self, text_column_names: Optional[List] = None) -> Dict:
         """
