@@ -1,7 +1,7 @@
-# Image-Text Matching with AutoMM - Zero-Shot
+# Image-Text Semantic Matching with AutoMM - Zero-Shot
 :label:`sec_automm_clip_embedding`
 
-The task of image-text matching refers to measuring the visual-semantic similarity between an image and a sentence. AutoMM supports zero-shot image-text matching by leveraging the powerful [CLIP](https://github.com/openai/CLIP). 
+The task of image-text semantic matching refers to measuring the visual-semantic similarity between an image and a sentence. AutoMM supports zero-shot image-text matching by leveraging the powerful [CLIP](https://github.com/openai/CLIP). 
 Thanks to the contrastive loss objective and trained on millions of image-text pairs, CLIP learns good embeddings for both vision and language, and their connections. Hence, we can use it to extract embeddings for retrieval and matching.
 
 CLIP has a two-tower architecture, which means it has two encoders: one for image, the other for text. An overview of CLIP model can be seen in the diagram below. Left shows its pre-training stage, and Right shows its zero-shot predicton stage. By computing the cosine similarity scores between one image embedding and all the text images, we pick the text which has the highest similarity as the prediction.

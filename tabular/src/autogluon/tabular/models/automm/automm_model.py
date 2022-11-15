@@ -127,19 +127,33 @@ class MultiModalPredictorModel(AbstractModel):
                 label_col_id += 1
         else:
             self._label_column_name = 'label'
-        X_train = self.preprocess(X, fit=True)
+
+        X = self.preprocess(X, fit=True)
+        params = self._get_model_params()
+        max_features = params.pop('_max_features', None)  # FIXME: `_max_features` is a hack. Instead use ag_args_fit and make generic
+        num_features = len(X.columns)
+        if max_features is not None and num_features > max_features:
+            raise AssertionError(f'Feature count ({num_features}) is greater than max allowed features ({max_features}) for {self.name}. Skipping model... '
+                                 f'To increase the max allowed features, specify the value via the `_max_features` parameter '
+                                 f'(Fully ignore by specifying `None`. '
+                                 f'`_max_features` is experimental and will likely change API without warning in future releases.')
+
         if X_val is not None:
             X_val = self.preprocess(X_val)
         # Get arguments from kwargs
         verbosity = kwargs.get('verbosity', 2)
+        if verbosity <= 2:
+            enable_progress_bar = False
+        else:
+            enable_progress_bar = True
         num_gpus = kwargs.get('num_gpus', None)
         if sample_weight is not None:  # TODO: support
             logger.log(15, "sample_weight not yet supported for MultiModalPredictorModel, "
                            "this model will ignore them in training.")
 
         # Need to deep copy to avoid altering outer context
-        X_train = X_train.copy()
-        X_train.insert(len(X_train.columns), self._label_column_name, y)
+        X = X.copy()
+        X.insert(len(X.columns), self._label_column_name, y)
         if X_val is not None:
             X_val = X_val.copy()
             X_val.insert(len(X_val.columns), self._label_column_name, y_val)
@@ -148,25 +162,30 @@ class MultiModalPredictorModel(AbstractModel):
         root_logger = logging.getLogger('autogluon')
         root_log_level = root_logger.level
         # in self.save(), the model is saved to automm_nn_path
-        automm_nn_path = os.path.join(path, self._NN_MODEL_NAME)
-        self.model = MultiModalPredictor(label=self._label_column_name,
-                                     problem_type=self.problem_type,
-                                     path=automm_nn_path,
-                                     eval_metric=self.eval_metric,
-                                     verbosity=verbosity_text)
-        params = self._get_model_params()
+        automm_nn_path = os.path.join(self.path, self._NN_MODEL_NAME)
+        self.model = MultiModalPredictor(
+            label=self._label_column_name,
+            problem_type=self.problem_type,
+            path=automm_nn_path,
+            eval_metric=self.eval_metric,
+            verbosity=verbosity_text,
+            enable_progress_bar=enable_progress_bar,
+        )
 
         if num_gpus is not None:
             params['env.num_gpus'] = num_gpus
         presets = params.pop('presets', None)
         seed = params.pop('seed', 0)
 
-        self.model.fit(train_data=X_train,
-                       tuning_data=X_val,
-                       time_limit=time_limit,
-                       presets=presets,
-                       hyperparameters=params,
-                       seed=seed)
+        self.model.fit(
+            train_data=X,
+            tuning_data=X_val,
+            time_limit=time_limit,
+            presets=presets,
+            hyperparameters=params,
+            seed=seed,
+        )
+
         self.model.set_verbosity(verbosity)
         root_logger.setLevel(root_log_level)  # Reset log level
 
