@@ -16,6 +16,12 @@ Advanced Topics
       How to do hyperparameter optimization in AutoMM.
 
    .. card::
+      :title: Knowledge Distillation in AutoMM
+      :link: model_distillation.html
+
+      How to do knowledge distillation in AutoMM.
+
+   .. card::
       :title: Customize AutoMM
       :link: customization.html
 
@@ -28,4 +34,5 @@ Advanced Topics
 
    efficient_finetuning_basic
    hyperparameter_optimization
+   model_distillation
    customization
