@@ -202,7 +202,7 @@ Advanced Topics
 
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 2
    :hidden:
 
    text_prediction/index
