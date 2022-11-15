@@ -571,7 +571,7 @@ def infer_problem_type_output_shape(
         elif provided_problem_type == NER:
             unique_entity_groups = [
                 annot[ENTITY_GROUP]
-                for annotation in data[label_column].iteritems()
+                for annotation in data[label_column].items()
                 for annot in json.loads(annotation[-1])
             ]
             return provided_problem_type, len(set(unique_entity_groups)) + 2
