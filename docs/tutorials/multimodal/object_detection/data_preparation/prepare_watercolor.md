@@ -9,10 +9,10 @@ The total time to prepare the dataset depends on your Internet speed and disk pe
 
 You can download the dataset from its [official project page](https://naoto0804.github.io/cross_domain_detection/).
 We also prepared a bash script for one-step downloading the dataset: 
-[download_watercolor.sh](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/download_watercolor.sh).
+[download_watercolor.sh](https://raw.githubusercontent.com/awslabs/autogluon/master/examples/automm/object_detection/download_watercolor.sh).
 Or you can also use our cli tool `prepare_detection_dataset` that can download all datasets mentioned in our tutorials.
 This python script is in our code: 
-[prepare_detection_dataset.py](https://github.com/awslabs/autogluon/tree/master/autogluon/multimodal/src/autogluon/multimodal/cli/prepare_detection_dataset.py),
+[prepare_detection_dataset.py](https://raw.githubusercontent.com/awslabs/autogluon/master/multimodal/src/autogluon/multimodal/cli/prepare_detection_dataset.py),
 and you can also run it as a cli: `python3 -m autogluon.multimodal.cli.prepare_detection_dataset`.
 
 ### Download with Python Script
@@ -75,26 +75,9 @@ However, for fast proof testing we also have limit support for VOC format.
 While using VOC format dataset, the input is the root path of the dataset, and contains at least:
 
 ```
-Annotations  ImageSets  JPEGImages labels.txt
+Annotations  ImageSets  JPEGImages
 ```
 
-Here `labels.txt` shall be added manually to include all the labels in the dataset. 
-For watercolor dataset, the content of `labels.txt` is shown as below:
-
-```
-bicycle
-bird
-car
-cat
-dog
-person
-```
-
-In Unix system, you can also generate the `labels.txt` file automatically by running the following command in its root path (under folder `watercolor`)
-
-```
-grep -ERoh '<name>(.*)</name>' ./Annotations | sort | uniq | sed 's/<name>//g' | sed 's/<\/name>//g' > labels.txt
-```
 
 ### Other Examples
 

@@ -20,11 +20,6 @@ Inference
 
       Download a pretrained model and run inference on VOC dataset
 
-   .. card::
-      :title: Load A Trained Detector
-      :link: detection_load_predictor.html
-
-      How to load and evaluate a trained predictor
 
 .. toctree::
    :maxdepth: 1

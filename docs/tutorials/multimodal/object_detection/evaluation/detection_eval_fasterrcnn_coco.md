@@ -12,7 +12,6 @@ from autogluon.multimodal import MultiModalPredictor
 
 We select the Faster R-CNN with ResNet50 as backbone and Feature Pyramid Network (FPN) as neck,
 this model has **23.9 frames per second (FPS)** on single A10e GPU with `batch_size=1`.
-For details about model selection, see :ref:`sec_automm_detection_select_models`.
 And we still use all the GPUs (if any):
 
 ```python
@@ -34,7 +33,7 @@ predictor = MultiModalPredictor(
 ```
 
 Here we use COCO17 for testing. 
-See other tutorials for \[Prepare COCO2017], \[Convert VOC Format Dataset to COCO Format], and \[Create Custom Dataset].
+See other tutorials for :ref:`sec_automm_detection_prepare_coco17`].
 While using COCO dataset, the input is the json annotation file of the dataset split.
 In this example, `instances_val2017.json` is the annotation file of validation split of COCO17 dataset.
 
@@ -70,7 +69,7 @@ Faster R-CNN balances speed and performance.
 But in case that faster speed or higher performance is required, 
 see :ref:`sec_automm_detection_eval_yolov3_coco` for faster speed,
 or :ref:`sec_automm_detection_eval_ddetr_coco` for higher performance.
-You can also see other tutorials for \[Fast Finetune on COCO format data] or \[Inference on COCO format data (with Visualization)].
+You can also see other tutorials for :ref:`sec_automm_detection_fast_finetune_coco` or :ref:`sec_automm_detection_infer_coco`.
 
 ### Other Examples
 
