@@ -7,11 +7,13 @@ import unittest
 
 s3_url = 'https://autogluon.s3.us-west-2.amazonaws.com/datasets/ano_test_hep.csv'
 
+
 def load_data():
     A = pd.read_csv(s3_url, index_col=0)
     A.loc[30:50, 'cat'] = 'dog'
     train_data, test_data = A[:40], A[40:]
     return train_data, test_data
+
 
 class TestAnomaly(unittest.TestCase):
     def test_ano_analysis(self):
@@ -46,14 +48,10 @@ class TestAnomaly(unittest.TestCase):
         )
         ano_analysis_args = dict(
             num_anomalies=6,
-            fit_train = True,
+            fit_train=True,
         )
         ano_viz_args = dict(headers=True)
-        auto.analyze(**analysis_args, anlz_facets=[
-            AnomalyDetector(**ano_analysis_args)
-        ],
-        viz_facets=[
-            AnomalyVisualization(**ano_viz_args)
-        ]
-        )
+        auto.analyze(**analysis_args,
+                     anlz_facets=[AnomalyDetector(**ano_analysis_args)],
+                     viz_facets=[AnomalyVisualization(**ano_viz_args)])
         pass

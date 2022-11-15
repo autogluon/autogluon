@@ -23,7 +23,7 @@ class AnomalyVisualization(AbstractVisualization, JupyterMixin):
         fig = waterfall(shap_data, show=False)
         test_samp['anomaly score'] = round(score, 3)
         cols = list(test_samp.index)
-        test_samp = test_samp.reindex(index = [cols[-1]] + cols[:-1])
+        test_samp = test_samp.reindex(index=[cols[-1]] + cols[:-1])
         self.display_obj(test_samp.to_frame().T)
         self.display_obj(fig)
 

@@ -18,9 +18,9 @@ class AnomalyDetector(AbstractAnalysis):
         'high_quality' for more powerful but computationally expensive detector, 'medium_quality' otherwise
     fit_train: bool, default = False
         True to find anomalies in the training set
-    OD_method: Callable, default = None
+    od_method: Callable, default = None
         Custom anomaly detector from pyod.models, if you don't want the defaults - will override preset
-    OD_kwargs: dict, default = {}
+    od_kwargs: dict, default = None
         kwargs for the OD method
     shap_sub_samp: float or int, default = 0.1
         The amount of subsampling for shap permutation
@@ -36,21 +36,23 @@ class AnomalyDetector(AbstractAnalysis):
     """
 
     def __init__(self,
-                 preset: str='high_quality',
-                 fit_train: bool=False,
-                 OD_method: Callable=None,
-                 OD_kwargs: dict={},
-                 shap_sub_samp: int=40, #fix this!
-                 num_anomalies: int=5,
-                 parent: Union[None,AbstractAnalysis] = None,
+                 preset: str = 'high_quality',
+                 fit_train: bool = False,
+                 od_method: Callable = None,
+                 od_kwargs: dict = None,
+                 shap_sub_samp: int = 40,
+                 num_anomalies: int = 5,
+                 parent: Union[None, AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
                  **kwargs) -> None:
         super().__init__(parent, children, **kwargs)
         preset_list = ['high_quality', 'medium_quality']
         assert preset in preset_list, 'preset must be one of ' + ', '.join(preset_list)
+        if od_kwargs is None:
+            od_kwargs = {}
         self.preset = preset
-        self.OD_method = OD_method
-        self.OD_kwargs = OD_kwargs
+        self.OD_method = od_method
+        self.OD_kwargs = od_kwargs
         self.shap_sub_samp = shap_sub_samp
         self.num_anomalies = num_anomalies
         self.fit_train = fit_train
@@ -61,29 +63,29 @@ class AnomalyDetector(AbstractAnalysis):
                 self.OD_method = iforest.IForest
             if self.preset == 'medium_quality':
                 self.OD_method = hbos.HBOS
-        X_train = args['train_data'].copy()
+        x_train = args['train_data'].copy()
         if args['label'] is not None:
             if args['label'] in args['train_data'].columns:
-                X_train = X_train.drop(columns=[args['label']])
+                x_train = x_train.drop(columns=[args['label']])
         feature_generator = AutoMLPipelineFeatureGenerator()
-        train_trans = feature_generator.fit_transform(X=X_train)
+        train_trans = feature_generator.fit_transform(X=x_train)
         if self.fit_train:
             state.top_train_anomalies = self._fit_train(train_trans, **fit_kwargs)
         if 'test_data' in args:
-            X_test = args['test_data'].copy()
+            x_test = args['test_data'].copy()
             if args['label'] is not None:
                 if args['label'] in args['test_data'].columns:
-                    X_test = X_test.drop(columns=[args['label']])
-            test_trans = feature_generator.transform(X_test)
+                    x_test = x_test.drop(columns=[args['label']])
+            test_trans = feature_generator.transform(x_test)
             state.top_test_anomalies = self._fit_test(train_trans, test_trans, **fit_kwargs)
 
     def _fit_train(self, train_trans, **fit_kwargs):
-        X_tr_1 = train_trans.sample(frac = 0.5)
-        X_tr_2 = train_trans.drop(X_tr_1.index)
-        ano_model_1 = self.OD_method(**self.OD_kwargs).fit(X_tr_1, **fit_kwargs)
-        ano_model_2 = self.OD_method(**self.OD_kwargs).fit(X_tr_2, **fit_kwargs)
-        scores_1 = ano_model_2.decision_function(X_tr_1.values)
-        scores_2 = ano_model_1.decision_function(X_tr_2.values)
+        x_tr_1 = train_trans.sample(frac=0.5)
+        x_tr_2 = train_trans.drop(x_tr_1.index)
+        ano_model_1 = self.OD_method(**self.OD_kwargs).fit(x_tr_1, **fit_kwargs)
+        ano_model_2 = self.OD_method(**self.OD_kwargs).fit(x_tr_2, **fit_kwargs)
+        scores_1 = ano_model_2.decision_function(x_tr_1.values)
+        scores_2 = ano_model_1.decision_function(x_tr_2.values)
         scores = [(score, 1, i) for i, score in enumerate(scores_1)]
         scores += [(score, 2, i) for i, score in enumerate(scores_2)]
         scores.sort(key=lambda x: x[0], reverse=True)
@@ -94,11 +96,11 @@ class AnomalyDetector(AbstractAnalysis):
         scores_top_2 = [sco for sco, s, id in scores_top if s == 2]
         shap_vals = []
         if len(top_ano_ids1) > 0:
-            shap_vals += [(a,b,c) for a, (b,c) in zip(scores_top_1,
-                    self._compute_anomaly_shap(ano_model_2, top_ano_ids1, X_tr_1))]
+            shap_vals += [(a, b, c) for a, (b, c) in zip(scores_top_1,
+                          self._compute_anomaly_shap(ano_model_2, top_ano_ids1, x_tr_1))]
         if len(top_ano_ids2) > 0:
-            shap_vals += [(a,b,c) for a, (b,c) in zip(scores_top_2,
-                self._compute_anomaly_shap(ano_model_1, top_ano_ids2, X_tr_2))]
+            shap_vals += [(a, b, c) for a, (b, c) in zip(scores_top_2,
+                          self._compute_anomaly_shap(ano_model_1, top_ano_ids2, x_tr_2))]
         return shap_vals
 
     def _fit_test(self, train_trans, test_trans, **fit_kwargs):
@@ -107,8 +109,8 @@ class AnomalyDetector(AbstractAnalysis):
         scores = clf.decision_function(test_trans.values)
         top_score_ids = scores.argsort()[:-self.num_anomalies-1:-1]
         scores_top = scores[top_score_ids]
-        return [(a,b,c) for a, (b,c) in zip(scores_top,
-                    self._compute_anomaly_shap(clf, top_score_ids, test_trans))]
+        return [(a, b, c) for a, (b, c) in zip(scores_top,
+                self._compute_anomaly_shap(clf, top_score_ids, test_trans))]
 
     def _compute_anomaly_shap(self, clf, top_score_ids, test_trans):
         test_sampler = shap.utils.sample(test_trans.values, self.shap_sub_samp)
