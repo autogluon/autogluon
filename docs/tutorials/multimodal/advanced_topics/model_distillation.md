@@ -1,21 +1,18 @@
-# Knowledge Distillation in AutoMM for Text - in A Multilingual Problem
+# Knowledge Distillation in AutoMM
 :label:`sec_automm_distillation_multilingual`
 
-Pretrained foundation models are becoming increasingly larger these days.  
+Pretrained foundation models are becoming increasingly large. However, these models are difficult to deploy due to 
+limited resources available in deployment scenarios. To benefit from large models under this constraint, 
+you transfer the knowledge from the large-scale teacher models to the student model, with knowledge distillation.
+In this way, the small student model can be practically deployed under real-world scenarios,
+while the performance will be better than training the student model from scratch thanks to the teacher.
 
-During the deployment of neural networks, limited resources always
-prevent us from using a larger models for better performance. 
-To benefit from large models under this constraint, 
-knowledge distillation asks a small student model to learn from a large teacher model.
-In this way, the small student model can be practically deployed under real-world constraints,
-while in the mean time more knowledge is captured by the large teacher model.
-
-In this tutorial, we introduce how `MultiModalPredictor` can help you complete a distillation task. For the purpose of demonstration, 
+In this tutorial, we introduce how to adopt `MultiModalPredictor` for knowledge distillation. For the purpose of demonstration, 
 we use the [Cross-Lingual Paraphrase Adversaries from Word Scrambling (PAWS-X)](https://arxiv.org/pdf/1908.11828.pdf) dataset, 
-which conprises 23,659 human translated PAWS evaluation pairs in six typologically distinct languages:
+which comprises 23,659 human translated PAWS evaluation pairs in six typologically distinct languages:
 French, Spanish, German, Chinese, Japanese, and Korean. 
 We will demonstrate how to use a large model to guide the learning 
-and improve the performance of a small model in Autogluon.
+and improve the performance of a small model in AutoGluon.
 
 ## Load Dataset
 
