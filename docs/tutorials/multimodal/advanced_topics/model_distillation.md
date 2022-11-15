@@ -55,7 +55,9 @@ teacher_predictor = MultiModalPredictor.load("ag_distillation_sample_teacher/")
 
 ## Distill to Student
 
-Training the student model is straight forward. You may just add the `teacher_predictor` argument when calling `.fit()`.
+Training the student model is straight forward. You may just add the `teacher_predictor` argument when calling `.fit()`. 
+Internally, the student will be trained by matching the prediction/feature map from the teacher. It can perform better than 
+directly finetuning the student.
 
 
 ```{.python .input}
@@ -76,36 +78,9 @@ student_predictor.fit(
 print(student_predictor.evaluate(data=test_df))
 ```
 
-## Comparing with Direct Finetuning
-
-We then finetune a small model [mMiniLMv2](https://arxiv.org/abs/2012.15828) without distillation. 
-We can still load the multilingual MiniLMv2 model from Huggingface/Transformers, 
-with the key as [nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large](ahttps://huggingface.co/nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large). 
-To simplify the experiment, we also just finetune for 4 epochs.
-
-
-```{.python .input}
-nodistill_predictor = MultiModalPredictor(label="label")
-nodistill_predictor.fit(
-    train_df,
-    tuning_data=valid_df,
-    hyperparameters={
-        "model.hf_text.checkpoint_name": "google/bert_uncased_L-6_H-768_A-12",
-        "optimization.max_epochs": 2,
-    }
-)
-```
-
-
-```{.python .input}
-print(nodistill_predictor.evaluate(data=test_df))
-```
-
-We can find that via knowledge distillation, the performance of `student_predictor` is better than `nodistill_predictor`.
-
 ## More about Knowledge Distillation
 
-To learn how to customize distillation, see the distillation examples 
+To learn how to customize distillation and how it compares with direct finetuning, see the distillation examples 
 and README in [AutoMM Distillation Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm/distillation).
 Especially the [multilingual distillation example](https://github.com/awslabs/autogluon/tree/master/examples/automm/distillation/automm_distillation_pawsx.py) with more details and customization.
 
