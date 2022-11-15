@@ -2,8 +2,10 @@
 :label:`sec_forecasting_indepth`
 
 This tutorial provides an in-depth overview of the time series forecasting capabilities in AutoGluon.
+Specifically, we will cover:
 
 - What is probabilistic time series forecasting?
+- Forecasting time series with additional information
 - Which forecasting models are available in AutoGluon?
 - How does AutoGluon evaluate performance of time series models?
 - What functionality does `TimeSeriesPredictor` offer?
@@ -17,60 +19,263 @@ This tutorial assumes that you are familiar with the contents of :ref:`sec_forec
 ## What is probabilistic time series forecasting?
 A time series is a sequence of measurements made at regular intervals.
 The main objective of time series forecasting is to predict the future values of a time series given the past observations.
-
 A typical example of this task is demand forecasting.
-We can represent the number of daily purchases of a certain product as a time series.
-The goal in this case can be to predict the demand for each of the next 14 days given the historical purchase data.
-
-In AutoGluon, the `prediction_length` argument of the `TimeSeriesPredictor`
-determines the length of the forecast horizon.
+For example, we can represent the number of daily purchases of a certain product as a time series.
+The goal in this case could be predicting the demand for each of the next 14 days (i.e., the forecast horizon) given the historical purchase data.
+In AutoGluon, the `prediction_length` argument of the `TimeSeriesPredictor` determines the length of the forecast horizon.
 
 ![Main goal of forecasting is to predict the future values of a time series given the past observations.](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth1.png)
-:width:`600px`
+:width:`800px`
 
-
-The `predict` method of a `TimeSeriesPredictor` generates two types of forecasts:
+The objective of forecasting could be to predict future averages of a given time series, as well as establishing prediction intervals within which the future values will likely lie.
+In AutoGluon, the `TimeSeriesPredictor` generates two types of forecasts:
 
 - **mean forecast** represents the expected value of the time series at each time step in the forecast horizon.
 - **quantile forecast** represents the quantiles of the forecast distribution.
-For example, if the `0.1` quantile (also known as P10) is equal to `x`, it means that the time series value is predicted to be below `x` 10% of the time. As another example, the `0.5` quantile (P50) corresponds to the median forecast.
-
-The quantiles can be used to reason about the range of possible outcomes.
+For example, if the `0.1` quantile (also known as P10, or the 10th percentile) is equal to `x`, it means that the time series value is predicted to be below `x` 10% of the time. As another example, the `0.5` quantile (P50) corresponds to the median forecast.
+Quantiles can be used to reason about the range of possible outcomes.
 For instance, by the definition of the quantiles, the time series is predicted to be between the P10 and P90 values with 80% probability.
 
 
 ![Mean and quantile (P10 and P90) forecasts.](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth2.png)
-:width:`600px`
+:width:`800px`
 
-By default, the predictor outputs the quantiles `[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]`. You can train the predictor with custom quantiles using the `quantile_levels` argument
+By default, the `TimeSeriesPredictor` outputs the quantiles `[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]`. Custom quantiles can be provided with the `quantile_levels` argument
 ```python
 predictor = TimeSeriesPredictor(quantile_levels=[0.05, 0.5, 0.95])
 ```
+
+## Forecasting time series with additional information
+In real-world forecasting problems we often have access to additional information, beyond just the raw time series values.
+AutoGluon supports two types of such additional information: static features and known covariates.
+
+### Static features
+Static features are the time-independent attributes (metadata) of a time series.
+These may include information such as:
+
+- location, where the time series was recorded (country, state, city)
+- fixed properties of a product (brand name, color, size, weight)
+- store ID or product ID
+
+Providing this information may, for instance, help forecasting models generate similar demand forecasts for stores located in the same city.
+
+In AutoGluon, static features are stored as an attribute of a `TimeSeriesDataFrame` object.
+As an example, let's have a look at the M4 Daily dataset.
+
+```{.python .input}
+# Hide code 
+import warnings
+warnings.filterwarnings(action="ignore")
+```
+
+```{.python .input}
+import pandas as pd
+from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
+```
+
+We download a subset of 100 time series and the related metadata, similar to the Quickstart tutorial (click on the arrow to show the preprocessing code).
+
+.. raw:: html
+
+   <details>
+   <summary><a>Loader for M4 Daily dataset</a></summary>
+
+```{.python .input}
+pd.set_option('display.max_rows', 6)  # Save space when printing
+
+M4_INFO_URL = "https://github.com/Mcompetitions/M4-methods/raw/master/Dataset/M4-info.csv"
+M4_DAILY_URL = "https://github.com/Mcompetitions/M4-methods/raw/master/Dataset/Train/Daily-train.csv"
+
+def download_m4_daily_dataset(save_path, metadata_save_path=None, num_items_to_load=100):
+    metadata = pd.read_csv(M4_INFO_URL)
+    metadata = metadata[metadata["SP"] == "Daily"].set_index("M4id")
+    # Select a subset of time series for faster processing
+    metadata = metadata.sample(num_items_to_load, random_state=42)
+    if metadata_save_path is not None:
+        metadata["Domain"] = metadata["category"]
+        metadata[["Domain"]].to_csv(metadata_save_path)
+
+    data = pd.read_csv(M4_DAILY_URL, index_col="V1")
+    results = []
+    for item_id in metadata.index:
+        time_series = data.loc[item_id].dropna().values
+        start_time = pd.Timestamp(metadata.loc[item_id]["StartingDate"])
+        timestamps = pd.date_range(start_time, freq="D", periods=len(time_series))
+        results.append(pd.DataFrame({"M4id": [item_id] * len(time_series), "Date": timestamps, "Value": time_series}))
+    result = pd.concat(results, ignore_index=True)
+    result.to_csv(save_path, index=False)
+
+download_m4_daily_dataset(save_path="m4_daily.csv", metadata_save_path="m4_daily_metadata.csv")
+```
+
+.. raw:: html
+
+   </details>
+
+
+We load the individual time series into a `TimeSeriesDataFrame`:
+```{.python .input}
+ts_dataframe = TimeSeriesDataFrame.from_data_frame(
+    pd.read_csv("m4_daily.csv", parse_dates=["Date"]),
+    id_column="M4id",
+    timestamp_column="Date",
+)
+ts_dataframe
+```
+AutoGluon expects static features as a pandas.DataFrame object, where the index column
+
+- is called `"item_id"`
+- includes all the `item_id`s present in the respective TimeSeriesDataFrame.
+```{.python .input}
+static_features = pd.read_csv("m4_daily_metadata.csv", index_col="M4id")
+static_features.index.rename("item_id", inplace=True)
+static_features
+```
+In the M4 Daily dataset, there is a single categorical static feature that denotes the domain of origin for each time series.
+
+We attach the static features to a TimeSeriesDataFrame as follows
+```python
+ts_dataframe.static_features = static_features
+```
+If `static_features` doesn't contain some `item_id`s that are present in `ts_dataframe`, an exception will be raised.
+
+Now, when we fit the predictor, all models that support static features will automatically use the static features included in `ts_dataframe`.
+```python
+predictor = TimeSeriesPredictor(target="Value").fit(ts_dataframe)
+```
+During fitting, the predictor will log how each static feature was interpreted as follows:
+```
+...
+Following types of static features have been inferred:
+	categorical: ['Domain']
+	continuous (float): []
+...
+```
+This message confirms that columns `'Domain'` was interpreted as a categorical feature.
+In general, AutoGluon-TimeSeries supports two types of static features:
+
+- `categorical`: columns of dtype `object`, `string` and `category` are interpreted as discrete categories
+- `continuous`: columns of dtype `int` and `float` are interpreted as continuous (real-valued) numbers
+- columns with other dtypes are ignored
+
+To override this logic, we need to manually change the columns dtype.
+For example, suppose the static features data frame contained an integer-valued column `"store_id"`.
+```python
+ts_dataframe.static_features["store_id"] = list(range(len(ts_dataframe)))
+```
+By default, this column will be interpreted as a continuous number.
+We can force AutoGluon to interpret it a a categorical feature by changing the dtype to `category`.
+```python
+ts_dataframe.static_features["store_id"] = ts_dataframe.static_features["store_id"].astype("category")
+```
+**Note:** If training data contained static features, the predictor will expect that data passed to `predictor.predict()`, `predictor.leaderboard()`, and `predictor.evaluate()` also includes static features with the exact same column names and data types.
+
+
+### Known covariates
+Covariates are the time-varying features that may influence the target time series.
+They are sometimes also referred to as dynamic features, exogenous regressors, or related time series.
+AutoGluon currently supports covariates that are _known in advance_ for the forecast horizon.
+Examples of such covariates include:
+
+- holidays
+- day of the week, month, year
+- promotions 
+- weather forecasts (available in the future via weather forecasts)
+
+![Target time series with one known covariate.](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth4.png)
+:width:`800px`
+
+As an example, we will again use the M4 Daily dataset.
+
+```{.python .input}
+prediction_length = 48
+ts_dataframe = TimeSeriesDataFrame.from_data_frame(
+    pd.read_csv("m4_daily.csv", parse_dates=["Date"]),
+    id_column="M4id",
+    timestamp_column="Date",
+)
+ts_dataframe
+```
+In this example, we will generate a known covariate `Weekend` that equals to 1 if a given day is a weekend, and 0 otherwise.
+First, we generate the covariate for the training set.
+```{.python .input}
+WEEKEND_INDICES = [5, 6]
+timestamps = ts_dataframe.index.get_level_values("timestamp")
+ts_dataframe["Weekend"] = timestamps.weekday.isin(WEEKEND_INDICES).astype(float)
+ts_dataframe
+```
+When creating the TimeSeriesPredictor, we specify that the column `"Value"` is our prediction target, and the
+column `"Weekend"` contains a covariate that will be known at prediction time.
+```python
+predictor = TimeSeriesPredictor(
+    prediction_length=prediction_length,
+    target="Value",
+    known_covariates_names=["Weekend"],
+)
+predictor.fit(ts_dataframe)
+```
+If the data frame contained additional columns (other than those specified in `target` and `known_covariates_names`), they would be ignored.
+
+Next, to make predictions, we generate the known covariates for the forecast horizon
+```{.python .input}
+# Time difference between consecutive timesteps
+offset = pd.tseries.frequencies.to_offset(ts_dataframe.freq)
+
+known_covariates_per_item = []
+for item_id in ts_dataframe.item_ids:
+    time_series = ts_dataframe.loc[item_id]
+    last_day = time_series.index[-1]
+    future_timestamps = pd.date_range(start=last_day + offset, freq=offset, periods=prediction_length)
+    weekend = future_timestamps.weekday.isin(WEEKEND_INDICES).astype(float)
+
+    index = pd.MultiIndex.from_product([[item_id], future_timestamps], names=["item_id", "timestamp"])
+    known_covariates_per_item.append(pd.DataFrame(weekend, index=index, columns=["Weekend"]))
+
+known_covariates = TimeSeriesDataFrame(pd.concat(known_covariates_per_item))
+known_covariates
+```
+Note that `known_covariates` must satisfy the following conditions:
+
+- The columns must include all columns listed in ``predictor.known_covariates_names``
+- The ``item_id`` index must include all item ids present in ``ts_dataframe``
+- The ``timestamp`` index must include the values for ``prediction_length`` many time steps into the future from the end of each time series in ``ts_dataframe``
+
+If `known_covariates` contain more information than necessary (e.g., contain additional columns, item_ids, or timestamps),
+AutoGluon will automatically select the necessary rows and columns.
+
+Finally, we pass the `known_covariates` to the `predict` function to generate predictions
+```python
+predictor.predict(ts_dataframe, known_covariates=known_covariates)
+```
+
+The list of models that support static features and covariates is available in :ref:`forecasting_zoo`.
+
 
 ## Which forecasting models are available in AutoGluon?
 Forecasting models in AutoGluon can be divided into three broad categories: local, global, and ensemble models.
 
 **Local models** are simple statistical models that are specifically designed to capture patterns such as trend or seasonality.
 Despite their simplicity, these models often produce reasonable forecasts and serve as a strong baseline.
-Available local models include:
+Some examples of available local models:
 
 - `ETS`
 - `ARIMA`
 - `Theta`
+- `SeasonalNaive`
 
 If the dataset consists of multiple time series, we fit a separate local model to each time series — hence the name "local".
 This means, if we want to make a forecast for a new time series that wasn't part of the training set, all local models will be fit from scratch for the new time series.
 
 **Global models** are machine learning algorithms that learn a single model from the entire training set consisting of multiple time series.
-AutoGluon relies on [GluonTS](https://ts.gluon.ai/stable/) for the implementation of global models in PyTorch and MXNet.
-Available global models include:
+Most global models in AutoGluon are provided by the [GluonTS](https://ts.gluon.ai/stable/) library.
+These are neural-network algorithms (implemented in PyTorch or MXNet), such as:
 
 - `DeepAR`
 - `SimpleFeedForward`
-- `Transformer`
-- `MQRNN`
-- `MQCNN`
-- `TemporalFusionTransformer`
+- `TemporalFusionTransformerMXNet`
+
+AutoGluon also offers a tree-based global model `AutoGluonTabular`.
+Under the hood, this model converts the forecasting task into a regression problem and uses a :class:`autogluon.tabular.TabularPredictor` to fit gradient-boosted tree algorithms like XGBoost, CatBoost, and LightGBM.
 
 Finally, an **ensemble** model works by combining predictions of all other models.
 By default, `TimeSeriesPredictor` always fits a `WeightedEnsemble` on top of other models.
@@ -111,7 +316,7 @@ _, test_data_multi_window = splitter.split(test_data, prediction_length)
 
 predictor.evaluate(test_data_multi_window)
 ```
-The new test set `test_data_multi_window` will now contain `num_windows` time series for each original time series in `test_data`.
+The new test set `test_data_multi_window` will now contain up to `num_windows` time series for each original time series in `test_data`.
 The score will be computed on the last `prediction_length` time steps of each time series (marked in orange).
 
 ![MultiWindowSplitter splits each original time series into multiple evaluation instances. Forecast is evaluated on the last `prediction_length` timesteps (orange).](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth3.png)
@@ -123,7 +328,7 @@ However, this strategy decreases the amount of training data available for fitti
 
 ### How to choose and interpret the evaluation metric?
 Different evaluation metrics capture different properties of the forecast, and therefore depend on the application that the user has in mind.
-For example, weighted quantile loss (`"mean_wQuantileLoss"`) measures how well-calibrated the quantile forecast is; mean absolute scale error (`"MASE"`) compares the mean forecast to a naive baseline.
+For example, weighted quantile loss (`"mean_wQuantileLoss"`) measures how well-calibrated the quantile forecast is; mean absolute scaled error (`"MASE"`) compares the mean forecast to the performance of a naive baseline.
 For more details about the available metrics, see the documentation for [autogluon.timeseries.evaluator.TimeSeriesEvaluator](https://github.com/awslabs/autogluon/blob/master/timeseries/src/autogluon/timeseries/evaluator.py#L53).
 
 Note that AutoGluon always reports all metrics in a **higher-is-better** format.
@@ -165,30 +370,28 @@ AutoGluon offers multiple ways to configure the behavior of a `TimeSeriesPredict
 We can fit `TimeSeriesPredictor` with different pre-defined configurations using the `presets` argument of the `fit` method.
 
 ```python
-predictor = TimeSeriesPredictor()
-predictor.fit(train_data=train_data, presets="medium_quality")
+predictor = TimeSeriesPredictor(...)
+predictor.fit(train_data, presets="medium_quality")
 ```
 
-Higher quality presets, in general, result in better forecasts but take longer to train.
+Higher quality presets usually result in better forecasts but take longer to train.
 The following presets are available:
 
-<!-- **TODO: These will be significantly changed by 0.6.0** -->
-
-- `"fast_training"`: train simple statistical models (`"ETS"`, `"ARIMA"`, `"Theta"`). These model are fast to train but can be slow at prediction time for unseen data.
-- `"medium_quality"`: train several selected models (`"ETS"`, `"ARIMA"`, `"DeepAR"`, `"SimpleFeedForward"`, `"TemporalFusionTransformer"`) without hyperparameter optimization. A good baseline setting.
-- `"best_quality"`: Train all available models with hyperparameter optimization.
+- ``"fast_training"``: fit simple "local" statistical models (``ETS``, ``ARIMA``, ``Theta``, ``Naive``, ``SeasonalNaive``). These models are fast to train, but cannot capture more complex patters in the data.
+- ``"medium_quality"``: all models in ``"fast_training"`` in addition to the tree-based ``AutoGluonTabular`` and the ``DeepAR`` deep learning model. Default setting that produces good forecasts with reasonable training time.
+- ``"high_quality"``: all models in ``"medium_quality"`` in addition to two more deep learning models: ``TemporalFusionTransformerMXNet`` (if MXNet is available) and ``SimpleFeedForward``. Moreover, this preset will enable hyperparameter optimization for local statistical models. Usually more accurate than ``medium_quality``, but takes longer to train.
+- ``"best_quality"``: all models in ``"high_quality"`` in addition to the transformer-based ``TransformerMXNet`` model (if MXNet is available). This setting also enables hyperparameter optimization for deep learning models. Usually better than ``high_quality``, but takes much longer to train.
 
 Another way to control the training time is using the `time_limit` argument.
 
 ```python
 predictor.fit(
-    train_data=train_data,
+    train_data,
     time_limit=60 * 60,  # total training time in seconds
 )
 ```
 
 If no `time_limit` is provided, the predictor will train until all models have been fit.
-
 
 
 ### Manually configuring models
@@ -201,20 +404,17 @@ Advanced users can override the presets and manually specify what models should 
 predictor = TimeSeriesPredictor(...)
 
 predictor.fit(
-    train_data=train_data,
+    train_data,
     hyperparameters={
         "DeepAR": {},
-        "ETS": {
-            "seasonality": "add",
-            "seasonal_period": 7,
-        }
+        "ETS": {"seasonal_period": 7},
     }
 )
 ```
 The code above will only train two models:
 
 - `DeepAR` (with default hyperparameters)
-- `ETS` (with the given `seasonality` and `seasonal_period`; all other parameters set to their defaults).
+- `ETS` (with the given `seasonal_period`; all other parameters set to their defaults).
 
 For the full list of available models and the respective hyperparameters, see :ref:`forecasting_zoo`.
 
@@ -229,20 +429,24 @@ import autogluon.core as ag
 predictor = TimeSeriesPredictor()
 
 predictor.fit(
-    train_data=train_data,
+    train_data,
     hyperparameters={
         "DeepAR": {
-            "cell_type": "lstm",
-            "num_layers": ag.space.Categorical(2, 3, 4),
-            "num_cells": ag.space.Int(10, 30),
-        }
+            "hidden_size": ag.space.Int(20, 100),
+            "dropout_rate": ag.space.Categorical(0.1, 0.3),
+        },
     },
-    hyperparameter_tune_kwargs="random",
+    hyperparameter_tune_kwargs="auto",
     enable_ensemble=False,
 )
 ```
 This code will train multiple versions of the `DeepAR` model with 10 different hyperparameter configurations.
 AutGluon will automatically select the best model configuration that achieves the highest validation score and use it for prediction.
+
+AutoGluon uses different hyperparameter optimization (HPO) backends for different models:
+
+- Ray Tune for GluonTS models implemented in `MXNet` (e.g., `DeepARMXNet`, `TemporalFusionTransformerMXNet`)
+- Custom backend implementing random search for all other models
 
 We can change the number of random search runs by passing a dictionary as `hyperparameter_tune_kwargs`
 ```python
@@ -256,6 +460,14 @@ predictor.fit(
     ...
 )
 ```
+The `hyperparameter_tune_kwargs` dict must include the following keys:
+
+- ``"num_trials"``: int, number of configurations to train for each tuned model
+- ``"searcher"``: one of ``"random"`` (random search), ``"bayes"`` (bayesian optimization for GluonTS MXNet models, random search for other models) and ``"auto"`` (same as ``"bayes"``).
+- ``"scheduler"``: the only supported option is ``"local"`` (all models trained on the same machine)
+
+**Note:** HPO significantly increases the training time for most models, but often provides only modest performance gains.
+
 
 ### Forecasting irregularly-sampled time series
 By default, `TimeSeriesPredictor` expects the time series data to be regularly sampled (e.g., measurements done every day).
