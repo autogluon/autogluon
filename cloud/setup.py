@@ -23,7 +23,7 @@ install_requires = [
     'boto3',
     'numpy',
     'opencv-python>=4.6,<4.7',
-    'packaging<22'
+    'packaging<22',
     'pandas',
     # TODO: update to the latest after 0.6 container is out
     'sagemaker>=2.94',
