@@ -1727,7 +1727,6 @@ class MultiModalMatcher:
                     "output_shape": self._output_shape,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
-                    "enable_progress_bar": self._enable_progress_bar,
                     "version": ag_version.__version__,
                 },
                 fp,
@@ -1831,8 +1830,6 @@ class MultiModalMatcher:
         matcher._output_shape = assets["output_shape"]
         matcher._column_types = assets["column_types"]
         matcher._validation_metric_name = assets["validation_metric_name"]
-        if "enable_progress_bar" in assets:
-            matcher._enable_progress_bar = assets["enable_progress_bar"]
         matcher._query_df_preprocessor = query_df_preprocessor
         matcher._response_df_preprocessor = response_df_preprocessor
         matcher._label_df_preprocessor = label_df_preprocessor

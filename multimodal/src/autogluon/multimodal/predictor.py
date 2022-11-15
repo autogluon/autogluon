@@ -2687,7 +2687,6 @@ class MultiModalPredictor:
                     "classes": self._classes,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
-                    "enable_progress_bar": self._enable_progress_bar,
                     "version": ag_version.__version__,
                 },
                 fp,
@@ -2887,8 +2886,6 @@ class MultiModalPredictor:
             predictor._classes = assets["classes"]
         predictor._column_types = assets["column_types"]
         predictor._validation_metric_name = assets["validation_metric_name"]
-        if "enable_progress_bar" in assets:
-            predictor._enable_progress_bar = assets["enable_progress_bar"]
         predictor._df_preprocessor = df_preprocessor
         predictor._data_processors = data_processors
 
