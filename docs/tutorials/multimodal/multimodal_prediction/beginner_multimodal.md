@@ -1,4 +1,4 @@
-# AutoMM for Multimodal - Quick Start
+# AutoMM for Image + Text + Tabular - Quick Start
 :label:`sec_automm_multimodal_beginner`
 
 AutoMM is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that are suitable for multimodal datasets. You will only need to convert the data into the multimodal dataframe format

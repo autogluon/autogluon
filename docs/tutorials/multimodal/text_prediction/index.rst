@@ -12,7 +12,7 @@ Text Prediction and Entity Extraction
       :title: AutoMM for Text Prediction - Multilingual Problems
       :link: multilingual_text.html
 
-      How to use MultiModalPredictor to build models on datasets with languages other than English.
+      How to use MultiModalPredictor to build models on multilingual datasets.
 
    .. card::
       :title: Named Entity Recognition with AutoMM - Quick Start

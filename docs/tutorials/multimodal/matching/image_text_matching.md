@@ -1,7 +1,7 @@
 # Image-Text Semantic Matching with AutoMM
 :label:`image_text_matching`
 
-Vision and language are two important aspects of human intelligence to understand the real world. Image-text matching, measuring the visual-semantic
+Vision and language are two important aspects of human intelligence to understand the real world. Image-text semantic matching, measuring the visual-semantic
 similarity between image and text, plays a critical role in bridging the vision and language. 
 Learning a joint space where text
 and image feature vectors are aligned is a typical solution for image-text matching. It is becoming increasingly significant for various vision-and-language tasks,
