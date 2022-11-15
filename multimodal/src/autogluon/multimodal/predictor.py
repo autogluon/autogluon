@@ -417,12 +417,16 @@ class MultiModalPredictor:
         self._model_loaded = False  # Whether the model has been loaded
         self._matcher = None
 
-        self._save_path = setup_save_path(
-            resume=self._resume,
-            proposed_save_path=path,
-            raise_if_exist=True,
-            warn_if_exist=self._warn_if_exist,
-        )
+        if path is not None:
+            self._save_path = setup_save_path(
+                resume=self._resume,
+                proposed_save_path=path,
+                raise_if_exist=True,
+                warn_if_exist=self._warn_if_exist,
+                model_loaded=self._model_loaded,
+            )
+        else:
+            self._save_path = None
 
         if self._problem_type == OBJECT_DETECTION:
             warnings.warn(
