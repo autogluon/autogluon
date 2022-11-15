@@ -2,6 +2,7 @@
 :label:`sec_forecasting_indepth`
 
 This tutorial provides an in-depth overview of the time series forecasting capabilities in AutoGluon.
+Specifically, we will cover:
 
 - What is probabilistic time series forecasting?
 - Forecasting time series with additional information
@@ -18,32 +19,28 @@ This tutorial assumes that you are familiar with the contents of :ref:`sec_forec
 ## What is probabilistic time series forecasting?
 A time series is a sequence of measurements made at regular intervals.
 The main objective of time series forecasting is to predict the future values of a time series given the past observations.
-
 A typical example of this task is demand forecasting.
-We can represent the number of daily purchases of a certain product as a time series.
-The goal in this case could be predicting the demand for each of the next 14 days given the historical purchase data.
-
-In AutoGluon, the `prediction_length` argument of the `TimeSeriesPredictor`
-determines the length of the forecast horizon.
+For example, we can represent the number of daily purchases of a certain product as a time series.
+The goal in this case could be predicting the demand for each of the next 14 days (i.e., the forecast horizon) given the historical purchase data.
+In AutoGluon, the `prediction_length` argument of the `TimeSeriesPredictor` determines the length of the forecast horizon.
 
 ![Main goal of forecasting is to predict the future values of a time series given the past observations.](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth1.png)
 :width:`800px`
 
-
-The `predict` method of a `TimeSeriesPredictor` generates two types of forecasts:
+The objective of forecasting could be to predict future averages of a given time series, as well as establishing prediction intervals within which the future values will likely lie.
+In AutoGluon, the `TimeSeriesPredictor` generates two types of forecasts:
 
 - **mean forecast** represents the expected value of the time series at each time step in the forecast horizon.
 - **quantile forecast** represents the quantiles of the forecast distribution.
-For example, if the `0.1` quantile (also known as P10) is equal to `x`, it means that the time series value is predicted to be below `x` 10% of the time. As another example, the `0.5` quantile (P50) corresponds to the median forecast.
-
-The quantiles can be used to reason about the range of possible outcomes.
+For example, if the `0.1` quantile (also known as P10, or the 10th percentile) is equal to `x`, it means that the time series value is predicted to be below `x` 10% of the time. As another example, the `0.5` quantile (P50) corresponds to the median forecast.
+Quantiles can be used to reason about the range of possible outcomes.
 For instance, by the definition of the quantiles, the time series is predicted to be between the P10 and P90 values with 80% probability.
 
 
 ![Mean and quantile (P10 and P90) forecasts.](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth2.png)
 :width:`800px`
 
-By default, the predictor outputs the quantiles `[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]`. You can train the predictor with custom quantiles using the `quantile_levels` argument
+By default, the `TimeSeriesPredictor` outputs the quantiles `[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]`. Custom quantiles can be provided with the `quantile_levels` argument
 ```python
 predictor = TimeSeriesPredictor(quantile_levels=[0.05, 0.5, 0.95])
 ```
@@ -64,6 +61,12 @@ Providing this information may, for instance, help forecasting models generate s
 
 In AutoGluon, static features are stored as an attribute of a `TimeSeriesDataFrame` object.
 As an example, let's have a look at the M4 Daily dataset.
+
+```{.python .input}
+# Hide code 
+import warnings
+warnings.filterwarnings(action="ignore")
+```
 
 ```{.python .input}
 import pandas as pd
@@ -148,7 +151,7 @@ Following types of static features have been inferred:
 	continuous (float): []
 ...
 ```
-This message means that columns `'Domain'` was interpreted as a categorical feature.
+This message confirms that columns `'Domain'` was interpreted as a categorical feature.
 In general, AutoGluon-TimeSeries supports two types of static features:
 
 - `categorical`: columns of dtype `object`, `string` and `category` are interpreted as discrete categories
@@ -171,14 +174,13 @@ ts_dataframe.static_features["store_id"] = ts_dataframe.static_features["store_i
 ### Known covariates
 Covariates are the time-varying features that may influence the target time series.
 They are sometimes also referred to as dynamic features, exogenous regressors, or related time series.
-
 AutoGluon currently supports covariates that are _known in advance_ for the forecast horizon.
 Examples of such covariates include:
 
 - holidays
 - day of the week, month, year
-- promotions
-- weather forecasts (e.g., historic average temperature for the given day)
+- promotions 
+- weather forecasts (available in the future via weather forecasts)
 
 ![Target time series with one known covariate.](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth4.png)
 :width:`800px`
@@ -326,7 +328,7 @@ However, this strategy decreases the amount of training data available for fitti
 
 ### How to choose and interpret the evaluation metric?
 Different evaluation metrics capture different properties of the forecast, and therefore depend on the application that the user has in mind.
-For example, weighted quantile loss (`"mean_wQuantileLoss"`) measures how well-calibrated the quantile forecast is; mean absolute scale error (`"MASE"`) compares the mean forecast to the performance of a naive baseline.
+For example, weighted quantile loss (`"mean_wQuantileLoss"`) measures how well-calibrated the quantile forecast is; mean absolute scaled error (`"MASE"`) compares the mean forecast to the performance of a naive baseline.
 For more details about the available metrics, see the documentation for [autogluon.timeseries.evaluator.TimeSeriesEvaluator](https://github.com/awslabs/autogluon/blob/master/timeseries/src/autogluon/timeseries/evaluator.py#L53).
 
 Note that AutoGluon always reports all metrics in a **higher-is-better** format.
@@ -376,9 +378,9 @@ Higher quality presets usually result in better forecasts but take longer to tra
 The following presets are available:
 
 - ``"fast_training"``: fit simple "local" statistical models (``ETS``, ``ARIMA``, ``Theta``, ``Naive``, ``SeasonalNaive``). These models are fast to train, but cannot capture more complex patters in the data.
-- ``"medium_quality"``: all models mentioned above + tree-based model ``AutoGluonTabular`` + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
-- ``"high_quality"``: all models mentioned above + hyperparameter optimization for local statistical models + deep learning models ``TemporalFusionTransformerMXNet`` (if MXNet is available) and ``SimpleFeedForward``. Usually more accurate than ``medium_quality``, but takes longer to train.
-- ``"best_quality"``: all models mentioned above + deep learning model ``TransformerMXNet`` (if MXNet is available) + hyperparameter optimization for deep learning models. Usually better than ``high_quality``, but takes much longer to train.
+- ``"medium_quality"``: all models in ``"fast_training"`` in addition to the tree-based ``AutoGluonTabular`` and the ``DeepAR`` deep learning model. Default setting that produces good forecasts with reasonable training time.
+- ``"high_quality"``: all models in ``"medium_quality"`` in addition to two more deep learning models: ``TemporalFusionTransformerMXNet`` (if MXNet is available) and ``SimpleFeedForward``. Moreover, this preset will enable hyperparameter optimization for local statistical models. Usually more accurate than ``medium_quality``, but takes longer to train.
+- ``"best_quality"``: all models in ``"high_quality"`` in addition to the transformer-based ``TransformerMXNet`` model (if MXNet is available). This setting also enables hyperparameter optimization for deep learning models. Usually better than ``high_quality``, but takes much longer to train.
 
 Another way to control the training time is using the `time_limit` argument.
 
