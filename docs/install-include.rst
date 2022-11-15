@@ -21,12 +21,14 @@ Select your preferences below and run the corresponding install commands:
      :title:`OS:`
      :act:`Linux`
      :opt:`Mac`
+     :opt:`Mac - Apple Silicon`
      :opt:`Windows`
 
      .. raw:: html
 
         <div class="mdl-tooltip" data-mdl-for="linux">Linux.</div>
         <div class="mdl-tooltip" data-mdl-for="mac">Mac OSX.</div>
+        <div class="mdl-tooltip" data-mdl-for="mac-apple-silicon">Mac OSX - Apple Silicon.</div>
         <div class="mdl-tooltip" data-mdl-for="windows">Windows.</div>
 
   .. container:: opt-group
@@ -102,7 +104,7 @@ Select your preferences below and run the corresponding install commands:
 
               .. include:: install-macos-no-gpu.rst
 
-     .. container:: M1/M2 mac
+     .. container:: mac-apple-silicon
 
         .. container:: pip
 
