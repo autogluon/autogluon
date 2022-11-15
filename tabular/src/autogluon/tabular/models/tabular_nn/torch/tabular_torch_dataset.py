@@ -9,7 +9,7 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, 
 logger = logging.getLogger(__name__)
 
 
-class TabularTorchDataset(torch.utils.data.Dataset):
+class TabularTorchDataset(torch.utils.data.IterableDataset):
     """
         This class follows the structure of TabularNNDataset in tabular_nn_dataset.py (using Pytorch DataLoader instead of MXNet DataLoader),
 
@@ -122,17 +122,31 @@ class TabularTorchDataset(torch.utils.data.Dataset):
         self.num_categories_per_embed_feature = None
         self.num_categories_per_embedfeature = self.getNumCategoriesEmbeddings()
 
-    def __getitem__(self, idx):
-        output_dict = {}
-        if self.has_vector_features():
-            output_dict['vector'] = self.data_list[self.vectordata_index][idx]
-        if self.num_embed_features() > 0:
-            output_dict['embed'] = []
-            for i in self.embed_indices:
-                output_dict['embed'].append(self.data_list[i][idx])
-        if self.label_index is not None:
-            output_dict['label'] = self.data_list[self.label_index][idx]
-        return output_dict
+        self.has_vector_features = self.vectordata_index is not None
+        self.has_embed_features = len(self.feature_groups['embed']) > 0
+
+    def __iter__(self):
+        idxarray = np.arange(self.num_examples)
+        if self.shuffle:
+            np.random.shuffle(idxarray)
+        indices = range(0, self.num_examples, self.batch_size)
+        for idx_start in indices:
+            if self.drop_last and (idx_start + self.batch_size) > self.num_examples:
+                break
+            idx = range(idx_start, min(self.num_examples, idx_start + self.batch_size))
+            if self.shuffle:
+                idx = idxarray[idx]
+            output_list = []
+            if self.has_vector_features:
+                output_list.append(self.data_list[self.vectordata_index][idx])
+            if self.has_embed_features:
+                output_embed = []
+                for i in self.embed_indices:
+                    output_embed.append(self.data_list[i][idx])
+                output_list.append(output_embed)
+            if self.label_index is not None:
+                output_list.append(self.data_list[self.label_index][idx])
+            yield tuple(output_list)
 
     def __len__(self):
         return self.num_examples
@@ -211,8 +225,10 @@ class TabularTorchDataset(torch.utils.data.Dataset):
     def build_loader(self, batch_size, num_workers, is_test=False):
         def worker_init_fn(worker_id):
             np.random.seed(np.random.get_state()[1][0] + worker_id)
-        loader = torch.utils.data.DataLoader(self, batch_size=batch_size, num_workers=num_workers,
-                                             shuffle=False if is_test else True,
-                                             drop_last=False if is_test else True,
+        self.batch_size = batch_size
+        self.shuffle = False if is_test else True
+        self.drop_last = False if is_test else True
+        loader = torch.utils.data.DataLoader(self, num_workers=num_workers,
+                                             batch_size=None, # no collation
                                              worker_init_fn=worker_init_fn)
         return loader
