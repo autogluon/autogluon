@@ -423,7 +423,6 @@ class MultiModalPredictor:
             proposed_save_path=path,
             raise_if_exist=True,
             warn_if_exist=self._warn_if_exist,
-            model_loaded=self._model_loaded,
         )
 
         if self._problem_type == OBJECT_DETECTION:
