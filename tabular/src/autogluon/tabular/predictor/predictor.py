@@ -3261,7 +3261,7 @@ class TabularPredictor:
                                  f'\tYou can identify the indices which are duplicated via `{name}.index.duplicated(keep=False)`')
 
     @staticmethod
-    def _validate_infer_limit(infer_limit: float, infer_limit_batch_size: int) -> Tuple(float, int):
+    def _validate_infer_limit(infer_limit: float, infer_limit_batch_size: int) -> Tuple[float, int]:
         if infer_limit_batch_size is not None:
             if not isinstance(infer_limit_batch_size, int):
                 raise ValueError(f'infer_limit_batch_size must be type int, but was instead type {type(infer_limit_batch_size)}')
