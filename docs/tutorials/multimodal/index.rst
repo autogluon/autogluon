@@ -193,7 +193,19 @@ Advanced Topics
 
       How to take advantage of larger foundation models with the help of parameter-efficient finetuning.
       In the tutorial, we will use combine IA^3, BitFit, and gradient checkpointing to finetune FLAN-T5-XL.
- 
+
+   .. card::
+      :title: HPO in AutoMM
+      :link: advanced_topics/hyperparameter_optimization.html
+
+      How to do hyperparameter optimization in AutoMM.
+
+   .. card::
+      :title: Knowledge Distillation in AutoMM
+      :link: advanced_topics/model_distillation.html
+
+      How to do knowledge distillation in AutoMM.
+
    .. card::
       :title: Customize AutoMM
       :link: advanced_topics/customization.html
