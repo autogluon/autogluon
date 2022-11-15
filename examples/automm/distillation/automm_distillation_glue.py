@@ -20,6 +20,36 @@ GLUE_METRICS = {
 }
 
 
+def get_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--glue_task", default="qnli", type=str)
+    parser.add_argument("--teacher_model", default="google/bert_uncased_L-12_H-768_A-12", type=str)
+    parser.add_argument("--student_model", default="google/bert_uncased_L-6_H-768_A-12", type=str)
+    parser.add_argument("--seed", default=123, type=int)
+    parser.add_argument("--max_epochs", default=1000, type=int)
+    parser.add_argument("--time_limit", default=None, type=int)
+    parser.add_argument("--num_gpu", default=-1, type=int)
+    parser.add_argument("--temperature", default=5.0, type=float)
+    parser.add_argument("--hard_label_weight", default=0.1, type=float)
+    parser.add_argument("--soft_label_weight", default=1.0, type=float)
+    parser.add_argument("--train_nodistill", default=True, type=bool,
+                        help="Whether to train the student model without distillation.")
+    parser.add_argument("--softmax_regression_weight", default=0.1, type=float)
+    parser.add_argument("--output_feature_loss_weight", default=0.01, type=float)
+    parser.add_argument("--rkd_distance_loss_weight", default=0.0, type=float)
+    parser.add_argument("--rkd_angle_loss_weight", default=0.0, type=float)
+    parser.add_argument("--soft_label_loss_type", default="", type=str)
+    parser.add_argument("--softmax_regression_loss_type", default="mse", type=str)
+    parser.add_argument("--output_feature_loss_type", default="mse", type=str)
+    parser.add_argument(
+        "--save_path",
+        default="./AutogluonModels/cache_finetuned",
+        type=str,
+    )
+    parser.add_argument("--resume", action="store_true")
+    return parser
+
+
 def main(args):
     assert args.glue_task in (list(GLUE_METRICS.keys()) + ["mnlim", "mnlimm"]), "Unsupported dataset name."
 
@@ -81,7 +111,7 @@ def main(args):
     except:
         print("No pretrained model at: %s" % nodistill_predictor_path)
         resume_nodistill = False
-    if not resume_nodistill:
+    if not resume_nodistill and args.train_nodistill:
         nodistill_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
         nodistill_predictor.fit(
             train_df,
@@ -99,19 +129,10 @@ def main(args):
     nodistill_result = nodistill_predictor.evaluate(data=valid_df, metrics=GLUE_METRICS[glue_task]["eval"])
 
     ### Distill and evaluate a student model
-    from autogluon.multimodal.constants import MODEL, DATA, OPTIMIZATION, ENVIRONMENT, DISTILLER
 
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        DISTILLER: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
     student_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
     student_predictor.fit(
         train_df,
-        config=config,
         hyperparameters={
             "env.num_gpus": args.num_gpu,
             "optimization.max_epochs": args.max_epochs,
@@ -157,30 +178,6 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--glue_task", default="qnli", type=str)
-    parser.add_argument("--teacher_model", default="google/bert_uncased_L-12_H-768_A-12", type=str)
-    parser.add_argument("--student_model", default="google/bert_uncased_L-6_H-768_A-12", type=str)
-    parser.add_argument("--seed", default=123, type=int)
-    parser.add_argument("--max_epochs", default=1000, type=int)
-    parser.add_argument("--time_limit", default=None, type=int)
-    parser.add_argument("--num_gpu", default=-1, type=int)
-    parser.add_argument("--temperature", default=5.0, type=float)
-    parser.add_argument("--hard_label_weight", default=0.1, type=float)
-    parser.add_argument("--soft_label_weight", default=1.0, type=float)
-    parser.add_argument("--softmax_regression_weight", default=0.1, type=float)
-    parser.add_argument("--output_feature_loss_weight", default=0.01, type=float)
-    parser.add_argument("--rkd_distance_loss_weight", default=0.0, type=float)
-    parser.add_argument("--rkd_angle_loss_weight", default=0.0, type=float)
-    parser.add_argument("--soft_label_loss_type", default="", type=str)
-    parser.add_argument("--softmax_regression_loss_type", default="mse", type=str)
-    parser.add_argument("--output_feature_loss_type", default="mse", type=str)
-    parser.add_argument(
-        "--save_path",
-        default="./AutogluonModels/cache_finetuned",
-        type=str,
-    )
-    parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
 
     main(args)
