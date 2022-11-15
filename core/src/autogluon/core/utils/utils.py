@@ -365,7 +365,7 @@ def generate_train_test_split(X: DataFrame,
                               problem_type: str,
                               test_size: float = 0.1,
                               random_state=0,
-                              min_cls_count_train=1) -> Tuple(DataFrame, DataFrame, Series, Series):
+                              min_cls_count_train=1) -> Tuple[DataFrame, DataFrame, Series, Series]:
     if (test_size <= 0.0) or (test_size >= 1.0):
         raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
 
