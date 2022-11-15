@@ -696,6 +696,7 @@ class MultiModalMatcher:
                 distance_type=config.matcher.distance.type,
             )
 
+        self._config = config
         self._query_config = query_config
         self._response_config = response_config
         self._query_model = query_model
