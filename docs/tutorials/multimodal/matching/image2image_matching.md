@@ -1,4 +1,4 @@
-# Image-to-Image Matching with AutoMM 
+# Image-to-Image Semantic Matching with AutoMM 
 :label:`image2image_matching`
 
 Computing the similarity between two images is a common task in computer vision, with several practical applications such as detecting same or different product, etc. In general, image similarity models will take two images as input and transform them into vectors, and then similarity scores calculated using cosine similarity, dot product, or Euclidean distances are used to measure how alike or different of the two images. 
@@ -12,7 +12,7 @@ warnings.filterwarnings('ignore')
 ```
 
 ## Prepare your Data
-In this tutorial, we will demonstrate how to use AutoMM for image-to-image matching with the simplified Stanford Online Products dataset ([SOP](https://cvgl.stanford.edu/projects/lifted_struct/)). 
+In this tutorial, we will demonstrate how to use AutoMM for image-to-image semantic matching with the simplified Stanford Online Products dataset ([SOP](https://cvgl.stanford.edu/projects/lifted_struct/)). 
 
 Stanford Online Products dataset is introduced for metric learning. There are 12 categories of products in this dataset: bicycle, cabinet, chair, coffee maker, fan, kettle, lamp, mug, sofa, stapler, table and toaster. Each category has some products, and each product has several images captured from different views. Here, we consider different views of the same product as positive pairs (labeled as 1) and images from different products as negative pairs (labeled as 0). 
 

@@ -1,10 +1,10 @@
-# Text-to-Text Matching with AutoMM 
+# Text-to-Text Semantic Matching with AutoMM 
 :label:`text2text_matching`
 
 Computing the similarity between two sentences/passages is a common task in NLP, with several practical applications such as web search, question answering, documents deduplication, plagiarism comparison, natural language inference, recommendation engines, etc. In general, text similarity models will take two sentences/passages as input and transform them into vectors, and then similarity scores calculated using cosine similarity, dot product, or Euclidean distances are used to measure how alike or different of the two text pieces. 
 
 ## Prepare your Data
-In this tutorial, we will demonstrate how to use AutoMM for text-to-text matching with the Stanford Natural Language Inference ([SNLI](https://nlp.stanford.edu/projects/snli/)) corpus. SNLI is a corpus contains around 570k human-written sentence pairs labeled with *entailment*, *contradiction*, and *neutral*. It is a widely used benchmark for evaluating the representation and inference capbility of machine learning methods. The following table contains three examples taken from this corpus.
+In this tutorial, we will demonstrate how to use AutoMM for text-to-text semantic matching with the Stanford Natural Language Inference ([SNLI](https://nlp.stanford.edu/projects/snli/)) corpus. SNLI is a corpus contains around 570k human-written sentence pairs labeled with *entailment*, *contradiction*, and *neutral*. It is a widely used benchmark for evaluating the representation and inference capbility of machine learning methods. The following table contains three examples taken from this corpus.
 
 | Premise                                                   | Hypothesis                                                           | Label         |
 |-----------------------------------------------------------|----------------------------------------------------------------------|---------------|

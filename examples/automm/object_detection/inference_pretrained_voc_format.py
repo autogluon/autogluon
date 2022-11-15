@@ -34,7 +34,7 @@ def tutorial_script_for_eval_pretrained_voc_format():
 
     test_path = "VOCdevkit/VOC2007"
 
-    pred = predictor.predict(test_path, save_results=True, result_path="VOCdevkit/VOC2007/results.txt")
+    pred = predictor.predict(test_path, save_results=True)
 
 
 def eval_pretrained_voc_format(
@@ -52,7 +52,7 @@ def eval_pretrained_voc_format(
         pipeline="object_detection",
     )
 
-    pred = predictor.predict(test_path, save_results=save_results, result_path=result_path)
+    pred = predictor.predict(test_path, save_results=save_results)
 
 
 if __name__ == "__main__":
@@ -61,7 +61,6 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint_name", default="faster_rcnn_r50_fpn_1x_voc0712", type=str)
     parser.add_argument("--num_gpus", default=1, type=int)
     parser.add_argument("--save_results", action="store_true")
-    parser.add_argument("--result_path", default=None, type=str)
     args = parser.parse_args()
 
     eval_pretrained_voc_format(
@@ -69,5 +68,4 @@ if __name__ == "__main__":
         checkpoint_name=args.checkpoint_name,
         num_gpus=args.num_gpus,
         save_results=args.save_results,
-        result_path=args.result_path,
     )

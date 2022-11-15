@@ -12,10 +12,10 @@ The total time to prepare the dataset depends on your Internet speed and disk pe
 COCO has an [official download page](https://cocodataset.org/#download), 
 but it's always easier to perform a one-step setup.
 We prepared a bash script for one-step downloading the COCO17 dataset: 
-[download_coco17.sh](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/download_coco17.sh).
+[download_coco17.sh](https://raw.githubusercontent.com/awslabs/autogluon/master/examples/automm/object_detection/download_coco17.sh).
 Or you can also use our cli tool `prepare_detection_dataset` that can download all datasets mentioned in our tutorials.
 This python script is in our code: 
-[prepare_detection_dataset.py](https://github.com/awslabs/autogluon/tree/master/autogluon/multimodal/src/autogluon/multimodal/cli/prepare_detection_dataset.py),
+[prepare_detection_dataset.py](https://raw.githubusercontent.com/awslabs/autogluon/master/multimodal/src/autogluon/multimodal/cli/prepare_detection_dataset.py),
 and you can also run it as a cli: `python3 -m autogluon.multimodal.cli.prepare_detection_dataset`.
 
 ### Download with Python Script
@@ -112,7 +112,7 @@ annotations  test2017  train2017  unlabeled2017  val2017
 
 COCO also refers to the specific format (in `.json` file) the COCO dataset is using.
 In Autogluon MultiModalPredictor, we strongly recommend using this as your data format.
-Check \[COCO format Custom Dataset] and \[Convert VOC to COCO] for more information
+Check :ref:`sec_automm_detection_convert_to_coco` and :ref:`sec_automm_detection_voc_to_coco` for more information
 about create a COCO format dataset from scratch or from other format, especially VOC format.
 
 ### Other Examples

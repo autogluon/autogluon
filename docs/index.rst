@@ -109,7 +109,7 @@ Launch Tutorial Notebooks
    :file: static/platforms.html
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :hidden:
 
    tutorials/tabular_prediction/index

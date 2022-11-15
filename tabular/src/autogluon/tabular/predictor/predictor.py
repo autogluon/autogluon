@@ -1478,7 +1478,7 @@ class TabularPredictor:
         return self._learner.evaluate_predictions(y_true=y_true, y_pred=y_pred, sample_weight=sample_weight, silent=silent,
                                                   auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
-    def leaderboard(self, data=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, silent=False):
+    def leaderboard(self, data=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, skip_score=False, silent=False):
         """
         Output summary of information about models produced during `fit()` as a :class:`pd.DataFrame`.
         Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
@@ -1590,6 +1590,10 @@ class TabularPredictor:
             At minimum this will include the model with the highest score and the model with the lowest inference time.
             This is useful when deciding which model to use during inference if inference time is a consideration.
             Models filtered out by this process would never be optimal choices for a user that only cares about model inference time and score.
+        skip_score : bool, default = False
+            [Advanced, primarily for developers]
+            If `True`, will skip computing `score_test` if `data` is specified. `score_test` will be set to NaN for all models.
+            `pred_time_test` and related columns will still be computed.
         silent : bool, default = False
             Should leaderboard DataFrame be printed?
 
@@ -1600,7 +1604,7 @@ class TabularPredictor:
         self._assert_is_fit('leaderboard')
         data = self.__get_dataset(data) if data is not None else data
         return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
-                                         only_pareto_frontier=only_pareto_frontier, silent=silent)
+                                         only_pareto_frontier=only_pareto_frontier, skip_score=skip_score, silent=silent)
 
     def fit_summary(self, verbosity=3, show_plot=False):
         """

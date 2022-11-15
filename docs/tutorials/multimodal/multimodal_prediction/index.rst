@@ -13,7 +13,7 @@ Multimodal Classification / Regression
       :title: AutoMM for Image + Text + Tabular - Quick Start
       :link: beginner_multimodal.html
 
-      How to use MultiModalPredictor to train a model that predicts the adoption speed of pets.
+      How to use MultiModalPredictor to train a model on data with image, text, numerical, and categorical features.
 
 
 .. toctree::
