@@ -15,7 +15,7 @@ from autogluon.multimodal import MultiModalPredictor
 We use the Faster R-CNN with ResNet50 as backbone and Feature Pyramid Network (FPN) as neck.
 This is the only model we support that is pretrained on VOC.
 It's always recommended to finetune a model pretrained on COCO which is a larger dataset with more complicated task.
-To test other model structures on VOC, check \[Fast Finetune on COCO format data] and \[Fast Finetune on VOC format data].
+To test other model structures on VOC, check :ref:`sec_automm_detection_voc_to_coco` and :ref:`sec_automm_detection_fast_finetune_coco`.
 
 ```python
 checkpoint_name = "faster_rcnn_r50_fpn_1x_voc0712"
@@ -35,7 +35,7 @@ predictor = MultiModalPredictor(
 )
 ```
 
-Here we use VOC2007 for testing: \[Prepare VOC Dataset].
+Here we use VOC2007 for testing: :ref:`sec_automm_detection_prepare_voc`.
 While using VOC format dataset, the input is the root path of the dataset, and contains at least:
 
 ```

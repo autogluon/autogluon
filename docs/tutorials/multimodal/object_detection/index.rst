@@ -19,16 +19,6 @@ For additional support, please refer to official instructions for mmdet_ and mmc
 .. _mmdet: https://mmdetection.readthedocs.io/en/v2.2.1/install.html
 .. _mmcv-full: https://mmcv.readthedocs.io/en/latest/get_started/installation.html
 
-Quick Start
-------------------
-.. container:: cards
-
-   .. card::
-      :title: Quick Start on a Tiny COCO Format Dataset
-      :link: quick_start/quick_start_coco.html
-
-      How to train high quality object detection model with MultiModalPredictor in under 5 minutes on COCO format dataset.
-
 
 Quick Start
 ------------------
@@ -92,12 +82,6 @@ Inference
 .. container:: cards
 
    .. card::
-      :title: Load A Trained Detector
-      :link: inference/detection_load_predictor.html
-
-      How to load and use a trained predictor
-
-   .. card::
       :title: Inference using a pretrained model - Quick Start
       :link: inference/detection_inference_quick_start.html
 
@@ -146,7 +130,7 @@ Evaluation
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :hidden:
 
    quick_start/index
