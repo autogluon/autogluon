@@ -142,6 +142,10 @@ class MultiModalPredictorModel(AbstractModel):
             X_val = self.preprocess(X_val)
         # Get arguments from kwargs
         verbosity = kwargs.get('verbosity', 2)
+        if verbosity <= 2:
+            enable_progress_bar = False
+        else:
+            enable_progress_bar = True
         num_gpus = kwargs.get('num_gpus', None)
         if sample_weight is not None:  # TODO: support
             logger.log(15, "sample_weight not yet supported for MultiModalPredictorModel, "
@@ -159,23 +163,29 @@ class MultiModalPredictorModel(AbstractModel):
         root_log_level = root_logger.level
         # in self.save(), the model is saved to automm_nn_path
         automm_nn_path = os.path.join(self.path, self._NN_MODEL_NAME)
-        self.model = MultiModalPredictor(label=self._label_column_name,
-                                     problem_type=self.problem_type,
-                                     path=automm_nn_path,
-                                     eval_metric=self.eval_metric,
-                                     verbosity=verbosity_text)
+        self.model = MultiModalPredictor(
+            label=self._label_column_name,
+            problem_type=self.problem_type,
+            path=automm_nn_path,
+            eval_metric=self.eval_metric,
+            verbosity=verbosity_text,
+            enable_progress_bar=enable_progress_bar,
+        )
 
         if num_gpus is not None:
             params['env.num_gpus'] = num_gpus
         presets = params.pop('presets', None)
         seed = params.pop('seed', 0)
 
-        self.model.fit(train_data=X,
-                       tuning_data=X_val,
-                       time_limit=time_limit,
-                       presets=presets,
-                       hyperparameters=params,
-                       seed=seed)
+        self.model.fit(
+            train_data=X,
+            tuning_data=X_val,
+            time_limit=time_limit,
+            presets=presets,
+            hyperparameters=params,
+            seed=seed,
+        )
+
         self.model.set_verbosity(verbosity)
         root_logger.setLevel(root_log_level)  # Reset log level
 
