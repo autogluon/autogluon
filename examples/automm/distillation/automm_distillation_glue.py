@@ -126,7 +126,7 @@ def main(args):
             seed=args.seed,
         )
         nodistill_predictor.save(nodistill_predictor_path)
-    nodistill_result = nodistill_predictor.evaluate(data=valid_df, metrics=GLUE_METRICS[glue_task]["eval"])
+        nodistill_result = nodistill_predictor.evaluate(data=valid_df, metrics=GLUE_METRICS[glue_task]["eval"])
 
     ### Distill and evaluate a student model
 

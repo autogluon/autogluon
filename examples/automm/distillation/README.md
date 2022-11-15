@@ -86,19 +86,25 @@ of teacher and student.
 
 Here we show the importance of output feature loss.
 
-```
-glue_task = qnli
-Teacher Model = google/bert_uncased_L-12_H-768_A-12
-Student Model = google/bert_uncased_L-6_H-768_A-12
-seed = 123
-max_epoch = 12
-metric = "accuracy"
-temperature = 5
-hard_label_weight = 0.1
-soft_label_weight = 1
-```
+```bash
+glue_task=qnli
+teacher_model=google/bert_uncased_L-12_H-768_A-12
+student_model=google/bert_uncased_L-6_H-768_A-12
+seed=123
+max_epoch=12
+metric="accuracy"
+temperature=5
+hard_label_weight=0.1
+soft_label_weight=1
 
-`python3 automm_distillation.py --teacher_model google/bert_uncased_L-12_H-768_A-12 --student_model google/bert_uncased_L-6_H-768_A-12 --seed 123 --max_epoch 8 --hard_label_weight 0.5 --soft_label_weight 5`
+python3 automm_distillation_glue.py --teacher_model ${teacher_model} \
+                                    --student_model ${student_model} \
+                                    --seed ${seed} \
+                                    --max_epoch ${max_epoch} \
+                                    --hard_label_weight ${hard_label_weight} \
+                                    --soft_label_weight ${soft_label_weight} \
+                                    --glue_task ${glue_task}
+```
 
 | output_feature_loss_weight | Teacher Model Acc | Pretrained Model Acc | Student Model Acc | Distillation Ratio [2] | Speed Up |
 | -------------------------- | ----------------- | -------------------- | ----------------- | ---------------------- | -------- |
