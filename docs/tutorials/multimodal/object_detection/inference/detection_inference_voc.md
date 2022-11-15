@@ -166,28 +166,26 @@ The `.txt` file therefore also has two columns, `image` and `bboxes`, where
 ## Visualizing Results
 To run visualizations, ensure that you have `opencv` installed. If you haven't already, install `opencv` by running 
 ```{.python}
-pip install opencv-python
+!pip install opencv-python
 ```
 
 To visualize the detection bounding boxes, run the following:
 ```{.python}
-from autogluon.multimodal.utils import from_coco_or_voc, visualize_detection
-import matplotlib.pyplot as plt
+from autogluon.multimodal.utils import visualize_detection
 conf_threshold = 0.4  # Specify a confidence threshold to filter out unwanted boxes
 visualization_result_dir = "~/data/VOCdevkit/VOC2007/visualizations"  # Specify a directory to save visualized images.
 
-df = from_coco_or_voc(test_path)[:10][["image"]]  # we took 10 images for this example.
-
-pred = predictor.predict(df)
-
 visualized = visualize_detection(
-    pred=pred,
+    pred=pred.iloc[:10],  # we took the first 10 images for this example
     detection_classes=predictor.get_predictor_classes(),
     conf_threshold=conf_threshold,
     visualization_result_dir=visualization_result_dir,
 )
 
-plt.imshow(visualized[0][:, : ,::-1])  # shows the first image with bounding box
+from PIL import Image
+from IPython.display import display
+img = Image.fromarray(visualized[0][:, :, ::-1], 'RGB')
+display(img)
 ```
 Note that we took 10 images to visualize for this example. 
 Please consider your storage situation when deciding the number of images to visualize.  

@@ -97,8 +97,7 @@ To run visualizations, ensure that you have `opencv` installed. If you haven't a
 
 To visualize the detection bounding boxes, run the following:
 ```{.python .input}
-from autogluon.multimodal.utils import from_coco_or_voc, visualize_detection
-from matplotlib import pyplot as plt
+from autogluon.multimodal.utils import visualize_detection
 
 conf_threshold = 0.4  # Specify a confidence threshold to filter out unwanted boxes
 visualization_result_dir = "./"  # Use the pwd as result dir
@@ -110,7 +109,10 @@ visualized = visualize_detection(
     visualization_result_dir=visualization_result_dir,
 )
 
-plt.imshow(visualized[0][:, : ,::-1])  # shows the first image with bounding box
+from PIL import Image
+from IPython.display import display
+img = Image.fromarray(visualized[0][:, :, ::-1], 'RGB')
+display(img)
 ```
 
 ### Other Examples
