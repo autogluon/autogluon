@@ -30,6 +30,17 @@ Quick Start
       How to train high quality object detection model with MultiModalPredictor in under 5 minutes on COCO format dataset.
 
 
+Quick Start
+------------------
+.. container:: cards
+
+   .. card::
+      :title: Quick Start on a Tiny COCO Format Dataset
+      :link: quick_start/quick_start_coco.html
+
+      How to train high quality object detection model with MultiModalPredictor in under 5 minutes on COCO format dataset.
+
+
 Data Preparation
 ------------------
 .. container:: cards
@@ -84,7 +95,25 @@ Inference
       :title: Load A Trained Detector
       :link: inference/detection_load_predictor.html
 
-      How to load and evaluate a trained predictor
+      How to load and use a trained predictor
+
+   .. card::
+      :title: Inference using a pretrained model - Quick Start
+      :link: inference/detection_inference_quick_start.html
+
+      How to inference with a pretrained model on a small dataset (COCO Format)
+
+   .. card::
+      :title: Inference using a pretrained model - COCO dataset
+      :link: inference/detection_inference_coco.html
+
+      How to inference with a pretrained model on COCO dataset
+
+   .. card::
+      :title: Inference using a pretrained model - VOC dataset
+      :link: inference/detection_inference_voc.html
+
+      How to inference with a pretrained model on VOC dataset
 
 
 Evaluation

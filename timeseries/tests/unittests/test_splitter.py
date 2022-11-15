@@ -29,7 +29,7 @@ def test_when_multi_window_splitter_splits_then_train_items_have_correct_length(
     train_data, _ = splitter.split(ts_dataframe=ts_dataframe, prediction_length=prediction_length)
     original_lengths = ts_dataframe.num_timesteps_per_item()
 
-    for item_id, length in original_lengths.iteritems():
+    for item_id, length in original_lengths.items():
         num_windows_from_this_item = min(num_windows, max((length - 1) // prediction_length - 1, 0))
         expected_length = length - num_windows_from_this_item * prediction_length
         assert expected_length == len(train_data.loc[item_id])
