@@ -32,7 +32,7 @@ def download_one_url(url, root_dir):
     print(f"Downloading {fname}...")
 
     r = requests.get(url)
-    with open(fname, "wb") as f:
+    with open(output_path, "wb") as f:
         f.write(r.content)
 
     return output_path

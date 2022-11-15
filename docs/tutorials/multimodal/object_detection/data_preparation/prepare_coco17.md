@@ -15,7 +15,7 @@ We prepared a bash script for one-step downloading the COCO17 dataset:
 [download_coco17.sh](https://raw.githubusercontent.com/awslabs/autogluon/master/examples/automm/object_detection/download_coco17.sh).
 Or you can also use our cli tool `prepare_detection_dataset` that can download all datasets mentioned in our tutorials.
 This python script is in our code: 
-[prepare_detection_dataset.py](https://github.com/awslabs/autogluon/tree/master/autogluon/multimodal/src/autogluon/multimodal/cli/prepare_detection_dataset.py),
+[prepare_detection_dataset.py](https://raw.githubusercontent.com/awslabs/autogluon/master/multimodal/src/autogluon/multimodal/cli/prepare_detection_dataset.py),
 and you can also run it as a cli: `python3 -m autogluon.multimodal.cli.prepare_detection_dataset`.
 
 ### Download with Python Script

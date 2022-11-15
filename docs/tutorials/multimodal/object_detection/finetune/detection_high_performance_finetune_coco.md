@@ -83,6 +83,7 @@ For more information about how to tune those hyperparameters,
 see :ref:`sec_automm_detection_tune_hyperparameters`.
 We also compute the time of the fit process here for better understanding the speed.
 ```python
+import time
 start = time.time()
 predictor.fit(
     train_path,
