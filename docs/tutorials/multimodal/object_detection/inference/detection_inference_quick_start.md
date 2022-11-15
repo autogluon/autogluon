@@ -6,13 +6,22 @@ The model we use is the VFNet pretrained on COCO dataset.
 
 ## Prepare data
 ```{.python .input}
+import warnings
+warnings.filterwarnings('ignore')
+np.random.seed(123)
+
 import os
 import time
 ```
 
 Download the example image:
 ```{.python .input}
-!wget https://raw.githubusercontent.com/dmlc/web-data/master/gluoncv/detection/street_small.jpg -q -O input.jpg
+from autogluon.multimodal import download
+```
+```{.python .input}
+from autogluon.multimodal import download
+image_url = "https://raw.githubusercontent.com/dmlc/web-data/master/gluoncv/detection/street_small.jpg"
+test_image = download(image_url)
 ```
 
 [//]: # (Now let's download the dataset)
@@ -65,14 +74,6 @@ predictor = MultiModalPredictor(
     },
     problem_type="object_detection",
 )
-```
-
-## Setting up data
-
-For COCO format data, we need to provide the path for the data split used for inference.
-
-```{.python .input}
-test_image = "./input.jpg"
 ```
 
 ## Running inference
