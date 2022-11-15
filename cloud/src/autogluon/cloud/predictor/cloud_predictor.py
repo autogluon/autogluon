@@ -1025,14 +1025,14 @@ class CloudPredictor(ABC):
     def _download_predictor(self, path, save_path):
         logger.log(20, 'Downloading trained models to local directory')
         predictor_bucket, predictor_key_prefix = s3_path_to_bucket_prefix(path)
-        tarball_path = os.path.join(save_path, 'model.tar.gz')
         self.sagemaker_session.download_data(
-            path=tarball_path,
+            path=save_path,
             bucket=predictor_bucket,
             key_prefix=predictor_key_prefix,
         )
         logger.log(20, 'Extracting the trained model tarball')
-        save_path = os.path.join(save_path, 'AutogluonModels')
+        tarball_path = os.path.join(save_path, 'model.tar.gz')
+        save_path = os.path.join(save_path, 'AutoGluonModels')
         unzip_file(tarball_path, save_path)
         return save_path
 
