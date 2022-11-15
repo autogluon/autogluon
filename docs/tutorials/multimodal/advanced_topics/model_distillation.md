@@ -17,7 +17,10 @@ sentence pairs in English. In the label column, `0` means that the sentence is n
 
 
 ```{.python .input}
+import datasets
 from datasets import load_dataset
+
+datasets.logging.disable_progress_bar()
 
 dataset = load_dataset("glue", "qnli")
 ```
