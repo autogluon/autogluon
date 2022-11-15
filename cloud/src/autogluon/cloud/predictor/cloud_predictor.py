@@ -11,6 +11,7 @@ import sagemaker
 from abc import ABC, abstractmethod
 from botocore.exceptions import ClientError
 from datetime import datetime
+from packaging import version
 from typing import Optional
 
 from autogluon.common.loaders import load_pd
@@ -254,6 +255,9 @@ class CloudPredictor(ABC):
             framework_version, py_versions = self._retrieve_latest_framework_version(framework_type)
             py_version = py_versions[0]
         else:
+            # Cloud supports 0.6+ containers
+            if version.parse(framework_version) < version.parse("0.6.0"):
+                raise ValueError('Cloud module only supports 0.6+ containers.')
             valid_options = retrieve_available_framework_versions(framework_type)
             assert framework_version in valid_options, f'{framework_version} is not a valid option. Options are: {valid_options}'
 
@@ -856,8 +860,6 @@ class CloudPredictor(ABC):
             Any extra arguments needed to pass to transform.
             Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/transformer.html#sagemaker.transformer.Transformer.transform for all options.
         """
-        # Sagemaker batch transformation is able to take in headers during the most recent test
-        # logger.warning('Please remove headers of the test data and make sure the columns are in the same order as the training data.')
         if not predictor_path:
             predictor_path = self._fit_job.get_output_path()
             assert predictor_path, 'No cloud trained model found.'

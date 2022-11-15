@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import pandas as pd
 
 from autogluon.core.constants import REGRESSION
@@ -8,16 +9,13 @@ from io import BytesIO, StringIO
 from PIL import Image
 
 
-image_index = 0
-
-
 def _save_image_and_update_dataframe_column(bytes):
-    global image_index
-    im = Image.open(BytesIO(base64.b85decode(bytes)))
-    im_name = f'tabular_image_{image_index}.png'
+    im_bytes = base64.b85decode(bytes)
+    im_hash = hashlib.md5(im_bytes).hexdigest()
+    im = Image.open(BytesIO(im_bytes))
+    im_name = f'tabular_image_{im_hash}.png'
     im.save(im_name)
-
-    return im_name
+    print(f'Image saved as {im_name}')
 
 
 def model_fn(model_dir):

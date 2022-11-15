@@ -1,35 +1,24 @@
 import base64
 import copy
+import hashlib
 import os
 import pandas as pd
 import numpy as np
 
-import autogluon.text  # Needed to check for multimodal version
-
 from autogluon.core.constants import BINARY, MULTICLASS
 from autogluon.core.utils import get_pred_from_proba_df
-
-from distutils.version import LooseVersion
-if LooseVersion(autogluon.text.__version__) < LooseVersion('0.5'):
-    from autogluon.text.automm import AutoMMPredictor
-    multimodal_predictor_cls = AutoMMPredictor
-else:
-    from autogluon.multimodal import MultiModalPredictor
-    multimodal_predictor_cls = MultiModalPredictor
+from autogluon.multimodal import MultiModalPredictor
 
 from io import BytesIO, StringIO
 from PIL import Image
 
 
-image_index = 0
-
-
 def _save_image_and_update_dataframe_column(bytes):
-    global image_index
-    im = Image.open(BytesIO(base64.b85decode(bytes)))
-    im_name = f'multimodal_image_{image_index}.png'
+    im_bytes = base64.b85decode(bytes)
+    im_hash = hashlib.md5(im_bytes).hexdigest()
+    im = Image.open(BytesIO(im_bytes))
+    im_name = f'multimodal_image_{im_hash}.png'
     im.save(im_name)
-    image_index += 1
     print(f'Image saved as {im_name}')
 
     return im_name
@@ -44,7 +33,7 @@ def _cleanup_images():
 
 def model_fn(model_dir):
     """loads model from previously saved artifact"""
-    model = multimodal_predictor_cls.load(model_dir)
+    model = MultiModalPredictor.load(model_dir)
     label_column = model._label_column
     column_types = copy.copy(model._column_types)
     column_types.pop(label_column)
@@ -75,9 +64,10 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         buf = BytesIO(request_body)
         data = np.load(buf, allow_pickle=True)
         image_paths = []
-        for i, bytes in enumerate(data):
-            im = Image.open(BytesIO(base64.b85decode(bytes)))
-            im_name = f'{i}.png'
+        for bytes in data:
+            im_bytes = base64.b85decode(bytes)
+            im_name = hashlib.md5(im_bytes).hexdigest()
+            im = Image.open(BytesIO(im_bytes))
             im.save(im_name)
             image_paths.append(im_name)
 

@@ -17,13 +17,11 @@ class ScriptManager:
     TRAIN_SCRIPT_PATH = os.path.join(SCRIPTS_PATH, 'train.py')
     TABULAR_SERVE_SCRIPT_PATH = os.path.join(SCRIPTS_PATH, 'tabular_serve.py')
     TEXT_SERVE_SCRIPT_PATH = os.path.join(SCRIPTS_PATH, 'text_serve.py')
-    TEXT_AUTOMM_SERVE_SCRIPT_PATH = os.path.join(SCRIPTS_PATH, 'text_serve_automm.py')
     IMAGE_SERVE_SCRIPT_PATH = os.path.join(SCRIPTS_PATH, 'image_serve.py')
     MULTIMODAL_SERVE_SCRIPT_PATH = os.path.join(SCRIPTS_PATH, 'multimodal_serve.py')
     _SERVE_SCRIPT_MAP = dict(
         tabular=TABULAR_SERVE_SCRIPT_PATH,
         text=TEXT_SERVE_SCRIPT_PATH,
-        text_automm=TEXT_AUTOMM_SERVE_SCRIPT_PATH,
         image=IMAGE_SERVE_SCRIPT_PATH,
         multimodal=MULTIMODAL_SERVE_SCRIPT_PATH,
     )
@@ -37,6 +35,4 @@ class ScriptManager:
     @classmethod
     def get_serve_script(cls, predictor_type, framework_version):
         assert predictor_type in ['tabular', 'text', 'image', 'multimodal']
-        if predictor_type == 'text' and LooseVersion(framework_version) >= LooseVersion('0.4'):
-            predictor_type = 'text_automm'
         return cls._SERVE_SCRIPT_MAP[predictor_type]

@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import os
 import pandas as pd
 import numpy as np
@@ -30,9 +31,10 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         buf = BytesIO(request_body)
         data = np.load(buf, allow_pickle=True)
         image_paths = []
-        for i, bytes in enumerate(data):
-            im = Image.open(BytesIO(base64.b85decode(bytes)))
-            im_name = f'{i}.png'
+        for bytes in data:
+            im_bytes = base64.b85decode(bytes)
+            im_name = hashlib.md5(im_bytes).hexdigest()
+            im = Image.open(BytesIO(im_bytes))
             im.save(im_name)
             image_paths.append(im_name)
 
