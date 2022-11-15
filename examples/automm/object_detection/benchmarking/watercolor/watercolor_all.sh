@@ -1,0 +1,12 @@
+#echo "yolo"
+#bash watercolor_yolo.sh
+#echo "faster"
+#bash watercolor_faster.sh
+echo "centercascade"
+bash watercolor_centercascade.sh
+echo "detr"
+bash watercolor_detr.sh
+echo "vfnet"
+bash watercolor_vfnet.sh
+echo "atssssdsparse"
+bash watercolor_atssssdsparse.sh
