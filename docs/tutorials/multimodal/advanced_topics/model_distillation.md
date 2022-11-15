@@ -32,7 +32,7 @@ dataset['train']
 from sklearn.model_selection import train_test_split
 
 train_valid_df = dataset["train"].to_pandas()[["question", "sentence", "label"]].sample(1000, random_state=123)
-train_df, valid_df = train_test_split(train_valid_df, test_size=0.2)
+train_df, valid_df = train_test_split(train_valid_df, test_size=0.2, random_state=123)
 test_df = dataset["validation"].to_pandas()[["question", "sentence", "label"]].sample(1000, random_state=123)
 ```
 
