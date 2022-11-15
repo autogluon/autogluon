@@ -15,7 +15,7 @@ class AnomalyVisualization(AbstractVisualization, JupyterMixin):
         self.headers = headers
 
     def can_handle(self, state: AnalysisState) -> bool:
-        keys_pres = self._at_least_one_key_must_be_present(state, ['top_train_anomalies', 'top_test_anomalies'])
+        keys_pres = 'top_train_anomalies' in state or 'top_test_anomalies' in state
         return keys_pres
 
     def _display_anom_water(self, score, test_samp, shap_data) -> None:

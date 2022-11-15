@@ -2,25 +2,28 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Optional
 
 from pandas import DataFrame
 
-from .. import AnalysisState
+from ..state import AnalysisState, StateCheckMixin
 
 logger = logging.getLogger(__name__)
 
+__all__ = ['AbstractAnalysis', 'BaseAnalysis', 'Namespace']
 
-class AbstractAnalysis(ABC):
+
+class AbstractAnalysis(ABC, StateCheckMixin):
 
     def __init__(self,
-                 parent: Union[None, AbstractAnalysis] = None,
+                 parent: Optional[AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
+                 state: Optional[AnalysisState] = None,
                  **kwargs) -> None:
 
         self.parent = parent
         self.children: List[AbstractAnalysis] = children
-        self.state: AnalysisState = None
+        self.state: AnalysisState = state
         for c in self.children:
             c.parent = self
             c.state = self.state
@@ -74,6 +77,27 @@ class AbstractAnalysis(ABC):
         return state
 
     @abstractmethod
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        """
+        Checks if state and args has all the required parameters for fitting.
+        See also :func:`at_least_one_key_must_be_present` and :func:`all_keys_must_be_present` helpers
+        to construct more complex logic.
+
+        Parameters
+        ----------
+        state: AnalysisState
+            state to be updated by this fit function
+        args: AnalysisState
+            analysis properties assembled from root of analysis hierarchy to this component (with lower levels shadowing upper level args).
+
+        Returns
+        -------
+            `True` if all the pre-requisites for fitting are present
+
+        """
+        raise NotImplemented
+
+    @abstractmethod
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         """
         @override
@@ -106,13 +130,34 @@ class AbstractAnalysis(ABC):
 
         """
         self.state = self._get_state_from_parent()
-        self._fit(self.state, self._gather_args(), **kwargs)
-        for c in self.children:
-            c.fit(**kwargs)
+        _args = self._gather_args()
+        if self.can_handle(self.state, _args):
+            self._fit(self.state, _args, **kwargs)
+            for c in self.children:
+                c.fit(**kwargs)
         return self.state
 
 
-class Namespace(AbstractAnalysis, ABC):
+class BaseAnalysis(AbstractAnalysis):
+
+    def __init__(self,
+                 parent: Union[None, AbstractAnalysis] = None,
+                 children: List[AbstractAnalysis] = [],
+                 **kwargs) -> None:
+        super().__init__(parent, children, **kwargs)
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+        pass
+
+
+class Namespace(AbstractAnalysis):
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
+
     def __init__(self,
                  namespace: str = None,
                  parent: Union[None, AbstractAnalysis] = None,
@@ -126,5 +171,6 @@ class Namespace(AbstractAnalysis, ABC):
 
     def _get_state_from_parent(self) -> AnalysisState:
         state = super()._get_state_from_parent()
-        state[self.namespace] = {}
+        if self.namespace not in state:
+            state[self.namespace] = {}
         return state[self.namespace]

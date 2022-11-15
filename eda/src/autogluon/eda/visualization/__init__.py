@@ -3,4 +3,5 @@ from .interaction import *
 from .layouts import *
 from .model import *
 from .shift import *
-from .anomaly import *
+from .missing import *
+from .anomaly import AnomalyVisualization

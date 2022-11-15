@@ -117,3 +117,6 @@ class AnomalyDetector(AbstractAnalysis):
         shap_values = explainer(test_trans.values[top_score_ids, :])
         top_anomalies = [(test_trans.iloc[aid, :], sv) for aid, sv in zip(top_score_ids, shap_values)]
         return top_anomalies
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return 'train_data' in args
