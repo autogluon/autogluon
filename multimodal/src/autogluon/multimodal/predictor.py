@@ -1033,9 +1033,7 @@ class MultiModalPredictor:
         # verify that student and teacher configs are consistent.
         assert self._problem_type == teacher_predictor._problem_type
         assert self._label_column == teacher_predictor._label_column
-        assert self._eval_metric_name == teacher_predictor._eval_metric_name
         assert self._output_shape == teacher_predictor._output_shape
-        assert self._validation_metric_name == teacher_predictor._validation_metric_name
 
         # if teacher and student have duplicate model names, change teacher's model names
         # we don't change student's model names to avoid changing the names back when saving the model.

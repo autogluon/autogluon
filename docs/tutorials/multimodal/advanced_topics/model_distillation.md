@@ -8,7 +8,7 @@ In this way, the small student model can be practically deployed under real-worl
 while the performance will be better than training the student model from scratch thanks to the teacher.
 
 In this tutorial, we introduce how to adopt `MultiModalPredictor` for knowledge distillation. For the purpose of demonstration, 
-we use the [Cross-Lingual Paraphrase Adversaries from Word Scrambling (PAWS-X)](https://arxiv.org/pdf/1908.11828.pdf) dataset, 
+we use the [Question-answering NLI](https://paperswithcode.com/dataset/qnli) dataset, 
 which comprises 23,659 human translated PAWS evaluation pairs in six typologically distinct languages:
 French, Spanish, German, Chinese, Japanese, and Korean. 
 We will demonstrate how to use a large model to guide the learning 
