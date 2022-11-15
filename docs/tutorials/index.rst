@@ -180,7 +180,7 @@ Cloud Training and Deployment
 
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 4
    :hidden:
 
    image_prediction/index
