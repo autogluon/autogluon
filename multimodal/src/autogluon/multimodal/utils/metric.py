@@ -171,6 +171,7 @@ def compute_score(
     """
     if metric_name == OVERALL_ACCURACY:
         metric = evaluate.load("seqeval")
+        warnings.filterwarnings("ignore", message="Recall and F-score are ill-defined")
         return metric.compute(references=metric_data[Y_TRUE], predictions=metric_data[Y_PRED])
 
     metric = get_metric(metric_name)
