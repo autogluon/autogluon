@@ -88,3 +88,13 @@ class FTTransformerModel(MultiModalPredictorModel):
             "num_cpus": 1,
             "num_gpus": 0,  # allow FT_Transformer to be trained on CPU only
         }
+
+    @classmethod
+    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
+        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
+        extra_ag_args_ensemble = {
+            'fold_fitting_strategy': 'auto',
+            'fold_fitting_strategy_gpu': 'sequential_local',  # Crashes when using GPU in parallel bagging
+        }
+        default_ag_args_ensemble.update(extra_ag_args_ensemble)
+        return default_ag_args_ensemble
