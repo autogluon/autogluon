@@ -88,9 +88,7 @@ Select your preferences below and run the corresponding install commands:
 
            .. container:: gpu
 
-              .. note::
-
-                 GPU usage is not yet supported on Mac OSX, please use Linux or Windows to utilize GPUs in AutoGluon.
+              .. include:: install-macos-no-gpu.rst
 
         .. container:: source
 
@@ -102,9 +100,29 @@ Select your preferences below and run the corresponding install commands:
 
            .. container:: gpu
 
-              .. note::
+              .. include:: install-macos-no-gpu.rst
 
-                 GPU usage is not yet supported on Mac OSX , please use Linux or Windows to utilize GPUs in AutoGluon.
+     .. container:: M1/M2 mac
+
+        .. container:: pip
+
+           .. container:: cpu
+
+              .. include:: install-macos-apple-silicon.rst
+
+           .. container:: gpu
+
+              .. include:: install-macos-no-gpu.rst
+
+        .. container:: source
+
+           .. container:: cpu
+
+              .. include:: install-macos-apple-silicon.rst
+
+           .. container:: gpu
+
+              .. include:: install-macos-no-gpu.rst
 
      .. container:: windows
 
