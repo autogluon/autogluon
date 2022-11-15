@@ -6,7 +6,6 @@ import unittest
 
 
 s3_url = 'https://autogluon.s3.us-west-2.amazonaws.com/datasets/ano_test_hep.csv'
-#s3_url = '../data/ano_test_hep.csv'
 
 def load_data():
     A = pd.read_csv(s3_url, index_col=0)

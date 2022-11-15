@@ -1,6 +1,5 @@
 from typing import Union, List, Callable
 
-import pandas as pd
 import shap
 from pyod.models import hbos, iforest
 from autogluon.features.generators import AutoMLPipelineFeatureGenerator
