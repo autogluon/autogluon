@@ -36,6 +36,16 @@ tabular_presets_dict = dict(
     # Fit only interpretable models.
     interpretable={'auto_stack': False, 'hyperparameters': 'interpretable'},
 
+    experimental_best_quality={'auto_stack': True, 'hyperparameters': 'default_FTT'},
+    experimental_high_quality={
+        'auto_stack': True,
+        'refit_full': True,
+        'set_best_to_refit_full': True,
+        '_save_bag_folds': False,
+        'hyperparameters': 'default_FTT',
+    },
+    experimental_ultra_quality={'auto_stack': True, 'hyperparameters': 'default_FTT', 'ag_args_ensemble': {'use_child_oof': False}},
+
     # TODO: Consider HPO-enabled configs if training time doesn't matter but inference latency does.
 )
 
