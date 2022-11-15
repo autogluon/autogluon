@@ -124,7 +124,8 @@ class NerProcessor:
         A dictionary containing one NER sample's features and/or labels.
         """
         ret = {}
-        if self.max_len is not None:
+        # overwrite model_max_length for standalone checkpoints if it's not specified.
+        if self.max_len is not None and self.tokenizer.model_max_length > 10**6:
             self.tokenizer.model_max_length = self.max_len
         text_column, annotation_column = None, None
         for column_name, column_modality in feature_modalities.items():
