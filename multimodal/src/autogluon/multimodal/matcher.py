@@ -589,14 +589,15 @@ class MultiModalMatcher:
             presets = "siamese_network"
 
         if presets == "siamese_network":
-            if self._config is None:
+            if self._config is not None:  # continuous training
+                config = self._config
+
                 config = get_config(
                     presets=presets,
+                    config=config,
                     overrides=hyperparameters,
                     extra=["matcher"],
                 )
-            else:
-                config = self._config
 
             if self._query_config is None:
                 query_config = copy.deepcopy(config)
