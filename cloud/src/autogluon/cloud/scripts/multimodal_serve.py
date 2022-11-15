@@ -66,7 +66,8 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         image_paths = []
         for bytes in data:
             im_bytes = base64.b85decode(bytes)
-            im_name = hashlib.md5(im_bytes).hexdigest()
+            im_hash = hashlib.md5(im_bytes).hexdigest()
+            im_name = f'multimodal_image_{im_hash}.png'
             im = Image.open(BytesIO(im_bytes))
             im.save(im_name)
             image_paths.append(im_name)

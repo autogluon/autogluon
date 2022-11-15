@@ -17,6 +17,8 @@ def _save_image_and_update_dataframe_column(bytes):
     im.save(im_name)
     print(f'Image saved as {im_name}')
 
+    return im_name
+
 
 def model_fn(model_dir):
     """loads model from previously saved artifact"""
