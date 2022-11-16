@@ -114,12 +114,6 @@ Object Detection
       How to finetune a pretrained model on a dataset in COCO format with high performance.
 
    .. card::
-      :title: Inference using a pretrained model - Quick Start
-      :link: object_detection/inference/detection_inference_quick_start.html
-
-      How to inference with a pretrained model on a small dataset (COCO Format)
-
-   .. card::
       :title: Inference using a pretrained model - COCO dataset
       :link: object_detection/inference/detection_inference_coco.html
 
