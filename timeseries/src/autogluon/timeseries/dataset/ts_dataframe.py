@@ -109,6 +109,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         super().__init__(data=data, *args, **kwargs)
         self._static_features: Optional[pd.DataFrame] = None
         if static_features is not None:
+            # TODO: These two checks should go inside the setter
             if isinstance(static_features, pd.Series):
                 static_features = static_features.to_frame()
             if not isinstance(static_features, pd.DataFrame):
@@ -155,6 +156,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
         # subset to ensure consistency
         if value is not None and len(set(value.index) - set(self.item_ids)) > 0:
             value = value.loc[self.item_ids].copy()
+
+        if value is not None and value.index.name != ITEMID:
+            value = value.copy()
+            value.index.rename(ITEMID, inplace=True)
 
         self._static_features = value
 
@@ -318,6 +323,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if timestamp_column is not None:
             assert timestamp_column in df.columns, f"Column {timestamp_column} not found!"
             df.rename(columns={timestamp_column: TIMESTAMP}, inplace=True)
+
+        if not df[TIMESTAMP].dtype == "datetime64[ns]":
+            df[TIMESTAMP] = pd.to_datetime(df[TIMESTAMP])
 
         cls._validate_data_frame(df)
         return df.set_index([ITEMID, TIMESTAMP])

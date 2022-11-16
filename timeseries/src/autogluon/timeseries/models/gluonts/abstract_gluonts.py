@@ -21,6 +21,7 @@ from autogluon.core.utils.savers import save_pkl
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.features import get_categorical_and_continuous_features
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_root_logger
 
 logger = logging.getLogger(__name__)
@@ -361,7 +362,10 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                     )
 
         # Make sure the item_ids are sorted in the same order as in data
-        return df.loc[data.item_ids]
+        df = df.loc[data.item_ids]
+        # Set correct timestamp index
+        df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
+        return df
 
     def _predict_gluonts_forecasts(
         self, data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame] = None, **kwargs
