@@ -394,7 +394,7 @@ class CloudPredictor(ABC):
         job_name=None,
         instance_type='ml.m5.2xlarge',
         instance_count=1,
-        volume_size=100,
+        volume_size=256,
         custom_image_uri=None,
         wait=True,
         autogluon_sagemaker_estimator_kwargs=dict(),
