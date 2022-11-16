@@ -25,22 +25,6 @@ image_url = "https://raw.githubusercontent.com/dmlc/web-data/master/gluoncv/dete
 test_image = download(image_url)
 ```
 
-[//]: # (Now let's download the dataset)
-
-
-[//]: # (download_dir = "./tiny_motorbike_coco"  # specify a target download dir to store this dataset)
-
-[//]: # ()
-[//]: # (load_zip.unzip&#40;zip_file, unzip_dir=download_dir&#41;)
-
-[//]: # (data_dir = os.path.join&#40;download_dir, "tiny_motorbike"&#41;)
-
-[//]: # (train_path = os.path.join&#40;data_dir, "Annotations", "train_cocoformat.json"&#41;)
-
-[//]: # (test_path = os.path.join&#40;data_dir, "Annotations", "test_cocoformat.json"&#41;)
-
-[//]: # (```)
-
 ## Creating the `MultiModalPredictor`
 To start, import MultiModalPredictor:
 ```{.python .input}
