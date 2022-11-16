@@ -26,11 +26,19 @@ def test_existing_save_path_but_empty_folder(save_path):
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=dataset.metric,
+        hyperparameters={
+            "optimization.max_epochs": 1,
+            "model.names": ["numerical_mlp"],
+            "data.categorical.convert_to_text": False,
+            "data.numerical.convert_to_text": False,
+            "env.num_workers": 0,
+            "env.num_workers_evaluation": 0,
+        },
     )
     predictor.fit(train_data=dataset.train_df, save_path=save_path)
 
     shutil.rmtree(abs_path)
-    
+
 
 @pytest.mark.parametrize(
     "save_path",
@@ -43,9 +51,9 @@ def test_existing_save_path_but_empty_folder(save_path):
 def test_existing_save_path_with_content_inside(save_path):
     abs_path = os.path.abspath(os.path.expanduser(save_path))
     os.makedirs(abs_path, exist_ok=True)
-    dummy_file_path = os.path.join(abs_path, 'dummy.txt')
-    with open(dummy_file_path, 'w') as f:
-        f.write('dummy')
+    dummy_file_path = os.path.join(abs_path, "dummy.txt")
+    with open(dummy_file_path, "w") as f:
+        f.write("dummy")
     with pytest.raises(ValueError):
         predictor = MultiModalPredictor(path=save_path)
 
