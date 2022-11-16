@@ -128,7 +128,7 @@ To accelerate the training, we downsample the number of training sampels to be 2
 ```{.python .input}
 # Just for clean the space
 clear_cache()
-shutil.rmtree("multilingual_ia3")
+shutil.rmtree(model_path)
 ```
 
 
@@ -203,7 +203,7 @@ Score in the English Testset: {'roc_auc': 0.931263189629183}
 ```python
 # Just for clean the space
 clear_cache()
-shutil.rmtree("multilingual_ia3_gradient_checkpoint")
+shutil.rmtree(new_model_path)
 ```
 
 ## Other Examples
