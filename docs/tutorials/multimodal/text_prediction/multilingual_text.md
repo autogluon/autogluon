@@ -75,7 +75,7 @@ predictor = MultiModalPredictor(label='label')
 predictor.fit(train_de_df,
               hyperparameters={
                   'model.hf_text.checkpoint_name': 'bert-base-german-cased',
-                  'optimization.max_epochs': 4
+                  'optimization.max_epochs': 2
               })
 ```
 
@@ -118,7 +118,7 @@ predictor = MultiModalPredictor(label='label')
 predictor.fit(train_en_df,
               presets='multilingual',
               hyperparameters={
-                  'optimization.max_epochs': 4
+                  'optimization.max_epochs': 2
               })
 ```
 
