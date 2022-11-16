@@ -9,11 +9,13 @@ In this tutorial, we are going to again use the subset of the [Shopee-IET datase
 We can load a dataset by downloading a url data automatically:
 
 ```{.python .input}
-import autogluon.core as ag
-from autogluon.multimodal import MultiModalPredictor
-from autogluon.vision import ImageDataset
+import warnings
+warnings.filterwarnings('ignore')
 from datetime import datetime
-train_data, _, test_data = ImageDataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
+
+from autogluon.multimodal.utils.misc import shopee_dataset
+download_dir = './ag_automm_tutorial_hpo'
+train_data, test_data = shopee_dataset(download_dir)
 train_data = train_data.sample(frac=0.5)
 print(train_data)
 ```
@@ -27,6 +29,7 @@ Recall that if we are to use the default settings predefined by Autogluon, we ca
 
 
 ```{.python .input}
+from autogluon.multimodal import MultiModalPredictor
 predictor_regular = MultiModalPredictor(label="label")
 start_time = datetime.now()
 predictor_regular.fit(
@@ -55,6 +58,7 @@ There are a few options we can have in MultiModalPredictor. We use [Ray Tune](ht
 
 1. Defining the search space of various `hyperparameter` values for the training of neural networks:
 
+<ul>
 ```
 hyperparameters = {
         "optimization.learning_rate": tune.uniform(0.00005, 0.005),
@@ -64,7 +68,6 @@ hyperparameters = {
         }
 ```
 
-<ul>
 This is an example but not an exhaustive list. You can find the full supported list in [Customize AutoMM](https://auto.gluon.ai/stable/tutorials/multimodal/customization.html#sec-automm-customization)
 </ul>
     
