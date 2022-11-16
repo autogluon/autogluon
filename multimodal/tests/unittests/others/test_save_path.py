@@ -23,19 +23,19 @@ def test_existing_save_path_but_empty_folder(save_path):
 
     dataset = PetFinderDataset()
     predictor = MultiModalPredictor(
-        label=dataset.label_columns[0],
-        problem_type=dataset.problem_type,
-        eval_metric=dataset.metric,
+        label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric
+    )
+    predictor.fit(
+        train_data=dataset.train_df,
         hyperparameters={
-            "optimization.max_epochs": 1,
-            "model.names": ["numerical_mlp"],
-            "data.categorical.convert_to_text": False,
-            "data.numerical.convert_to_text": False,
             "env.num_workers": 0,
             "env.num_workers_evaluation": 0,
+            "model.names": ["timm_image", "hf_text", "fusion_mlp"],
+            "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+            "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
         },
+        time_limit=10,
     )
-    predictor.fit(train_data=dataset.train_df, save_path=save_path)
 
     shutil.rmtree(abs_path)
 
@@ -104,3 +104,7 @@ def test_continuous_training_save_path():
     predictor_loaded = MultiModalPredictor.load(save_path)
     predictor_loaded.fit(train_data=dataset.train_df, time_limit=10)
     assert predictor_loaded.path != abs_path and f"AutogluonModels{os.path.sep}ag-" in predictor.path
+
+
+if __name__ == "__main__":
+    test_existing_save_path_but_empty_folder("an_empty_existing_path")
