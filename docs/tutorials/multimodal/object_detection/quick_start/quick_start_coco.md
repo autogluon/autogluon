@@ -45,7 +45,6 @@ and `test_cocoformat.json` is the annotation file of the test split.
 We select the YOLOv3 with MobileNetV2 as backbone,
 and input resolution is 320x320, pretrained on COCO dataset. With this setting, it is fast to finetune or inference,
 and easy to deploy.
-For more model choices, see :label:`sec_automm_detection_selecting_models`.
 And we use all the GPUs (if any):
 
 ```python .input
@@ -83,8 +82,6 @@ Using a two-stage learning rate with high learning rate only on head layers make
 the model converge faster during finetuning. It usually gives better performance as well,
 especially on small datasets with hundreds or thousands of images.
 We also set the epoch to be 15 and batch_size to be 32.
-For more information about how to tune those hyperparameters,
-see :ref:`sec_automm_detection_tune_hyperparameters`.
 We also compute the time of the fit process here for better understanding the speed.
 We run it on a g4.2xlarge EC2 machine on AWS,
 and part of the command outputs are shown below:
@@ -164,8 +161,7 @@ better_predictor.evaluate(test_path)
 ```
 
 For how to set those hyperparameters and finetune the model with higher performance, 
-see :ref:`sec_automm_detection_high_performance_finetune_coco`.
-
+see :ref:`sec_automm_detection_high_ft_coco`.
 ### Other Examples
 
 You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
