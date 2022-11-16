@@ -39,7 +39,7 @@ AutoMM detection requires `mmcv-full` and `mmdet` packages. Please make sure `mm
 
 ### Use a pretrained model
 You can download a pretrained model and construct a predictor with it. 
-In this example, we use the VFNet with ResNext as backbone and Feature Pyramid Network (FPN) as neck.
+In this example, we use the YOLOv3 with MobileNet backbone.
 
 ```{.python .input}
 checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
@@ -109,11 +109,12 @@ To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization
 
 ### Citation
 ```
-@inproceedings{zhang2021varifocalnet,
-  title={Varifocalnet: An iou-aware dense object detector},
-  author={Zhang, Haoyang and Wang, Ying and Dayoub, Feras and Sunderhauf, Niko},
-  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
-  pages={8514--8523},
-  year={2021}
+@misc{redmon2018yolov3,
+    title={YOLOv3: An Incremental Improvement},
+    author={Joseph Redmon and Ali Farhadi},
+    year={2018},
+    eprint={1804.02767},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
 }
 ```
