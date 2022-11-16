@@ -395,7 +395,8 @@ def medium_quality_faster_inference_image_text_similarity():
 def best_quality_ner():
     return {
         "model.names": ["ner_text"],
-        "model.ner_text.checkpoint_name": "microsoft/deberta-v3-base",
+        "model.ner_text.checkpoint_name": "microsoft/deberta-v3-large",
+        "env.per_gpu_batch_size": 4,
     }
 
 
