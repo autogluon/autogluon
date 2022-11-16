@@ -15,9 +15,24 @@ We can load a dataset by downloading a url data automatically:
 ```{.python .input}
 import warnings
 warnings.filterwarnings('ignore')
-from autogluon.vision import ImageDataset
-train_dataset, _, test_dataset = ImageDataset.from_folders("https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip")
-print(train_dataset)
+import pandas as pd
+
+download_dir = './ag_automm_tutorial_imgcls'
+zip_file = 'https://automl-mm-bench.s3.amazonaws.com/vision_datasets/shopee.zip'
+from autogluon.core.utils.loaders import load_zip
+load_zip.unzip(zip_file, unzip_dir=download_dir)
+
+dataset_path = os.path.join(download_dir, "shopee")
+train_data = pd.read_csv(f'{dataset_path}/train.csv')
+test_data = pd.read_csv(f'{dataset_path}/test.csv')
+
+def path_expander(path, base_folder):
+    path_l = path.split(';')
+    return ';'.join([os.path.abspath(os.path.join(base_folder, path)) for path in path_l])
+
+train_data["image"] = train_data["image"].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
+test_data["image"] = test_data["image"].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
+print(train_data)
 ```
 
 We can see there are 800 rows and 2 columns in this training dataframe. The 2 columns are **image** and **label**, and each row represents a different training sample.
@@ -31,12 +46,12 @@ Now, we fit a classifier using AutoMM as follows:
 from autogluon.multimodal import MultiModalPredictor
 predictor = MultiModalPredictor(label="label", path="./automm_imgcls")
 predictor.fit(
-    train_data=train_dataset,
+    train_data=train_data,
     time_limit=30, # seconds
 ) # you can trust the default config, e.g., we use a `swin_base_patch4_window7_224` model
 ```
 
-**label** is the name of the column that contains the target variable to predict, e.g., it is "label" in our example. **path** indicates the directory where models and intermediate outputs should be saved. We set the training time limit to 30 seconds for demonstration purpose, but you can control the training time by setting configurations. To customize AutoMM, please refer to :ref:`sec_automm_customization`.
+**label** is the name of the column that contains the target variable to predict, e.g., it is "label" in our example. We set the training time limit to 30 seconds for demonstration purpose, but you can control the training time by setting configurations. To customize AutoMM, please refer to :ref:`sec_automm_customization`.
 
 
 ## Evaluate on Test Dataset
@@ -44,7 +59,7 @@ predictor.fit(
 You can evaluate the classifier on the test dataset to see how it performs, the test top-1 accuracy is:
 
 ```{.python .input}
-scores = predictor.evaluate(test_dataset, metrics=["accuracy"])
+scores = predictor.evaluate(test_data, metrics=["accuracy"])
 print('Top-1 test acc: %.3f' % scores["accuracy"])
 ```
 
@@ -54,7 +69,7 @@ print('Top-1 test acc: %.3f' % scores["accuracy"])
 Given an example image, let's visualize it first,
 
 ```{.python .input}
-image_path = test_dataset.iloc[0]['image']
+image_path = test_data.iloc[0]['image']
 from IPython.display import Image, display
 pil_img = Image(filename=image_path)
 display(pil_img)
