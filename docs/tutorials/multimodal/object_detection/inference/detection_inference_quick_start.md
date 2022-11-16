@@ -6,6 +6,7 @@ The model we use is the VFNet pretrained on COCO dataset.
 
 ## Prepare data
 ```{.python .input}
+import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
 np.random.seed(123)
