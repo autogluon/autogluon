@@ -13,7 +13,7 @@ AutoMM detection requires `mmcv-full` and `mmdet` packages. Please make sure `mm
 
 ## Prepare data
 For running this tutorial, you should have COCO dataset prepared.
-If you haven't already, head over to :label:`sec_automm_detection_prepare_coco17` to learn how to get COCO dataset.
+If you haven't already, head over to :ref:`sec_automm_detection_prepare_coco17` to learn how to get COCO dataset.
 This tutorial assumes that COCO dataset is under `~/data`, i.e. it is located in `~/data/coco17`
 
 ## Creating the `MultiModalPredictor`

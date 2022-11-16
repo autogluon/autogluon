@@ -3,8 +3,9 @@
 
 In this section, we show an example to run inference on VOC2007 dataset that is in VOC Format. 
 Different from running evaluation, the purpose is to get detection results for potential down-stream tasks. 
-For more details about the VOC format, please see \[Convert VOC to COCO].
+For more details about the data format, please see :ref:`sec_automm_detection_convert_to_coco`.
 However, we strongly recommend using the COCO format, through we provide limited support for VOC format.
+For information about converting VOC format to COCO format, please see :ref:`sec_automm_detection_voc_to_coco`
 We use a Faster R-CNN model model pretrained on VOC2007 and VOC2012 dataset
 
 AutoMM detection requires `mmcv-full` and `mmdet` packages. Please make sure `mmcv-full` and `mmdet` are installed:
@@ -15,7 +16,7 @@ AutoMM detection requires `mmcv-full` and `mmdet` packages. Please make sure `mm
 
 ## Prepare data
 For running this tutorial, you should have VOC dataset prepared. 
-If you haven't already, head over to :label:`sec_automm_detection_prepare_voc` to prepare your VOC data. 
+If you haven't already, head over to :ref:`sec_automm_detection_prepare_coco17` to prepare your VOC data. 
 This tutorial assumes that you have saved VOC data under the folder `~/data/`, i.e. it should appear at `~/data/VOCdevkit`.
 
 ## Creating the `MultiModalPredictor`
@@ -66,7 +67,7 @@ predictor = MultiModalPredictor.load(load_path)
 
 ## Setting up data
 
-Here we use VOC2007 for testing. See :label:`sec_automm_detection_prepare_voc` for VOC data preparation.
+Here we use VOC2007 for testing. See :ref:`sec_automm_detection_prepare_voc` for VOC data preparation.
 While using VOC format dataset, the input is the root path of the dataset, and contains at least:
 
 ```
