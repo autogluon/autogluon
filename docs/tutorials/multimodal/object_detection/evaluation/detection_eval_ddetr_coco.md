@@ -70,7 +70,7 @@ time usage: 389.92
 Deformable DETR has best performance but takes more time and (GPU memory) space. 
 If there is a restriction in time or space, 
 see :ref:`sec_automm_detection_eval_fasterrcnn_coco` or :ref:`sec_automm_detection_eval_yolov3_coco`.
-You can also see other tutorials for :ref:`sec_automm_detection_high_performance_finetune_coco` or :ref:`sec_automm_detection_infer_coco`.
+You can also see other tutorials for :ref:`sec_automm_detection_high_ft_coco` or :ref:`sec_automm_detection_infer_coco`.
 
 ### Other Examples
 
