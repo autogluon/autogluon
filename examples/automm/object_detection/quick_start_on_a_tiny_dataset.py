@@ -56,5 +56,16 @@ def tutorial_script_for_quick_start():
     # Evaluate new predictor
     new_predictor.evaluate(test_path)
 
+    # Load Trained Predictor from S3
+    zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/quick_start/AP50_433.zip"
+    download_dir = "./AP50_433"
+    load_zip.unzip(zip_file, unzip_dir=download_dir)
+    better_predictor = MultiModalPredictor.load("./AP50_433/quick_start_tutorial_temp_save")
+    better_predictor.set_num_gpus(1)
+
+    # Evaluate new predictor
+    better_predictor.evaluate(test_path)
+
+
 if __name__ == "__main__":
     tutorial_script_for_quick_start()
