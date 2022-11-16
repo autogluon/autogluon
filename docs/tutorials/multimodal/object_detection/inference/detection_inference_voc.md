@@ -38,8 +38,7 @@ To test other model structures on VOC, check \[Fast Finetune on COCO format data
 checkpoint_name = "faster_rcnn_r50_fpn_1x_voc0712"
 num_gpus = 1  # multi GPU inference is not supported in VOC format
 ```
-You can also use other model by setting `checkpoint_name` to other model configs. 
-Please refer to :ref: `selecting_models` for details about model selection. 
+You can also use other model by setting `checkpoint_name` to other model configs.  
 
 As before, we create the MultiModalPredictor with selected checkpoint name and number of GPUs.
 We also need to specify the `problem_type` to `"object_detection"`.

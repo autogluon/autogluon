@@ -29,8 +29,7 @@ In this example, we use the VFNet with ResNext as backbone and Feature Pyramid N
 checkpoint_name = "vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco"
 num_gpus = 1  # set to -1 to use all GPUs if available
 ```
-You can also use other model by setting `checkpoint_name` to other names. 
-Please refer to :ref: `selecting_models` for details about model selection.
+You can also use other model by setting `checkpoint_name` to other names.
 
 As before, we create the MultiModalPredictor with selected checkpoint name and number of GPUs.
 We also need to specify the `problem_type` to `"object_detection"`.
