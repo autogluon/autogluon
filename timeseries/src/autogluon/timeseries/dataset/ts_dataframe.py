@@ -324,9 +324,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
             assert timestamp_column in df.columns, f"Column {timestamp_column} not found!"
             df.rename(columns={timestamp_column: TIMESTAMP}, inplace=True)
 
-        if not df[TIMESTAMP].dtype == "datetime64[ns]":
-            df[TIMESTAMP] = pd.to_datetime(df[TIMESTAMP])
-
         cls._validate_data_frame(df)
         return df.set_index([ITEMID, TIMESTAMP])
 
