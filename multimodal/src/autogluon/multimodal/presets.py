@@ -397,7 +397,6 @@ def best_quality_ner():
         "model.names": ["ner_text"],
         "model.ner_text.checkpoint_name": "microsoft/deberta-v3-large",
         "env.per_gpu_batch_size": 4,
-        "env.batch_size": 4,
     }
 
 
