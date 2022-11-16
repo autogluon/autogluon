@@ -469,6 +469,7 @@ class MultiModalMatcher:
         )
 
         self._fit(**_fit_args)
+        print(f"Models and intermediate outputs are saved to {save_path} ")
         return self
 
     def _get_matcher_df_preprocessor(
