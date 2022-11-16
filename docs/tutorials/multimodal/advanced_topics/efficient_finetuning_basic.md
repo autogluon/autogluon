@@ -97,7 +97,7 @@ predictor.fit(train_en_df,
                   "optimization.lr_decay": 0.9,
                   "optimization.learning_rate": 3e-03,
                   "optimization.end_lr": 3e-03,
-                  "optimization.max_epochs": 3,
+                  "optimization.max_epochs": 2,
                   "optimization.warmup_steps": 0,
                   "env.batch_size": 32,
               })
