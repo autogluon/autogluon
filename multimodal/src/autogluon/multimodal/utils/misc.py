@@ -60,11 +60,12 @@ def shopee_dataset(download_dir):
     """
     zip_file = "https://automl-mm-bench.s3.amazonaws.com/vision_datasets/shopee.zip"
     from autogluon.core.utils.loaders import load_zip
+
     load_zip.unzip(zip_file, unzip_dir=download_dir)
 
     dataset_path = os.path.join(download_dir, "shopee")
-    train_data = pd.read_csv(f'{dataset_path}/train.csv')
-    test_data = pd.read_csv(f'{dataset_path}/test.csv')
+    train_data = pd.read_csv(f"{dataset_path}/train.csv")
+    test_data = pd.read_csv(f"{dataset_path}/test.csv")
 
     def path_expander(path, base_folder):
         path_l = path.split(";")
