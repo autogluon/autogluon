@@ -9,11 +9,29 @@ In this tutorial, we are going to again use the subset of the [Shopee-IET datase
 We can load a dataset by downloading a url data automatically:
 
 ```{.python .input}
-import autogluon.core as ag
-from autogluon.multimodal import MultiModalPredictor
-from autogluon.vision import ImageDataset
+import os
+import warnings
+warnings.filterwarnings('ignore')
+import pandas as pd
 from datetime import datetime
-train_data, _, test_data = ImageDataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
+
+download_dir = './ag_automm_tutorial_imgcls'
+zip_file = 'https://automl-mm-bench.s3.amazonaws.com/vision_datasets/shopee.zip'
+from autogluon.core.utils.loaders import load_zip
+load_zip.unzip(zip_file, unzip_dir=download_dir)
+
+dataset_path = os.path.join(download_dir, "shopee")
+train_data = pd.read_csv(f'{dataset_path}/train.csv')
+test_data = pd.read_csv(f'{dataset_path}/test.csv')
+
+def path_expander(path, base_folder):
+    path_l = path.split(';')
+    return ';'.join([os.path.abspath(os.path.join(base_folder, path)) for path in path_l])
+
+train_data["image"] = train_data["image"].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
+test_data["image"] = test_data["image"].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
+print(train_data)
+
 train_data = train_data.sample(frac=0.5)
 print(train_data)
 ```
@@ -27,6 +45,7 @@ Recall that if we are to use the default settings predefined by Autogluon, we ca
 
 
 ```{.python .input}
+from autogluon.multimodal import MultiModalPredictor
 predictor_regular = MultiModalPredictor(label="label")
 start_time = datetime.now()
 predictor_regular.fit(
@@ -55,6 +74,7 @@ There are a few options we can have in MultiModalPredictor. We use [Ray Tune](ht
 
 1. Defining the search space of various `hyperparameter` values for the training of neural networks:
 
+<ul>
 ```
 hyperparameters = {
         "optimization.learning_rate": tune.uniform(0.00005, 0.005),
@@ -64,7 +84,6 @@ hyperparameters = {
         }
 ```
 
-<ul>
 This is an example but not an exhaustive list. You can find the full supported list in [Customize AutoMM](https://auto.gluon.ai/stable/tutorials/multimodal/customization.html#sec-automm-customization)
 </ul>
     

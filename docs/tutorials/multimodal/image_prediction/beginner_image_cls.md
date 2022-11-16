@@ -13,6 +13,7 @@ Our subset of the data contains the following possible labels: `BabyPants`, `Bab
 We can load a dataset by downloading a url data automatically:
 
 ```{.python .input}
+import os
 import warnings
 warnings.filterwarnings('ignore')
 import pandas as pd
