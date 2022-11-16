@@ -619,7 +619,11 @@ def get_mmocr_config_and_model(checkpoint_name: str):
     An MMOCR config and model.
     """
     try:
-        import mmcv
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            import mmcv
         from mmcv.runner import load_checkpoint
     except ImportError:
         mmcv = None
