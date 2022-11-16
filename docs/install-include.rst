@@ -21,12 +21,14 @@ Select your preferences below and run the corresponding install commands:
      :title:`OS:`
      :act:`Linux`
      :opt:`Mac`
+     :opt:`Mac - Apple Silicon`
      :opt:`Windows`
 
      .. raw:: html
 
         <div class="mdl-tooltip" data-mdl-for="linux">Linux.</div>
         <div class="mdl-tooltip" data-mdl-for="mac">Mac OSX.</div>
+        <div class="mdl-tooltip" data-mdl-for="mac-apple-silicon">Mac OSX - Apple Silicon.</div>
         <div class="mdl-tooltip" data-mdl-for="windows">Windows.</div>
 
   .. container:: opt-group
@@ -88,9 +90,7 @@ Select your preferences below and run the corresponding install commands:
 
            .. container:: gpu
 
-              .. note::
-
-                 GPU usage is not yet supported on Mac OSX, please use Linux or Windows to utilize GPUs in AutoGluon.
+              .. include:: install-macos-no-gpu.rst
 
         .. container:: source
 
@@ -102,9 +102,29 @@ Select your preferences below and run the corresponding install commands:
 
            .. container:: gpu
 
-              .. note::
+              .. include:: install-macos-no-gpu.rst
 
-                 GPU usage is not yet supported on Mac OSX , please use Linux or Windows to utilize GPUs in AutoGluon.
+     .. container:: mac-apple-silicon
+
+        .. container:: pip
+
+           .. container:: cpu
+
+              .. include:: install-macos-apple-silicon.rst
+
+           .. container:: gpu
+
+              .. include:: install-macos-no-gpu.rst
+
+        .. container:: source
+
+           .. container:: cpu
+
+              .. include:: install-macos-apple-silicon.rst
+
+           .. container:: gpu
+
+              .. include:: install-macos-no-gpu.rst
 
      .. container:: windows
 
