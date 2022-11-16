@@ -3,12 +3,6 @@ Quick Start
 .. container:: cards
 
    .. card::
-      :title: Inference using a pretrained model - Quick Start
-      :link: detection_inference_quick_start.html
-
-      How to inference with a pretrained model on a small dataset (COCO Format)
-
-   .. card::
       :title: Quick Start on a Tiny COCO Format Dataset
       :link: quick_start_coco.html
 

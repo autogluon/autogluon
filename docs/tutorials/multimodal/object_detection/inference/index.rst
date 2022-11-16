@@ -21,4 +21,3 @@ Inference
 
     detection_inference_coco
     detection_inference_voc
-    detection_load_predictor
