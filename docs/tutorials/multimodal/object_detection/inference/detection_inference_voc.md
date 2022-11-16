@@ -9,7 +9,7 @@ For information about converting VOC format to COCO format, please see :ref:`sec
 We use a Faster R-CNN model model pretrained on VOC2007 and VOC2012 dataset
 
 AutoMM detection requires `mmcv-full` and `mmdet` packages. Please make sure `mmcv-full` and `mmdet` are installed:
-```{.python}
+```python
 !mim install mmcv-full
 !pip install mmdet
 ```
@@ -22,7 +22,7 @@ This tutorial assumes that you have saved VOC data under the folder `~/data/`, i
 ## Creating the `MultiModalPredictor`
 To start, import MultiModalPredictor:
 
-```{.python}
+```python
 from autogluon.multimodal import MultiModalPredictor
 ```
 
@@ -34,7 +34,7 @@ This is the only model we support that is pretrained on VOC.
 It's always recommended to finetune a model pretrained on COCO which is a larger dataset with more complicated task.
 To test other model structures on VOC, check \[Fast Finetune on COCO format data] and \[Fast Finetune on VOC format data].
 
-```{.python}
+```python
 checkpoint_name = "faster_rcnn_r50_fpn_1x_voc0712"
 num_gpus = 1  # multi GPU inference is not supported in VOC format
 ```
@@ -43,7 +43,7 @@ You can also use other model by setting `checkpoint_name` to other model configs
 As before, we create the MultiModalPredictor with selected checkpoint name and number of GPUs.
 We also need to specify the `problem_type` to `"object_detection"`.
 
-```{.python}
+```python
 predictor = MultiModalPredictor(
     hyperparameters={
         "model.mmdet_image.checkpoint_name": checkpoint_name,
@@ -56,11 +56,11 @@ predictor = MultiModalPredictor(
 ### Use a finetuned model
 You can also use a previously trained/finetuned predictor to run inference with.
 First specify the predictor path, for example:
-```{.python}
+```python
 load_path = "./AutogluonModels/ag-20221104_185342"  # replace this with path to your desired predictor
 ```
 Then load the predictor:
-```{.python}
+```python
 predictor = MultiModalPredictor.load(load_path)
 ```
 
@@ -103,14 +103,14 @@ tvmonitor
 
 For VOC format data, we always use root_path. And the predictor will automatically select the `test` split.
 
-```{.python}
+```python
 test_path = "~/data/VOCdevkit/VOC2007"
 ```
 
 ## Running inference
 To run inference, perform:
 
-```{.python}
+```python
 pred = predictor.predict(test_path)
 print(pred)
 ```
@@ -153,7 +153,7 @@ Here is an example:
 Note that, by default, the `predictor.predict` does not save the detection results into a file.
 
 To run inference and save results, run the following:
-```{.python}
+```python
 pred = predictor.predict(test_path, save_results=True)
 ```
 
@@ -165,12 +165,12 @@ The `.txt` file therefore also has two columns, `image` and `bboxes`, where
 
 ## Visualizing Results
 To run visualizations, ensure that you have `opencv` installed. If you haven't already, install `opencv` by running 
-```{.python}
+```python
 !pip install opencv-python
 ```
 
 To visualize the detection bounding boxes, run the following:
-```{.python}
+```python
 from autogluon.multimodal.utils import visualize_detection
 conf_threshold = 0.4  # Specify a confidence threshold to filter out unwanted boxes
 visualization_result_dir = "~/data/VOCdevkit/VOC2007/visualizations"  # Specify a directory to save visualized images.
