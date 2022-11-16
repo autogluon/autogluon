@@ -429,6 +429,12 @@ class BaggedEnsembleModel(AbstractModel):
                    num_gpus=None,
                    **kwargs):
         fold_fitting_strategy = self.params.get('fold_fitting_strategy', 'auto')
+        if num_gpus is not None and not isinstance(num_gpus, str):
+            # Use a specialized fitting strategy for CPU or GPU models if specified.
+            if num_gpus > 0:
+                fold_fitting_strategy = self.params.get('fold_fitting_strategy_gpu', fold_fitting_strategy)
+            else:
+                fold_fitting_strategy = self.params.get('fold_fitting_strategy_cpu', fold_fitting_strategy)
         if fold_fitting_strategy == 'auto':
             fold_fitting_strategy = self._get_default_fold_fitting_strategy()
         num_folds_parallel = self.params.get('num_folds_parallel', 'auto')

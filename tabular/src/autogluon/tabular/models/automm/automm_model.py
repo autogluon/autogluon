@@ -191,7 +191,7 @@ class MultiModalPredictorModel(AbstractModel):
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
-        
+
         self.model._enable_progress_bar = False
         if self.problem_type == REGRESSION:
             return self.model.predict(X, as_pandas=False)
