@@ -867,6 +867,7 @@ class MultiModalPredictor:
         self._fit(**_fit_args)
         training_end = time.time()
         self.elapsed_time = (training_end - training_start) / 60.0
+        logger.info(f"Models and intermediate outputs are saved to {self._save_path} ")
         return self
 
     def _verify_inference_ready(self):
