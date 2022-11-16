@@ -139,3 +139,10 @@ From the training log, you should be able to see the current best trial as below
 Current best trial: 47aef96a with val_accuracy=0.862500011920929 and parameters={'optimization.learning_rate': 0.0007195214018085505, 'model.timm_image.checkpoint_name': 'ghostnet_100'}
 ```
 After our simple 2-trial HPO run, we got a better test accuracy, by searching different learning rates and models, compared to the out-of-box solution provided in the previous section. HPO helps select the combination of hyperparameters with highest validation accuracy. 
+
+## Other Examples
+
+You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+
+## Customization
+To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.
