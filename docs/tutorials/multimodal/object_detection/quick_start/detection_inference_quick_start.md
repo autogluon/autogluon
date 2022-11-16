@@ -4,6 +4,12 @@
 In this section, we show an quick-start example to run inference on a single image and visualize the detections.  
 The model we use is the YOLOv3 pretrained on COCO dataset.
 
+AutoMM detection requires `mmcv-full` and `mmdet` packages. Please make sure `mmcv-full` and `mmdet` are installed:
+```{.python .input}
+!mim install mmcv-full
+!pip install mmdet
+```
+
 ## Prepare data
 ```{.python .input}
 import numpy as np
@@ -29,12 +35,6 @@ test_image = download(image_url)
 To start, import MultiModalPredictor:
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
-```
-
-AutoMM detection requires `mmcv-full` and `mmdet` packages. Please make sure `mmcv-full` and `mmdet` are installed:
-```{.python .input}
-!mim install mmcv-full
-!pip install mmdet
 ```
 
 ### Use a pretrained model
