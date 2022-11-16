@@ -25,7 +25,7 @@ Inference
    :maxdepth: 1
    :hidden:
 
-    detection_inference_quick_start
-    detection_inference_coco
-    detection_inference_voc
-    detection_load_predictor
+   detection_inference_quick_start
+   detection_inference_coco
+   detection_inference_voc
+   detection_load_predictor

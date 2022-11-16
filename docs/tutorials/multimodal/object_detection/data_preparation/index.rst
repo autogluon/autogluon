@@ -37,8 +37,8 @@ Data Preparation
    :maxdepth: 1
    :hidden:
 
-    prepare_coco17
-    prepare_voc
-    prepare_watercolor
-    convert_data_to_coco_format
-    voc_to_coco
+   prepare_coco17
+   prepare_voc
+   prepare_watercolor
+   convert_data_to_coco_format
+   voc_to_coco
