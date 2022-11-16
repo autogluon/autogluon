@@ -66,8 +66,11 @@ To save time, we subsample the data and only train for three minutes.
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
+import uuid
+
 time_limit = 3 * 60  # set to larger value in your applications
-predictor = MultiModalPredictor(label='Price', path='automm_text_book_price_prediction')
+model_path = f"./tmp/{uuid.uuid4().hex}-automm_text_book_price_prediction"
+predictor = MultiModalPredictor(label='Price', path=model_path)
 predictor.fit(train_data, time_limit=time_limit)
 ```
 

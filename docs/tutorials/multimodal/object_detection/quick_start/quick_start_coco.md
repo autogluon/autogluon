@@ -62,6 +62,9 @@ It will be saved to a automatically generated directory with timestamp under `Au
 
 ```python .input
 # Init predictor
+import uuid
+
+model_path = f"./tmp/{uuid.uuid4().hex}-quick_start_tutorial_temp_save"
 predictor = MultiModalPredictor(
     hyperparameters={
         "model.mmdet_image.checkpoint_name": checkpoint_name,
@@ -69,7 +72,7 @@ predictor = MultiModalPredictor(
     },
     problem_type="object_detection",
     sample_data_path=train_path,
-    path="./quick_start_tutorial_temp_save",
+    path=model_path,
 )
 ```
 
@@ -134,7 +137,7 @@ and we can also reset the number of GPUs to use if not all the devices are avail
 
 ```python .input
 # Load and reset num_gpus
-new_predictor = MultiModalPredictor.load("./quick_start_tutorial_temp_save")
+new_predictor = MultiModalPredictor.load(model_path)
 new_predictor.set_num_gpus(1)
 ```
 
