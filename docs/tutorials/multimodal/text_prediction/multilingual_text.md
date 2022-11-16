@@ -13,6 +13,8 @@ We will demonstrate how to use AutoGluon Text to build sentiment classification 
 - Finetune the German BERT
 - Cross-lingual transfer from English to German
 
+*Note:* You are recommended to also check :ref:`sec_automm_efficient_finetuning_basic` about how to achieve better performance via parameter-efficient finetuning. 
+
 ## Load Dataset
 
 The [Cross-Lingual Amazon Product Review Sentiment](https://webis.de/data/webis-cls-10.html) dataset contains Amazon product reviews in four languages. 
