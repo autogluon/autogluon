@@ -146,8 +146,8 @@ new_predictor.evaluate(test_path)
 ```
 
 If we set validation metric to `"map"` (Mean Average Precision), and max epochs to `50`, 
-the predictor will have better predictions with the same YOLOv3 pretrained model.
-We have prepared such a model in S3, we can load it and check the result:
+the predictor will have better performance with the same pretrained model (YOLOv3).
+We trained it offline and uploaded to S3. To load and check the result:
 ```python .input
 # Load Trained Predictor from S3
 zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/quick_start/AP50_433.zip"
