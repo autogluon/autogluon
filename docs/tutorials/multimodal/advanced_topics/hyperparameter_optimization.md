@@ -9,29 +9,13 @@ In this tutorial, we are going to again use the subset of the [Shopee-IET datase
 We can load a dataset by downloading a url data automatically:
 
 ```{.python .input}
-import os
 import warnings
 warnings.filterwarnings('ignore')
-import pandas as pd
 from datetime import datetime
 
-download_dir = './ag_automm_tutorial_imgcls'
-zip_file = 'https://automl-mm-bench.s3.amazonaws.com/vision_datasets/shopee.zip'
-from autogluon.core.utils.loaders import load_zip
-load_zip.unzip(zip_file, unzip_dir=download_dir)
-
-dataset_path = os.path.join(download_dir, "shopee")
-train_data = pd.read_csv(f'{dataset_path}/train.csv')
-test_data = pd.read_csv(f'{dataset_path}/test.csv')
-
-def path_expander(path, base_folder):
-    path_l = path.split(';')
-    return ';'.join([os.path.abspath(os.path.join(base_folder, path)) for path in path_l])
-
-train_data["image"] = train_data["image"].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
-test_data["image"] = test_data["image"].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
-print(train_data)
-
+from autogluon.multimodal.utils.misc import shopee_dataset
+download_dir = './ag_automm_tutorial_hpo'
+train_data, test_data = shopee_dataset(download_dir)
 train_data = train_data.sample(frac=0.5)
 print(train_data)
 ```

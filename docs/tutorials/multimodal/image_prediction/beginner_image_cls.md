@@ -13,26 +13,13 @@ Our subset of the data contains the following possible labels: `BabyPants`, `Bab
 We can load a dataset by downloading a url data automatically:
 
 ```{.python .input}
-import os
 import warnings
 warnings.filterwarnings('ignore')
 import pandas as pd
 
+from autogluon.multimodal.utils.misc import shopee_dataset
 download_dir = './ag_automm_tutorial_imgcls'
-zip_file = 'https://automl-mm-bench.s3.amazonaws.com/vision_datasets/shopee.zip'
-from autogluon.core.utils.loaders import load_zip
-load_zip.unzip(zip_file, unzip_dir=download_dir)
-
-dataset_path = os.path.join(download_dir, "shopee")
-train_data = pd.read_csv(f'{dataset_path}/train.csv')
-test_data = pd.read_csv(f'{dataset_path}/test.csv')
-
-def path_expander(path, base_folder):
-    path_l = path.split(';')
-    return ';'.join([os.path.abspath(os.path.join(base_folder, path)) for path in path_l])
-
-train_data["image"] = train_data["image"].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
-test_data["image"] = test_data["image"].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
+train_data, test_data = shopee_dataset(download_dir)
 print(train_data)
 ```
 
@@ -45,14 +32,16 @@ Now, we fit a classifier using AutoMM as follows:
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
-predictor = MultiModalPredictor(label="label", path="./automm_imgcls")
+import uuid
+model_path = f"./tmp/{uuid.uuid4().hex}-automm_shopee"
+predictor = MultiModalPredictor(label="label", path=model_path)
 predictor.fit(
     train_data=train_data,
     time_limit=30, # seconds
 ) # you can trust the default config, e.g., we use a `swin_base_patch4_window7_224` model
 ```
 
-**label** is the name of the column that contains the target variable to predict, e.g., it is "label" in our example. We set the training time limit to 30 seconds for demonstration purpose, but you can control the training time by setting configurations. To customize AutoMM, please refer to :ref:`sec_automm_customization`.
+**label** is the name of the column that contains the target variable to predict, e.g., it is "label" in our example. **path** indicates the directory where models and intermediate outputs should be saved. We set the training time limit to 30 seconds for demonstration purpose, but you can control the training time by setting configurations. To customize AutoMM, please refer to :ref:`sec_automm_customization`.
 
 
 ## Evaluate on Test Dataset
@@ -112,7 +101,7 @@ The trained predictor is automatically saved at the end of `fit()`, and you can 
 :::
 
 ```{.python .input}
-loaded_predictor = MultiModalPredictor.load('automm_imgcls')
+loaded_predictor = MultiModalPredictor.load(model_path)
 load_proba = loaded_predictor.predict_proba({'image': [image_path]})
 print(load_proba)
 ```
