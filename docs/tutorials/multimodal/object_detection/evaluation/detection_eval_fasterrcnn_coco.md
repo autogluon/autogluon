@@ -33,7 +33,7 @@ predictor = MultiModalPredictor(
 ```
 
 Here we use COCO17 for testing. 
-See other tutorials for :ref:`sec_automm_detection_prepare_coco17`].
+See other tutorials for :ref:`sec_automm_detection_prepare_coco17`.
 While using COCO dataset, the input is the json annotation file of the dataset split.
 In this example, `instances_val2017.json` is the annotation file of validation split of COCO17 dataset.
 
