@@ -620,6 +620,7 @@ def get_mmocr_config_and_model(checkpoint_name: str):
     """
     try:
         import warnings
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             import mmcv
