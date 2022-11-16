@@ -2,15 +2,29 @@ Multimodal Prediction
 =====================
 
 For problems on multimodal data tables that contain image, text, and tabular data, AutoGluon provides `MultiModalPredictor` (abbreviated as `AutoMM`)
-that automatically selects and fuses deep learning backbones from popular packages like `timm <https://github.com/rwightman/pytorch-image-models>`_,
+that automatically selects, fuses, and tunes deep learning backbones from popular packages like `timm <https://github.com/rwightman/pytorch-image-models>`_,
 `huggingface/transformers <https://github.com/huggingface/transformers>`_,
-`CLIP <https://github.com/openai/CLIP>`_, etc. You can use it to build models for multimodal problems that involve image, text, and tabular features, e.g., predicting the product price
-based on the items' description, photo, and other metadata, or matching images with text descriptions.
+`CLIP <https://github.com/openai/CLIP>`_, `MMDetection <https://github.com/open-mmlab/mmdetection>`_ etc. You can use AutoMM to build models for
+multimodal problems that involve image, text, tabular features, object bounding boxes, named entities, etc.
 
-In addition, being good at multimodal problems implies that the predictor will be good for **each specific modality**. Thus, you can also use `AutoMM` to solve standard NLP/Vision tasks like sentiment classification,
-intent detection, paraphrase detection, image classification. Moreover, `AutoMM` can be used as a basic model in the multi-layer stack-ensemble of `TabularPredictor`.
+In addition, being good at multimodal problems implies that the predictor will be good for **each specific modality**.
+Thus, you can also use `AutoMM` to solve standard NLP/Vision tasks like sentiment classification,
+intent detection, paraphrase detection, image classification. Moreover, `AutoMM` can be used as a basic model in the multi-layer
+stack-ensemble of `AutoGluon Tabular <https://auto.gluon.ai/stable/tutorials/tabular_prediction/index.html>`_, and is powering up the FT-Transformer in `TabularPredictor`.
 
-In the following, we prepared a few tutorials to help you learn how to use `AutoMM` to solve problems that involve image, text, and tabular data.
+Here are some example use-cases of AutoMM:
+
+- Analyze sentence sentiment and measure sentence similarity. :doc:`[Tutorial] <text_prediction/beginner_text.html>`
+- Predicting pets' popularity based on their description, photo, and other metadata. :doc:`[Tutorial] <mulitmodal_prediction/beginner_multimodal.html>` `[Example] <https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_pawpularity>`_.
+- Predicting the price of book. :doc:`[Tutorial] <mulitmodal_prediction/multimodal_text_tabular.html>`.
+- Scoring student's essays. `[Example] <https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_feedback_prize>`_.
+- Image classification. :doc:`[Tutorial] <image_prediction/beginner_image_cls.html>`.
+- Object detection. :doc:`[Tutorial] <object_detection/quick_start/quick_start_coco.html>` `[Example] <https://github.com/awslabs/autogluon/tree/master/examples/automm/object_detection>`_.
+- Extracting named entities. :doc:`[Tutorial] <text_prediction/ner.html>`.
+- Search for relevant text / image via text queries. :doc:`[Tutorial] <matching/index>`.
+
+
+In the following, we decomposed the functionalities of AutoMM and prepared step-by-step guide for each functionality.
 
 
 Text Prediction and Entity Extraction
@@ -21,7 +35,7 @@ Text Prediction and Entity Extraction
       :title: AutoMM for Text Prediction - Quick Start
       :link: text_prediction/beginner_text.html
 
-      How to train high-quality text prediction models with MultiModalPredictor in under 5 minutes.
+      How to train high-quality text prediction models with MultiModalPredictor.
 
    .. card::
       :title: AutoMM for Text Prediction - Multilingual Problems
