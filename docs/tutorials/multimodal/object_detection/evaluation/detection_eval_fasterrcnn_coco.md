@@ -69,7 +69,7 @@ Faster R-CNN balances speed and performance.
 But in case that faster speed or higher performance is required, 
 see :ref:`sec_automm_detection_eval_yolov3_coco` for faster speed,
 or :ref:`sec_automm_detection_eval_ddetr_coco` for higher performance.
-You can also see other tutorials for :ref:`sec_automm_detection_fast_finetune_coco` or :ref:`sec_automm_detection_infer_coco`.
+You can also see other tutorials for :ref:`sec_automm_detection_fast_ft_coco` or :ref:`sec_automm_detection_infer_coco`.
 
 ### Other Examples
 

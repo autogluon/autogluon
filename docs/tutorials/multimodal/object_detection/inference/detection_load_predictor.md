@@ -15,7 +15,7 @@ To start, let's import MultiModalPredictor:
 from autogluon.multimodal import MultiModalPredictor
 ```
 
-We'll use the predictor we finetuned in previous tutorial :ref:`sec_automm_detection_fast_finetune_coco`.
+We'll use the predictor we finetuned in previous tutorial :ref:`sec_automm_detection_fast_ft_coco`.
 Note that you should have a different `load_path`. For test, we still use VOC2007 test set in COCO format.
 
 ```python

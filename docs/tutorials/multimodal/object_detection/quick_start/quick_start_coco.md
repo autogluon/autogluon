@@ -45,7 +45,6 @@ and `test_cocoformat.json` is the annotation file of the test split.
 We select the YOLOv3 with MobileNetV2 as backbone,
 and input resolution is 320x320, pretrained on COCO dataset. With this setting, it is fast to finetune or inference,
 and easy to deploy.
-For more model choices, see :label:`sec_automm_detection_selecting_models`.
 And we use all the GPUs (if any):
 
 ```python .input
@@ -62,6 +61,9 @@ It will be saved to a automatically generated directory with timestamp under `Au
 
 ```python .input
 # Init predictor
+import uuid
+
+model_path = f"./tmp/{uuid.uuid4().hex}-quick_start_tutorial_temp_save"
 predictor = MultiModalPredictor(
     hyperparameters={
         "model.mmdet_image.checkpoint_name": checkpoint_name,
@@ -69,7 +71,7 @@ predictor = MultiModalPredictor(
     },
     problem_type="object_detection",
     sample_data_path=train_path,
-    path="./quick_start_tutorial_temp_save",
+    path=model_path,
 )
 ```
 
@@ -80,8 +82,6 @@ Using a two-stage learning rate with high learning rate only on head layers make
 the model converge faster during finetuning. It usually gives better performance as well,
 especially on small datasets with hundreds or thousands of images.
 We also set the epoch to be 15 and batch_size to be 32.
-For more information about how to tune those hyperparameters,
-see :ref:`sec_automm_detection_tune_hyperparameters`.
 We also compute the time of the fit process here for better understanding the speed.
 We run it on a g4.2xlarge EC2 machine on AWS,
 and part of the command outputs are shown below:
@@ -134,7 +134,7 @@ and we can also reset the number of GPUs to use if not all the devices are avail
 
 ```python .input
 # Load and reset num_gpus
-new_predictor = MultiModalPredictor.load("./quick_start_tutorial_temp_save")
+new_predictor = MultiModalPredictor.load(model_path)
 new_predictor.set_num_gpus(1)
 ```
 
@@ -145,6 +145,23 @@ Evaluating the new predictor gives us exactly the same result:
 new_predictor.evaluate(test_path)
 ```
 
+If we set validation metric to `"map"` (Mean Average Precision), and max epochs to `50`, 
+the predictor will have better performance with the same pretrained model (YOLOv3).
+We trained it offline and uploaded to S3. To load and check the result:
+```python .input
+# Load Trained Predictor from S3
+zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/quick_start/AP50_433.zip"
+download_dir = "./AP50_433"
+load_zip.unzip(zip_file, unzip_dir=download_dir)
+better_predictor = MultiModalPredictor.load("./AP50_433/quick_start_tutorial_temp_save")
+better_predictor.set_num_gpus(1)
+
+# Evaluate new predictor
+better_predictor.evaluate(test_path)
+```
+
+For how to set those hyperparameters and finetune the model with higher performance, 
+see :ref:`sec_automm_detection_high_ft_coco`.
 ### Other Examples
 
 You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.

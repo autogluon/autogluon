@@ -1,5 +1,5 @@
 # AutoMM Detection - High Performance Finetune on COCO Format Dataset
-:label:`sec_automm_detection_high_performance_finetune_coco`
+:label:`sec_automm_detection_high_ft_coco`
 
 In this section, our goal is to finetune a high performance model on VOC2017 training set, 
 and evaluate it in VOC2007 test set. Both training and test sets are in COCO format.
@@ -19,10 +19,9 @@ Their role is to collect feature maps from different stages.)*
 With this setting, it sacrifices training and inference time,
 and also requires much more GPU memory,
 but the performance is high. 
-For more model choices, see :label:`sec_automm_detection_selecting_models`.
 
 We use `val_metric = map`, i.e., mean average precision in COCO standard as our validation metric.
-In previous section :ref:`sec_automm_detection_fast_finetune_coco`,
+In previous section :ref:`sec_automm_detection_fast_ft_coco`,
 we did not specify the validation metric and by default the validation loss is used as validation metric.
 Using validation loss is much faster but using mean average precision gives the best performance.
 
@@ -79,8 +78,6 @@ Using a two-stage learning rate with high learning rate only on head layers make
 the model converge faster during finetuning. It usually gives better performance as well,
 especially on small datasets with hundreds or thousands of images.
 We also set the batch_size to be 2, because this model is too huge to run with larger batch size.
-For more information about how to tune those hyperparameters,
-see :ref:`sec_automm_detection_tune_hyperparameters`.
 We also compute the time of the fit process here for better understanding the speed.
 ```python
 import time
@@ -113,8 +110,6 @@ Notice that at the end of each progress bar, if the checkpoint at current stage 
 it prints the model's save path.
 In this example, it's `/media/code/autogluon/examples/automm/object_detection/AutogluonModels/ag-20221104_051558`.
 You can also specify the `save_path` like below while creating the MultiModalPredictor.
-For more information about save and load the model,
-see :ref:`sec_automm_detection_save_and_load`. 
 
 ```
 predictor = MultiModalPredictor(
@@ -159,7 +154,7 @@ And the evaluation results are shown in command line output. The first value `0.
 
 Under this high performance finetune setting, it took 5 hours but reached `mAP50 = 0.932` on VOC!
 For how to finetune faster,
-see :ref:`sec_automm_detection_fast_finetune_coco`, where we finetuned a YOLOv3 model with
+see :ref:`sec_automm_detection_fast_ft_coco`, where we finetuned a YOLOv3 model with
 100 seconds and reached `mAP50 = 0.755` on VOC.
 
 ### Other Examples
