@@ -7,7 +7,11 @@ import torch
 from torch import nn
 
 try:
-    import mmcv
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        import mmcv
     from mmcv.ops import RoIPool
     from mmcv.parallel import scatter
     from mmcv.runner import load_checkpoint
