@@ -171,14 +171,14 @@ Multimodal Classification / Regression
 
    .. card::
       :title: AutoMM for Text + Tabular - Quick Start
-      :link: mulitmodal_prediction/multimodal_text_tabular.html
+      :link: multimodal_prediction/multimodal_text_tabular.html
 
       How MultiModalPredictor can be applied to multimodal data tables with a mix of text, numerical, and
       categorical columns. Here, we train a model to predict the price of books.
 
    .. card::
       :title: AutoMM for Image + Text + Tabular - Quick Start
-      :link: mulitmodal_prediction/beginner_multimodal.html
+      :link: multimodal_prediction/beginner_multimodal.html
 
       How to use MultiModalPredictor to train a model that predicts the adoption speed of pets.
 

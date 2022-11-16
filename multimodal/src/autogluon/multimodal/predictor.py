@@ -2035,7 +2035,8 @@ class MultiModalPredictor:
         if strategy == "ddp" and self._fit_called:
             num_gpus = 1  # While using DDP, we can only use single gpu after fit is called
 
-        if num_gpus == 1:
+        if num_gpus <= 1:
+            # Force set strategy to be None if it's cpu-only or we have only one GPU.
             strategy = None
 
         precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False)
