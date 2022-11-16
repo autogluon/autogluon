@@ -85,9 +85,11 @@ In AutoMM, to enable efficient finetuning, just specify the `optimization.effici
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
+import uuid
 
+model_path = f"./tmp/{uuid.uuid4().hex}-multilingual_ia3"
 predictor = MultiModalPredictor(label="label",
-                                path="multilingual_ia3")
+                                path=model_path)
 predictor.fit(train_en_df,
               presets="multilingual",
               hyperparameters={
@@ -133,10 +135,11 @@ shutil.rmtree("multilingual_ia3")
 ```python
 from autogluon.multimodal import MultiModalPredictor
 
-train_en_df_downsample = train_en_df.sample(200, random_state=123) 
+train_en_df_downsample = train_en_df.sample(200, random_state=123)
 
+new_model_path = f"./tmp/{uuid.uuid4().hex}-multilingual_ia3_gradient_checkpoint"
 predictor = MultiModalPredictor(label="label",
-                                path="multilingual_ia3_gradient_checkpoint")
+                                path=new_model_path)
 predictor.fit(train_en_df_downsample,
               presets="multilingual",
               hyperparameters={
