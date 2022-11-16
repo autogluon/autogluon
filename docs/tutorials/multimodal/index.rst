@@ -14,7 +14,7 @@ stack-ensemble of `AutoGluon Tabular <https://auto.gluon.ai/stable/tutorials/tab
 
 Here are some example use-cases of AutoMM:
 
-- Analyze sentence sentiment and measure sentence similarity. :doc:`[Tutorial] <text_prediction/beginner_text.html>`
+- Multilingual text classification :doc:`[Tutorial] <text_prediction/multilingual_text.html>`
 - Predicting pets' popularity based on their description, photo, and other metadata. :doc:`[Tutorial] <mulitmodal_prediction/beginner_multimodal.html>` `[Example] <https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_pawpularity>`_.
 - Predicting the price of book. :doc:`[Tutorial] <mulitmodal_prediction/multimodal_text_tabular.html>`.
 - Scoring student's essays. `[Example] <https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_feedback_prize>`_.
