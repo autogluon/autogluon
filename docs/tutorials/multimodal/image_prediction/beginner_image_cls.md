@@ -29,13 +29,10 @@ Now, we fit a classifier using AutoMM as follows:
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
-import uuid
-
-model_path = f"./tmp/{uuid.uuid4().hex}-automm_imgcls"
-predictor = MultiModalPredictor(label="label", path=model_path)
+predictor = MultiModalPredictor(label="label", path="./automm_imgcls")
 predictor.fit(
     train_data=train_dataset,
-    time_limit=60, # seconds
+    time_limit=30, # seconds
 ) # you can trust the default config, e.g., we use a `swin_base_patch4_window7_224` model
 ```
 
@@ -99,7 +96,7 @@ The trained predictor is automatically saved at the end of `fit()`, and you can 
 :::
 
 ```{.python .input}
-loaded_predictor = MultiModalPredictor.load(model_path)
+loaded_predictor = MultiModalPredictor.load('automm_imgcls')
 load_proba = loaded_predictor.predict_proba({'image': [image_path]})
 print(load_proba)
 ```
