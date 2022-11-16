@@ -162,6 +162,7 @@ better_predictor.evaluate(test_path)
 
 For how to set those hyperparameters and finetune the model with higher performance, 
 see :ref:`sec_automm_detection_high_ft_coco`.
+
 ### Other Examples
 
 You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
