@@ -145,6 +145,24 @@ Evaluating the new predictor gives us exactly the same result:
 new_predictor.evaluate(test_path)
 ```
 
+If we set validation metric to `"map"` (Mean Average Precision), and max epochs to `50`, 
+the predictor will have better performance with the same pretrained model (YOLOv3).
+We trained it offline and uploaded to S3. To load and check the result:
+```python .input
+# Load Trained Predictor from S3
+zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/quick_start/AP50_433.zip"
+download_dir = "./AP50_433"
+load_zip.unzip(zip_file, unzip_dir=download_dir)
+better_predictor = MultiModalPredictor.load("./AP50_433/quick_start_tutorial_temp_save")
+better_predictor.set_num_gpus(1)
+
+# Evaluate new predictor
+better_predictor.evaluate(test_path)
+```
+
+For how to set those hyperparameters and finetune the model with higher performance, 
+see :ref:`sec_automm_detection_high_performance_finetune_coco`.
+
 ### Other Examples
 
 You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.

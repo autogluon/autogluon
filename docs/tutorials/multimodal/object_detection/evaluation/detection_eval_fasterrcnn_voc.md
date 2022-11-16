@@ -2,7 +2,7 @@
 :label:`sec_automm_detection_eval_fasterrcnn_voc`
 
 In this section, our goal is to evaluate Faster-RCNN model on VOC2007 dataset in VOC format.
-See \[Convert VOC to COCO] for how to quickly convert a VOC format dataset.
+See :ref:`sec_automm_detection_voc_to_coco` for how to quickly convert a VOC format dataset.
 In previous section :ref:`sec_automm_detection_eval_fasterrcnn_coco`, we evaluated Faster-RCNN on COCO dataset.
 We strongly recommend using COCO format, but AutoMM still have limited support for VOC format for quick proof testing.
 

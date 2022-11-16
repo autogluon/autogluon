@@ -13,7 +13,10 @@ from torchmetrics.aggregation import BaseAggregator
 try:
     import mmdet
     from mmcv import ConfigDict
-except ImportError:
+except ImportError as e:
+    import warnings
+
+    warnings.warn(f"Encountered error while import mmdet and mmcv: {e}")
     pass
 
 from ..constants import AUTOMM, IMAGE, LABEL
