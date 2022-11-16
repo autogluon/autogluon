@@ -19,20 +19,20 @@ from torchvision import transforms
 from .randaug import RandAugment
 
 try:
-    import warnings
-
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         import mmcv
     from mmcv.parallel import collate
-except ImportError:
+except ImportError as e:
+    warnings.warn(f"Encountered error while import mmcv: {e}")
     mmcv = None
 
 try:
     import mmdet
     from mmdet.datasets import replace_ImageToTensor
     from mmdet.datasets.pipelines import Compose
-except ImportError:
+except ImportError as e:
+    warnings.warn(f"Encountered error while import mmdet: {e}")
     mmdet = None
 
 try:

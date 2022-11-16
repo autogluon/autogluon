@@ -626,6 +626,7 @@ def get_mmocr_config_and_model(checkpoint_name: str):
             import mmcv
         from mmcv.runner import load_checkpoint
     except ImportError:
+        warnings.warn(f"Encountered error while import mmcv: {e}")
         mmcv = None
     try:
         import mmocr

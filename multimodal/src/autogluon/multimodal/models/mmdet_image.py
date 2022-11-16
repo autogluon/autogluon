@@ -16,13 +16,15 @@ try:
     from mmcv.parallel import scatter
     from mmcv.runner import load_checkpoint
 except ImportError:
+    warnings.warn(f"Encountered error while import mmcv: {e}")
     mmcv = None
 
 try:
     import mmdet
     from mmdet.core import get_classes
     from mmdet.models import build_detector
-except ImportError:
+except ImportError as e:
+    warnings.warn(f"Encountered error while import mmdet: {e}")
     mmdet = None
 
 from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
