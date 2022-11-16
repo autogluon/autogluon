@@ -19,7 +19,11 @@ from torchvision import transforms
 from .randaug import RandAugment
 
 try:
-    import mmcv
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        import mmcv
     from mmcv.parallel import collate
 except ImportError:
     mmcv = None
