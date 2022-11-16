@@ -15,7 +15,7 @@ try:
     from mmcv.ops import RoIPool
     from mmcv.parallel import scatter
     from mmcv.runner import load_checkpoint
-except ImportError:
+except ImportError as e:
     warnings.warn(f"Encountered error while import mmcv: {e}")
     mmcv = None
 
