@@ -104,7 +104,3 @@ def test_continuous_training_save_path():
     predictor_loaded = MultiModalPredictor.load(save_path)
     predictor_loaded.fit(train_data=dataset.train_df, time_limit=10)
     assert predictor_loaded.path != abs_path and f"AutogluonModels{os.path.sep}ag-" in predictor.path
-
-
-if __name__ == "__main__":
-    test_existing_save_path_but_empty_folder("an_empty_existing_path")
