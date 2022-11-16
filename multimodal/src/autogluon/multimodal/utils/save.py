@@ -104,7 +104,7 @@ def process_save_path(path, resume: Optional[bool] = False, raise_if_exist: Opti
             f"However, it does not contain the last checkpoint file: '{LAST_CHECKPOINT}'. "
             "Are you using a correct path?"
         )
-    elif os.path.isdir(path):
+    elif os.path.isdir(path) and len(os.listdir(path)) > 0:
         if raise_if_exist:
             raise ValueError(
                 f"Path {path} already exists."
