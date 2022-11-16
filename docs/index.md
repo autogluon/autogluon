@@ -27,7 +27,7 @@ hide-toc: true
 :child-align: justify
 :class: sd-text-white sd-fs-3
 
-AutoML for Tabular, Text, Image, and Multimodal Data
+AutoML for Tabular, Text, Image, Multimodal, and Time Series Data
 
 ```{button-link} tabular/quick_start.html
 :outline:
@@ -49,10 +49,10 @@ State-of-the-art Techniques
 : Automatically utilize SOTA models without expert knowledge.
 
 Easy to Deploy
-: Easily deploy to the cloud.
+: Move from experimentation to production with cloud predictors and pre-built containers.
 
 Customizable
-: Extensible with custom feature processing, model, and metrics.
+: Extensible with custom feature processing, models, and metrics.
 
 ## {octicon}`rocket` Quick Examples
 
@@ -66,11 +66,11 @@ Predict the `class` column on a data table:
 ```python
 from autogluon.tabular import TabularDataset, TabularPredictor
 
-root = 'https://autogluon.s3.amazonaws.com/datasets/Inc/'
-train_data = TabularDataset(root+'train.csv')
-predictor = TabularPredictor(label='class').fit(train_data=train_data)
+data_root = 'https://autogluon.s3.amazonaws.com/datasets/Inc/'
+train_data = TabularDataset(data_root + 'train.csv')
+test_data = TabularDataset(data_root + 'test.csv')
 
-test_data = TabularDataset(root+'test.csv')
+predictor = TabularPredictor(label='class').fit(train_data=train_data)
 predictions = predictor.predict(test_data)
 ```
 :::
@@ -80,16 +80,37 @@ predictions = predictor.predict(test_data)
 :animate: fade-in-slide-down
 :color: primary
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+Predict sentiment of movie reviews:
 
+```python
+from autogluon.multimodal import MultiModalPredictor
+from autogluon.core.utils.loaders import load_pd
+
+data_root = 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/'
+train_data = load_pd.load(data_root + 'train.parquet')
+test_data = load_pd.load(data_root + 'dev.parquet')
+
+predictor = MultiModalPredictor(label='label').fit(train_data=train_data)
+predictions = predictor.predict(test_data)
+```
 :::
 
 :::{dropdown} Image Classification
 :animate: fade-in-slide-down
 :color: primary
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+Predict clothing article types:
 
+```python
+from autogluon.multimodal import MultiModalPredictor
+from autogluon.vision import ImageDataset
+
+data_zip = 'https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip'
+train_data, _, test_data = ImageDataset.from_folders(data_zip)
+
+predictor = MultiModalPredictor(label='label').fit(train_data=train_data)
+predictions = predictor.predict(test_data)
+```
 :::
 
 
@@ -97,7 +118,8 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor i
 :class: dropdown
 :open:
 
-asdfasf
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
 :::
 
 ## {octicon}`package` Installation
@@ -106,14 +128,13 @@ asdfasf
 ![](https://img.shields.io/pypi/v/autogluon.svg)
 ![](https://img.shields.io/pypi/dm/autogluon)
 
-AutoGluon supports Linux, MacOS (both Intel and Apple M1), and Windows. 
-To install use [pip](https://pip.pypa.io/en/stable/installation/):
+Install AuotGluon using [pip](https://pip.pypa.io/en/stable/installation/): 
 
 ```bash
-pip install autogluon
+python -m pip install autogluon
 ```
 
-Check {doc}`./install` for detailed instructions. 
+AutoGluon supports Linux, MacOS, and Windows. See {doc}`./install` for detailed instructions. 
 
 
 ## {octicon}`light-bulb` Solutions to ML problems
@@ -154,8 +175,10 @@ E
 :caption: Get Started
 :maxdepth: 1
 
-tabular/quick_start
 install
+tabular/quick_start
+multimodal/quick_start
+timeseries/quick_start
 ```
 
 ```{toctree}
