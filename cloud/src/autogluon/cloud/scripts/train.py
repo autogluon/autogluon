@@ -104,8 +104,7 @@ if __name__ == "__main__":
     if args.images_dir:
         image_compressed_file = get_input_path(args.images_dir)
         shutil.unpack_archive(image_compressed_file)
-    if predictor_type in ('text', 'multimodal'):
-        predictor_init_args.pop('path', None)
+
     predictor = predictor_cls(**predictor_init_args).fit(training_data, tuning_data=tuning_data, **predictor_fit_args)
 
     # When use automm backend, predictor needs to be saved with standalone flag to avoid need of internet access when loading
