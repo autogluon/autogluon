@@ -1,3 +1,4 @@
+import copy
 import pandas as pd
 
 from autogluon.core.constants import BINARY, MULTICLASS
@@ -9,7 +10,10 @@ from io import BytesIO, StringIO
 def model_fn(model_dir):
     """loads model from previously saved artifact"""
     model = TextPredictor.load(model_dir)
-    globals()["column_names"] = model._model.feature_columns
+    label_column = model._predictor._label_column
+    column_types = copy.copy(model._predictor._column_types)
+    column_types.pop(label_column)
+    globals()["column_names"] = list(column_types.keys())
 
     return model
 
@@ -54,13 +58,13 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
             data.columns = column_names
 
     if model.problem_type == BINARY or model.problem_type == MULTICLASS:
-        pred_proba = model.predict_proba(data)
+        pred_proba = model.predict_proba(data, as_pandas=True)
         pred = get_pred_from_proba_df(pred_proba, problem_type=model.problem_type)
         pred_proba.columns = [str(c) + '_proba' for c in pred_proba.columns]
         pred.name = str(pred.name) + '_pred' if pred.name is not None else 'pred'
         prediction = pd.concat([pred, pred_proba], axis=1)
     else:
-        prediction = model.predict(data)
+        prediction = model.predict(data, as_pandas=True)
     if isinstance(prediction, pd.Series):
         prediction = prediction.to_frame()
     if output_content_type == "application/json":
