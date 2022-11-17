@@ -18,8 +18,7 @@ version = ag.update_version(version, use_file_if_exists=False, create_file=True)
 submodule = 'cloud'
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
-    # TODO: update to ag 0.6 after release
-    'autogluon.common<0.6'
+    'autogluon.common<0.7'
     'boto3',
     'numpy',
     'opencv-python>=4.6,<4.7',
