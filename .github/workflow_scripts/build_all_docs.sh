@@ -53,19 +53,19 @@ else
     S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA/all  # We still write to BRANCH so copy_docs.sh knows where to find it
 fi
 
-mkdir -p docs/_build/rst/tutorials/
-aws s3 cp $BUILD_DOCS_PATH docs/_build/rst/tutorials/ --recursive
+mkdir -p docs/_build/html/tutorials/
+aws s3 cp $BUILD_DOCS_PATH docs/_build/html/tutorials/ --recursive
 
 setup_build_contrib_env
 install_all_no_tests
 
-sed -i -e "s@###_PLACEHOLDER_WEB_CONTENT_ROOT_###@http://$site@g" docs/config.ini
-sed -i -e "s@###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###@$other_doc_version_text@g" docs/config.ini
-sed -i -e "s@###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###@$other_doc_version_branch@g" docs/config.ini
+sed -i -e "s@###_PLACEHOLDER_WEB_CONTENT_ROOT_###@http://$site@g" docs/conf.py
+sed -i -e "s@###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###@$other_doc_version_text@g" docs/conf.py
+sed -i -e "s@###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###@$other_doc_version_branch@g" docs/conf.py
 
 shopt -s extglob
-rm -rf ./docs/tutorials/!(index.rst)
-cd docs && d2lbook build rst && d2lbook build html && cp static/images/* _build/html/_static
+# rm -rf ./docs/tutorials/!(index.rst)
+cd docs && sphinx-autogen api/*.rst -t _templates/autosummary && sphinx-build -b html . _build/html/
 
 COMMAND_EXIT_CODE=$?
 if [ $COMMAND_EXIT_CODE -ne 0 ]; then
