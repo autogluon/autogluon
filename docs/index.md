@@ -176,9 +176,9 @@ E
 :maxdepth: 1
 
 install
-tabular/quick_start
-multimodal/quick_start
-timeseries/quick_start
+tutorials/tabular/quick_start
+tutorials/multimodal/quick_start
+tutorials/timeseries/quick_start
 ```
 
 ```{toctree}
