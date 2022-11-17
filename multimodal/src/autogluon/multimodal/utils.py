@@ -1803,7 +1803,7 @@ def download(
             The sha1sum
         """
         with open(filename, mode="rb") as f:
-            d = hashlib.sha1()
+            d = hashlib.sha1()  # nosec B303 - not a cryptographic use
             for buf in iter(functools.partial(f.read, 1024 * 100), b""):
                 d.update(buf)
         return d.hexdigest()

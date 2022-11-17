@@ -1,5 +1,6 @@
 function setup_build_env {
     python3 -m pip install --upgrade pip
+    python3 -m pip install tox
     python3 -m pip install flake8
     python3 -m pip install black>=22.3
     python3 -m pip install isort>=5.10
@@ -47,7 +48,7 @@ function install_features {
 }
 
 function install_eda {
-    python3 -m pip install --upgrade -e eda/[tests]
+    echo "python3 -m pip install --upgrade -e eda/[tests]"
 }
 
 function install_tabular {
@@ -100,4 +101,13 @@ function install_all {
     install_timeseries
     install_eda
     install_autogluon
+}
+
+function build_all {
+    for module in common core features tabular multimodal text vision timeseries autogluon
+    do
+        cd "$module"/
+        python setup.py sdist bdist_wheel
+        cd ..
+    done
 }

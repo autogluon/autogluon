@@ -45,6 +45,7 @@ install_requires = [
     'pytorch-metric-learning>=1.3.0,<1.4.0',
     'nlpaug>=1.1.10,<=1.1.10',
     'nltk>=3.4.5,<4.0.0',
+    'openmim>0.1.5,<=0.2.1',
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
