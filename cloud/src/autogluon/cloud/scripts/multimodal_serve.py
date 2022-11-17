@@ -15,12 +15,8 @@ from PIL import Image
 
 def _save_image_and_update_dataframe_column(bytes):
     im_bytes = base64.b85decode(bytes)
-<<<<<<< HEAD
     # nosec B303 - not a cryptographic use
     im_hash = hashlib.sha1(im_bytes).hexdigest()
-=======
-    im_hash = hashlib.md5(im_bytes).hexdigest()
->>>>>>> 8660f568... cleanup old version code
     im = Image.open(BytesIO(im_bytes))
     im_name = f'multimodal_image_{im_hash}.png'
     im.save(im_name)
@@ -71,18 +67,9 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         image_paths = []
         for bytes in data:
             im_bytes = base64.b85decode(bytes)
-<<<<<<< HEAD
-<<<<<<< HEAD
             # nosec B303 - not a cryptographic use
             im_hash = hashlib.sha1(im_bytes).hexdigest()
             im_name = f'multimodal_image_{im_hash}.png'
-=======
-            im_name = hashlib.md5(im_bytes).hexdigest()
->>>>>>> 8660f568... cleanup old version code
-=======
-            im_hash = hashlib.md5(im_bytes).hexdigest()
-            im_name = f'multimodal_image_{im_hash}.png'
->>>>>>> df15a231... fix
             im = Image.open(BytesIO(im_bytes))
             im.save(im_name)
             image_paths.append(im_name)

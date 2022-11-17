@@ -11,21 +11,12 @@ from PIL import Image
 
 def _save_image_and_update_dataframe_column(bytes):
     im_bytes = base64.b85decode(bytes)
-<<<<<<< HEAD
     # nosec B303 - not a cryptographic use
     im_hash = hashlib.sha1(im_bytes).hexdigest()
-=======
-    im_hash = hashlib.md5(im_bytes).hexdigest()
->>>>>>> 8660f568... cleanup old version code
     im = Image.open(BytesIO(im_bytes))
     im_name = f'tabular_image_{im_hash}.png'
     im.save(im_name)
     print(f'Image saved as {im_name}')
-<<<<<<< HEAD
-
-    return im_name
-=======
->>>>>>> 8660f568... cleanup old version code
 
     return im_name
 
