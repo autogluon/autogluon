@@ -23,18 +23,21 @@ class AutoGluonSagemakerEstimator(Estimator):
         instance_type,
         source_dir=None,
         hyperparameters=None,
+        custom_image_uri=None,
         **kwargs,
     ):
         self.framework_version = framework_version
         self.py_version = py_version
-        self.image_uri = image_uris.retrieve(
-            "autogluon",
-            region=region,
-            version=framework_version,
-            py_version=py_version,
-            image_scope="training",
-            instance_type=instance_type,
-        )
+        self.image_uri = custom_image_uri
+        if self.image_uri is None:
+            self.image_uri = image_uris.retrieve(
+                "autogluon",
+                region=region,
+                version=framework_version,
+                py_version=py_version,
+                image_scope="training",
+                instance_type=instance_type,
+            )
         super().__init__(
             entry_point=entry_point,
             source_dir=source_dir,
@@ -118,16 +121,19 @@ class AutoGluonSagemakerInferenceModel(Model):
         framework_version,
         py_version,
         instance_type,
+        custom_image_uri=None,
         **kwargs
     ):
-        image_uri = image_uris.retrieve(
-            "autogluon",
-            region=region,
-            version=framework_version,
-            py_version=py_version,
-            image_scope="inference",
-            instance_type=instance_type,
-        )
+        image_uri = custom_image_uri
+        if image_uri is None:
+            image_uri = image_uris.retrieve(
+                "autogluon",
+                region=region,
+                version=framework_version,
+                py_version=py_version,
+                image_scope="inference",
+                instance_type=instance_type,
+            )
         super().__init__(
             model_data=model_data,
             role=role,

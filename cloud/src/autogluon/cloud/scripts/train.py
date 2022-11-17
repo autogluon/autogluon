@@ -6,18 +6,7 @@ import yaml
 from autogluon.tabular import TabularPredictor, TabularDataset, FeatureMetadata
 from autogluon.vision import ImagePredictor
 from autogluon.text import TextPredictor
-
-# Not following import style because importing autogluon.text before other module would cause segfault
-# https://github.com/awslabs/autogluon/issues/2042
-import autogluon.text
-
-from distutils.version import LooseVersion
-if LooseVersion(autogluon.text.__version__) < LooseVersion('0.5'):
-    from autogluon.text.automm import AutoMMPredictor
-    multimodal_predictor_cls = AutoMMPredictor
-else:
-    from autogluon.multimodal import MultiModalPredictor
-    multimodal_predictor_cls = MultiModalPredictor
+from autogluon.multimodal import MultiModalPredictor
 
 from pprint import pprint
 
@@ -96,7 +85,7 @@ if __name__ == "__main__":
     elif predictor_type == 'image':
         predictor_cls = ImagePredictor
     elif predictor_type == 'multimodal':
-        predictor_cls = multimodal_predictor_cls
+        predictor_cls = MultiModalPredictor
 
     train_file = get_input_path(args.training_dir)
     training_data = TabularDataset(train_file)
@@ -123,6 +112,7 @@ if __name__ == "__main__":
     if predictor_type in ('text', 'multimodal'):
         try:
             # Need os.path.sep because text/multimodal predictor has a bug where the old path has separator in the end, and the comparison doesn't use normpath
+            # TODO: remove this try except after 0.6 release
             predictor.save(path=save_path+os.path.sep, standalone=True)
         except:
             predictor.save(path=save_path+os.path.sep)

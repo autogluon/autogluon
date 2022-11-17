@@ -2,12 +2,10 @@ import copy
 import logging
 import os
 import pandas as pd
-import PIL
 
 from autogluon.common.loaders import load_pd
 from autogluon.common.utils.s3_utils import is_s3_url, s3_path_to_bucket_prefix
 from botocore.exceptions import ClientError
-from PIL import Image
 
 from .cloud_predictor import CloudPredictor
 from ..utils.ag_sagemaker import AutoGluonMultiModalRealtimePredictor
@@ -180,9 +178,3 @@ class MultiModalCloudPredictor(CloudPredictor):
                 test_data_image_column=test_data_image_column,
                 **kwargs,
             )
-        # TODO: remove this after fix is out for 0.6 release
-        if self.info()['recent_transform_job']['status'] == 'Failed':
-            logger.warning("If the log shows error related to loading gpu trained model on cpu")
-            logger.warning('Warning: You can either try deploy on a gpu machine')
-            logger.warning('Warning: or download the trained artifact and modify `num_gpus` to be `-1` in the config file located at `config.yaml`')
-            logger.warning('Warning: then try to deploy with the modified artifact')

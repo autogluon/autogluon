@@ -11,6 +11,7 @@ import sagemaker
 from abc import ABC, abstractmethod
 from botocore.exceptions import ClientError
 from datetime import datetime
+from packaging import version
 from typing import Optional
 
 from autogluon.common.loaders import load_pd
@@ -254,6 +255,9 @@ class CloudPredictor(ABC):
             framework_version, py_versions = self._retrieve_latest_framework_version(framework_type)
             py_version = py_versions[0]
         else:
+            # Cloud supports 0.6+ containers
+            if version.parse(framework_version) < version.parse("0.6.0"):
+                raise ValueError('Cloud module only supports 0.6+ containers.')
             valid_options = retrieve_available_framework_versions(framework_type)
             assert framework_version in valid_options, f'{framework_version} is not a valid option. Options are: {valid_options}'
 
@@ -391,6 +395,7 @@ class CloudPredictor(ABC):
         instance_type='ml.m5.2xlarge',
         instance_count=1,
         volume_size=100,
+        custom_image_uri=None,
         wait=True,
         autogluon_sagemaker_estimator_kwargs=dict(),
         **kwargs
@@ -504,6 +509,7 @@ class CloudPredictor(ABC):
             base_job_name="autogluon-cloudpredictor-train",
             output_path=output_path,
             inputs=inputs,
+            custom_image_uri=custom_image_uri,
             wait=wait,
             job_name=job_name,
             autogluon_sagemaker_estimator_kwargs=autogluon_sagemaker_estimator_kwargs,
@@ -606,6 +612,7 @@ class CloudPredictor(ABC):
         framework_version='latest',
         instance_type='ml.m5.2xlarge',
         initial_instance_count=1,
+        custom_image_uri=None,
         wait=True,
         model_kwargs=dict(),
         **kwargs
@@ -683,6 +690,7 @@ class CloudPredictor(ABC):
             framework_version=framework_version,
             py_version=py_version,
             instance_type=instance_type,
+            custom_image_uri=custom_image_uri,
             entry_point=entry_point,
             predictor_cls=predictor_cls,
             **model_kwargs
@@ -804,6 +812,7 @@ class CloudPredictor(ABC):
         job_name=None,
         instance_type='ml.m5.2xlarge',
         instance_count=1,
+        custom_image_uri=None,
         wait=True,
         model_kwargs=dict(),
         transformer_kwargs=dict(),
@@ -851,8 +860,6 @@ class CloudPredictor(ABC):
             Any extra arguments needed to pass to transform.
             Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/transformer.html#sagemaker.transformer.Transformer.transform for all options.
         """
-        # Sagemaker batch transformation is able to take in headers during the most recent test
-        # logger.warning('Please remove headers of the test data and make sure the columns are in the same order as the training data.')
         if not predictor_path:
             predictor_path = self._fit_job.get_output_path()
             assert predictor_path, 'No cloud trained model found.'
@@ -923,6 +930,7 @@ class CloudPredictor(ABC):
             job_name=job_name,
             split_type=split_type,
             content_type=content_type,
+            custom_image_uri=custom_image_uri,
             wait=wait,
             transformer_kwargs=transformer_kwargs,
             model_kwargs=model_kwargs,
@@ -1017,14 +1025,14 @@ class CloudPredictor(ABC):
     def _download_predictor(self, path, save_path):
         logger.log(20, 'Downloading trained models to local directory')
         predictor_bucket, predictor_key_prefix = s3_path_to_bucket_prefix(path)
-        tarball_path = os.path.join(save_path, 'model.tar.gz')
         self.sagemaker_session.download_data(
-            path=tarball_path,
+            path=save_path,
             bucket=predictor_bucket,
             key_prefix=predictor_key_prefix,
         )
         logger.log(20, 'Extracting the trained model tarball')
-        save_path = os.path.join(save_path, 'AutogluonModels')
+        tarball_path = os.path.join(save_path, 'model.tar.gz')
+        save_path = os.path.join(save_path, 'AutoGluonModels')
         unzip_file(tarball_path, save_path)
         return save_path
 
