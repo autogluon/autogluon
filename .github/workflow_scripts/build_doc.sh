@@ -13,7 +13,7 @@ function build_doc {
     setup_mmcv
     # only build for docs/$DOC
     rm -rf ./docs/tutorials/!($DOC)
-    cd docs && rm -rf _build && d2lbook build rst
+    cd docs && rm -rf _build && rm -rf juptyer_execute/ && sphinx-build -b html . _build/
 
     COMMAND_EXIT_CODE=$?
     if [ $COMMAND_EXIT_CODE -ne 0 ]; then
@@ -23,7 +23,7 @@ function build_doc {
     cd ..
 
     if [[ -n $PR_NUMBER ]]; then BUCKET=autogluon-ci S3_PATH=s3://$BUCKET/build_docs/$PR_NUMBER/$COMMIT_SHA; else BUCKET=autogluon-ci-push S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA; fi
-    DOC_PATH=docs/_build/rst/tutorials/$DOC/
+    DOC_PATH=docs/_build/tutorials/$DOC/
     S3_PATH=$S3_PATH/$DOC/
 
     write_to_s3 $BUCKET $DOC_PATH $S3_PATH
