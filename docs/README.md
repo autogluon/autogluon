@@ -1,4 +1,4 @@
-# How to locally build AutoGluon docs
+# How to locally build AutoGluon docs 
 
 Instructions apply to Linux and Mac. Windows has not been tested for doc builds.
 
