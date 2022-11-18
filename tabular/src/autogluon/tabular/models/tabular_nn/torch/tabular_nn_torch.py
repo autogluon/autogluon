@@ -488,10 +488,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 df = df.drop(columns=drop_cols)
 
         # self.feature_arraycol_map, self.feature_type_map have been previously set while processing training data.
-        import time
-        tic = time.time()
         df = self.processor.transform(df)
-        print(f"elapsed (transform): {(time.time()-tic)*1000:.0f} ms")
         return TabularTorchDataset(df, self.feature_arraycol_map, self.feature_type_map, self.problem_type, labels)
 
     def _process_train_data(self, df, impute_strategy, max_category_levels, skew_threshold,
