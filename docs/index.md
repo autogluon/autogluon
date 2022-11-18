@@ -143,8 +143,11 @@ tutorials/timeseries/timeseries_quick_start
 ```{toctree}
 :caption: API
 :hidden:
-:maxdepth: 3
+:maxdepth: 2
 
-api/autogluon.tabular
-api/autogluon.core
+api/_autogen/autogluon.tabular.TabularDataset
+api/_autogen/autogluon.tabular.TabularPredictor
+api/_autogen/autogluon.timeseries.TimeSeriesDataFrame
+api/_autogen/autogluon.timeseries.TimeSeriesPredictor
+api/_autogen/autogluon.multimodal.MultiModalPredictor
 ```
