@@ -129,39 +129,6 @@ python -m pip install autogluon
 AutoGluon supports Linux, MacOS, and Windows. See {doc}`./install` for detailed instructions. 
 
 
-## {octicon}`light-bulb` Solutions to ML problems
-
-::::{grid} 3
-:gutter: 3
-
-:::{grid-item-card}  Predicting Columns in a Table
-:link: tabular/quick_start.html
-
-Fitting models with tabular datasets
-:::
-
-:::{grid-item-card}  Example 1
-:link-type: ref
-:link: install
-
-A
-:::
-:::{grid-item-card}  Example 2
-C
-:::
-
-:::{grid-item-card}  Example 3
-D
-:::
-
-:::{grid-item-card}  Example 4
-E
-:::
-
-::::
-
-
-
 ```{toctree}
 :hidden:
 :caption: Get Started
