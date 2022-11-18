@@ -120,7 +120,7 @@ predictions = predictor.predict(test_data)
 ![](https://img.shields.io/pypi/v/autogluon.svg)
 ![](https://img.shields.io/pypi/dm/autogluon)
 
-Install AuotGluon using [pip](https://pip.pypa.io/en/stable/installation/): 
+Install AutoGluon using [pip](https://pip.pypa.io/en/stable/installation/):
 
 ```bash
 python -m pip install autogluon
