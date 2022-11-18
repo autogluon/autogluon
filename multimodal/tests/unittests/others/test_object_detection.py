@@ -1,4 +1,5 @@
 import os
+
 import pytest
 import requests
 from PIL import Image
