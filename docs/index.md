@@ -29,7 +29,7 @@ hide-toc: true
 
 AutoML for Tabular, Text, Image, Multimodal, and Time Series Data
 
-```{button-link} tabular/tabular_quick_start.html
+```{button-link} tutorials/tabular/tabular_quick_start.html
 :outline:
 :color: white
 :class: sd-px-4 sd-fs-5
