@@ -67,7 +67,7 @@ sed -i -e "s@###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###@$other_doc_version_bran
 
 shopt -s extglob
 rm -rf ./docs/tutorials/!(index.rst)
-cd docs && sphinx-autogen api/*.rst -t _templates/autosummary && sphinx-build -b html . _build/
+cd docs && sphinx-autogen api/*.rst -t _templates/autosummary && sphinx-build -b html . _build/html/
 
 COMMAND_EXIT_CODE=$?
 if [ $COMMAND_EXIT_CODE -ne 0 ]; then
