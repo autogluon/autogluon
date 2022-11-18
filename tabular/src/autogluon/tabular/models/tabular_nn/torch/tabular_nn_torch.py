@@ -31,7 +31,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     """
 
     # Constants used throughout this class:
-    unique_category_str = '!missing!'  # string used to represent missing values and unknown categories for categorical features.
+    unique_category_str = np.nan  # string used to represent missing values and unknown categories for categorical features.
     params_file_name = 'net.params'  # Stores parameters of final network
     temp_file_name = 'temp_net.params'  # Stores temporary network parameters (eg. during the course of training)
 
@@ -488,7 +488,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 df = df.drop(columns=drop_cols)
 
         # self.feature_arraycol_map, self.feature_type_map have been previously set while processing training data.
+        import time
+        tic = time.time()
         df = self.processor.transform(df)
+        print(f"elapsed (transform): {(time.time()-tic)*1000:.0f} ms")
         return TabularTorchDataset(df, self.feature_arraycol_map, self.feature_type_map, self.problem_type, labels)
 
     def _process_train_data(self, df, impute_strategy, max_category_levels, skew_threshold,
