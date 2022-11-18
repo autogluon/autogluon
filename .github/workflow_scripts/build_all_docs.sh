@@ -53,8 +53,8 @@ else
     S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA/all  # We still write to BRANCH so copy_docs.sh knows where to find it
 fi
 
-mkdir -p docs/_build/tutorials/
-aws s3 cp $BUILD_DOCS_PATH docs/_build/tutorials/ --recursive
+mkdir -p docs/_build/html/tutorials/
+aws s3 cp $BUILD_DOCS_PATH docs/_build/html/tutorials/ --recursive
 
 setup_build_contrib_env
 install_all
