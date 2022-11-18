@@ -29,7 +29,7 @@ hide-toc: true
 
 AutoML for Tabular, Text, Image, Multimodal, and Time Series Data
 
-```{button-link} tabular/quick_start.html
+```{button-link} tabular/tabular_quick_start.html
 :outline:
 :color: white
 :class: sd-px-4 sd-fs-5
@@ -176,9 +176,9 @@ E
 :maxdepth: 1
 
 install
-tutorials/tabular/quick_start
-tutorials/multimodal/quick_start
-tutorials/timeseries/quick_start
+tutorials/tabular/tabular_quick_start
+tutorials/multimodal/multimodal_quick_start
+tutorials/timeseries/timeseries_quick_start
 ```
 
 ```{toctree}
