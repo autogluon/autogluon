@@ -141,17 +141,6 @@ tutorials/timeseries/timeseries_quick_start
 ```
 
 ```{toctree}
-:caption: Tabular
-:hidden:
-:maxdepth: 2
-
-tabular/fit
-tabular/predict
-tabular/applications
-tabular/customization
-```
-
-```{toctree}
 :caption: API
 :hidden:
 :maxdepth: 3
