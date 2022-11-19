@@ -297,4 +297,4 @@ class NonparametricSignificanceVisualization(AbstractVisualization, JupyterMixin
                     square=True,
                     # cbar_kws={"shrink": 0.5},
                     **args)
-        self.display_obj(fig)
+        # self.display_obj(fig)
