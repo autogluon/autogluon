@@ -1,14 +1,11 @@
-import re
-from typing import Union, List, Any, Dict
+from typing import Union, List, Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
 from scipy.cluster import hierarchy as hc
-from scipy.stats import spearmanr
 from pandas.api.types import is_object_dtype, is_numeric_dtype
 from scipy.stats import chi2_contingency, spearmanr, kruskal
 
-from autogluon.features.generators import AutoMLPipelineFeatureGenerator
 from .base import AbstractAnalysis
 from .. import AnalysisState
 
@@ -100,7 +97,9 @@ class Correlation(AbstractAnalysis):
                 keep_cols = df_corr.index.values
                 state.correlations[ds] = df_corr[keep_cols]
 
-                high_corr = state.correlations[ds][[self.focus_field]].sort_values(self.focus_field, ascending=False).drop(self.focus_field)
+                high_corr = state.correlations[ds][[self.focus_field]].sort_values(self.focus_field,
+                                                                                   ascending=False).drop(
+                    self.focus_field)
                 state.correlations_focus_high_corr[ds] = high_corr
 
 
@@ -116,30 +115,60 @@ class CorrelationSignificance(AbstractAnalysis):
 
 
 class FeatureDistanceAnalysis(AbstractAnalysis, StateCheckMixin):
+
+    def __init__(self,
+                 near_duplicates_threshold: float = 0.0,
+                 parent: Optional[AbstractAnalysis] = None,
+                 children: List[AbstractAnalysis] = [],
+                 state: Optional[AnalysisState] = None,
+                 **kwargs) -> None:
+        super().__init__(parent, children, state, **kwargs)
+        self.near_duplicates_threshold = near_duplicates_threshold
+
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
-        return self.all_keys_must_be_present(args, 'train_data', 'label')
+        return self.all_keys_must_be_present(args, 'train_data', 'label', 'feature_generator')
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         x = args.train_data.drop(labels=[args.label], axis=1)
-        feature_generator = AutoMLPipelineFeatureGenerator(
-            enable_numeric_features=True,
-            enable_categorical_features=True,
-            enable_datetime_features=False,
-            enable_text_special_features=False,
-            enable_text_ngram_features=False,
-            enable_raw_text_features=False,
-            enable_vision_features=False,
-        )
-        x_transformed = feature_generator.fit_transform(X=x)
-        corr = np.round(spearmanr(x_transformed).correlation, 4)
+        corr = np.round(spearmanr(x).correlation, 4)
         np.fill_diagonal(corr, 1)
         corr_condensed = hc.distance.squareform(1 - np.nan_to_num(corr))
         z = hc.linkage(corr_condensed, method='average')
+        columns = list(x.columns)
         s = {
-            'columns': x_transformed.columns,
+            'columns': columns,
             'linkage': z,
+            'near_duplicates_threshold': self.near_duplicates_threshold,
+            'near_duplicates': self.__get_linkage_clusters(z, columns, self.near_duplicates_threshold),
         }
         state['feature_distance'] = s
+
+    @staticmethod
+    def __get_linkage_clusters(linkage, columns, threshold: float):
+        idx_to_col = {i: v for i, v in enumerate(columns)}
+        idx_to_dist = {}
+        clusters = {}
+        for (f1, f2, d, l), i in zip(
+                linkage,
+                np.arange(len(idx_to_col), len(idx_to_col) + len(linkage))
+        ):
+            idx_to_dist[i] = d
+            f1 = int(f1)
+            f2 = int(f2)
+            if d <= threshold:
+                clusters[i] = [*clusters.pop(f1, [f1]), *clusters.pop(f2, [f2])]
+
+        results = []
+        for i, nodes in clusters.items():
+            d = idx_to_dist[i]
+            nodes = [idx_to_col[n] for n in nodes]
+            results.append({
+                'nodes': sorted(nodes),
+                'distance': d,
+            })
+
+        return results
+
 
 class NonparametricAssociation(AbstractAnalysis):
     """

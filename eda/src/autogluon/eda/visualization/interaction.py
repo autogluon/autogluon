@@ -11,7 +11,7 @@ from .jupyter import JupyterMixin
 from ..state import AnalysisState, StateCheckMixin
 from ..util.types import map_raw_type_to_feature_type
 
-__all__ = ['CorrelationVisualization', 'CorrelationSignificanceVisualization']
+__all__ = ['CorrelationVisualization', 'CorrelationSignificanceVisualization', 'FeatureDistanceAnalysisVisualization', 'FeatureInteractionVisualization']
 
 
 class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
@@ -236,7 +236,7 @@ class CorrelationSignificanceVisualization(AbstractVisualization, JupyterMixin):
             plt.show(fig)
 
 
-class FeatureDistanceAnalysisVisualization(AbstractVisualization, StateCheckMixin):
+class FeatureDistanceAnalysisVisualization(AbstractVisualization, StateCheckMixin, JupyterMixin):
     def __init__(self,
                  namespace: str = None,
                  fig_args: Union[None, Dict[str, Any]] = {},
@@ -255,6 +255,13 @@ class FeatureDistanceAnalysisVisualization(AbstractVisualization, StateCheckMixi
         ax.grid(False)
         hc.dendrogram(ax=ax, Z=state.feature_distance.linkage, labels=state.feature_distance.columns, **{**default_args, **self._kwargs})
         plt.show(fig)
+        if len(state.feature_distance.near_duplicates) > 0:
+            message = f'**The following feature groups are considered as near-duplicates**:\n\n' \
+                      f'Distance threshold: <= `{state.feature_distance.near_duplicates_threshold}`. ' \
+                      f'Consider keeping only some of the columns within each group:\n'
+            for group in state.feature_distance.near_duplicates:
+                message += f'\n - `{"`, `".join(sorted(group["nodes"]))}` - distance `{group["distance"]:.2f}`'
+            self.render_markdown(message)
 
 class NonparametricSignificanceVisualization(AbstractVisualization, JupyterMixin):
 
@@ -289,5 +296,4 @@ class NonparametricSignificanceVisualization(AbstractVisualization, JupyterMixin
                     square=True,
                     # cbar_kws={"shrink": 0.5},
                     **args)
-        plt.yticks(rotation=0)
-        plt.show(fig)
+        self.display_obj(fig)
