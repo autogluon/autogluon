@@ -175,7 +175,7 @@ class NonparametricAssociation(AbstractAnalysis):
     """
 
     def __init__(self,
-                 data = None,
+                 data=None,
                  association_cols: list = [],
                  parent: Union[None, AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
@@ -186,7 +186,7 @@ class NonparametricAssociation(AbstractAnalysis):
 
     @staticmethod
     def custom_kruskal(df, obj_col_name, num_col_name):
-        cat_groups = [v[num_col_name] for i,v in df[[obj_col_name, num_col_name]].groupby(obj_col_name)]
+        cat_groups = [v[num_col_name] for i, v in df[[obj_col_name, num_col_name]].groupby(obj_col_name)]
         test_res = kruskal(*cat_groups)
         return {'test_statistic': test_res.statistic,
                 'pvalue': test_res.pvalue,
@@ -240,7 +240,7 @@ class NonparametricAssociation(AbstractAnalysis):
         for i in range(n_cols):
             for j in range(n_cols):
                 if i == j:
-                    pval_matrix[i,j] = 1.0
+                    pval_matrix[i, j] = 1.0
                     continue
                 if i < j:
                     col1 = self.association_cols[i]
@@ -248,9 +248,9 @@ class NonparametricAssociation(AbstractAnalysis):
                 else:
                     col1 = self.association_cols[j]
                     col2 = self.association_cols[i]
-                pval_matrix[i,j] = tests[(col1, col2)]['pvalue']
+                pval_matrix[i, j] = tests[(col1, col2)]['pvalue']
         state.association_pvalue_matrix = pd.DataFrame(pval_matrix,
-                     columns = self.association_cols,
-                     index = self.association_cols)
+                                                       columns=self.association_cols,
+                                                       index=self.association_cols)
         state.association_cols = self.association_cols
         state.association_tests = sorted(tests.items(), key=lambda x: x[1]['pvalue'])

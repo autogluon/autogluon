@@ -263,6 +263,7 @@ class FeatureDistanceAnalysisVisualization(AbstractVisualization, StateCheckMixi
                 message += f'\n - `{"`, `".join(sorted(group["nodes"]))}` - distance `{group["distance"]:.2f}`'
             self.render_markdown(message)
 
+
 class NonparametricSignificanceVisualization(AbstractVisualization, JupyterMixin):
 
     def __init__(self,
