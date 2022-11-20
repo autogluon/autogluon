@@ -66,7 +66,7 @@ class ConfusionMatrix(AbstractVisualization, JupyterMixin):
         return "model_evaluation" in state and "confusion_matrix" in state.model_evaluation
 
     def _render(self, state: AnalysisState) -> None:
-        self.render_header_if_needed(state, "Confusion matrix")
+        self.render_header_if_needed(state, "Confusion Matrix")
         cm = pd.DataFrame(state.model_evaluation.confusion_matrix)
         cm.index.name = "Actual"
         cm.columns.name = "Predicted"
@@ -91,8 +91,6 @@ class RegressionEvaluation(AbstractVisualization, JupyterMixin):
         namespace to use; can be nested like `ns_a.ns_b.ns_c`
     fig_args: Optional[Dict[str, Any]] = None,
         kwargs to pass into chart figure
-    chart_args: Optional[Dict[str, Any]] = None,
-        kwargs to pass into chart
 
     Examples
     --------
@@ -107,7 +105,7 @@ class RegressionEvaluation(AbstractVisualization, JupyterMixin):
     >>> auto.analyze(model=predictor, val_data=df_test, anlz_facets=[
     >>>     eda.model.AutoGluonModelEvaluator(),
     >>> ], viz_facets=[
-    >>>     viz.model.RegressionEvaluation(fig_args=dict(figsize=(6,6)), chart_args=dict(marker='o', scatter_kws={'s':5})),
+    >>>     viz.model.RegressionEvaluation(fig_args=dict(figsize=(6,6)), marker='o', scatter_kws={'s':5}),
     >>> ])
 
     See Also
@@ -118,7 +116,6 @@ class RegressionEvaluation(AbstractVisualization, JupyterMixin):
     def __init__(
         self,
         fig_args: Optional[Dict[str, Any]] = None,
-        chart_args: Optional[Dict[str, Any]] = None,
         headers: bool = False,
         namespace: Optional[str] = None,
         **kwargs,
@@ -130,17 +127,14 @@ class RegressionEvaluation(AbstractVisualization, JupyterMixin):
             fig_args = {}
         self.fig_args = fig_args
 
-        if chart_args is None:
-            chart_args = {}
-        self.chart_args = chart_args
-
     def can_handle(self, state: AnalysisState) -> bool:
         return "model_evaluation" in state and state.model_evaluation.problem_type == REGRESSION
 
     def _render(self, state: AnalysisState) -> None:
+        self.render_header_if_needed(state, "Prediction vs Target")
         data = pd.DataFrame({"y_true": state.model_evaluation.y_true, "y_pred": state.model_evaluation.y_pred})
         fig, ax = plt.subplots(**self.fig_args)
-        sns.regplot(ax=ax, data=data, x="y_true", y="y_pred", **self.chart_args)
+        sns.regplot(ax=ax, data=data, x="y_true", y="y_pred", **self._kwargs)
         plt.show(fig)
 
 
@@ -203,10 +197,10 @@ class FeatureImportance(AbstractVisualization, JupyterMixin):
         return "model_evaluation" in state and "importance" in state.model_evaluation
 
     def _render(self, state: AnalysisState) -> None:
-        self.render_header_if_needed(state, "Feature importance")
+        self.render_header_if_needed(state, "Feature Importance")
         importance = state.model_evaluation.importance
         self.display_obj(importance)
         if self.show_barplots:
             fig, ax = plt.subplots(**self.fig_args)
-            sns.barplot(ax=ax, data=importance.reset_index(), y="index", x="importance")
+            sns.barplot(ax=ax, data=importance.reset_index(), y="index", x="importance", **self._kwargs)
             plt.show(fig)
