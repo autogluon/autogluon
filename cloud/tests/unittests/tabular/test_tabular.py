@@ -34,7 +34,10 @@ def test_tabular(test_helper):
             predictor_init_args,
             predictor_fit_args,
             cloud_predictor_no_train,
-            test_data
+            test_data,
+            fit_kwargs=dict(custom_image_uri=test_helper.cpu_training_image),
+            deploy_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
+            predict_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
         )
 
 
@@ -76,9 +79,13 @@ def test_tabular_tabular_text_image(test_helper):
             test_data,
             image_path='tabular_text_image_images.zip',
             fit_instance_type='ml.g4dn.2xlarge',
-            fit_kwargs=dict(image_column='Images'),
+            fit_kwargs=dict(
+                image_column='Images',
+                custom_image_uri=test_helper.gpu_training_image
+            ),
             deploy_kwargs=dict(
                 instance_type='ml.g4dn.2xlarge',
+                custom_image_uri=test_helper.gpu_inference_image
             ),
             predict_real_time_kwargs=dict(
                 test_data_image_column='Images',
@@ -86,8 +93,8 @@ def test_tabular_tabular_text_image(test_helper):
             predict_kwargs=dict(
                 instance_type='ml.g4dn.2xlarge',
                 test_data_image_column='Images',
-            ),
-            skip_predict=True  # TODO: remove this after autogluon 0.6 release. Currently, some issues cause some module's batch inference to fail
+                custom_image_uri=test_helper.gpu_inference_image
+            )
         )
 
 
@@ -124,11 +131,13 @@ def test_tabular_tabular_text(test_helper):
             cloud_predictor_no_train,
             test_data,
             fit_instance_type='ml.g4dn.2xlarge',
+            fit_kwargs=dict(custom_image_uri=test_helper.cpu_training_image),
             deploy_kwargs=dict(
                 instance_type='ml.g4dn.2xlarge',
+                custom_image_uri=test_helper.gpu_inference_image
             ),
             predict_kwargs=dict(
                 instance_type='ml.g4dn.2xlarge',
-            ),
-            skip_predict=True  # TODO: remove this after autogluon 0.6 release. Currently, some issues cause some module's batch inference to fail
+                custom_image_uri=test_helper.gpu_inference_image
+            )
         )

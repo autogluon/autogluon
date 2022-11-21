@@ -35,7 +35,10 @@ def test_text(test_helper):
             predictor_fit_args,
             cloud_predictor_no_train,
             test_data,
-            fit_instance_type='ml.g4dn.2xlarge'
+            fit_instance_type='ml.g4dn.2xlarge',
+            fit_kwargs=dict(custom_image_uri=test_helper.gpu_training_image),
+            deploy_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
+            predict_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
         )
 
 
@@ -70,5 +73,8 @@ def test_multimodal_text_only(test_helper):
             predictor_fit_args,
             cloud_predictor_no_train,
             test_data,
-            fit_instance_type='ml.g4dn.2xlarge'
+            fit_instance_type='ml.g4dn.2xlarge',
+            fit_kwargs=dict(custom_image_uri=test_helper.gpu_training_image),
+            deploy_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
+            predict_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
         )
