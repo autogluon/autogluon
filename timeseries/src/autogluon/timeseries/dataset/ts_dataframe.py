@@ -109,12 +109,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         super().__init__(data=data, *args, **kwargs)
         self._static_features: Optional[pd.DataFrame] = None
         if static_features is not None:
-            if isinstance(static_features, pd.Series):
-                static_features = static_features.to_frame()
-            if not isinstance(static_features, pd.DataFrame):
-                raise ValueError(
-                    f"static_features must be a pandas DataFrame (received object of type {type(static_features)})"
-                )
             self.static_features = static_features
 
         # internal value for cached frequency values that are inferred. corresponds to either a
@@ -148,13 +142,22 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if not isinstance(self.index, pd.MultiIndex):
             return
 
-        if value is not None and not set(value.index).issuperset(set(self.item_ids)):
-            raise ValueError("Static features index should match item index")
-
-        # if static features being set are a strict superset of the item index, we take a
-        # subset to ensure consistency
-        if value is not None and len(set(value.index) - set(self.item_ids)) > 0:
-            value = value.loc[self.item_ids].copy()
+        if value is not None:
+            if isinstance(value, pd.Series):
+                value = value.to_frame()
+            if not isinstance(value, pd.DataFrame):
+                raise ValueError(f"static_features must be a pandas DataFrame (received object of type {type(value)})")
+            missing_item_ids = self.item_ids.difference(value.index)
+            if len(missing_item_ids) > 0:
+                raise ValueError(
+                    f"Following item_ids are missing from the index of static_features: {missing_item_ids.to_list()}"
+                )
+            # if provided static features are a strict superset of the item index, we take a subset to ensure consistency
+            if len(value.index.difference(self.item_ids)) > 0:
+                value = value.loc[self.item_ids].copy()
+            if value.index.name != ITEMID:
+                value = value.copy()
+                value.index.rename(ITEMID, inplace=True)
 
         self._static_features = value
 
