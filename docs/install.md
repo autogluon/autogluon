@@ -56,7 +56,7 @@ Modules and optional dependencies:
 By default, AutoGluon is installed with GPU support on both Linux and Windows, and this version also works well for CPU. If you only need CPU support and are concerned about network and disk usage, run the following command before installing AutoGluon, which installs the CPU-only version of `pytorch` that is 10x smaller than the default version with GPU support:
 
 ```bash
-python -m pip install "torch>=1.0,<1.12+cpu" -f https://download.pytorch.org/whl/cpu/torch_stable.html
+python -m pip install "torch>=1.0,<1.13+cpu" -f https://download.pytorch.org/whl/cpu/torch_stable.html
 ```
 ::::
 
