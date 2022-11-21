@@ -46,7 +46,7 @@ from ..models import (
     TFewModel,
     TimmAutoModelForImagePrediction,
 )
-from ..models.utils import inject_adaptation_to_linear_layer, inject_ia3_to_linear_layer, inject_lora_to_linear_layer
+from ..models.utils import inject_adaptation_to_linear_layer
 
 logger = logging.getLogger(AUTOMM)
 
