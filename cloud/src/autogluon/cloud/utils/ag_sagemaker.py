@@ -1,15 +1,16 @@
 import copy
 import os
+
 import sagemaker
-from sagemaker import fw_utils
+from sagemaker import fw_utils, image_uris, vpc_utils
 from sagemaker.estimator import Estimator
-from sagemaker import image_uris, vpc_utils
-from sagemaker.model import Model, DIR_PARAM_NAME, SCRIPT_PARAM_NAME
+from sagemaker.model import DIR_PARAM_NAME, SCRIPT_PARAM_NAME, Model
 from sagemaker.predictor import Predictor
 from sagemaker.serializers import CSVSerializer, NumpySerializer
-from .serializers import ParquetSerializer, MultiModalSerializer
+
 from .deserializers import PandasDeserializer
 from .sagemaker_utils import retrieve_latest_framework_version
+from .serializers import MultiModalSerializer, ParquetSerializer
 
 
 # Estimator documentation: https://sagemaker.readthedocs.io/en/stable/api/training/estimators.html#estimators
@@ -103,10 +104,12 @@ class AutoGluonSagemakerEstimator(Estimator):
 
     @classmethod
     def _prepare_init_params_from_job_description(cls, job_details, model_channel_name=None):
-        init_params = super()._prepare_init_params_from_job_description(job_details, model_channel_name=model_channel_name)
+        init_params = super()._prepare_init_params_from_job_description(
+            job_details, model_channel_name=model_channel_name
+        )
         # This two parameters will not be used, but is required to reattach the job
-        init_params['region'] = 'us-east-1'
-        init_params['framework_version'] = retrieve_latest_framework_version()
+        init_params["region"] = "us-east-1"
+        init_params["framework_version"] = retrieve_latest_framework_version()
         return init_params
 
 
@@ -122,7 +125,7 @@ class AutoGluonSagemakerInferenceModel(Model):
         py_version,
         instance_type,
         custom_image_uri=None,
-        **kwargs
+        **kwargs,
     ):
         image_uri = custom_image_uri
         if image_uri is None:
@@ -134,24 +137,18 @@ class AutoGluonSagemakerInferenceModel(Model):
                 image_scope="inference",
                 instance_type=instance_type,
             )
-        super().__init__(
-            model_data=model_data,
-            role=role,
-            entry_point=entry_point,
-            image_uri=image_uri,
-            **kwargs
-        )
+        super().__init__(model_data=model_data, role=role, entry_point=entry_point, image_uri=image_uri, **kwargs)
 
     def transformer(
         self,
         instance_count,
         instance_type,
-        strategy='MultiRecord',
+        strategy="MultiRecord",
         max_payload=6,  # Maximum size of the payload in a single HTTP request to the container in MB. Will split into multiple batches if a request is more than max_payload
         max_concurrent_transforms=1,  # The maximum number of HTTP requests to be made to each individual transform container at one time.
-        accept='application/json',
-        assemble_with='Line',
-        **kwargs
+        accept="application/json",
+        assemble_with="Line",
+        **kwargs,
     ):
         return super().transformer(
             instance_count=instance_count,
@@ -161,13 +158,13 @@ class AutoGluonSagemakerInferenceModel(Model):
             max_concurrent_transforms=max_concurrent_transforms,
             accept=accept,
             assemble_with=assemble_with,
-            **kwargs
+            **kwargs,
         )
 
 
 class AutoGluonRepackInferenceModel(AutoGluonSagemakerInferenceModel):
     """
-        Custom implementation to force repack of inference code into model artifacts
+    Custom implementation to force repack of inference code into model artifacts
     """
 
     def prepare_container_def(
@@ -176,9 +173,7 @@ class AutoGluonRepackInferenceModel(AutoGluonSagemakerInferenceModel):
         accelerator_type=None,
         serverless_inference_config=None,
     ):  # pylint: disable=unused-argument
-        deploy_key_prefix = fw_utils.model_code_key_prefix(
-            self.key_prefix, self.name, self.image_uri
-        )
+        deploy_key_prefix = fw_utils.model_code_key_prefix(self.key_prefix, self.name, self.image_uri)
         deploy_env = copy.deepcopy(self.env)
         self._upload_code(deploy_key_prefix, repack=True)
         deploy_env.update(self._script_mode_env_vars())
@@ -205,7 +200,7 @@ class AutoGluonNonRepackInferenceModel(AutoGluonSagemakerInferenceModel):
         deploy_env = copy.deepcopy(self.env)
         deploy_env.update(self._script_mode_env_vars())
         deploy_env[SCRIPT_PARAM_NAME.upper()] = os.path.basename(deploy_env[SCRIPT_PARAM_NAME.upper()])
-        deploy_env[DIR_PARAM_NAME.upper()] = '/opt/ml/model/code'
+        deploy_env[DIR_PARAM_NAME.upper()] = "/opt/ml/model/code"
 
         return sagemaker.container_def(
             self.image_uri,
@@ -218,40 +213,21 @@ class AutoGluonNonRepackInferenceModel(AutoGluonSagemakerInferenceModel):
 # Predictor documentation: https://sagemaker.readthedocs.io/en/stable/api/inference/predictors.html
 class AutoGluonRealtimePredictor(Predictor):
     def __init__(self, *args, **kwargs):
-        super().__init__(
-            *args,
-            serializer=ParquetSerializer(),
-            deserializer=PandasDeserializer(),
-            **kwargs
-        )
+        super().__init__(*args, serializer=ParquetSerializer(), deserializer=PandasDeserializer(), **kwargs)
 
 
 class AutoGluonImageRealtimePredictor(Predictor):
     def __init__(self, *args, **kwargs):
-        super().__init__(
-            *args,
-            serializer=NumpySerializer(),
-            deserializer=PandasDeserializer(),
-            **kwargs
-        )
+        super().__init__(*args, serializer=NumpySerializer(), deserializer=PandasDeserializer(), **kwargs)
 
 
 class AutoGluonMultiModalRealtimePredictor(Predictor):
     def __init__(self, *args, **kwargs):
-        super().__init__(
-            *args,
-            serializer=MultiModalSerializer(),
-            deserializer=PandasDeserializer(),
-            **kwargs
-        )
+        super().__init__(*args, serializer=MultiModalSerializer(), deserializer=PandasDeserializer(), **kwargs)
 
 
 # Predictor documentation: https://sagemaker.readthedocs.io/en/stable/api/inference/predictors.html
 # SageMaker can only take in csv format for batch transformation because files need to be easily splitable to be batch processed.
 class AutoGluonBatchPredictor(Predictor):
     def __init__(self, *args, **kwargs):
-        super().__init__(
-            *args,
-            serializer=CSVSerializer(),
-            **kwargs
-        )
+        super().__init__(*args, serializer=CSVSerializer(), **kwargs)

@@ -1,1 +1,1 @@
-from .sagemaker_job import SageMakerFitJob, SageMakerBatchTransformationJob
+from .sagemaker_job import SageMakerBatchTransformationJob, SageMakerFitJob

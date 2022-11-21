@@ -1,16 +1,16 @@
+from typing import Optional
+
 import boto3
 import sagemaker
-
 from botocore.config import Config
-from typing import Optional
 
 
 def setup_sagemaker_session(
     config: Optional[Config] = None,
     connect_timeout: int = 60,
     read_timeout: int = 60,
-    retries: dict = {'max_attempts': 20},
-    **kwargs
+    retries: dict = {"max_attempts": 20},
+    **kwargs,
 ):
     """
     Setup a sagemaker session with a given configuration
@@ -42,11 +42,6 @@ def setup_sagemaker_session(
                 adaptive - Retries with additional client side throttling.
     """
     if config is None:
-        config = Config(
-            connect_timeout=connect_timeout,
-            read_timeout=read_timeout,
-            retries=retries,
-            **kwargs
-        )
-    sm_boto = boto3.client('sagemaker', config=config)
+        config = Config(connect_timeout=connect_timeout, read_timeout=read_timeout, retries=retries, **kwargs)
+    sm_boto = boto3.client("sagemaker", config=config)
     return sagemaker.Session(sagemaker_client=sm_boto)
