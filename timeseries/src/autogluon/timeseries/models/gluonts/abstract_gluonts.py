@@ -77,7 +77,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             df = self.target_df.loc[item_id]
             time_series = {
                 FieldName.ITEM_ID: item_id,
-                FieldName.TARGET: df.squeeze().to_numpy(dtype=self.float_dtype),
+                FieldName.TARGET: df.to_numpy(dtype=self.float_dtype).ravel(),
                 FieldName.START: pd.Period(df.index[0], freq=self.freq),
             }
             if self.feat_static_cat is not None:
