@@ -363,7 +363,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         # Make sure the item_ids are sorted in the same order as in data
         df = df.loc[data.item_ids]
-        # Set correct timestamp index
+        # GluonTS uses pd.Period internally, which may lead to loss of precision (e.g., "2020-01-01 12:00" becomes
+        # "2020-01-01 00:00"). We manually set the index to avoid such problems.
         df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
         return df
 
