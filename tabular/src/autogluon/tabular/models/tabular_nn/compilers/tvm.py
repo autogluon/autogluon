@@ -54,6 +54,27 @@ class TabularNeuralNetTorchTvmPredictor:
 
     def predict(self, X):
         """Run the model with the input and return the result."""
+        predict_data = self._predict_proba(X)
+
+        # Problem type specific post processing
+        if self.problem_type == QUANTILE:
+            predict_data = torch.sort(predict_data, -1)[0]  # sorting ensures monotonicity of quantile estimates
+        elif self.problem_type in [BINARY, MULTICLASS, SOFTCLASS]:
+            from scipy.special import softmax
+            predict_data = softmax(predict_data)  # convert NN output to probability
+        elif self.problem_type == REGRESSION:
+            predict_data = predict_data.flatten()
+        if self.problem_type == BINARY:
+            predict_data = predict_data[:,1]
+
+        return predict_data
+
+    def predict_proba(self, X):
+        """Run the model with the input, and return probabilities as result."""
+        raise NotImplementedError("Not supported to produce probabilities in predict_proba.")
+
+    def _predict_proba(self, X):
+        """Run the model with the input, and return probabilities as result."""
         import tvm
         input_data = self._get_input_vector(X)
         num_net_outputs = self.architecture_desc['num_net_outputs']
@@ -81,24 +102,7 @@ class TabularNeuralNetTorchTvmPredictor:
         # Remove padded result from output
         if data_size < batch_size:
             predict_data = predict_data[:data_size]
-
-        # Problem type specific post processing
-        if self.problem_type == QUANTILE:
-            predict_data = torch.sort(predict_data, -1)[0]  # sorting ensures monotonicity of quantile estimates
-        elif self.problem_type in [BINARY, MULTICLASS, SOFTCLASS]:
-            from scipy.special import softmax
-            predict_data = softmax(predict_data)  # convert NN output to probability
-        elif self.problem_type == REGRESSION:
-            predict_data = predict_data.flatten()
-        if self.problem_type == BINARY:
-            predict_data = predict_data[:,1]
-
         return predict_data
-
-    def predict_proba(self, X):
-        """Run the model with the input, and return probabilities as result."""
-        pass
-
 
 class TabularNeuralNetTorchTvmCompiler:
     name = 'tvm'
@@ -131,7 +135,8 @@ class TabularNeuralNetTorchTvmCompiler:
         """
         import torch
         import tvm
-        from tvm import relay
+        from tvm import relay, auto_scheduler
+        from tvm.topi.sparse.utils import sparse_sketch_rules
         if input_types is None or not isinstance(input_types[0], tuple):
             raise RuntimeError("input_types argument should contain at least one tuple"
                                ", e.g. [((1, 14), np.float32)]")
@@ -154,8 +159,20 @@ class TabularNeuralNetTorchTvmCompiler:
 
         target = tvm.target.Target("llvm", host="llvm")
         dev = tvm.cpu(0)
-        with tvm.transform.PassContext(opt_level=3):
-            lib = relay.build(mod, target=target, params=params)
+        log_file = path + "log.txt"
+
+        tasks, task_weights = auto_scheduler.extract_tasks(mod["main"], params, target)
+        tuner = auto_scheduler.TaskScheduler(tasks, task_weights)
+        tune_option = auto_scheduler.TuningOptions(
+            num_measure_trials=len(tasks)*20,  # change this to 20000 to achieve the best performance
+            runner=auto_scheduler.LocalRunner(repeat=5, enable_cpu_cache_flush=True),
+            measure_callbacks=[auto_scheduler.RecordToFile(log_file)],
+            verbose=0,
+        )
+        tuner.tune(tune_option)
+        with auto_scheduler.ApplyHistoryBest(log_file):
+            with tvm.transform.PassContext(opt_level=3, config={"relay.backend.use_auto_scheduler": True}):
+                lib = relay.build(mod, target=target, params=params)
 
         model.architecture_desc['problem_type'] = model.problem_type
         TabularNeuralNetTorchTvmCompiler.save(lib, path, model.architecture_desc)

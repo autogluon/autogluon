@@ -400,6 +400,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     #  If this isn't here, inference speed is slowed down massively.
     #  Remove once upgraded to XGBoost>=1.6
     def _predict_proba(self, X, _reset_threads=True, **kwargs):
+        import torch.nn as nn
+        if not isinstance(self.model, nn.Module):
+            # Avoid overwriting num_threads for compiled models
+            _reset_threads = False
         if _reset_threads:
             from ..._utils.torch_utils import TorchThreadManager
             with TorchThreadManager(num_threads=self._num_cpus_infer):
@@ -589,8 +593,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def compile(self, compiler_configs=None):
         if compiler_configs is None:
             compiler_configs = {}
-        super().compile(compiler_configs=compiler_configs)
         batch_size = compiler_configs.get("batch_size", self.max_batch_size)
+        compiler_configs.update(batch_size=batch_size)
+        super().compile(compiler_configs=compiler_configs)
         if self._compiler is not None:
             self.max_batch_size = batch_size
 
