@@ -36,7 +36,10 @@ def test_image(test_helper):
             cloud_predictor_no_train,
             test_data,
             image_path='shopee-iet.zip',
-            fit_instance_type='ml.g4dn.2xlarge'
+            fit_instance_type='ml.g4dn.2xlarge',
+            fit_kwargs=dict(custom_image_uri=test_helper.gpu_training_image),
+            deploy_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
+            predict_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
         )
 
 
@@ -73,4 +76,7 @@ def test_multimodal_image_only(test_helper):
             test_data,
             image_path='shopee-iet.zip',
             fit_instance_type='ml.g4dn.2xlarge',
+            fit_kwargs=dict(custom_image_uri=test_helper.gpu_training_image),
+            deploy_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
+            predict_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
         )
