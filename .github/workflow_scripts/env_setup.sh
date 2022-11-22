@@ -51,6 +51,10 @@ function install_eda {
     python3 -m pip install --upgrade -e eda/[tests]
 }
 
+function install_fair {
+    python3 -m pip install --upgrade -e fair/
+}
+
 function install_tabular {
     python3 -m pip install --upgrade -e tabular/[tests]
 }
