@@ -406,7 +406,10 @@ def create_fusion_model(
                     f"More than one fusion models are detected in {names}. Only one fusion model is allowed."
                 )
         else:  # single model
-            if OmegaConf.select(config, "optimization.efficient_finetune"):
+            if (
+                OmegaConf.select(config, "optimization.efficient_finetune") is not None
+                and OmegaConf.select(config, "optimization.efficient_finetune") != "None"
+            ):
                 model = apply_model_adaptation(model, config)
             single_models.append(model)
 
