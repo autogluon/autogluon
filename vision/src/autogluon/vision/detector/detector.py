@@ -243,7 +243,7 @@ class ObjectDetector(object):
                        'In a future release ObjectDetector may be entirely reworked to use Torch as a backend.\n'
                        'This future change will likely be API breaking.'
                        'Users should ensure they update their code that depends on ObjectDetector when upgrading to future AutoGluon releases.\n'
-                       'For more information, refer to ObjectDetector refactor GitHub issue: https://github.com/awslabs/autogluon/issues/1559\n'
+                       'For more information, refer to ObjectDetector refactor GitHub issue: https://github.com/autogluon/autogluon/issues/1559\n'
                        '=============================================================================\n')
         if presets:
             if not isinstance(presets, list):

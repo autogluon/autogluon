@@ -13,7 +13,7 @@ set -ex
 source $(dirname "$0")/env_setup.sh
 source $(dirname "$0")/write_to_s3.sh
 
-if [[ (-n $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
+if [[ (-n $PR_NUMBER) || ($GIT_REPO != autogluon/autogluon) ]]
 then
     bucket='autogluon-staging'
     if [[ -n $PR_NUMBER ]]; then path=$PR_NUMBER; else path=$BRANCH; fi
@@ -78,7 +78,7 @@ DOC_PATH=_build/html/
 # Write docs to s3
 write_to_s3 $BUCKET $DOC_PATH $S3_PATH
 # Write root_index to s3 if master
-if [[ ($BRANCH == 'master') && ($GIT_REPO == awslabs/autogluon) ]]
+if [[ ($BRANCH == 'master') && ($GIT_REPO == autogluon/autogluon) ]]
 then
     write_to_s3 $BUCKET root_index.html s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA/root_index.html
 fi

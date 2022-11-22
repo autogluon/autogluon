@@ -61,7 +61,7 @@ python -m pip install "torch>=1.0,<1.13+cpu" -f https://download.pytorch.org/whl
 ::::
 
 ::::{dropdown} M1 Apple Silicon
-Running AutoGluon on M1 Macs requires additional setup steps. See this [github issue](https://github.com/awslabs/autogluon/issues/1242#issuecomment-1285276870) for specific instructions. M2 Macs are currently not supported, but support is being tracked [here](https://github.com/awslabs/autogluon/issues/2271).
+Running AutoGluon on M1 Macs requires additional setup steps. See this [github issue](https://github.com/autogluon/autogluon/issues/1242#issuecomment-1285276870) for specific instructions. M2 Macs are currently not supported, but support is being tracked [here](https://github.com/autogluon/autogluon/issues/2271).
 ::::
 
 ::::{dropdown} `LibOMP` on MacOS
@@ -90,7 +90,7 @@ To build AutoGluon from source, make sure `pip` is updated, clone the source rep
 
 ```bash
 python -m pip install --upgrade pip
-git clone https://github.com/awslabs/autogluon
+git clone https://github.com/autogluon/autogluon
 cd autogluon && ./full_install.sh
 ```
 
@@ -98,5 +98,4 @@ cd autogluon && ./full_install.sh
 
 ````{admonition} Trouble Shooting
 
-If you encounter installation issues not covered here, please create a [github issue](https://github.com/awslabs/autogluon/issues).
-````
+If you encounter installation issues not covered here, please create a [github issue](https://github.com/autogluon/autogluon/issues).

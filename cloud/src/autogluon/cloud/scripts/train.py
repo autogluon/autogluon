@@ -8,7 +8,7 @@ from autogluon.vision import ImagePredictor
 from autogluon.text import TextPredictor
 
 # Not following import style because importing autogluon.text before other module would cause segfault
-# https://github.com/awslabs/autogluon/issues/2042
+# https://github.com/autogluon/autogluon/issues/2042
 import autogluon.text
 
 from distutils.version import LooseVersion

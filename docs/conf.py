@@ -68,7 +68,7 @@ html_theme_options = {
     "dark_logo": "autogluon-w.png",
 
     # 'base_url': 'http://bashtage.github.io/sphinx-material/',
-    'repo_url': 'https://github.com/awslabs/autogluon/',
+    'repo_url': 'https://github.com/autogluon/autogluon/',
     'repo_name': 'AutoGluon',
     # 'google_analytics_account': 'UA-96378503-12',
     # 'html_minify': True,
