@@ -24,6 +24,7 @@ from .data import (
 )
 from .download import download, is_url
 from .environment import (
+    check_if_packages_installed,
     compute_inference_batch_size,
     compute_num_gpus,
     infer_precision,
