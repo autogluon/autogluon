@@ -34,6 +34,15 @@ install_requires = [
 
 extras_require = dict()
 
+test_requirements = [
+    'tox',
+    'pytest',
+    'pytest-cov'
+]
+
+test_requirements = list(set(test_requirements))
+extras_require['tests'] = test_requirements
+
 install_requires = ag.get_dependency_version_ranges(install_requires)
 for key in extras_require:
     extras_require[key] = ag.get_dependency_version_ranges(extras_require[key])
