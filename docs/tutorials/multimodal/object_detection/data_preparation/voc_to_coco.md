@@ -6,7 +6,7 @@ And VOC format refers to the specific format (in `.xml` file) the Pascal VOC dat
 
 In this tutorial, we will convert VOC2007 dataset from VOC format to COCO format. See :ref:`sec_automm_detection_prepare_voc` for how to download it.
 We will use our tool `voc2coco`. This python script is in our code: 
-[voc2coco.py](https://raw.githubusercontent.com/awslabs/autogluon/master/multimodal/src/autogluon/multimodal/cli/voc2coco.py),
+[voc2coco.py](https://raw.githubusercontent.com/autogluon/autogluon/master/multimodal/src/autogluon/multimodal/cli/voc2coco.py),
 and you can also run it as a cli: `python3 -m autogluon.multimodal.cli.voc2coco`.
 
 **Note: In Autogluon MultiModalPredictor, we strongly recommend using COCO as your data format.** However, for fast proof testing we also have limit support for VOC format.
@@ -75,7 +75,7 @@ usersplit_test_cocoformat.json
 
 ### Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ### Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

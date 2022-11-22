@@ -256,7 +256,7 @@ test_text_data[text_col][image_to_text_hits[0][1]['response_id']]
 
 ## Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 
 ## Customization

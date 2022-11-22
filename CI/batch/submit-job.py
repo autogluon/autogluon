@@ -54,8 +54,8 @@ parser.add_argument('--save-path',
 parser.add_argument('--command', help='command to run', type=str,
                     default='git rev-parse HEAD | tee stdout.log')
 parser.add_argument('--remote',
-                    help='git repo address. https://github.com/awslabs/autogluon',
-                    type=str, default="https://github.com/awslabs/autogluon")
+                    help='git repo address. https://github.com/autogluon/autogluon',
+                    type=str, default="https://github.com/autogluon/autogluon")
 parser.add_argument('--safe-to-use-script',
                     help='whether the script changes from the actor is safe. We assume it is safe if the actor has write permission to our repo',
                     action='store_true')

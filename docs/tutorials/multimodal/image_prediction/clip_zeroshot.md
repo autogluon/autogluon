@@ -98,7 +98,7 @@ CLIP also has other limitations. If you are interested, you can read [CLIP paper
 
 ## Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ## Customization
 

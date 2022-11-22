@@ -1,5 +1,5 @@
 
-If you run into difficulties installing AutoGluon on Windows, please provide details in `this GitHub Issue  <https://github.com/awslabs/autogluon/issues/164>`_.
+If you run into difficulties installing AutoGluon on Windows, please provide details in `this GitHub Issue  <https://github.com/autogluon/autogluon/issues/164>`_.
 
 Note: ObjectDetector and any model that uses MXNet is not supported on Windows!
 GPU-based MXNet is not supported on Windows, and it is recommended to use Linux instead for these models.
