@@ -46,7 +46,8 @@ nb_custom_formats = {
     '.ipynb': "conf.notebook_reads"
 }
 
-nb_execution_mode = "off"
+nb_execution_mode = "force"
+nb_execution_timeout = 300
 nb_execution_excludepatterns = ['jupyter_execute']
 
 templates_path = ['_templates']
