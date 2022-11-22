@@ -13,7 +13,7 @@ try:
 except:
     pass
 
-from ..constants import AUTOMM, OBJECT_DETECTION
+from ..constants import AUTOMM, OBJECT_DETECTION, OCR
 
 logger = logging.getLogger(AUTOMM)
 
@@ -256,7 +256,7 @@ def check_if_packages_installed(problem_type: str):
         return
 
     problem_type = problem_type.lower()
-    if any(p in problem_type for p in [OBJECT_DETECTION, "ocr"]):
+    if any(p in problem_type for p in [OBJECT_DETECTION, OCR]):
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -271,7 +271,7 @@ def check_if_packages_installed(problem_type: str):
         except ImportError as e:
             raise ValueError(f"Encountered error while importing mmdet: {e}. Try to install mmdet: pip install mmdet.")
 
-        if "ocr" in problem_type:
+        if OCR in problem_type:
             try:
                 import mmocr
             except ImportError as e:
