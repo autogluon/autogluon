@@ -93,7 +93,7 @@ def multilingual():
 def few_shot_text_classification():
     return {
         "model.names": ["t_few"],
-        "model.t_few.checkpoint_name": "google/flan-t5-xl",
+        "model.t_few.checkpoint_name": "google/flan-t5-xl",  # 3B model. google/flan-t5-xxl for 11B model.
         "model.t_few.gradient_checkpointing": True,
         "optimization.learning_rate": 1e-3,
         "optimization.lr_decay": 1.0,
@@ -108,7 +108,7 @@ def few_shot_text_classification():
         "optimization.top_k": 1,
         "optimization.max_epochs": -1,
         "env.batch_size": 8,
-        "env.per_gpu_batch_size": 2,
+        "env.per_gpu_batch_size": 8,
         "env.precision": "bf16",
         "data.templates.turn_on": True,
         "env.eval_batch_size_ratio": 2,
