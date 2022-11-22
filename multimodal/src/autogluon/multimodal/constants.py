@@ -162,6 +162,22 @@ LORA_NORM = "lora_norm"
 IA3 = "ia3"
 IA3_BIAS = "ia3_bias"
 IA3_NORM = "ia3_norm"
+IA3_LORA = "ia3_lora"
+IA3_LORA_BIAS = "ia3_lora_bias"
+IA3_LORA_NORM = "Ia3_lora_norm"
+PEFT_STRATEGIES = [
+    BIT_FIT,
+    NORM_FIT,
+    LORA,
+    LORA_BIAS,
+    LORA_NORM,
+    IA3,
+    IA3_BIAS,
+    IA3_NORM,
+    IA3_LORA,
+    IA3_LORA_BIAS,
+    IA3_LORA_NORM,
+]
 
 # DeepSpeed constants
 DEEPSPEED_OFFLOADING = "deepspeed_stage_3_offload"
