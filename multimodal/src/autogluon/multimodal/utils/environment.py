@@ -13,7 +13,7 @@ try:
 except:
     pass
 
-from ..constants import AUTOMM
+from ..constants import AUTOMM, OBJECT_DETECTION, OCR
 
 logger = logging.getLogger(AUTOMM)
 
@@ -240,3 +240,41 @@ def get_precision_context(precision: Union[int, str], device_type: Optional[str]
         return double_precision_context()
     else:
         raise ValueError(f"Unknown precision: {precision}")
+
+
+def check_if_packages_installed(problem_type: str):
+    """
+    Check if necessary packages are installed for some problem types.
+    Raise an error if an package can't be imported.
+
+    Parameters
+    ----------
+    problem_type
+        Problem type
+    """
+    if not problem_type:
+        return
+
+    problem_type = problem_type.lower()
+    if any(p in problem_type for p in [OBJECT_DETECTION, OCR]):
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                import mmcv
+        except ImportError as e:
+            raise ValueError(
+                f"Encountered error while importing mmcv: {e}. Try to install mmcv: mim install mmcv-full."
+            )
+
+        try:
+            import mmdet
+        except ImportError as e:
+            raise ValueError(f"Encountered error while importing mmdet: {e}. Try to install mmdet: pip install mmdet.")
+
+        if OCR in problem_type:
+            try:
+                import mmocr
+            except ImportError as e:
+                raise ValueError(
+                    f"Encountered error while importing mmocr: {e}. Try to install mmocr: pip install mmocr."
+                )
