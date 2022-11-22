@@ -93,6 +93,32 @@ def multilingual():
 def few_shot_text_classification():
     return {
         "model.names": ["t_few"],
+        "model.t_few.checkpoint_name": "google/flan-t5-xl",  # 3B model. google/flan-t5-xxl for 11B model.
+        "model.t_few.gradient_checkpointing": True,
+        "optimization.learning_rate": 1e-3,
+        "optimization.lr_decay": 1.0,
+        "optimization.efficient_finetune": "ia3_lora",
+        "optimization.max_steps": 600,  # Find better solution to train for long
+        "optimization.check_val_every_n_epoch": 10,  # Might need adjustment
+        "optimization.val_check_interval": 1.0,
+        "optimization.top_k_average_method": "best",
+        "optimization.warmup_steps": 0.06,
+        "optimization.lora.module_filter": [".*SelfAttention|.*EncDecAttention|.*DenseReluDense"],
+        "optimization.lora.filter": ["q|k|v|wi_1.*"],
+        "optimization.top_k": 1,
+        "optimization.max_epochs": -1,
+        "env.batch_size": 8,
+        "env.per_gpu_batch_size": 8,
+        "env.precision": "bf16",
+        "data.templates.turn_on": True,
+        "env.eval_batch_size_ratio": 2,
+    }
+
+
+@automm_presets.register()
+def few_shot_text_classification_tfew():
+    return {
+        "model.names": ["t_few"],
         "model.t_few.checkpoint_name": "bigscience/T0_3B",
         "model.t_few.gradient_checkpointing": True,
         "optimization.learning_rate": 3e-3,

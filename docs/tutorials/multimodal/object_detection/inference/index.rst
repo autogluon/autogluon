@@ -19,5 +19,5 @@ Inference
    :maxdepth: 1
    :hidden:
 
-    detection_inference_coco
-    detection_inference_voc
+   detection_inference_coco
+   detection_inference_voc

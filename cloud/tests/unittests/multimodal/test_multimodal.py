@@ -33,6 +33,9 @@ def test_multimodal_tabular_text(test_helper):
             cloud_predictor_no_train,
             test_data,
             fit_instance_type='ml.g4dn.2xlarge',
+            fit_kwargs=dict(custom_image_uri=test_helper.gpu_training_image),
+            deploy_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
+            predict_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
         )
 
 
@@ -69,6 +72,11 @@ def test_multimodal_tabular_text_image(test_helper):
             test_data,
             image_path='tabular_text_image_images.zip',
             fit_instance_type='ml.g4dn.2xlarge',
+            fit_kwargs=dict(custom_image_uri=test_helper.gpu_training_image),
+            deploy_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
             predict_real_time_kwargs=dict(test_data_image_column='Images'),
-            predict_kwargs=dict(test_data_image_column='Images')
+            predict_kwargs=dict(
+                test_data_image_column='Images',
+                custom_image_uri=test_helper.cpu_inference_image
+            )
         )

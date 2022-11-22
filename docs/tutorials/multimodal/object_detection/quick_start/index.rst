@@ -13,4 +13,4 @@ Quick Start
    :maxdepth: 1
    :hidden:
 
-    quick_start_coco
+   quick_start_coco

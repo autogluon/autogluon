@@ -57,6 +57,96 @@ class LoRALayer:
         self.merge_weights = merge_weights
 
 
+class IA3LoRALinear(nn.Linear, LoRALayer):
+    """
+    LoRA (low-rank adaptation) followed by (IA)^3 (weight rescaling) incorporated in a Linear Layer. Weights of Linear layer are set to be frozen per default.
+
+    Parameters
+    ----------
+    in_features
+        input dimension, set to the original linear layer input dimension LoRA is replacing.
+    out_features
+        output dimension, set to the original linear layer output dimension LoRA is replacing.
+    r
+        rank r of the low-rank decomposition.
+    lora_alpha
+        Scaling factor. Can be simply set to same value as r as initialization is scaled already.
+    lora_dropout
+        Dropout probability.
+    fan_in_fan_out
+        Set this to True if the layer to replace stores weight like (fan_in, fan_out).
+    merge_weights
+        Merging weights during inference to reduce latency.
+    """
+
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        r=8,
+        lora_alpha=8,
+        lora_dropout: float = 0.0,
+        fan_in_fan_out=False,
+        merge_weights=False,
+        **kwargs,
+    ):
+        nn.Linear.__init__(self, in_features, out_features, **kwargs)
+        LoRALayer.__init__(self, r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout, merge_weights=merge_weights)
+        # In essence the $b$ parameter of LoRA.
+        self.lora_b = nn.Parameter(torch.ones(out_features, 1))
+        self.lora_A = nn.Parameter(self.weight.new_zeros((r, in_features)))
+        self.lora_B = nn.Parameter(self.weight.new_zeros((out_features, r)))
+        self.fan_in_fan_out = fan_in_fan_out
+        self.weight.requires_grad = False
+
+        self.scaling = self.lora_alpha / self.r
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        nn.Linear.reset_parameters(self)
+        if hasattr(self, "lora_A"):
+            # initialize A the same way as the default for nn.Linear and B to zero
+            nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
+            nn.init.zeros_(self.lora_B)
+
+    def T(self, w):
+        return w.T if self.fan_in_fan_out else w
+
+    def forward(self, x: torch.Tensor):
+        result = F.linear(x, self.T(self.weight), bias=self.bias)
+        if self.r > 0:
+            result += (self.lora_dropout(x) @ self.lora_A.T @ self.lora_B.T) * self.scaling
+
+        hidden = result * self.lora_b.flatten()
+        return hidden
+
+    def train(self, mode: bool = True):
+        nn.Linear.train(self, mode)
+        if self.merge_weights and self.merged:
+            # Make sure that the weights are not merged
+            if self.r > 0:
+                self.weight.data /= self.lora_b.flatten()
+                self.weight.data -= self.T(self.lora_B @ self.lora_A) * self.scaling
+            self.merged = False
+
+    def eval(self):
+        # def T(w):
+        #     return w.T if self.fan_in_fan_out else w
+        nn.Linear.eval(self)
+        if self.merge_weights and not self.merged:
+            # Merge the weights and mark it
+            if self.r > 0:
+                self.weight.data += self.T(self.lora_B @ self.lora_A) * self.scaling
+                self.weight.data *= self.lora_b.flatten()
+            self.merged = True
+        return hidden
+
+    def extra_repr(self):
+        return "in_features={}, out_features={}, bias={}".format(
+            self.in_features, self.out_features, self.bias is not None
+        )
+
+
 class IA3Linear(nn.Linear, LoRALayer):
     """
     (IA)^3 incorporated in a Linear Layer. Weights of Linear layer are set to be frozen per default.
@@ -82,10 +172,13 @@ class IA3Linear(nn.Linear, LoRALayer):
         self,
         in_features: int,
         out_features: int,
+        merge_weights: False,
         **kwargs,
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
-        LoRALayer.__init__(self, r=4, lora_alpha=4, lora_dropout=0.0, merge_weights=True)  # Default arguments, only
+        LoRALayer.__init__(
+            self, r=4, lora_alpha=4, lora_dropout=0.0, merge_weights=merge_weights
+        )  # Default arguments, only
         # In essence the $b$ parameter of LoRA.
         self.lora_b = nn.Parameter(torch.ones(out_features, 1))
         self.weight.requires_grad = False
@@ -93,6 +186,25 @@ class IA3Linear(nn.Linear, LoRALayer):
     def forward(self, x: torch.Tensor):
         hidden = F.linear(x, self.weight, self.bias)
         hidden = hidden * self.lora_b.flatten()
+        return hidden
+
+    def train(self, mode: bool = True):
+        nn.Linear.train(self, mode)
+        if self.merge_weights and self.merged:
+            # Make sure that the weights are not merged
+            if self.r > 0:
+                self.weight.data /= self.lora_b.flatten()
+            self.merged = False
+
+    def eval(self):
+        # def T(w):
+        #     return w.T if self.fan_in_fan_out else w
+        nn.Linear.eval(self)
+        if self.merge_weights and not self.merged:
+            # Merge the weights and mark it
+            if self.r > 0:
+                self.weight.data *= self.lora_b.flatten()
+            self.merged = True
         return hidden
 
     def extra_repr(self):
@@ -115,6 +227,8 @@ class LoRALinear(nn.Linear, LoRALayer):
         rank r of the low-rank decomposition.
     lora_alpha
         Scaling factor. Can be simply set to same value as r as initialization is scaled already.
+    lora_dropout
+        Dropout probability.
     fan_in_fan_out
         Set this to True if the layer to replace stores weight like (fan_in, fan_out).
     merge_weights

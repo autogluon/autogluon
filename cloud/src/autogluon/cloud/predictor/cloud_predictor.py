@@ -472,7 +472,7 @@ class CloudPredictor(ABC):
 
         self._train_script_path = ScriptManager.get_train_script(self.predictor_type, framework_version)
         entry_point = self._train_script_path
-        user_entry_point = autogluon_sagemaker_estimator_kwargs.pop(entry_point, None)
+        user_entry_point = autogluon_sagemaker_estimator_kwargs.pop('entry_point', None)
         if user_entry_point:
             logger.warning(f'Providing a custom entry point could break the fit. Please refer to `{entry_point}` for our implementation')
             entry_point = user_entry_point
