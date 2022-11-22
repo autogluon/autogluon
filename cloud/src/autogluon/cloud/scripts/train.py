@@ -1,3 +1,6 @@
+# isort: skip_file
+# The import order of autogluon sub module here could cause seg fault. Ignore isort for now
+# https://github.com/awslabs/autogluon/issues/2042
 import argparse
 import os
 import shutil
@@ -5,10 +8,10 @@ from pprint import pprint
 
 import yaml
 
-from autogluon.multimodal import MultiModalPredictor
-from autogluon.tabular import FeatureMetadata, TabularDataset, TabularPredictor
-from autogluon.text import TextPredictor
+from autogluon.tabular import TabularPredictor, TabularDataset, FeatureMetadata
 from autogluon.vision import ImagePredictor
+from autogluon.text import TextPredictor
+from autogluon.multimodal import MultiModalPredictor
 
 
 def get_input_path(path):
