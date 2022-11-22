@@ -7,7 +7,7 @@ from autogluon.cloud import MultiModalCloudPredictor
 def test_multimodal_tabular_text(test_helper):
     train_data = "tabular_text_train.csv"
     test_data = "tabular_text_test.csv"
-    with tempfile.TemporaryDirectory() as root:
+    with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, test_data)
         time_limit = 60
 
@@ -40,7 +40,7 @@ def test_multimodal_tabular_text_image(test_helper):
     train_data = "tabular_text_image_train.csv"
     test_data = "tabular_text_image_test.csv"
     images = "tabular_text_image_images.zip"
-    with tempfile.TemporaryDirectory() as root:
+    with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, test_data, images)
         with zipfile.ZipFile(images, "r") as zip_ref:
             zip_ref.extractall(".")

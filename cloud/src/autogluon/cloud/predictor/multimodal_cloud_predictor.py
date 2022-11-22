@@ -3,7 +3,6 @@ import logging
 import os
 
 import pandas as pd
-from botocore.exceptions import ClientError
 
 from autogluon.common.loaders import load_pd
 from autogluon.common.utils.s3_utils import is_s3_url, s3_path_to_bucket_prefix
@@ -102,23 +101,7 @@ class MultiModalCloudPredictor(CloudPredictor):
 
         # Providing content type here because sagemaker serializer doesn't support change content type dynamically.
         # Pass to `endpoint.predict()` call as `initial_args` instead
-        try:
-            return self._predict_real_time(test_data=test_data, accept=accept, ContentType=content_type)
-        except ClientError as e:
-            # TODO: remove this after fix is out for 0.6 release
-            fail_to_load_on_cpu_error_msg = "GPUAccelerator can not run on your system since the accelerator is not available. The following accelerator(s) is available and can be passed into `accelerator` argument of `Trainer`: ['cpu']."
-            if fail_to_load_on_cpu_error_msg in e.response["Error"]["Message"]:
-                logger.warning(e.response["Error"]["Message"])
-                logger.warning(
-                    "Warning: Having trouble load gpu trained model on a cpu machine. This is a known issue of AutoGluon and will be fixed in future containers"
-                )
-                logger.warning("Warning: You can either try deploy on a gpu machine")
-                logger.warning(
-                    "Warning: or download the trained artifact and modify `num_gpus` to be `-1` in the config file located at `config.yaml`"
-                )
-                logger.warning("Warning: then try to deploy with the modified artifact")
-                return None
-            raise e
+        return self._predict_real_time(test_data=test_data, accept=accept, ContentType=content_type)
 
     def predict(
         self,

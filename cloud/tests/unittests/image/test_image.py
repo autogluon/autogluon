@@ -7,7 +7,7 @@ def test_image(test_helper):
     train_data = "image_train_relative.csv"
     train_image = "shopee-iet.zip"
     test_data = "test_images/BabyPants_1035.jpg"
-    with tempfile.TemporaryDirectory() as root:
+    with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, train_image, test_data)
         test_data = "BabyPants_1035.jpg"
         time_limit = 60
@@ -39,7 +39,7 @@ def test_multimodal_image_only(test_helper):
     train_data = "image_train_relative.csv"
     train_image = "shopee-iet.zip"
     test_data = "test_images/BabyPants_1035.jpg"
-    with tempfile.TemporaryDirectory() as root:
+    with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, train_image, test_data)
         test_data = "BabyPants_1035.jpg"
         time_limit = 60

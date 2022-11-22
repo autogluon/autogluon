@@ -144,7 +144,8 @@ class AutoGluonSagemakerInferenceModel(Model):
         instance_count,
         instance_type,
         strategy="MultiRecord",
-        max_payload=6,  # Maximum size of the payload in a single HTTP request to the container in MB. Will split into multiple batches if a request is more than max_payload
+        # Maximum size of the payload in a single HTTP request to the container in MB. Will split into multiple batches if a request is more than max_payload
+        max_payload=6,
         max_concurrent_transforms=1,  # The maximum number of HTTP requests to be made to each individual transform container at one time.
         accept="application/json",
         assemble_with="Line",

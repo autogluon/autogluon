@@ -75,8 +75,10 @@ class CloudPredictor(ABC):
             Otherwise files from first `fit()` will be overwritten by second `fit()`.
         local_output_path: str
             Path to directory where downloaded trained predictor, batch transform results, and intermediate outputs should be saved
-            If unspecified, a time-stamped folder called "AutogluonCloudPredictor/ag-[TIMESTAMP]" will be created in the working directory to store all downloaded trained predictor, batch transform results, and intermediate outputs.
-            Note: To call `fit()` twice and save all results of each fit, you must specify different `local_output_path` locations or don't specify `local_output_path` at all.
+            If unspecified, a time-stamped folder called "AutogluonCloudPredictor/ag-[TIMESTAMP]"
+            will be created in the working directory to store all downloaded trained predictor, batch transform results, and intermediate outputs.
+            Note: To call `fit()` twice and save all results of each fit,
+            you must specify different `local_output_path` locations or don't specify `local_output_path` at all.
             Otherwise files from first `fit()` will be overwritten by second `fit()`.
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed.
@@ -226,7 +228,7 @@ class CloudPredictor(ABC):
         path_cleaned = path
         try:
             path_cleaned = path.split("://", 1)[1]
-        except:
+        except Exception:
             pass
         path_split = path_cleaned.split("/", 1)
         # If user only provided the bucket, we create a subfolder with timestamp for them
@@ -373,7 +375,7 @@ class CloudPredictor(ABC):
         volume_size=100,
         custom_image_uri=None,
         wait=True,
-        autogluon_sagemaker_estimator_kwargs=dict(),
+        autogluon_sagemaker_estimator_kwargs=None,
         **kwargs,
     ):
         """
@@ -443,6 +445,8 @@ class CloudPredictor(ABC):
         if not job_name:
             job_name = sagemaker.utils.unique_name_from_base(SAGEMAKER_RESOURCE_PREFIX)
 
+        if autogluon_sagemaker_estimator_kwargs is None:
+            autogluon_sagemaker_estimator_kwargs = {}
         autogluon_sagemaker_estimator_kwargs = copy.deepcopy(autogluon_sagemaker_estimator_kwargs)
         autogluon_sagemaker_estimator_kwargs.pop("output_path", None)
         output_path = self.cloud_output_path + "/model"
@@ -594,7 +598,7 @@ class CloudPredictor(ABC):
         initial_instance_count=1,
         custom_image_uri=None,
         wait=True,
-        model_kwargs=dict(),
+        model_kwargs=None,
         **kwargs,
     ):
         """
@@ -644,6 +648,8 @@ class CloudPredictor(ABC):
 
         self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
         entry_point = self._serve_script_path
+        if model_kwargs is None:
+            model_kwargs = {}
         model_kwargs = copy.deepcopy(model_kwargs)
         user_entry_point = model_kwargs.pop("entry_point", None)
         if user_entry_point:
@@ -661,7 +667,8 @@ class CloudPredictor(ABC):
         user_predictor_cls = model_kwargs.pop("predictor_cls", None)
         if user_predictor_cls:
             logger.warning(
-                "Providing a custom predictor_cls could break the deployment. Please refer to `AutoGluonRealtimePredictor` for how to provide a custom predictor"
+                "Providing a custom predictor_cls could break the deployment.",
+                "Please refer to `AutoGluonRealtimePredictor` for how to provide a custom predictor",
             )
             predictor_cls = user_predictor_cls
 
@@ -804,8 +811,8 @@ class CloudPredictor(ABC):
         instance_count=1,
         custom_image_uri=None,
         wait=True,
-        model_kwargs=dict(),
-        transformer_kwargs=dict(),
+        model_kwargs=None,
+        transformer_kwargs=None,
         **kwargs,
     ):
         """
@@ -848,7 +855,8 @@ class CloudPredictor(ABC):
             Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/transformer.html#sagemaker.transformer.Transformer for all options.
         **kwargs:
             Any extra arguments needed to pass to transform.
-            Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/transformer.html#sagemaker.transformer.Transformer.transform for all options.
+            Please refer to
+            https://sagemaker.readthedocs.io/en/stable/api/inference/transformer.html#sagemaker.transformer.Transformer.transform for all options.
         """
         if not predictor_path:
             predictor_path = self._fit_job.get_output_path()
@@ -881,7 +889,12 @@ class CloudPredictor(ABC):
 
         self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
         entry_point = self._serve_script_path
+        if model_kwargs is None:
+            model_kwargs = {}
         model_kwargs = copy.deepcopy(model_kwargs)
+        if transformer_kwargs is None:
+            transformer_kwargs = {}
+        transformer_kwargs = copy.deepcopy(transformer_kwargs)
         user_entry_point = model_kwargs.pop("entry_point", None)
         repack_model = False
         if predictor_path != self._fit_job.get_output_path() or user_entry_point is not None:

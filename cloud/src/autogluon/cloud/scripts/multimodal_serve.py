@@ -1,3 +1,4 @@
+# flake8: noqa
 import base64
 import copy
 import hashlib

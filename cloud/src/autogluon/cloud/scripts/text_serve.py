@@ -1,3 +1,4 @@
+# flake8: noqa
 import copy
 from io import BytesIO, StringIO
 

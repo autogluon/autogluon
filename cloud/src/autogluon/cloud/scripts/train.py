@@ -1,4 +1,5 @@
 # isort: skip_file
+# flake8: noqa
 # The import order of autogluon sub module here could cause seg fault. Ignore isort for now
 # https://github.com/awslabs/autogluon/issues/2042
 import argparse
@@ -113,7 +114,7 @@ if __name__ == "__main__":
             # Need os.path.sep because text/multimodal predictor has a bug where the old path has separator in the end, and the comparison doesn't use normpath
             # TODO: remove this try except after 0.6 release
             predictor.save(path=save_path + os.path.sep, standalone=True)
-        except:
+        except Exception as e:
             predictor.save(path=save_path + os.path.sep)
     elif predictor_type == "image":
         predictor.save()

@@ -7,7 +7,7 @@ def test_text(test_helper):
     train_data = "text_train.csv"
     tune_data = "text_tune.csv"
     test_data = "text_test.csv"
-    with tempfile.TemporaryDirectory() as root:
+    with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, tune_data, test_data)
         time_limit = 60
 
@@ -37,7 +37,7 @@ def test_multimodal_text_only(test_helper):
     train_data = "text_train.csv"
     tune_data = "text_tune.csv"
     test_data = "text_test.csv"
-    with tempfile.TemporaryDirectory() as root:
+    with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, tune_data, test_data)
         time_limit = 60
 

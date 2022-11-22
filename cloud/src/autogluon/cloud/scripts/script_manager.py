@@ -1,5 +1,4 @@
 import os
-from distutils.version import LooseVersion
 from pathlib import Path
 
 CLOUD_PATH = Path(__file__).parent.parent.absolute()

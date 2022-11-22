@@ -19,7 +19,7 @@ def _prepare_path(input_file, output_type):
 
 
 def test_prepare_data():
-    with tempfile.TemporaryDirectory() as root:
+    with tempfile.TemporaryDirectory() as _:
         file_types = ["csv", "parquet"]
         s3 = boto3.client("s3")
         for file_type in file_types:
