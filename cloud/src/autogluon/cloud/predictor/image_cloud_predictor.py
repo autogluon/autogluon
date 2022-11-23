@@ -1,25 +1,23 @@
 import copy
+
 import pandas as pd
 
 from autogluon.common.loaders import load_pd
 from autogluon.common.utils.s3_utils import is_s3_url
 
-from .cloud_predictor import CloudPredictor
 from ..utils.ag_sagemaker import AutoGluonImageRealtimePredictor
 from ..utils.constants import VALID_ACCEPT
-from ..utils.utils import (
-    read_image_bytes_and_encode,
-    is_image_file,
-)
+from ..utils.utils import is_image_file, read_image_bytes_and_encode
+from .cloud_predictor import CloudPredictor
 
 
 class ImageCloudPredictor(CloudPredictor):
 
-    predictor_file_name = 'ImageCloudPredictor.pkl'
+    predictor_file_name = "ImageCloudPredictor.pkl"
 
     @property
     def predictor_type(self):
-        return 'image'
+        return "image"
 
     @property
     def _realtime_predictor_cls(self):
@@ -27,30 +25,19 @@ class ImageCloudPredictor(CloudPredictor):
 
     def _get_local_predictor_cls(self):
         from autogluon.vision import ImagePredictor
+
         predictor_cls = ImagePredictor
         return predictor_cls
 
-    def fit(
-        self,
-        *,
-        predictor_init_args,
-        predictor_fit_args,
-        image_path,
-        **kwargs
-    ):
+    def fit(self, *, predictor_init_args, predictor_fit_args, image_path, **kwargs):
         super().fit(
             predictor_init_args=predictor_init_args,
             predictor_fit_args=predictor_fit_args,
             image_path=image_path,
-            **kwargs
+            **kwargs,
         )
 
-    def predict_real_time(
-            self,
-            test_data,
-            test_data_image_column=None,
-            accept='application/x-parquet'
-        ):
+    def predict_real_time(self, test_data, test_data_image_column=None, accept="application/x-parquet"):
         """
         Predict with the deployed SageMaker endpoint. A deployed SageMaker endpoint is required.
         This is intended to provide a low latency inference.
@@ -75,8 +62,8 @@ class ImageCloudPredictor(CloudPredictor):
         Pandas.DataFrame
         Predict results in DataFrame
         """
-        assert self.endpoint, 'Please call `deploy()` to deploy an endpoint first.'
-        assert accept in VALID_ACCEPT, f'Invalid accept type. Options are {VALID_ACCEPT}.'
+        assert self.endpoint, "Please call `deploy()` to deploy an endpoint first."
+        assert accept in VALID_ACCEPT, f"Invalid accept type. Options are {VALID_ACCEPT}."
 
         import numpy as np
 
@@ -85,19 +72,21 @@ class ImageCloudPredictor(CloudPredictor):
                 test_data = load_pd.load(test_data)
             else:
                 if is_image_file(test_data):
-                    test_data = np.array([read_image_bytes_and_encode(test_data)], dtype='object')
+                    test_data = np.array([read_image_bytes_and_encode(test_data)], dtype="object")
                 else:
                     test_data = load_pd.load(test_data)
         if isinstance(test_data, list):
             images = []
-            test_data = np.array([read_image_bytes_and_encode(image) for image in images], dtype='object')
+            test_data = np.array([read_image_bytes_and_encode(image) for image in images], dtype="object")
         if isinstance(test_data, pd.DataFrame):
-            assert test_data_image_column is not None, 'Please specify an image column name'
-            assert test_data_image_column in test_data, 'Please specify a valid image column name'
+            assert test_data_image_column is not None, "Please specify an image column name"
+            assert test_data_image_column in test_data, "Please specify a valid image column name"
 
             # Convert test data to be numpy array for network transfer
-            test_data = np.asarray([read_image_bytes_and_encode(image_path) for image_path in test_data[test_data_image_column]])
-        assert isinstance(test_data, np.ndarray), f'Invalid test data format {type(test_data)}'
+            test_data = np.asarray(
+                [read_image_bytes_and_encode(image_path) for image_path in test_data[test_data_image_column]]
+            )
+        assert isinstance(test_data, np.ndarray), f"Invalid test data format {type(test_data)}"
 
         return self._predict_real_time(test_data=test_data, accept=accept)
 
@@ -113,10 +102,10 @@ class ImageCloudPredictor(CloudPredictor):
             Refer to `CloudPredictor.predict()`
         """
         split_type = None
-        content_type = 'application/x-image'
+        content_type = "application/x-image"
         kwargs = copy.deepcopy(kwargs)
-        transformer_kwargs = kwargs.pop('transformer_kwargs', dict())
-        transformer_kwargs['strategy'] = 'SingleRecord'
+        transformer_kwargs = kwargs.pop("transformer_kwargs", dict())
+        transformer_kwargs["strategy"] = "SingleRecord"
         super().predict(
             test_data,
             split_type=split_type,

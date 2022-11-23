@@ -1,12 +1,11 @@
 import os
-import pandas as pd
-
 from abc import ABC, abstractmethod
 from typing import Union
 
+import pandas as pd
+
 
 class FormatConverter(ABC):
-
     @property
     @abstractmethod
     def ext(self) -> str:
@@ -41,8 +40,8 @@ class FormatConverter(ABC):
         elif FormatConverter.is_csv_file(filename):
             data = pd.read_csv(filename)
         else:
-            ext = filename.split('.')[-1]
-            raise ValueError(f'{ext} file type is not supported.')
+            ext = filename.split(".")[-1]
+            raise ValueError(f"{ext} file type is not supported.")
         return data
 
     def convert(self, data: Union[str, pd.DataFrame], output_path: str, filename: str) -> str:
@@ -73,31 +72,30 @@ class FormatConverter(ABC):
                 else:
                     return data
             else:
-                raise ValueError('Please provide a path to a file.')
+                raise ValueError("Please provide a path to a file.")
 
         if isinstance(data, pd.DataFrame):
-            path = os.path.join(output_path, f'{filename}.{self.ext}')
+            path = os.path.join(output_path, f"{filename}.{self.ext}")
             self._save_dataframe(data, path)
             return path
 
-        raise ValueError(f'{type(data)} is not supported.')
+        raise ValueError(f"{type(data)} is not supported.")
 
     @staticmethod
     def is_csv_file(filename: str) -> bool:
         """If the file is a csv file or not"""
-        return filename.endswith('.csv') or filename.endswith('.tsv')
+        return filename.endswith(".csv") or filename.endswith(".tsv")
 
     @staticmethod
     def is_parquet_file(filename: str) -> bool:
         """If the file is a parquet file or not"""
-        return filename.endswith('.parquet') or filename.endswith('.pq')
+        return filename.endswith(".parquet") or filename.endswith(".pq")
 
 
 class CSVConverter(FormatConverter):
-
     @property
     def ext(self) -> str:
-        return 'csv'
+        return "csv"
 
     def _need_conversion(self, filename: str) -> bool:
         return not FormatConverter.is_csv_file(filename)
@@ -107,10 +105,9 @@ class CSVConverter(FormatConverter):
 
 
 class ParquetConverter(FormatConverter):
-
     @property
     def ext(self) -> str:
-        return 'parquet'
+        return "parquet"
 
     def _need_conversion(self, filename: str) -> bool:
         return not FormatConverter.is_parquet_file(filename)
@@ -119,7 +116,7 @@ class ParquetConverter(FormatConverter):
         data.to_parquet(path, index=None)
 
 
-class FormatConverterFactory():
+class FormatConverterFactory:
 
     __supported_converters = [CSVConverter, ParquetConverter]
     __ext_to_converter = {cls().ext: cls for cls in __supported_converters}
@@ -127,5 +124,5 @@ class FormatConverterFactory():
     @staticmethod
     def get_converter(converter_type: str) -> FormatConverter:
         """Return the corresponding converter"""
-        assert converter_type in FormatConverterFactory.__ext_to_converter, f'{converter_type} not supported'
+        assert converter_type in FormatConverterFactory.__ext_to_converter, f"{converter_type} not supported"
         return FormatConverterFactory.__ext_to_converter[converter_type]()

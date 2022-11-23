@@ -44,8 +44,26 @@ jobs:
         uses: actions-ecosystem/action-remove-labels@v1.3.0
         with:
           labels: 'cloud safe to test'
-  test_general_cloud:
+  cloud_lint_check:
     needs: permission_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        if: ${{ github.event_name != 'pull_request_target' }}
+        uses: actions/checkout@v2
+      - name: Checkout repository(Pull Request Target)
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: actions/checkout@v2
+        with:
+          ref: "refs/pull/${{ github.event.number }}/merge"
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+      - name: Cloud Lint Check
+        run: |
+          chmod +x ./.github/workflow_scripts/cloud_lint_check.sh && ./.github/workflow_scripts/cloud_lint_check.sh
+  test_general_cloud:
+    needs: cloud_lint_check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -64,7 +82,7 @@ jobs:
         with:
           submodule-to-test: general
   test_tabular_cloud:
-    needs: permission_check
+    needs: cloud_lint_check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -83,7 +101,7 @@ jobs:
         with:
           submodule-to-test: tabular
   test_text_cloud:
-    needs: permission_check
+    needs: cloud_lint_check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -102,7 +120,7 @@ jobs:
         with:
           submodule-to-test: text
   test_image_cloud:
-    needs: permission_check
+    needs: cloud_lint_check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -121,7 +139,7 @@ jobs:
         with:
           submodule-to-test: image
   test_multimodal_cloud:
-    needs: permission_check
+    needs: cloud_lint_check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

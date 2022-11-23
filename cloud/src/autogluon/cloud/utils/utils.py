@@ -1,20 +1,19 @@
 import base64
 import logging
 import os
-import PIL
-import tarfile
 import shutil
+import tarfile
 import uuid
 import zipfile
 
+import PIL
 from PIL import Image
-
 
 logger = logging.getLogger(__name__)
 
 
 def read_image_bytes_and_encode(image_path):
-    image_obj = open(image_path, 'rb')
+    image_obj = open(image_path, "rb")
     image_bytes = image_obj.read()
     image_obj.close()
     b64_image = base64.b85encode(image_bytes).decode("utf-8")
@@ -23,7 +22,7 @@ def read_image_bytes_and_encode(image_path):
 
 
 def convert_image_path_to_encoded_bytes_in_dataframe(dataframe, image_column):
-    assert image_column in dataframe, 'Please specify a valid image column name'
+    assert image_column in dataframe, "Please specify a valid image column name"
     dataframe[image_column] = [read_image_bytes_and_encode(path) for path in dataframe[image_column]]
 
     return dataframe
@@ -44,7 +43,7 @@ def zipfolder(output_filename, dir_name):
     dir_name = os.path.abspath(dir_name)
     root_dir = os.path.dirname(dir_name)
     base_dir = os.path.basename(dir_name)
-    shutil.make_archive(output_filename, 'zip', root_dir, base_dir)
+    shutil.make_archive(output_filename, "zip", root_dir, base_dir)
 
 
 def is_compressed_file(filename):
@@ -67,13 +66,13 @@ def unzip_file(tarball_path, save_path):
 
 
 def rename_file_with_uuid(file_name):
-    tmp = file_name.rsplit('.', 1)
+    tmp = file_name.rsplit(".", 1)
     name = tmp[0]
     if len(tmp) > 1:
         extension = tmp[1]
-        joiner = '.'
+        joiner = "."
     else:
-        extension = ''
-        joiner = ''
-    new_file_name = name + '_' + str(uuid.uuid4()) + joiner + extension
+        extension = ""
+        joiner = ""
+    new_file_name = name + "_" + str(uuid.uuid4()) + joiner + extension
     return new_file_name
