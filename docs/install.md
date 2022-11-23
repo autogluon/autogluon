@@ -1,3 +1,7 @@
+````{seealso}
+Welcome to AutoGluon's new documentation. For more details, check out the [stable docs](https://auto.gluon.ai/stable/index.html).
+````
+
 # Installation
 
 AutoGluon requires Python version 3.7, 3.8, or 3.9. 
