@@ -133,7 +133,7 @@ better_predictor.set_num_gpus(1)
 better_predictor.evaluate(test_path)
 ```
 
-Under this high performance finetune setting, it took a long time to train but reached `mAP50 = 0.718`!
+Under this high performance finetune setting, it took a long time to train but reached `mAP = 0.450, mAP50 = 0.718`!
 For how to finetune faster,
 see :ref:`sec_automm_detection_fast_ft_coco`, where we finetuned a YOLOv3 model with lower
 performance but much faster.

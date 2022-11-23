@@ -110,7 +110,7 @@ def tutorial_script_for_finetune_high_performance_pothole_in_coco_format():
     train_path = os.path.join(data_dir, "Annotations", "usersplit_train_cocoformat.json")
     val_path = os.path.join(data_dir, "Annotations", "usersplit_val_cocoformat.json")
     test_path = os.path.join(data_dir, "Annotations", "usersplit_test_cocoformat.json")
-    
+
     checkpoint_name = "vfnet_r50_fpn_mdconv_c3-c5_mstrain_2x_coco"
     num_gpus = 1
 
@@ -123,7 +123,6 @@ def tutorial_script_for_finetune_high_performance_pothole_in_coco_format():
         problem_type="object_detection",
         sample_data_path=train_path,
     )
-
 
     start = time.time()
     predictor.fit(
@@ -143,7 +142,7 @@ def tutorial_script_for_finetune_high_performance_pothole_in_coco_format():
 
     # Load Trained Predictor from S3
     zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/checkpoints/pothole_AP50_718.zip"
-    download_dir = "./pothole_AP50_718.zip"
+    download_dir = "./pothole_AP50_718"
     load_zip.unzip(zip_file, unzip_dir=download_dir)
     better_predictor = MultiModalPredictor.load("./pothole_AP50_718/AutogluonModels/ag-20221123_021130")
     better_predictor.set_num_gpus(1)
