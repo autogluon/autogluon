@@ -5,6 +5,10 @@ hide-toc: true
 
 # AutoGluon
 
+````{seealso}
+Welcome to AutoGluon's new documentation. For more details, check out the [stable docs](https://auto.gluon.ai/stable/index.html).
+````
+
 ::::::{div} landing-title
 :style: "padding: 0.1rem 0.5rem 0.6rem 0; background-image: linear-gradient(315deg, #438ff9 0%, #3977B9 74%); clip-path: polygon(0px 0px, 100% 0%, 100% 100%, 0% calc(100% - 1.5rem)); -webkit-clip-path: polygon(0px 0px, 100% 0%, 100% 100%, 0% calc(100% - 1.5rem));"
 
