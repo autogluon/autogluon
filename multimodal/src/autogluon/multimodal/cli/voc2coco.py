@@ -98,7 +98,7 @@ def get_image_info(annotation_root, extract_num_from_imgid=True):
     else:
         filename = os.path.basename(path)
     img_name = os.path.basename(filename)
-    if filename[-4:] != ".jpg":
+    if not filename[-4:] in [".jpg", ".png"]:
         filename = filename + ".jpg"
     img_id = os.path.splitext(img_name)[0]
     if extract_num_from_imgid and isinstance(img_id, str):

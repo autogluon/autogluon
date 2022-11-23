@@ -22,12 +22,14 @@ An example to finetune an MMDetection model on VOC:
 """
 
 import argparse
+import os
 import time
 
+from autogluon.core.utils.loaders import load_zip
 from autogluon.multimodal import MultiModalPredictor
 
 
-def tutorial_script_for_finetune_fast_coco_format():
+def tutorial_script_for_finetune_fast_voc_in_coco_format():
     train_path = "./VOCdevkit/VOC2012/Annotations/train_cocoformat.json"
     test_path = "./VOCdevkit/VOC2007/Annotations/test_cocoformat.json"
     checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
@@ -59,8 +61,83 @@ def tutorial_script_for_finetune_fast_coco_format():
     predictor.evaluate(test_path)
 
 
+def tutorial_script_for_finetune_fast_pothole_in_coco_format():
+    zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/dataset/pothole.zip"
+    download_dir = "./pothole"
 
-def tutorial_script_for_finetune_high_performance_coco_format():
+    load_zip.unzip(zip_file, unzip_dir=download_dir)
+    data_dir = os.path.join(download_dir, "pothole")
+    train_path = os.path.join(data_dir, "Annotations", "usersplit_train_cocoformat.json")
+    val_path = os.path.join(data_dir, "Annotations", "usersplit_val_cocoformat.json")
+    test_path = os.path.join(data_dir, "Annotations", "usersplit_test_cocoformat.json")
+
+    checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
+    num_gpus = 1
+
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": num_gpus,
+        },
+        problem_type="object_detection",
+        sample_data_path=train_path,
+    )
+
+
+    start = time.time()
+    predictor.fit(
+        train_path,
+        tuning_data=val_path,
+        hyperparameters={
+            "optimization.learning_rate": 2e-4, # we use two stage and detection head has 100x lr
+            "optimization.max_epochs": 30,
+            "env.per_gpu_batch_size": 32,  # decrease it when model is large
+        },
+    )
+    end = time.time()
+
+    print("This finetuning takes %.2f seconds." % (end - start))
+
+    predictor.evaluate(test_path)
+
+
+def tutorial_script_for_finetune_high_performance_pothole_in_coco_format():
+    train_path = "./pothole/Annotations/usersplit_train_cocoformat.json"
+    val_path = "./pothole/Annotations/usersplit_val_cocoformat.json"
+    test_path = "./pothole/Annotations/usersplit_test_cocoformat.json"
+    checkpoint_name = "vfnet_r50_fpn_mdconv_c3-c5_mstrain_2x_coco"
+    num_gpus = -1
+
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": num_gpus,
+            "optimization.val_metric": "map",
+        },
+        problem_type="object_detection",
+        sample_data_path=train_path,
+    )
+
+
+    start = time.time()
+    predictor.fit(
+        train_path,
+        tuning_data=val_path,
+        hyperparameters={
+            "optimization.learning_rate": 5e-6, # we use two stage and detection head has 100x lr
+            "optimization.max_epochs": 50,
+            "env.per_gpu_batch_size": 4,  # decrease it when model is large
+        },
+    )
+    end = time.time()
+
+    print("This finetuning takes %.2f seconds." % (end - start))
+
+    predictor.evaluate(test_path)
+
+
+
+def tutorial_script_for_finetune_high_performance_voc_in_coco_format():
     checkpoint_name = "vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco"
     num_gpus = -1
     val_metric = "map"
@@ -164,4 +241,4 @@ def main():
 
 if __name__ == "__main__":
     # main()
-    tutorial_script_for_finetune_fast_coco_format()
+    tutorial_script_for_finetune_fast_pothole_in_coco_format()
