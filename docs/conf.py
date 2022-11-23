@@ -49,6 +49,7 @@ nb_custom_formats = {
 nb_execution_mode = "force"
 nb_execution_timeout = 300
 nb_execution_excludepatterns = ['jupyter_execute']
+nb_merge_streams = True
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'README.md', 'syllabus_raw.md']
