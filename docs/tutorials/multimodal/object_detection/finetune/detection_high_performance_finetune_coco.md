@@ -124,7 +124,7 @@ To load and check the result:
 ```python .input
 # Load Trained Predictor from S3
 zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/checkpoints/pothole_AP50_718.zip"
-download_dir = "./pothole_AP50_718.zip"
+download_dir = "./pothole_AP50_718"
 load_zip.unzip(zip_file, unzip_dir=download_dir)
 better_predictor = MultiModalPredictor.load("./pothole_AP50_718/AutogluonModels/ag-20221123_021130")
 better_predictor.set_num_gpus(1)

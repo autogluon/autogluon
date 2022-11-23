@@ -415,8 +415,6 @@ def from_coco(
     elif root is None:
         # try to use the default coco structure
         root = os.path.join(os.path.dirname(anno_file), "..")
-        if os.path.exists(os.path.join(root, "README.roboflow.txt")):  # fix for roboflow datasets
-            root = os.path.dirname(anno_file)
         logger.info(f"Using default root folder: {root}. Specify `root=...` if you feel it is wrong...")
     else:
         raise ValueError("Unable to parse root: {}".format(root))
