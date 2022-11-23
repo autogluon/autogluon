@@ -72,13 +72,13 @@ predictor = MultiModalPredictor(
 )
 ```
 
-We set the learning rate to be `1e-4`.
+We set the learning rate to be `2e-4`.
 Note that we use a two-stage learning rate option during finetuning by default,
 and the model head will have 100x learning rate.
 Using a two-stage learning rate with high learning rate only on head layers makes
 the model converge faster during finetuning. It usually gives better performance as well,
 especially on small datasets with hundreds or thousands of images.
-We also set the epoch to be 20 for fast finetuning and batch_size to be 32.
+We also set the epoch to be 30 for fast finetuning and batch_size to be 32.
 We also compute the time of the fit process here for better understanding the speed.
 
 ```python .input
@@ -87,8 +87,8 @@ start = time.time()
 predictor.fit(
     train_path,
     hyperparameters={
-        "optimization.learning_rate": 1e-4, # we use two stage and detection head has 100x lr
-        "optimization.max_epochs": 20,
+        "optimization.learning_rate": 2e-4, # we use two stage and detection head has 100x lr
+        "optimization.max_epochs": 30,
         "env.per_gpu_batch_size": 32,  # decrease it when model is large
     },
 )

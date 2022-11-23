@@ -102,11 +102,17 @@ def tutorial_script_for_finetune_fast_pothole_in_coco_format():
 
 
 def tutorial_script_for_finetune_high_performance_pothole_in_coco_format():
-    train_path = "./pothole/Annotations/usersplit_train_cocoformat.json"
-    val_path = "./pothole/Annotations/usersplit_val_cocoformat.json"
-    test_path = "./pothole/Annotations/usersplit_test_cocoformat.json"
+    zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/dataset/pothole.zip"
+    download_dir = "./pothole"
+
+    load_zip.unzip(zip_file, unzip_dir=download_dir)
+    data_dir = os.path.join(download_dir, "pothole")
+    train_path = os.path.join(data_dir, "Annotations", "usersplit_train_cocoformat.json")
+    val_path = os.path.join(data_dir, "Annotations", "usersplit_val_cocoformat.json")
+    test_path = os.path.join(data_dir, "Annotations", "usersplit_test_cocoformat.json")
+    
     checkpoint_name = "vfnet_r50_fpn_mdconv_c3-c5_mstrain_2x_coco"
-    num_gpus = -1
+    num_gpus = 1
 
     predictor = MultiModalPredictor(
         hyperparameters={
@@ -125,7 +131,7 @@ def tutorial_script_for_finetune_high_performance_pothole_in_coco_format():
         tuning_data=val_path,
         hyperparameters={
             "optimization.learning_rate": 5e-6, # we use two stage and detection head has 100x lr
-            "optimization.max_epochs": 50,
+            "optimization.max_epochs": 1,
             "env.per_gpu_batch_size": 4,  # decrease it when model is large
         },
     )
@@ -135,6 +141,15 @@ def tutorial_script_for_finetune_high_performance_pothole_in_coco_format():
 
     predictor.evaluate(test_path)
 
+    # Load Trained Predictor from S3
+    zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/checkpoints/pothole_AP50_718.zip"
+    download_dir = "./pothole_AP50_718.zip"
+    load_zip.unzip(zip_file, unzip_dir=download_dir)
+    better_predictor = MultiModalPredictor.load("./pothole_AP50_718/AutogluonModels/ag-20221123_021130")
+    better_predictor.set_num_gpus(1)
+
+    # Evaluate new predictor
+    better_predictor.evaluate(test_path)
 
 
 def tutorial_script_for_finetune_high_performance_voc_in_coco_format():
@@ -241,4 +256,4 @@ def main():
 
 if __name__ == "__main__":
     # main()
-    tutorial_script_for_finetune_fast_pothole_in_coco_format()
+    tutorial_script_for_finetune_high_performance_pothole_in_coco_format()
