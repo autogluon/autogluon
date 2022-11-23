@@ -174,7 +174,7 @@ see :ref:`sec_automm_detection_high_ft_coco`.
 Now that we have gone through the model setup, finetuning, and evaluation, this section details the inference. 
 Specifically, we layout the steps for using the model to make predictions and visualize the results.
 
-To run inference **on the entire test set**, perform:
+To run inference on the entire test set, perform:
 
 ```python .input
 pred = predictor.predict(test_path)
@@ -194,23 +194,7 @@ pred = better_predictor.predict(test_path, save_results=True)
 ```
 Here, we save `pred` into a `.txt` file, which exactly follows the same layout as in `pred`.
 You can use a predictor initialzed in anyway (i.e. finetuned predictor, predictor with pretrained model, etc.).
-Here, we demonstrate using the `better_predictor` loaded previously. 
-
-You can also download an image and **run inference on that single image**. The follow is an example:
-
-Download the example image:
-```python .input
-from autogluon.multimodal import download
-image_url = "https://raw.githubusercontent.com/dmlc/web-data/master/gluoncv/detection/street_small.jpg"
-test_image = download(image_url)
-```
-
-Run inference:
-
-```python .input
-pred_test_image = better_predictor.predict({"image": [test_image]})
-print(pred_test_image)
-```
+Here, we demonstrate using the `better_predictor` loaded previously.
 
 ### Visualizing Results
 To run visualizations, ensure that you have `opencv` installed. If you haven't already, install `opencv` by running 
@@ -226,7 +210,7 @@ conf_threshold = 0.4  # Specify a confidence threshold to filter out unwanted bo
 visualization_result_dir = "./"  # Use the pwd as result dir to save the visualized image
 
 visualized = visualize_detection(
-    pred=pred[:1],
+    pred=pred[30:31],
     detection_classes=predictor.get_predictor_classes(),
     conf_threshold=conf_threshold,
     visualization_result_dir=visualization_result_dir,
@@ -236,6 +220,23 @@ from PIL import Image
 from IPython.display import display
 img = Image.fromarray(visualized[0][:, :, ::-1], 'RGB')
 display(img)
+```
+
+### Testing on Your Own Image
+You can also download an image and run inference on that single image. The follow is an example:
+
+Download the example image:
+```python .input
+from autogluon.multimodal import download
+image_url = "https://raw.githubusercontent.com/dmlc/web-data/master/gluoncv/detection/street_small.jpg"
+test_image = download(image_url)
+```
+
+Run inference:
+
+```python .input
+pred_test_image = better_predictor.predict({"image": [test_image]})
+print(pred_test_image)
 ```
 
 ### Other Examples
