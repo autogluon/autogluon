@@ -25,6 +25,7 @@ def from_dict(data):
     -------
     a pandas DataFrame with columns "image", "rois", and "label".
     """
+    # TODO: Remove this function after refactoring
     d = {"image": [], "rois": [], "label": []}
 
     for image in data["image"]:

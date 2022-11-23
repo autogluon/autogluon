@@ -92,9 +92,7 @@ def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "faster_rcnn_r50_fpn_2x_coco",
         "yolov3_mobilenetv2_320_300e_coco",
-        "detr_r50_8x2_150e_coco",
     ],
 )
 def test_mmdet_object_detection_inference_df(checkpoint_name):
@@ -119,9 +117,7 @@ def test_mmdet_object_detection_inference_df(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "faster_rcnn_r50_fpn_2x_coco",
         "yolov3_mobilenetv2_320_300e_coco",
-        "detr_r50_8x2_150e_coco",
     ],
 )
 def test_mmdet_object_detection_inference_coco(checkpoint_name):
@@ -161,9 +157,7 @@ def test_mmdet_object_detection_evaluate_coco(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "faster_rcnn_r50_fpn_2x_coco",
         "yolov3_mobilenetv2_320_300e_coco",
-        "detr_r50_8x2_150e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_then_inference_dict(checkpoint_name):
@@ -197,9 +191,7 @@ def test_mmdet_object_detection_fit_then_inference_dict(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "faster_rcnn_r50_fpn_2x_coco",
         "yolov3_mobilenetv2_320_300e_coco",
-        "detr_r50_8x2_150e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_then_inference_df(checkpoint_name):
@@ -235,9 +227,7 @@ def test_mmdet_object_detection_fit_then_inference_df(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "faster_rcnn_r50_fpn_2x_coco",
         "yolov3_mobilenetv2_320_300e_coco",
-        "detr_r50_8x2_150e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_then_inference_coco(checkpoint_name):

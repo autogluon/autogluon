@@ -180,10 +180,11 @@ To run inference **on the entire test set**, perform:
 pred = predictor.predict(test_path)
 print(pred)
 ```
-The output `pred` is a `pandas` `DataFrame` that has two columns, `image` and `bboxes`, where
-- in `image`, each row contains the image path
-- in `bboxes`, each row is a list of dictionaries, each one representing a bounding box: 
-  - `{"class": <predicted_class_name>, "bbox": [x1, y1, x2, y2], "score": <confidence_score>}`
+The output `pred` is a `pandas` `DataFrame` that has two columns, `image` and `bboxes`.
+
+In `image`, each row contains the image path
+
+In `bboxes`, each row is a list of dictionaries, each one representing a bounding box: `{"class": <predicted_class_name>, "bbox": [x1, y1, x2, y2], "score": <confidence_score>}`
 
 Note that, by default, the `predictor.predict` does not save the detection results into a file.
 
@@ -207,7 +208,7 @@ test_image = download(image_url)
 Run inference:
 
 ```python .input
-pred_test_image = better_predictor.predict({"image": [test_image]}, as_pandas=True)
+pred_test_image = better_predictor.predict({"image": [test_image]})
 print(pred_test_image)
 ```
 

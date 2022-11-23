@@ -5,7 +5,6 @@ import logging
 import os
 import platform
 import sys
-import numpy as np
 from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
