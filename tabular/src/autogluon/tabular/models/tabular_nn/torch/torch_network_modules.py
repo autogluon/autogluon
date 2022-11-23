@@ -162,7 +162,6 @@ class EmbedNet(nn.Module):
             embed_data = data_batch[input_offset]
             for i in range(len(self.embed_blocks)):
                 input_data.append(self.embed_blocks[i](embed_data[i].to(self.device)))
-            input_offset += 1
 
         if len(input_data) > 1:
             input_data = torch.cat(input_data, dim=1)

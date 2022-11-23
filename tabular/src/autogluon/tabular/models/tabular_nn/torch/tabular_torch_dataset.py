@@ -126,16 +126,34 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
         self.has_embed_features = len(self.feature_groups['embed']) > 0
 
     def __iter__(self):
+        """
+        Iterate through the iterable dataset, and return a subsample of it.
+
+        This overrides the `__iter__` function in IterableDataset.
+        This is typically useful when we are using :class:`torch.utils.data.DataLoader` to
+        load the dataset.
+
+        Returns a tuple containing (vector_features, embed_features, label).
+        The length of the tuple depends on `has_vector_features` and `has_embed_feautures` attribute.
+        """
         idxarray = np.arange(self.num_examples)
         if self.shuffle:
             np.random.shuffle(idxarray)
         indices = range(0, self.num_examples, self.batch_size)
         for idx_start in indices:
+            # Drop last batch
             if self.drop_last and (idx_start + self.batch_size) > self.num_examples:
                 break
             idx = range(idx_start, min(self.num_examples, idx_start + self.batch_size))
+
+            # Shuffle the index array to reorder the output sequence.
+            # This should be consistent across different features (vector, embed and label).
             if self.shuffle:
                 idx = idxarray[idx]
+
+            # Generate a tuple that contains (vector_features, embed_features, label).
+            # The length of the tuple depends on `has_vector_features`, `has_embed_feautures`, and
+            # whether the label has been provided.
             output_list = []
             if self.has_vector_features:
                 output_list.append(self.data_list[self.vectordata_index][idx])
