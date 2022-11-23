@@ -87,7 +87,7 @@ function install_timeseries {
 
 function install_cloud {
     python3 -m pip install --upgrade pytest-xdist # Enable running tests in parallel for speedup
-    python3 -m pip install --upgrade -e cloud/
+    python3 -m pip install --upgrade -e cloud/[tests]
 }
 
 function install_autogluon {
