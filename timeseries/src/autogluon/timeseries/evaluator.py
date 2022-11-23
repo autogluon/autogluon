@@ -19,30 +19,30 @@ def in_sample_naive_1_error(*, y_history: pd.Series) -> pd.Series:
     """Compute the error of naive forecast (predict previous value) for each time series."""
     diff = y_history.diff()
     # We ignore the differences between the last value of prev item and the first value of the next item
-    length_per_item = y_history.groupby(ITEMID, sort=False).size()
+    length_per_item = y_history.groupby(level=ITEMID, sort=False).size()
     first_index_for_each_item = length_per_item.cumsum().values[:-1]
     diff.iloc[first_index_for_each_item] = np.nan
-    return diff.abs().groupby(ITEMID, sort=False).mean()
+    return diff.abs().groupby(level=ITEMID, sort=False).mean()
 
 
 def mse_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     """Compute Mean Squared Error for each item (time series)."""
-    return (y_true - y_pred).pow(2.0).groupby(ITEMID, sort=False).mean()
+    return (y_true - y_pred).pow(2.0).groupby(level=ITEMID, sort=False).mean()
 
 
 def mae_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     """Compute Mean Absolute Error for each item (time series)."""
-    return (y_true - y_pred).abs().groupby(ITEMID, sort=False).mean()
+    return (y_true - y_pred).abs().groupby(level=ITEMID, sort=False).mean()
 
 
 def mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     """Compute Mean Absolute Percentage Error for each item (time series)."""
-    return ((y_true - y_pred) / y_true).abs().groupby(ITEMID, sort=False).mean()
+    return ((y_true - y_pred) / y_true).abs().groupby(level=ITEMID, sort=False).mean()
 
 
 def symmetric_mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     """Compute symmetric Mean Absolute Percentage Error for each item (time series)."""
-    return (2 * (y_true - y_pred).abs() / (y_true.abs() + y_pred.abs())).groupby(ITEMID, sort=False).mean()
+    return (2 * (y_true - y_pred).abs() / (y_true.abs() + y_pred.abs())).groupby(level=ITEMID, sort=False).mean()
 
 
 def quantile_loss(*, y_true: pd.Series, y_pred: pd.Series, q: float) -> float:
