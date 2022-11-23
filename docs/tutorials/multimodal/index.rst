@@ -72,12 +72,6 @@ Object Detection
 .. container:: cards
 
    .. card::
-      :title: Inference using a pretrained model - Quick Start
-      :link: object_detection/quick_start/detection_inference_quick_start.html
-
-      How to inference with a pretrained model on a small dataset (COCO Format)
-
-   .. card::
       :title: Quick Start on a Tiny COCO Format Dataset
       :link: object_detection/quick_start/quick_start_coco.html
 
@@ -118,18 +112,6 @@ Object Detection
       :link: object_detection/finetune/detection_high_performance_finetune_coco.html
 
       How to finetune a pretrained model on a dataset in COCO format with high performance.
-
-   .. card::
-      :title: Inference using a pretrained model - COCO dataset
-      :link: object_detection/inference/detection_inference_coco.html
-
-      How to inference with a pretrained model on COCO dataset
-
-   .. card::
-      :title: Inference using a pretrained model - VOC dataset
-      :link: object_detection/inference/detection_inference_voc.html
-
-      How to inference with a pretrained model on VOC dataset
 
    .. card::
       :title: Evaluate Pretrained YOLOv3 on COCO Format Dataset

@@ -6,6 +6,7 @@ from PIL import Image
 
 from autogluon.core.utils.loaders import load_zip
 from autogluon.multimodal import MultiModalPredictor
+from autogluon.multimodal.utils import from_coco_or_voc
 
 
 def download_sample_images():
@@ -49,8 +50,6 @@ def test_mmdet_object_detection_inference_dict(checkpoint_name):
 
     pred = predictor.predict({"image": [mmdet_image_name] * 10})  # test batch inference
     assert len(pred) == 10  # test data size is 100
-    assert len(pred[0]) == 80  # COCO has 80 classes
-    assert pred[0][0].ndim == 2  # two dimensions, (# of proposals, 5)
 
 
 @pytest.mark.parametrize(
@@ -61,7 +60,7 @@ def test_mmdet_object_detection_inference_dict(checkpoint_name):
         "detr_r50_8x2_150e_coco",
     ],
 )
-def test_mmdet_object_detection_inference_dict(checkpoint_name):
+def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
     data_dir = download_sample_dataset()
 
     train_path = os.path.join(data_dir, "Annotations", "trainval_cocoformat.json")
@@ -88,3 +87,182 @@ def test_mmdet_object_detection_inference_dict(checkpoint_name):
 
     # Evaluate
     predictor.evaluate(test_path)
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "faster_rcnn_r50_fpn_2x_coco",
+        "yolov3_mobilenetv2_320_300e_coco",
+        "detr_r50_8x2_150e_coco",
+    ],
+)
+def test_mmdet_object_detection_inference_df(checkpoint_name):
+
+    data_dir = download_sample_dataset()
+
+    test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
+    # Init predictor
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": 1,
+        },
+        problem_type="object_detection",
+    )
+
+    test_df = from_coco_or_voc(test_path)
+
+    pred = predictor.predict(test_df.iloc[:100])
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "faster_rcnn_r50_fpn_2x_coco",
+        "yolov3_mobilenetv2_320_300e_coco",
+        "detr_r50_8x2_150e_coco",
+    ],
+)
+def test_mmdet_object_detection_inference_coco(checkpoint_name):
+    data_dir = download_sample_dataset()
+
+    test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
+    # Init predictor
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": 1,
+        },
+        problem_type="object_detection",
+    )
+
+    pred = predictor.predict(test_path)
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    ["https://automl-mm-bench.s3.amazonaws.com/object_detection/quick_start/AP50_433.zip"],
+)
+def test_mmdet_object_detection_evaluate_coco(checkpoint_name):
+    data_dir = download_sample_dataset()
+
+    test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
+    # Init predictor
+    zip_file = checkpoint_name
+    download_dir = "./AP50_433"
+    load_zip.unzip(zip_file, unzip_dir=download_dir)
+    predictor = MultiModalPredictor.load("./AP50_433/quick_start_tutorial_temp_save")
+    predictor.set_num_gpus(1)
+
+    pred = predictor.evaluate(test_path)
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "faster_rcnn_r50_fpn_2x_coco",
+        "yolov3_mobilenetv2_320_300e_coco",
+        "detr_r50_8x2_150e_coco",
+    ],
+)
+def test_mmdet_object_detection_fit_then_inference_dict(checkpoint_name):
+    data_dir = download_sample_dataset()
+    mmdet_image_name = download_sample_images()
+
+    train_path = os.path.join(data_dir, "Annotations", "trainval_cocoformat.json")
+    test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
+    # Init predictor
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": 1,
+        },
+        problem_type="object_detection",
+        sample_data_path=train_path,
+    )
+
+    # Fit
+    predictor.fit(
+        train_path,
+        hyperparameters={
+            "optimization.learning_rate": 2e-4,
+            "env.per_gpu_batch_size": 2,
+        },
+        time_limit=30,
+    )
+    pred = predictor.predict({"image": [mmdet_image_name] * 10})  # test batch inference
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "faster_rcnn_r50_fpn_2x_coco",
+        "yolov3_mobilenetv2_320_300e_coco",
+        "detr_r50_8x2_150e_coco",
+    ],
+)
+def test_mmdet_object_detection_fit_then_inference_df(checkpoint_name):
+
+    data_dir = download_sample_dataset()
+
+    train_path = os.path.join(data_dir, "Annotations", "trainval_cocoformat.json")
+    test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
+    # Init predictor
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": 1,
+        },
+        problem_type="object_detection",
+        sample_data_path=train_path,
+    )
+
+    # Fit
+    predictor.fit(
+        train_path,
+        hyperparameters={
+            "optimization.learning_rate": 2e-4,
+            "env.per_gpu_batch_size": 2,
+        },
+        time_limit=30,
+    )
+
+    df = from_coco_or_voc(test_path)
+    pred = predictor.predict(df)  # test batch inference
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "faster_rcnn_r50_fpn_2x_coco",
+        "yolov3_mobilenetv2_320_300e_coco",
+        "detr_r50_8x2_150e_coco",
+    ],
+)
+def test_mmdet_object_detection_fit_then_inference_coco(checkpoint_name):
+    data_dir = download_sample_dataset()
+
+    train_path = os.path.join(data_dir, "Annotations", "trainval_cocoformat.json")
+    test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
+    # Init predictor
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": 1,
+        },
+        problem_type="object_detection",
+        sample_data_path=train_path,
+    )
+
+    # Fit
+    predictor.fit(
+        train_path,
+        hyperparameters={
+            "optimization.learning_rate": 2e-4,
+            "env.per_gpu_batch_size": 2,
+        },
+        time_limit=30,
+    )
+
+    pred = predictor.predict(test_path)  # test batch inference

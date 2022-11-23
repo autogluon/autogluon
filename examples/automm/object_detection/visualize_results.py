@@ -33,8 +33,13 @@ def tutorial_script_for_visualize_detection_results():
 
     df = from_coco_or_voc(test_path)[:10][["image"]]
 
-    pred = predictor.predict(
-        df, visualize_results=True, visualize_path=visualization_result_dir, visualize_conf_th=conf_threshold
+    pred = predictor.predict(df)
+
+    visualize_detection(
+        pred=pred,
+        detection_classes=predictor.get_predictor_classes(),
+        conf_threshold=conf_threshold,
+        visualization_result_dir=visualization_result_dir,
     )
 
 
@@ -63,6 +68,7 @@ def visualize_detection_results(
         conf_threshold=conf_threshold,
         visualization_result_dir=visualization_result_dir,
     )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
