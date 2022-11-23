@@ -4,7 +4,7 @@ autogluon.tabular
 
 .. currentmodule:: autogluon.tabular
 
-.. autosummary:: 
+.. autosummary::
     :nosignatures:
     :toctree: _autogen
 

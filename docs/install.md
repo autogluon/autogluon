@@ -103,3 +103,4 @@ cd autogluon && ./full_install.sh
 ````{admonition} Trouble Shooting
 
 If you encounter installation issues not covered here, please create a [github issue](https://github.com/autogluon/autogluon/issues).
+````
