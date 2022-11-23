@@ -7,6 +7,7 @@ def get_model_true_infer_speed_per_row_batch(
         predictor,
         batch_size: int = 100000,
         repeats=1,
+        persist_models=True,
         silent=False):
     """
     Get per-model true inference speed per row for a given batch size of data.
