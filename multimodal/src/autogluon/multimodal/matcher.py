@@ -1137,7 +1137,7 @@ class MultiModalMatcher:
         strategy = "dp"  # default used in inference.
 
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
-        if num_gpus == 1:
+        if num_gpus <= 1:
             strategy = None
 
         precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision)
