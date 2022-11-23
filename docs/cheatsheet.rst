@@ -18,9 +18,9 @@ Looking for a different version? Refer to the `autogluon-doc-utils`_ repo to vie
 Multimodal
 ----------
 
-.. image:: static/cheatsheet/AutoGluon_Multimodal_Cheatsheet_latest.png
+.. image:: static/images/cheatsheet/AutoGluon_Multimodal_Cheatsheet_stable.png
    :width: 900
 
 Download the PDF version with clickable links `multimodal-cheatsheet`_.
 
-.. _Multimodal-cheatsheet: static/cheatsheet/AutoGluon_Multimodal_Cheatsheet_latest.pdf
+.. _Multimodal-cheatsheet: _static/cheatsheet/AutoGluon_Multimodal_Cheatsheet_stable.pdf
