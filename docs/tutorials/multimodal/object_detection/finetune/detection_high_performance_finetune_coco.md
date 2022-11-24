@@ -1,7 +1,7 @@
 # AutoMM Detection - High Performance Finetune on COCO Format Dataset
 :label:`sec_automm_detection_high_ft_coco`
 
-![Pothole Dataset](https://storage.googleapis.com/kagglesdsdata/datasets/702771/1228192/images/potholes101.png?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=databundle-worker-v2%40kaggle-161607.iam.gserviceaccount.com%2F20221124%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20221124T064243Z&X-Goog-Expires=345600&X-Goog-SignedHeaders=host&X-Goog-Signature=7ea47c3f7dca097792c950e0ad33114b7bd22b4d8a2882270a6c278870c24674f4aa4572a124c82068b30e56b184f8ab8a57e05993c146fd2defcd565db5b21d80d1e7eebfdf39c24344e8a8f9b01c0382252e36f8d1a09e0be20681b8b8e986f678316da3a7f6216e0b5195a78126133e997bb77f92666cd90285abdac6ab8839a33c22a18fbd19dec3a044a4ac9018c977a84894926a252094c39a7e3df4fba320ddd462e542a8cc7311e16cb8e66e9eef4cf1712bca1ee61780461039c79c5c5ab58f14400cb54ff9da34d706fbe0184cb0a3ed9a0fae13e130b8d86d23782362e72a3b34c0ffc08a20b26349bba0cc7de7cf36b31a8aa4e475d58a7c9dae)
+![Pothole Dataset](https://storage.googleapis.com/kagglesdsdata/datasets/702771/1228192/images/potholes144.png?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=databundle-worker-v2%40kaggle-161607.iam.gserviceaccount.com%2F20221124%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20221124T213104Z&X-Goog-Expires=345600&X-Goog-SignedHeaders=host&X-Goog-Signature=a7b1ae8dd97ffda78bba3e5c098e65b9adab10b59b8a96de45b45f8700141a1e623e59607d3c12b0062c89500206b1f53d83377d63c509758c7e1868e09af763a16590f75a4b88cb4f07422f0bd8776af9f85a56038de20f4aa42ee3f23a9a91964a28b12eeb5453dbab9c180e3cadd704ca63c240cf0d386829997d30159a721580b123e69fb4b515ae4c2b9e81455bdf195f35e20dc8ee924b5be60214f43331c1f617552e590af40367ca39532a3d48c4db13ace6af020152e673e5286c76b975b4688ec1c452a3014234fea832ad684acf86942fa6d9fcbb571573bab30cf6c1ae21e57dbddc64ee29f647925eb74f41dbbf5374d71a22882d4dbeb31810)
 :width:`500px`
 
 In this section, our goal is to fast finetune and evaluate a pretrained model 
@@ -150,10 +150,10 @@ Let's also visualize the prediction result:
 
 ```python .input
 from autogluon.multimodal.utils import visualize_detection
-conf_threshold = 0.1  # Specify a confidence threshold to filter out unwanted boxes
+conf_threshold = 0.4  # Specify a confidence threshold to filter out unwanted boxes
 visualization_result_dir = "./"  # Use the pwd as result dir to save the visualized image
 visualized = visualize_detection(
-    pred=pred[4:5],
+    pred=pred[12:13],
     detection_classes=predictor.get_predictor_classes(),
     conf_threshold=conf_threshold,
     visualization_result_dir=visualization_result_dir,
