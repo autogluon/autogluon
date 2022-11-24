@@ -124,6 +124,7 @@ from .utils import (
     extract_from_output,
     filter_search_space,
     from_coco_or_voc,
+    from_dict,
     get_config,
     get_detection_classes,
     get_local_pretrained_config_paths,
@@ -2334,11 +2335,16 @@ class MultiModalPredictor:
                 id_mappings=id_mappings,
                 as_pandas=as_pandas,
             )
-        detection_data_path = None
         if self._problem_type == OBJECT_DETECTION:
             if isinstance(data, str):
-                detection_data_path = data
                 data = from_coco_or_voc(data, "test")
+            elif isinstance(data, dict):
+                data = from_dict(data)
+            else:
+                assert isinstance(
+                    data, pd.DataFrame
+                ), "TypeError: Expected data type to be a filepath, a folder or a dictionary, but got {}".format(data)
+
             if self._label_column not in data:
                 self._label_column = None
 
@@ -2373,9 +2379,12 @@ class MultiModalPredictor:
                 logits = extract_from_output(outputs=outputs, ret_type=ret_type)
 
             if self._df_preprocessor:
-                pred = self._df_preprocessor.transform_prediction(
-                    y_pred=logits,
-                )
+                if ret_type == BBOX:
+                    pred = logits
+                else:
+                    pred = self._df_preprocessor.transform_prediction(
+                        y_pred=logits,
+                    )
             else:
                 if isinstance(logits, (torch.Tensor, np.ndarray)) and logits.ndim == 2:
                     pred = logits.argmax(axis=1)

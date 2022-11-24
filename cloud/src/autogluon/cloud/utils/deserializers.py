@@ -1,12 +1,11 @@
 import io
-import pandas as pd
-
 from abc import ABC, abstractmethod
+
+import pandas as pd
 from sagemaker.deserializers import SimpleBaseDeserializer
 
 
 class PandasDeserializeStrategy(ABC):
-
     @property
     @abstractmethod
     def supported_content_type(self):
@@ -27,7 +26,6 @@ class PandasDeserializeStrategy(ABC):
 
 
 class ParquetPandasDeserializeStrategy(PandasDeserializeStrategy):
-
     @property
     def supported_content_type(self):
         return "application/x-parquet"
@@ -37,7 +35,6 @@ class ParquetPandasDeserializeStrategy(PandasDeserializeStrategy):
 
 
 class CSVPandasDeserializeStrategy(PandasDeserializeStrategy):
-
     @property
     def supported_content_type(self):
         return "text/csv"
@@ -47,7 +44,6 @@ class CSVPandasDeserializeStrategy(PandasDeserializeStrategy):
 
 
 class JsonPandasDeserializeStrategy(PandasDeserializeStrategy):
-
     @property
     def supported_content_type(self):
         return "application/json"
@@ -58,12 +54,18 @@ class JsonPandasDeserializeStrategy(PandasDeserializeStrategy):
 
 class PandasDeserializeStrategyFactory:
 
-    __supported_strategy = [ParquetPandasDeserializeStrategy, CSVPandasDeserializeStrategy, JsonPandasDeserializeStrategy]
+    __supported_strategy = [
+        ParquetPandasDeserializeStrategy,
+        CSVPandasDeserializeStrategy,
+        JsonPandasDeserializeStrategy,
+    ]
     __content_type_to_strategy = {cls().supported_content_type: cls for cls in __supported_strategy}
 
     @staticmethod
     def get_strategy(content_type: str) -> PandasDeserializeStrategy:
-        assert content_type in PandasDeserializeStrategyFactory.__content_type_to_strategy, f'{content_type} not supported'
+        assert (
+            content_type in PandasDeserializeStrategyFactory.__content_type_to_strategy
+        ), f"{content_type} not supported"
         return PandasDeserializeStrategyFactory.__content_type_to_strategy[content_type]()
 
 

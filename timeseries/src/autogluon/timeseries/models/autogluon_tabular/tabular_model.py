@@ -210,7 +210,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             new_df = pd.DataFrame(new_values, index=new_index, columns=[self.target])
             return pd.concat([group.droplevel(ITEMID), new_df])
 
-        extended_data = data.groupby(ITEMID, sort=False).apply(extend_single_time_series)
+        extended_data = data.groupby(level=ITEMID, sort=False).apply(extend_single_time_series)
         extended_data.static_features = data.static_features
         return extended_data
 
@@ -242,7 +242,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         """Normalize data such that each the average absolute value of each time series is equal to 1."""
         # TODO: Implement other scalers (min/max)?
         # TODO: Don't include validation data when computing the scale
-        scale_per_item = data.abs().groupby(ITEMID, sort=False)[self.target].mean().clip(lower=min_scale)
+        scale_per_item = data.abs().groupby(level=ITEMID, sort=False)[self.target].mean().clip(lower=min_scale)
         normalized_data = data.copy()
         for col in normalized_data.columns:
             normalized_data[col] = normalized_data[col] / scale_per_item

@@ -1,7 +1,6 @@
-import pandas as pd
 import numpy as np
-
-from sagemaker.serializers import SimpleBaseSerializer, NumpySerializer
+import pandas as pd
+from sagemaker.serializers import NumpySerializer, SimpleBaseSerializer
 
 
 class ParquetSerializer(SimpleBaseSerializer):
@@ -33,7 +32,7 @@ class ParquetSerializer(SimpleBaseSerializer):
         if hasattr(data, "read"):
             return data.read()
 
-        raise ValueError(f'{data} format is not supported. Please provide a DataFrame, parquet file, or buffer.')
+        raise ValueError(f"{data} format is not supported. Please provide a DataFrame, parquet file, or buffer.")
 
 
 class MultiModalSerializer(SimpleBaseSerializer):
@@ -73,7 +72,7 @@ class MultiModalSerializer(SimpleBaseSerializer):
         if isinstance(data, np.ndarray):
             return self.numpy_serializer.serialize(data)
 
-        raise ValueError(f'{data} format is not supported. Please provide a DataFrame, or numpy array.')
+        raise ValueError(f"{data} format is not supported. Please provide a DataFrame, or numpy array.")
 
 
 class JsonLineSerializer(SimpleBaseSerializer):
@@ -98,6 +97,6 @@ class JsonLineSerializer(SimpleBaseSerializer):
             io.StringIO: A buffer containing data serialized in the .jsonl format.
         """
         if isinstance(data, pd.DataFrame):
-            return data.to_json(orient='records', lines=True)
+            return data.to_json(orient="records", lines=True)
 
-        raise ValueError(f'{data} format is not supported. Please provide a DataFrame.')
+        raise ValueError(f"{data} format is not supported. Please provide a DataFrame.")
