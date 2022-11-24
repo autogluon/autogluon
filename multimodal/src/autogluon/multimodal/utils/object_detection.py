@@ -14,6 +14,29 @@ from .download import download, is_url
 logger = logging.getLogger(AUTOMM)
 
 
+def from_dict(data):
+    """
+    Construct a dataframe (dummy) from a data dictionary, with the form {"image": ["img1.jpg", "img2.jpg", ...]}
+    Parameters
+    ----------
+    data
+        Dict containing the image paths
+    Returns
+    -------
+    a pandas DataFrame with columns "image", "rois", and "label".
+    """
+    # TODO: Remove this function after refactoring
+    d = {"image": [], "rois": [], "label": []}
+
+    for image in data["image"]:
+        d["image"].append(image)
+        # Dummy rois
+        d["rois"].append([[-1, -1, -1, -1, 0]])
+        d["label"].append([[-1, -1, -1, -1, 0]])
+    df = pd.DataFrame(d)
+    return df.sort_values("image").reset_index(drop=True)
+
+
 def from_voc(
     root: str,
     splits: Optional[Union[str, tuple]] = None,
