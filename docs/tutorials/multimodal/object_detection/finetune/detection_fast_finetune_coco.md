@@ -111,6 +111,34 @@ And the evaluation results are shown in command line output.
 The first value is mAP in COCO standard, and the second one is mAP in VOC standard (or mAP50). 
 For more details about these metrics, see [COCO's evaluation guideline](https://cocodataset.org/#detection-eval).
 
+We can get the prediction on test set:
+
+```python .input
+pred = predictor.predict(test_path)
+```
+
+Let's also visualize the prediction result:
+
+```python .input
+!pip install opencv-python
+```
+
+```python .input
+from autogluon.multimodal.utils import visualize_detection
+conf_threshold = 0.1  # Specify a confidence threshold to filter out unwanted boxes
+visualization_result_dir = "./"  # Use the pwd as result dir to save the visualized image
+visualized = visualize_detection(
+    pred=pred[4:5],
+    detection_classes=predictor.get_predictor_classes(),
+    conf_threshold=conf_threshold,
+    visualization_result_dir=visualization_result_dir,
+)
+from PIL import Image
+from IPython.display import display
+img = Image.fromarray(visualized[0][:, :, ::-1], 'RGB')
+display(img)
+```
+
 Under this fast finetune setting, we reached a good mAP number on a new dataset with a few hundred seconds!
 For how to finetune with higher performance,
 see :ref:`sec_automm_detection_high_ft_coco`, where we finetuned a VFNet model with 

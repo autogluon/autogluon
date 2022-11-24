@@ -133,6 +133,34 @@ better_predictor.set_num_gpus(1)
 better_predictor.evaluate(test_path)
 ```
 
+We can get the prediction on test set:
+
+```python .input
+pred = better_predictor.predict(test_path)
+```
+
+Let's also visualize the prediction result:
+
+```python .input
+!pip install opencv-python
+```
+
+```python .input
+from autogluon.multimodal.utils import visualize_detection
+conf_threshold = 0.1  # Specify a confidence threshold to filter out unwanted boxes
+visualization_result_dir = "./"  # Use the pwd as result dir to save the visualized image
+visualized = visualize_detection(
+    pred=pred[4:5],
+    detection_classes=predictor.get_predictor_classes(),
+    conf_threshold=conf_threshold,
+    visualization_result_dir=visualization_result_dir,
+)
+from PIL import Image
+from IPython.display import display
+img = Image.fromarray(visualized[0][:, :, ::-1], 'RGB')
+display(img)
+```
+
 Under this high performance finetune setting, it took a long time to train but reached `mAP = 0.450, mAP50 = 0.718`!
 For how to finetune faster,
 see :ref:`sec_automm_detection_fast_ft_coco`, where we finetuned a YOLOv3 model with lower
