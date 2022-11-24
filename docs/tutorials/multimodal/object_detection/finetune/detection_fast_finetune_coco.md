@@ -128,7 +128,7 @@ Let's also visualize the prediction result:
 
 ```python .input
 from autogluon.multimodal.utils import visualize_detection
-conf_threshold = 0.4  # Specify a confidence threshold to filter out unwanted boxes
+conf_threshold = 0.25  # Specify a confidence threshold to filter out unwanted boxes
 visualization_result_dir = "./"  # Use the pwd as result dir to save the visualized image
 visualized = visualize_detection(
     pred=pred[12:13],
