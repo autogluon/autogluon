@@ -1,6 +1,9 @@
 # AutoMM Detection - Fast Finetune on COCO Format Dataset
 :label:`sec_automm_detection_fast_ft_coco`
 
+![Pothole Dataset](https://storage.googleapis.com/kagglesdsdata/datasets/702771/1228192/images/potholes101.png?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=databundle-worker-v2%40kaggle-161607.iam.gserviceaccount.com%2F20221124%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20221124T064243Z&X-Goog-Expires=345600&X-Goog-SignedHeaders=host&X-Goog-Signature=7ea47c3f7dca097792c950e0ad33114b7bd22b4d8a2882270a6c278870c24674f4aa4572a124c82068b30e56b184f8ab8a57e05993c146fd2defcd565db5b21d80d1e7eebfdf39c24344e8a8f9b01c0382252e36f8d1a09e0be20681b8b8e986f678316da3a7f6216e0b5195a78126133e997bb77f92666cd90285abdac6ab8839a33c22a18fbd19dec3a044a4ac9018c977a84894926a252094c39a7e3df4fba320ddd462e542a8cc7311e16cb8e66e9eef4cf1712bca1ee61780461039c79c5c5ab58f14400cb54ff9da34d706fbe0184cb0a3ed9a0fae13e130b8d86d23782362e72a3b34c0ffc08a20b26349bba0cc7de7cf36b31a8aa4e475d58a7c9dae)
+:width:`500px`
+
 In this section, our goal is to fast finetune and evaluate a pretrained model 
 on [Pothole dataset](https://www.kaggle.com/datasets/andrewmvd/pothole-detection) in COCO format.
 Pothole is a single object, i.e. `pothole`, detection dataset, containing 665 images with bounding box annotations
