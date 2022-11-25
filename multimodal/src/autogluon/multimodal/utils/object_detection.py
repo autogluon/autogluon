@@ -438,7 +438,7 @@ def from_coco(
     elif root is None:
         # try to use the default coco structure
         root = os.path.join(os.path.dirname(anno_file), "..")
-        logger.info("Using default root folder: %s. Specify `root=...` if you feel it is wrong...", root)
+        logger.info(f"Using default root folder: {root}. Specify `root=...` if you feel it is wrong...")
     else:
         raise ValueError("Unable to parse root: {}".format(root))
 
@@ -515,7 +515,10 @@ def VOCName2Idx(name):
 
 
 def get_image_name_num(path):
-    start_idx = path.rfind("/") + 1
+    if "/potholes" in path:
+        start_idx = path.rfind("/potholes") + 9
+    else:
+        start_idx = path.rfind("/") + 1
     end_idx = path.rindex(".")
     return int(path[start_idx:end_idx])
 

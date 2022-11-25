@@ -1,30 +1,62 @@
 # AutoMM Detection - Fast Finetune on COCO Format Dataset
 :label:`sec_automm_detection_fast_ft_coco`
 
-In this section, our goal is to fast finetune a pretrained model on VOC2017 training set, 
-and evaluate it in VOC2007 test set. Both training and test sets are in COCO format.
-See :ref:`sec_automm_detection_prepare_voc` for how to prepare VOC dataset,
-and :ref:`sec_automm_detection_convert_to_coco` for how to convert other datasets to COCO format.
+![Pothole Dataset](https://automl-mm-bench.s3.amazonaws.com/object_detection/example_image/pothole144_gt.jpg)
+:width:`500px`
+
+In this section, our goal is to fast finetune and evaluate a pretrained model 
+on [Pothole dataset](https://www.kaggle.com/datasets/andrewmvd/pothole-detection) in COCO format.
+Pothole is a single object, i.e. `pothole`, detection dataset, containing 665 images with bounding box annotations
+for the creation of detection models and can work as POC/POV for the maintenance of roads.
+See :ref:`sec_automm_detection_prepare_voc` for how to prepare Pothole dataset.
 
 To start, let's import MultiModalPredictor:
 
-```python
+```python .input
 from autogluon.multimodal import MultiModalPredictor
 ```
+
+Make sure `mmcv-full` and `mmdet` are installed:
+```python .input
+!mim install mmcv-full
+!pip install mmdet
+```
+
+And also import some other packages that will be used in this tutorial:
+
+```python .input
+import os
+import time
+
+from autogluon.core.utils.loaders import load_zip
+```
+
+We have the sample dataset ready in the cloud. Let's download it:
+
+```python .input
+zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/dataset/pothole.zip"
+download_dir = "./pothole"
+
+load_zip.unzip(zip_file, unzip_dir=download_dir)
+data_dir = os.path.join(download_dir, "pothole")
+train_path = os.path.join(data_dir, "Annotations", "usersplit_train_cocoformat.json")
+val_path = os.path.join(data_dir, "Annotations", "usersplit_val_cocoformat.json")
+test_path = os.path.join(data_dir, "Annotations", "usersplit_test_cocoformat.json")
+```
+
+While using COCO format dataset, the input is the json annotation file of the dataset split.
+In this example, `usersplit_train_cocoformat.json` is the annotation file of the train split.
+`usersplit_val_cocoformat.json` is the annotation file of the validation split.
+And `usersplit_test_cocoformat.json` is the annotation file of the test split.
 
 We select the YOLOv3 with MobileNetV2 as backbone,
 and input resolution is 320x320, pretrained on COCO dataset. With this setting, it is fast to finetune or inference,
 and easy to deploy.
-While using COCO format dataset, the input is the json annotation file of the dataset split.
-In this example, `voc07_train.json` and `voc07_test.json` are the annotation files of train and test split of VOC2007 dataset.
 And we use all the GPUs (if any):
 
-```python
+```python .input
 checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
 num_gpus = -1  # use all GPUs
-
-train_path = "./VOCdevkit/VOC2007/Annotations/train_cocoformat.json" 
-test_path = "./VOCdevkit/VOC2007/Annotations/test_cocoformat.json"
 ```
 
 We create the MultiModalPredictor with selected checkpoint name and number of GPUs.
@@ -32,7 +64,7 @@ We need to specify the problem_type to `"object_detection"`,
 and also provide a `sample_data_path` for the predictor to infer the catgories of the dataset.
 Here we provide the `train_path`, and it also works using any other split of this dataset.
 
-```python
+```python .input
 predictor = MultiModalPredictor(
     hyperparameters={
         "model.mmdet_image.checkpoint_name": checkpoint_name,
@@ -43,106 +75,77 @@ predictor = MultiModalPredictor(
 )
 ```
 
-If no data sample is available at this point, you can also create the MultiModalPredictor by manually input the classes:
-
-```python
-voc_classes = ["aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"]
-predictor = MultiModalPredictor(
-    hyperparameters={
-        "model.mmdet_image.checkpoint_name": checkpoint_name,
-        "env.num_gpus": num_gpus,
-    },
-    problem_type="object_detection",
-    classes=voc_classes,
-)
-```
-
-We set the learning rate to be `1e-4`.
+We set the learning rate to be `2e-4`.
 Note that we use a two-stage learning rate option during finetuning by default,
 and the model head will have 100x learning rate.
 Using a two-stage learning rate with high learning rate only on head layers makes
 the model converge faster during finetuning. It usually gives better performance as well,
 especially on small datasets with hundreds or thousands of images.
-We also set the epoch to be 5 for fast finetuning and batch_size to be 32.
+We also set the epoch to be 30 for fast finetuning and batch_size to be 32.
 We also compute the time of the fit process here for better understanding the speed.
-```python
+
+```python .input
 import time
 start = time.time()
 predictor.fit(
     train_path,
     hyperparameters={
-        "optimization.learning_rate": 1e-4, # we use two stage and detection head has 100x lr
-        "optimization.max_epochs": 5,
+        "optimization.learning_rate": 2e-4, # we use two stage and detection head has 100x lr
+        "optimization.max_epochs": 30,
         "env.per_gpu_batch_size": 32,  # decrease it when model is large
     },
 )
 end = time.time()
 ```
 
-We run it on a g5dn.12xlarge EC2 machine on AWS,
-and part of the command outputs are shown below:
+Print out the time and we can see that it's fast!
 
-```
-Epoch 0:  98%|██████████████████████████████████████████████████████████████████████████████████████████▏ | 50/51 [00:15<00:00,  3.19it/s, loss=766, v_num=Epoch 0, global step 40: 'val_direct_loss' reached 555.37537 (best 555.37537), saving model to '/media/code/autogluon/examples/automm/object_detection/AutogluonModels/ag-20221104_185342/epoch=0-step=40.ckpt' as top 1
-Epoch 1:  49%|█████████████████████████████████████████████                                               | 25/51 [00:08<00:08,  3.01it/s, loss=588, v_num=Epoch 1, global step 61: 'val_direct_loss' reached 499.56232 (best 499.56232), saving model to '/media/code/autogluon/examples/automm/object_detection/AutogluonModels/ag-20221104_185342/epoch=1-step=61.ckpt' as top 1
-Epoch 1:  98%|██████████████████████████████████████████████████████████████████████████████████████████▏ | 50/51 [00:15<00:00,  3.17it/s, loss=554, v_num=Epoch 1, global step 81: 'val_direct_loss' reached 481.33121 (best 481.33121), saving model to '/media/code/autogluon/examples/automm/object_detection/AutogluonModels/ag-20221104_185342/epoch=1-step=81.ckpt' as top 1
-Epoch 2:  49%|█████████████████████████████████████████████                                               | 25/51 [00:08<00:08,  2.99it/s, loss=539, v_num=Epoch 2, global step 102: 'val_direct_loss' reached 460.25449 (best 460.25449), saving model to '/media/code/autogluon/examples/automm/object_detection/AutogluonModels/ag-20221104_185342/epoch=2-step=102.ckpt' as top 1
-Epoch 2:  98%|██████████████████████████████████████████████████████████████████████████████████████████▏ | 50/51 [00:15<00:00,  3.15it/s, loss=539, v_num=Epoch 2, global step 122: 'val_direct_loss' was not in top 1                                                                                                 
-Epoch 3:  49%|█████████████████████████████████████████████                                               | 25/51 [00:08<00:08,  2.96it/s, loss=533, v_num=Epoch 3, global step 143: 'val_direct_loss' was not in top 1                                                                                                 
-Epoch 3:  88%|█████████████████████████████████████████████████████████████████████████████████▏          | 45/51 [00:14<00:01,  3.17it/s, loss=508, v_num=]
-```
-
-Notice that at the end of each progress bar, if the checkpoint at current stage is saved,
-it prints the model's save path.
-In this example, it's `/media/code/autogluon/examples/automm/object_detection/AutogluonModels/ag-20221104_185342`.
-You can also specify the `save_path` like below while creating the MultiModalPredictor.
-
-```
-predictor = MultiModalPredictor(
-    save_path="./this_is_a_save_path",
-    ...
-)
-```
-
-Print out the time and we can see that it only takes 100.42 seconds!
-
-```python
+```python .input
 print("This finetuning takes %.2f seconds." % (end - start))
-```
-
-```
-This finetuning takes 100.42 seconds.
 ```
 
 To evaluate the model we just trained, run:
 
-```python
+```python .input
 predictor.evaluate(test_path)
 ```
 
 And the evaluation results are shown in command line output. 
-The first value `0.375` is mAP in COCO standard, and the second one `0.755` is mAP in VOC standard (or mAP50). 
+The first value is mAP in COCO standard, and the second one is mAP in VOC standard (or mAP50). 
 For more details about these metrics, see [COCO's evaluation guideline](https://cocodataset.org/#detection-eval).
 
-```
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.375
- Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.755
- Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.311
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.111
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.230
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.431
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.355
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.505
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.515
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.258
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.415
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.556
+We can get the prediction on test set:
+
+```python .input
+pred = predictor.predict(test_path)
 ```
 
-Under this fast finetune setting, we reached `mAP50 = 0.755` on VOC with 100 seconds!
+Let's also visualize the prediction result:
+
+```python .input
+!pip install opencv-python
+```
+
+```python .input
+from autogluon.multimodal.utils import visualize_detection
+conf_threshold = 0.25  # Specify a confidence threshold to filter out unwanted boxes
+visualization_result_dir = "./"  # Use the pwd as result dir to save the visualized image
+visualized = visualize_detection(
+    pred=pred[12:13],
+    detection_classes=predictor.get_predictor_classes(),
+    conf_threshold=conf_threshold,
+    visualization_result_dir=visualization_result_dir,
+)
+from PIL import Image
+from IPython.display import display
+img = Image.fromarray(visualized[0][:, :, ::-1], 'RGB')
+display(img)
+```
+
+Under this fast finetune setting, we reached a good mAP number on a new dataset with a few hundred seconds!
 For how to finetune with higher performance,
 see :ref:`sec_automm_detection_high_ft_coco`, where we finetuned a VFNet model with 
-5 hours and reached `mAP50 = 0.932` on VOC.
+5 hours and reached `mAP = 0.450, mAP50 = 0.718` on this dataset.
 
 ### Other Examples
 
