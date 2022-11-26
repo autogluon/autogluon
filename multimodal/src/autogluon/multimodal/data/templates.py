@@ -640,7 +640,8 @@ class DatasetTemplates:
                 "Please ignore this warning if you are creating new prompts for this dataset."
             )
             return {}
-        yaml_dict = yaml.safe_load(open(self.yaml_path, "r"))
+        with open(self.yaml_path, "r") as f:
+            yaml_dict = yaml.safe_load(f)
         return yaml_dict[self.TEMPLATES_KEY]
 
     def write_to_file(self) -> None:
