@@ -892,8 +892,9 @@ class MultiModalPredictor:
         )
 
         ray_tune_adapter = AutommRayTuneAdapter()
-        if try_import_ray_lightning():
-            ray_tune_adapter = AutommRayTuneLightningAdapter()
+        # Do not use ray lightning.
+        # if try_import_ray_lightning():
+        #     ray_tune_adapter = AutommRayTuneLightningAdapter()
         search_space = _fit_args.get("hyperparameters", dict())
         metric = "val_" + _fit_args.get("validation_metric_name")
         mode = _fit_args.get("minmax_mode")
