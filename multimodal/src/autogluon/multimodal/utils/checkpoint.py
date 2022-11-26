@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import shutil
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pytorch_lightning as pl
@@ -10,11 +11,17 @@ from pytorch_lightning.plugins.io.checkpoint_plugin import CheckpointIO
 from pytorch_lightning.utilities.cloud_io import atomic_save, get_filesystem
 from pytorch_lightning.utilities.cloud_io import load as pl_load
 from pytorch_lightning.utilities.rank_zero import rank_zero_warn
-from pytorch_lightning.utilities.types import _METRIC, _PATH
+from torch import Tensor
+from torchmetrics import Metric
 
 from ..constants import AUTOMM, DEEPSPEED_STRATEGY
 
 logger = logging.getLogger(AUTOMM)
+
+
+_PATH = Union[str, Path]
+_NUMBER = Union[int, float]
+_METRIC = Union[Metric, Tensor, _NUMBER]
 
 
 def average_checkpoints(
