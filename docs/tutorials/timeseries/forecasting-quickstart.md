@@ -12,6 +12,7 @@ to produce multi-step ahead _probabilistic_ forecasts for univariate time series
 
 This tutorial demonstrates how to quickly start using AutoGluon to generate hourly forecasts for the [M4 forecasting competition](https://www.sciencedirect.com/science/article/pii/S0169207019301128).
 For a short summary of how to train models and make forecasts in a few lines of code with `autogluon.timeseries`, scroll to the [bottom of this page](#summary).
+Also check out the AutoGluon-TimeSeries [cheat sheet](/cheatsheet.html#time-series).
 
 
 ## Loading time series data as a `TimeSeriesDataFrame`
