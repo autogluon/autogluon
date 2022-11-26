@@ -32,6 +32,7 @@ install_requires = [
     "seqeval<=1.2.2",
     "evaluate<=0.3.0",
     "accelerate>=0.9,<0.14",
+    "tensorboard<2.12.0",
     "timm<0.7.0",
     "torch>=1.9,<1.14",
     "torchvision<0.15.0",
