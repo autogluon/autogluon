@@ -21,7 +21,7 @@ function setup_mxnet_gpu {
 }
 
 function setup_torch_gpu {
-    python3 -m pip install torch==1.12.0+cu113 torchvision==0.13.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
+    python3 -m pip install torch==1.13.0+cu117 torchvision==0.14.0+cu117 --extra-index-url https://download.pytorch.org/whl/cu117
 }
 
 function install_common {
