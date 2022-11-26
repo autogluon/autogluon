@@ -24,3 +24,15 @@ Multimodal
 Download the PDF version with clickable links `multimodal-cheatsheet`_.
 
 .. _Multimodal-cheatsheet: https://automl-mm-bench.s3-accelerate.amazonaws.com/cheatsheet/v0.6.0/AutoGluon_Multimodal_Cheatsheet_v0.6.0.pdf
+
+
+Time Series
+-----------
+
+.. image:: https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/autogluon_timeseries_cheatsheet.png
+   :width: 900
+
+Download the PDF version with clickable links `ts-cheatsheet`_.
+
+.. _ts-cheatsheet: https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/autogluon_timeseries_cheatsheet.pdf
+

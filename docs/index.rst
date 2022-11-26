@@ -1,5 +1,5 @@
-AutoGluon: AutoML for Text, Image, and Tabular Data
-====================================================
+AutoGluon: AutoML for Text, Image, Time Series, and Tabular Data
+================================================================
 
 .. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.6.0-blue
     :target: https://auto.gluon.ai/dev/versions.html
