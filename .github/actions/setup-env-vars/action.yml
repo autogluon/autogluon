@@ -9,6 +9,7 @@ runs:
       run: |
         SHA='${{ github.sha }}'
         branch='${{ github.ref }}'
+        title='${{ github.event.pull_request.title }}'
         git_repo='${{ github.repository }}'
         short_sha=$(git rev-parse --short "$SHA")
         pr_number="" 
@@ -17,6 +18,7 @@ runs:
         echo "GIT_REPO=$git_repo" >> $GITHUB_ENV
         echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
         echo "PR_NUMBER=$pr_number" >> $GITHUB_ENV
+        echo "TITLE=$title" >> $GITHUB_ENV
     - name: Get Commit SHA(For pull request)
       if: ${{ github.event_name == 'pull_request_target' }}
       shell: bash
