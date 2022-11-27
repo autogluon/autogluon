@@ -1,8 +1,6 @@
 name: Security Test
 
-on:
-  push
-  pull_request_target
+on: pull_request_target
 permissions:
   id-token: write
   pull-requests: write
