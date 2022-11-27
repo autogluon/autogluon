@@ -1,16 +1,16 @@
 name: "Setup Env Vars"
-env:
-  SHA: ${{ github.sha }}
-  branch: ${{ github.ref }}
-  git_repo: ${{ github.repository }}
-  short_sha: $(git rev-parse --short "$SHA")
-  pr_number: ""
 runs:
   using: "composite"
   steps:
     - name: Get Commit SHA(For push)
       if: ${{ github.event_name == 'push' }}
       shell: bash
+      env:
+        SHA: ${{ github.sha }}
+        branch: ${{ github.ref }}
+        git_repo: ${{ github.repository }}
+        short_sha: $(git rev-parse --short "$SHA")
+        pr_number: ""
       run: |
         echo "BRANCH=$branch" >> $GITHUB_ENV
         echo "GIT_REPO=$git_repo" >> $GITHUB_ENV
