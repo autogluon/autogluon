@@ -1,6 +1,16 @@
 name: Security Test
 
-on: pull_request_target
+on:
+  push:
+    paths-ignore:
+      - 'cloud/**'
+      - '.github/workflows/cloud_continuous_integration.yml'
+      - '.github/workflow_scripts/test_cloud.sh'
+    pull_request_target:
+      paths-ignore:
+        - 'cloud/**'
+        - '.github/workflows/cloud_continuous_integration.yml'
+        - '.github/workflow_scripts/test_cloud.sh'
 permissions:
   id-token: write
   pull-requests: write
