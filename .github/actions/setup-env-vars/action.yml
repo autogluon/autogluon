@@ -9,7 +9,7 @@ runs:
       run: |
         SHA='${{ github.sha }}'
         branch='${{ github.ref }}'
-        title='${{ github.event.pull_request.title }}'
+        title="${{ github.event.pull_request.title }}"
         git_repo='${{ github.repository }}'
         short_sha=$(git rev-parse --short "$SHA")
         pr_number="" 
@@ -24,7 +24,7 @@ runs:
       shell: bash
       run: |
         branch='${{ github.event.pull_request.head.ref }}'
-        title='${{ github.event.pull_request.title }}'
+        title="${{ github.event.pull_request.title }}"
         
         echo "BRANCH=$branch" >> $GITHUB_ENV
         echo "TITLE=$title" >> $GITHUB_ENV
