@@ -14,7 +14,7 @@ runs:
       run: |
         echo "BRANCH=$branch" >> $GITHUB_ENV
         echo "GIT_REPO=$git_repo" >> $GITHUB_ENV
-        echo "$SHORT_SHA=$short_sha" >> $GITHUB_ENV
+        echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
         echo "PR_NUMBER=$pr_number" >> $GITHUB_ENV
     - name: Get Commit SHA(For pull request)
       if: ${{ github.event_name == 'pull_request_target' }}
@@ -23,7 +23,7 @@ runs:
         SHA: ${{ github.event.pull_request.head.sha }}
         branch: ${{ github.event.pull_request.head.ref }}
         git_repo: ${{ github.event.pull_request.head.repo.full_name }}
-        pr_number: "PR-"${{ github.event.number }}
+        pr_number: PR-${{ github.event.number }}
 
       run: |
         echo "BRANCH=$branch" >> $GITHUB_ENV
