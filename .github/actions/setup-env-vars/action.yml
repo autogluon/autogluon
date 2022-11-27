@@ -21,13 +21,8 @@ runs:
       if: ${{ github.event_name == 'pull_request_target' }}
       shell: bash
       run: |
-        SHA='${{ github.event.pull_request.head.sha }}'
         branch='${{ github.event.pull_request.head.ref }}'
-        git_repo='${{ github.event.pull_request.head.repo.full_name }}'
-        short_sha=$(git rev-parse --short "$SHA")
-        pr_number=PR-'${{ github.event.number }}'
-
+        title='${{ github.event.pull_request.title }}'
+        
         echo "BRANCH=$branch" >> $GITHUB_ENV
-        echo "GIT_REPO=$git_repo" >> $GITHUB_ENV
-        echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
-        echo "PR_NUMBER=$pr_number" >> $GITHUB_ENV
+        echo "TITLE=$title" >> $GITHUB_ENV
