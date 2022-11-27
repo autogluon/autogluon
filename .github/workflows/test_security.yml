@@ -1,0 +1,21 @@
+name: Security Test
+
+on:
+  push
+  pull_request_target
+permissions:
+  id-token: write
+  pull-requests: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build_tabular_prediction_tutorial:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
