@@ -2,6 +2,7 @@ import collections
 import json
 import logging
 import warnings
+from io import BytesIO
 from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
@@ -15,6 +16,7 @@ from ..constants import (
     ENTITY_GROUP,
     IDENTIFIER,
     IMAGE,
+    IMAGE_BYTEARRAY,
     IMAGE_PATH,
     MULTICLASS,
     NAMED_ENTITY_RECOGNITION,
@@ -84,20 +86,24 @@ def is_categorical_column(
                 ratio = 0.1
         threshold = min(int(len(data) * ratio), threshold)
         data_value_counts = data.value_counts(dropna=False)
-        key_set = set(data_value_counts.keys())
-        if len(data_value_counts) < threshold:
-            valid_value_counts = valid_data.value_counts(dropna=False)
-            total_valid_num = len(valid_data)
-            oov_num = 0
-            for k, v in zip(valid_value_counts.keys(), valid_value_counts.values):
-                if k not in key_set:
-                    oov_num += v
-            if is_label and oov_num != 0:
+        try:
+            key_set = set(data_value_counts.keys())
+            if len(data_value_counts) < threshold:
+                valid_value_counts = valid_data.value_counts(dropna=False)
+                total_valid_num = len(valid_data)
+                oov_num = 0
+                for k, v in zip(valid_value_counts.keys(), valid_value_counts.values):
+                    if k not in key_set:
+                        oov_num += v
+                if is_label and oov_num != 0:
+                    return False
+                if oov_num / total_valid_num > oov_ratio_threshold:
+                    return False
+                return True
+            else:
                 return False
-            if oov_num / total_valid_num > oov_ratio_threshold:
-                return False
-            return True
-        return False
+        except:
+            return False
 
 
 def is_rois_column(data: pd.Series) -> bool:
@@ -208,6 +214,61 @@ def is_imagepath_column(
         return False
 
 
+def is_imagebytearray_column(
+    data: pd.Series,
+    col_name: str,
+) -> bool:
+    """
+    Identify if a column contains valid image bytearray.
+
+    Parameters
+    ----------
+    data
+        One column of a multimodal pd.DataFrame for training.
+    col_name
+        Name of column.
+
+    Returns
+    -------
+    Whether the column is an image-bytearray column.
+    """
+    sample_num = min(len(data), 500)
+    data = data.sample(n=sample_num, random_state=0)
+    data = data.tolist()
+    failure_count = 0
+    for image_bytearrays in data:
+        success = False
+        if not isinstance(image_bytearrays, list):
+            image_bytearrays = [image_bytearrays]
+
+        for img_bytearray in image_bytearrays:
+            try:
+                with PIL.Image.open(BytesIO(img_bytearray)) as img:
+                    pass
+                success = True
+                break
+            except:
+                pass
+            if not success:
+                failure_count += 1
+    failure_ratio = failure_count / sample_num
+    # Tolerate high failure rate in case that many image files may be corrupted.
+    if failure_ratio <= 0.9:
+        if failure_ratio > 0:
+            warnings.warn(
+                f"Among {sample_num} sampled images in column '{col_name}', "
+                f"{failure_ratio:.0%} images can't be open. "
+                "You may need to thoroughly check your data to see the percentage of missing images, "
+                "and estimate the potential influence. By default, we skip the samples with missing images. "
+                "You can also set hyperparameter 'data.image.missing_value_strategy' to be 'zero', "
+                "which uses a zero image to replace any missing image.",
+                UserWarning,
+            )
+        return True
+    else:
+        return False
+
+
 def is_text_column(data: pd.Series) -> bool:
     """
     Identify if a column is one text column.
@@ -224,19 +285,21 @@ def is_text_column(data: pd.Series) -> bool:
     if len(data) > 5000:
         # Sample to speed-up type inference
         data = data.sample(n=5000, random_state=0)
-    data_unique = data.unique()
-    num_unique = len(data_unique)
-    num_rows = len(data)
-    unique_ratio = num_unique / num_rows
-    if unique_ratio <= 0.01:
-        return False
     try:
-        avg_words = pd.Series(data_unique).str.split().str.len().mean()
-    except AttributeError:
+        data_unique = data.unique()
+        num_unique = len(data_unique)
+        num_rows = len(data)
+        unique_ratio = num_unique / num_rows
+        if unique_ratio <= 0.01:
+            return False
+        try:
+            avg_words = pd.Series(data_unique).str.split().str.len().mean()
+        except AttributeError:
+            return False
+        if avg_words < 3:
+            return False
+    except:
         return False
-    if avg_words < 3:
-        return False
-
     return True
 
 
@@ -311,6 +374,8 @@ def infer_id_mappings_types(id_mappings: Union[Dict[str, Dict], Dict[str, pd.Ser
             )
         if is_imagepath_column(per_id_mappings, col_name=per_name):
             id_mappings_types[per_name] = IMAGE_PATH
+        if is_imagebytearray_column(per_id_mappings, col_name=per_name):
+            id_mappings_types[per_name] = IMAGE_BYTEARRAY
         elif is_text_column(per_id_mappings):
             id_mappings_types[per_name] = TEXT
         else:
@@ -383,7 +448,7 @@ def infer_column_types(
             column_types[col_name] = NULL
             continue
         if (
-            (not isinstance(data[col_name][idx], (list, dict, set)))
+            (not isinstance(data[col_name][idx], (list, dict, set, bytearray)))
             and len(data[col_name].unique()) == 1
             and is_training
         ):
@@ -405,6 +470,8 @@ def infer_column_types(
             column_types[col_name] = NUMERICAL
         elif is_imagepath_column(data[col_name], col_name):  # Infer image-path column
             column_types[col_name] = IMAGE_PATH
+        elif is_imagebytearray_column(data[col_name], col_name):  # Infer image-bytearray column
+            column_types[col_name] = IMAGE_BYTEARRAY
         elif is_text_column(data[col_name]):  # Infer text column
             column_types[col_name] = TEXT
         else:  # All the other columns are treated as categorical
