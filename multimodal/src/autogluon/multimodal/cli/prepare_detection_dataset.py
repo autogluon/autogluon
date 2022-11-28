@@ -26,24 +26,25 @@ def get_fname_from_path_or_url(path_or_url):
     return fname
 
 
-def download_one_url(url, root_dir):
-    fname = get_fname_from_path_or_url(url)
+def download_one_url(url, root_dir, fname=None):
+    if not fname:
+        fname = get_fname_from_path_or_url(url)
     output_path = os.path.join(root_dir, fname)
     print(f"Downloading {fname}...")
 
     r = requests.get(url)
-    with open(fname, "wb") as f:
+    with open(output_path, "wb") as f:
         f.write(r.content)
 
     return output_path
 
 
-def download_urls(urls, root_dir):
+def download_urls(urls, root_dir, fnames=[]):
     output_paths = []
     if isinstance(urls, str):
         urls = [urls]
-    for url in urls:
-        output_path = download_one_url(url, root_dir)
+    for i, url in enumerate(urls):
+        output_path = download_one_url(url, root_dir, fname=fnames[i] if fnames else None)
         output_paths.append(output_path)
     return output_paths
 
@@ -62,9 +63,9 @@ def remove_archived_file_paths(archived_file_paths):
         os.remove(archived_file_path)
 
 
-def prepare_dataset(output_dir, new_folder_name, urls):
+def prepare_dataset(output_dir, new_folder_name, urls, fnames=[]):
     root_dir = get_root_dir(output_dir=output_dir, new_folder_name=new_folder_name)
-    archived_file_paths = download_urls(urls, root_dir)
+    archived_file_paths = download_urls(urls, root_dir, fnames=fnames)
     unpack(archived_file_paths, root_dir)
     remove_archived_file_paths(archived_file_paths)
 
@@ -114,6 +115,13 @@ def prepare_watercolor(output_dir):
     prepare_dataset(output_dir=output_dir, new_folder_name=None, urls=urls)
 
 
+def prepare_pothole(output_dir):
+    print("Preparing Pothole dataset...")
+    # urls = ["https://www.kaggle.com/datasets/andrewmvd/pothole-detection/download?datasetVersionNumber=1"]
+    urls = ["https://automl-mm-bench.s3.amazonaws.com/object_detection/dataset/pothole.zip"]
+    prepare_dataset(output_dir=output_dir, new_folder_name=None, urls=urls, fnames=[])
+
+
 def main(dataset_name, output_dir):
     if dataset_name.lower() in ["coco", "coco17", "coco2017"]:
         prepare_coco17(output_dir=output_dir)
@@ -125,6 +133,8 @@ def main(dataset_name, output_dir):
         prepare_voc12(output_dir=output_dir)
     elif dataset_name.lower() in ["watercolor"]:
         prepare_watercolor(output_dir=output_dir)
+    elif dataset_name.lower() in ["pothole"]:
+        prepare_pothole(output_dir=output_dir)
     else:
         raise ValueError(f"This dataset name is not supported: {dataset_name}")
 

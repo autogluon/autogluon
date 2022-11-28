@@ -96,6 +96,10 @@ hyperparameter_config_dict = dict(
     }
 )
 
+# default_FTT is experimental
+hyperparameter_config_dict['default_FTT'] = {'FT_TRANSFORMER': {}}
+hyperparameter_config_dict['default_FTT'].update(hyperparameter_config_dict['default'])
+
 
 def get_hyperparameter_config_options():
     return list(hyperparameter_config_dict.keys())

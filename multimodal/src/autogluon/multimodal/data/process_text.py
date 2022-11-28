@@ -373,7 +373,7 @@ class TextProcessor:
                 answer_ids = self.tokenizer(
                     col_text,
                     padding="max_length",
-                    max_length=20,  # TODO: Currently hardcoded max_length for textual choices.
+                    max_length=self.template_engine.get_max_choice_length(self.tokenizer),
                 )["input_ids"]
                 tokens[col_name] = answer_ids
                 continue

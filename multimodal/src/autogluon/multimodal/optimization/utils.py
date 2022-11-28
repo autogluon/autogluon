@@ -32,6 +32,9 @@ from ..constants import (
     HIT_RATE,
     IA3,
     IA3_BIAS,
+    IA3_LORA,
+    IA3_LORA_BIAS,
+    IA3_LORA_NORM,
     IA3_NORM,
     LOG_LOSS,
     LORA,
@@ -46,6 +49,7 @@ from ..constants import (
     OVERALL_ACCURACY,
     PAIR_MARGIN_MINER,
     PEARSONR,
+    PEFT_STRATEGIES,
     QUADRATIC_KAPPA,
     R2,
     REGRESSION,
@@ -619,12 +623,12 @@ def get_trainable_params_efficient_finetune(
     elif efficient_finetune == NORM_FIT:
         trainable_param_names.append(".*bias*.")
         trainable_param_names += norm_param_names
-    elif efficient_finetune in [LORA, IA3]:
+    elif efficient_finetune in [LORA, IA3, IA3_LORA]:
         trainable_param_names.append(".*lora_*.")
-    elif efficient_finetune in [LORA_BIAS, IA3_BIAS]:
+    elif efficient_finetune in [LORA_BIAS, IA3_BIAS, IA3_LORA_BIAS]:
         trainable_param_names.append(".*lora_*.")
         trainable_param_names.append(".*bias*.")
-    elif efficient_finetune in [LORA_NORM, IA3_NORM]:
+    elif efficient_finetune in [LORA_NORM, IA3_NORM, IA3_LORA_NORM]:
         trainable_param_names.append(".*lora_*.")
         trainable_param_names.append(".*bias*.")
         trainable_param_names += norm_param_names
@@ -632,7 +636,7 @@ def get_trainable_params_efficient_finetune(
         raise NotImplementedError(
             f"The efficient finetuning strategy '{efficient_finetune}'"
             f" is not supported. We only support"
-            f" '{BIT_FIT}', '{NORM_FIT}', '{LORA}', '{LORA_NORM}', '{LORA_BIAS}', '{IA3}', '{IA3_BIAS}', '{IA3_NORM}'."
+            f" {', '.join(PEFT_STRATEGIES)}."
         )
 
     return trainable_param_names

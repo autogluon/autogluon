@@ -12,13 +12,13 @@ The total time to prepare the dataset depends on your Internet speed and disk pe
 VOC has an [official webpage](http://host.robots.ox.ac.uk/pascal/VOC/) to download the data, 
 but it's always easier to perform a one-step setup.
 We prepared a script to download both VOC2007 and VOC2012 in our examples: 
-[download_voc0712.sh](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/download_voc0712.sh).
+[download_voc0712.sh](https://raw.githubusercontent.com/awslabs/autogluon/master/examples/automm/object_detection/download_voc0712.sh).
 You can also download them separately:
-[download_voc07.sh](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/download_voc07.sh),
-[download_voc12.sh](https://github.com/awslabs/autogluon/blob/master/examples/automm/object_detection/download_voc12.sh).
+[download_voc07.sh](https://raw.githubusercontent.com/awslabs/autogluon/master/examples/automm/object_detection/download_voc07.sh),
+[download_voc12.sh](https://raw.githubusercontent.com/awslabs/autogluon/master/examples/automm/object_detection/download_voc12.sh).
 Or you can also use our cli tool `prepare_detection_dataset` that can download all datasets mentioned in our tutorials.
 This python script is in our code: 
-[prepare_detection_dataset.py](https://github.com/awslabs/autogluon/tree/master/autogluon/multimodal/src/autogluon/multimodal/cli/prepare_detection_dataset.py),
+[prepare_detection_dataset.py](https://raw.githubusercontent.com/awslabs/autogluon/master/multimodal/src/autogluon/multimodal/cli/prepare_detection_dataset.py),
 and you can also run it as a cli: `python3 -m autogluon.multimodal.cli.prepare_detection_dataset`.
 
 ### Download with Python Script
@@ -107,35 +107,8 @@ However, for fast proof testing we also have limit support for VOC format.
 While using VOC format dataset, the input is the root path of the dataset, and contains at least:
 
 ```
-Annotations  ImageSets  JPEGImages labels.txt
+Annotations  ImageSets  JPEGImages
 ```
-
-Here `labels.txt` shall be added manually to include all the labels in the dataset. 
-Using VOC Dataset as an example, the content of `labels.txt` is shown as below:
-
-```
-aeroplane
-bicycle
-bird
-boat
-bottle
-bus
-car
-cat
-chair
-cow
-diningtable
-dog
-horse
-motorbike
-person
-pottedplant
-sheep
-sofa
-train
-tvmonitor
-```
-
 
 ### Other Examples
 

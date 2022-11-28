@@ -1,7 +1,7 @@
-AutoGluon: AutoML for Text, Image, and Tabular Data
-====================================================
+AutoGluon: AutoML for Text, Image, Time Series, and Tabular Data
+================================================================
 
-.. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.5.2-blue
+.. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.6.0-blue
     :target: https://auto.gluon.ai/dev/versions.html
     :scale: 100%
 .. |StableVersion| image:: https://img.shields.io/github/v/release/awslabs/autogluon?color=blue&label=stable%20release&sort=semver
@@ -73,24 +73,6 @@ Tutorials
       How to predict variables in tabular datasets.
 
    .. card::
-      :title: Image Prediction
-      :link: tutorials/image_prediction/index.html
-
-      How to classify images into various categories.
-
-   .. card::
-      :title: Object Detection
-      :link: tutorials/object_detection/index.html
-
-      How to detect objects and their location in images.
-
-   .. card::
-      :title: Text Prediction
-      :link: tutorials/text_prediction/index.html
-
-      How to solve NLP problems via supervised learning from raw text.
-
-   .. card::
       :title: Multimodal Prediction
       :link: tutorials/multimodal/index.html
 
@@ -102,6 +84,24 @@ Tutorials
 
       How to train time series models for forecasting.
 
+   .. card::
+      :title: Image Prediction (Legacy Version)
+      :link: tutorials/image_prediction/index.html
+
+      How to classify images into various categories.
+
+   .. card::
+      :title: Object Detection (Legacy Version)
+      :link: tutorials/object_detection/index.html
+
+      How to detect objects and their location in images.
+
+   .. card::
+      :title: Text Prediction (Legacy Version)
+      :link: tutorials/text_prediction/index.html
+
+      How to solve NLP problems via supervised learning from raw text.
+
 Launch Tutorial Notebooks
 -------------------------
 
@@ -109,17 +109,17 @@ Launch Tutorial Notebooks
    :file: static/platforms.html
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :hidden:
 
    tutorials/tabular_prediction/index
    tutorials/multimodal/index
-   tutorials/image_prediction/index
-   tutorials/object_detection/index
-   tutorials/text_prediction/index
    tutorials/timeseries/index
    tutorials/cloud_fit_deploy/index
    cheatsheet.rst
+   tutorials/image_prediction/index
+   tutorials/object_detection/index
+   tutorials/text_prediction/index
    api/autogluon.predictor
    api/autogluon.features
    api/autogluon.tabular.models

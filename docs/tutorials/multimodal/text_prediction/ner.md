@@ -38,8 +38,11 @@ Now, let's create a predictor for named entity recognition by seting the *proble
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
+import uuid
+
 label_col = "entity_annotations"
-predictor = MultiModalPredictor(problem_type="ner", label=label_col, path='./automm_ner')
+model_path = f"./tmp/{uuid.uuid4().hex}-automm_ner"
+predictor = MultiModalPredictor(problem_type="ner", label=label_col, path=model_path)
 predictor.fit(
     train_data=train_data,
     time_limit=300, #second
@@ -69,8 +72,9 @@ for entity in predictions[0]:
 The trained predictor is automatically saved and you can easily reload it using the path. If you are not saftisfied with the current model performance, you can continue training the loaded model with new data.
 
 ```{.python .input}
-new_predictor = MultiModalPredictor.load('automm_ner')
-new_predictor.fit(train_data, time_limit=60, save_path='automm_ner_continue_train')
+new_predictor = MultiModalPredictor.load(model_path)
+new_model_path = f"./tmp/{uuid.uuid4().hex}-automm_ner_continue_train"
+new_predictor.fit(train_data, time_limit=60, save_path=new_model_path)
 test_score = new_predictor.evaluate(test_data, metrics=['overall_f1', 'ACTOR'])
 print(test_score)
 ```

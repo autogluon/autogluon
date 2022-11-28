@@ -46,7 +46,7 @@ from ..models import (
     TFewModel,
     TimmAutoModelForImagePrediction,
 )
-from ..models.utils import inject_ia3_to_linear_layer, inject_lora_to_linear_layer
+from ..models.utils import inject_adaptation_to_linear_layer
 
 logger = logging.getLogger(AUTOMM)
 
@@ -300,6 +300,7 @@ def create_model(
             checkpoint_name=model_config.checkpoint_name,
             num_classes=num_classes,
             gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            low_cpu_mem_usage=OmegaConf.select(model_config, "low_cpu_mem_usage", default=False),
             pretrained=pretrained,
         )
     elif model_name.lower().startswith(FUSION_MLP):
@@ -405,7 +406,10 @@ def create_fusion_model(
                     f"More than one fusion models are detected in {names}. Only one fusion model is allowed."
                 )
         else:  # single model
-            if OmegaConf.select(config, "optimization.efficient_finetune"):
+            if (
+                OmegaConf.select(config, "optimization.efficient_finetune") is not None
+                and OmegaConf.select(config, "optimization.efficient_finetune") != "None"
+            ):
                 model = apply_model_adaptation(model, config)
             single_models.append(model)
 
@@ -433,21 +437,14 @@ def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
     config:
         A DictConfig object. The optimization config should be accessible by "config.optimization".
     """
-    if "lora" in OmegaConf.select(config, "optimization.efficient_finetune"):
-        model = inject_lora_to_linear_layer(
-            model=model,
-            lora_r=config.optimization.lora.r,
-            lora_alpha=config.optimization.lora.alpha,
-            module_filter=config.optimization.lora.module_filter,
-            filter=config.optimization.lora.filter,
-        )
-    elif "ia3" in OmegaConf.select(config, "optimization.efficient_finetune"):
-        model = inject_ia3_to_linear_layer(
-            model=model,
-            module_filter=config.optimization.lora.module_filter,
-            filter=config.optimization.lora.filter,
-        )
-
+    model = inject_adaptation_to_linear_layer(
+        model=model,
+        efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+        lora_r=config.optimization.lora.r,
+        lora_alpha=config.optimization.lora.alpha,
+        module_filter=config.optimization.lora.module_filter,
+        filter=config.optimization.lora.filter,
+    )
     model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.
 
     return model

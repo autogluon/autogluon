@@ -21,12 +21,14 @@ Select your preferences below and run the corresponding install commands:
      :title:`OS:`
      :act:`Linux`
      :opt:`Mac`
+     :opt:`Mac - Apple Silicon`
      :opt:`Windows`
 
      .. raw:: html
 
         <div class="mdl-tooltip" data-mdl-for="linux">Linux.</div>
         <div class="mdl-tooltip" data-mdl-for="mac">Mac OSX.</div>
+        <div class="mdl-tooltip" data-mdl-for="mac-apple-silicon">Mac OSX - Apple Silicon.</div>
         <div class="mdl-tooltip" data-mdl-for="windows">Windows.</div>
 
   .. container:: opt-group
@@ -88,9 +90,7 @@ Select your preferences below and run the corresponding install commands:
 
            .. container:: gpu
 
-              .. note::
-
-                 GPU usage is not yet supported on Mac OSX, please use Linux or Windows to utilize GPUs in AutoGluon.
+              .. include:: install-macos-no-gpu.rst
 
         .. container:: source
 
@@ -102,9 +102,29 @@ Select your preferences below and run the corresponding install commands:
 
            .. container:: gpu
 
-              .. note::
+              .. include:: install-macos-no-gpu.rst
 
-                 GPU usage is not yet supported on Mac OSX , please use Linux or Windows to utilize GPUs in AutoGluon.
+     .. container:: mac-apple-silicon
+
+        .. container:: pip
+
+           .. container:: cpu
+
+              .. include:: install-macos-apple-silicon.rst
+
+           .. container:: gpu
+
+              .. include:: install-macos-no-gpu.rst
+
+        .. container:: source
+
+           .. container:: cpu
+
+              .. include:: install-macos-apple-silicon.rst
+
+           .. container:: gpu
+
+              .. include:: install-macos-no-gpu.rst
 
      .. container:: windows
 
@@ -150,6 +170,7 @@ AutoGluon is modularized into `sub-modules <https://packaging.python.org/guides/
     - Optional Dependency: `vowpalwabbit`. This will install the VowpalWabbit package and allow you to fit VowpalWabbit in TabularPredictor.
     - Optional Dependency: `imodels`. This will install the imodels package and allow you to fit interpretable models in TabularPredictor.
 - `autogluon.multimodal` - functionality for image, text, and multimodal problems. Focus on deep learning models.
+    - To try object detection functionality using `MultiModalPredictor`, please install additional dependencies via `mim install mmcv-full` and `pip install mmdet`. Note that Windows users should also install `pycocotools`` by: `pip install pycocotools-windows`, but it only supports python 3.6/3.7/3.8.
 - `autogluon.vision` - only functionality for computer vision (ImagePredictor, ObjectDetector)
 - `autogluon.text` - only functionality for natural language processing (TextPredictor)
 - `autogluon.timeseries` - only functionality for time series data (TimeSeriesPredictor)

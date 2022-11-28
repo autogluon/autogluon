@@ -14,7 +14,6 @@ from autogluon.multimodal import MultiModalPredictor
 
 We select the two-stage Deformable DETR with ResNet50 as backbone with bounding box finetune,
 this model has **15.7 frames per second (FPS)** on single A10e GPU with `batch_size=1`.
-For details about model selection, see :ref:`sec_automm_detection_select_models`.
 And we use all the GPUs (if any):
 
 ```python
@@ -36,7 +35,7 @@ predictor = MultiModalPredictor(
 ```
 
 Here we use COCO17 for testing. 
-See other tutorials for \[Prepare COCO2017], \[Convert VOC Format Dataset to COCO Format], and \[Create Custom Dataset].
+See other tutorials for :ref:`sec_automm_detection_prepare_coco17`.
 While using COCO dataset, the input is the json annotation file of the dataset split.
 In this example, `instances_val2017.json` is the annotation file of validation split of COCO17 dataset.
 
@@ -71,7 +70,7 @@ time usage: 389.92
 Deformable DETR has best performance but takes more time and (GPU memory) space. 
 If there is a restriction in time or space, 
 see :ref:`sec_automm_detection_eval_fasterrcnn_coco` or :ref:`sec_automm_detection_eval_yolov3_coco`.
-You can also see other tutorials for \[Fast Finetune on COCO format data] or \[Inference on COCO format data (with Visualization)].
+You can also see other tutorials for :ref:`sec_automm_detection_high_ft_coco` or :ref:`sec_automm_detection_infer_coco`.
 
 ### Other Examples
 

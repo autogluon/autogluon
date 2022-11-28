@@ -1,4 +1,4 @@
-# AutoMM for Multimodal - Quick Start
+# AutoMM for Image + Text + Tabular - Quick Start
 :label:`sec_automm_multimodal_beginner`
 
 AutoMM is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that are suitable for multimodal datasets. You will only need to convert the data into the multimodal dataframe format
@@ -142,8 +142,11 @@ It is also convenient to save a predictor and re-load it.
 :::
 
 ```{.python .input}
-predictor.save('my_saved_dir')
-loaded_predictor = MultiModalPredictor.load('my_saved_dir')
+import uuid
+
+model_path = f"./tmp/{uuid.uuid4().hex}-saved_model"
+predictor.save(model_path)
+loaded_predictor = MultiModalPredictor.load(model_path)
 scores2 = loaded_predictor.evaluate(test_data, metrics=["roc_auc"])
 scores2
 ```

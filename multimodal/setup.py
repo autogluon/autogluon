@@ -30,7 +30,7 @@ install_requires = [
     "requests",
     "jsonschema<=4.8.0",
     "seqeval<=1.2.2",
-    "evaluate<=0.2.2",
+    "evaluate<=0.3.0",
     "accelerate>=0.9,<0.14",
     "timm<0.7.0",
     "torch>=1.9,<1.13",
@@ -53,7 +53,7 @@ install_requires = [
     "nlpaug>=1.1.10,<=1.1.10",
     "nltk>=3.4.5,<4.0.0",
     "openmim>0.1.5,<=0.2.1",
-    "pycocotools>=2.0.4,<=2.0.4",
+    "pycocotools>=2.0.5,<2.0.7;platform_system!='Windows'",
     "defusedxml>=0.7.1,<=0.7.1",
     "albumentations>=1.1.0,<=1.2.0",
 ]

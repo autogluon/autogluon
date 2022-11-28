@@ -39,11 +39,15 @@
 * Update the `stable` documentation to the new release:
   * Delete the `stable` branch.
   * Create new `stable` branch from `0.x.y` branch (They should be identical).
+  * Add and push any change in `docs/README.md` (i.e. space) to ensure `stable` branch is different from `0.x.y`. 
+    * This is required for GH Action to execute CI continuous integration step if `0.x.y` and `stable` hashes are matching.
   * Wait for CI build of the `stable` branch to pass
   * Check that website has updated to align with the release docs.
 * Perform version release by going to https://github.com/awslabs/autogluon/releases and click 'Draft a new release' in top right.
   * Tag release with format `v0.x.y`
   * Name the release identically to the tag (ex: `v0.x.y`)
+  * Select `master` branch as a target
+    * Note: we generally use master unless there are certain commits there we don't want to add to the release
   * DO NOT use the 'Save draft' option during the creation of the release. This breaks GitHub pipelines.
   * Copy-paste the content of `docs/whats_new/v0.x.y.md` into the release notes box.
     * Ensure release notes look correct and make any final formatting fixes.
@@ -63,10 +67,6 @@
 * IF THERE IS A MAJOR ISSUE: Do an emergency hot-fix and a new release ASAP. Releases cannot be deleted, so a new release will have to be done.
 
 After release is published, on the mainline branch:
-* Update header links pointing to the **previous** version in `docs/config.ini` 
-    ```
-    header_links = v0.x.y Documentation, https://auto.gluon.ai/0.x.y/index.html, fas fa-book,
-    ```
 * Update `release` in `docs/config.ini`
 * Increment version in the `VERSION` file
 * Update `ReleaseVersion` image link in `docs/badges.rst`

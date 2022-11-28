@@ -7,18 +7,22 @@ import torch
 from torch import nn
 
 try:
-    import mmcv
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        import mmcv
     from mmcv.ops import RoIPool
     from mmcv.parallel import scatter
     from mmcv.runner import load_checkpoint
-except ImportError:
+except ImportError as e:
     mmcv = None
 
 try:
     import mmdet
     from mmdet.core import get_classes
     from mmdet.models import build_detector
-except ImportError:
+except ImportError as e:
     mmdet = None
 
 from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS

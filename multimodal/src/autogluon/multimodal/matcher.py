@@ -469,6 +469,7 @@ class MultiModalMatcher:
         )
 
         self._fit(**_fit_args)
+        logger.info(f"Models and intermediate outputs are saved to {save_path} ")
         return self
 
     def _get_matcher_df_preprocessor(
@@ -589,14 +590,13 @@ class MultiModalMatcher:
             presets = "siamese_network"
 
         if presets == "siamese_network":
-            if self._config is None:
-                config = get_config(
-                    presets=presets,
-                    overrides=hyperparameters,
-                    extra=["matcher"],
-                )
-            else:
-                config = self._config
+            config = self._config
+            config = get_config(
+                presets=presets,
+                config=config,
+                overrides=hyperparameters,
+                extra=["matcher"],
+            )
 
             if self._query_config is None:
                 query_config = copy.deepcopy(config)
@@ -695,6 +695,7 @@ class MultiModalMatcher:
                 distance_type=config.matcher.distance.type,
             )
 
+        self._config = config
         self._query_config = query_config
         self._response_config = response_config
         self._query_model = query_model
@@ -1136,7 +1137,7 @@ class MultiModalMatcher:
         strategy = "dp"  # default used in inference.
 
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
-        if num_gpus == 1:
+        if num_gpus <= 1:
             strategy = None
 
         precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision)

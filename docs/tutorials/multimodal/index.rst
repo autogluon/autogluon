@@ -2,15 +2,29 @@ Multimodal Prediction
 =====================
 
 For problems on multimodal data tables that contain image, text, and tabular data, AutoGluon provides `MultiModalPredictor` (abbreviated as `AutoMM`)
-that automatically selects and fuses deep learning backbones from popular packages like `timm <https://github.com/rwightman/pytorch-image-models>`_,
+that automatically selects, fuses, and tunes deep learning backbones from popular packages like `timm <https://github.com/rwightman/pytorch-image-models>`_,
 `huggingface/transformers <https://github.com/huggingface/transformers>`_,
-`CLIP <https://github.com/openai/CLIP>`_, etc. You can use it to build models for multimodal problems that involve image, text, and tabular features, e.g., predicting the product price
-based on the items' description, photo, and other metadata, or matching images with text descriptions.
+`CLIP <https://github.com/openai/CLIP>`_, `MMDetection <https://github.com/open-mmlab/mmdetection>`_ etc. You can use AutoMM to build models for
+multimodal problems that involve image, text, tabular features, object bounding boxes, named entities, etc.
 
-In addition, being good at multimodal problems implies that the predictor will be good for **each specific modality**. Thus, you can also use `AutoMM` to solve standard NLP/Vision tasks like sentiment classification,
-intent detection, paraphrase detection, image classification. Moreover, `AutoMM` can be used as a basic model in the multi-layer stack-ensemble of `TabularPredictor`.
+In addition, being good at multimodal problems implies that the predictor will be good for **each specific modality**.
+Thus, you can also use `AutoMM` to solve standard NLP/Vision tasks like sentiment classification,
+intent detection, paraphrase detection, image classification. Moreover, `AutoMM` can be used as a basic model in the multi-layer
+stack-ensemble of `AutoGluon Tabular <https://auto.gluon.ai/stable/tutorials/tabular_prediction/index.html>`_, and is powering up the FT-Transformer in `TabularPredictor`.
 
-In the following, we prepared a few tutorials to help you learn how to use `AutoMM` to solve problems that involve image, text, and tabular data.
+Here are some example use-cases of AutoMM:
+
+- Multilingual text classification :doc:`[Tutorial] <text_prediction/multilingual_text>`
+- Predicting pets' popularity based on their description, photo, and other metadata. :doc:`[Tutorial] <multimodal_prediction/beginner_multimodal>` `[Example] <https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_pawpularity>`_.
+- Predicting the price of book. :doc:`[Tutorial] <multimodal_prediction/multimodal_text_tabular>`.
+- Scoring student's essays. `[Example] <https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_feedback_prize>`_.
+- Image classification. :doc:`[Tutorial] <image_prediction/beginner_image_cls>`.
+- Object detection. :doc:`[Tutorial] <object_detection/quick_start/quick_start_coco>` `[Example] <https://github.com/awslabs/autogluon/tree/master/examples/automm/object_detection>`_.
+- Extracting named entities. :doc:`[Tutorial] <text_prediction/ner>`.
+- Search for relevant text / image via text queries. :doc:`[Tutorial] <matching/index>`.
+
+
+In the following, we decomposed the functionalities of AutoMM and prepared step-by-step guide for each functionality.
 
 
 Text Prediction and Entity Extraction
@@ -21,7 +35,7 @@ Text Prediction and Entity Extraction
       :title: AutoMM for Text Prediction - Quick Start
       :link: text_prediction/beginner_text.html
 
-      How to train high-quality text prediction models with MultiModalPredictor in under 5 minutes.
+      How to train high-quality text prediction models with MultiModalPredictor.
 
    .. card::
       :title: AutoMM for Text Prediction - Multilingual Problems
@@ -59,27 +73,69 @@ Object Detection
 
    .. card::
       :title: Quick Start on a Tiny COCO Format Dataset
-      :link: quick_start/quick_start_coco.html
+      :link: object_detection/quick_start/quick_start_coco.html
 
       How to train high quality object detection model with MultiModalPredictor in under 5 minutes on COCO format dataset.
 
    .. card::
+      :title: Prepare COCO2017 Dataset
+      :link: object_detection/data_preparation/prepare_coco17.html
+
+      How to prepare COCO2017 dataset for object detection.
+
+   .. card::
+      :title: Prepare Pascal VOC Dataset
+      :link: object_detection/data_preparation/prepare_voc.html
+
+      How to prepare Pascal VOC dataset for object detection.
+
+   .. card::
+      :title: Prepare Watercolor Dataset
+      :link: object_detection/data_preparation/prepare_watercolor.html
+
+      How to prepare Watercolor dataset for object detection.
+
+   .. card::
+      :title: Convert VOC Format Dataset to COCO Format
+      :link: object_detection/data_preparation/voc_to_coco.html
+
+      How to convert a dataset from VOC format to COCO format for object detection.
+
+   .. card::
       :title: Fast Finetune on COCO Format Dataset
-      :link: finetune/detection_fast_finetune_coco.html
+      :link: object_detection/finetune/detection_fast_finetune_coco.html
 
       How to fast finetune a pretrained model on a dataset in COCO format.
 
    .. card::
+      :title: High Performance Finetune on COCO Format Dataset
+      :link: object_detection/finetune/detection_high_performance_finetune_coco.html
+
+      How to finetune a pretrained model on a dataset in COCO format with high performance.
+
+   .. card::
       :title: Evaluate Pretrained YOLOv3 on COCO Format Dataset
-      :link: inference/detection_eval_yolov3_coco.html
+      :link: object_detection/evaluation/detection_eval_yolov3_coco.html
 
       How to evaluate the very fast pretrained YOLOv3 model on dataset in COCO format.
 
    .. card::
-      :title: Load A Trained Detector
-      :link: inference/detection_load_predictor.html
+      :title: Evaluate Pretrained Faster R-CNN on COCO Format Dataset
+      :link: object_detection/evaluation/detection_eval_fasterrcnn_coco.html
 
-      How to load and evaluate a trained predictor.
+      How to evaluate the pretrained Faster R-CNN model with high performance on dataset in COCO format.
+
+   .. card::
+      :title: Evaluate Pretrained Deformable DETR on COCO Format Dataset
+      :link: object_detection/evaluation/detection_eval_ddetr_coco.html
+
+      How to evaluate the pretrained Deformable DETR model with higher performance on dataset in COCO format
+
+   .. card::
+      :title: Evaluate Pretrained Faster R-CNN on VOC Format Dataset
+      :link: object_detection/evaluation/detection_eval_fasterrcnn_voc.html
+
+      How to evaluate the pretrained Faster R-CNN model on dataset in VOC format
 
 
 Matching
@@ -111,14 +167,14 @@ Multimodal Classification / Regression
 
    .. card::
       :title: AutoMM for Text + Tabular - Quick Start
-      :link: mulitmodal_prediction/multimodal_text_tabular.html
+      :link: multimodal_prediction/multimodal_text_tabular.html
 
       How MultiModalPredictor can be applied to multimodal data tables with a mix of text, numerical, and
       categorical columns. Here, we train a model to predict the price of books.
 
    .. card::
       :title: AutoMM for Image + Text + Tabular - Quick Start
-      :link: mulitmodal_prediction/beginner_multimodal.html
+      :link: multimodal_prediction/beginner_multimodal.html
 
       How to use MultiModalPredictor to train a model that predicts the adoption speed of pets.
 
@@ -133,7 +189,19 @@ Advanced Topics
 
       How to take advantage of larger foundation models with the help of parameter-efficient finetuning.
       In the tutorial, we will use combine IA^3, BitFit, and gradient checkpointing to finetune FLAN-T5-XL.
- 
+
+   .. card::
+      :title: HPO in AutoMM
+      :link: advanced_topics/hyperparameter_optimization.html
+
+      How to do hyperparameter optimization in AutoMM.
+
+   .. card::
+      :title: Knowledge Distillation in AutoMM
+      :link: advanced_topics/model_distillation.html
+
+      How to do knowledge distillation in AutoMM.
+
    .. card::
       :title: Customize AutoMM
       :link: advanced_topics/customization.html
@@ -142,7 +210,7 @@ Advanced Topics
 
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 2
    :hidden:
 
    text_prediction/index

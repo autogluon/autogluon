@@ -33,8 +33,8 @@ class EmbedNet(nn.Module):
             params = self._set_params(**kwargs)
             # adpatively specify network architecture based on training dataset
             self.from_logits = False
-            self.has_vector_features = train_dataset.has_vector_features()
-            self.has_embed_features = train_dataset.num_embed_features() > 0
+            self.has_vector_features = train_dataset.has_vector_features
+            self.has_embed_features = train_dataset.has_embed_features
             if self.has_embed_features:
                 num_categs_per_feature = train_dataset.getNumCategoriesEmbeddings()
                 embed_dims = get_embed_sizes(train_dataset, params, num_categs_per_feature)
@@ -154,10 +154,12 @@ class EmbedNet(nn.Module):
 
     def forward(self, data_batch):
         input_data = []
+        input_offset = 0
         if self.has_vector_features:
-            input_data.append(data_batch['vector'].to(self.device))
+            input_data.append(data_batch[0].to(self.device))
+            input_offset += 1
         if self.has_embed_features:
-            embed_data = data_batch['embed']
+            embed_data = data_batch[input_offset]
             for i in range(len(self.embed_blocks)):
                 input_data.append(self.embed_blocks[i](embed_data[i].to(self.device)))
 
@@ -227,7 +229,7 @@ class EmbedNet(nn.Module):
         # train mode
         self.train()
         predict_data = self(data_batch)
-        target_data = data_batch['label'].to(self.device)
+        target_data = data_batch[-1].to(self.device)
         if self.problem_type in [BINARY, MULTICLASS]:
             target_data = target_data.type(torch.long)  # Windows default int type is int32. Need to explicit convert to Long.
         if self.problem_type == QUANTILE:

@@ -1,5 +1,5 @@
 Object Detection
-=========
+================
 
 Pre-requisite
 -------------
@@ -19,6 +19,7 @@ For additional support, please refer to official instructions for mmdet_ and mmc
 .. _mmdet: https://mmdetection.readthedocs.io/en/v2.2.1/install.html
 .. _mmcv-full: https://mmcv.readthedocs.io/en/latest/get_started/installation.html
 
+
 Quick Start
 ------------------
 .. container:: cards
@@ -28,7 +29,6 @@ Quick Start
       :link: quick_start/quick_start_coco.html
 
       How to train high quality object detection model with MultiModalPredictor in under 5 minutes on COCO format dataset.
-
 
 Data Preparation
 ------------------
@@ -76,17 +76,6 @@ Finetune
       How to finetune a pretrained model on a dataset in COCO format with high performance.
 
 
-Inference
-------------------
-.. container:: cards
-
-   .. card::
-      :title: Load A Trained Detector
-      :link: inference/detection_load_predictor.html
-
-      How to load and evaluate a trained predictor
-
-
 Evaluation
 ------------------
 .. container:: cards
@@ -117,7 +106,7 @@ Evaluation
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :hidden:
 
    quick_start/index

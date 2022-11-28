@@ -106,21 +106,22 @@ def test_clip_zero_shot():
 
 
 @pytest.mark.parametrize(
-    "checkpoint_name",
+    "checkpoint_name,num_gpus",
     [
-        "swin_tiny_patch4_window7_224",
-        "vit_tiny_patch16_224",
-        "resnet18",
-        "legacy_seresnet18",
+        ("swin_tiny_patch4_window7_224", -1),
+        ("vit_tiny_patch16_224", -1),
+        ("resnet18", 0),
+        ("legacy_seresnet18", -1),
     ],
 )
-def test_timm_zero_shot(checkpoint_name):
+def test_timm_zero_shot(checkpoint_name, num_gpus):
     cat_image_name, dog_image_name = download_sample_images()
 
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.names": ["timm_image"],
             "model.timm_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": num_gpus,
         },
         problem_type="zero_shot_image_classification",
     )

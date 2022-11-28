@@ -1,9 +1,15 @@
-import boto3
 import os
+
+import boto3
 import pytest
 
 
 class CloudTestHelper:
+
+    cpu_training_image = "369469875935.dkr.ecr.us-east-1.amazonaws.com/autogluon-nightly-training:cpu-latest"
+    gpu_training_image = "369469875935.dkr.ecr.us-east-1.amazonaws.com/autogluon-nightly-training:gpu-latest"
+    cpu_inference_image = "369469875935.dkr.ecr.us-east-1.amazonaws.com/autogluon-nightly-inference:cpu-latest"
+    gpu_inference_image = "369469875935.dkr.ecr.us-east-1.amazonaws.com/autogluon-nightly-inference:gpu-latest"
 
     @staticmethod
     def prepare_data(*args):
@@ -14,9 +20,9 @@ class CloudTestHelper:
         args: str
             names of files to download
         """
-        s3 = boto3.client('s3')
+        s3 = boto3.client("s3")
         for arg in args:
-            s3.download_file('autogluon-cloud', arg, os.path.basename(arg))
+            s3.download_file("autogluon-cloud", arg, os.path.basename(arg))
 
     @staticmethod
     def test_endpoint(cloud_predictor, test_data, **predict_real_time_kwargs):
@@ -34,7 +40,7 @@ class CloudTestHelper:
         cloud_predictor_no_train,
         test_data,
         image_path=None,
-        fit_instance_type='ml.m5.2xlarge',
+        fit_instance_type="ml.m5.2xlarge",
         fit_kwargs=None,
         deploy_kwargs=None,
         predict_real_time_kwargs=None,
@@ -48,13 +54,13 @@ class CloudTestHelper:
             predictor_fit_args=predictor_fit_args,
             image_path=image_path,
             instance_type=fit_instance_type,
-            **fit_kwargs
+            **fit_kwargs,
         )
         info = cloud_predictor.info()
-        assert info['local_output_path'] is not None
-        assert info['cloud_output_path'] is not None
-        assert info['fit_job']['name'] is not None
-        assert info['fit_job']['status'] == 'Completed'
+        assert info["local_output_path"] is not None
+        assert info["cloud_output_path"] is not None
+        assert info["fit_job"]["name"] is not None
+        assert info["fit_job"]["status"] == "Completed"
 
         if deploy_kwargs is None:
             deploy_kwargs = dict()
@@ -71,17 +77,17 @@ class CloudTestHelper:
         cloud_predictor.cleanup_deployment()
 
         info = cloud_predictor.info()
-        assert info['local_output_path'] is not None
-        assert info['cloud_output_path'] is not None
-        assert info['fit_job']['name'] is not None
-        assert info['fit_job']['status'] == 'Completed'
+        assert info["local_output_path"] is not None
+        assert info["cloud_output_path"] is not None
+        assert info["fit_job"]["name"] is not None
+        assert info["fit_job"]["status"] == "Completed"
 
         if predict_kwargs is None:
             predict_kwargs = dict()
         if not skip_predict:
             cloud_predictor.predict(test_data, **predict_kwargs)
             info = cloud_predictor.info()
-            assert info['recent_transform_job']['status'] == 'Completed'
+            assert info["recent_transform_job"]["status"] == "Completed"
 
         # Test deploy with already trained predictor
         trained_predictor_path = cloud_predictor._fit_job.get_output_path()
@@ -91,7 +97,8 @@ class CloudTestHelper:
         if not skip_predict:
             cloud_predictor_no_train.predict(test_data, predictor_path=trained_predictor_path, **predict_kwargs)
             info = cloud_predictor_no_train.info()
-            assert info['recent_transform_job']['status'] == 'Completed'
+            assert info["recent_transform_job"]["status"] == "Completed"
+
 
 @pytest.fixture
 def test_helper():

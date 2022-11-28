@@ -1,6 +1,8 @@
 # Object Detection - Quick Start
 :label:`sec_object_detection_quick`
 
+**Note**: AutoGluon ObjectDetector will be deprecated in v0.7. Please try our [AutoGluon MultiModalPredictor](https://auto.gluon.ai/stable/tutorials/multimodal/object_detection/quick_start/quick_start_coco.html) for more functionalities and better support for your object detection  need.
+
 Object detection is the process of identifying and localizing objects in an image and is an important task in computer vision. Follow this tutorial to learn how to use AutoGluon for object detection.
 
 **Tip**: If you are new to AutoGluon, review :ref:`sec_imgquick` first to learn the basics of the AutoGluon API.
