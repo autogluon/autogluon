@@ -247,7 +247,6 @@ def create_fusion_data_processors(
             if data_types is not None and IMAGE in data_types:
                 data_types.remove(IMAGE)
 
-
         if requires_label:
             # each model has its own label processor
             label_processor = create_data_processor(
