@@ -44,12 +44,11 @@ def tutorial_script_for_finetune_fast_voc_in_coco_format():
         sample_data_path=train_path,
     )
 
-
     start = time.time()
     predictor.fit(
         train_path,
         hyperparameters={
-            "optimization.learning_rate": 1e-4, # we use two stage and detection head has 100x lr
+            "optimization.learning_rate": 1e-4,  # we use two stage and detection head has 100x lr
             "optimization.max_epochs": 5,
             "env.per_gpu_batch_size": 32,  # decrease it when model is large
         },
@@ -83,13 +82,12 @@ def tutorial_script_for_finetune_fast_pothole_in_coco_format():
         sample_data_path=train_path,
     )
 
-
     start = time.time()
     predictor.fit(
         train_path,
         tuning_data=val_path,
         hyperparameters={
-            "optimization.learning_rate": 2e-4, # we use two stage and detection head has 100x lr
+            "optimization.learning_rate": 2e-4,  # we use two stage and detection head has 100x lr
             "optimization.max_epochs": 30,
             "env.per_gpu_batch_size": 32,  # decrease it when model is large
         },
@@ -129,7 +127,7 @@ def tutorial_script_for_finetune_high_performance_pothole_in_coco_format():
         train_path,
         tuning_data=val_path,
         hyperparameters={
-            "optimization.learning_rate": 5e-6, # we use two stage and detection head has 100x lr
+            "optimization.learning_rate": 5e-6,  # we use two stage and detection head has 100x lr
             "optimization.max_epochs": 1,
             "env.per_gpu_batch_size": 4,  # decrease it when model is large
         },
@@ -173,7 +171,7 @@ def tutorial_script_for_finetune_high_performance_voc_in_coco_format():
     predictor.fit(
         train_path,
         hyperparameters={
-            "optimization.learning_rate": 1e-5, # we use two stage and detection head has 100x lr
+            "optimization.learning_rate": 1e-5,  # we use two stage and detection head has 100x lr
             "optimization.max_epochs": 20,
             "env.per_gpu_batch_size": 2,  # decrease it when model is large
         },
@@ -214,7 +212,7 @@ def detection_train(
         train_path,
         tuning_data=val_path,
         hyperparameters={
-            "optimization.learning_rate": lr, # we use two stage and lr_mult=100 for detection
+            "optimization.learning_rate": lr,  # we use two stage and lr_mult=100 for detection
             "optimization.max_epochs": epochs,
             "env.per_gpu_batch_size": per_gpu_batch_size,  # decrease it when model is large
         },
@@ -228,9 +226,7 @@ def detection_train(
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--train_path", default="./VOCdevkit/VOC2007/Annotations/train_cocoformat.json", type=str
-    )
+    parser.add_argument("--train_path", default="./VOCdevkit/VOC2007/Annotations/train_cocoformat.json", type=str)
     parser.add_argument("--val_path", default=None, type=str)
     parser.add_argument("--test_path", default=None, type=str)
     parser.add_argument("--checkpoint_name", default="yolov3_mobilenetv2_320_300e_coco", type=str)
@@ -253,6 +249,6 @@ def main():
         per_gpu_batch_size=args.per_gpu_batch_size,
     )
 
+
 if __name__ == "__main__":
-    # main()
-    tutorial_script_for_finetune_fast_pothole_in_coco_format()
+    main()
