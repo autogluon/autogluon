@@ -514,13 +514,10 @@ def VOCName2Idx(name):
     return VOC_NAME_TO_IDX[name]
 
 
-def get_image_name_num(path):
-    if "/potholes" in path:
-        start_idx = path.rfind("/potholes") + 9
-    else:
-        start_idx = path.rfind("/") + 1
+def get_image_filename(path):
+    start_idx = path.rfind("/") + 1
     end_idx = path.rindex(".")
-    return int(path[start_idx:end_idx])
+    return path[start_idx:end_idx]
 
 
 class COCODataset:
@@ -531,17 +528,17 @@ class COCODataset:
         with open(anno_file, "r") as f:
             d = json.load(f)
         image_list = d["images"]
-        img_namenum_list = []
+        img_filename_list = []
         img_id_list = []
         for img in image_list:
-            img_namenum_list.append(get_image_name_num(img["file_name"]))
+            img_filename_list.append(get_image_filename(img["file_name"]))
             img_id_list.append(int(img["id"]))
-        self.image_namenum_to_id = dict(zip(img_namenum_list, img_id_list))
+        self.image_filename_to_id = dict(zip(img_filename_list, img_id_list))
 
         self.category_ids = [cat["id"] for cat in d["categories"]]
 
     def get_image_id_from_path(self, image_path):
-        return self.image_namenum_to_id[get_image_name_num(image_path)]
+        return self.image_filename_to_id[get_image_filename(image_path)]
 
     def save_result(self, ret, data, save_path):
         coco_format_result = []
