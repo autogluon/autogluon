@@ -158,10 +158,6 @@ def create_data_processor(
     elif data_type == ROIS:
         data_processor = RoisProcessor(
             model=model,
-            train_transform_types=model_config.train_transform_types,
-            val_transform_types=model_config.val_transform_types,
-            norm_type=model_config.image_norm,
-            size=model_config.image_size,
             max_img_num_per_col=model_config.max_img_num_per_col,
             missing_value_strategy=config.data.image.missing_value_strategy,
         )
