@@ -768,7 +768,7 @@ class OrdinalMergeRaresHandleUnknownEncoder(_BaseEncoder):
         X = np.array(X).tolist()  # converts all elements in X to the same type (i.e. cannot mix floats, ints, and str)
         self._fit(X, handle_unknown='ignore')
 
-        self.categories_as_sets_ = [set(categories) for categories in self.categories_]
+        self.categories_as_sets_ = [np.array(list(set(categories))) for categories in self.categories_]
         # new level introduced to account for unknown categories, always = 1 + total number of categories seen during training
         self.categories_unknown_level_ = [min(len(categories), self.max_levels) for categories in self.categories_]
         self.categories_len_ = [len(categories) for categories in self.categories_]
@@ -789,13 +789,12 @@ class OrdinalMergeRaresHandleUnknownEncoder(_BaseEncoder):
         
         """
         X_og_array = np.array(X)  # original X array before transform
-        X = X_og_array.tolist()  # converts all elements in X to the same type (i.e. cannot mix floats, ints, and str)
         X_int, _ = self._transform(X, handle_unknown='ignore')  # will contain zeros for 0th category as well as unknown values.
 
         for i in range(X_int.shape[1]):
             X_col_data = X_og_array[:, i]
             cat_set = self.categories_as_sets_[i]
-            unknown_elements = np.array([cat not in cat_set for cat in X_col_data.tolist()])
+            unknown_elements = np.isin(X_col_data, cat_set, invert=True)
             X_int[unknown_elements, i] = self.categories_unknown_level_[i]  # replace entries with unknown categories with feature_i_numlevels + 1 value. Do NOT modify self.categories_
 
         return X_int.astype(self.dtype, copy=False)

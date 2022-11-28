@@ -31,7 +31,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     """
 
     # Constants used throughout this class:
-    unique_category_str = '!missing!'  # string used to represent missing values and unknown categories for categorical features.
+    unique_category_str = np.nan  # string used to represent missing values and unknown categories for categorical features.
     params_file_name = 'net.params'  # Stores parameters of final network
     temp_file_name = 'temp_net.params'  # Stores temporary network parameters (eg. during the course of training)
 

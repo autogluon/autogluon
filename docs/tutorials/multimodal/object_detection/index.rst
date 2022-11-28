@@ -30,7 +30,6 @@ Quick Start
 
       How to train high quality object detection model with MultiModalPredictor in under 5 minutes on COCO format dataset.
 
-
 Data Preparation
 ------------------
 .. container:: cards
@@ -75,23 +74,6 @@ Finetune
       :link: finetune/detection_high_performance_finetune_coco.html
 
       How to finetune a pretrained model on a dataset in COCO format with high performance.
-
-
-Inference
-------------------
-.. container:: cards
-
-   .. card::
-      :title: Inference using a pretrained model - COCO dataset
-      :link: inference/detection_inference_coco.html
-
-      How to inference with a pretrained model on COCO dataset
-
-   .. card::
-      :title: Inference using a pretrained model - VOC dataset
-      :link: inference/detection_inference_voc.html
-
-      How to inference with a pretrained model on VOC dataset
 
 
 Evaluation

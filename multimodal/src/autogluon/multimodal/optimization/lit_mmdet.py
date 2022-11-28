@@ -16,7 +16,6 @@ try:
 except ImportError as e:
     import warnings
 
-    warnings.warn(f"Encountered error while import mmdet and mmcv: {e}")
     pass
 
 from ..constants import AUTOMM, IMAGE, LABEL

@@ -104,17 +104,16 @@ from .optimization.utils import (
     get_norm_layer_param_names,
     get_trainable_params_efficient_finetune,
 )
-from .presets import matcher_presets
 from .utils import (
     AutoMMModelCheckpoint,
     AutoMMModelCheckpointIO,
-    COCODataset,
     CustomUnpickler,
     DDPCacheWriter,
     LogFilter,
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
+    check_if_packages_installed,
     cocoeval,
     compute_inference_batch_size,
     compute_num_gpus,
@@ -124,15 +123,14 @@ from .utils import (
     data_to_df,
     extract_from_output,
     filter_search_space,
-    from_coco,
     from_coco_or_voc,
+    from_dict,
     get_config,
     get_detection_classes,
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_mixup,
     get_onnx_input,
-    getCOCOCatIDs,
     hpo_trial,
     infer_batch,
     infer_dtypes_by_model_names,
@@ -145,7 +143,6 @@ from .utils import (
     load_text_tokenizers,
     logits_to_prob,
     modify_duplicate_model_names,
-    process_save_path,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
@@ -368,6 +365,8 @@ class MultiModalPredictor:
             problem_type = problem_property.name
             if problem_property.experimental:
                 warnings.warn(f"problem_type='{problem_type}' is currently experimental.", UserWarning)
+
+        check_if_packages_installed(problem_type=problem_type)
 
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
@@ -2336,11 +2335,16 @@ class MultiModalPredictor:
                 id_mappings=id_mappings,
                 as_pandas=as_pandas,
             )
-        detection_data_path = None
         if self._problem_type == OBJECT_DETECTION:
             if isinstance(data, str):
-                detection_data_path = data
                 data = from_coco_or_voc(data, "test")
+            elif isinstance(data, dict):
+                data = from_dict(data)
+            else:
+                assert isinstance(
+                    data, pd.DataFrame
+                ), "TypeError: Expected data type to be a filepath, a folder or a dictionary, but got {}".format(data)
+
             if self._label_column not in data:
                 self._label_column = None
 
@@ -2375,9 +2379,12 @@ class MultiModalPredictor:
                 logits = extract_from_output(outputs=outputs, ret_type=ret_type)
 
             if self._df_preprocessor:
-                pred = self._df_preprocessor.transform_prediction(
-                    y_pred=logits,
-                )
+                if ret_type == BBOX:
+                    pred = logits
+                else:
+                    pred = self._df_preprocessor.transform_prediction(
+                        y_pred=logits,
+                    )
             else:
                 if isinstance(logits, (torch.Tensor, np.ndarray)) and logits.ndim == 2:
                     pred = logits.argmax(axis=1)

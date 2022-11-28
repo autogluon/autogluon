@@ -24,6 +24,7 @@ from .data import (
 )
 from .download import download, is_url
 from .environment import (
+    check_if_packages_installed,
     compute_inference_batch_size,
     compute_num_gpus,
     infer_precision,
@@ -46,6 +47,7 @@ from .object_detection import (
     cocoeval,
     from_coco,
     from_coco_or_voc,
+    from_dict,
     from_voc,
     get_detection_classes,
     get_image_name_num,
