@@ -28,10 +28,10 @@ DEPENDENT_PACKAGES = {
     'Pillow': '>=9.0.1,<9.1.0',
     'timm': '>=0.5.4,<0.7.0',
 } if not LITE_MODE else {
-    'numpy': '>=1.21,<1.23',
+    'numpy': '>=1.21,<1.24',
     'pandas': '>=1.2.5,!=1.4.0,<=1.5.0',
     'scikit-learn': '>=1.0.0,<=1.1.1',
-    'scipy': '>=1.5.4,<=1.9.1',
+    'scipy': '>=1.5.4,<=1.9.3',
     'tqdm': '>=4.38.0',
 }
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}

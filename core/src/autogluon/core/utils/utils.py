@@ -40,6 +40,7 @@ class ResourceManager():
         return psutil.cpu_count(logical=logical)
     
     @staticmethod
+    @disable_if_lite_mode(ret=0)
     def get_gpu_count_all():
         num_gpus = ResourceManager._get_gpu_count_cuda()
         if num_gpus == 0:
@@ -93,6 +94,12 @@ class ResourceManager():
     def get_memory_size():
         import psutil
         return bytes_to_mega_bytes(psutil.virtual_memory().total)
+
+    @staticmethod
+    @disable_if_lite_mode(ret=1073741824)
+    def get_available_virtual_mem():
+        import psutil
+        return psutil.virtual_memory().available
     
     @staticmethod
     def get_available_disk_size():
@@ -107,6 +114,7 @@ class ResourceManager():
             return None
     
     @staticmethod
+    @disable_if_lite_mode(ret=0)
     def _get_gpu_count_cuda():
         # FIXME: Sometimes doesn't detect GPU on Windows
         # FIXME: Doesn't ensure the GPUs are actually usable by the model (MXNet, PyTorch, etc.)

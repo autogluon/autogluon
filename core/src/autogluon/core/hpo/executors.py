@@ -16,6 +16,7 @@ from ..ray.resources_calculator import ResourceCalculator
 from ..scheduler.scheduler_factory import scheduler_factory
 
 from typing import TYPE_CHECKING
+from autogluon.core.utils import ResourceManager
 from autogluon.common.utils.lite import disable_if_lite_mode
 
 if TYPE_CHECKING:
@@ -184,14 +185,9 @@ class HpoExecutor(ABC):
             num_jobs_in_parallel_with_mem = math.inf
 
             if initialized_model.estimate_memory_usage is not None:
-                @disable_if_lite_mode(ret=num_jobs_in_parallel_with_mem)
-                def _update_num_jobs_in_parallel_with_mem():
-                    import psutil
-                    model_estimate_memory_usage = initialized_model.estimate_memory_usage(**kwargs)
-                    total_memory_available = psutil.virtual_memory().available
-                    return total_memory_available // model_estimate_memory_usage
-
-                num_jobs_in_parallel_with_mem = _update_num_jobs_in_parallel_with_mem()
+                model_estimate_memory_usage = initialized_model.estimate_memory_usage(**kwargs)
+                total_memory_available = ResourceManager.get_available_virtual_mem()
+                num_jobs_in_parallel_with_mem = total_memory_available // model_estimate_memory_usage
 
             num_jobs_in_parallel_with_cpu = num_cpus // minimum_model_num_cpus
             num_jobs_in_parallel_with_gpu = math.inf
