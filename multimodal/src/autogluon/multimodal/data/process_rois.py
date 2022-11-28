@@ -34,16 +34,8 @@ try:
 except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
-from ..constants import (
-    AUTOMM,
-    COLUMN,
-    IMAGE,
-    IMAGE_VALID_NUM,
-    MMDET_IMAGE,
-    MMOCR,
-    MMOCR_TEXT_DET,
-    MMOCR_TEXT_RECOG,
-)
+from ..constants import AUTOMM, COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
+
 from .collator import Pad, Stack
 from .utils import is_rois_input
 
