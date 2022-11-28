@@ -1,6 +1,7 @@
 import ast
 import logging
 import warnings
+from io import BytesIO
 from typing import Dict, List, Optional, Union
 
 import numpy as np
@@ -52,6 +53,8 @@ from ..constants import (
     CLIP_IMAGE_STD,
     COLUMN,
     IMAGE,
+    IMAGE_BYTEARRAY,
+    IMAGE_PATH,
     IMAGE_VALID_NUM,
     MMDET_IMAGE,
     MMLAB_MODELS,
@@ -396,7 +399,8 @@ class ImageProcessor:
 
     def process_one_sample(
         self,
-        image_paths: Dict[str, List[str]],
+        image_features: Dict[str, Union[List[str], List[bytearray]]],
+        feature_modalities: Dict[str, List[str]],
         is_training: bool,
     ) -> Dict:
         """
@@ -421,19 +425,20 @@ class ImageProcessor:
         ret = {}
         column_start = 0
         if self.prefix.lower().startswith(MMLAB_MODELS):
-            for per_col_name, per_col_content in image_paths.items():
+            for per_col_name, per_col_content in image_features.items():
                 if is_rois_input(per_col_content):
                     rois = np.array(per_col_content)
                     # TODO: add gt masks
                     mm_data["ann_info"] = dict(bboxes=rois[:, :4], labels=rois[:, 4], masks=[])
                 else:
-                    with PIL.Image.open(per_col_content[0]) as img:
-                        mm_data["img_info"] = dict(filename=per_col_content[0], height=img.height, width=img.width)
+                    if feature_modalities.get(per_col_name) == IMAGE_PATH:
+                        with PIL.Image.open(per_col_content[0]) as img:
+                            mm_data["img_info"] = dict(filename=per_col_content[0], height=img.height, width=img.width)
             if self.requires_column_info:
                 pass  # TODO
         else:
-            for per_col_name, per_col_image_paths in image_paths.items():
-                for img_path in per_col_image_paths[: self.max_img_num_per_col]:
+            for per_col_name, per_col_image_features in image_features.items():
+                for img_feature in per_col_image_features[: self.max_img_num_per_col]:
                     with warnings.catch_warnings():
                         warnings.filterwarnings(
                             "ignore",
@@ -443,7 +448,11 @@ class ImageProcessor:
                         )
                         is_zero_img = False
                         try:
-                            with PIL.Image.open(img_path) as img:
+                            if feature_modalities.get(per_col_name) == IMAGE_BYTEARRAY:
+                                image_feature = BytesIO(img_feature)
+                            else:
+                                image_feature = img_feature
+                            with PIL.Image.open(image_feature) as img:
                                 img = img.convert("RGB")
                         except Exception as e:
                             if self.missing_value_strategy.lower() == "zero":
@@ -506,7 +515,7 @@ class ImageProcessor:
         """
         images = {k: [v] if isinstance(v, str) else v for k, v in images.items()}
 
-        return self.process_one_sample(images, is_training)
+        return self.process_one_sample(images, feature_modalities, is_training)
 
     def __getstate__(self):
         odict = self.__dict__.copy()  # get attribute dictionary
