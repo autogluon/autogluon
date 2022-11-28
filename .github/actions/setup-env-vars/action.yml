@@ -10,7 +10,7 @@ runs:
         SHA: ${{ github.sha }}
         branch: ${{ github.ref }}
         git_repo: ${{ github.repository }}
-        short_sha: $(git rev-parse --short "$SHA")
+        short_sha: $(git rev-parse --short "${{ github.sha }}")
         pr_number: ""
       run: |
         echo "BRANCH=$branch" >> $GITHUB_ENV
@@ -24,7 +24,7 @@ runs:
         SHA: ${{ github.event.pull_request.head.sha }}
         branch: ${{ github.event.pull_request.head.ref }}
         git_repo: ${{ github.event.pull_request.head.repo.full_name }}
-        short_sha: $(git rev-parse --short "$SHA")
+        short_sha: $(git rev-parse --short "${{ github.event.pull_request.head.sha }}")
         pr_number: PR-${{ github.event.number }}
       run: |
 
