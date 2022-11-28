@@ -6,13 +6,13 @@ runs:
     - name: Get Commit SHA(For push)
       if: ${{ github.event_name == 'push' }}
       shell: bash
+      env:
+        SHA: ${{ github.sha }}
+        branch: ${{ github.ref }}
+        git_repo: ${{ github.repository }}
+        short_sha: $(git rev-parse --short "$SHA")
+        pr_number: ""
       run: |
-        SHA='${{ github.sha }}'
-        branch='${{ github.ref }}'
-        git_repo='${{ github.repository }}'
-        short_sha=$(git rev-parse --short "$SHA")
-        pr_number="" 
-
         echo "BRANCH=$branch" >> $GITHUB_ENV
         echo "GIT_REPO=$git_repo" >> $GITHUB_ENV
         echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
@@ -20,12 +20,13 @@ runs:
     - name: Get Commit SHA(For pull request)
       if: ${{ github.event_name == 'pull_request_target' }}
       shell: bash
+      env:
+        SHA: ${{ github.event.pull_request.head.sha }}
+        branch: ${{ github.event.pull_request.head.ref }}
+        git_repo: ${{ github.event.pull_request.head.repo.full_name }}
+        short_sha: $(git rev-parse --short "$SHA")
+        pr_number: PR-${{ github.event.number }}
       run: |
-        SHA='${{ github.event.pull_request.head.sha }}'
-        branch='${{ github.event.pull_request.head.ref }}'
-        git_repo='${{ github.event.pull_request.head.repo.full_name }}'
-        short_sha=$(git rev-parse --short "$SHA")
-        pr_number=PR-'${{ github.event.number }}'
 
         echo "BRANCH=$branch" >> $GITHUB_ENV
         echo "GIT_REPO=$git_repo" >> $GITHUB_ENV
