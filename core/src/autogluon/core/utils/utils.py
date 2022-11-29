@@ -114,7 +114,6 @@ class ResourceManager():
             return None
     
     @staticmethod
-    @disable_if_lite_mode(ret=0)
     def _get_gpu_count_cuda():
         # FIXME: Sometimes doesn't detect GPU on Windows
         # FIXME: Doesn't ensure the GPUs are actually usable by the model (MXNet, PyTorch, etc.)
