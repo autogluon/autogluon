@@ -162,6 +162,7 @@ def is_numerical_column(
 def is_imagepath_column(
     data: pd.Series,
     col_name: str,
+    sample_n: Optional[int] = 500,
 ) -> bool:
     """
     Identify if a column is one image-path column.
@@ -179,7 +180,7 @@ def is_imagepath_column(
     -------
     Whether the column is an image-path column.
     """
-    sample_num = min(len(data), 500)
+    sample_num = min(len(data), sample_n)
     data = data.sample(n=sample_num, random_state=0)
     data = data.apply(lambda ele: str(ele).split(";")).tolist()
     failure_count = 0
@@ -217,6 +218,7 @@ def is_imagepath_column(
 def is_imagebytearray_column(
     data: pd.Series,
     col_name: str,
+    sample_n: Optional[int] = 500,
 ) -> bool:
     """
     Identify if a column contains valid image bytearray.
@@ -232,7 +234,7 @@ def is_imagebytearray_column(
     -------
     Whether the column is an image-bytearray column.
     """
-    sample_num = min(len(data), 500)
+    sample_num = min(len(data), sample_n)
     data = data.sample(n=sample_num, random_state=0)
     data = data.tolist()
     failure_count = 0
