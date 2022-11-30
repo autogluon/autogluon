@@ -229,6 +229,8 @@ def is_imagebytearray_column(
         One column of a multimodal pd.DataFrame for training.
     col_name
         Name of column.
+    sample_n
+        Number of sample images to open for sanity check.
 
     Returns
     -------
@@ -259,7 +261,7 @@ def is_imagebytearray_column(
         if failure_ratio > 0:
             warnings.warn(
                 f"Among {sample_num} sampled images in column '{col_name}', "
-                f"{failure_ratio:.0%} images can't be open. "
+                f"{failure_count} images can't be open. "
                 "You may need to thoroughly check your data to see the percentage of missing images, "
                 "and estimate the potential influence. By default, we skip the samples with missing images. "
                 "You can also set hyperparameter 'data.image.missing_value_strategy' to be 'zero', "
