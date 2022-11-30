@@ -402,6 +402,7 @@ class ImageProcessor:
         image_features: Dict[str, Union[List[str], List[bytearray]]],
         feature_modalities: Dict[str, List[str]],
         is_training: bool,
+        image_mode: Optional[str] = "RGB",
     ) -> Dict:
         """
         Read images, process them, and stack them. One sample can have multiple images,
@@ -409,11 +410,16 @@ class ImageProcessor:
 
         Parameters
         ----------
-        image_paths
+        image_features
             One sample may have multiple image columns in a pd.DataFrame and multiple images
             inside each image column.
+        feature_modalities
+            What modality each column belongs to.
         is_training
             Whether to process images in the training mode.
+        image_mode
+            A string which defines the type and depth of a pixel in the image.
+            For example, RGB, RGBA, CMYK, and etc.
 
         Returns
         -------
@@ -453,11 +459,11 @@ class ImageProcessor:
                             else:
                                 image_feature = img_feature
                             with PIL.Image.open(image_feature) as img:
-                                img = img.convert("RGB")
+                                img = img.convert(image_mode)
                         except Exception as e:
                             if self.missing_value_strategy.lower() == "zero":
                                 logger.debug(f"Using a zero image due to '{e}'")
-                                img = PIL.Image.new("RGB", (self.size, self.size), color=0)
+                                img = PIL.Image.new(image_mode, (self.size, self.size), color=0)
                                 is_zero_img = True
                             else:
                                 raise e

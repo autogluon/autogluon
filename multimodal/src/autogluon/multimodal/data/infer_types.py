@@ -85,8 +85,8 @@ def is_categorical_column(
                 oov_ratio_threshold = 0
                 ratio = 0.1
         threshold = min(int(len(data) * ratio), threshold)
-        data_value_counts = data.value_counts(dropna=False)
         try:
+            data_value_counts = data.value_counts(dropna=False)
             key_set = set(data_value_counts.keys())
             if len(data_value_counts) < threshold:
                 valid_value_counts = valid_data.value_counts(dropna=False)
@@ -378,10 +378,10 @@ def infer_id_mappings_types(id_mappings: Union[Dict[str, Dict], Dict[str, pd.Ser
             )
         if is_imagepath_column(per_id_mappings, col_name=per_name):
             id_mappings_types[per_name] = IMAGE_PATH
-        if is_imagebytearray_column(per_id_mappings, col_name=per_name):
-            id_mappings_types[per_name] = IMAGE_BYTEARRAY
         elif is_text_column(per_id_mappings):
             id_mappings_types[per_name] = TEXT
+        elif is_imagebytearray_column(per_id_mappings, col_name=per_name):
+            id_mappings_types[per_name] = IMAGE_BYTEARRAY
         else:
             raise ValueError(
                 f"{per_name} in the id_mappings has an invalid type. Currently, we only support image and text types."
@@ -474,10 +474,10 @@ def infer_column_types(
             column_types[col_name] = NUMERICAL
         elif is_imagepath_column(data[col_name], col_name):  # Infer image-path column
             column_types[col_name] = IMAGE_PATH
-        elif is_imagebytearray_column(data[col_name], col_name):  # Infer image-bytearray column
-            column_types[col_name] = IMAGE_BYTEARRAY
         elif is_text_column(data[col_name]):  # Infer text column
             column_types[col_name] = TEXT
+        elif is_imagebytearray_column(data[col_name], col_name):  # Infer image-bytearray column
+            column_types[col_name] = IMAGE_BYTEARRAY
         else:  # All the other columns are treated as categorical
             column_types[col_name] = CATEGORICAL
 
