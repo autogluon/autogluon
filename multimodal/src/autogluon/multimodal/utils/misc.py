@@ -1,5 +1,6 @@
 import logging
 import os
+from random import randint
 
 import numpy as np
 import pandas as pd
@@ -74,3 +75,114 @@ def shopee_dataset(download_dir):
     train_data["image"] = train_data["image"].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
     test_data["image"] = test_data["image"].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
     return train_data, test_data
+
+
+class NERVisualizer:
+    """An NER visualizer that renders NER prediction as a string of HTML
+    inline to any Python class Jupyter notebooks.
+    """
+
+    def __init__(self, pred, sent):
+        self.pred = pred
+        self.sent = sent
+        self.colors = {}
+        self.spans = self.merge_spans()
+
+    def merge_spans(self):
+        """Merge subsequent predictions."""
+        spans = {}
+        last_start = -1
+        last_end = -1
+        last_label = ""
+        for entity in self.pred:
+            entity_group = entity["entity_group"]
+            start = entity["start"]
+            last = end = entity["end"]
+            if (
+                last_start >= 0
+                and (not entity_group.startswith("B-"))
+                and (
+                    (entity_group.startswith("I-") and last_label[2:] == entity_group[2:])
+                    or last_label == entity_group
+                )
+                and start - last_end <= 2
+            ):
+                last_end = end
+            else:
+                last_start = start
+                last_end = end
+                last_label = entity_group
+
+            spans.update({last_start: (last_end, last_label)})
+        return spans
+
+    @staticmethod
+    def escape_html(text: str) -> str:
+        """Replace <, >, &, " with their HTML encoded representation. Intended to
+        prevent HTML errors in rendered displaCy markup.
+        text (str): The original text.
+        RETURNS (str): Equivalent text to be safely used within HTML.
+        """
+        text = text.replace("&", "&amp;")
+        text = text.replace("<", "&lt;")
+        text = text.replace(">", "&gt;")
+        text = text.replace('"', "&quot;")
+        return text
+
+    def html_template(self, text, label, color):
+        """
+        Generate an HTML template for the given text and its label.
+
+        Parameters
+        ----------
+        text
+            The text to be highlighted.
+        label
+            The predicted label for the given text.
+        color
+            The background color of the mark tag.
+        """
+        text = '<mark style="background-color:{}; color:white; border-radius: 1em .1em; padding: .3em;">{} \
+         <b style="background-color:white; color:black; font-size:x-small; border-radius: 0.3em .3em; padding: .1em;">{} </b> \
+         </mark>'.format(
+            color, self.escape_html(text), self.escape_html(label)
+        )
+        return text
+
+    def _repr_html_(self):
+        entities = []
+        new_sent = ""
+        last = 0
+        for key, value in self.spans.items():
+            entity_group = value[-1]
+            if entity_group.startswith("B-") or entity_group.startswith("I-"):
+                entity_group = entity_group[2:]
+            if entity_group not in self.colors:
+                self.colors.update({entity_group: "#%06X" % randint(0, 0xFFFFFF)})
+            start = key
+            new_sent += self.sent[last:start]
+            last = end = value[0]
+            entity_text = self.html_template(self.sent[start:end], entity_group, color=self.colors[entity_group])
+            new_sent += entity_text
+        new_sent += self.sent[last:]
+
+        return new_sent
+
+
+def visualize_ner(sentence, prediction):
+    """
+    Visualize the prediction of NER.
+
+    Parameters
+    ----------
+    sentence
+        The input sentence.
+    prediction
+        The NER prediction for the sentence.
+
+    Returns
+    -------
+    An NER html visualizer.
+    """
+    visualizer = NERVisualizer(prediction, sentence)
+    return visualizer
