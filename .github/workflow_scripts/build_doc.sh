@@ -14,7 +14,7 @@ function build_doc {
     setup_mmcv
     # only build for docs/$DOC
     rm -rf ./docs/tutorials/!($DOC)
-    if [[ -n $SUB_DOC ]]; then rm -rf ./docs/tutorials/"$DOC"/!($SUB_DOC); fi
+    if [[ -n $SUB_DOC ]]; then rm -rf ./docs/tutorials/"$DOC"/!(index.rst|$SUB_DOC); fi
     cd docs && rm -rf _build && d2lbook build rst
 
     COMMAND_EXIT_CODE=$?
