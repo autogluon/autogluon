@@ -95,12 +95,14 @@ _COLORS = np.array(
 
 def colormap(rgb=False, maximum=255):
     """
-    Args:
-        rgb (bool): whether to return RGB colors or BGR colors.
-        maximum (int): either 255 or 1
+    Parameters
+    ----------
+    rgb (bool): whether to return RGB colors or BGR colors.
+    maximum (int): either 255 or 1
 
-    Returns:
-        ndarray: a float32 array of Nx3 colors, in range [0, 255] or [0, 1]
+    Returns
+    -------
+    ndarray: a float32 array of Nx3 colors, in range [0, 255] or [0, 1]
     """
     assert maximum in [255, 1], maximum
     c = _COLORS * maximum
@@ -111,12 +113,14 @@ def colormap(rgb=False, maximum=255):
 
 def random_color(rgb=False, maximum=255):
     """
-    Args:
-        rgb (bool): whether to return RGB colors or BGR colors.
-        maximum (int): either 255 or 1
+    Parameters
+    ----------
+    rgb (bool): whether to return RGB colors or BGR colors.
+    maximum (int): either 255 or 1
 
-    Returns:
-        ndarray: a vector of 3 numbers
+    Returns
+    -------
+    ndarray: a vector of 3 numbers
     """
     idx = np.random.randint(0, len(_COLORS))
     ret = _COLORS[idx] * maximum
@@ -127,13 +131,15 @@ def random_color(rgb=False, maximum=255):
 
 def random_colors(N, rgb=False, maximum=255):
     """
-    Args:
-        N (int): number of unique colors needed
-        rgb (bool): whether to return RGB colors or BGR colors.
-        maximum (int): either 255 or 1
+    Parameters
+    ----------
+    N (int): number of unique colors needed
+    rgb (bool): whether to return RGB colors or BGR colors.
+    maximum (int): either 255 or 1
 
-    Returns:
-        ndarray: a list of random_color
+    Returns
+    -------
+    ndarray: a list of random_color
     """
     indices = random.sample(range(len(_COLORS)), N)
     ret = [_COLORS[i] * maximum for i in indices]
