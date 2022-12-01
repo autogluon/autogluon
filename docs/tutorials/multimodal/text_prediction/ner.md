@@ -70,7 +70,7 @@ for entity in predictions[0]:
 
 ## Visualization
 If you are running the code in a Jupyter notebook, you can also easily visualize the predictions using the visualize_ner function which will highlight the named entities and their labels in a text.
-```
+```{.python .input}
 from autogluon.multimodal.utils import visualize_ner
 visualize_ner(sentence, predictions[0])
 ```
