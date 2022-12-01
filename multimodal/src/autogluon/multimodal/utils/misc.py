@@ -45,7 +45,27 @@ def tensor_to_ndarray(tensor: torch.Tensor):
     return tensor.detach().cpu().float().numpy()
 
 
-def shopee_dataset(download_dir):
+def path_expander(path, base_folder):
+    path_l = path.split(";")
+    return ";".join([os.path.abspath(os.path.join(base_folder, path)) for path in path_l])
+
+
+def _read_byte(file):
+    with open(file, "rb") as image:
+        f = image.read()
+        b = bytearray(f)
+    return b
+
+
+def path_to_bytearray_expander(path, base_folder):
+    path_l = path.split(";")
+    return [_read_byte(os.path.abspath(os.path.join(base_folder, path))) for path in path_l]
+
+
+def shopee_dataset(
+    download_dir: str,
+    is_bytearray=False,
+):
     """
     Download Shopee dataset for demo.
 
@@ -67,10 +87,7 @@ def shopee_dataset(download_dir):
     train_data = pd.read_csv(f"{dataset_path}/train.csv")
     test_data = pd.read_csv(f"{dataset_path}/test.csv")
 
-    def path_expander(path, base_folder):
-        path_l = path.split(";")
-        return ";".join([os.path.abspath(os.path.join(base_folder, path)) for path in path_l])
-
-    train_data["image"] = train_data["image"].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
-    test_data["image"] = test_data["image"].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
+    expander = path_to_bytearray_expander if is_bytearray else path_expander
+    train_data["image"] = train_data["image"].apply(lambda ele: expander(ele, base_folder=dataset_path))
+    test_data["image"] = test_data["image"].apply(lambda ele: expander(ele, base_folder=dataset_path))
     return train_data, test_data
