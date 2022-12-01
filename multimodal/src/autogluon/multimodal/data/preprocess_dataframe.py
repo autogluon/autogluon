@@ -17,6 +17,7 @@ from ..constants import (
     CATEGORICAL,
     IDENTIFIER,
     IMAGE,
+    IMAGE_BYTEARRAY,
     IMAGE_PATH,
     LABEL,
     NER,
@@ -32,7 +33,7 @@ logger = logging.getLogger(AUTOMM)
 
 class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     """
-    Preprocess one multimodal pd.DataFrame including image paths, texts, numerical features,
+    Preprocess one multimodal pd.DataFrame including image paths, image bytearrays, texts, numerical features,
     and categorical features. Each modality may have multiple columns.
     The preprocessor is designed to output model-agnostic features.
     """
@@ -144,8 +145,22 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             return [col_name for col_name in self._image_feature_names if self._column_types[col_name] == IMAGE_PATH]
 
     @property
+    def image_bytearray_names(self):
+        if hasattr(self, "_image_bytearray_names"):
+            return self._image_bytearray_names
+        else:
+            return [
+                col_name for col_name in self._image_feature_names if self._column_types[col_name] == IMAGE_BYTEARRAY
+            ]
+
+    @property
     def image_feature_names(self):
-        return self._image_path_names if hasattr(self, "_image_path_names") else self._image_feature_names
+        if hasattr(self, "_image_path_names"):
+            return self._image_path_names
+        elif hasattr(self, "_image_bytearray_names"):
+            return self._image_bytearray_names
+        else:
+            return self._image_feature_names
 
     @property
     def text_feature_names(self):
@@ -161,10 +176,12 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
     @property
     def required_feature_names(self):
-
-        image_feature_names = (
-            self._image_path_names if hasattr(self, "_image_path_names") else self._image_feature_names
-        )
+        if hasattr(self, "_image_path_names"):
+            image_feature_names = self._image_path_names
+        elif hasattr(self, "_image_bytearray_names"):
+            image_feature_names = self._image_bytearray_names
+        else:
+            image_feature_names = self._image_feature_names
 
         return (
             image_feature_names
@@ -212,7 +229,12 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
     def get_column_names(self, modality: str):
         if modality.startswith(IMAGE) or modality == ROIS:
-            return self._image_path_names if hasattr(self, "_image_path_names") else self._image_feature_names
+            if hasattr(self, "_image_path_names"):
+                return self._image_path_names
+            elif hasattr(self, "_image_bytearray_names"):
+                return self._image_bytearray_names
+            else:
+                return self._image_feature_names
         elif modality.startswith(TEXT):
             return self._text_feature_names
         elif modality == CATEGORICAL:
@@ -398,8 +420,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         image_features
             All the image data stored in a dictionary.
         image_types
-            The column types of these image data, e.g., image_path or image_identifier.
-        """
+            The column types of these image data, e.g., image_path, image_bytearray or image_identifier."""
         assert (
             self._fit_called or self._fit_x_called
         ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_image."
@@ -412,8 +433,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
             if col_type == ROIS:
                 processed_data = df[col_name].tolist()
-            elif col_type == IMAGE_PATH or IMAGE:
+            elif col_type in [IMAGE_PATH, IMAGE]:
                 processed_data = col_value.apply(lambda ele: ele.split(";")).tolist()
+            elif col_type == IMAGE_BYTEARRAY:
+                processed_data = col_value.apply(lambda ele: ele if isinstance(ele, list) else [ele]).tolist()
             elif col_type == f"{IMAGE}_{IDENTIFIER}":
                 processed_data = col_value
             else:

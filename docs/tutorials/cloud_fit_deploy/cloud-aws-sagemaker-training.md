@@ -135,13 +135,13 @@ Tabular example YAML config:
 
 ```yaml
 # AutoGluon Predictor constructor arguments
-# - see https://github.com/awslabs/autogluon/blob/v0.5.2/tabular/src/autogluon/tabular/predictor/predictor.py#L56-L181
+# - see https://github.com/autogluon/autogluon/blob/v0.5.2/tabular/src/autogluon/tabular/predictor/predictor.py#L56-L181
 ag_predictor_args:
   eval_metric: roc_auc
   label: class
 
 # AutoGluon Predictor.fit arguments
-# - see https://github.com/awslabs/autogluon/blob/v0.5.2/tabular/src/autogluon/tabular/predictor/predictor.py#L286-L711
+# - see https://github.com/autogluon/autogluon/blob/v0.5.2/tabular/src/autogluon/tabular/predictor/predictor.py#L286-L711
 ag_fit_args:
   presets: "medium_quality_faster_train"
   num_bag_folds: 2
@@ -157,13 +157,13 @@ Another example, MultiModal example YAML config:
 
 ```yaml
 # AutoGluon Predictor constructor arguments
-# - see https://github.com/awslabs/autogluon/blob/v0.5.2/multimodal/src/autogluon/multimodal/predictor.py#L123-L180
+# - see https://github.com/autogluon/autogluon/blob/v0.5.2/multimodal/src/autogluon/multimodal/predictor.py#L123-L180
 ag_predictor_args:
   eval_metric: acc
   label: label
 
 # AutoGluon Predictor.fit arguments
-# - see https://github.com/awslabs/autogluon/blob/v0.5.2/multimodal/src/autogluon/multimodal/predictor.py#L246-L363
+# - see https://github.com/autogluon/autogluon/blob/v0.5.2/multimodal/src/autogluon/multimodal/predictor.py#L246-L363
 ag_fit_args:
   presets: "high_quality"
   time_limit: 120

@@ -131,7 +131,7 @@ class TextProcessor:
         normalize_text
             Whether to normalize text to resolve encoding problems.
             Examples of normalized texts can be found at
-            https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_feedback_prize#15-a-few-examples-of-normalized-texts
+            https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_feedback_prize#15-a-few-examples-of-normalized-texts
         """
         self.prefix = model.prefix
         self.tokenizer_name = tokenizer_name

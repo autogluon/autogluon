@@ -35,7 +35,7 @@ In 2022, our top priorities are:
 
 ## AutoGluon 0.4 Features, Released: March 2022
 
-[v0.4 Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.4.0)
+[v0.4 Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.4.0)
 
 ### Themes and Major Features
 
@@ -71,19 +71,19 @@ In 2021, our top priorities are:
 
 ### AutoGluon 0.3.1 Features, Released: August 2021
 
-[Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.3.1)
+[Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.3.1)
 
 ### AutoGluon 0.3 Features, Released: August 2021
 
-[Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.3.0)
+[Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.3.0)
 
 ### AutoGluon 0.2 Features, Released: April 2021
 
-[Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.2.0)
+[Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.2.0)
 
 ### AutoGluon 0.1 Features, Released: March 2021
 
-[Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.1.0)
+[Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.1.0)
 
 # AutoGluon Roadmap 2020
 
@@ -93,16 +93,16 @@ We will work towards unifying the APIs of the separate tasks (Tabular, Image, Te
 
 ### 2020 Releases
 
-- [v0.0.15 Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.0.15) (December 2020)
-- [v0.0.14 Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.0.14) (October 2020, Highlight: Added FastAI Neural Network Model)
-- [v0.0.13 Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.0.13) (August 2020, Highlight: Added model distillation ([paper](https://arxiv.org/abs/2006.14284)))
-- [v0.0.12 Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.0.12) (July 2020, Highlight: Added custom model support)
-- [v0.0.11 Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.0.11) (June 2020)
-- [v0.0.10 Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.0.10) (June 2020, Highlight: Implemented feature importance)
-- [v0.0.9 Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.0.9) (May 2020)
-- [v0.0.8 Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.0.8) (May 2020)
-- [v0.0.7 Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.0.7) (May 2020, Highlight: first addition of the `presets` argument)
-- [v0.0.6 Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.0.6) (March 2020, first release tagged on GitHub with release notes)
+- [v0.0.15 Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.0.15) (December 2020)
+- [v0.0.14 Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.0.14) (October 2020, Highlight: Added FastAI Neural Network Model)
+- [v0.0.13 Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.0.13) (August 2020, Highlight: Added model distillation ([paper](https://arxiv.org/abs/2006.14284)))
+- [v0.0.12 Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.0.12) (July 2020, Highlight: Added custom model support)
+- [v0.0.11 Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.0.11) (June 2020)
+- [v0.0.10 Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.0.10) (June 2020, Highlight: Implemented feature importance)
+- [v0.0.9 Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.0.9) (May 2020)
+- [v0.0.8 Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.0.8) (May 2020)
+- [v0.0.7 Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.0.7) (May 2020, Highlight: first addition of the `presets` argument)
+- [v0.0.6 Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.0.6) (March 2020, first release tagged on GitHub with release notes)
 - [v0.0.5 Release](https://pypi.org/project/autogluon/0.0.5/) (February 2020, used in the original [AutoGluon-Tabular paper](https://arxiv.org/abs/2003.06505))
 - [v0.0.4 Release](https://pypi.org/project/autogluon/0.0.4/) (January 2020)
 
