@@ -440,6 +440,9 @@ class ImageProcessor:
                     if feature_modalities.get(per_col_name) == IMAGE_PATH:
                         with PIL.Image.open(per_col_content[0]) as img:
                             mm_data["img_info"] = dict(filename=per_col_content[0], height=img.height, width=img.width)
+                    elif feature_modalities.get(per_col_name) == IMAGE_BYTEARRAY:
+                        # TODO: add bytearray support for detection
+                        raise NotImplementedError
             if self.requires_column_info:
                 pass  # TODO
         else:
