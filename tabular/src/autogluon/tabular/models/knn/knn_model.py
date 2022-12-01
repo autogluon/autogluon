@@ -250,7 +250,7 @@ class KNNModel(AbstractModel):
         return self.model
 
     def _get_default_resources(self):
-        # use at most 32 cpus to avoid OpenBLAS error: https://github.com/awslabs/autogluon/issues/1020
+        # use at most 32 cpus to avoid OpenBLAS error: https://github.com/autogluon/autogluon/issues/1020
         num_cpus = min(32, ResourceManager.get_cpu_count())
         num_gpus = 0
         return num_cpus, num_gpus

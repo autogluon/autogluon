@@ -329,7 +329,7 @@ However, this strategy decreases the amount of training data available for fitti
 ### How to choose and interpret the evaluation metric?
 Different evaluation metrics capture different properties of the forecast, and therefore depend on the application that the user has in mind.
 For example, weighted quantile loss (`"mean_wQuantileLoss"`) measures how well-calibrated the quantile forecast is; mean absolute scaled error (`"MASE"`) compares the mean forecast to the performance of a naive baseline.
-For more details about the available metrics, see the documentation for [autogluon.timeseries.evaluator.TimeSeriesEvaluator](https://github.com/awslabs/autogluon/blob/master/timeseries/src/autogluon/timeseries/evaluator.py#L53).
+For more details about the available metrics, see the documentation for [autogluon.timeseries.evaluator.TimeSeriesEvaluator](https://github.com/autogluon/autogluon/blob/master/timeseries/src/autogluon/timeseries/evaluator.py#L53).
 
 Note that AutoGluon always reports all metrics in a **higher-is-better** format.
 For this purpose, some metrics are multiplied by -1.

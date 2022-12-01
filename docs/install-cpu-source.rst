@@ -7,5 +7,5 @@
     # pytorch documentation - https://pytorch.org/get-started/locally/
     pip3 install torch==1.12.0+cpu torchvision==0.13.0+cpu torchtext==0.13.0 --extra-index-url https://download.pytorch.org/whl/cpu
 
-    git clone https://github.com/awslabs/autogluon
+    git clone https://github.com/autogluon/autogluon
     cd autogluon && ./full_install.sh

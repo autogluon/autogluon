@@ -15,11 +15,11 @@ stack-ensemble of `AutoGluon Tabular <https://auto.gluon.ai/stable/tutorials/tab
 Here are some example use-cases of AutoMM:
 
 - Multilingual text classification :doc:`[Tutorial] <text_prediction/multilingual_text>`
-- Predicting pets' popularity based on their description, photo, and other metadata. :doc:`[Tutorial] <multimodal_prediction/beginner_multimodal>` `[Example] <https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_pawpularity>`_.
+- Predicting pets' popularity based on their description, photo, and other metadata. :doc:`[Tutorial] <multimodal_prediction/beginner_multimodal>` `[Example] <https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_pawpularity>`_.
 - Predicting the price of book. :doc:`[Tutorial] <multimodal_prediction/multimodal_text_tabular>`.
-- Scoring student's essays. `[Example] <https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_feedback_prize>`_.
+- Scoring student's essays. `[Example] <https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_feedback_prize>`_.
 - Image classification. :doc:`[Tutorial] <image_prediction/beginner_image_cls>`.
-- Object detection. :doc:`[Tutorial] <object_detection/quick_start/quick_start_coco>` `[Example] <https://github.com/awslabs/autogluon/tree/master/examples/automm/object_detection>`_.
+- Object detection. :doc:`[Tutorial] <object_detection/quick_start/quick_start_coco>` `[Example] <https://github.com/autogluon/autogluon/tree/master/examples/automm/object_detection>`_.
 - Extracting named entities. :doc:`[Tutorial] <text_prediction/ner>`.
 - Search for relevant text / image via text queries. :doc:`[Tutorial] <matching/index>`.
 

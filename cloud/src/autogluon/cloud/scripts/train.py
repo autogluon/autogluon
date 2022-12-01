@@ -1,7 +1,7 @@
 # isort: skip_file
 # flake8: noqa
 # The import order of autogluon sub module here could cause seg fault. Ignore isort for now
-# https://github.com/awslabs/autogluon/issues/2042
+# https://github.com/autogluon/autogluon/issues/2042
 import argparse
 import os
 import shutil

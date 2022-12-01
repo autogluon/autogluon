@@ -4,19 +4,19 @@ AutoGluon: AutoML for Text, Image, Time Series, and Tabular Data
 .. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.6.0-blue
     :target: https://auto.gluon.ai/dev/versions.html
     :scale: 100%
-.. |StableVersion| image:: https://img.shields.io/github/v/release/awslabs/autogluon?color=blue&label=stable%20release&sort=semver
+.. |StableVersion| image:: https://img.shields.io/github/v/release/autogluon/autogluon?color=blue&label=stable%20release&sort=semver
     :target: https://auto.gluon.ai/stable/index.html
     :scale: 100%
 .. |PythonVersion| image:: https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue
     :target: https://pypi.org/project/autogluon/
-.. |GitHub| image:: https://img.shields.io/github/stars/awslabs/autogluon?style=social
-    :target: https://github.com/awslabs/autogluon/stargazers
+.. |GitHub| image:: https://img.shields.io/github/stars/autogluon/autogluon?style=social
+    :target: https://github.com/autogluon/autogluon/stargazers
 .. |Twitter| image:: https://img.shields.io/twitter/follow/autogluon?style=social
     :target: https://twitter.com/autogluon
 .. |Downloads| image:: https://pepy.tech/badge/autogluon/month
     :target: https://pepy.tech/project/autogluon
-.. |License| image:: https://img.shields.io/github/license/awslabs/autogluon?color=blue
-    :target: https://github.com/awslabs/autogluon/blob/master/LICENSE
+.. |License| image:: https://img.shields.io/github/license/autogluon/autogluon?color=blue
+    :target: https://github.com/autogluon/autogluon/blob/master/LICENSE
 
 |ReleaseVersion| |StableVersion| |PythonVersion| |License| |Downloads| |GitHub| |Twitter| 
 

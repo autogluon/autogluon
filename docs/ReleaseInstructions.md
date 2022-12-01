@@ -15,7 +15,7 @@
 * Ensure each sub-module is working IN ISOLATION via `pip install --pre autogluon.{submodule}`.
   * Ensure a fresh venv is used for each submodule.
   * Doing this will avoid issues like in v0.4 release with `autogluon.text` crashing when installed standalone due to missing setup.py dependencies
-    * https://github.com/awslabs/autogluon/issues/1607
+    * https://github.com/autogluon/autogluon/issues/1607
 * If minor fixes are needed, create PRs and merge them as necessary if they are low risk. Ensure fixes are tested manually.
 * If major fixes are needed, consider the severity and if they are release critical. If they are, consider delaying release to ensure the issue is fixed (and tested).
 
@@ -24,7 +24,7 @@
 * Ensure that the mainline code you are planning to release is stable: Benchmark, ensure CI passes, check with team, etc.
 * Cut a release branch with format `0.x.y` (no v) - this branch is required to publish docs to versioned path
   * Clone from master branch
-  * Add 1 commit to the release branch to remove pre-release warnings and update install instructions to remove `--pre`: https://github.com/awslabs/autogluon/commit/1d66194d4685b06e884bbf15dcb97580cbfb9261
+  * Add 1 commit to the release branch to remove pre-release warnings and update install instructions to remove `--pre`: https://github.com/autogluon/autogluon/commit/1d66194d4685b06e884bbf15dcb97580cbfb9261
   * Push release branch
   * Build the release branch docs in [CI](https://ci.gluon.ai/job/autogluon/).
   * Once CI passes, verify it's available at `https://auto.gluon.ai/0.x.y/index.html`
@@ -43,7 +43,7 @@
     * This is required for GH Action to execute CI continuous integration step if `0.x.y` and `stable` hashes are matching.
   * Wait for CI build of the `stable` branch to pass
   * Check that website has updated to align with the release docs.
-* Perform version release by going to https://github.com/awslabs/autogluon/releases and click 'Draft a new release' in top right.
+* Perform version release by going to https://github.com/autogluon/autogluon/releases and click 'Draft a new release' in top right.
   * Tag release with format `v0.x.y`
   * Name the release identically to the tag (ex: `v0.x.y`)
   * Select `master` branch as a target
@@ -57,7 +57,7 @@
 ### Release Cheatsheet
 
 * If intending to create a new cheatsheet for the release, refer to [autogluon-doc-utils README.md](https://github.com/Innixma/autogluon-doc-utils) for instructions on creating a new cheatsheet.
-* If a cheatsheet exists for `0.x.y` (or `0.x`), update the `docs/cheatsheet.rst` url paths ([example](https://github.com/awslabs/autogluon/blob/0.4.1/docs/cheatsheet.rst)) in branch `0.x.y` to the correct location ([example for v0.4.0 and v0.4.1](https://github.com/Innixma/autogluon-doc-utils/tree/main/docs/cheatsheets/v0.4.0)).
+* If a cheatsheet exists for `0.x.y` (or `0.x`), update the `docs/cheatsheet.rst` url paths ([example](https://github.com/autogluon/autogluon/blob/0.4.1/docs/cheatsheet.rst)) in branch `0.x.y` to the correct location ([example for v0.4.0 and v0.4.1](https://github.com/Innixma/autogluon-doc-utils/tree/main/docs/cheatsheets/v0.4.0)).
   * Example urls: [JPEG](https://raw.githubusercontent.com/Innixma/autogluon-doc-utils/main/docs/cheatsheets/v0.4.0/autogluon-cheat-sheet.jpeg), [PDF](https://nbviewer.org/github/Innixma/autogluon-doc-utils/blob/main/docs/cheatsheets/v0.4.0/autogluon-cheat-sheet.pdf)
   * Do NOT do this for `stable` branch or `master` branch, instead have them continue pointing to the [stable cheatsheet files](https://github.com/Innixma/autogluon-doc-utils/tree/main/docs/cheatsheets/stable). This is to ensure that as we release new versions of the cheatsheet, old docs will still refer to the correct cheatsheet for their version.
   * Finally, update the stable files [here](https://github.com/Innixma/autogluon-doc-utils/tree/main/docs/cheatsheets/stable) to reflect the latest released version of the cheatsheet.

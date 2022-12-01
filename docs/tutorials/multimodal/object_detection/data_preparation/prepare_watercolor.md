@@ -9,10 +9,10 @@ The total time to prepare the dataset depends on your Internet speed and disk pe
 
 You can download the dataset from its [official project page](https://naoto0804.github.io/cross_domain_detection/).
 We also prepared a bash script for one-step downloading the dataset: 
-[download_watercolor.sh](https://raw.githubusercontent.com/awslabs/autogluon/master/examples/automm/object_detection/download_watercolor.sh).
+[download_watercolor.sh](https://raw.githubusercontent.com/autogluon/autogluon/master/examples/automm/object_detection/download_watercolor.sh).
 Or you can also use our cli tool `prepare_detection_dataset` that can download all datasets mentioned in our tutorials.
 This python script is in our code: 
-[prepare_detection_dataset.py](https://raw.githubusercontent.com/awslabs/autogluon/master/multimodal/src/autogluon/multimodal/cli/prepare_detection_dataset.py),
+[prepare_detection_dataset.py](https://raw.githubusercontent.com/autogluon/autogluon/master/multimodal/src/autogluon/multimodal/cli/prepare_detection_dataset.py),
 and you can also run it as a cli: `python3 -m autogluon.multimodal.cli.prepare_detection_dataset`.
 
 ### Download with Python Script
@@ -81,7 +81,7 @@ Annotations  ImageSets  JPEGImages
 
 ### Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ### Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.
