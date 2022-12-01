@@ -81,12 +81,12 @@ class NERVisualizer:
     inline to any Python class Jupyter notebooks.
     """
 
-    def __init__(self, pred, sent):
+    def __init__(self, pred, sent, seed):
         self.pred = pred
         self.sent = sent
         self.colors = {}
         self.spans = self.merge_spans()
-        self.rng = np.random.RandomState(0)
+        self.rng = np.random.RandomState(seed)
 
     def merge_spans(self):
         """Merge subsequent predictions."""
@@ -169,7 +169,7 @@ class NERVisualizer:
         return new_sent
 
 
-def visualize_ner(sentence, prediction):
+def visualize_ner(sentence, prediction, seed=0):
     """
     Visualize the prediction of NER.
 
@@ -179,10 +179,12 @@ def visualize_ner(sentence, prediction):
         The input sentence.
     prediction
         The NER prediction for the sentence.
+    seed
+        The seed for colorpicker.
 
     Returns
     -------
     An NER html visualizer.
     """
-    visualizer = NERVisualizer(prediction, sentence)
+    visualizer = NERVisualizer(prediction, sentence, seed)
     return visualizer
