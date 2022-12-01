@@ -1,6 +1,5 @@
 import logging
 import os
-from random import randint
 
 import numpy as np
 import pandas as pd
@@ -87,6 +86,7 @@ class NERVisualizer:
         self.sent = sent
         self.colors = {}
         self.spans = self.merge_spans()
+        self.rng = np.random.RandomState(0)
 
     def merge_spans(self):
         """Merge subsequent predictions."""
@@ -158,7 +158,7 @@ class NERVisualizer:
             if entity_group.startswith("B-") or entity_group.startswith("I-"):
                 entity_group = entity_group[2:]
             if entity_group not in self.colors:
-                self.colors.update({entity_group: "#%06X" % randint(0, 0xFFFFFF)})
+                self.colors.update({entity_group: "#%06X" % self.rng.randint(0, 0xFFFFFF)})
             start = key
             new_sent += self.sent[last:start]
             last = end = value[0]
