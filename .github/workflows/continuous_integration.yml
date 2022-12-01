@@ -413,9 +413,11 @@ jobs:
           ./.github/workflow_scripts/copy_docs.sh '${{ github.ref }}' '${{ github.repository }}' '${{ env.SHORT_SHA }}'
       - name: Copy Docs to Bucket(For pull request)
         if: ${{ github.event_name == 'pull_request_target' }}
+        env:
+          branch: ${{ github.event.pull_request.head.ref }}
         run: |
           chmod +x ./.github/workflow_scripts/copy_docs.sh
-          ./.github/workflow_scripts/copy_docs.sh '${{ github.event.pull_request.head.ref }}' '${{ github.event.pull_request.head.repo.full_name }}' '${{ env.SHORT_SHA }}' PR-'${{ github.event.number }}'
+          ./.github/workflow_scripts/copy_docs.sh "$branch" '${{ github.event.pull_request.head.repo.full_name }}' '${{ env.SHORT_SHA }}' PR-'${{ github.event.number }}'
       - name: Comment on PR
         if: ${{ github.event_name == 'pull_request_target' }}
         uses: peter-evans/create-or-update-comment@v2.0.0
