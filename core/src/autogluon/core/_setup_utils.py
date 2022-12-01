@@ -87,7 +87,7 @@ def create_version_file(*, version, submodule):
     with open(version_path, 'w') as f:
         f.write(f'"""This is the {AUTOGLUON} version file."""\n')
         f.write("__version__ = '{}'\n".format(version))
-        f.write("__lite__ = '{}'\n".format(LITE_MODE))
+        f.write("__lite__ = {}\n".format(LITE_MODE))
 
 
 def default_setup_args(*, version, submodule):
