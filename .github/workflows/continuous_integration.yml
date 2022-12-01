@@ -368,7 +368,7 @@ jobs:
           job-name: AutoGluon-BuildTimeseries
           command: chmod +x ./.github/workflow_scripts/build_timeseries_tutorial.sh && ./.github/workflow_scripts/build_timeseries_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_all_docs:
-    needs: [build_image_prediction_tutorial, build_object_detection_tutorial, build_tabular_prediction_tutorial, build_multimodal_advanced_topics_tutorial, build_multimodal_image_prediction_tutorial, build_multimodal_matching_tutorial, build_multimodal_prediction_tutorial, build_multimodal_object_detection_tutorial, build_multimodal_text_prediction_tutorial, build_text_prediction_tutorial, build_cloud_fit_deploy_tutorial, build_timeseries_tutorial]
+    needs: [build_image_prediction_tutorial, build_object_detection_tutorial, build_tabular_prediction_tutorial, build_multimodal_tutorial, build_cloud_fit_deploy_tutorial, build_timeseries_tutorial]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
