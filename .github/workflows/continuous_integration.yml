@@ -338,7 +338,7 @@ jobs:
         with:
           job-type: CI-GPU
           job-name: AutoGluon-BuildMultimodal
-          command: chmod +x ./.github/workflow_scripts/build_multimodal_tutorial.sh && ./.github/workflow_scripts/build_multimodal_tutorial.sh $SUB_DOC '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
+          command: chmod +x ./.github/workflow_scripts/build_multimodal_tutorial.sh && ./.github/workflow_scripts/build_multimodal_tutorial.sh '${{ matrix.SUB_DOC }}' '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_cloud_fit_deploy_tutorial:
     needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
