@@ -25,6 +25,12 @@ OBJECTIVES_TO_NORMALIZE = ['log_loss', 'pac_score', 'soft_log_loss']  # do not l
 AUTO_WEIGHT = 'auto_weight'
 BALANCE_WEIGHT = 'balance_weight'
 
+# Constants used to infer problem type
+MULTICLASS_UPPER_LIMIT = 1000  # assume regression if dtype is numeric and unique label count is above this limit
+LARGE_DATA_THRESHOLD = 1000
+REGRESS_THRESHOLD_LARGE_DATA = 0.05
+REGRESS_THRESHOLD_SMALL_DATA = 0.1
+
 # TODO: Add docs to dedicated page, or should it live in AbstractModel?
 # TODO: How to reference correct version of docs?
 # TODO: Add error in AG_ARGS if unknown key present
