@@ -3,9 +3,21 @@ import os
 import zipfile
 
 
+def read_byte(file):
+    with open(file, "rb") as image:
+        f = image.read()
+        b = bytearray(f)
+    return b
+
+
 def path_expander(path, base_folder):
     path_l = path.split(";")
     return ";".join([os.path.join(base_folder, path) for path in path_l])
+
+
+def path_to_bytearray_expander(path, base_folder):
+    path_l = path.split(";")
+    return [read_byte(os.path.join(base_folder, path)) for path in path_l]
 
 
 def get_home_dir():

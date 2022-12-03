@@ -68,6 +68,14 @@ for entity in predictions[0]:
     print(f"Word '{sentence[entity['start']:entity['end']]}' belongs to group: {entity['entity_group']}")
 ```
 
+## Visualization
+If you are running the code in a Jupyter notebook, you can also easily visualize the predictions using the visualize_ner function which will highlight the named entities and their labels in a text.
+```{.python .input}
+from autogluon.multimodal.utils import visualize_ner
+visualize_ner(sentence, predictions[0])
+```
+
+
 ## Reloading and Continuous Training 
 The trained predictor is automatically saved and you can easily reload it using the path. If you are not saftisfied with the current model performance, you can continue training the loaded model with new data.
 
@@ -81,7 +89,7 @@ print(test_score)
 
 ## Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ## Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

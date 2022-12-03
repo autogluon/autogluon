@@ -4,6 +4,7 @@ CATEGORICAL = "categorical"
 TEXT = "text"
 NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
+IMAGE_BYTEARRAY = "image_bytearray"
 IDENTIFIER = "identifier"
 
 # Problem types
