@@ -1,5 +1,13 @@
+import copy
 import logging
 from typing import Callable, Dict, List, Optional, Union
+import boto3
+import os
+import time
+import json
+import shutil
+from pathlib import Path
+import torch
 
 import torchmetrics
 from torch import nn
@@ -53,6 +61,7 @@ class PretrainLitModule(LitModule):
         pretrain_objective: Optional[str] = None,
         row_attention_weight_decay: Optional[float] = None,
         temperature: Optional[float] = 1,
+        is_pretrain=None,
     ):
         """
         Parameters
@@ -158,6 +167,10 @@ class PretrainLitModule(LitModule):
         self.pretrain_epochs = pretrain_epochs
         self.pretrain_objective = pretrain_objective
 
+        self.is_pretrain = is_pretrain
+        self.prev_state_dic = None
+        self.current_iter = 0
+
     def _compute_pretrain_loss(
         self,
         batch: Dict,
@@ -184,6 +197,62 @@ class PretrainLitModule(LitModule):
 
         return loss
 
+    def _save_s3(
+            self,
+            target='ec2/2022_09_14/cross_table_pretrain/pretrained_hogwild.ckpt',
+            save_diff=False,
+    ):
+        current_state_dic = self.model.fusion_transformer.state_dict()
+        if self.prev_state_dic is None:
+            self.prev_state_dic = copy.deepcopy(current_state_dic)
+        if save_diff:
+            with torch.no_grad():
+                for name in current_state_dic:
+                    current_state_dic[name] = current_state_dic[name] - self.prev_state_dic[name]
+
+        while True:
+            try:
+                checkpoint = {
+                    "state_dict": {name: param for name, param in
+                                   current_state_dic.items()}
+                }
+                torch.save(checkpoint, os.path.join("./", "pretrained.ckpt"))
+                s3 = boto3.resource('s3')
+                s3.Bucket('automl-benchmark-bingzzhu').upload_file('./pretrained.ckpt', target)
+                break
+            except:
+                pass
+                # time.sleep(5)
+
+    def _save_pretrained_ckpt(self):
+        s3_client = boto3.client('s3')
+        BUCKET = 'automl-benchmark-bingzzhu'
+        PREFIX = 'ec2/2022_09_14/cross_table_pretrain/iter_' + str(self.current_iter)
+        file_names, folders = self.get_file_folders(s3_client, BUCKET, PREFIX)
+        self.download_files(
+            s3_client,
+            BUCKET,
+            "./" + self.is_pretrain['name'] + '/',
+            file_names,
+            folders
+        )
+
+        local_path = './' + self.is_pretrain['name'] + '/' + 'ec2/2022_09_14/cross_table_pretrain/iter_'
+        files = os.listdir(local_path + str(self.current_iter))
+
+        new_pretrained = copy.deepcopy(self.prev_state_dic)
+        for file_name in files:
+            ckpt_path = local_path + str(self.current_iter) + '/' + file_name
+            state_dict = torch.load(ckpt_path, map_location=torch.device("cuda"))["state_dict"]
+            with torch.no_grad():
+                for name in new_pretrained:
+                    new_pretrained[name] = new_pretrained[name] + state_dict[name]
+        self.model.fusion_transformer.load_state_dict(new_pretrained)
+        self._save_s3('ec2/2022_09_14/cross_table_pretrain/iter_' + str(self.current_iter) + '/pretrained.ckpt')
+        self.prev_state_dic = copy.deepcopy(new_pretrained)
+        shutil.rmtree('./' + self.is_pretrain['name'] + '/')
+
+
     def _shared_step(
         self,
         batch: Dict,
@@ -209,6 +278,107 @@ class PretrainLitModule(LitModule):
         loss = self._compute_loss(output=output, label=label)
         return output, loss, pretrain_data
 
+
+    def _process_lock(self):
+        keep_waiting = True
+        while keep_waiting:
+            try:
+                print("saving ckpt to s3")
+                self._save_s3(
+                    'ec2/2022_09_14/cross_table_pretrain/iter_' + str(self.current_iter) + '/' + self.is_pretrain[
+                        'name'] + '.ckpt', True)
+                break
+            except:
+                pass
+
+        while keep_waiting:
+            try:
+                bucket = 'automl-benchmark-bingzzhu'
+                File = 'ec2/2022_09_14/cross_table_pretrain/iter_' + str(self.current_iter) + '/'
+                objs = boto3.client('s3').list_objects_v2(Bucket=bucket, Prefix=File)
+                num_waiting = objs['KeyCount']
+
+                bucket = 'automl-benchmark-bingzzhu'
+                File = 'ec2/2022_09_14/cross_table_pretrain/iter_' + str(-1) + '/'
+                objs = boto3.client('s3').list_objects_v2(Bucket=bucket, Prefix=File)
+                num_failed = objs['KeyCount']
+
+                print("n_waiting:", num_waiting, "num_failed:", num_failed)
+
+                if num_waiting + num_failed >= self.is_pretrain["num_tasks"]:
+                    break
+            except:
+                pass
+
+        while True:
+            try:
+                print("start global averaging")
+                s3 = boto3.resource('s3')
+                s3.Bucket('automl-benchmark-bingzzhu').download_file(
+                    'ec2/2022_09_14/cross_table_pretrain/iter_' + str(self.current_iter) + '/pretrained.ckpt',
+                    './pretrained_.ckpt'
+                )
+                pretrain_path = os.path.join("./", 'pretrained_.ckpt')
+                state_dict = torch.load(pretrain_path, map_location=torch.device("cuda"))["state_dict"]
+                self.model.fusion_transformer.load_state_dict(state_dict)
+                self.prev_state_dic = copy.deepcopy(state_dict)
+                print("found global ckpt")
+                break
+            except:
+                print("not found global ckpt")
+                self._save_pretrained_ckpt()
+                torch.cuda.empty_cache()
+                break
+
+        return
+
+    def get_file_folders(self, s3_client, bucket_name, prefix=""):
+        file_names = []
+        folders = []
+
+        default_kwargs = {
+            "Bucket": bucket_name,
+            "Prefix": prefix
+        }
+        next_token = ""
+
+        while next_token is not None:
+            updated_kwargs = default_kwargs.copy()
+            if next_token != "":
+                updated_kwargs["ContinuationToken"] = next_token
+
+            response = s3_client.list_objects_v2(**updated_kwargs)
+            contents = response.get("Contents")
+
+            for result in contents:
+                key = result.get("Key")
+                if key[-1] == "/":
+                    folders.append(key)
+                else:
+                    file_names.append(key)
+
+            next_token = response.get("NextContinuationToken")
+
+        return file_names, folders
+
+    def download_files(self, s3_client, bucket_name, local_path, file_names, folders):
+        local_path = Path(local_path)
+
+        for folder in folders:
+            folder_path = Path.joinpath(local_path, folder)
+            folder_path.mkdir(parents=True, exist_ok=True)
+
+        for file_name in file_names:
+            file_path = Path.joinpath(local_path, file_name)
+
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            s3_client.download_file(
+                bucket_name,
+                file_name,
+                str(file_path)
+            )
+
+
     def training_step(self, batch, batch_idx):
         """
         Per training step. This function is registered by pl.LightningModule.
@@ -228,6 +398,23 @@ class PretrainLitModule(LitModule):
         -------
         Average loss of the mini-batch data.
         """
+        if self.is_pretrain["is_pretrain"]:
+            if self.current_iter % self.is_pretrain["upload_per_n_iter"] == 0:
+                while True:
+                    try:
+                        self._process_lock()
+                        break
+                    except:
+                        pass
+
+            if self.current_iter % self.is_pretrain["iter_per_save"] == 0:
+                self._save_s3(target='ec2/2022_09_14/cross_table_pretrain/raw_hog/pretrained_' + str(self.current_iter) + '.ckpt')
+
+            if self.current_iter >= self.is_pretrain["max_iter"]:
+                raise Exception("Pretraining reached max iteration")
+
+            self.current_iter += 1
+
         output, loss, pretrain_data = self._shared_step(batch)
         self.log("train_loss", loss)
 

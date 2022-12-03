@@ -12,7 +12,7 @@ import sys
 import warnings
 from datetime import timedelta
 from typing import Callable, Dict, List, Optional, Union
-
+import boto3
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
@@ -356,6 +356,7 @@ class MultiModalPredictor:
         seed: Optional[int] = 123,
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[dict] = None,
+        is_pretrain=False,
     ):
         """
         Fit MultiModalPredictor predict label column of a dataframe based on the other columns,
@@ -624,6 +625,7 @@ class MultiModalPredictor:
             teacher_predictor=teacher_predictor,
             standalone=standalone,
             hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
+            is_pretrain_=is_pretrain,
         )
 
         if hyperparameter_tune_kwargs is not None:
@@ -899,8 +901,11 @@ class MultiModalPredictor:
         teacher_predictor: Union[str, MultiModalPredictor] = None,
         hpo_mode: bool = False,
         standalone: bool = True,
+        is_pretrain_=False,
         **hpo_kwargs,
     ):
+        print("----------fitting---------------", is_pretrain_)
+
         if self._config is not None:  # continuous training
             config = self._config
 
@@ -952,6 +957,24 @@ class MultiModalPredictor:
             )
         else:  # continuing training
             model = self._model
+
+        while True:
+            if (not is_pretrain_["is_pretrain"]) and ("finetune_on" not in is_pretrain_):
+                break
+            try:
+                foundation_model = is_pretrain_[
+                    "finetune_on"] if "finetune_on" in is_pretrain_ else "pretrained_hogwild.ckpt"
+                s3 = boto3.resource('s3')
+                s3.Bucket('automl-benchmark-bingzzhu').download_file(
+                    'ec2/2022_09_14/cross_table_pretrain/' + foundation_model,
+                    './pretrained.ckpt'
+                )
+                pretrain_path = os.path.join("./", 'pretrained.ckpt')
+                state_dict = torch.load(pretrain_path, map_location=torch.device("cuda"))["state_dict"]
+                model.fusion_transformer.load_state_dict(state_dict)
+                break
+            except:
+                pass
 
         norm_param_names = get_norm_layer_param_names(model)
 
@@ -1156,6 +1179,7 @@ class MultiModalPredictor:
                 decay_loss_coefficient=config.pretrainer.decay_pretrain_coefficient,
                 pretrain_objective=config.pretrainer.objective,
                 temperature=config.pretrainer.temperature,
+                is_pretrain=is_pretrain_,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1317,11 +1341,28 @@ class MultiModalPredictor:
                 ".* in the `DataLoader` init to improve performance.*",
             )
             warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
-            trainer.fit(
-                task,
-                datamodule=train_dm,
-                ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
-            )
+            try:
+                trainer.fit(
+                    task,
+                    datamodule=train_dm,
+                    ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
+                )
+            except:
+                while True:
+                    try:
+                        target = 'ec2/2022_09_14/cross_table_pretrain/iter_' + str(-1) + '/' + is_pretrain_[
+                            'name'] + '.ckpt'
+                        checkpoint = {
+                            "state_dict": {name: param for name, param in
+                                           self._model.fusion_transformer.state_dict().items()}
+                        }
+                        torch.save(checkpoint, os.path.join("./", "pretrained.ckpt"))
+                        s3 = boto3.resource('s3')
+                        s3.Bucket('automl-benchmark-bingzzhu').upload_file('./pretrained.ckpt', target)
+                        break
+                    except:
+                        pass
+
             self._fit_called = True
 
         if trainer.global_rank == 0:
