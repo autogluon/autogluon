@@ -4,9 +4,9 @@
 An awesome colormap for really neat visualizations.
 Copied from Detectron, and removed gray colors.
 """
+import random
 
 import numpy as np
-import random
 
 __all__ = ["colormap", "random_color", "random_colors"]
 
