@@ -5,7 +5,6 @@
 
 import colorsys
 import logging
-
 from enum import Enum, unique
 from typing import List
 
@@ -14,7 +13,6 @@ import matplotlib.colors as mplc
 import matplotlib.figure as mplfigure
 import numpy as np
 import pandas as pd
-
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 from .colormap import random_color
