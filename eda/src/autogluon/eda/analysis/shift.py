@@ -98,7 +98,7 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return self.all_keys_must_be_present(args, "train_data", "test_data")
 
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         """Fit method.  `args` can contain
         - 'train_data': pd.DataFrame, required
         - 'test_data': pd.DataFrame, required

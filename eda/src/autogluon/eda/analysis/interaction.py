@@ -22,7 +22,7 @@ class Correlation(AbstractAnalysis):
             * phik : phi_k correlation
                 Correlation matrix of bivariate gaussian derived from chi2-value Chi2-value
                 gets converted into correlation coefficient of bivariate gauss with correlation
-                value rho, assuming giving binning and number of records. Correlation coefficient
+                value rho, assuming given binning and number of records. Correlation coefficient
                 value is between 0 and 1. Bivariate gaussian's range is set to [-5,5] by construction.
                 See Also `phik <https://github.com/KaveIO/PhiK>`_ documentation.
 
@@ -33,7 +33,7 @@ class Correlation(AbstractAnalysis):
         a cut-off threshold when `focus_field` is specified
     parent: Optional[AbstractAnalysis], default = None
         parent Analysis
-    children: List[AbstractAnalysis], default []
+    children: List[AbstractAnalysis], default = []
         wrapped analyses; these will receive sampled `args` during `fit` call
 
     See Also
@@ -60,7 +60,7 @@ class Correlation(AbstractAnalysis):
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return True
 
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         state.correlations = {}
         state.correlations_method = self.method
         for (ds, df) in self.available_datasets(args):
@@ -103,7 +103,7 @@ class CorrelationSignificance(AbstractAnalysis):
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return self.all_keys_must_be_present(state, "correlations", "correlations_method")
 
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         state.significance_matrix = {}
         for (ds, df) in self.available_datasets(args):
             state.significance_matrix[ds] = df[state.correlations[ds].columns].significance_matrix(
