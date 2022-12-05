@@ -1,6 +1,7 @@
 import ast
 import logging
 import warnings
+from io import BytesIO
 from typing import Dict, List, Optional, Union
 
 import numpy as np
@@ -25,7 +26,18 @@ try:
 except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
-from ..constants import AUTOMM, CLIP, CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, COLUMN, IMAGE, IMAGE_VALID_NUM, TIMM_IMAGE
+from ..constants import (
+    AUTOMM,
+    CLIP,
+    CLIP_IMAGE_MEAN,
+    CLIP_IMAGE_STD,
+    COLUMN,
+    IMAGE,
+    IMAGE_BYTEARRAY,
+    IMAGE_PATH,
+    IMAGE_VALID_NUM,
+    TIMM_IMAGE,
+)
 from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config, is_rois_input
@@ -303,8 +315,10 @@ class ImageProcessor:
 
     def process_one_sample(
         self,
-        image_paths: Dict[str, List[str]],
+        image_features: Dict[str, Union[List[str], List[bytearray]]],
+        feature_modalities: Dict[str, List[str]],
         is_training: bool,
+        image_mode: Optional[str] = "RGB",
     ) -> Dict:
         """
         Read images, process them, and stack them. One sample can have multiple images,
@@ -312,11 +326,16 @@ class ImageProcessor:
 
         Parameters
         ----------
-        image_paths
+        image_features
             One sample may have multiple image columns in a pd.DataFrame and multiple images
             inside each image column.
+        feature_modalities
+            What modality each column belongs to.
         is_training
             Whether to process images in the training mode.
+        image_mode
+            A string which defines the type and depth of a pixel in the image.
+            For example, RGB, RGBA, CMYK, and etc.
 
         Returns
         -------
@@ -327,8 +346,8 @@ class ImageProcessor:
         ret = {}
         column_start = 0
 
-        for per_col_name, per_col_image_paths in image_paths.items():
-            for img_path in per_col_image_paths[: self.max_img_num_per_col]:
+        for per_col_name, per_col_image_features in image_features.items():
+            for img_feature in per_col_image_features[: self.max_img_num_per_col]:
                 with warnings.catch_warnings():
                     warnings.filterwarnings(
                         "ignore",
@@ -338,12 +357,16 @@ class ImageProcessor:
                     )
                     is_zero_img = False
                     try:
-                        with PIL.Image.open(img_path) as img:
-                            img = img.convert("RGB")
+                        if feature_modalities.get(per_col_name) == IMAGE_BYTEARRAY:
+                            image_feature = BytesIO(img_feature)
+                        else:
+                            image_feature = img_feature
+                        with PIL.Image.open(image_feature) as img:
+                            img = img.convert(image_mode)
                     except Exception as e:
                         if self.missing_value_strategy.lower() == "zero":
                             logger.debug(f"Using a zero image due to '{e}'")
-                            img = PIL.Image.new("RGB", (self.size, self.size), color=0)
+                            img = PIL.Image.new(image_mode, (self.size, self.size), color=0)
                             is_zero_img = True
                         else:
                             raise e
@@ -399,7 +422,7 @@ class ImageProcessor:
         """
         images = {k: [v] if isinstance(v, str) else v for k, v in images.items()}
 
-        return self.process_one_sample(images, is_training)
+        return self.process_one_sample(images, feature_modalities, is_training)
 
     def __getstate__(self):
         odict = self.__dict__.copy()  # get attribute dictionary

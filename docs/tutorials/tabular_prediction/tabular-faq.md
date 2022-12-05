@@ -93,7 +93,7 @@ The positive class can also be retrieved via `predictor.class_labels[-1]`. The o
 
 See ["Interpretability (feature importance)" in the In Depth Tutorial](tabular-indepth.html#interpretability-feature-importance), which allows you to quantify how much each feature contributes to AutoGluon's predictive accuracy.
 
-Additionally, you can explain particular AutoGluon predictions using [Shapely values](https://github.com/slundberg/shap/). Notebooks demonstrating this are provided at: [https://github.com/awslabs/autogluon/tree/master/examples/tabular/interpret](https://github.com/awslabs/autogluon/tree/master/examples/tabular/interpret). We recommend starting with the notebook "SHAP with AutoGluon-Tabular" contained in this folder, which demonstrates handling of multiclass classification tasks and data with categorical features.
+Additionally, you can explain particular AutoGluon predictions using [Shapely values](https://github.com/slundberg/shap/). Notebooks demonstrating this are provided at: [https://github.com/autogluon/autogluon/tree/master/examples/tabular/interpret](https://github.com/autogluon/autogluon/tree/master/examples/tabular/interpret). We recommend starting with the notebook "SHAP with AutoGluon-Tabular" contained in this folder, which demonstrates handling of multiclass classification tasks and data with categorical features.
 
 
 ### How can I perform inference on a file that won't fit in memory?
@@ -164,7 +164,7 @@ alternatives in practice is not particularly feasible nor generalizable.
 
 Note that the `TabularDataset` object is essentially a [pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/frame.html) and you can transform your training data however you wish before calling `fit()`. Note that any transformations you perform yourself must also be applied to all future test data before calling `predict()`, and AutoGluon will still perform its default processing on your transformed data inside `fit()`.
 
-To solely use custom data preprocessing and automatically apply your custom transformations to both the train data and all future data encountered during inference, you should instead create a custom FeatureGenerator. Follow this example in the source code: [examples/tabular/example_custom_feature_generator.py](https://github.com/awslabs/autogluon/blob/master/examples/tabular/example_custom_feature_generator.py)
+To solely use custom data preprocessing and automatically apply your custom transformations to both the train data and all future data encountered during inference, you should instead create a custom FeatureGenerator. Follow this example in the source code: [examples/tabular/example_custom_feature_generator.py](https://github.com/autogluon/autogluon/blob/master/examples/tabular/example_custom_feature_generator.py)
 
 ### How can I differently weight the importance of training examples?
 
@@ -211,4 +211,4 @@ To address it, either cleanup your workspace, or 1) shutdown your Notebook insta
 
 ### Issues not addressed here
 
-First search if your issue is addressed in the [tutorials](index.html), [examples](https://github.com/awslabs/autogluon/tree/master/examples/tabular), [documentation](../../api/autogluon.predictor.html), or [Github issues](https://github.com/awslabs/autogluon/issues) (search both Closed and Open issues). If it is not there, please open a [new Github Issue](https://github.com/awslabs/autogluon/issues/new) and clearly state your issue. If you have a bug, please include: your code (call `fit(..., verbosity=4)` which will print more details), the output printed during the code execution, and information about your operating system, Python version, and installed packages (output of `pip freeze`).
+First search if your issue is addressed in the [tutorials](index.html), [examples](https://github.com/autogluon/autogluon/tree/master/examples/tabular), [documentation](../../api/autogluon.predictor.html), or [Github issues](https://github.com/autogluon/autogluon/issues) (search both Closed and Open issues). If it is not there, please open a [new Github Issue](https://github.com/autogluon/autogluon/issues/new) and clearly state your issue. If you have a bug, please include: your code (call `fit(..., verbosity=4)` which will print more details), the output printed during the code execution, and information about your operating system, Python version, and installed packages (output of `pip freeze`).

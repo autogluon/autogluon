@@ -92,4 +92,4 @@ predictor.fit(train_df, hyperparameters='multimodal', presets='best_quality')
 ```
 
 which will automatically select values for `num_stack_levels` (how many stacking layers) and `num_bag_folds` (how many folds to split data into during bagging).
-Stack ensembling can take much longer, so we won't run with this configuration here. You may explore more examples in https://github.com/awslabs/autogluon/tree/master/examples/text_prediction, which demonstrate how you can achieve top performance in competitions with a stack ensembling based solution.
+Stack ensembling can take much longer, so we won't run with this configuration here. You may explore more examples in https://github.com/autogluon/autogluon/tree/master/examples/text_prediction, which demonstrate how you can achieve top performance in competitions with a stack ensembling based solution.

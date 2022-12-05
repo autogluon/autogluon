@@ -7,12 +7,13 @@ from sklearn.model_selection import train_test_split
 from autogluon.multimodal.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.multimodal.utils import download
 
-from .utils import get_data_home_dir, get_repo_url, path_expander, protected_zip_extraction
+from .utils import get_data_home_dir, get_repo_url, path_expander, path_to_bytearray_expander, protected_zip_extraction
 
 
 class PetFinderDataset:
     def __init__(
         self,
+        is_bytearray=False,
     ):
         sha1sum_id = "72cb19612318bb304d4a169804f525f88dc3f0d0"
         dataset = "petfinder"
@@ -32,12 +33,13 @@ class PetFinderDataset:
         )
         self._train_df = pd.read_csv(os.path.join(self._path, "train.csv"), index_col=0)
         self._test_df = pd.read_csv(os.path.join(self._path, "test.csv"), index_col=0)
+        expander = path_to_bytearray_expander if is_bytearray else path_expander
         for img_col in self.image_columns:
             self._train_df[img_col] = self._train_df[img_col].apply(
-                lambda ele: path_expander(ele, base_folder=os.path.join(self._path, "images"))
+                lambda ele: expander(ele, base_folder=os.path.join(self._path, "images"))
             )
             self._test_df[img_col] = self._test_df[img_col].apply(
-                lambda ele: path_expander(ele, base_folder=os.path.join(self._path, "images"))
+                lambda ele: expander(ele, base_folder=os.path.join(self._path, "images"))
             )
             print(self._train_df[img_col][0])
             print(self._test_df[img_col][0])
@@ -119,6 +121,7 @@ class PetFinderDataset:
 class HatefulMeMesDataset:
     def __init__(
         self,
+        is_bytearray=False,
     ):
         sha1sum_id = "2aae657b786f505004ac2922b66097d60a540a58"
         dataset = "hateful_memes"
@@ -138,12 +141,13 @@ class HatefulMeMesDataset:
         )
         self._train_df = pd.read_csv(os.path.join(self._path, "train.csv"), index_col=0)
         self._test_df = pd.read_csv(os.path.join(self._path, "test.csv"), index_col=0)
+        expander = path_to_bytearray_expander if is_bytearray else path_expander
         for img_col in self.image_columns:
             self._train_df[img_col] = self._train_df[img_col].apply(
-                lambda ele: path_expander(ele, base_folder=os.path.join(self._path, "images"))
+                lambda ele: expander(ele, base_folder=os.path.join(self._path, "images"))
             )
             self._test_df[img_col] = self._test_df[img_col].apply(
-                lambda ele: path_expander(ele, base_folder=os.path.join(self._path, "images"))
+                lambda ele: expander(ele, base_folder=os.path.join(self._path, "images"))
             )
             print(self._train_df[img_col][0])
             print(self._test_df[img_col][0])

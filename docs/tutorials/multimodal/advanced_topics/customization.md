@@ -542,7 +542,7 @@ predictor.fit(hyperparameters={"data.image.missing_value_strategy": "zero"})
 ```
 
 ### data.text.normalize_text
-Whether to normalize text with encoding problems. If True, TextProcessor will run through a series of encoding and decoding for text normalization. Please refer to the [Example](https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_feedback_prize) of Kaggle competition for applying text normalization.
+Whether to normalize text with encoding problems. If True, TextProcessor will run through a series of encoding and decoding for text normalization. Please refer to the [Example](https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_feedback_prize) of Kaggle competition for applying text normalization.
 
 ```
 # default used by AutoMM

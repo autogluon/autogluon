@@ -17,7 +17,7 @@ Next steps
 ~~~~~~~~~~
 
 - Check out `the tutorials <tutorials/index.html>`_ to start producing models in under 5 minutes!
-- Learn more about AutoGluon through `other resources <https://github.com/awslabs/autogluon/#resources>`_ 
+- Learn more about AutoGluon through `other resources <https://github.com/autogluon/autogluon/#resources>`_ 
 
 .. raw:: html
 

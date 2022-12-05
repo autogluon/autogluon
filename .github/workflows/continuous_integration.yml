@@ -323,6 +323,9 @@ jobs:
           job-name: AutoGluon-BuildTabularPrediction
           command: chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_multimodal_tutorial:
+    strategy:
+      matrix:
+        SUB_DOC: ["advanced_topics", "image_prediction", "matching", "object_detection", "text_prediction", "multimodal_prediction"]
     needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
@@ -335,21 +338,7 @@ jobs:
         with:
           job-type: CI-GPU
           job-name: AutoGluon-BuildMultimodal
-          command: chmod +x ./.github/workflow_scripts/build_multimodal_tutorial.sh && ./.github/workflow_scripts/build_multimodal_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
-  build_text_prediction_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_vision, test_timeseries, test_install]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Setup Env Vars
-        uses: ./.github/actions/setup-env-vars
-      - name: Build Text Prediction Tutorial on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-BuildTextPrediction
-          command: chmod +x ./.github/workflow_scripts/build_text_prediction_tutorial.sh && ./.github/workflow_scripts/build_text_prediction_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
+          command: chmod +x ./.github/workflow_scripts/build_multimodal_tutorial.sh && ./.github/workflow_scripts/build_multimodal_tutorial.sh '${{ matrix.SUB_DOC }}' '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_cloud_fit_deploy_tutorial:
     needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
@@ -379,7 +368,7 @@ jobs:
           job-name: AutoGluon-BuildTimeseries
           command: chmod +x ./.github/workflow_scripts/build_timeseries_tutorial.sh && ./.github/workflow_scripts/build_timeseries_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_all_docs:
-    needs: [build_image_prediction_tutorial, build_object_detection_tutorial, build_tabular_prediction_tutorial, build_multimodal_tutorial, build_text_prediction_tutorial, build_cloud_fit_deploy_tutorial, build_timeseries_tutorial]
+    needs: [build_image_prediction_tutorial, build_object_detection_tutorial, build_tabular_prediction_tutorial, build_multimodal_tutorial, build_cloud_fit_deploy_tutorial, build_timeseries_tutorial]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
