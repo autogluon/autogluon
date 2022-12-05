@@ -102,6 +102,12 @@ Tutorials
 
       How to solve NLP problems via supervised learning from raw text.
 
+Managed Solutions Featuring AutoGluon
+-------------------------------------
+
+.. raw:: html
+   :file: static/managed_solutions.html
+
 Launch Tutorial Notebooks
 -------------------------
 
