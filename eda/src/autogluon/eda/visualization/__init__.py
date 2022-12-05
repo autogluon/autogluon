@@ -2,3 +2,4 @@ from .layouts import MarkdownSectionComponent, SimpleVerticalLinearLayout, Simpl
 from .dataset import DatasetStatistics, DatasetTypeMismatch
 from .shift import XShiftSummary
 from .missing import MissingValues
+from .interaction import CorrelationVisualization, CorrelationSignificanceVisualization
