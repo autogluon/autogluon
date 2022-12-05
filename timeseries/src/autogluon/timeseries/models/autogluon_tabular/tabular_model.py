@@ -86,6 +86,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
 
         self.tabular_predictor = TabularPredictor(
             label=self.target,
+            path=self.path,
             problem_type=ag.constants.REGRESSION,
             eval_metric=self.TIMESERIES_METRIC_TO_TABULAR_METRIC.get(self.eval_metric),
         )
