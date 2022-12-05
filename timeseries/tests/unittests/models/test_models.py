@@ -305,3 +305,24 @@ def test_when_predict_called_with_test_data_then_predictor_inference_correct(
     assert all(predicted_item_index == test_data.item_ids)  # noqa
     assert all(len(predictions.loc[i]) == prediction_length for i in predicted_item_index)
     assert all(predictions.loc[i].index[0].hour > 0 for i in predicted_item_index)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 5])
+def test_when_get_info_is_called_then_all_keys_are_present(model_class, prediction_length, trained_models):
+    model = trained_models[(prediction_length, repr(model_class))]
+    info = model.get_info()
+    expected_keys = [
+        "name",
+        "model_type",
+        "eval_metric",
+        "fit_time",
+        "predict_time",
+        "freq",
+        "prediction_length",
+        "quantile_levels",
+        "val_score",
+        "hyperparameters",
+    ]
+    for key in expected_keys:
+        assert key in info
