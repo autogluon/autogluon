@@ -2880,7 +2880,9 @@ class MultiModalPredictor:
             data_processors = None
 
         # backward compatibility. Use ROISProcessor for old mmdet/mmocr models.
-        if assets["problem_type"] == OBJECT_DETECTION or ("pipeline" in assets and assets["pipeline"] == OBJECT_DETECTION):
+        if assets["problem_type"] == OBJECT_DETECTION or (
+            "pipeline" in assets and assets["pipeline"] == OBJECT_DETECTION
+        ):
             data_processors = None
 
         predictor._label_column = assets["label_column"]
