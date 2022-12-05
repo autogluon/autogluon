@@ -25,16 +25,7 @@ try:
 except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
-from ..constants import (
-    AUTOMM,
-    CLIP,
-    CLIP_IMAGE_MEAN,
-    CLIP_IMAGE_STD,
-    COLUMN,
-    IMAGE,
-    IMAGE_VALID_NUM,
-    TIMM_IMAGE,
-)
+from ..constants import AUTOMM, CLIP, CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, COLUMN, IMAGE, IMAGE_VALID_NUM, TIMM_IMAGE
 from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config, is_rois_input
