@@ -547,7 +547,6 @@ def test_when_info_is_called_then_all_keys_and_models_are_included(temp_model_pa
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
     expected_keys = [
         "path",
-        "random_state",
         "version",
         "time_fit_training",
         "time_limit",
