@@ -80,9 +80,11 @@ if __name__ == "__main__":
             predictor_fit_args["feature_meatadata"] = FeatureMetadata(**predictor_fit_args["feature_meatadata"])
     elif predictor_type == "text":
         from autogluon.text import TextPredictor
+
         predictor_cls = TextPredictor
     elif predictor_type == "image":
         from autogluon.vision import ImagePredictor
+
         predictor_cls = ImagePredictor
     elif predictor_type == "multimodal":
         predictor_cls = MultiModalPredictor
