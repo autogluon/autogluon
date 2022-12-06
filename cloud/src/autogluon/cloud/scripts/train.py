@@ -12,7 +12,6 @@ import yaml
 from autogluon.tabular import TabularPredictor, TabularDataset, FeatureMetadata
 
 
-
 def get_input_path(path):
     file = os.listdir(path)[0]
     if len(os.listdir(path)) > 1:
@@ -88,7 +87,7 @@ if __name__ == "__main__":
         predictor_cls = ImagePredictor
     elif predictor_type == "multimodal":
         from autogluon.multimodal import MultiModalPredictor
-        
+
         predictor_cls = MultiModalPredictor
 
     train_file = get_input_path(args.training_dir)
