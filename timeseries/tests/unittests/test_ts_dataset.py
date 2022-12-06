@@ -690,7 +690,7 @@ def test_when_dataframe_sliced_by_item_array_then_static_features_stay_consisten
 
 def test_when_dataframe_reindexed_view_called_then_static_features_stay_consistent():
     view = SAMPLE_TS_DATAFRAME_STATIC.get_reindexed_view()
-    assert view._static_features is SAMPLE_TS_DATAFRAME_STATIC._static_features
+    assert view._static_features.equals(SAMPLE_TS_DATAFRAME_STATIC._static_features)
 
 
 SAMPLE_DATAFRAME_WITH_MIXED_INDEX = pd.DataFrame(
