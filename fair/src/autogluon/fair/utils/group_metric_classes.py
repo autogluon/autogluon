@@ -1,3 +1,5 @@
+"""The clases used to define group measures for fairness and performance"""
+import abc
 from abc import abstractmethod
 import logging
 import copy
@@ -10,11 +12,11 @@ logger = logging.getLogger(__name__)
 
 class BaseGroupMetric:
     """building block for GroupMetrics. It does book keeping allowing group metrics to take as raw
-    input either a single array containing TP,FP,FN,TN values broadcast over groups and many
+    input either a single array containing t_pos,f_pos,f_neg,t_neg values broadcast over groups and many
     different thresholds, or singular vectors corresponding to y_true, y_pred, and groups.
     Also contains additional annotations: name, and greater_is_better
     """
-
+    __metaclass__ = abc.ABCMeta
     def __init__(self, func: Callable[[np.ndarray, np.ndarray, np.ndarray, np.ndarray], np.ndarray],
                  name: str, greater_is_better: bool) -> None:
         self.func: Callable[[np.ndarray, np.ndarray, np.ndarray, np.ndarray], np.ndarray] = func
@@ -49,20 +51,20 @@ class BaseGroupMetric:
         y_true: np.ndarray = args[0].astype(int)
         y_pred: np.ndarray = args[1].astype(int)
         groups: np.ndarray = args[2]
-        if not (y_true.size == y_pred.size == groups.size):
+        if not y_true.size == y_pred.size == groups.size:
             logger.error('Inputs to group_metric are of different sizes.')
-        TP = y_true * y_pred
-        FP = (1 - y_true) * y_pred
-        FN = y_true * (1 - y_pred)
-        TN = (1 - y_true) * (1 - y_pred)
+        t_pos = y_true * y_pred
+        f_pos = (1 - y_true) * y_pred
+        f_neg = y_true * (1 - y_pred)
+        t_neg = (1 - y_true) * (1 - y_pred)
         unique = np.unique(groups)
         out = np.zeros((4, 1, unique.shape[0]))
-        for i, g in enumerate(unique):
-            mask = (groups == g)
-            out[0, :, i] = TP[mask].sum()
-            out[1, :, i] = FP[mask].sum()
-            out[2, :, i] = FN[mask].sum()
-            out[3, :, i] = TN[mask].sum()
+        for i, group_name in enumerate(unique):
+            mask = (groups == group_name)
+            out[0, :, i] = t_pos[mask].sum()
+            out[1, :, i] = f_pos[mask].sum()
+            out[2, :, i] = f_neg[mask].sum()
+            out[3, :, i] = t_neg[mask].sum()
         return out[0], out[1], out[2], out[3]
 
     def rename(self, new_name: str):
@@ -133,8 +135,8 @@ class Overall(BaseGroupMetric):
     "helper class for reporting score over entire dataset"
 
     def __call__(self, *args: np.ndarray) -> np.ndarray:
-        TP, FP, FN, TN = self.build_array(args)
-        val = self.func(TP.sum(1), FP.sum(1), FN.sum(1), TN.sum(1))
+        t_pos, f_pos, f_neg, t_neg = self.build_array(args)
+        val = self.func(t_pos.sum(1), f_pos.sum(1), f_neg.sum(1), t_neg.sum(1))
         return val
 
 
@@ -208,7 +210,7 @@ class AddGroupMetrics(BaseGroupMetric):
     a BaseGroupMetric that gives scores of the form:
         weight*metric1_response+(1-weight)*metric2_response """
 
-    def __init__(self, metric1: BaseGroupMetric, metric2: BaseGroupMetric, name: str,
+    def __init__(self, metric1: BaseGroupMetric, metric2: BaseGroupMetric, name: str, # pylint: disable=super-init-not-called
                  weight: float = 0.5) -> None:
         self.metric1: BaseGroupMetric = metric1
         self.metric2: BaseGroupMetric = metric2
@@ -226,7 +228,7 @@ class AddGroupMetrics(BaseGroupMetric):
 
 class Utility(GroupMetric):
     """A group metric for encoding utility functions.
-    See Fairness on the Ground: https://arxiv.org/pdf/2103.06172.pdf
+    See Fairness on the Ground: htt_poss://arxiv.org/pdf/2103.06172.pdf
     This is implemented as a group metric, so the standard fairness concerns i.e.
     difference in utility between groups, ratio of utility, minimum utility of any group
     are all supported.
@@ -244,7 +246,7 @@ class Utility(GroupMetric):
         self.utility = utility
         super().__init__(self.cost, name, greater_is_better)
 
-    def cost(self, TP, FP, FN, TN):
+    def cost(self, t_pos, f_pos, f_neg, t_neg):
         "Method for computing the cost/utility"
-        return (TP * self.utility[0] + FP * self.utility[1] + FN * self.utility[2]
-                + TN * self.utility[3]) / (TP + FP + FN + TN)
+        return (t_pos * self.utility[0] + f_pos * self.utility[1] + f_neg * self.utility[2]
+                + t_neg * self.utility[3]) / (t_pos + f_pos + f_neg + t_neg)

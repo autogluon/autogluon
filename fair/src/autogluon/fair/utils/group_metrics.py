@@ -1,7 +1,9 @@
+"""Definitions of standard measures for fairness and performance"""
 import numpy as np
 
 from autogluon.core.metrics import roc_auc
-from .group_metric_classes import GroupMetric, AddGroupMetrics, BaseGroupMetric, Utility
+from .group_metric_classes import GroupMetric, AddGroupMetrics, BaseGroupMetric, Utility # pylint: disable=unused-import
+
 # N.B. BaseGroupMetric and Utility are needed for type declarations
 
 # Basic parity measures for fairness

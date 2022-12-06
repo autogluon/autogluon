@@ -1,3 +1,4 @@
+"""Implements efficient methods for fast computation of binary metrics"""
 import logging
 from typing import Callable, Tuple, List
 import numpy as np
@@ -88,17 +89,17 @@ def keep_front(solutions: np.ndarray, initial_weights: np.ndarray, directions: n
     undominated = np.ones(front.shape[0], dtype=bool)
 
     for i in range(front.shape[0]):
-        n = front.shape[0]
+        size = front.shape[0]
         # process each point in turn
-        if i >= n:
+        if i >= size:
             break
         # find all points not dominated by i
         # since points are sorted by coordinate sum
         # i cannot dominate any points in 1,...,i-1
         undominated[i] = True  # Bug fix missing from online version
-        undominated[i + 1:n] = (front[i + 1:n] >= front[i] + tol).any(1)
-        front = front[undominated[:n]]
-        weights = weights[undominated[:n]]
+        undominated[i + 1:size] = (front[i + 1:size] >= front[i] + tol).any(1)
+        front = front[undominated[:size]]
+        weights = weights[undominated[:size]]
 
     weights = weights.T
     front *= directions
@@ -179,6 +180,18 @@ def condense(thresholds: np.ndarray, labels: np.ndarray, lmax: int, groups: np.n
     assert out.sum() == labels.shape[0]
     return unique_thresh, out
 
+def test_cum_sum(accum_count,groups):
+    "Check expected properties of accum_count hold"
+    # N.B. all values are int, and float approximation is not a concern
+    for group in range(groups):
+        assert (np.abs(accum_count[group].sum(1) - accum_count[group][0].sum(0)).sum()) == 0
+        # Total sum must be the same
+        assert (np.abs(accum_count[group][:, 0] + accum_count[group][:, 2]
+                       - accum_count[group][0][0] - accum_count[group][0][2]).sum()) == 0
+        # TP+FN must be the same
+        assert (np.abs(accum_count[group][:, 1] + accum_count[group][:, 3]
+                       - accum_count[group][0][1] - accum_count[group][0][3]).sum()) == 0
+        # FP+TN must be the same
 
 def grid_search(y_true: np.ndarray, proba: np.ndarray, metric1: Callable, metric2: Callable,
                 hard_assignment: np.ndarray, true_groups: np.ndarray, directions: np.ndarray,
@@ -244,28 +257,20 @@ def grid_search(y_true: np.ndarray, proba: np.ndarray, metric1: Callable, metric
     thresholds = [np.concatenate((t[0:1] + eps, t), 0) for t in thresholds]
     # add threshold above maximum value
 
-    def cumsum_zero(x):
-        zero = np.zeros((1,) + x.shape[1:], dtype=int)
-        out = np.concatenate((zero, np.cumsum(x, 0)), 0)
+    def cumsum_zero(array):
+        zero = np.zeros((1,) + array.shape[1:], dtype=int)
+        out = np.concatenate((zero, np.cumsum(array, 0)), 0)
         return out
 
     accum_count = [np.concatenate((cumsum_zero(o), cumsum_zero(o[::-1])[::-1]), 1)
                    for o in ordered_encode]
-    # The above the important code
+    # The above is the important code
     # accum_count is a list of size groups where each element is an array consisting of the number
     # of true positives, false positives, false negatives and false positives if a threshold is set
     # at a particular value. It is of size (4, groups) because the group assignment may come at test
     # time from an inaccurate classifier
 
-    # Check expected properties hold.
-    # N.B. all values are int, and float approximation is not a concern
-    for g in range(groups):
-        assert (np.abs(accum_count[g].sum(1) - accum_count[g][0].sum(0)).sum()) == 0
-        # Total sum must be the same
-        assert (np.abs(accum_count[g][:, 0] + accum_count[g][:, 2] - accum_count[g][0][0] - accum_count[g][0][2]).sum()) == 0
-        # TP+FN must be the same
-        assert (np.abs(accum_count[g][:, 1] + accum_count[g][:, 3] - accum_count[g][0][1] - accum_count[g][0][3]).sum()) == 0
-        # FP+TN must be the same
+    test_cum_sum(accum_count,groups)
     # now for the computational bottleneck
     bottom = np.zeros(groups)
     top = np.asarray([s.shape[0] for s in group_score])

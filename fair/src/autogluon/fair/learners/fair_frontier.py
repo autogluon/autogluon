@@ -1,4 +1,4 @@
-# TODO Either fully comment or remove this file.
+"""Slow pathway for computing fairness constraints. Compatable with Scorers and group metrics, while efficient_compute is only compatable with group metrics"""
 from typing import Callable, Tuple
 import numpy as np
 from autogluon.core.metrics import Scorer

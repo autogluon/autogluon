@@ -1,3 +1,4 @@
+"""The entry point to fair. Defines the FairPredictor object used to access fairness functionality."""
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
