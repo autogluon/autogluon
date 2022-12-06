@@ -2854,7 +2854,7 @@ class MultiModalPredictor:
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = CustomUnpickler(fp).load()
             if not hasattr(df_preprocessor, "_rois_feature_names"):
-                df_preprocessor._rois_feature_names = []  #backward compatibility
+                df_preprocessor._rois_feature_names = []  # backward compatibility
 
         try:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
