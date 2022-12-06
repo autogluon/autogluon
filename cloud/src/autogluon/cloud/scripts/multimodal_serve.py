@@ -14,18 +14,6 @@ from autogluon.core.utils import get_pred_from_proba_df
 from autogluon.multimodal import MultiModalPredictor
 
 
-def _save_image_and_update_dataframe_column(bytes):
-    im_bytes = base64.b85decode(bytes)
-    # nosec B303 - not a cryptographic use
-    im_hash = hashlib.sha1(im_bytes).hexdigest()
-    im = Image.open(BytesIO(im_bytes))
-    im_name = f"multimodal_image_{im_hash}.png"
-    im.save(im_name)
-    print(f"Image saved as {im_name}")
-
-    return im_name
-
-
 def _cleanup_images():
     files = os.listdir(".")
     for file in files:
@@ -45,7 +33,7 @@ def model_fn(model_dir):
 
 
 def transform_fn(model, request_body, input_content_type, output_content_type="application/json"):
-    image_paths = None
+    image_bytearrays = None
     if input_content_type == "application/x-parquet":
         buf = BytesIO(request_body)
         data = pd.read_parquet(buf)
@@ -65,29 +53,19 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
     elif input_content_type == "application/x-npy":
         buf = BytesIO(request_body)
         data = np.load(buf, allow_pickle=True)
-        image_paths = []
+        image_bytearrays = []
         for bytes in data:
             im_bytes = base64.b85decode(bytes)
-            # nosec B303 - not a cryptographic use
-            im_hash = hashlib.sha1(im_bytes).hexdigest()
-            im_name = f"multimodal_image_{im_hash}.png"
-            im = Image.open(BytesIO(im_bytes))
-            im.save(im_name)
-            image_paths.append(im_name)
+            image_bytearrays.append(im_bytes)
 
     elif input_content_type == "application/x-image":
-        buf = BytesIO(request_body)
-        im = Image.open(buf)
-        image_paths = []
-        im_name = "test.png"
-        im.save(im_name)
-        image_paths.append(im_name)
+        image_bytearrays.append(request_body)
 
     else:
         raise ValueError(f"{input_content_type} input content type not supported.")
 
-    if image_paths is not None:
-        data = dict(image=image_paths)  # multimodal image prediction takes in a dict containing image paths
+    if image_bytearrays is not None:
+        data = dict(image=image_bytearrays)  # multimodal image prediction takes in a dict containing image bytearrays
     else:
         # no header
         test_columns = sorted(list(data.columns))
@@ -108,13 +86,12 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         # find image column
         image_column = None
         for column_name, column_type in model._column_types.items():
-            if column_type in ("image_path", "image"):
+            if column_type in ("image_path", "image", "image_bytearray"):
                 image_column = column_name
                 break
-        # save image column bytes to disk and update the column with saved path
         if image_column is not None:
             print(f"Detected image column {image_column}")
-            data[image_column] = [_save_image_and_update_dataframe_column(bytes) for bytes in data[image_column]]
+            data[image_column] = [base64.b85decode(bytes) for bytes in data[image_column]]
 
     if model.problem_type == BINARY or model.problem_type == MULTICLASS:
         pred_proba = model.predict_proba(data, as_pandas=True)
