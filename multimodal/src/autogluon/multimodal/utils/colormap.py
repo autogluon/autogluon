@@ -146,19 +146,3 @@ def random_colors(N, rgb=False, maximum=255):
     if not rgb:
         ret = [x[::-1] for x in ret]
     return ret
-
-
-if __name__ == "__main__":
-    import cv2
-
-    size = 100
-    H, W = 10, 10
-    canvas = np.random.rand(H * size, W * size, 3).astype("float32")
-    for h in range(H):
-        for w in range(W):
-            idx = h * W + w
-            if idx >= len(_COLORS):
-                break
-            canvas[h * size : (h + 1) * size, w * size : (w + 1) * size] = _COLORS[idx]
-    cv2.imshow("a", canvas)
-    cv2.waitKey(0)
