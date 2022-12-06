@@ -212,6 +212,11 @@ class TimeSeriesPredictor:
                 "data set used has a uniform time index, or create the `TimeSeriesPredictor` "
                 "setting `ignore_time_index=True`."
             )
+        if df.isna().values.any():
+            raise ValueError(
+                "TimeSeriesPredictor does not yet support missing values. "
+                "Please make sure that the provided data contains no NaNs."
+            )
         return df
 
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)
@@ -232,7 +237,8 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         train_data : TimeSeriesDataFrame
-            Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
+            Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format. Ideally, all time series
+            should have length ``> 2 * prediction_length``.
 
             If ``known_covariates_names`` were specified when creating the predictor, ``train_data`` must include the
             columns listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
@@ -424,6 +430,19 @@ class TimeSeriesPredictor:
             )
         logger.info(f"Training artifacts will be saved to: {Path(self.path).resolve()}")
         logger.info("=====================================================")
+
+        num_timesteps_per_item = train_data.num_timesteps_per_item()
+        if (num_timesteps_per_item <= 2).any():
+            warnings.warn(
+                "Detected time series with length <= 2 in train_data. "
+                "Please remove them from the dataset or TimeSeriesPredictor likely won't work as intended."
+            )
+        elif (num_timesteps_per_item <= 2 * self.prediction_length).any():
+            warnings.warn(
+                "Detected short time series in train_data. "
+                "Ideally, all training time series should have length >= 2 * prediction_length + 1"
+                f"(at least {2 * self.prediction_length + 1})."
+            )
 
         if random_seed is not None:
             set_random_seed(random_seed)
