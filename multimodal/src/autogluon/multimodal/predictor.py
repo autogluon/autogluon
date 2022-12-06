@@ -2853,8 +2853,12 @@ class MultiModalPredictor:
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = CustomUnpickler(fp).load()
-            if not hasattr(df_preprocessor, "_rois_feature_names") and ROIS in df_preprocessor._image_feature_names:  # backward compatibility for mmlab models
-                df_preprocessor._image_feature_names = [name for name in df_preprocessor._image_feature_names if name != ROIS]
+            if (
+                not hasattr(df_preprocessor, "_rois_feature_names") and ROIS in df_preprocessor._image_feature_names
+            ):  # backward compatibility for mmlab models
+                df_preprocessor._image_feature_names = [
+                    name for name in df_preprocessor._image_feature_names if name != ROIS
+                ]
                 df_preprocessor._rois_feature_names = [ROIS]
 
         try:
