@@ -115,6 +115,7 @@ from .utils import (
     average_checkpoints,
     check_if_packages_installed,
     cocoeval,
+    convert_data_to_df,
     compute_inference_batch_size,
     compute_num_gpus,
     compute_score,
@@ -2336,14 +2337,18 @@ class MultiModalPredictor:
                 as_pandas=as_pandas,
             )
         if self._problem_type == OBJECT_DETECTION:
-            if isinstance(data, str):
-                data = from_coco_or_voc(data, "test")
-            elif isinstance(data, dict):
-                data = from_dict(data)
+            if isinstance(data, (str, dict, list)):
+                data = convert_data_to_df(data)
+            # if isinstance(data, str):
+            #     data = from_coco_or_voc(data, "test")
+            # elif isinstance(data, dict):
+            #     data = from_dict(data)
             else:
                 assert isinstance(
                     data, pd.DataFrame
-                ), "TypeError: Expected data type to be a filepath, a folder or a dictionary, but got {}".format(data)
+                ), "TypeError: Expected data type to be of type dict, list, or str, but got {} of type {}".format(
+                    data, type(data)
+                )
 
             if self._label_column not in data:
                 self._label_column = None

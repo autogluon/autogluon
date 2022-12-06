@@ -45,6 +45,7 @@ from .object_detection import (
     COCODataset,
     bbox_xyxy_to_xywh,
     cocoeval,
+    convert_data_to_df,
     from_coco,
     from_coco_or_voc,
     from_dict,
