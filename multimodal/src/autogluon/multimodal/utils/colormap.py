@@ -150,7 +150,6 @@ def random_colors(N, rgb=False, maximum=255):
 
 if __name__ == "__main__":
     import cv2
-
     size = 100
     H, W = 10, 10
     canvas = np.random.rand(H * size, W * size, 3).astype("float32")
