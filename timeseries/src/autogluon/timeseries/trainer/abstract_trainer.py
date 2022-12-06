@@ -825,7 +825,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             return self._predict_model(data, model, known_covariates=known_covariates, **kwargs)
         except Exception as err:
             logger.error(f"Warning: Model {model.name} failed during prediction with exception: {err}")
-            logger.debug(traceback.format_exc())
             other_models = [m for m in self.get_model_names() if m != model.name]
             if len(other_models) > 0 and model_was_selected_automatically:
                 logger.info(f"\tYou can call predict(data, model) with one of other available models: {other_models}")
