@@ -29,7 +29,7 @@ install_requires = [
     # TODO: update to the latest after 0.6 container is out
     "sagemaker>=2.94",
     "pyarrow>=9.0",
-    "Pillow>=9.0.0",
+    "Pillow>=9.3.0",
 ]
 
 extras_require = dict()
