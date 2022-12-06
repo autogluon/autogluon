@@ -180,14 +180,16 @@ class SimpleAbstractTrainer:
 
     # TODO: This is horribly inefficient beyond simple weighted ensembling.
     #  Refactor to Tabular's implementation if doing stacking / multiple ensembles
-    def get_inputs_to_model(self, model, X, model_pred_proba_dict=None):
+    def get_inputs_to_model(
+        self, model, X, model_pred_proba_dict=None, known_covariates: Optional[TimeSeriesDataFrame] = None
+    ):
         if model_pred_proba_dict is None:
             model_pred_proba_dict = {}
         model_set = self.get_minimum_model_set(model, include_self=False)
         if model_set:
             for m in model_set:
                 if m not in model_pred_proba_dict:
-                    model_pred_proba_dict[m] = self.predict(model=m, data=X)
+                    model_pred_proba_dict[m] = self.predict(model=m, data=X, known_covariates=known_covariates)
             return model_pred_proba_dict
         else:
             return X
@@ -869,7 +871,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     ) -> TimeSeriesDataFrame:
         if isinstance(model, str):
             model = self.load_model(model)
-        data = self.get_inputs_to_model(model=model, X=data)
+        data = self.get_inputs_to_model(model=model, X=data, known_covariates=known_covariates)
         return model.predict(data, known_covariates=known_covariates, **kwargs)
 
     # TODO: experimental
