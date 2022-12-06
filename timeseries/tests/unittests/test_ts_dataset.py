@@ -720,3 +720,29 @@ def test_when_static_features_are_modified_on_shallow_copy_then_original_df_does
     new_df = old_df.copy(deep=False)
     new_df.static_features = None
     assert old_df.static_features is not None
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        SAMPLE_DATAFRAME.sample(frac=1),
+        SAMPLE_TS_DATAFRAME.sample(frac=1),
+    ],
+)
+def test_when_raw_timestamps_are_not_sorted_then_ts_dataframe_has_sorted_timestamps(data):
+    tsdf = TimeSeriesDataFrame(data)
+    for item_id in tsdf.item_ids:
+        assert tsdf.loc[item_id].index.is_monotonic_increasing
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        SAMPLE_DATAFRAME.sample(frac=1),
+        SAMPLE_TS_DATAFRAME.sample(frac=1),
+    ],
+)
+def test_when_raw_timestamps_are_not_sorted_then_freq_inference_works(data):
+    tsdf = TimeSeriesDataFrame(data)
+    assert tsdf.freq is not None
+    assert tsdf.freq == SAMPLE_TS_DATAFRAME.freq
