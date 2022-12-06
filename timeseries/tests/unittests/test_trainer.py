@@ -16,7 +16,7 @@ from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesEnsembleWrapper
 from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
-from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index, DATAFRAME_WITH_COVARIATES
+from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
