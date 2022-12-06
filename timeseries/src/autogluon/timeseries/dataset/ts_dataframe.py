@@ -154,9 +154,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 )
             # if provided static features are a strict superset of the item index, we take a subset to ensure consistency
             if len(value.index.difference(self.item_ids)) > 0:
-                value = value.loc[self.item_ids].copy()
+                value = value.loc[self.item_ids]
+            # Avoid modifying static features inplace
+            value = value.copy()
             if value.index.name != ITEMID:
-                value = value.copy()
                 value.index.rename(ITEMID, inplace=True)
 
         self._static_features = value
