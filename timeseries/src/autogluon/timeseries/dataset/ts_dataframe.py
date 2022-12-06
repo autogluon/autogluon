@@ -102,10 +102,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 self._validate_multi_index_data_frame(data)
             else:
                 data = self._construct_pandas_frame_from_data_frame(data)
-            data = self._sort_timestamps(data)
+            # Make sure that timestamps are sorted but item_id order is preserved
+            item_ids = data.index.unique(level=ITEMID)
+            data = data.sort_values(by=TIMESTAMP).loc[item_ids]
         elif isinstance(data, Iterable):
             data = self._construct_pandas_frame_from_iterable_dataset(data)
-            data = self._sort_timestamps(data)
         else:
             raise ValueError("Data input type not recognized, must be DataFrame or iterable.")
         super().__init__(data=data, *args, **kwargs)
@@ -135,11 +136,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @property
     def static_features(self):
         return self._static_features
-
-    @staticmethod
-    def _sort_timestamps(data: pd.DataFrame) -> pd.DataFrame:
-        item_ids = data.index.unique(level=ITEMID)
-        return data.sort_values(by=TIMESTAMP).loc[item_ids]
 
     @static_features.setter
     def static_features(self, value: Optional[pd.DataFrame]):
