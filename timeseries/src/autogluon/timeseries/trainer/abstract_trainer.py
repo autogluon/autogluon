@@ -735,6 +735,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         )
 
         self._add_model(model=simple_ensemble, base_models=simple_ensemble.model_names)
+        self.save_model(model=simple_ensemble)
         return simple_ensemble.name
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:

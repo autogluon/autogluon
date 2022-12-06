@@ -399,6 +399,9 @@ class TimeSeriesLearner(AbstractLearner):
         )
 
         learner_info.update(trainer_info)
+        # self.random_state not used during fitting, so we don't include it in the summary
+        # TODO: Report random seed passed to predictor.fit?
+        learner_info.pop("random_state", None)
         return learner_info
 
     def refit_full(self, models="all"):
