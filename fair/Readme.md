@@ -288,7 +288,7 @@ In contrast, even though the base classifiers have similar accuracy, when using 
 
     # Now using the inferred attributes
     
-    fpredictor2 = FairPredictor(predictor2, val, 'race', protected)
+    fpredictor2 = FairPredictor(predictor2, val, 'race', inferred_groups=protected)
     
     evaluate(fpredictor2,gm.clarify_metrics)
 
@@ -357,6 +357,7 @@ The file `../autogluon/examples/fair/sample_use.ipynb` has an example on the adu
 The remainder of the document lists the standard measures provided by the group_metrics library, which is imported as:
 
     from autogluon.fair.utils import group_metrics as gm
+
 ### Basic Structure
 
 The majority of measures are defined as GroupMetrics or sub-objects of GroupMetrics.
