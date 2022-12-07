@@ -1357,7 +1357,7 @@ class MultiModalPredictor:
             except:
                 while True:
                     try:
-                        target = 'ec2/2022_09_14/cross_table_pretrain/' + self.is_pretrain["folder_name"] + '/iter_' + str(-1) + '/' + is_pretrain_[
+                        target = 'ec2/2022_09_14/cross_table_pretrain/' + is_pretrain_["folder_name"] + '/iter_' + str(-1) + '/' + is_pretrain_[
                             'name'] + '.ckpt'
                         checkpoint = {
                             "state_dict": {name: param for name, param in
