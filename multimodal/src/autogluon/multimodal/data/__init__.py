@@ -7,7 +7,7 @@ from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from .process_categorical import CategoricalProcessor
 from .process_image import ImageProcessor
 from .process_label import LabelProcessor
+from .process_mmlab import MMDetProcessor, MMOcrProcessor
 from .process_ner import NerProcessor
 from .process_numerical import NumericalProcessor
 from .process_text import TextProcessor
-from .process_mmlab import MMDetProcessor, MMOcrProcessor
