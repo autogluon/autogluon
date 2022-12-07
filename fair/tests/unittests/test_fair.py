@@ -113,7 +113,7 @@ def pathologoical(predictor, train_data):
 
 def pathologoical2(predictor, train_data, use_fast):
     "pass it the same objective twice"
-    fpredictor = fair.FairPredictor(predictor, train_data, groups='sex', use_fast=False)
+    fpredictor = fair.FairPredictor(predictor, train_data, groups='sex', use_fast=use_fast)
     fpredictor.fit(gm.balanced_accuracy, gm.balanced_accuracy, 0)
     fpredictor.plot_frontier()
     fpredictor.evaluate_fairness()
@@ -121,7 +121,8 @@ def pathologoical2(predictor, train_data, use_fast):
 
 def recall_diff(predictor, test_data, use_fast):
     """ Maximize accuracy while enforcing weak equalized odds,
-    such that the difference in recall between groups is less than 2.5%"""
+    such that the difference in recall between groups is less than 2.5%
+    This also tests the sign functionality on constraints and the objective"""
 
     fpredictor = fair.FairPredictor(predictor, test_data, 'sex', use_fast=use_fast)
 
@@ -133,6 +134,14 @@ def recall_diff(predictor, test_data, use_fast):
     assert measures['original']['recall.diff'] > 0.025
 
     assert measures['updated']['recall.diff'] < 0.025
+    measures=fpredictor.evaluate()
+    acc=measures['updated']['accuracy']
+    fpredictor.fit(gm.accuracy, gm.recall.diff, 0.025, greater_is_better_const=True)
+    measures = fpredictor.evaluate_fairness()
+    assert measures['original']['recall.diff'] > 0.025
+
+    fpredictor.fit(gm.accuracy, gm.recall.diff, 0.025,greater_is_better_obj=False)
+    assert acc>fpredictor.evaluate()['updated']['accuracy']
 
 
 def subset(predictor, test_data, new_test, use_fast):

@@ -42,7 +42,7 @@ def compute_metric(
 
 
 def keep_front(solutions: np.ndarray, initial_weights: np.ndarray, directions: np.ndarray,
-               tol=1e-12) -> Tuple[np.ndarray, np.ndarray]:
+               *, tol=1e-12) -> Tuple[np.ndarray, np.ndarray]:
     """Modified from
         https://stackoverflow.com/questions/32791911/fast-calculation-of-pareto-front-in-python
         Returns Pareto efficient row subset of solutions and its associated weights
@@ -110,7 +110,7 @@ def keep_front(solutions: np.ndarray, initial_weights: np.ndarray, directions: n
 
 
 def build_grid(accum_count: np.ndarray, bottom, top, metric1: Callable,
-               metric2: Callable, steps=25) -> Tuple[np.ndarray, List[np.ndarray], np.ndarray]:
+               metric2: Callable, *, steps=25) -> Tuple[np.ndarray, List[np.ndarray], np.ndarray]:
     """Part of efficient grid search.
     This uses the fact that metrics can be computed efficiently as a function of TP,FP,FN and TN.
     By sorting the data per assigned group  we can efficiently compute these four values by looking
@@ -180,7 +180,8 @@ def condense(thresholds: np.ndarray, labels: np.ndarray, lmax: int, groups: np.n
     assert out.sum() == labels.shape[0]
     return unique_thresh, out
 
-def test_cum_sum(accum_count,groups):
+
+def test_cum_sum(accum_count, groups):
     "Check expected properties of accum_count hold"
     # N.B. all values are int, and float approximation is not a concern
     for group in range(groups):
@@ -193,8 +194,16 @@ def test_cum_sum(accum_count,groups):
                        - accum_count[group][0][1] - accum_count[group][0][3]).sum()) == 0
         # FP+TN must be the same
 
+
+def cumsum_zero(array: np.ndarray):
+    "compute a cumalitive sum starting with zero (i.e. the sum upto the first element)"
+    zero = np.zeros((1,) + array.shape[1:], dtype=int)
+    out = np.concatenate((zero, np.cumsum(array, 0)), 0)
+    return out
+
+
 def grid_search(y_true: np.ndarray, proba: np.ndarray, metric1: Callable, metric2: Callable,
-                hard_assignment: np.ndarray, true_groups: np.ndarray, directions: np.ndarray,
+                hard_assignment: np.ndarray, true_groups: np.ndarray, *, directions=(+1, +1),
                 group_response=False, steps=25) -> Tuple[np.ndarray, np.ndarray]:
     """Efficient grid search.
     Functions under the assumtion data is hard assigned by a group classifer with errors
@@ -253,14 +262,9 @@ def grid_search(y_true: np.ndarray, proba: np.ndarray, metric1: Callable, metric
     ordered_encode = [e[o] for e, o in zip(group_encode, order)]
     # thresholds are returned but not used in computation
 
-    eps = 1e-4
-    thresholds = [np.concatenate((t[0:1] + eps, t), 0) for t in thresholds]
+    #eps = 1e-4
+    thresholds = [np.concatenate((t[0:1] + 1e-4, t), 0) for t in thresholds]
     # add threshold above maximum value
-
-    def cumsum_zero(array):
-        zero = np.zeros((1,) + array.shape[1:], dtype=int)
-        out = np.concatenate((zero, np.cumsum(array, 0)), 0)
-        return out
 
     accum_count = [np.concatenate((cumsum_zero(o), cumsum_zero(o[::-1])[::-1]), 1)
                    for o in ordered_encode]
@@ -270,11 +274,11 @@ def grid_search(y_true: np.ndarray, proba: np.ndarray, metric1: Callable, metric
     # at a particular value. It is of size (4, groups) because the group assignment may come at test
     # time from an inaccurate classifier
 
-    test_cum_sum(accum_count,groups)
+    test_cum_sum(accum_count, groups)
     # now for the computational bottleneck
     bottom = np.zeros(groups)
     top = np.asarray([s.shape[0] for s in group_score])
-    score, mesh_indices, step = build_grid(accum_count, bottom, top, metric1, metric2, steps)
+    score, mesh_indices, step = build_grid(accum_count, bottom, top, metric1, metric2, steps=steps)
 
     indicies = np.asarray(np.meshgrid(*mesh_indices, sparse=False)).reshape(groups, -1)
     front, index = keep_front(score, indicies, directions)
@@ -284,7 +288,7 @@ def grid_search(y_true: np.ndarray, proba: np.ndarray, metric1: Callable, metric
         tindex = index
     bottom = np.floor(np.maximum(step / 2, tindex.min(1) - step))
     top = np.ceil(np.minimum(top, tindex.max(1) + step))
-    score, mesh_indices, _ = build_grid(accum_count, bottom, top, metric1, metric2, steps)
+    score, mesh_indices, _ = build_grid(accum_count, bottom, top, metric1, metric2, steps=steps)
 
     indicies = np.asarray(np.meshgrid(*mesh_indices, sparse=False)).reshape(groups, -1)
     new_front, new_index = keep_front(score, indicies, directions)

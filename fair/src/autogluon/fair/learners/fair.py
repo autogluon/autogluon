@@ -43,7 +43,7 @@ class FairPredictor:
         fair_frontier.py can be removed
     """
 
-    def __init__(self, predictor, validation_data, groups=None, inferred_groups=False,
+    def __init__(self, predictor, validation_data, groups=None, *, inferred_groups=False,
                  use_fast=True) -> None:
 
         if predictor.problem_type != 'binary':
@@ -108,8 +108,9 @@ class FairPredictor:
             return np.zeros(data.shape[0])
         return groups
 
-    def fit(self, objective, constraint=group_metrics.accuracy, value=0.0, greater_is_better_obj=None,
-            greater_is_better_const=None, recompute=True, tol=False, grid_width=False):
+    def fit(self, objective, constraint=group_metrics.accuracy, value=0.0, *,
+            greater_is_better_obj=None, greater_is_better_const=None,
+            recompute=True, tol=False, grid_width=False):
         """Fits the chosen predictor to optimize an objective while satisfing a constraint.
         parameters
         ----------
@@ -142,36 +143,29 @@ class FairPredictor:
             greater_is_better_const = constraint.greater_is_better
 
         if recompute is True or self.frontier is None:
-            self.compute_frontier(objective, constraint, greater_is_better_obj,
-                                  greater_is_better_const, tol=tol,
+            self.compute_frontier(objective, constraint,
+                                  greater_is_better_obj1=greater_is_better_obj,
+                                  greater_is_better_obj2=greater_is_better_const, tol=tol,
                                   grid_width=grid_width)
         if greater_is_better_const:
             mask = self.frontier[0][1] >= value
         else:
             mask = self.frontier[0][1] <= value
+
         if mask.sum() == 0:
             logger.warning('No solutions satisfy the constraint found, selecting the closest solution')
             weights = self.frontier[1]
-            if greater_is_better_const:
-                vmax = self.frontier[0][1].argmax()
-            else:
-                vmax = self.frontier[0][1].argmin()
+            vmax = [self.frontier[0][1].argmin(),
+                    self.frontier[0][1].argmax()][int(greater_is_better_const)]
         else:
             values = self.frontier[0][0][mask]
-            if self.use_fast:
-                weights = self.frontier[1][:, mask]
-            else:
-                weights = self.frontier[1][:, :, mask]
-            if greater_is_better_obj:
-                vmax = values.argmax()
-            else:
-                vmax = values.argmin()
-        if self.use_fast:
-            self.offset = weights[:, vmax]
-        else:
-            self.offset = weights[:, :, vmax]
+            weights = self.frontier[1].T[mask].T
 
-    def compute_frontier(self, objective1, objective2, greater_is_better_obj1,
+            vmax = [values.argmin(),
+                    values.argmax()][int(greater_is_better_obj)]
+        self.offset = weights.T[vmax].T
+
+    def compute_frontier(self, objective1, objective2, *, greater_is_better_obj1,
                          greater_is_better_obj2, tol=False,
                          grid_width=False) -> None:
         """ Computes the parato frontier. Internal logic used by fit
@@ -254,10 +248,8 @@ class FairPredictor:
         if self.frontier is None:
             logger.error('Call fit before plot_frontier')
 
-        if objective1 is False:
-            objective1 = self.objective1
-        if objective2 is False:
-            objective2 = self.objective2
+        objective1 = objective1 or self.objective1
+        objective2 = objective2 or self.objective2
         plt.figure()
         plt.title('Frontier found')
         plt.xlabel(objective2.name)
@@ -283,12 +275,12 @@ class FairPredictor:
             else:
                 val_thresholds = np.asarray(self.inferred_groups.predict_proba(data))
 
-        if self.use_fast is False and _needs_groups(objective1):
-            objective1 = fix_groups(objective1, groups)
-        if self.use_fast is False and _needs_groups(objective2):
-            objective2 = fix_groups(objective2, groups)
-
         if self.use_fast is False:
+            if _needs_groups(objective1):
+                objective1 = fix_groups(objective1, groups)
+            if _needs_groups(objective2):
+                objective2 = fix_groups(objective2, groups)
+
             front1 = fair_frontier.compute_metric(objective1, labels, proba,
                                                   val_thresholds, self.frontier[1])
             front2 = fair_frontier.compute_metric(objective2, labels, proba,
@@ -296,6 +288,11 @@ class FairPredictor:
 
             zero = [dispatch_metric(objective1, labels, proba, groups),
                     dispatch_metric(objective2, labels, proba, groups)]
+
+            front1_u = fair_frontier.compute_metric(objective1, labels, proba,
+                                                    val_thresholds, self.offset[:, :, np.newaxis])
+            front2_u = fair_frontier.compute_metric(objective2, labels, proba,
+                                                    val_thresholds, self.offset[:, :, np.newaxis])
 
         else:
             front1 = efficient_compute.compute_metric(objective1, labels, proba,
@@ -308,22 +305,17 @@ class FairPredictor:
             zero = [objective1(labels, proba.argmax(1), groups),
                     objective2(labels, proba.argmax(1), groups)]
 
+            front1_u = efficient_compute.compute_metric(objective1, labels, proba, groups,
+                                                        val_thresholds.argmax(1),
+                                                        self.offset[:, np.newaxis])
+            front2_u = efficient_compute.compute_metric(objective2, labels, proba, groups,
+                                                        val_thresholds.argmax(1),
+                                                        self.offset[:, np.newaxis])
+
         plt.scatter(front2, front1, label='Frontier')
         plt.scatter(zero[1], zero[0], label='Original predictor')
-        if np.any(self.offset):
-            if self.use_fast is False:
-                front1 = fair_frontier.compute_metric(objective1, labels, proba,
-                                                      val_thresholds, self.offset[:, :, np.newaxis])
-                front2 = fair_frontier.compute_metric(objective2, labels, proba,
-                                                      val_thresholds, self.offset[:, :, np.newaxis])
-            else:
-                front1 = efficient_compute.compute_metric(objective1, labels, proba, groups,
-                                                          val_thresholds.argmax(1),
-                                                          self.offset[:, np.newaxis])
-                front2 = efficient_compute.compute_metric(objective2, labels, proba, groups,
-                                                          val_thresholds.argmax(1),
-                                                          self.offset[:, np.newaxis])
-            plt.scatter(front2, front1, label='Updated predictor')
+
+        plt.scatter(front2_u, front1_u, label='Updated predictor')
         plt.legend(loc='best')
 
     def evaluate(self, data=None, metrics=None, verbose=False) -> pd.DataFrame:
@@ -349,9 +341,9 @@ class FairPredictor:
         if data is not None:
             groups = np.ones(data.shape[0])
 
-        return self.evaluate_fairness(data, groups, metrics, verbose=verbose)
+        return self.evaluate_fairness(data, groups, metrics=metrics, verbose=verbose)
 
-    def evaluate_fairness(self, data=None, groups=None, metrics=None, verbose=False) -> pd.DataFrame:
+    def evaluate_fairness(self, data=None, groups=None, *, metrics=None, verbose=False) -> pd.DataFrame:
         """Compute standard fairness metrics of the orginal predictor and the new predictor
          found by fit. If fit has not been called return a dataframe containing
          only the metrics of the original predictor.
@@ -383,18 +375,18 @@ class FairPredictor:
             labels = (labels == self.predictor.positive_class) * 1
         groups = self.groups_to_numpy(groups, data)
 
-        collect = self.fairness_metrics(labels, y_pred_proba, groups, metrics, verbose)
+        collect = self.fairness_metrics(labels, y_pred_proba, groups, metrics, verbose=verbose)
         collect.columns = ['original']
 
         if np.any(self.offset):
             y_pred_proba = self.predict_proba(data)
-            new_pd = self.fairness_metrics(labels, y_pred_proba, groups, metrics, verbose)
+            new_pd = self.fairness_metrics(labels, y_pred_proba, groups, metrics, verbose=verbose)
             new_pd.columns = ['updated']
             collect = pd.concat([collect, new_pd], axis='columns')
         return collect
 
     def fairness_metrics(self, y_true: np.ndarray, proba, groups: np.ndarray,
-                         metrics: dict, verbose) -> pd.DataFrame:
+                         metrics: dict, *, verbose=False) -> pd.DataFrame:
         """Helper function for evaluate_fairness
         Report fairness metrics that do not require additional information.
         parameters
@@ -419,7 +411,7 @@ class FairPredictor:
 
         return pd.DataFrame(values, index=names)
 
-    def evaluate_groups(self, data=None, groups=None, metrics=None, return_original=False,
+    def evaluate_groups(self, data=None, groups=None, metrics=None, *, return_original=False,
                         verbose=False):
         """Evaluate standard metrics per group and returns dataframe.
         parameters
@@ -463,18 +455,22 @@ class FairPredictor:
         if return_original:
             original = self.evaluate_predictor_binary(y_true,
                                                       orig_pred_proba,
-                                                      groups, metrics, verbose)
+                                                      groups,
+                                                      metrics=metrics,
+                                                      verbose=verbose)
 
         updated = self.evaluate_predictor_binary(y_true,
                                                  new_pred_proba,
-                                                 groups, metrics, verbose)
+                                                 groups,
+                                                 metrics=metrics,
+                                                 verbose=verbose)
 
         out = updated
         if return_original:
             out = pd.concat([original, updated], keys=['original', 'updated'])
         return out
 
-    def evaluate_predictor_binary(self, y_true, proba, groups, metrics, verbose) -> pd.DataFrame:
+    def evaluate_predictor_binary(self, y_true, proba, groups, metrics, *, verbose=True) -> pd.DataFrame:
         """Helper function for evaluate_groups
         Compute standard per-group  metrics for binary classification
         parameters
@@ -519,7 +515,7 @@ class FairPredictor:
             out.index.name = 'groups'
         return out
 
-    def predict_proba(self, data, transform_features=True) -> pd.DataFrame:
+    def predict_proba(self, data, *, transform_features=True) -> pd.DataFrame:
         """Duplicates the functionality of predictor.predict_proba with the updated predictor.
         parameters
         ----------
@@ -550,7 +546,7 @@ class FairPredictor:
         proba += tmp
         return proba
 
-    def predict(self, data, transform_features=True) -> pd.Series:
+    def predict(self, data, *, transform_features=True) -> pd.Series:
         "duplicates the functionality of predictor.predict but with the fair predictor"
         return self.predict_proba(data, transform_features=transform_features).idxmax(1)
 
