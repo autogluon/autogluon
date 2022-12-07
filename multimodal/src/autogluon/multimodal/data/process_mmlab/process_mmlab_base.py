@@ -1,6 +1,6 @@
 import logging
 import warnings
-from typing import Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
 import PIL
@@ -42,15 +42,16 @@ logger = logging.getLogger(AUTOMM)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
-class RoisProcessor:
+class MMLabProcessor:
     """
-    Prepare rois data for mmlab models specified by "prefix". For multiple models requiring rois data,
-    we need to create a ImageProcessor for each related model so that they will have independent input.
+    The base class to prepare data for mmlab models specified by "prefix".
+    Child class shall provide its specific collate function in __init__.
     """
 
     def __init__(
         self,
         model: nn.Module,
+        collate_func: Callable,
         max_img_num_per_col: Optional[int] = 1,
         missing_value_strategy: Optional[str] = "skip",
         requires_column_info: bool = False,
@@ -58,6 +59,10 @@ class RoisProcessor:
         """
         Parameters
         ----------
+        model
+            The model using this data processor.
+        collate_func
+            The collate function to use for this processor
         max_img_num_per_col
             The maximum number of images one sample can have.
         missing_value_strategy
@@ -68,13 +73,12 @@ class RoisProcessor:
                 Use an image with zero pixels.
         requires_column_info
             Whether to require feature column information in dataloader.
-        model
-            The model using this data processor.
         """
 
         self.prefix = model.prefix
         self.missing_value_strategy = missing_value_strategy
         self.requires_column_info = requires_column_info
+        self.collate_func = collate_func
 
         self.max_img_num_per_col = max_img_num_per_col
         if max_img_num_per_col <= 0:
@@ -87,12 +91,13 @@ class RoisProcessor:
             assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
         else:
             assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
-        cfg = model.model.cfg
+        self.cfg = model.model.cfg
+        # TODO: remove hardcode here
         try:  # yolov3
-            training_pipeline = cfg.data.train.dataset.pipeline
+            training_pipeline = self.cfg.data.train.dataset.pipeline
         except:  # faster_rcnn
-            training_pipeline = cfg.data.train.pipeline
-        self.val_processor = Compose(replace_ImageToTensor(cfg.data.val.pipeline))
+            training_pipeline = self.cfg.data.train.pipeline
+        self.val_processor = Compose(replace_ImageToTensor(self.cfg.data.val.pipeline))
         self.train_processor = Compose(replace_ImageToTensor(training_pipeline))
 
     @property
@@ -125,21 +130,12 @@ class RoisProcessor:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
         assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-        if self.prefix.lower().startswith(MMDET_IMAGE):
-            from ..utils import CollateMMCV
 
-            fn.update(
-                {
-                    self.image_key: CollateMMCV(samples_per_gpu=per_gpu_batch_size),
-                }
-            )
-        else:
-            # TODO: update MMOCR
-            fn.update(
-                {
-                    self.image_key: lambda x: collate(x, samples_per_gpu=per_gpu_batch_size),
-                }
-            )
+        fn.update(
+            {
+                self.image_key: self.collate_func(samples_per_gpu=per_gpu_batch_size),
+            }
+        )
 
         return fn
 

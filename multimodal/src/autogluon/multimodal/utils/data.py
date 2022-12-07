@@ -30,12 +30,13 @@ from ..data import (
     CategoricalProcessor,
     ImageProcessor,
     LabelProcessor,
+    MMDetProcessor,
+    MMOcrProcessor,
     MixupModule,
     MultiModalFeaturePreprocessor,
     NerLabelEncoder,
     NerProcessor,
     NumericalProcessor,
-    RoisProcessor,
     TextProcessor,
 )
 
@@ -156,7 +157,7 @@ def create_data_processor(
             max_len=model_config.max_text_len,
         )
     elif data_type == ROIS:
-        data_processor = RoisProcessor(
+        data_processor = MMDetProcessor(
             model=model,
             max_img_num_per_col=model_config.max_img_num_per_col,
             missing_value_strategy=config.data.image.missing_value_strategy,

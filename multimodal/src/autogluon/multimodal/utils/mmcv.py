@@ -163,7 +163,7 @@ def datacontainer_to_cuda(container, device: Union[str, torch.device]):
                 container._data[idx] = container.data[idx].to(device)
 
 
-class CollateMMCV:
+class CollateMMDet:
     def __init__(self, samples_per_gpu):
         self.samples_per_gpu = samples_per_gpu
 
@@ -187,3 +187,10 @@ class CollateMMCV:
                 gt_labels.append(ret["gt_labels"][0][i].long())
 
             return dict(img=img, img_metas=img_metas, gt_bboxes=gt_bboxes, gt_labels=gt_labels)
+
+class CollateMMOcr:
+    def __init__(self, samples_per_gpu):
+        self.samples_per_gpu = samples_per_gpu
+
+    def __call__(self, x):
+        return collate(x, samples_per_gpu=self.samples_per_gpu)
