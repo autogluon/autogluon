@@ -237,8 +237,8 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         train_data : TimeSeriesDataFrame
-            Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format. Ideally, all time series
-            should have length ``> 2 * prediction_length``.
+            Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format. For best performance, all
+            time series should have length ``> 2 * prediction_length``.
 
             If ``known_covariates_names`` were specified when creating the predictor, ``train_data`` must include the
             columns listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
@@ -440,7 +440,7 @@ class TimeSeriesPredictor:
         elif (num_timesteps_per_item <= 2 * self.prediction_length).any():
             warnings.warn(
                 "Detected short time series in train_data. "
-                "Ideally, all training time series should have length >= 2 * prediction_length + 1"
+                "For best performance, all training time series should have length >= 2 * prediction_length + 1"
                 f"(at least {2 * self.prediction_length + 1})."
             )
 
