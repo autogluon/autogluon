@@ -52,7 +52,14 @@ class MMOcrProcessor(MMLabProcessor):
             Whether to require feature column information in dataloader.
         """
         from ...utils import CollateMMOcr
-        super().__init__(model=model, collate_func=CollateMMOcr, max_img_num_per_col=max_img_num_per_col, missing_value_strategy=missing_value_strategy, requires_column_info=requires_column_info)
+
+        super().__init__(
+            model=model,
+            collate_func=CollateMMOcr,
+            max_img_num_per_col=max_img_num_per_col,
+            missing_value_strategy=missing_value_strategy,
+            requires_column_info=requires_column_info,
+        )
 
     def process_one_sample(
         self,

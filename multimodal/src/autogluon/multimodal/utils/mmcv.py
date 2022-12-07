@@ -188,6 +188,7 @@ class CollateMMDet:
 
             return dict(img=img, img_metas=img_metas, gt_bboxes=gt_bboxes, gt_labels=gt_labels)
 
+
 class CollateMMOcr:
     def __init__(self, samples_per_gpu):
         self.samples_per_gpu = samples_per_gpu
