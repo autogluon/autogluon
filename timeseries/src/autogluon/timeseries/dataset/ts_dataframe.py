@@ -28,7 +28,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     Parameters
     ----------
-    data: Any
+    data : Any
         Time-series data to construct a ``TimeSeriesDataFrame``. The class currently supports three
         input formats.
 
@@ -67,7 +67,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                         2019-01-02       7
                         2019-01-03       8
 
-    static_features: Optional[pd.DataFrame]
+    static_features : Optional[pd.DataFrame]
         An optional data frame describing the metadata attributes of individual items in the item index. These
         may be categorical or real valued attributes for each item. For example, if the item index refers to
         time series data of individual households, static features may refer to time-independent demographic
@@ -78,21 +78,29 @@ class TimeSeriesDataFrame(pd.DataFrame):
         ``TimeSeriesDataFrame`` will ensure consistency of static features during serialization/deserialization,
         copy and slice operations although these features should be considered experimental.
 
+    sort_timestamps : bool, default = True
+        If True, will ensure that the rows of the underlying pandas.DataFrame are sorted chronologically for each item.
+        This argument is only set to False by some internal methods for efficiency reasons.
+
     Attributes
     ----------
-    freq: str
+    freq : str
         A pandas and gluon-ts compatible string describing the frequency of the time series. For example
         "D" is daily data, etc. Also see,
         https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
-    num_items: int
+    num_items : int
         Number of items (time series) in the data set.
+    item_ids : pd.Index
+        List of unique time series IDs contained in the data set.
     """
 
     DUMMY_INDEX_START_TIME = pd.Timestamp("1900-01-01 00:00:00")
     index: pd.MultiIndex
     _metadata = ["_static_features", "_cached_freq"]
 
-    def __init__(self, data: Any, static_features: Optional[pd.DataFrame] = None, *args, **kwargs):
+    def __init__(
+        self, data: Any, static_features: Optional[pd.DataFrame] = None, sort_timestamps: bool = True, *args, **kwargs
+    ):
         if isinstance(data, (BlockManager, ArrayManager)):
             # necessary for copy constructor to work. see _constructor
             # and pandas.DataFrame
@@ -102,9 +110,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 self._validate_multi_index_data_frame(data)
             else:
                 data = self._construct_pandas_frame_from_data_frame(data)
-            # Make sure that timestamps are sorted but item_id order is preserved
-            item_ids = data.index.unique(level=ITEMID)
-            data = data.sort_values(by=TIMESTAMP).loc[item_ids]
+            if sort_timestamps:
+                # Make sure that timestamps are sorted but item_id order is preserved
+                item_ids = data.index.unique(level=ITEMID)
+                data = data.sort_values(by=TIMESTAMP).loc[item_ids]
         elif isinstance(data, Iterable):
             data = self._construct_pandas_frame_from_iterable_dataset(data)
         else:
@@ -409,9 +418,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         nanosecond_before_cutoff = cutoff_time - pd.Timedelta(nanoseconds=1)
         data_before = self.loc[(slice(None), slice(None, nanosecond_before_cutoff)), :]
         data_after = self.loc[(slice(None), slice(cutoff_time, None)), :]
-        before, after = TimeSeriesDataFrame(data_before, static_features=self.static_features), TimeSeriesDataFrame(
-            data_after, static_features=self.static_features
-        )
+        before = TimeSeriesDataFrame(data_before, static_features=self.static_features, sort_timestamps=False)
+        after = TimeSeriesDataFrame(data_after, static_features=self.static_features, sort_timestamps=False)
         before._cached_freq = self._cached_freq
         after._cached_freq = self._cached_freq
         return before, after
@@ -527,7 +535,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             indicator[start_index:end_index] = True
             boolean_indicators.append(indicator)
         index = np.concatenate(boolean_indicators)
-        result = TimeSeriesDataFrame(self[index].copy(), static_features=self.static_features)
+        result = TimeSeriesDataFrame(self[index].copy(), static_features=self.static_features, sort_timestamps=False)
         result._cached_freq = self._cached_freq
         return result
 
@@ -573,6 +581,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return TimeSeriesDataFrame(
             self.loc[(slice(None), slice(start_time, nanosecond_before_end_time)), :],
             static_features=self.static_features,
+            sort_timestamps=False,
         )
 
     @classmethod
