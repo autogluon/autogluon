@@ -976,6 +976,13 @@ class MultiModalPredictor:
             except:
                 pass
 
+        if "few_shot" in is_pretrain_:
+            n = is_pretrain_["few_shot"]
+            if isinstance(n, int):
+                train_df = train_df.sample(n=n)
+            elif isinstance(n, float):
+                train_df = train_df.sample(frac=n)
+
         norm_param_names = get_norm_layer_param_names(model)
 
         trainable_param_names = get_trainable_params_efficient_finetune(
