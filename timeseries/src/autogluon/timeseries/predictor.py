@@ -212,6 +212,16 @@ class TimeSeriesPredictor:
                 "data set used has a uniform time index, or create the `TimeSeriesPredictor` "
                 "setting `ignore_time_index=True`."
             )
+        if df.isna().values.any():
+            raise ValueError(
+                "TimeSeriesPredictor does not yet support missing values. "
+                "Please make sure that the provided data contains no NaNs."
+            )
+        if (df.num_timesteps_per_item() <= 2).any():
+            warnings.warn(
+                "Detected time series with length <= 2 in data. "
+                "Please remove them from the dataset or TimeSeriesPredictor likely won't work as intended."
+            )
         return df
 
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)
@@ -232,7 +242,8 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         train_data : TimeSeriesDataFrame
-            Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
+            Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format. For best performance, all
+            time series should have length ``> 2 * prediction_length``.
 
             If ``known_covariates_names`` were specified when creating the predictor, ``train_data`` must include the
             columns listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
@@ -384,6 +395,13 @@ class TimeSeriesPredictor:
 
         train_data = self._check_and_prepare_data_frame(train_data)
         tuning_data = self._check_and_prepare_data_frame(tuning_data)
+
+        if (train_data.num_timesteps_per_item() <= 2 * self.prediction_length).any():
+            warnings.warn(
+                "Detected short time series in train_data. "
+                "For best performance, all training time series should have length >= 2 * prediction_length + 1"
+                f"(at least {2 * self.prediction_length + 1})."
+            )
 
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity)

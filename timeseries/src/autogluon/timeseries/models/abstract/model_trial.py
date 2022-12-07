@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+import traceback
 
 from autogluon.core.models.abstract.model_trial import init_model
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -47,6 +48,7 @@ def model_trial(
         if not isinstance(err, TimeLimitExceeded):
             logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
             logger.error(f"\t{err}")
+            logger.debug(traceback.format_exc())
         # In case of TimeLimitExceed, val_score could be None
         hpo_executor.report(
             reporter=reporter,

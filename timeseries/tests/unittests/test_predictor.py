@@ -560,3 +560,20 @@ def test_when_info_is_called_then_all_keys_and_models_are_included(temp_model_pa
         assert key in info
 
     assert len(info["model_info"]) == num_models
+
+
+def test_when_train_data_contains_nans_then_exception_is_raised(temp_model_path):
+    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    df = DUMMY_TS_DATAFRAME.copy()
+    df.iloc[5] = np.nan
+    with pytest.raises(ValueError, match="missing values"):
+        predictor.fit(df)
+
+
+def test_when_prediction_data_contains_nans_then_exception_is_raised(temp_model_path):
+    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    df = DUMMY_TS_DATAFRAME.copy()
+    df.iloc[5] = np.nan
+    with pytest.raises(ValueError, match="missing values"):
+        predictor.predict(df)
