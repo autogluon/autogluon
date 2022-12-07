@@ -227,7 +227,7 @@ class PretrainLitModule(LitModule):
     def _save_pretrained_ckpt(self):
         s3_client = boto3.client('s3')
         BUCKET = 'automl-benchmark-bingzzhu'
-        PREFIX = 'ec2/2022_09_14/cross_table_pretrain/iter_' + str(self.current_iter)
+        PREFIX = 'ec2/2022_09_14/cross_table_pretrain/' + self.is_pretrain["folder_name"] + '/iter_' + str(self.current_iter)
         file_names, folders = self.get_file_folders(s3_client, BUCKET, PREFIX)
         self.download_files(
             s3_client,
@@ -237,18 +237,19 @@ class PretrainLitModule(LitModule):
             folders
         )
 
-        local_path = './' + self.is_pretrain['name'] + '/' + 'ec2/2022_09_14/cross_table_pretrain/iter_'
+        local_path = './' + self.is_pretrain['name'] + '/' + 'ec2/2022_09_14/cross_table_pretrain/' + self.is_pretrain["folder_name"] + '/iter_'
         files = os.listdir(local_path + str(self.current_iter))
 
+        num_files = len(files)
         new_pretrained = copy.deepcopy(self.prev_state_dic)
         for file_name in files:
             ckpt_path = local_path + str(self.current_iter) + '/' + file_name
             state_dict = torch.load(ckpt_path, map_location=torch.device("cuda"))["state_dict"]
             with torch.no_grad():
                 for name in new_pretrained:
-                    new_pretrained[name] = new_pretrained[name] + state_dict[name]
+                    new_pretrained[name] = new_pretrained[name] + state_dict[name] / num_files
         self.model.fusion_transformer.load_state_dict(new_pretrained)
-        self._save_s3('ec2/2022_09_14/cross_table_pretrain/iter_' + str(self.current_iter) + '/pretrained.ckpt')
+        self._save_s3('ec2/2022_09_14/cross_table_pretrain/' + self.is_pretrain["folder_name"] + '/iter_' + str(self.current_iter) + '/pretrained.ckpt')
         self.prev_state_dic = copy.deepcopy(new_pretrained)
         shutil.rmtree('./' + self.is_pretrain['name'] + '/')
 
@@ -285,7 +286,7 @@ class PretrainLitModule(LitModule):
             try:
                 print("saving ckpt to s3")
                 self._save_s3(
-                    'ec2/2022_09_14/cross_table_pretrain/iter_' + str(self.current_iter) + '/' + self.is_pretrain[
+                    'ec2/2022_09_14/cross_table_pretrain/' + self.is_pretrain["folder_name"] + '/iter_' + str(self.current_iter) + '/' + self.is_pretrain[
                         'name'] + '.ckpt', True)
                 break
             except:
@@ -294,12 +295,12 @@ class PretrainLitModule(LitModule):
         while keep_waiting:
             try:
                 bucket = 'automl-benchmark-bingzzhu'
-                File = 'ec2/2022_09_14/cross_table_pretrain/iter_' + str(self.current_iter) + '/'
+                File = 'ec2/2022_09_14/cross_table_pretrain/' + self.is_pretrain["folder_name"] + '/iter_' + str(self.current_iter) + '/'
                 objs = boto3.client('s3').list_objects_v2(Bucket=bucket, Prefix=File)
                 num_waiting = objs['KeyCount']
 
                 bucket = 'automl-benchmark-bingzzhu'
-                File = 'ec2/2022_09_14/cross_table_pretrain/iter_' + str(-1) + '/'
+                File = 'ec2/2022_09_14/cross_table_pretrain/' + self.is_pretrain["folder_name"] + '/iter_' + str(-1) + '/'
                 objs = boto3.client('s3').list_objects_v2(Bucket=bucket, Prefix=File)
                 num_failed = objs['KeyCount']
 
@@ -315,7 +316,7 @@ class PretrainLitModule(LitModule):
                 print("start global averaging")
                 s3 = boto3.resource('s3')
                 s3.Bucket('automl-benchmark-bingzzhu').download_file(
-                    'ec2/2022_09_14/cross_table_pretrain/iter_' + str(self.current_iter) + '/pretrained.ckpt',
+                    'ec2/2022_09_14/cross_table_pretrain/' + self.is_pretrain["folder_name"] + '/iter_' + str(self.current_iter) + '/pretrained.ckpt',
                     './pretrained_.ckpt'
                 )
                 pretrain_path = os.path.join("./", 'pretrained_.ckpt')
@@ -408,7 +409,7 @@ class PretrainLitModule(LitModule):
                         pass
 
             if self.current_iter % self.is_pretrain["iter_per_save"] == 0:
-                self._save_s3(target='ec2/2022_09_14/cross_table_pretrain/raw_hog/pretrained_' + str(self.current_iter) + '.ckpt')
+                self._save_s3(target='ec2/2022_09_14/cross_table_pretrain/' + self.is_pretrain["folder_name"] + '/raw_hog/pretrained_' + str(self.current_iter) + '.ckpt')
 
             if self.current_iter >= self.is_pretrain["max_iter"]:
                 raise Exception("Pretraining reached max iteration")
