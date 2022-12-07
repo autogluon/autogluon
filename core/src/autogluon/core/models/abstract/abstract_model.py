@@ -851,8 +851,9 @@ class AbstractModel:
         model = load_pkl.load(path=file_path, verbose=verbose)
         if reset_paths:
             model.set_contexts(path)
-        if model._compiler is not None and not model._compiler.save_in_pkl:
-            model.model = model._compiler.load(path=path)
+        if hasattr(model, '_compiler'):
+            if model._compiler is not None and not model._compiler.save_in_pkl:
+                model.model = model._compiler.load(path=path)
         return model
 
     def compute_feature_importance(self,
@@ -1425,7 +1426,7 @@ class AbstractModel:
             'feature_metadata': self.feature_metadata,
             # 'disk_size': self.get_disk_size(),
             'memory_size': self.get_memory_size(),  # Memory usage of model in bytes
-            'compile_time': self.compile_time,
+            'compile_time': self.compile_time if hasattr(self, 'compile_time') else None,
         }
         return info
 
