@@ -26,6 +26,7 @@ from packaging import version
 from sklearn.model_selection import train_test_split
 from torch import nn
 
+import autogluon.multimodal.utils.object_detection
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.utils.try_import import try_import_ray_lightning
 from autogluon.core.utils.utils import default_holdout_frac
@@ -115,7 +116,6 @@ from .utils import (
     average_checkpoints,
     check_if_packages_installed,
     cocoeval,
-    convert_data_to_df,
     compute_inference_batch_size,
     compute_num_gpus,
     compute_score,
@@ -2338,11 +2338,7 @@ class MultiModalPredictor:
             )
         if self._problem_type == OBJECT_DETECTION:
             if isinstance(data, (str, dict, list)):
-                data = convert_data_to_df(data)
-            # if isinstance(data, str):
-            #     data = from_coco_or_voc(data, "test")
-            # elif isinstance(data, dict):
-            #     data = from_dict(data)
+                data = autogluon.multimodal.utils.object_detection.convert_data_to_df(data)
             else:
                 assert isinstance(
                     data, pd.DataFrame
