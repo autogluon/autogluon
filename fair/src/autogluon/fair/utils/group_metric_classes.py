@@ -17,6 +17,7 @@ class BaseGroupMetric:
     Also contains additional annotations: name, and greater_is_better
     """
     __metaclass__ = abc.ABCMeta
+
     def __init__(self, func: Callable[[np.ndarray, np.ndarray, np.ndarray, np.ndarray], np.ndarray],
                  name: str, greater_is_better: bool) -> None:
         self.func: Callable[[np.ndarray, np.ndarray, np.ndarray, np.ndarray], np.ndarray] = func
@@ -210,7 +211,7 @@ class AddGroupMetrics(BaseGroupMetric):
     a BaseGroupMetric that gives scores of the form:
         weight*metric1_response+(1-weight)*metric2_response """
 
-    def __init__(self, metric1: BaseGroupMetric, metric2: BaseGroupMetric, name: str, # pylint: disable=super-init-not-called
+    def __init__(self, metric1: BaseGroupMetric, metric2: BaseGroupMetric, name: str,  # pylint: disable=super-init-not-called
                  weight: float = 0.5) -> None:
         self.metric1: BaseGroupMetric = metric1
         self.metric2: BaseGroupMetric = metric2

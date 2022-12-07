@@ -36,11 +36,6 @@ class FairPredictor:
     If use_fast is True, the fair search is much more efficient, but the objectives must take the
     form of a GroupMetric
     If use_fast is False, autogluon scorers are also supported.
-    TODO
-    ----
-    1. Move specification of use_fast to fit.
-    2. decide if there is a compelling usecase for scorables, or if the slow pathway in the file
-        fair_frontier.py can be removed
     """
 
     def __init__(self, predictor, validation_data, groups=None, *, inferred_groups=False,
@@ -52,7 +47,7 @@ class FairPredictor:
         if groups is None:
             groups = False
         # Internal logic differentiates between groups are not provided on other data
-        #i.e. groups = None
+        # i.e. groups = None
         # and there are no groups i.e. groups = False
         # However, as a user interface groups = None makes more sense for instantiation.
         self.groups = groups

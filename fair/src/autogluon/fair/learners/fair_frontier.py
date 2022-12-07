@@ -1,4 +1,5 @@
-"""Slow pathway for computing fairness constraints. Compatable with Scorers and group metrics, while efficient_compute is only compatable with group metrics"""
+"""Slow pathway for computing fairness constraints. Compatable with Scorers and group metrics,
+while efficient_compute is only compatable with group metrics"""
 from typing import Callable, Tuple
 import numpy as np
 from autogluon.core.metrics import Scorer
@@ -39,7 +40,7 @@ def sort_by_front(front: np.ndarray, weights: np.ndarray) -> Tuple[np.ndarray, n
 
 
 def keep_front(solutions: np.ndarray, initial_weights: np.ndarray, directions: np.ndarray,
-               tol=1e-12) -> Tuple[np.ndarray, np.ndarray]:
+               *, tol=1e-12) -> Tuple[np.ndarray, np.ndarray]:
     """Modified from
         https://stackoverflow.com/questions/32791911/fast-calculation-of-pareto-front-in-python
         Returns Pareto efficient row subset of solutions and its associated weights
@@ -47,7 +48,6 @@ def keep_front(solutions: np.ndarray, initial_weights: np.ndarray, directions: n
         direction.
         Where an element of direction is positive frontier maximizes, negative, it mimizes.
         """
-    #assert np.all(solutions>=0)
     front = solutions.T.copy()
     front *= directions
 
@@ -94,7 +94,7 @@ def linear_interpolate(front: np.ndarray, weights: np.ndarray, gap=0.01) -> np.n
     return out
 
 
-def make_grid_between_points(point_a: np.ndarray, point_b: np.ndarray, refinement_factor=2,
+def make_grid_between_points(point_a: np.ndarray, point_b: np.ndarray, *, refinement_factor=2,
                              add_zero=False, use_linspace=True) -> np.ndarray:
     """
     creates new grid points between two points by refining each axis in which the two points do not
@@ -162,10 +162,10 @@ def make_finer_grid(weights: np.ndarray, refinement_factor=2, use_linspace=True)
 
 def front_from_weights(weights: np.ndarray, y_true: np.ndarray, proba: np.ndarray,
                        groups_infered: np.ndarray,
-                       metric_1: callable, metric_2: callable) -> np.ndarray:
+                       tupple_metrics) -> np.ndarray:
     """Computes the values of each metric from the weights"""
-    front = np.stack((compute_metric(metric_1, y_true, proba, groups_infered, weights),
-                      compute_metric(metric_2, y_true, proba, groups_infered, weights)))
+    front = np.stack(list(map(lambda x: compute_metric(x, y_true, proba,
+                                                       groups_infered, weights), tupple_metrics)))
     return front
 
 
@@ -174,7 +174,8 @@ def build_coarse_to_fine_front(metric_1: callable,
                                y_true: np.ndarray,
                                proba: np.ndarray,
                                groups_infered: np.ndarray,
-                               directions,
+                               *,
+                               directions=(+1, +1),
                                initial_divisions=15,
                                nr_of_recursive_calls=5,
                                refinement_factor=4) -> Tuple[np.ndarray, np.ndarray]:
@@ -194,8 +195,9 @@ def build_coarse_to_fine_front(metric_1: callable,
     max_initial[:, :] = upper_bound[:, np.newaxis]
     # perform an initial two stage search, first coarsely over every possible value
     # then take the front and search over valid values from it
-    weights = make_grid_between_points(min_initial, max_initial, initial_divisions - 1)
-    front = front_from_weights(weights, y_true, proba, groups_infered, metric_1, metric_2)
+    weights = make_grid_between_points(min_initial, max_initial,
+                                       refinement_factor=initial_divisions - 1)
+    front = front_from_weights(weights, y_true, proba, groups_infered, (metric_1, metric_2))
     front, weights = keep_front(front, weights, directions)
     # second stage
     mins = weights[:, :-1].min(-1)  # drop zeros
@@ -203,8 +205,8 @@ def build_coarse_to_fine_front(metric_1: callable,
     mins -= 2 / initial_divisions  # if we only get one point, expand around it
     maxs += 2 / initial_divisions
     eps = ((maxs - mins))
-    new_weights = make_grid_between_points(mins, maxs, initial_divisions, add_zero=True)
-    new_front = front_from_weights(new_weights, y_true, proba, groups_infered, metric_1, metric_2)
+    new_weights = make_grid_between_points(mins, maxs, refinement_factor=initial_divisions, add_zero=True)
+    new_front = front_from_weights(new_weights, y_true, proba, groups_infered, (metric_1, metric_2))
     weights = np.concatenate((new_weights, weights), -1)
     front = np.concatenate((new_front, front), -1)
     front, weights = keep_front(front, weights, directions)
@@ -213,7 +215,7 @@ def build_coarse_to_fine_front(metric_1: callable,
             eps /= refinement_factor
             new_weights = make_finer_grid(weights, eps, use_linspace=False)
             new_front = front_from_weights(new_weights, y_true, proba, groups_infered,
-                                           metric_1, metric_2)
+                                           (metric_1, metric_2))
             weights = np.concatenate((new_weights, weights), -1)
             front = np.concatenate((new_front, front), -1)
         front, weights = keep_front(front, weights, directions)

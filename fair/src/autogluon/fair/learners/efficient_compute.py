@@ -262,7 +262,7 @@ def grid_search(y_true: np.ndarray, proba: np.ndarray, metric1: Callable, metric
     ordered_encode = [e[o] for e, o in zip(group_encode, order)]
     # thresholds are returned but not used in computation
 
-    #eps = 1e-4
+    # eps = 1e-4
     thresholds = [np.concatenate((t[0:1] + 1e-4, t), 0) for t in thresholds]
     # add threshold above maximum value
 

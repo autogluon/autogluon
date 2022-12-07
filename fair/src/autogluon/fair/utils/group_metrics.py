@@ -2,7 +2,7 @@
 import numpy as np
 
 from autogluon.core.metrics import roc_auc
-from .group_metric_classes import GroupMetric, AddGroupMetrics, BaseGroupMetric, Utility # pylint: disable=unused-import
+from .group_metric_classes import GroupMetric, AddGroupMetrics, BaseGroupMetric, Utility  # pylint: disable=unused-import # noqa
 
 # N.B. BaseGroupMetric and Utility are needed for type declarations
 
