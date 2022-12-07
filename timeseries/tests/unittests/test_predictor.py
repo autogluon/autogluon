@@ -503,3 +503,60 @@ def test_when_target_included_in_known_covariates_then_exception_is_raised(temp_
         predictor = TimeSeriesPredictor(
             path_context=temp_model_path, target=target_column, known_covariates_names=["Y", target_column, "X"]
         )
+
+
+@pytest.mark.parametrize(
+    "hyperparameters, num_models",
+    [
+        ({"Naive": {}}, 1),
+        ({"Naive": {}, "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}}, 3),  # + 1 for ensemble
+    ],
+)
+def test_when_fit_summary_is_called_then_all_keys_and_models_are_included(
+    temp_model_path, hyperparameters, num_models
+):
+    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
+    expected_keys = [
+        "model_types",
+        "model_performance",
+        "model_best",
+        "model_paths",
+        "model_fit_times",
+        "model_pred_times",
+        "model_hyperparams",
+        "leaderboard",
+    ]
+    fit_summary = predictor.fit_summary()
+    for key in expected_keys:
+        assert key in fit_summary
+        # All keys except model_best return a dict with results per model
+        if key != "model_best":
+            assert len(fit_summary[key]) == num_models
+
+
+@pytest.mark.parametrize(
+    "hyperparameters, num_models",
+    [
+        ({"Naive": {}}, 1),
+        ({"Naive": {}, "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}}, 3),  # + 1 for ensemble
+    ],
+)
+def test_when_info_is_called_then_all_keys_and_models_are_included(temp_model_path, hyperparameters, num_models):
+    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
+    expected_keys = [
+        "path",
+        "version",
+        "time_fit_training",
+        "time_limit",
+        "best_model",
+        "best_model_score_val",
+        "num_models_trained",
+        "model_info",
+    ]
+    info = predictor.info()
+    for key in expected_keys:
+        assert key in info
+
+    assert len(info["model_info"]) == num_models

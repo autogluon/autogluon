@@ -19,7 +19,7 @@ class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
 
     def __init__(self, feature_metadata: Optional[FeatureMetadata] = None, verbosity: int = 0, **kwargs):
         generators = [
-            CategoryFeatureGenerator(minimum_cat_count=1),
+            CategoryFeatureGenerator(minimum_cat_count=1, fillna="mode"),
             IdentityFeatureGenerator(infer_features_in_args={"valid_raw_types": [R_INT, R_FLOAT]}),
         ]
         super().__init__(
