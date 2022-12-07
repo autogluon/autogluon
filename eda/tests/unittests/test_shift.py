@@ -52,16 +52,16 @@ class TestShift(unittest.TestCase):
                 train_data=train,
                 test_data=test,
                 label="class",
-                classifier_kwargs={"path": "AutogluonModels"},
+                classifier_kwargs={"path": os.path.join(path, "AutogluonModels")},
                 classifier_fit_kwargs={"hyperparameters": {"RF": {}}},
             )
             shft_ana = eda.shift.XShiftDetector(**analysis_args)
             shft_ana.fit()
-        viz_args = dict(headers=True)
-        shft_viz = viz.shift.XShiftSummary(**viz_args)
-        shft_viz.render(shft_ana.state)
-        res = shft_ana.state.xshift_results
-        assert all(
-            res[k] is not None
-            for k in ["detection_status", "pvalue", "pvalue_threshold", "eval_metric", "feature_importance"]
-        )
+            viz_args = dict(headers=True)
+            shft_viz = viz.shift.XShiftSummary(**viz_args)
+            shft_viz.render(shft_ana.state)
+            res = shft_ana.state.xshift_results
+            assert all(
+                res[k] is not None
+                for k in ["detection_status", "pvalue", "pvalue_threshold", "eval_metric", "feature_importance"]
+            )
