@@ -540,6 +540,11 @@ class TimeSeriesPredictor:
         if random_seed is not None:
             set_random_seed(random_seed)
         data = self._check_and_prepare_data_frame(data)
+        if (data.num_timesteps_per_item <= 2).any():
+            warnings.warn(
+                "Detected time series with length <= 2 in data. "
+                "Please remove them from the dataset or TimeSeriesPredictor likely won't work as intended."
+            )
         return self._learner.predict(data, known_covariates=known_covariates, model=model, **kwargs)
 
     def evaluate(self, data: TimeSeriesDataFrame, **kwargs):
