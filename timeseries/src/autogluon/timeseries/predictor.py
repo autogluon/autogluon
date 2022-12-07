@@ -217,7 +217,7 @@ class TimeSeriesPredictor:
                 "TimeSeriesPredictor does not yet support missing values. "
                 "Please make sure that the provided data contains no NaNs."
             )
-        if (df.num_timesteps_per_item <= 2).any():
+        if (df.num_timesteps_per_item() <= 2).any():
             warnings.warn(
                 "Detected time series with length <= 2 in data. "
                 "Please remove them from the dataset or TimeSeriesPredictor likely won't work as intended."
@@ -396,7 +396,7 @@ class TimeSeriesPredictor:
         train_data = self._check_and_prepare_data_frame(train_data)
         tuning_data = self._check_and_prepare_data_frame(tuning_data)
 
-        if (train_data.num_timesteps_per_item <= 2 * self.prediction_length).any():
+        if (train_data.num_timesteps_per_item() <= 2 * self.prediction_length).any():
             warnings.warn(
                 "Detected short time series in train_data. "
                 "For best performance, all training time series should have length >= 2 * prediction_length + 1"
