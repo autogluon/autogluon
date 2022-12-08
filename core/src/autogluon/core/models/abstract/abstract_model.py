@@ -479,7 +479,7 @@ class AbstractModel:
         else:
             self.normalize_pred_probas = False
 
-    def _preprocess_fit_resources(self, silent=False, total_resources=None, **kwargs):
+    def _preprocess_fit_resources(self, silent=False, total_resources=None, hpo=False, **kwargs):
         """
         This function should be called to process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
@@ -527,7 +527,6 @@ class AbstractModel:
             else:
                 if user_specified_model_level_num_gpus is not None:
                     user_specified_lower_level_num_gpus = min(user_specified_model_level_num_gpus * k_fold, system_num_gpus)
-            
         if total_resources is None:
             total_resources = {}
         num_cpus = total_resources.get('num_cpus', 'auto')
@@ -543,11 +542,21 @@ class AbstractModel:
                 num_cpus = user_specified_lower_level_num_cpus
             else:
                 num_cpus = default_num_cpus
+        else:
+            if (k_fold is None or k_fold == 0) and not hpo:
+                if user_specified_lower_level_num_cpus is not None:
+                    assert user_specified_lower_level_num_cpus <= num_cpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total specified: {num_cpus}'
+                    num_cpus = user_specified_lower_level_num_cpus
         if num_gpus == 'auto':
             if user_specified_lower_level_num_gpus is not None:
                 num_gpus = user_specified_lower_level_num_gpus
             else:
                 num_gpus = default_num_gpus
+        else:
+            if (k_fold is None or k_fold == 0) and not hpo:
+                if user_specified_lower_level_num_gpus is not None:
+                    assert user_specified_lower_level_num_gpus <= num_gpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total specified: {num_gpus}'
+                    num_gpus = user_specified_lower_level_num_gpus
         # This will be ag_args_ensemble when bagging, and ag_args_fit when non-bagging
         params_aux_num_cpus = self._user_params_aux.get('num_cpus', None)
         params_aux_num_gpus = self._user_params_aux.get('num_gpus', None)
@@ -1204,7 +1213,7 @@ class AbstractModel:
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
-        kwargs = self._preprocess_fit_resources(**kwargs)
+        kwargs = self._preprocess_fit_resources(hpo=True, **kwargs)
         self.validate_fit_resources(**kwargs)
         hpo_executor.register_resources(self, **kwargs)
         return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
