@@ -34,7 +34,7 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         return X_out, type_family_groups_special
 
     def _transform(self, X: DataFrame, is_fit=False) -> DataFrame:
-        return self._generate_features_datetime(X, is_fit)
+        return self._generate_features_datetime(X, is_fit=is_fit)
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
@@ -54,8 +54,8 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         series = pd.to_datetime(X[feature], utc=True, errors='coerce')
         broken_idx = series[(series == 'NaT') | series.isna() | series.isnull()].index
         bad_rows = series.iloc[broken_idx]
-        good_rows = series[~series.isin(bad_rows)].astype(int)
         if is_fit:
+            good_rows = series[~series.isin(bad_rows)].astype(int)
             self._fillna_map[feature] = pd.to_datetime(int(good_rows.mean()), utc=True)
         series[broken_idx] = self._fillna_map[feature]
         return series
