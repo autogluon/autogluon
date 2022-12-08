@@ -527,9 +527,7 @@ def get_image_filename(path: str):
     -------
     The file name of image.
     """
-    start_idx = path.rfind("/") + 1
-    end_idx = path.rindex(".")
-    return path[start_idx:end_idx]
+    return Path(path.replace('\\', '/')).stem
 
 
 class COCODataset:
