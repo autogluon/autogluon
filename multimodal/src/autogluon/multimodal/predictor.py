@@ -979,6 +979,7 @@ class MultiModalPredictor:
         if "few_shot" in is_pretrain_:
             n = is_pretrain_["few_shot"]
             if isinstance(n, int):
+                n = min(n, len(train_df.index))
                 train_df = train_df.sample(n=n)
             elif isinstance(n, float):
                 train_df = train_df.sample(frac=n)
