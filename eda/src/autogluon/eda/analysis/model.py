@@ -13,7 +13,9 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
     """
     Evaluate AutoGluon model performance.
 
-    This analysis requires trained classifier passed in `model` arg and uses 'val_data' dataset to asses model performance.
+    This analysis requires a trained classifier passed in `model` arg and uses 'val_data' dataset to assess model performance.
+
+    It is assumed that the validation dataset should follow the same column names seen by the model and has not been used during the training process.
 
     Parameters
     ----------
@@ -65,7 +67,16 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
         self.normalize = normalize
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
-        return "model" in args and "val_data" in args
+        keys_present = self.all_keys_must_be_present(args, "model", "val_data")
+        data_cols = sorted(args.val_data.columns.values)
+        model_cols = sorted(args.model.original_features + [args.model.label])
+        columns_the_same = data_cols == model_cols if keys_present else False
+        if not columns_the_same:
+            self.logger.warning(
+                f"val_data columns {data_cols} are not matching original features model was trained on: {model_cols}"
+            )
+
+        return keys_present and columns_the_same
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         predictor: TabularPredictor = args.model
