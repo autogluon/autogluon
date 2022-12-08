@@ -137,6 +137,19 @@ def test_bagged_model_without_total_resources_but_with_ensemble_resources(mock_s
         k_fold = 2
         resources = bagged_model._preprocess_fit_resources(k_fold=k_fold)
         resources.pop('k_fold')
+        assert resources == {'num_cpus': 1, 'num_gpus': 0}
+        
+        
+def test_bagged_model_without_total_resources_and_without_model_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus):
+    with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
+        model_base = DummyModel()
+        bagged_model = DummyBaggedModel(
+            model_base,
+            hyperparameters={}
+        )
+        k_fold = 2
+        resources = bagged_model._preprocess_fit_resources(k_fold=k_fold)
+        resources.pop('k_fold')
         default_model_num_cpus, default_model_num_gpus = model_base._get_default_resources()
         default_model_resources = {
             'num_cpus': min(default_model_num_cpus * k_fold, ResourceManager.get_cpu_count()),
@@ -228,10 +241,24 @@ def test_nonbagged_model_without_total_resources_but_with_model_resources(mock_s
         model_base = DummyModel(
             hyperparameters={
                 'ag_args_fit': {
-                    'num_cpus': 1,
-                    'num_gpus': 1
+                    'num_cpus': 2,
+                    'num_gpus': 2
                 }
             }
         )
         resources = model_base._preprocess_fit_resources()
-        assert resources == {'num_cpus': 1, 'num_gpus': 1}
+        assert resources == {'num_cpus': 2, 'num_gpus': 2}
+        
+
+def test_nonbagged_model_without_total_resources_and_without_model_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus):
+    with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
+        model_base = DummyModel(
+            hyperparameters={}
+        )
+        resources = model_base._preprocess_fit_resources()
+        default_model_num_cpus, default_model_num_gpus = model_base._get_default_resources()
+        default_model_resources = {
+            'num_cpus': min(default_model_num_cpus, ResourceManager.get_cpu_count()),
+            'num_gpus': min(default_model_num_gpus, ResourceManager.get_gpu_count_all()),
+        }
+        assert resources == default_model_resources

@@ -496,11 +496,38 @@ class AbstractModel:
         system_num_cpus = ResourceManager.get_cpu_count()
         system_num_gpus = ResourceManager.get_gpu_count_all()
         default_num_cpus, default_num_gpus = self._get_default_resources()
+        # This could be resource requirement for bagged model or individual model
+        user_specified_lower_level_num_cpus = self._user_params_aux.get('num_cpus', None)
+        user_specified_lower_level_num_gpus = self._user_params_aux.get('num_gpus', None)
+        if user_specified_lower_level_num_cpus is not None:
+            assert user_specified_lower_level_num_cpus <= system_num_cpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total: {system_num_cpus}'
+        if user_specified_lower_level_num_gpus is not None:
+            assert user_specified_lower_level_num_gpus <= system_num_cpus, f'Specified num_gpus per {self.__class__.__name__} is more than the total: {system_num_cpus}'
         k_fold = kwargs.get('k_fold', None)
         if k_fold is not None and k_fold > 0:
             # bagged model's default resources should be resources * k_fold if the amount is available
             default_num_cpus = min(default_num_cpus * k_fold, system_num_cpus)
             default_num_gpus = min(default_num_gpus * k_fold, system_num_gpus)
+            # initialize the model base to check if there's user specified resources requirements
+            user_specified_model_level_num_cpus = self.model_base._user_params_aux.get('num_cpus', None)
+            user_specified_model_level_num_gpus = self.model_base._user_params_aux.get('num_gpus', None)
+            if user_specified_model_level_num_cpus is not None:
+                assert user_specified_model_level_num_cpus <= system_num_cpus, f'Specified num_cpus per {self.model_base.__class__.__name__} is more than the total: {system_num_cpus}'
+            if user_specified_model_level_num_gpus is not None:
+                assert user_specified_model_level_num_gpus <= system_num_gpus, f'Specified num_gpus per {self.model_base.__class__.__name__} is more than the total: {system_num_gpus}'
+            if user_specified_lower_level_num_cpus is not None:
+                if user_specified_model_level_num_cpus is not None:
+                    user_specified_lower_level_num_cpus = min(user_specified_lower_level_num_cpus * k_fold, user_specified_model_level_num_cpus)
+            else:
+                if user_specified_model_level_num_cpus is not None:
+                    user_specified_lower_level_num_cpus = min(user_specified_model_level_num_cpus * k_fold, system_num_cpus)
+            if user_specified_lower_level_num_gpus is not None:
+                if user_specified_model_level_num_gpus is not None:
+                    user_specified_lower_level_num_gpus = min(user_specified_lower_level_num_gpus * k_fold, user_specified_model_level_num_gpus)
+            else:
+                if user_specified_model_level_num_gpus is not None:
+                    user_specified_lower_level_num_gpus = min(user_specified_model_level_num_gpus * k_fold, system_num_gpus)
+            
         if total_resources is None:
             total_resources = {}
         num_cpus = total_resources.get('num_cpus', 'auto')
@@ -512,9 +539,15 @@ class AbstractModel:
             logger.warning(f'Specified total num_gpus: {num_gpus}, but only {system_num_gpus} are available. Will use {system_num_gpus} instead')
             num_gpus = system_num_gpus
         if num_cpus == 'auto':
-            num_cpus = default_num_cpus
+            if user_specified_lower_level_num_cpus is not None:
+                num_cpus = user_specified_lower_level_num_cpus
+            else:
+                num_cpus = default_num_cpus
         if num_gpus == 'auto':
-            num_gpus = default_num_gpus
+            if user_specified_lower_level_num_gpus is not None:
+                num_gpus = user_specified_lower_level_num_gpus
+            else:
+                num_gpus = default_num_gpus
         # This will be ag_args_ensemble when bagging, and ag_args_fit when non-bagging
         params_aux_num_cpus = self._user_params_aux.get('num_cpus', None)
         params_aux_num_gpus = self._user_params_aux.get('num_gpus', None)
