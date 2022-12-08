@@ -514,14 +514,27 @@ def VOCName2Idx(name):
     return VOC_NAME_TO_IDX[name]
 
 
-def get_image_filename(path):
+def get_image_filename(path: str):
+    """
+    Get the filename (without extension) from its path.
+
+    Parameters
+    ----------
+    path
+        The path of image.
+
+    Returns
+    -------
+    The file name of image.
+    """
     start_idx = path.rfind("/") + 1
     end_idx = path.rindex(".")
     return path[start_idx:end_idx]
 
 
 class COCODataset:
-    # refactor data loading into here
+    # The class that load/save COCO data format.
+    # TODO: refactor data loading into here
     def __init__(self, anno_file):
         self.anno_file = anno_file
 
@@ -537,10 +550,34 @@ class COCODataset:
 
         self.category_ids = [cat["id"] for cat in d["categories"]]
 
-    def get_image_id_from_path(self, image_path):
+    def get_image_id_from_path(self, image_path: str):
+        """
+        Get image id from its path.
+
+        Parameters
+        ----------
+        image_path
+            Image path.
+
+        Returns
+        -------
+        Image ID.
+        """
         return self.image_filename_to_id[get_image_filename(image_path)]
 
-    def save_result(self, ret, data, save_path):
+    def save_result(self, ret: List, data: pd.DataFrame, save_path: str):
+        """
+        Save COCO format result to given save path.
+
+        Parameters
+        ----------
+        ret
+            The returned prediction result.
+        data
+            The input data.
+        save_path
+            The save path given to store COCO format output.
+        """
         coco_format_result = []
 
         for i, row in data.reset_index(drop=True).iterrows():
