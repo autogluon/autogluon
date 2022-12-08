@@ -508,7 +508,7 @@ class AbstractModel:
             # bagged model's default resources should be resources * k_fold if the amount is available
             default_num_cpus = min(default_num_cpus * k_fold, system_num_cpus)
             default_num_gpus = min(default_num_gpus * k_fold, system_num_gpus)
-            # initialize the model base to check if there's user specified resources requirements
+            # retrieve model level requirement when self is bagged model
             user_specified_model_level_num_cpus = self.model_base._user_params_aux.get('num_cpus', None)
             user_specified_model_level_num_gpus = self.model_base._user_params_aux.get('num_gpus', None)
             if user_specified_model_level_num_cpus is not None:
