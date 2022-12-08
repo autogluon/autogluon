@@ -131,33 +131,6 @@ def is_rois_column(data: pd.Series) -> bool:
         return is_rois_input(data[idx])
 
 
-def is_image_path(feature: Any):
-    is_path = True
-    image_paths = str(feature).split(";")
-    for img_path in image_paths:
-        try:
-            with PIL.Image.open(img_path) as img:
-                pass
-            break
-        except:
-            is_path = False
-    return is_path
-
-
-def is_image_bytearray(feature: Any):
-    is_bytearray = True
-    if not isinstance(feature, list):
-        feature = [feature]
-    for img_bytearray in feature:
-        try:
-            with PIL.Image.open(BytesIO(img_bytearray)) as img:
-                pass
-            break
-        except:
-            is_bytearray = False
-    return is_bytearray
-
-
 def is_numerical_column(
     data: pd.Series,
     valid_data: Optional[pd.Series] = None,
@@ -186,6 +159,30 @@ def is_numerical_column(
         return False
 
 
+def get_image_feature_type(feature: Any):
+    image_type = None
+    if isinstance(feature, str):
+        image_feature = feature.split(";")[0]
+    elif isinstance(feature, bytearray):
+        image_feature = feature
+    elif isinstance(feature, list) and isinstance(feature[0], bytearray):
+        image_feature = feature[0]
+    else:
+        return image_type
+
+    try:
+        with PIL.Image.open(image_feature) as img:
+            image_type = IMAGE_PATH
+    except:
+        try:
+            with PIL.Image.open(BytesIO(image_feature)) as img:
+                image_type = IMAGE_BYTEARRAY
+        except:
+            return image_type
+
+    return image_type
+
+
 def is_image_column(
     data: pd.Series,
     col_name: str,
@@ -209,11 +206,10 @@ def is_image_column(
     """
     sample_num = min(len(data), sample_n)
     data = data.sample(n=sample_num, random_state=0)
-    if is_image_path(data.iloc[0]):
-        image_type = IMAGE_PATH
+    image_type = get_image_feature_type(data.iloc[0])
+    if image_type == IMAGE_PATH:
         data = data.apply(lambda ele: str(ele).split(";")).tolist()
-    elif is_image_bytearray(data.iloc[0]):
-        image_type = IMAGE_BYTEARRAY
+    elif image_type == IMAGE_BYTEARRAY:
         data = data.tolist()
     else:
         return False

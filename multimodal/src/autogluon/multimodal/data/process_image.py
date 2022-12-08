@@ -64,7 +64,7 @@ from ..constants import (
     TIMM_IMAGE,
 )
 from .collator import Pad, Stack
-from .infer_types import is_image_bytearray, is_image_path
+from .infer_types import get_image_feature_type
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config, is_rois_input
 
@@ -438,14 +438,11 @@ class ImageProcessor:
                     # TODO: add gt masks
                     mm_data["ann_info"] = dict(bboxes=rois[:, :4], labels=rois[:, 4], masks=[])
                 else:
-                    if feature_modalities.get(per_col_name) in [IMAGE, IMAGE_PATH] and is_image_path(
-                        per_col_content[0]
-                    ):
+                    image_type = get_image_feature_type(per_col_content[0])
+                    if feature_modalities.get(per_col_name) in [IMAGE, IMAGE_PATH] and image_type == IMAGE_PATH:
                         with PIL.Image.open(per_col_content[0]) as img:
                             mm_data["img_info"] = dict(filename=per_col_content[0], height=img.height, width=img.width)
-                    elif feature_modalities.get(per_col_name) == IMAGE_BYTEARRAY or is_image_bytearray(
-                        per_col_content[0]
-                    ):
+                    elif feature_modalities.get(per_col_name) == IMAGE_BYTEARRAY or image_type == IMAGE_BYTEARRAY:
                         # TODO: add bytearray support for detection
                         raise NotImplementedError(f"column_type={IMAGE_BYTEARRAY} is not supported for detection!")
             if self.requires_column_info:
@@ -465,9 +462,10 @@ class ImageProcessor:
                             if feature_modalities.get(per_col_name) == IMAGE_BYTEARRAY:
                                 image_feature = BytesIO(img_feature)
                             else:
-                                if is_image_bytearray(img_feature):
+                                image_type = get_image_feature_type(img_feature)
+                                if image_type == IMAGE_BYTEARRAY:
                                     image_feature = BytesIO(img_feature)
-                                elif is_image_path(img_feature):
+                                elif image_type == IMAGE_PATH:
                                     image_feature = img_feature
                             with PIL.Image.open(image_feature) as img:
                                 img = img.convert(image_mode)

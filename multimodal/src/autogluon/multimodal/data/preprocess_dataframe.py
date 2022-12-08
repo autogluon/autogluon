@@ -212,6 +212,29 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def fit_y_called(self):
         return self._fit_y_called
 
+    def _get_image_feature_type(self, feature: Any):
+        image_type = None
+        if isinstance(feature, str):
+            image_feature = feature.split(";")[0]
+        elif isinstance(feature, bytearray):
+            image_feature = feature
+        elif isinstance(feature, list) and isinstance(feature[0], bytearray):
+            image_feature = feature[0]
+        else:
+            return image_type
+
+        try:
+            with PIL.Image.open(image_feature) as img:
+                image_type = IMAGE_PATH
+        except:
+            try:
+                with PIL.Image.open(BytesIO(image_feature)) as img:
+                    image_type = IMAGE_BYTEARRAY
+            except:
+                return image_type
+
+        return image_type
+
     def get_column_names(self, modality: str):
         if modality.startswith(IMAGE) or modality == ROIS:
             if hasattr(self, "_image_path_names"):
@@ -230,31 +253,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             return self._text_feature_names + [self._label_column]
         else:
             raise ValueError(f"Unknown modality: {modality}.")
-
-    def _is_image_path(self, feature: Any):
-        is_path = True
-        image_paths = str(feature).split(";")
-        for img_path in image_paths:
-            try:
-                with PIL.Image.open(img_path) as img:
-                    pass
-                break
-            except:
-                is_path = False
-        return is_path
-
-    def _is_image_bytearray(self, feature: Any):
-        is_bytearray = True
-        if not isinstance(feature, list):
-            feature = [feature]
-        for img_bytearray in feature:
-            try:
-                with PIL.Image.open(BytesIO(img_bytearray)) as img:
-                    pass
-                break
-            except:
-                is_bytearray = False
-        return is_bytearray
 
     def _fit_x(self, X: pd.DataFrame):
         """
@@ -442,9 +440,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             if col_type == ROIS:
                 processed_data = df[col_name].tolist()
             elif col_type in [IMAGE, IMAGE_BYTEARRAY, IMAGE_PATH]:  # for backward compatibility
-                if self._is_image_path(df[col_name].iloc[0]):
+                image_type = self._get_image_feature_type(df[col_name].iloc[0])
+                if image_type == IMAGE_PATH:
                     processed_data = col_value.apply(lambda ele: ele.split(";")).tolist()
-                elif self._is_image_bytearray(df[col_name].iloc[0]):
+                elif image_type == IMAGE_BYTEARRAY:
                     processed_data = col_value.apply(lambda ele: ele if isinstance(ele, list) else [ele]).tolist()
             elif col_type == f"{IMAGE}_{IDENTIFIER}":
                 processed_data = col_value
