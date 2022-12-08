@@ -136,6 +136,20 @@ class DataHelper:
         )
 
     @staticmethod
+    def generate_datetime_as_object_feature_advanced() -> Series:
+        """Nightmare input for datetime"""
+        return Series(
+            [
+                '8/1/2018 16:27',
+                '',  # nan
+                np.nan,  # nan
+                '2021-08-09T17:07:08.659-0400',  # With timezone 4
+                '2021-08-09T17:08:15.541-0400',  # With timezone 4
+                '2021-01-07T12:33:23.938-0500',  # With timezone 5
+            ]
+        )
+
+    @staticmethod
     def generate_datetime_feature() -> Series:
         return pd.to_datetime(DataHelper.generate_datetime_as_object_feature(), errors='coerce')
 
