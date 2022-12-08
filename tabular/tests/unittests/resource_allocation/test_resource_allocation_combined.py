@@ -1,0 +1,465 @@
+import numpy as np
+import pytest
+import pandas as pd
+import time
+
+from autogluon.core.hpo.executors import RayHpoExecutor
+from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
+from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy
+from autogluon.tabular.models import AbstractModel
+
+
+class DummyBaseModel(AbstractModel):
+    
+    def __init__(self, minimum_resources=None, default_resources=None, **kwargs):
+        self._minimum_resources = minimum_resources
+        self._default_resources = default_resources
+        super().__init__(**kwargs)
+        
+    def get_minimum_resources(self, **kwargs):
+        return self._minimum_resources
+    
+    def _get_default_resources(self):
+        num_cpus = self._default_resources.get('num_cpus')
+        num_gpus = self._default_resources.get('num_gpus')
+        return num_cpus, num_gpus
+
+
+class DummyModel(DummyBaseModel):
+    pass
+
+    
+class DummyBaggedModel(BaggedEnsembleModel):
+    pass
+
+
+dummy_x = pd.DataFrame([1,2,3], columns=['Dummy'])
+
+
+def _initialize_executor(executor_cls, hyperparameter_tune_kwargs):
+    executor = executor_cls()
+    executor.initialize(hyperparameter_tune_kwargs)
+    return executor
+
+
+def _prepare_data():
+    # prepare an all numeric data so that we don't need to clean labels and features
+    data = [[1, 10], [2, 20], [3, 30]]
+    df = pd.DataFrame(data, columns=['Number', 'Age'])
+    label = 'Age'
+    X = df.drop(columns=[label])
+    y = df[label]
+    return X, y
+
+
+def _construct_dummy_fold_strategy(
+    fold_strategy_cls,
+    num_jobs,
+    num_folds_parallel,
+    resource_granted,
+    model_base,
+    bagged_model
+):
+    
+    train_data, test_data = _prepare_data()
+    args = dict(
+        model_base=model_base,
+        model_base_kwargs=dict(),
+        bagged_ensemble_model=bagged_model,
+        X=train_data,
+        y=test_data,
+        X_pseudo=None,
+        y_pseudo=None,
+        sample_weight=None,
+        time_start=time.time(),
+        time_limit=0,
+        models=[],
+        oof_pred_proba=np.array([]),
+        oof_pred_model_repeats=np.array([]),
+        save_folds=True,
+        time_limit_fold_ratio=1,
+        **resource_granted  # These will be processed at abstract model level in a real tabular predictor
+    )
+    if fold_strategy_cls == ParallelLocalFoldFittingStrategy:
+        args['num_jobs'] = num_jobs
+        args['num_folds_parallel'] = num_folds_parallel
+    return fold_strategy_cls(**args)
+
+
+def _test_bagging(
+    num_jobs,
+    num_folds_parallel,
+    model_base,
+    bagged_model,
+    resources,
+    expected_answer,
+):
+    fold_fitting_strategy = _construct_dummy_fold_strategy(
+        fold_strategy_cls=ParallelLocalFoldFittingStrategy,
+        num_jobs=num_jobs,
+        num_folds_parallel=num_folds_parallel,
+        resource_granted=resources,
+        model_base=model_base,
+        bagged_model=bagged_model
+    )
+    expected_resources_per_model = expected_answer['resources_per_model']
+    expected_model_in_parallel = expected_answer['model_in_parallel']
+    assert fold_fitting_strategy.resources == expected_resources_per_model
+    assert fold_fitting_strategy.num_parallel_jobs == expected_model_in_parallel
+    
+    
+def _test_functionality(mock_system_resources_ctx_mgr, test_args):
+    system_resources = test_args.get('system_resources', {'num_cpus': 16, 'num_gpus': 4})
+    total_resources = test_args.get('total_resources', {'num_cpus': 'auto', 'num_gpus': 'auto'})
+    model_default_resources = test_args.get('model_default_resources', {'num_cpus': 1, 'num_gpus': 0})
+    model_minimum_resources = test_args.get('model_minimum_resources', {'num_cpus': 1, 'num_gpus': 0})
+    ag_args_ensemble = test_args.get('ag_args_ensemble', {})
+    ag_args_fit = test_args.get('ag_args_fit', {})
+    num_bag_folds = test_args.get('num_bag_folds', 0)
+    num_trials = test_args.get('num_trials', 0)
+    expected_answer = test_args.get('expected_answer')
+    should_raise = test_args.get('should_raise', False)
+    hpo = num_trials > 0
+    with mock_system_resources_ctx_mgr(num_cpus=system_resources.get('num_cpus'), num_gpus=system_resources.get('num_gpus')):
+        model = DummyModel(
+            minimum_resources=model_minimum_resources,
+            default_resources=model_default_resources,
+            hyperparameters={'ag_args_fit': ag_args_fit}
+        )
+        model.initialize()
+        if num_bag_folds > 0:
+            model = DummyBaggedModel(
+                model,
+                hyperparameters={'ag_args_fit': ag_args_ensemble}
+            )
+            model.initialize()
+        resources = model._preprocess_fit_resources(total_resources=total_resources, k_fold=num_bag_folds, hpo=hpo)
+        resources.pop('k_fold')
+        if hpo:
+            hyperparameter_tune_kwargs = {
+                'scheduler': 'local',
+                'searcher': 'random',
+                'num_trials': num_trials
+            }
+            executor = _initialize_executor(RayHpoExecutor, hyperparameter_tune_kwargs)
+            executor.register_resources(model, k_fold=num_bag_folds, X=dummy_x, **resources)
+            if num_bag_folds > 0:
+                resources_per_trial = executor.hyperparameter_tune_kwargs['resources_per_trial']
+                assert resources_per_trial == expected_answer['resources_per_trial']
+                _test_bagging(
+                    num_jobs=num_bag_folds,
+                    num_folds_parallel=num_bag_folds,
+                    model_base=model.model_base,
+                    bagged_model=model,
+                    resources=resources_per_trial,
+                    expected_answer=expected_answer
+                )
+        else:
+            if num_bag_folds > 0:
+                _test_bagging(
+                    num_jobs=num_bag_folds,
+                    num_folds_parallel=num_bag_folds,
+                    model_base=model.model_base,
+                    bagged_model=model,
+                    resources=resources,
+                    expected_answer=expected_answer
+                )
+            else:
+                assert resources == expected_answer['resources_per_model']
+
+
+@pytest.mark.parametrize(
+    'test_args',
+    [
+        (
+            {
+                'ag_args_fit': {'num_cpus': 8, 'num_gpus': 2},
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 8, 'num_gpus': 2}
+                }
+            }
+        ),
+        (
+            {
+                'total_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus': 8, 'num_gpus': 2},
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 8, 'num_gpus': 2}
+                }
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 8, 'num_gpus': 2}
+                }
+            }
+        ),
+        (
+            {
+                'model_default_resources': {'num_cpus': 2, 'num_gpus': 1},
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1}
+                }
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus':2, 'num_gpus': 1},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 2},
+                'num_bag_folds': 8,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1},
+                    'model_in_parallel': 2
+                }
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus':2, 'num_gpus': 1},
+                'ag_args_ensemble': {'num_cpus': 16, 'num_gpus': 4},
+                'num_bag_folds': 4,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 4, 'num_gpus': 1},
+                    'model_in_parallel': 4
+                }
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus':2, 'num_gpus': 0.5},
+                'model_default_resources': {'num_cpus':2, 'num_gpus': 1},
+                'num_bag_folds': 8,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
+                    'model_in_parallel': 8
+                }
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'total_resources': {'num_cpus':8, 'num_gpus': 2},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
+                'num_bag_folds': 8,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
+                    'model_in_parallel': 2
+                }
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
+                'num_trials': 2,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1}
+                }
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'model_default_resources': {'num_cpus': 2, 'num_gpus': 1},
+                'num_trials': 2,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1}
+                }
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 1},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1}
+                }
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 1},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1}
+                }
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 1},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'num_bag_folds': 2,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 8, 'num_gpus': 2},
+                    'resources_per_model': {'num_cpus': 4, 'num_gpus': 1},
+                    'model_in_parallel': 2  # This is models running in parallel in a bagged model
+                }
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
+                'ag_args_ensemble': {'num_cpus':4, 'num_gpus': 1},
+                'ag_args_fit': {'num_cpus':2, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'num_bag_folds': 2,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 4, 'num_gpus': 1},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
+                    'model_in_parallel': 2  # This is models running in parallel in a bagged model
+                }
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 1, 'num_gpus': 0.5},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
+                'ag_args_fit': {'num_cpus':2, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'num_bag_folds': 2,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 4, 'num_gpus': 1},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
+                    'model_in_parallel': 2  # This is models running in parallel in a bagged model
+                }
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 1, 'num_gpus': 0.5},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
+                'ag_args_ensemble': {'num_cpus':4, 'num_gpus': 1},
+                'num_trials': 2,
+                'num_bag_folds': 2,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 4, 'num_gpus': 1},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
+                    'model_in_parallel': 2  # This is models running in parallel in a bagged model
+                }
+            }
+        ),
+        # Should raise staring now
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'ag_args_ensemble': {'num_cpus':99, 'num_gpus': 99},
+                'ag_args_fit': {'num_cpus':2, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'num_bag_folds': 2,
+                'should_raise': True
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'ag_args_ensemble': {'num_cpus':8, 'num_gpus': 2},
+                'ag_args_fit': {'num_cpus':99, 'num_gpus': 99},
+                'num_trials': 2,
+                'num_bag_folds': 2,
+                'should_raise': True
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'ag_args_ensemble': {'num_cpus':99, 'num_gpus': 99},
+                'ag_args_fit': {'num_cpus':4, 'num_gpus': 1},
+                'num_bag_folds': 2,
+                'should_raise': True
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus':99, 'num_gpus': 99},
+                'should_raise': True
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_ensemble': {'num_cpus':4, 'num_gpus': 1},
+                'num_trials': 2,
+                'num_bag_folds': 2,
+                'should_raise': True
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus':4, 'num_gpus': 1},
+                'num_trials': 2,
+                'num_bag_folds': 2,
+                'should_raise': True
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus':4, 'num_gpus': 1},
+                'num_bag_folds': 2,
+                'should_raise': True
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus':4, 'num_gpus': 1},
+                'num_trials': 2,
+                'should_raise': True
+            }
+        ),
+        (
+            {
+                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus':4, 'num_gpus': 1},
+                'should_raise': True
+            }
+        ),
+    ]
+)
+def test_resource_allocation_combined_valid(
+    mock_system_resources_ctx_mgr,
+    test_args
+):
+    should_raise = test_args.get('should_raise', False)
+    if should_raise:
+        with pytest.raises(AssertionError) as e:
+            _test_functionality(
+                mock_system_resources_ctx_mgr=mock_system_resources_ctx_mgr,
+                test_args=test_args
+            )
+    else:
+        _test_functionality(
+            mock_system_resources_ctx_mgr=mock_system_resources_ctx_mgr,
+            test_args=test_args
+        )
+    

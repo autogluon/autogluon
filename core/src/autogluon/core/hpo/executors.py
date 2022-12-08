@@ -194,7 +194,6 @@ class HpoExecutor(ABC):
             if minimum_model_num_gpus > 0:
                 num_jobs_in_parallel_with_gpu = num_gpus // minimum_model_num_gpus
             num_jobs_in_parallel = min(num_jobs_in_parallel_with_mem, num_jobs_in_parallel_with_cpu, num_jobs_in_parallel_with_gpu)
-
             if model_base != initialized_model:
                 # bagged model
                 if num_jobs_in_parallel // k_fold < 1:

@@ -74,19 +74,19 @@ def test_bagged_model_with_total_resources_and_ensemble_resources(mock_system_re
             'num_gpus': 1,
         }
         model_base = DummyModel()
+        ensemble_ag_args_fit = {
+            'num_cpus': 4,
+            'num_gpus': 1,
+        }
         bagged_model = DummyBaggedModel(
             model_base,
             hyperparameters={
-                'ag_args_fit': {
-                    'num_cpus': 4,
-                    'num_gpus': 1,
-                }
+                'ag_args_fit': ensemble_ag_args_fit
             }
         )
         resources = bagged_model._preprocess_fit_resources(total_resources=total_resources, k_fold=k_fold)
         resources.pop('k_fold')
-        # Total resources should not be affected by ensemble resources.
-        assert resources == total_resources
+        assert resources == ensemble_ag_args_fit
     
 
 def test_bagged_model_without_total_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold):

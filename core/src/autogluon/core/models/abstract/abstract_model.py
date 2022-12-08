@@ -546,35 +546,47 @@ class AbstractModel:
             num_gpus = system_num_gpus
         if num_cpus == 'auto':
             if user_specified_lower_level_num_cpus is not None:
-                num_cpus = user_specified_lower_level_num_cpus
+                if not hpo:
+                    num_cpus = user_specified_lower_level_num_cpus
+                else:
+                    num_cpus = system_num_cpus
             else:
-                num_cpus = default_num_cpus
+                if not hpo:
+                    num_cpus = default_num_cpus
+                else:
+                    num_cpus = system_num_cpus
         else:
-            if (k_fold is None or k_fold == 0) and not hpo:
+            if not hpo:
                 if user_specified_lower_level_num_cpus is not None:
                     assert user_specified_lower_level_num_cpus <= num_cpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total specified: {num_cpus}'
                     num_cpus = user_specified_lower_level_num_cpus
         if num_gpus == 'auto':
             if user_specified_lower_level_num_gpus is not None:
-                num_gpus = user_specified_lower_level_num_gpus
+                if not hpo:
+                    num_gpus = user_specified_lower_level_num_gpus
+                else:
+                    num_gpus = system_num_gpus if user_specified_lower_level_num_gpus > 0 else 0
             else:
-                num_gpus = default_num_gpus
+                if not hpo:
+                    num_gpus = default_num_gpus
+                else:
+                    num_gpus = system_num_gpus if default_num_gpus > 0 else 0
         else:
-            if (k_fold is None or k_fold == 0) and not hpo:
+            if not hpo:
                 if user_specified_lower_level_num_gpus is not None:
                     assert user_specified_lower_level_num_gpus <= num_gpus, f'Specified num_gpus per {self.__class__.__name__} is more than the total specified: {num_gpus}'
                     num_gpus = user_specified_lower_level_num_gpus
-        # This will be ag_args_ensemble when bagging, and ag_args_fit when non-bagging
-        params_aux_num_cpus = self._user_params_aux.get('num_cpus', None)
-        params_aux_num_gpus = self._user_params_aux.get('num_gpus', None)
-        if params_aux_num_cpus is not None:
-            assert params_aux_num_cpus <= num_cpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total: {num_cpus}'
-        if params_aux_num_gpus is not None:
-            assert params_aux_num_gpus <= num_gpus, f'Specified num_gpus per {self.__class__.__name__} is more than the total: {num_gpus}'
+
+        minimum_model_resources = self.get_minimum_resources(
+            is_gpu_available=(num_gpus > 0)
+        )
+        minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
+        minimum_model_num_gpus = minimum_model_resources.get('num_gpus', 0)
+        assert num_cpus >= minimum_model_num_cpus, f'Specified num_cpus per {self.__class__.__name__} is less than minimum num_cpus requirement {minimum_model_num_cpus}'
+        assert num_gpus >= minimum_model_num_gpus, f'Specified num_gpus per {self.__class__.__name__} is less than minimum num_gpus requirement {minimum_model_num_gpus}'
         
         kwargs['num_cpus'] = num_cpus
         kwargs['num_gpus'] = num_gpus
-        
         if not silent:
             logger.log(15, f"\tFitting {self.name} with 'num_gpus': {kwargs['num_gpus']}, 'num_cpus': {kwargs['num_cpus']}")
         return kwargs
