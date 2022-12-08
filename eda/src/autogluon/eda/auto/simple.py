@@ -1,3 +1,4 @@
+import logging
 from typing import Union, List, Optional
 
 from .. import AnalysisState
@@ -5,6 +6,7 @@ from ..analysis.base import BaseAnalysis, AbstractAnalysis
 from ..analysis.dataset import Sampler
 from ..visualization.base import AbstractVisualization
 from ..visualization.layouts import SimpleVerticalLinearLayout
+from autogluon.common.utils.log_utils import verbosity2loglevel
 
 
 def analyze(
@@ -18,6 +20,7 @@ def analyze(
     anlz_facets: Optional[List[AbstractAnalysis]] = None,
     viz_facets: Optional[List[AbstractVisualization]] = None,
     return_state: bool = False,
+    verbosity: int = 2,
 ):
     """
     This helper creates `BaseAnalysis` wrapping passed analyses into
@@ -49,6 +52,11 @@ def analyze(
         visualizations to add to this composite analysis
     return_state: bool, default = False
         return state if `True`
+    verbosity: int, default = 2,
+        Verbosity levels range from 0 to 4 and control how much information is printed.
+        Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+        If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
+        where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
 
     Returns
     -------
@@ -68,6 +76,11 @@ def analyze(
     if not isinstance(state, AnalysisState):
         state = AnalysisState(state)
 
+    root_logger = logging.getLogger("autogluon")
+    root_log_level = root_logger.level
+    log_level = verbosity2loglevel(verbosity)
+    root_logger.setLevel(log_level)
+
     analysis = BaseAnalysis(
         state=state,
         train_data=train_data,
@@ -85,6 +98,8 @@ def analyze(
     SimpleVerticalLinearLayout(
         facets=viz_facets,
     ).render(state)
+
+    root_logger.setLevel(root_log_level)  # Reset log level
 
     if return_state:
         return state

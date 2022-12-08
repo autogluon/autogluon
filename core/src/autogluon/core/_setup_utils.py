@@ -23,7 +23,7 @@ DEPENDENT_PACKAGES = {
     'psutil': '>=5.7.3,<6',
     'gluoncv': '>=0.10.5,<0.10.6',
     'tqdm': '>=4.38.0',
-    'Pillow': '>=9.0.1,<9.1.0',
+    'Pillow': '>=9.3.0,<=9.4.0',
     'timm': '>=0.5.4,<0.7.0',
 }
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
@@ -92,7 +92,7 @@ def default_setup_args(*, version, submodule):
         name=name,
         version=version,
         author='AutoGluon Community',
-        url='https://github.com/awslabs/autogluon',
+        url='https://github.com/autogluon/autogluon',
         description='AutoML for Image, Text, and Tabular Data',
         long_description=long_description,
         long_description_content_type='text/markdown',
@@ -134,9 +134,9 @@ def default_setup_args(*, version, submodule):
         ],
         project_urls={
             'Documentation': 'https://auto.gluon.ai',
-            'Bug Reports': 'https://github.com/awslabs/autogluon/issues',
-            'Source': 'https://github.com/awslabs/autogluon/',
-            'Contribute!': 'https://github.com/awslabs/autogluon/blob/master/CONTRIBUTING.md',
+            'Bug Reports': 'https://github.com/autogluon/autogluon/issues',
+            'Source': 'https://github.com/autogluon/autogluon/',
+            'Contribute!': 'https://github.com/autogluon/autogluon/blob/master/CONTRIBUTING.md',
         },
     )
     return setup_args

@@ -84,12 +84,12 @@ print(student_predictor.evaluate(data=test_df))
 ## More about Knowledge Distillation
 
 To learn how to customize distillation and how it compares with direct finetuning, see the distillation examples 
-and README in [AutoMM Distillation Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm/distillation).
-Especially the [multilingual distillation example](https://github.com/awslabs/autogluon/tree/master/examples/automm/distillation/automm_distillation_pawsx.py) with more details and customization.
+and README in [AutoMM Distillation Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm/distillation).
+Especially the [multilingual distillation example](https://github.com/autogluon/autogluon/tree/master/examples/automm/distillation/automm_distillation_pawsx.py) with more details and customization.
 
 ## Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ## Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

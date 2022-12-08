@@ -25,7 +25,7 @@ If this is not done, AutoGluon will crash during fit when trying to parallelize 
 In the below example, you would want to create a new python file such as `my_metrics.py` with `ag_accuracy_scorer` defined in it,
 and then use it via `from my_metrics import ag_accuracy_scorer`.
 
-If your metric is not serializable, you will get many errors similar to: `_pickle.PicklingError: Can't pickle`. Refer to https://github.com/awslabs/autogluon/issues/1637 for an example.
+If your metric is not serializable, you will get many errors similar to: `_pickle.PicklingError: Can't pickle`. Refer to https://github.com/autogluon/autogluon/issues/1637 for an example.
 
 The custom metrics in this tutorial are **not** serializable for ease of demonstration. If `best_quality` preset was used, it would crash.
 
@@ -258,7 +258,7 @@ predictor_custom.leaderboard(test_data, silent=True)
 
 That's all it takes to create and use custom metrics in AutoGluon!
 
-If you create a custom metric, consider [submitting a PR](https://github.com/awslabs/autogluon/pulls) so that we can add it officially to AutoGluon!
+If you create a custom metric, consider [submitting a PR](https://github.com/autogluon/autogluon/pulls) so that we can add it officially to AutoGluon!
 
 For a tutorial on implementing custom models in AutoGluon, refer to :ref:`sec_tabularcustommodel`.
 

@@ -1,7 +1,7 @@
 # isort: skip_file
 # flake8: noqa
 # The import order of autogluon sub module here could cause seg fault. Ignore isort for now
-# https://github.com/awslabs/autogluon/issues/2042
+# https://github.com/autogluon/autogluon/issues/2042
 import argparse
 import os
 import shutil
@@ -10,9 +10,6 @@ from pprint import pprint
 import yaml
 
 from autogluon.tabular import TabularPredictor, TabularDataset, FeatureMetadata
-from autogluon.vision import ImagePredictor
-from autogluon.text import TextPredictor
-from autogluon.multimodal import MultiModalPredictor
 
 
 def get_input_path(path):
@@ -81,10 +78,16 @@ if __name__ == "__main__":
         if "feature_meatadata" in predictor_fit_args:
             predictor_fit_args["feature_meatadata"] = FeatureMetadata(**predictor_fit_args["feature_meatadata"])
     elif predictor_type == "text":
+        from autogluon.text import TextPredictor
+
         predictor_cls = TextPredictor
     elif predictor_type == "image":
+        from autogluon.vision import ImagePredictor
+
         predictor_cls = ImagePredictor
     elif predictor_type == "multimodal":
+        from autogluon.multimodal import MultiModalPredictor
+
         predictor_cls = MultiModalPredictor
 
     train_file = get_input_path(args.training_dir)

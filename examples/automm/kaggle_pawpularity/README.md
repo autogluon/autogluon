@@ -73,7 +73,7 @@ To solve the problem, there are two key points:
  - Loading AutoGluon and its related libraries through datasets.
  - Using standalone models to avoid model downloading.
 
-You can download [AutoGluon](https://github.com/awslabs/autogluon) and use the tools to train your model locally.
+You can download [AutoGluon](https://github.com/autogluon/autogluon) and use the tools to train your model locally.
 For using AutoGluon in Kaggle submission, it should be uploaded to Kaggle as a dataset. You can create a new dataset called "auotgluon" in Kaggle. After that, find AutoGluon at the installation path and upload it into the dataset. 
 In this way, AutoGluon is introduced without network support in submission. 
 Through the code following, you can import AutoGluon into your work.

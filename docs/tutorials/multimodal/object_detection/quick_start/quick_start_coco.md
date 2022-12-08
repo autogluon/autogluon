@@ -204,21 +204,20 @@ To run visualizations, ensure that you have `opencv` installed. If you haven't a
 
 To visualize the detection bounding boxes, run the following:
 ```python .input
-from autogluon.multimodal.utils import visualize_detection
+from autogluon.multimodal.utils import Visualizer
 
 conf_threshold = 0.4  # Specify a confidence threshold to filter out unwanted boxes
-visualization_result_dir = "./"  # Use the pwd as result dir to save the visualized image
+image_result = pred.iloc[30]
 
-visualized = visualize_detection(
-    pred=pred[30:31],
-    detection_classes=predictor.get_predictor_classes(),
-    conf_threshold=conf_threshold,
-    visualization_result_dir=visualization_result_dir,
-)
+img_path = image_result.image  # Select an image to visualize
+
+visualizer = Visualizer(img_path)  # Initialize the Visualizer
+out = visualizer.draw_instance_predictions(image_result, conf_threshold=conf_threshold)  # Draw detections
+visualized = out.get_image()  # Get the visualized image
 
 from PIL import Image
 from IPython.display import display
-img = Image.fromarray(visualized[0][:, :, ::-1], 'RGB')
+img = Image.fromarray(visualized, 'RGB')
 display(img)
 ```
 
@@ -241,7 +240,7 @@ print(pred_test_image)
 
 ### Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ### Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.
