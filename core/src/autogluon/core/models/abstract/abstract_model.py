@@ -478,6 +478,20 @@ class AbstractModel:
             logger.debug(f"{self.name} predicted probabilities will be transformed to never =0 since eval_metric='{self.eval_metric.name}'")
         else:
             self.normalize_pred_probas = False
+            
+    def _process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(self, system_resource, user_specified_ensemble_resource, resource_type, k_fold):
+        # retrieve model level requirement when self is bagged model
+        user_specified_model_level_resource = self.model_base._user_params_aux.get(resource_type, None)
+        if user_specified_model_level_resource is not None:
+            assert user_specified_model_level_resource <= system_resource, f'Specified {resource_type} per {self.model_base.__class__.__name__} is more than the total: {system_resource}'
+        user_specified_lower_level_resource = user_specified_ensemble_resource
+        if user_specified_ensemble_resource is not None:
+            if user_specified_model_level_resource is not None:
+                user_specified_lower_level_resource = min(user_specified_model_level_resource * k_fold, user_specified_ensemble_resource, system_resource)
+        else:
+            if user_specified_model_level_resource is not None:
+                user_specified_lower_level_resource = min(user_specified_model_level_resource * k_fold, system_resource)
+        return user_specified_lower_level_resource
 
     def _preprocess_fit_resources(self, silent=False, total_resources=None, hpo=False, **kwargs):
         """
@@ -508,25 +522,18 @@ class AbstractModel:
             # bagged model's default resources should be resources * k_fold if the amount is available
             default_num_cpus = min(default_num_cpus * k_fold, system_num_cpus)
             default_num_gpus = min(default_num_gpus * k_fold, system_num_gpus)
-            # retrieve model level requirement when self is bagged model
-            user_specified_model_level_num_cpus = self.model_base._user_params_aux.get('num_cpus', None)
-            user_specified_model_level_num_gpus = self.model_base._user_params_aux.get('num_gpus', None)
-            if user_specified_model_level_num_cpus is not None:
-                assert user_specified_model_level_num_cpus <= system_num_cpus, f'Specified num_cpus per {self.model_base.__class__.__name__} is more than the total: {system_num_cpus}'
-            if user_specified_model_level_num_gpus is not None:
-                assert user_specified_model_level_num_gpus <= system_num_gpus, f'Specified num_gpus per {self.model_base.__class__.__name__} is more than the total: {system_num_gpus}'
-            if user_specified_lower_level_num_cpus is not None:
-                if user_specified_model_level_num_cpus is not None:
-                    user_specified_lower_level_num_cpus = min(user_specified_lower_level_num_cpus * k_fold, user_specified_model_level_num_cpus)
-            else:
-                if user_specified_model_level_num_cpus is not None:
-                    user_specified_lower_level_num_cpus = min(user_specified_model_level_num_cpus * k_fold, system_num_cpus)
-            if user_specified_lower_level_num_gpus is not None:
-                if user_specified_model_level_num_gpus is not None:
-                    user_specified_lower_level_num_gpus = min(user_specified_lower_level_num_gpus * k_fold, user_specified_model_level_num_gpus)
-            else:
-                if user_specified_model_level_num_gpus is not None:
-                    user_specified_lower_level_num_gpus = min(user_specified_model_level_num_gpus * k_fold, system_num_gpus)
+            user_specified_lower_level_num_cpus = self._process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(
+                system_resource=system_num_cpus,
+                user_specified_ensemble_resource=user_specified_lower_level_num_cpus,
+                resource_type='num_cpus',
+                k_fold=k_fold
+            )
+            user_specified_lower_level_num_gpus = self._process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(
+                system_resource=system_num_gpus,
+                user_specified_ensemble_resource=user_specified_lower_level_num_gpus,
+                resource_type='num_gpus',
+                k_fold=k_fold
+            )
         if total_resources is None:
             total_resources = {}
         num_cpus = total_resources.get('num_cpus', 'auto')
@@ -555,7 +562,7 @@ class AbstractModel:
         else:
             if (k_fold is None or k_fold == 0) and not hpo:
                 if user_specified_lower_level_num_gpus is not None:
-                    assert user_specified_lower_level_num_gpus <= num_gpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total specified: {num_gpus}'
+                    assert user_specified_lower_level_num_gpus <= num_gpus, f'Specified num_gpus per {self.__class__.__name__} is more than the total specified: {num_gpus}'
                     num_gpus = user_specified_lower_level_num_gpus
         # This will be ag_args_ensemble when bagging, and ag_args_fit when non-bagging
         params_aux_num_cpus = self._user_params_aux.get('num_cpus', None)
