@@ -184,6 +184,24 @@ tests_dict = {
                 }
             }
         ),
+        'valid_ag_args_fit_without_gpu_default_no_gpu': (
+            {
+                'ag_args_fit': {'num_cpus': 8},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0},
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 8, 'num_gpus': 0}
+                }
+            }
+        ),
+        'valid_ag_args_fit_without_gpu_default_gpu': (
+            {
+                'ag_args_fit': {'num_cpus': 8},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 1},
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 8, 'num_gpus': 1}
+                }
+            }
+        ),
         'valid_ag_args_ensemble_and_ag_args_fit': (
             {
                 'ag_args_ensemble': {'num_cpus': 8, 'num_gpus': 2},
@@ -614,6 +632,7 @@ tests_dict = {
         'hpo_and_bagging_without_anything': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 1},
                 'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 1},
                 'num_trials': 2,
                 'num_bag_folds': 4,
