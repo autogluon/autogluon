@@ -435,8 +435,18 @@ class TextProcessor:
         -------
         A tokenizer instance.
         """
-        tokenizer_class = ALL_TOKENIZERS[tokenizer_name]
-        return tokenizer_class.from_pretrained(checkpoint_name)
+        try:
+            tokenizer_class = ALL_TOKENIZERS[tokenizer_name]
+            return tokenizer_class.from_pretrained(checkpoint_name)
+        except TypeError as e:
+            try:
+                tokenizer_class = ALL_TOKENIZERS["bert"]
+                tokenizer = tokenizer_class.from_pretrained(checkpoint_name)
+                logger.warning(f"Current checkpoint {checkpoint_name} does not support AutoTokenizer. "
+                               "Switch to BertTokenizer instead.")
+                return tokenizer
+            except:
+                raise e
 
     @staticmethod
     def get_trimmed_lengths(
