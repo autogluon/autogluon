@@ -519,9 +519,10 @@ class AbstractModel:
             assert user_specified_lower_level_num_gpus <= system_num_cpus, f'Specified num_gpus per {self.__class__.__name__} is more than the total: {system_num_cpus}'
         k_fold = kwargs.get('k_fold', None)
         if k_fold is not None and k_fold > 0:
-            # bagged model's default resources should be resources * k_fold if the amount is available
-            default_num_cpus = min(default_num_cpus * k_fold, system_num_cpus)
-            default_num_gpus = min(default_num_gpus * k_fold, system_num_gpus)
+            # bagged model will look ag_args_ensemble and ag_args_fit internally to determine resources
+            # pass all resources here by default
+            default_num_cpus = system_num_cpus
+            default_num_gpus = system_num_gpus
             user_specified_lower_level_num_cpus = self._process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(
                 system_resource=system_num_cpus,
                 user_specified_ensemble_resource=user_specified_lower_level_num_cpus,

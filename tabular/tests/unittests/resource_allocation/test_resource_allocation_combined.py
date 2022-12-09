@@ -5,7 +5,7 @@ import time
 
 from autogluon.core.hpo.executors import RayHpoExecutor
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
-from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy
+from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy, SequentialLocalFoldFittingStrategy
 from autogluon.tabular.models import AbstractModel
 
 
@@ -87,6 +87,7 @@ def _construct_dummy_fold_strategy(
 
 
 def _test_bagging(
+    fold_strategy_cls,
     num_jobs,
     num_folds_parallel,
     model_base,
@@ -95,7 +96,7 @@ def _test_bagging(
     expected_answer,
 ):
     fold_fitting_strategy = _construct_dummy_fold_strategy(
-        fold_strategy_cls=ParallelLocalFoldFittingStrategy,
+        fold_strategy_cls=fold_strategy_cls,
         num_jobs=num_jobs,
         num_folds_parallel=num_folds_parallel,
         resource_granted=resources,
@@ -103,9 +104,11 @@ def _test_bagging(
         bagged_model=bagged_model
     )
     expected_resources_per_model = expected_answer['resources_per_model']
-    expected_model_in_parallel = expected_answer['model_in_parallel']
     assert fold_fitting_strategy.resources == expected_resources_per_model
-    assert fold_fitting_strategy.num_parallel_jobs == expected_model_in_parallel
+    if fold_strategy_cls == ParallelLocalFoldFittingStrategy:
+        expected_model_in_parallel = expected_answer['model_in_parallel']
+        assert fold_fitting_strategy.num_parallel_jobs == expected_model_in_parallel
+    
     
     
 def _test_functionality(mock_system_resources_ctx_mgr, test_args):
@@ -116,9 +119,9 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
     ag_args_ensemble = test_args.get('ag_args_ensemble', {})
     ag_args_fit = test_args.get('ag_args_fit', {})
     num_bag_folds = test_args.get('num_bag_folds', 0)
+    fold_strategy_cls = test_args.get('fold_strategy_cls', ParallelLocalFoldFittingStrategy)
     num_trials = test_args.get('num_trials', 0)
     expected_answer = test_args.get('expected_answer')
-    should_raise = test_args.get('should_raise', False)
     hpo = num_trials > 0
     with mock_system_resources_ctx_mgr(num_cpus=system_resources.get('num_cpus'), num_gpus=system_resources.get('num_gpus')):
         model = DummyModel(
@@ -143,10 +146,11 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
             }
             executor = _initialize_executor(RayHpoExecutor, hyperparameter_tune_kwargs)
             executor.register_resources(model, k_fold=num_bag_folds, X=dummy_x, **resources)
+            resources_per_trial = executor.hyperparameter_tune_kwargs['resources_per_trial']
+            assert resources_per_trial == expected_answer['resources_per_trial']
             if num_bag_folds > 0:
-                resources_per_trial = executor.hyperparameter_tune_kwargs['resources_per_trial']
-                assert resources_per_trial == expected_answer['resources_per_trial']
                 _test_bagging(
+                    fold_strategy_cls=fold_strategy_cls,
                     num_jobs=num_bag_folds,
                     num_folds_parallel=num_bag_folds,
                     model_base=model.model_base,
@@ -157,6 +161,7 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
         else:
             if num_bag_folds > 0:
                 _test_bagging(
+                    fold_strategy_cls=fold_strategy_cls,
                     num_jobs=num_bag_folds,
                     num_folds_parallel=num_bag_folds,
                     model_base=model.model_base,
@@ -168,10 +173,8 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
                 assert resources == expected_answer['resources_per_model']
 
 
-@pytest.mark.parametrize(
-    'test_args',
-    [
-        (
+tests_dict = {
+        'valid_ag_args_fit': (
             {
                 'ag_args_fit': {'num_cpus': 8, 'num_gpus': 2},
                 'expected_answer': {
@@ -179,7 +182,7 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
                 }
             }
         ),
-        (
+        'total_resources_with_valid_ag_args_fit': (
             {
                 'total_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'ag_args_fit': {'num_cpus': 8, 'num_gpus': 2},
@@ -188,16 +191,16 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
                 }
             }
         ),
-        (
+        'total_resources_without_ag_args_fit': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'total_resources': {'num_cpus': 8, 'num_gpus': 2},
                 'expected_answer': {
                     'resources_per_model': {'num_cpus': 8, 'num_gpus': 2}
                 }
             }
         ),
-        (
+        'without_anything': (
             {
                 'model_default_resources': {'num_cpus': 2, 'num_gpus': 1},
                 'expected_answer': {
@@ -205,10 +208,11 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
                 }
             }
         ),
-        (
+        'total_resources_with_valid_ag_args_ensemble_and_valid_ag_args_fit': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
-                'ag_args_fit': {'num_cpus':2, 'num_gpus': 1},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
                 'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 2},
                 'num_bag_folds': 8,
                 'expected_answer': {
@@ -217,23 +221,46 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
                 }
             }
         ),
-        (
+        'valid_ag_args_ensemble_and_valid_ag_args_fit': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
-                'model_minimum_resources': {'num_cpus':2, 'num_gpus': 1},
-                'ag_args_ensemble': {'num_cpus': 16, 'num_gpus': 4},
-                'num_bag_folds': 4,
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 2},
+                'num_bag_folds': 8,
                 'expected_answer': {
-                    'resources_per_model': {'num_cpus': 4, 'num_gpus': 1},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1},
+                    'model_in_parallel': 2
+                }
+            }
+        ),
+        'valid_ag_args_ensemble_without_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_ensemble': {'num_cpus': 8, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 1},
+                'num_bag_folds': 8,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1},
                     'model_in_parallel': 4
                 }
             }
         ),
-        (
+        'valid_ag_args_fit_without_ag_args_ensemble': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
-                'model_minimum_resources': {'num_cpus':2, 'num_gpus': 0.5},
-                'model_default_resources': {'num_cpus':2, 'num_gpus': 1},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
+                'num_bag_folds': 8,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1},
+                    'model_in_parallel': 4
+                }
+            }
+        ),
+        'bagging_without_anything': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'model_default_resources': {'num_cpus': 2, 'num_gpus': 1},
                 'num_bag_folds': 8,
                 'expected_answer': {
                     'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
@@ -241,65 +268,133 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
                 }
             }
         ),
-        (
+        'total_resources_with_valid_ag_args_ensemble_and_valid_ag_args_fit_sequential': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
-                'total_resources': {'num_cpus':8, 'num_gpus': 2},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
                 'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
                 'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
                 'num_bag_folds': 8,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
                 'expected_answer': {
                     'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
-                    'model_in_parallel': 2
                 }
             }
         ),
-        (
+        'valid_ag_args_ensemble_with_ag_args_fit_sequential': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_ensemble': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
+                'num_bag_folds': 8,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1},
+                }
+            }
+        ),
+        'valid_ag_args_ensemble_without_ag_args_fit_sequential': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_ensemble': {'num_cpus': 2, 'num_gpus': 1},
+                'num_bag_folds': 8,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1},
+                }
+            }
+        ),
+        'valid_ag_args_fit_with_ag_args_ensemble_sequential': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
+                'num_bag_folds': 8,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1},
+                }
+            }
+        ),
+        'sequential_bagging_without_anything': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'model_default_resources': {'num_cpus': 2, 'num_gpus': 1},
+                'num_bag_folds': 8,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1},
+                }
+            }
+        ),
+        'hpo_with_total_resources_and_ag_args_ensemble_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
                 'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
                 'num_trials': 2,
                 'expected_answer': {
-                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1}
+                    'resources_per_trial': {'num_cpus': 2, 'num_gpus': 1}
                 }
             }
         ),
-        (
+        'hpo_with_total_resources_and_ag_args_ensemble': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_ensemble': {'num_cpus': 2, 'num_gpus': 1},
+                'num_trials': 2,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 4, 'num_gpus': 1}  # ag_args_ensemble shouldn't affect hpo without bagging
+                }
+            }
+        ),
+        'hpo_with_total_resources_and_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
+                'num_trials': 2,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 2, 'num_gpus': 1}
+                }
+            }
+        ),
+        'hpo_with_ag_args_ensemble': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_ensemble': {'num_cpus': 2, 'num_gpus': 1},
                 'model_default_resources': {'num_cpus': 2, 'num_gpus': 1},
                 'num_trials': 2,
                 'expected_answer': {
-                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1}
+                    'resources_per_trial': {'num_cpus': 8, 'num_gpus': 2}  # ag_args_ensemble shouldn't affect hpo without bagging
                 }
             }
         ),
-        (
+        'hpo_with_ag_args_fit': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
-                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 1},
-                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
                 'num_trials': 2,
                 'expected_answer': {
-                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1}
+                    'resources_per_trial': {'num_cpus': 2, 'num_gpus': 1}
                 }
             }
         ),
-        (
+        'hpo_without_anything': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
-                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
-                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 1},
-                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_default_resources': {'num_cpus': 2, 'num_gpus': 1},
                 'num_trials': 2,
                 'expected_answer': {
-                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1}
+                    'resources_per_trial': {'num_cpus': 8, 'num_gpus': 2}
                 }
             }
         ),
-        (
+        'hpo_and_bagging_with_total_resources': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'total_resources': {'num_cpus': 8, 'num_gpus': 2},
                 'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 1},
                 'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
@@ -312,16 +407,16 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
                 }
             }
         ),
-        (
+        'hpo_and_bagging_with_total_resources_and_ag_args_ensemble_and_ag_args_fit': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'total_resources': {'num_cpus': 8, 'num_gpus': 2},
                 'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
                 'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
-                'ag_args_ensemble': {'num_cpus':4, 'num_gpus': 1},
-                'ag_args_fit': {'num_cpus':2, 'num_gpus': 0.5},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
                 'num_trials': 2,
-                'num_bag_folds': 2,
+                'num_bag_folds': 4,
                 'expected_answer': {
                     'resources_per_trial': {'num_cpus': 4, 'num_gpus': 1},
                     'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
@@ -329,15 +424,15 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
                 }
             }
         ),
-        (
+        'hpo_and_bagging_with_total_resources_and_ag_args_ensemble': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'total_resources': {'num_cpus': 8, 'num_gpus': 2},
                 'model_minimum_resources': {'num_cpus': 1, 'num_gpus': 0.5},
                 'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
-                'ag_args_fit': {'num_cpus':2, 'num_gpus': 0.5},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
                 'num_trials': 2,
-                'num_bag_folds': 2,
+                'num_bag_folds': 4,
                 'expected_answer': {
                     'resources_per_trial': {'num_cpus': 4, 'num_gpus': 1},
                     'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
@@ -345,106 +440,252 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
                 }
             }
         ),
-        (
+        'hpo_and_bagging_with_total_resources_and_ag_args_fit': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'total_resources': {'num_cpus': 8, 'num_gpus': 2},
                 'model_minimum_resources': {'num_cpus': 1, 'num_gpus': 0.5},
                 'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
-                'ag_args_ensemble': {'num_cpus':4, 'num_gpus': 1},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
                 'num_trials': 2,
-                'num_bag_folds': 2,
+                'num_bag_folds': 4,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 8, 'num_gpus': 2},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
+                    'model_in_parallel': 4  # This is models running in parallel in a bagged model
+                }
+            }
+        ),
+        'hpo_and_bagging_with_ag_args_ensemble_and_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'num_bag_folds': 4,
                 'expected_answer': {
                     'resources_per_trial': {'num_cpus': 4, 'num_gpus': 1},
                     'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
                     'model_in_parallel': 2  # This is models running in parallel in a bagged model
+                }
+            }
+        ),
+        'hpo_and_bagging_with_ag_args_ensemble': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'num_bag_folds': 4,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 4, 'num_gpus': 1},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
+                    'model_in_parallel': 2  # This is models running in parallel in a bagged model
+                }
+            }
+        ),
+        'hpo_and_bagging_with_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'num_bag_folds': 4,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 8, 'num_gpus': 2},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
+                    'model_in_parallel': 4  # This is models running in parallel in a bagged model
+                }
+            }
+        ),
+        'hpo_and_bagging_without_anything': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 1},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'num_bag_folds': 4,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 16, 'num_gpus': 4},
+                    'resources_per_model': {'num_cpus': 4, 'num_gpus': 1},
+                    'model_in_parallel': 4  # This is models running in parallel in a bagged model
                 }
             }
         ),
         # Should raise staring now
-        (
+        'hpo_and_bagging_invalid_ag_args_ensemble_more_than_total': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
-                'ag_args_ensemble': {'num_cpus':99, 'num_gpus': 99},
-                'ag_args_fit': {'num_cpus':2, 'num_gpus': 0.5},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_ensemble': {'num_cpus': 99, 'num_gpus': 99},
                 'num_trials': 2,
                 'num_bag_folds': 2,
                 'should_raise': True
             }
         ),
-        (
+        'hpo_and_bagging_invalid_ag_args_fit_more_than_total': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
-                'ag_args_ensemble': {'num_cpus':8, 'num_gpus': 2},
-                'ag_args_fit': {'num_cpus':99, 'num_gpus': 99},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_fit': {'num_cpus': 99, 'num_gpus': 99},
                 'num_trials': 2,
                 'num_bag_folds': 2,
                 'should_raise': True
             }
         ),
-        (
+        'bagging_invalid_ag_args_ensemble_more_than_total': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
-                'ag_args_ensemble': {'num_cpus':99, 'num_gpus': 99},
-                'ag_args_fit': {'num_cpus':4, 'num_gpus': 1},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_ensemble': {'num_cpus': 99, 'num_gpus': 99},
                 'num_bag_folds': 2,
                 'should_raise': True
             }
         ),
-        (
+        'bagging_invalid_ag_args_fit_more_than_total':(
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
-                'ag_args_fit': {'num_cpus':99, 'num_gpus': 99},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_fit': {'num_cpus': 99, 'num_gpus': 1},
+                'num_bag_folds': 2,
                 'should_raise': True
             }
         ),
-        (
+        'hpo_invalid_ag_args_fit_more_than_total':(
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_fit': {'num_cpus': 99, 'num_gpus': 1},
+                'num_trials': 2,
+                'should_raise': True
+            }
+        ),
+        'sequential_bagging_invalid_ag_args_ensemble_more_than_total': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_ensemble': {'num_cpus': 99, 'num_gpus': 99},
+                'num_bag_folds': 2,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'should_raise': True
+            }
+        ),
+        'sequential_bagging_invalid_ag_args_fit_more_than_total': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_fit': {'num_cpus': 99, 'num_gpus': 99},
+                'num_bag_folds': 2,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'should_raise': True
+            }
+        ),
+        'invalid_ag_args_fit_more_than_total': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_fit': {'num_cpus': 99, 'num_gpus': 99},
+                'should_raise': True
+            }
+        ),
+        'hpo_and_bagging_invalid_ag_args_ensemble_less_than_min': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
-                'ag_args_ensemble': {'num_cpus':4, 'num_gpus': 1},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
                 'num_trials': 2,
                 'num_bag_folds': 2,
                 'should_raise': True
             }
         ),
-        (
+        'hpo_and_bagging_invalid_ag_args_fit_less_than_min': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
-                'ag_args_fit': {'num_cpus':4, 'num_gpus': 1},
+                'ag_args_fit': {'num_cpus': 4, 'num_gpus': 1},
                 'num_trials': 2,
                 'num_bag_folds': 2,
                 'should_raise': True
             }
         ),
-        (
+        'bagging_invalid_ag_args_ensemble_less_than_min': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
-                'ag_args_fit': {'num_cpus':4, 'num_gpus': 1},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
                 'num_bag_folds': 2,
                 'should_raise': True
             }
         ),
-        (
+        'bagging_invalid_ag_args_fit_less_than_min': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
-                'ag_args_fit': {'num_cpus':4, 'num_gpus': 1},
+                'ag_args_fit': {'num_cpus': 4, 'num_gpus': 1},
+                'num_bag_folds': 2,
+                'should_raise': True
+            }
+        ),
+        'sequential_bagging_invalid_ag_args_ensemble_less_than_min': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'num_bag_folds': 2,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'should_raise': True
+            }
+        ),
+        'sequential_bagging_invalid_ag_args_fit_less_than_min': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus': 4, 'num_gpus': 1},
+                'num_bag_folds': 2,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'should_raise': True
+            }
+        ),
+        'hpo_invalid_ag_args_ensemble_less_than_min': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
                 'num_trials': 2,
                 'should_raise': True
             }
         ),
-        (
+        'hpo_invalid_ag_args_fit_less_than_min': (
             {
-                'system_resources': {'num_cpus':16, 'num_gpus': 4},
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
-                'ag_args_fit': {'num_cpus':4, 'num_gpus': 1},
+                'ag_args_fit': {'num_cpus': 4, 'num_gpus': 1},
+                'num_trials': 2,
                 'should_raise': True
             }
         ),
-    ]
+        'invalid_ag_args_fit_less_than_min': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus': 4, 'num_gpus': 1},
+                'should_raise': True
+            }
+        ),
+}
+
+ids = sorted(list(tests_dict.keys()))
+tests = [tests_dict[id] for id in ids]
+
+@pytest.mark.parametrize(
+    'test_args',
+    tests,
+    ids=ids
 )
 def test_resource_allocation_combined_valid(
     mock_system_resources_ctx_mgr,

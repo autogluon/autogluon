@@ -89,17 +89,6 @@ def test_bagged_model_with_total_resources_and_ensemble_resources(mock_system_re
         assert resources == ensemble_ag_args_fit
     
 
-def test_bagged_model_without_total_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold):
-    with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
-        model_base = DummyModel()
-        bagged_model = DummyBaggedModel(model_base)
-        resources = bagged_model._preprocess_fit_resources(k_fold=k_fold)
-        resources.pop('k_fold')
-        default_model_num_cpus, default_model_num_gpus = model_base._get_default_resources()
-        default_model_resources = {'num_cpus': default_model_num_cpus * k_fold, 'num_gpus': default_model_num_gpus * k_fold}
-        assert resources == default_model_resources
-    
-
 def test_bagged_model_with_total_resources_but_no_gpu_specified(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold):
     with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
         model_base = DummyModel()
@@ -153,12 +142,12 @@ def test_bagged_model_without_total_resources_and_without_model_resources(mock_s
         )
         resources = bagged_model._preprocess_fit_resources(k_fold=k_fold)
         resources.pop('k_fold')
-        default_model_num_cpus, default_model_num_gpus = model_base._get_default_resources()
-        default_model_resources = {
-            'num_cpus': min(default_model_num_cpus * k_fold, ResourceManager.get_cpu_count()),
-            'num_gpus': min(default_model_num_gpus * k_fold, ResourceManager.get_gpu_count_all()),
+        # Bagged model should take all resources and internally calculate correct resources given ag_args_ensemble and ag_args_fit
+        expected_model_resources = {
+            'num_cpus': ResourceManager.get_cpu_count(),
+            'num_gpus': ResourceManager.get_gpu_count_all(),
         }
-        assert resources == default_model_resources
+        assert resources == expected_model_resources
 
 
 def test_nonbagged_model_with_total_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus):
