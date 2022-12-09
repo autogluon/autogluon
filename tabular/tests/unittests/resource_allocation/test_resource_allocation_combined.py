@@ -942,6 +942,16 @@ tests_dict = {
                 'should_raise': True
             }
         ),
+        'custom_hpo_invalid_ag_args_fit_more_than_total':(
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_fit': {'num_cpus': 99, 'num_gpus': 1},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'should_raise': True
+            }
+        ),
         'sequential_bagging_invalid_ag_args_ensemble_more_than_total': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
@@ -1043,6 +1053,26 @@ tests_dict = {
                 'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'ag_args_fit': {'num_cpus': 4, 'num_gpus': 1},
                 'num_trials': 2,
+                'should_raise': True
+            }
+        ),
+        'custom_hpo_invalid_ag_args_ensemble_less_than_min': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'should_raise': True
+            }
+        ),
+        'custom_hpo_invalid_ag_args_fit_less_than_min': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
                 'should_raise': True
             }
         ),
