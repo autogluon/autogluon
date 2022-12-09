@@ -613,7 +613,9 @@ def cocoeval_torchmetrics(outputs: List):
     return map_metric.compute()
 
 
-def cocoeval_pycocotools(outputs: List, data: pd.DataFrame, anno_file: str, cache_path: str, metrics: Optional[str, List]):
+def cocoeval_pycocotools(
+    outputs: List, data: pd.DataFrame, anno_file: str, cache_path: str, metrics: Optional[str, List]
+):
     """
     Evaluate predictor's output using pycocotool's mAP implementation.
     Pycocotool's implementation takes COCO format prediction result file as input.
@@ -667,7 +669,14 @@ def cocoeval_pycocotools(outputs: List, data: pd.DataFrame, anno_file: str, cach
     return {metrics: cocoEval.stats[0]}
 
 
-def cocoeval(outputs: List, data: pd.DataFrame, anno_file: str, cache_path: str, metrics: Optional[str, List], tool="pycocotools"):
+def cocoeval(
+    outputs: List,
+    data: pd.DataFrame,
+    anno_file: str,
+    cache_path: str,
+    metrics: Optional[str, List],
+    tool="pycocotools",
+):
     """
     Evaluate predictor's output using mAP metrics per COCO's standard.
 
