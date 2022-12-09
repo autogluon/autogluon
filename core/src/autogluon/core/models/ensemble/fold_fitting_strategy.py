@@ -197,7 +197,6 @@ class LocalFoldFittingStrategy(AbstractFoldFittingStrategy):
             user_resources_per_job['num_gpus'] = user_gpu_per_job
         self.user_ensemble_resources = user_ensemble_resources
         self.user_resources_per_job = user_resources_per_job
-        print(user_ensemble_resources, user_resources_per_job)
 
     def _get_fold_time_limit(self, fold_ctx):
         _, folds_finished, folds_left, folds_to_fit, _, _ = self._get_fold_properties(fold_ctx)

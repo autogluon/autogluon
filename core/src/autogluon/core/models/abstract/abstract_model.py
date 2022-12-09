@@ -530,7 +530,7 @@ class AbstractModel:
             # bagged model will look ag_args_ensemble and ag_args_fit internally to determine resources
             # pass all resources here by default
             default_num_cpus = system_num_cpus
-            default_num_gpus = system_num_gpus
+            default_num_gpus = system_num_gpus if default_num_gpus > 0 else 0
             user_specified_lower_level_num_cpus = self._process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(
                 system_resource=system_num_cpus,
                 user_specified_total_resource=num_cpus,
