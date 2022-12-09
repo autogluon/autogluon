@@ -71,7 +71,7 @@ class NerLabelEncoder:
         }
         all_annotations = []
         all_entity_groups = []
-        for ner_annotations in y.iteritems():
+        for ner_annotations in y.items():
             json_ner_annotations = json.loads(ner_annotations[-1])  # load the json annotations
             try:
                 jsonschema.validate(json_ner_annotations, schema)  # verify the json schema
@@ -142,7 +142,7 @@ class NerLabelEncoder:
         """
         all_annotations, _ = self.extract_ner_annotations(y)
         transformed_y = []
-        for annotation, text_snippet in zip(all_annotations, x.iteritems()):
+        for annotation, text_snippet in zip(all_annotations, x.items()):
             word_label, _, _, _ = process_ner_annotations(annotation, text_snippet[-1], tokenizer, is_eval=True)
             word_label_invers = []
             for l in word_label:

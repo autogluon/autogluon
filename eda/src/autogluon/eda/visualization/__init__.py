@@ -1,4 +1,6 @@
-from .layouts import MarkdownSectionComponent, SimpleVerticalLinearLayout, SimpleHorizontalLayout, TabLayout
 from .dataset import DatasetStatistics, DatasetTypeMismatch
-from .shift import XShiftSummary
+from .interaction import CorrelationVisualization, CorrelationSignificanceVisualization
+from .layouts import MarkdownSectionComponent, SimpleVerticalLinearLayout, SimpleHorizontalLayout, TabLayout
 from .missing import MissingValues
+from .model import ConfusionMatrix, FeatureImportance, RegressionEvaluation
+from .shift import XShiftSummary

@@ -30,7 +30,7 @@ install_requires = [
     "requests",
     "jsonschema<=4.8.0",
     "seqeval<=1.2.2",
-    "evaluate<=0.2.2",
+    "evaluate<=0.3.0",
     "accelerate>=0.9,<0.14",
     "timm<0.7.0",
     "torch>=1.9,<1.13",

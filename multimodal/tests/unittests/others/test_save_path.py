@@ -11,14 +11,49 @@ from .unittest_datasets import PetFinderDataset
 @pytest.mark.parametrize(
     "save_path",
     [
+        "an_empty_existing_path",
+        "~/an_empty_existing_path",
+        os.path.join(os.path.expanduser("~"), "an_empty_existing_path"),
+    ],
+)
+def test_existing_save_path_but_empty_folder(save_path):
+    abs_path = os.path.abspath(os.path.expanduser(save_path))
+    os.makedirs(abs_path, exist_ok=True)
+    predictor = MultiModalPredictor(path=save_path)
+
+    dataset = PetFinderDataset()
+    predictor = MultiModalPredictor(
+        label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric
+    )
+    predictor.fit(
+        train_data=dataset.train_df,
+        hyperparameters={
+            "env.num_workers": 0,
+            "env.num_workers_evaluation": 0,
+            "model.names": ["timm_image", "hf_text", "fusion_mlp"],
+            "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+            "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+        },
+        time_limit=10,
+    )
+
+    shutil.rmtree(abs_path)
+
+
+@pytest.mark.parametrize(
+    "save_path",
+    [
         "an_existing_path",
         "~/an_existing_path",
         os.path.join(os.path.expanduser("~"), "an_existing_path"),
     ],
 )
-def test_existing_save_path(save_path):
+def test_existing_save_path_with_content_inside(save_path):
     abs_path = os.path.abspath(os.path.expanduser(save_path))
     os.makedirs(abs_path, exist_ok=True)
+    dummy_file_path = os.path.join(abs_path, "dummy.txt")
+    with open(dummy_file_path, "w") as f:
+        f.write("dummy")
     with pytest.raises(ValueError):
         predictor = MultiModalPredictor(path=save_path)
 

@@ -6,11 +6,13 @@ import tempfile
 from unittest import mock
 
 import numpy as np
+import pandas as pd
 import pytest
 from flaky import flaky
 
 import autogluon.core as ag
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 
@@ -22,6 +24,7 @@ from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
 
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
 TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS + TABULAR_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS
+DUMMY_HYPERPARAMETERS = {"epochs": 1, "num_batches_per_epoch": 1, "maxiter": 1}
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
 
 
@@ -35,7 +38,7 @@ def trained_models():
             path=temp_model_path + os.path.sep,
             freq="H",
             prediction_length=prediction_length,
-            hyperparameters={"epochs": 1, "maxiter": 1},
+            hyperparameters=DUMMY_HYPERPARAMETERS,
         )
 
         model.fit(train_data=DUMMY_TS_DATAFRAME)
@@ -166,10 +169,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         freq="H",
         prediction_length=3,
         quantile_levels=quantile_levels,
-        hyperparameters={
-            "epochs": 1,
-            "maxiter": 1,
-        },
+        hyperparameters=DUMMY_HYPERPARAMETERS,
     )
     # TFT cannot handle arbitrary quantiles
     if "TemporalFusionTransformer" in model.name:
@@ -219,7 +219,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
         path=temp_model_path,
         freq="H",
         prediction_length=prediction_length,
-        hyperparameters={"epochs": 1},
+        hyperparameters=DUMMY_HYPERPARAMETERS,
     )
 
     model.fit(train_data=train_data)
@@ -229,6 +229,32 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
     min_hour_in_pred = predictions.index.levels[1].min().hour
 
     assert min_hour_in_pred == max_hour_in_test + 1
+
+
+@pytest.mark.parametrize("freq", ["D", "H", "S", "M"])
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_predict_called_then_predicted_timestamps_align_with_time(model_class, freq, temp_model_path):
+    prediction_length = 4
+    train_length = 20
+    item_id = "A"
+    timestamps = pd.date_range(start=pd.Timestamp("2020-01-05 12:05:01"), freq=freq, periods=train_length)
+    index = pd.MultiIndex.from_product([(item_id,), timestamps], names=[ITEMID, TIMESTAMP])
+    train_data = TimeSeriesDataFrame(pd.DataFrame({"target": np.random.rand(train_length)}, index=index))
+
+    model = model_class(
+        path=temp_model_path,
+        freq=train_data.freq,
+        prediction_length=prediction_length,
+        hyperparameters=DUMMY_HYPERPARAMETERS,
+    )
+
+    model.fit(train_data=train_data)
+    predictions = model.predict(train_data)
+
+    offset = pd.tseries.frequencies.to_offset(freq)
+    preds_first_item = predictions.loc[item_id]
+    for i in range(prediction_length):
+        assert preds_first_item.index[i] == timestamps[-1] + offset * (i + 1)
 
 
 @pytest.mark.parametrize(
@@ -265,7 +291,7 @@ def test_when_predict_called_with_test_data_then_predictor_inference_correct(
         path=temp_model_path,
         freq="H",
         prediction_length=prediction_length,
-        hyperparameters={"epochs": 1},
+        hyperparameters=DUMMY_HYPERPARAMETERS,
     )
 
     model.fit(train_data=train_data)
@@ -279,3 +305,24 @@ def test_when_predict_called_with_test_data_then_predictor_inference_correct(
     assert all(predicted_item_index == test_data.item_ids)  # noqa
     assert all(len(predictions.loc[i]) == prediction_length for i in predicted_item_index)
     assert all(predictions.loc[i].index[0].hour > 0 for i in predicted_item_index)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 5])
+def test_when_get_info_is_called_then_all_keys_are_present(model_class, prediction_length, trained_models):
+    model = trained_models[(prediction_length, repr(model_class))]
+    info = model.get_info()
+    expected_keys = [
+        "name",
+        "model_type",
+        "eval_metric",
+        "fit_time",
+        "predict_time",
+        "freq",
+        "prediction_length",
+        "quantile_levels",
+        "val_score",
+        "hyperparameters",
+    ]
+    for key in expected_keys:
+        assert key in info

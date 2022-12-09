@@ -13,6 +13,7 @@ def default():
         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+        "env.num_workers": 2,
     }
 
 
@@ -23,6 +24,7 @@ def medium_quality_faster_train():
         "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
         "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
         "optimization.learning_rate": 4e-4,
+        "env.num_workers": 2,
     }
 
 
@@ -32,6 +34,7 @@ def medium_quality_faster_inference_image_classification():
         "model.names": ["timm_image"],
         "model.timm_image.checkpoint_name": "mobilenetv3_large_100",
         "optimization.learning_rate": 1e-3,
+        "env.num_workers": 2,
     }
 
 
@@ -41,6 +44,7 @@ def high_quality_fast_inference_image_classification():
         "model.names": ["timm_image"],
         "model.timm_image.checkpoint_name": "resnet50",
         "optimization.learning_rate": 1e-3,
+        "env.num_workers": 2,
     }
 
 
@@ -50,6 +54,7 @@ def high_quality():
         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+        "env.num_workers": 2,
     }
 
 
@@ -60,6 +65,7 @@ def best_quality():
         "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
         "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
         "env.per_gpu_batch_size": 1,
+        "env.num_workers": 2,
     }
 
 
@@ -68,6 +74,7 @@ def high_quality_image_classification():
     return {
         "model.names": ["timm_image"],
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+        "env.num_workers": 2,
     }
 
 
@@ -84,6 +91,32 @@ def multilingual():
 
 @automm_presets.register()
 def few_shot_text_classification():
+    return {
+        "model.names": ["t_few"],
+        "model.t_few.checkpoint_name": "google/flan-t5-xl",  # 3B model. google/flan-t5-xxl for 11B model.
+        "model.t_few.gradient_checkpointing": True,
+        "optimization.learning_rate": 1e-3,
+        "optimization.lr_decay": 1.0,
+        "optimization.efficient_finetune": "ia3_lora",
+        "optimization.max_steps": 600,  # Find better solution to train for long
+        "optimization.check_val_every_n_epoch": 10,  # Might need adjustment
+        "optimization.val_check_interval": 1.0,
+        "optimization.top_k_average_method": "best",
+        "optimization.warmup_steps": 0.06,
+        "optimization.lora.module_filter": [".*SelfAttention|.*EncDecAttention|.*DenseReluDense"],
+        "optimization.lora.filter": ["q|k|v|wi_1.*"],
+        "optimization.top_k": 1,
+        "optimization.max_epochs": -1,
+        "env.batch_size": 8,
+        "env.per_gpu_batch_size": 8,
+        "env.precision": "bf16",
+        "data.templates.turn_on": True,
+        "env.eval_batch_size_ratio": 2,
+    }
+
+
+@automm_presets.register()
+def few_shot_text_classification_tfew():
     return {
         "model.names": ["t_few"],
         "model.t_few.checkpoint_name": "bigscience/T0_3B",
@@ -125,6 +158,7 @@ def zero_shot_image_classification():
         "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
         "model.clip.max_text_len": 0,
         "env.eval_batch_size_ratio": 1,
+        "env.num_workers": 2,
     }
 
 
@@ -147,6 +181,7 @@ def medium_quality_faster_inference_object_detection():
         "optimization.patience": 10,
         "optimization.max_epochs": 10,
         "optimization.val_metric": "direct_loss",
+        "env.num_workers": 2,
     }
 
 
@@ -159,6 +194,7 @@ def high_quality_fast_inference_object_detection():
         "env.precision": 32,
         "env.strategy": "ddp",
         "env.auto_select_gpus": False,  # Have to turn off for detection!
+        "env.num_workers": 2,
         "optimization.learning_rate": 1e-5,
         "optimization.lr_decay": 0.95,
         "optimization.lr_mult": 100,
@@ -181,6 +217,7 @@ def higher_quality_object_detection():
         "env.precision": 32,
         "env.strategy": "ddp",
         "env.auto_select_gpus": False,  # Have to turn off for detection!
+        "env.num_workers": 2,
         "optimization.learning_rate": 5e-6,
         "optimization.lr_decay": 0.95,
         "optimization.lr_mult": 100,
@@ -203,6 +240,7 @@ def best_quality_object_detection():
         "env.precision": 32,
         "env.strategy": "ddp",
         "env.auto_select_gpus": False,  # Have to turn off for detection!
+        "env.num_workers": 2,
         "optimization.learning_rate": 1e-5,
         "optimization.lr_decay": 0.95,
         "optimization.lr_mult": 100,
@@ -225,6 +263,7 @@ def object_detection():
         "env.precision": 32,
         "env.strategy": "ddp",  # TODO: support ddp_spawn for detection
         "env.auto_select_gpus": False,  # Have to turn off for detection!
+        "env.num_workers": 2,
         "optimization.learning_rate": 5e-5,
         "optimization.lr_decay": 0.95,
         "optimization.lr_mult": 100,
@@ -280,6 +319,7 @@ def best_quality_image_similarity():
     return {
         "model.names": ["timm_image"],
         "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
+        "env.num_workers": 2,
     }
 
 
@@ -289,6 +329,7 @@ def high_quality_fast_inference_image_similarity():
     return {
         "model.names": ["timm_image"],
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+        "env.num_workers": 2,
     }
 
 
@@ -298,6 +339,7 @@ def medium_quality_faster_inference_image_similarity():
     return {
         "model.names": ["timm_image"],
         "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+        "env.num_workers": 2,
     }
 
 
@@ -358,6 +400,7 @@ def best_quality_image_text_similarity():
         "matcher.loss.type": "multi_negatives_softmax_loss",
         "env.per_gpu_batch_size": 8,
         "optimization.learning_rate": 1e-5,
+        "env.num_workers": 2,
     }
 
 
@@ -370,6 +413,7 @@ def high_quality_fast_inference_image_text_similarity():
         "matcher.loss.type": "multi_negatives_softmax_loss",
         "env.per_gpu_batch_size": 16,
         "optimization.learning_rate": 1e-5,
+        "env.num_workers": 2,
     }
 
 
@@ -388,6 +432,7 @@ def medium_quality_faster_inference_image_text_similarity():
         "matcher.loss.type": "multi_negatives_softmax_loss",
         "env.per_gpu_batch_size": 128,
         "optimization.learning_rate": 1e-5,
+        "env.num_workers": 2,
     }
 
 
@@ -395,8 +440,8 @@ def medium_quality_faster_inference_image_text_similarity():
 def best_quality_ner():
     return {
         "model.names": ["ner_text"],
-        "model.ner_text.checkpoint_name": "google/flan-t5-base",
-        "env.precision": "bf16",
+        "model.ner_text.checkpoint_name": "microsoft/deberta-v3-large",
+        "env.per_gpu_batch_size": 4,
     }
 
 
@@ -404,8 +449,7 @@ def best_quality_ner():
 def medium_quality_faster_inference_ner():
     return {
         "model.names": ["ner_text"],
-        "model.ner_text.checkpoint_name": "google/flan-t5-small",
-        "env.precision": "bf16",
+        "model.ner_text.checkpoint_name": "google/electra-small-discriminator",
     }
 
 
@@ -413,7 +457,7 @@ def medium_quality_faster_inference_ner():
 def high_quality_fast_inference_ner():
     return {
         "model.names": ["ner_text"],
-        "model.ner_text.checkpoint_name": "bert-base-cased",
+        "model.ner_text.checkpoint_name": "microsoft/deberta-v3-base",
     }
 
 

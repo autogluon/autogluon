@@ -51,6 +51,10 @@ function install_eda {
     python3 -m pip install --upgrade -e eda/[tests]
 }
 
+function install_fair {
+    python3 -m pip install --upgrade -e fair/
+}
+
 function install_tabular {
     python3 -m pip install --upgrade -e tabular/[tests]
 }
@@ -83,7 +87,7 @@ function install_timeseries {
 
 function install_cloud {
     python3 -m pip install --upgrade pytest-xdist # Enable running tests in parallel for speedup
-    python3 -m pip install --upgrade -e cloud/
+    python3 -m pip install --upgrade -e cloud/[tests]
 }
 
 function install_autogluon {

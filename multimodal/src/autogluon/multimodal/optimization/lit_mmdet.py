@@ -13,7 +13,9 @@ from torchmetrics.aggregation import BaseAggregator
 try:
     import mmdet
     from mmcv import ConfigDict
-except ImportError:
+except ImportError as e:
+    import warnings
+
     pass
 
 from ..constants import AUTOMM, IMAGE, LABEL

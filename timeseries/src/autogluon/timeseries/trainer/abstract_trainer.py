@@ -180,14 +180,16 @@ class SimpleAbstractTrainer:
 
     # TODO: This is horribly inefficient beyond simple weighted ensembling.
     #  Refactor to Tabular's implementation if doing stacking / multiple ensembles
-    def get_inputs_to_model(self, model, X, model_pred_proba_dict=None):
+    def get_inputs_to_model(
+        self, model, X, model_pred_proba_dict=None, known_covariates: Optional[TimeSeriesDataFrame] = None
+    ):
         if model_pred_proba_dict is None:
             model_pred_proba_dict = {}
         model_set = self.get_minimum_model_set(model, include_self=False)
         if model_set:
             for m in model_set:
                 if m not in model_pred_proba_dict:
-                    model_pred_proba_dict[m] = self.predict(model=m, data=X)
+                    model_pred_proba_dict[m] = self.predict(model=m, data=X, known_covariates=known_covariates)
             return model_pred_proba_dict
         else:
             return X
@@ -509,6 +511,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         except (Exception, MemoryError) as err:
             logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
             logger.error(f"\t{err}")
+            logger.debug(traceback.format_exc())
         else:
             self._add_model(model=model)  # noqa: F821
             model_names_trained.append(model.name)  # noqa: F821
@@ -648,8 +651,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                             time_limit=time_left_for_ensemble,
                         )
                     )
-                except Exception as e:  # noqa
-                    logger.error(f"\tEnsemble training failed with error \n{traceback.format_exc()}.")
+                except Exception as err:  # noqa
+                    logger.error(
+                        "\tWarning: Exception caused ensemble to fail during training... Skipping this model."
+                    )
+                    logger.error(f"\t{err}")
+                    logger.debug(traceback.format_exc())
 
         logger.info(f"Training complete. Models trained: {model_names_trained}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
@@ -735,6 +742,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         )
 
         self._add_model(model=simple_ensemble, base_models=simple_ensemble.model_names)
+        self.save_model(model=simple_ensemble)
         return simple_ensemble.name
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
@@ -764,6 +772,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     model_info[model_name]["pred_time_test"] = time.time() - time_start_test_score
                 except Exception as e:  # noqa
                     logger.error(f"Cannot score with model {model_name}. An error occurred: {str(e)}")
+                    logger.debug(traceback.format_exc())
                     model_info[model_name]["score_test"] = float("nan")
                     model_info[model_name]["pred_time_test"] = float("nan")
 
@@ -822,6 +831,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             return self._predict_model(data, model, known_covariates=known_covariates, **kwargs)
         except Exception as err:
             logger.error(f"Warning: Model {model.name} failed during prediction with exception: {err}")
+            logger.debug(traceback.format_exc())
             other_models = [m for m in self.get_model_names() if m != model.name]
             if len(other_models) > 0 and model_was_selected_automatically:
                 logger.info(f"\tYou can call predict(data, model) with one of other available models: {other_models}")
@@ -868,7 +878,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     ) -> TimeSeriesDataFrame:
         if isinstance(model, str):
             model = self.load_model(model)
-        data = self.get_inputs_to_model(model=model, X=data)
+        data = self.get_inputs_to_model(model=model, X=data, known_covariates=known_covariates)
         return model.predict(data, known_covariates=known_covariates, **kwargs)
 
     # TODO: experimental

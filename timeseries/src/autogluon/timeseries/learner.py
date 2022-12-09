@@ -375,7 +375,7 @@ class TimeSeriesLearner(AbstractLearner):
         return self.load_trainer().score(data=data, model=model, metric=metric)
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
-        if self.static_feature_pipeline.is_fit():
+        if data is not None and self.static_feature_pipeline.is_fit():
             fix_message = (
                 "Please make sure that data has static_features with columns and dtypes exactly matching "
                 "train_data.static_features. "
@@ -399,6 +399,9 @@ class TimeSeriesLearner(AbstractLearner):
         )
 
         learner_info.update(trainer_info)
+        # self.random_state not used during fitting, so we don't include it in the summary
+        # TODO: Report random seed passed to predictor.fit?
+        learner_info.pop("random_state", None)
         return learner_info
 
     def refit_full(self, models="all"):

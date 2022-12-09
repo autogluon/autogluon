@@ -4,6 +4,7 @@ CATEGORICAL = "categorical"
 TEXT = "text"
 NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
+IMAGE_BYTEARRAY = "image_bytearray"
 IDENTIFIER = "identifier"
 
 # Problem types
@@ -22,8 +23,9 @@ NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
 FEATURE_EXTRACTION = "feature_extraction"
 ZERO_SHOT_IMAGE_CLASSIFICATION = "zero_shot_image_classification"
 OBJECT_DETECTION = "object_detection"
-OCR_TEXT_DETECTION = "ocr_text_detection"
-OCR_TEXT_RECOGNITION = "ocr_text_recognition"
+OCR = "ocr"
+OCR_TEXT_DETECTION = f"{OCR}_text_detection"
+OCR_TEXT_RECOGNITION = f"{OCR}_text_recognition"
 IMAGE_SIMILARITY = "image_similarity"
 TEXT_SIMILARITY = "text_similarity"
 IMAGE_TEXT_SIMILARITY = "image_text_similarity"
@@ -162,6 +164,22 @@ LORA_NORM = "lora_norm"
 IA3 = "ia3"
 IA3_BIAS = "ia3_bias"
 IA3_NORM = "ia3_norm"
+IA3_LORA = "ia3_lora"
+IA3_LORA_BIAS = "ia3_lora_bias"
+IA3_LORA_NORM = "Ia3_lora_norm"
+PEFT_STRATEGIES = [
+    BIT_FIT,
+    NORM_FIT,
+    LORA,
+    LORA_BIAS,
+    LORA_NORM,
+    IA3,
+    IA3_BIAS,
+    IA3_NORM,
+    IA3_LORA,
+    IA3_LORA_BIAS,
+    IA3_LORA_NORM,
+]
 
 # DeepSpeed constants
 DEEPSPEED_OFFLOADING = "deepspeed_stage_3_offload"

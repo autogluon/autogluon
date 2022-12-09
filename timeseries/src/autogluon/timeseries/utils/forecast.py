@@ -27,4 +27,4 @@ def get_forecast_horizon_index_ts_dataframe(
             past_timestamps=timestamps, freq=ts_dataframe.freq, prediction_length=prediction_length
         ).to_frame()
 
-    return ts_dataframe.groupby(ITEMID, sort=False).apply(get_series_with_timestamps_per_item).index
+    return ts_dataframe.groupby(level=ITEMID, sort=False).apply(get_series_with_timestamps_per_item).index

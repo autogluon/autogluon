@@ -16,7 +16,7 @@ from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesEnsembleWrapper
 from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
-from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
+from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
@@ -419,3 +419,26 @@ def test_given_base_model_fails_when_trainer_scores_then_weighted_ensemble_can_s
         score = trainer.score(DUMMY_TS_DATAFRAME, model="WeightedEnsemble")
         fail_predict.assert_called()
         assert isinstance(score, float)
+
+
+def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict(temp_model_path):
+    df = DATAFRAME_WITH_COVARIATES.copy()
+    prediction_length = 2
+    df_train = df.slice_by_timestep(None, -prediction_length)
+    df_future = df.slice_by_timestep(-prediction_length, None)
+    known_covariates = df_future.drop("target", axis=1)
+
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, prediction_length=prediction_length, enable_ensemble=False)
+    trainer.fit(df_train, hyperparameters={"ETS": {"maxiter": 1}, "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}})
+
+    # Manually add ensemble to ensure that both models have non-zero weight
+    ensemble = TimeSeriesEnsembleWrapper(weights={"DeepAR": 0.5, "ETS": 0.5}, name="WeightedEnsemble")
+    trainer._add_model(model=ensemble, base_models=["DeepAR", "ETS"])
+    with mock.patch(
+        "autogluon.timeseries.models.ensemble.greedy_ensemble.TimeSeriesEnsembleWrapper.predict"
+    ) as mock_predict:
+        trainer.predict(df_train, model="WeightedEnsemble", known_covariates=known_covariates)
+        inputs = mock_predict.call_args[0][0]
+        # No models failed during prediction
+        assert inputs["DeepAR"] is not None
+        assert inputs["ETS"] is not None

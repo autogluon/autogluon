@@ -34,9 +34,9 @@ install_requires = [
     "pytorch-lightning>=1.7.4,<1.8.0",
     "networkx",
     "tqdm",
-    f"autogluon.core=={version}",
+    f"autogluon.core[raytune]=={version}",
     f"autogluon.common=={version}",
-    f"autogluon.tabular=={version}",
+    f"autogluon.tabular[catboost,lightgbm,xgboost]=={version}",
 ]
 
 extras_require = {

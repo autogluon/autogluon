@@ -65,11 +65,11 @@ time usage: 81.76
 ```
 
 YOLOv3 is small and fast. For larger model with higher performance, see :ref:`sec_automm_detection_eval_fasterrcnn_coco` or :ref:`sec_automm_detection_eval_ddetr_coco`.
-You can also see other tutorials for :ref:`sec_automm_detection_fast_finetune_coco` or :ref:`sec_automm_detection_infer_coco`.
+You can also see other tutorials for :ref:`sec_automm_detection_fast_ft_coco` or :ref:`sec_automm_detection_infer_coco`.
 
 ### Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ### Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

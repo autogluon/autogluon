@@ -15,9 +15,12 @@ We can load a dataset by downloading a url data automatically:
 ```{.python .input}
 import warnings
 warnings.filterwarnings('ignore')
-from autogluon.vision import ImageDataset
-train_dataset, _, test_dataset = ImageDataset.from_folders("https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip")
-print(train_dataset)
+import pandas as pd
+
+from autogluon.multimodal.utils.misc import shopee_dataset
+download_dir = './ag_automm_tutorial_imgcls'
+train_data, test_data = shopee_dataset(download_dir)
+print(train_data)
 ```
 
 We can see there are 800 rows and 2 columns in this training dataframe. The 2 columns are **image** and **label**, and each row represents a different training sample.
@@ -29,9 +32,11 @@ Now, we fit a classifier using AutoMM as follows:
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
-predictor = MultiModalPredictor(label="label", path="./automm_imgcls")
+import uuid
+model_path = f"./tmp/{uuid.uuid4().hex}-automm_shopee"
+predictor = MultiModalPredictor(label="label", path=model_path)
 predictor.fit(
-    train_data=train_dataset,
+    train_data=train_data,
     time_limit=30, # seconds
 ) # you can trust the default config, e.g., we use a `swin_base_patch4_window7_224` model
 ```
@@ -44,7 +49,7 @@ predictor.fit(
 You can evaluate the classifier on the test dataset to see how it performs, the test top-1 accuracy is:
 
 ```{.python .input}
-scores = predictor.evaluate(test_dataset, metrics=["accuracy"])
+scores = predictor.evaluate(test_data, metrics=["accuracy"])
 print('Top-1 test acc: %.3f' % scores["accuracy"])
 ```
 
@@ -54,7 +59,7 @@ print('Top-1 test acc: %.3f' % scores["accuracy"])
 Given an example image, let's visualize it first,
 
 ```{.python .input}
-image_path = test_dataset.iloc[0]['image']
+image_path = test_data.iloc[0]['image']
 from IPython.display import Image, display
 pil_img = Image(filename=image_path)
 display(pil_img)
@@ -96,7 +101,7 @@ The trained predictor is automatically saved at the end of `fit()`, and you can 
 :::
 
 ```{.python .input}
-loaded_predictor = MultiModalPredictor.load('automm_imgcls')
+loaded_predictor = MultiModalPredictor.load(model_path)
 load_proba = loaded_predictor.predict_proba({'image': [image_path]})
 print(load_proba)
 ```
@@ -105,7 +110,7 @@ We can see the predicted class probabilities are still the same as above, which 
 
 ## Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ## Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

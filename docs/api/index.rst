@@ -10,7 +10,7 @@ describing what they are and what they do. The APIs are grouped into the followi
       :title: Predictors
       :link: autogluon.predictor.html
 
-      Automatically train/deploy predictors with 1 line of code for text, image, or tabular data.
+      Automatically train/deploy predictors with 1 line of code for text, image, time series, or tabular data.
 
 .. toctree::
    :maxdepth: 2

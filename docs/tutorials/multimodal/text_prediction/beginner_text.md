@@ -52,9 +52,10 @@ To achieve reasonable performance in your applications, you are recommended to s
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
-
-predictor = MultiModalPredictor(label='label', eval_metric='acc', path='./automm_sst')
-predictor.fit(train_data, time_limit=60)
+import uuid
+model_path = f"./tmp/{uuid.uuid4().hex}-automm_sst"
+predictor = MultiModalPredictor(label='label', eval_metric='acc', path=model_path)
+predictor.fit(train_data, time_limit=180)
 ```
 
 Above we specify that: the column named **label** contains the label values to predict, AutoGluon should optimize its predictions for the accuracy evaluation metric, 
@@ -119,7 +120,7 @@ The trained predictor is automatically saved at the end of `fit()`, and you can 
 :::
 
 ```{.python .input}
-loaded_predictor = MultiModalPredictor.load('automm_sst')
+loaded_predictor = MultiModalPredictor.load(model_path)
 loaded_predictor.predict_proba({'sentence': [sentence1, sentence2]})
 ```
 
@@ -127,8 +128,9 @@ You can also save the predictor to any location by calling `.save()`.
 
 
 ```{.python .input}
-loaded_predictor.save('my_saved_dir')
-loaded_predictor2 = MultiModalPredictor.load('my_saved_dir')
+new_model_path = f"./tmp/{uuid.uuid4().hex}-automm_sst"
+loaded_predictor.save(new_model_path)
+loaded_predictor2 = MultiModalPredictor.load(new_model_path)
 loaded_predictor2.predict_proba({'sentence': [sentence1, sentence2]})
 ```
 
@@ -162,8 +164,8 @@ You can also load a predictor and call `.fit()` again to continue training the s
 
 
 ```{.python .input}
-new_predictor = MultiModalPredictor.load('automm_sst')
-new_predictor.fit(train_data, time_limit=30, save_path='automm_sst_continue_train')
+new_predictor = MultiModalPredictor.load(new_model_path)
+new_predictor.fit(train_data, time_limit=30)
 test_score = new_predictor.evaluate(test_data, metrics=['acc', 'f1'])
 print(test_score)
 ```
@@ -191,7 +193,8 @@ Let's train a regression model to predict these scores. Note that we only need t
 
 
 ```{.python .input}
-predictor_sts = MultiModalPredictor(label='score', path='./automm_sts')
+sts_model_path = f"./tmp/{uuid.uuid4().hex}-automm_sts"
+predictor_sts = MultiModalPredictor(label='score', path=sts_model_path)
 predictor_sts.fit(sts_train_data, time_limit=60)
 ```
 
@@ -236,7 +239,7 @@ Internally, it integrates with [timm](https://github.com/rwightman/pytorch-image
 
 ## Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ## Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

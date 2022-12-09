@@ -142,15 +142,18 @@ It is also convenient to save a predictor and re-load it.
 :::
 
 ```{.python .input}
-predictor.save('my_saved_dir')
-loaded_predictor = MultiModalPredictor.load('my_saved_dir')
+import uuid
+
+model_path = f"./tmp/{uuid.uuid4().hex}-saved_model"
+predictor.save(model_path)
+loaded_predictor = MultiModalPredictor.load(model_path)
 scores2 = loaded_predictor.evaluate(test_data, metrics=["roc_auc"])
 scores2
 ```
 
 ## Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ## Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

@@ -85,9 +85,11 @@ In AutoMM, to enable efficient finetuning, just specify the `optimization.effici
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
+import uuid
 
+model_path = f"./tmp/{uuid.uuid4().hex}-multilingual_ia3"
 predictor = MultiModalPredictor(label="label",
-                                path="multilingual_ia3")
+                                path=model_path)
 predictor.fit(train_en_df,
               presets="multilingual",
               hyperparameters={
@@ -95,7 +97,7 @@ predictor.fit(train_en_df,
                   "optimization.lr_decay": 0.9,
                   "optimization.learning_rate": 3e-03,
                   "optimization.end_lr": 3e-03,
-                  "optimization.max_epochs": 3,
+                  "optimization.max_epochs": 2,
                   "optimization.warmup_steps": 0,
                   "env.batch_size": 32,
               })
@@ -126,17 +128,18 @@ To accelerate the training, we downsample the number of training sampels to be 2
 ```{.python .input}
 # Just for clean the space
 clear_cache()
-shutil.rmtree("multilingual_ia3")
+shutil.rmtree(model_path)
 ```
 
 
 ```python
 from autogluon.multimodal import MultiModalPredictor
 
-train_en_df_downsample = train_en_df.sample(200, random_state=123) 
+train_en_df_downsample = train_en_df.sample(200, random_state=123)
 
+new_model_path = f"./tmp/{uuid.uuid4().hex}-multilingual_ia3_gradient_checkpoint"
 predictor = MultiModalPredictor(label="label",
-                                path="multilingual_ia3_gradient_checkpoint")
+                                path=new_model_path)
 predictor.fit(train_en_df_downsample,
               presets="multilingual",
               hyperparameters={
@@ -200,12 +203,12 @@ Score in the English Testset: {'roc_auc': 0.931263189629183}
 ```python
 # Just for clean the space
 clear_cache()
-shutil.rmtree("multilingual_ia3_gradient_checkpoint")
+shutil.rmtree(new_model_path)
 ```
 
 ## Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ## Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

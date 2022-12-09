@@ -133,16 +133,23 @@ class AbstractTimeSeriesModel(AbstractModel):
         return params
 
     def get_info(self) -> dict:
-        info_dict = super().get_info()
-        info_dict.update(
-            {
-                "freq": self.freq,
-                "prediction_length": self.prediction_length,
-                "quantile_levels": self.quantile_levels,
-                "metadata": self.metadata,
-            }
-        )
-        return info_dict
+        """
+        Returns a dictionary of numerous fields describing the model.
+        """
+        # TODO: Include self.metadata
+        info = {
+            "name": self.name,
+            "model_type": type(self).__name__,
+            "eval_metric": self.eval_metric,
+            "fit_time": self.fit_time,
+            "predict_time": self.predict_time,
+            "freq": self.freq,
+            "prediction_length": self.prediction_length,
+            "quantile_levels": self.quantile_levels,
+            "val_score": self.val_score,
+            "hyperparameters": self.params,
+        }
+        return info
 
     def fit(self, **kwargs) -> "AbstractTimeSeriesModel":
         """Fit timeseries model.

@@ -36,6 +36,19 @@ tabular_presets_dict = dict(
     # Fit only interpretable models.
     interpretable={'auto_stack': False, 'hyperparameters': 'interpretable'},
 
+    # ------------------------------------------
+    # ------------------------------------------
+    # ------------------------------------------
+    # Experimental presets. Only use these presets if you are ok with unstable and potentially poor performing presets.
+    #  Experimental presets can be removed or changed without warning.
+
+    # Best quality with an additional FTTransformer model, GPU is recommended.
+    experimental_best_quality={'auto_stack': True, 'hyperparameters': 'default_FTT'},
+
+    # ------------------------------------------
+    # ------------------------------------------
+    # ------------------------------------------
+
     # TODO: Consider HPO-enabled configs if training time doesn't matter but inference latency does.
 )
 

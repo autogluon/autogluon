@@ -14,6 +14,29 @@ from .download import download, is_url
 logger = logging.getLogger(AUTOMM)
 
 
+def from_dict(data):
+    """
+    Construct a dataframe (dummy) from a data dictionary, with the form {"image": ["img1.jpg", "img2.jpg", ...]}
+    Parameters
+    ----------
+    data
+        Dict containing the image paths
+    Returns
+    -------
+    a pandas DataFrame with columns "image", "rois", and "label".
+    """
+    # TODO: Remove this function after refactoring
+    d = {"image": [], "rois": [], "label": []}
+
+    for image in data["image"]:
+        d["image"].append(image)
+        # Dummy rois
+        d["rois"].append([[-1, -1, -1, -1, 0]])
+        d["label"].append([[-1, -1, -1, -1, 0]])
+    df = pd.DataFrame(d)
+    return df.sort_values("image").reset_index(drop=True)
+
+
 def from_voc(
     root: str,
     splits: Optional[Union[str, tuple]] = None,
@@ -415,7 +438,7 @@ def from_coco(
     elif root is None:
         # try to use the default coco structure
         root = os.path.join(os.path.dirname(anno_file), "..")
-        logger.info("Using default root folder: %s. Specify `root=...` if you feel it is wrong...", root)
+        logger.info(f"Using default root folder: {root}. Specify `root=...` if you feel it is wrong...")
     else:
         raise ValueError("Unable to parse root: {}".format(root))
 
@@ -491,33 +514,68 @@ def VOCName2Idx(name):
     return VOC_NAME_TO_IDX[name]
 
 
-def get_image_name_num(path):
-    start_idx = path.rfind("/") + 1
-    end_idx = path.rindex(".")
-    return int(path[start_idx:end_idx])
+def get_image_filename(path: str):
+    """
+    Get the filename (without extension) from its path.
+
+    Parameters
+    ----------
+    path
+        The path of image.
+
+    Returns
+    -------
+    The file name of image.
+    """
+    return Path(path.replace("\\", "/")).stem
 
 
 class COCODataset:
-    # refactor data loading into here
+    # The class that load/save COCO data format.
+    # TODO: refactor data loading into here
     def __init__(self, anno_file):
         self.anno_file = anno_file
 
         with open(anno_file, "r") as f:
             d = json.load(f)
         image_list = d["images"]
-        img_namenum_list = []
+        img_filename_list = []
         img_id_list = []
         for img in image_list:
-            img_namenum_list.append(get_image_name_num(img["file_name"]))
+            img_filename_list.append(get_image_filename(img["file_name"]))
             img_id_list.append(int(img["id"]))
-        self.image_namenum_to_id = dict(zip(img_namenum_list, img_id_list))
+        self.image_filename_to_id = dict(zip(img_filename_list, img_id_list))
 
         self.category_ids = [cat["id"] for cat in d["categories"]]
 
-    def get_image_id_from_path(self, image_path):
-        return self.image_namenum_to_id[get_image_name_num(image_path)]
+    def get_image_id_from_path(self, image_path: str):
+        """
+        Get image id from its path.
 
-    def save_result(self, ret, data, save_path):
+        Parameters
+        ----------
+        image_path
+            Image path.
+
+        Returns
+        -------
+        Image ID.
+        """
+        return self.image_filename_to_id[get_image_filename(image_path)]
+
+    def save_result(self, ret: List, data: pd.DataFrame, save_path: str):
+        """
+        Save COCO format result to given save path.
+
+        Parameters
+        ----------
+        ret
+            The returned prediction result.
+        data
+            The input data.
+        save_path
+            The save path given to store COCO format output.
+        """
         coco_format_result = []
 
         for i, row in data.reset_index(drop=True).iterrows():

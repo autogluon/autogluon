@@ -2,7 +2,7 @@
 :label:`sec_automm_detection_eval_fasterrcnn_voc`
 
 In this section, our goal is to evaluate Faster-RCNN model on VOC2007 dataset in VOC format.
-See \[Convert VOC to COCO] for how to quickly convert a VOC format dataset.
+See :ref:`sec_automm_detection_voc_to_coco` for how to quickly convert a VOC format dataset.
 In previous section :ref:`sec_automm_detection_eval_fasterrcnn_coco`, we evaluated Faster-RCNN on COCO dataset.
 We strongly recommend using COCO format, but AutoMM still have limited support for VOC format for quick proof testing.
 
@@ -15,7 +15,7 @@ from autogluon.multimodal import MultiModalPredictor
 We use the Faster R-CNN with ResNet50 as backbone and Feature Pyramid Network (FPN) as neck.
 This is the only model we support that is pretrained on VOC.
 It's always recommended to finetune a model pretrained on COCO which is a larger dataset with more complicated task.
-To test other model structures on VOC, check :ref:`sec_automm_detection_voc_to_coco` and :ref:`sec_automm_detection_fast_finetune_coco`.
+To test other model structures on VOC, check :ref:`sec_automm_detection_voc_to_coco` and :ref:`sec_automm_detection_fast_ft_coco`.
 
 ```python
 checkpoint_name = "faster_rcnn_r50_fpn_1x_voc0712"
@@ -91,7 +91,7 @@ time usage: 533.67
 
 ### Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ### Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

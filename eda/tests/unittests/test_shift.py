@@ -1,17 +1,22 @@
-import pandas as pd
-import numpy as np
-import autogluon.eda.analysis as eda
-import autogluon.eda.visualization as viz
-from sklearn.model_selection import train_test_split
+import os
+import tempfile
 import unittest
 
-S3_URL = "https://autogluon.s3.us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/"
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+import autogluon.eda.analysis as eda
+import autogluon.eda.visualization as viz
+
+RESOURCE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "resources"))
+
 SAMPLE_SIZE = 200
 
 
 def load_adult_data():
-    train_data = S3_URL + "train_data.csv"
-    test_data = S3_URL + "test_data.csv"
+    train_data = os.path.join(RESOURCE_PATH, "adult", "train_data.csv")
+    test_data = os.path.join(RESOURCE_PATH, "adult", "test_data.csv")
     train = pd.read_csv(train_data).sample(SAMPLE_SIZE, random_state=0)
     test = pd.read_csv(test_data).sample(SAMPLE_SIZE, random_state=0)
     data = (train, test)
@@ -41,20 +46,22 @@ def sim_cov_shift(train, test, p_nonmarr=0.75, val=False):
 class TestShift(unittest.TestCase):
     def test_shift(self):
         train, test = load_adult_data()
-        analysis_args = dict(
-            train_data=train,
-            test_data=test,
-            label="class",
-            classifier_kwargs={"path": "AutogluonModels"},
-            classifier_fit_kwargs={"hyperparameters": {"RF": {}}},
-        )
-        shft_ana = eda.shift.XShiftDetector(**analysis_args)
-        shft_ana.fit()
-        viz_args = dict(headers=True)
-        shft_viz = viz.shift.XShiftSummary(**viz_args)
-        shft_viz.render(shft_ana.state)
-        res = shft_ana.state.xshift_results
-        assert all(
-            res[k] is not None
-            for k in ["detection_status", "pvalue", "pvalue_threshold", "eval_metric", "feature_importance"]
-        )
+        with tempfile.TemporaryDirectory() as path:
+            analysis_args = dict(
+                path=path,
+                train_data=train,
+                test_data=test,
+                label="class",
+                classifier_kwargs={"path": os.path.join(path, "AutogluonModels")},
+                classifier_fit_kwargs={"hyperparameters": {"RF": {}}},
+            )
+            shft_ana = eda.shift.XShiftDetector(**analysis_args)
+            shft_ana.fit()
+            viz_args = dict(headers=True)
+            shft_viz = viz.shift.XShiftSummary(**viz_args)
+            shft_viz.render(shft_ana.state)
+            res = shft_ana.state.xshift_results
+            assert all(
+                res[k] is not None
+                for k in ["detection_status", "pvalue", "pvalue_threshold", "eval_metric", "feature_importance"]
+            )

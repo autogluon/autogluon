@@ -1,6 +1,8 @@
 # Image Prediction - Quick Start
 :label:`sec_imgquick`
 
+**Note**: AutoGluon ImagePredictor will be deprecated in v0.7. Please try our [AutoGluon MultiModalPredictor](https://auto.gluon.ai/stable/tutorials/multimodal/image_prediction/beginner_image_cls.html) for more functionalities and better support for your image classification need.
+
 In this quick start, we'll use the task of image classification to illustrate how to use AutoGluon’s APIs. This tutorial demonstrates how to load images and corresponding labels into AutoGluon and use this data to obtain a neural network that can classify new images. This is different from traditional machine learning where we need to manually define the neural network and then specify the hyperparameters in the training process. Instead, with just a single call to AutoGluon's [fit](../../api/autogluon.predictor.html#autogluon.vision.ImagePredictor.fit) function, AutoGluon automatically trains many models with different hyperparameter configurations and returns the model that achieved the highest level of accuracy.
 
 ```{.python .input}

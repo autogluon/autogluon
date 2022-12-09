@@ -13,6 +13,8 @@ We will demonstrate how to use AutoGluon Text to build sentiment classification 
 - Finetune the German BERT
 - Cross-lingual transfer from English to German
 
+*Note:* You are recommended to also check :ref:`sec_automm_efficient_finetuning_basic` about how to achieve better performance via parameter-efficient finetuning. 
+
 ## Load Dataset
 
 The [Cross-Lingual Amazon Product Review Sentiment](https://webis.de/data/webis-cls-10.html) dataset contains Amazon product reviews in four languages. 
@@ -75,7 +77,7 @@ predictor = MultiModalPredictor(label='label')
 predictor.fit(train_de_df,
               hyperparameters={
                   'model.hf_text.checkpoint_name': 'bert-base-german-cased',
-                  'optimization.max_epochs': 4
+                  'optimization.max_epochs': 2
               })
 ```
 
@@ -118,7 +120,7 @@ predictor = MultiModalPredictor(label='label')
 predictor.fit(train_en_df,
               presets='multilingual',
               hyperparameters={
-                  'optimization.max_epochs': 4
+                  'optimization.max_epochs': 2
               })
 ```
 
@@ -158,7 +160,7 @@ Amazingly, the model also works for Japanese!
 
 ## Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ## Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

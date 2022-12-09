@@ -5,6 +5,7 @@ In this section, our goal is to fast finetune a pretrained model on a small data
 and evaluate on its test set. Both training and test sets are in COCO format.
 See :ref:`sec_automm_detection_convert_to_coco` for how to convert other datasets to COCO format.
 
+### Setting up the imports
 To start, let's import MultiModalPredictor:
 
 ```python .input
@@ -26,6 +27,7 @@ import time
 from autogluon.core.utils.loaders import load_zip
 ```
 
+### Downloading Data
 We have the sample dataset ready in the cloud. Let's download it:
 
 ```python .input
@@ -42,10 +44,10 @@ While using COCO format dataset, the input is the json annotation file of the da
 In this example, `trainval_cocoformat.json` is the annotation file of the train-and-validate split,
 and `test_cocoformat.json` is the annotation file of the test split.
 
+### Creating the MultiModalPredictor
 We select the YOLOv3 with MobileNetV2 as backbone,
 and input resolution is 320x320, pretrained on COCO dataset. With this setting, it is fast to finetune or inference,
 and easy to deploy.
-For more model choices, see :label:`sec_automm_detection_selecting_models`.
 And we use all the GPUs (if any):
 
 ```python .input
@@ -62,6 +64,9 @@ It will be saved to a automatically generated directory with timestamp under `Au
 
 ```python .input
 # Init predictor
+import uuid
+
+model_path = f"./tmp/{uuid.uuid4().hex}-quick_start_tutorial_temp_save"
 predictor = MultiModalPredictor(
     hyperparameters={
         "model.mmdet_image.checkpoint_name": checkpoint_name,
@@ -69,9 +74,11 @@ predictor = MultiModalPredictor(
     },
     problem_type="object_detection",
     sample_data_path=train_path,
-    path="./quick_start_tutorial_temp_save",
+    path=model_path,
 )
 ```
+
+### Finetuning the Model
 
 We set the learning rate to be `2e-4`.
 Note that we use a two-stage learning rate option during finetuning by default,
@@ -80,8 +87,6 @@ Using a two-stage learning rate with high learning rate only on head layers make
 the model converge faster during finetuning. It usually gives better performance as well,
 especially on small datasets with hundreds or thousands of images.
 We also set the epoch to be 15 and batch_size to be 32.
-For more information about how to tune those hyperparameters,
-see :ref:`sec_automm_detection_tune_hyperparameters`.
 We also compute the time of the fit process here for better understanding the speed.
 We run it on a g4.2xlarge EC2 machine on AWS,
 and part of the command outputs are shown below:
@@ -110,6 +115,8 @@ Print out the time and we can see that it's fast!
 print("This finetuning takes %.2f seconds." % (train_end - start))
 ```
 
+### Evaluation
+
 To evaluate the model we just trained, run following code.
 
 And the evaluation results are shown in command line output. 
@@ -134,7 +141,7 @@ and we can also reset the number of GPUs to use if not all the devices are avail
 
 ```python .input
 # Load and reset num_gpus
-new_predictor = MultiModalPredictor.load("./quick_start_tutorial_temp_save")
+new_predictor = MultiModalPredictor.load(model_path)
 new_predictor.set_num_gpus(1)
 ```
 
@@ -145,9 +152,95 @@ Evaluating the new predictor gives us exactly the same result:
 new_predictor.evaluate(test_path)
 ```
 
+If we set validation metric to `"map"` (Mean Average Precision), and max epochs to `50`, 
+the predictor will have better performance with the same pretrained model (YOLOv3).
+We trained it offline and uploaded to S3. To load and check the result:
+```python .input
+# Load Trained Predictor from S3
+zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/quick_start/AP50_433.zip"
+download_dir = "./AP50_433"
+load_zip.unzip(zip_file, unzip_dir=download_dir)
+better_predictor = MultiModalPredictor.load("./AP50_433/quick_start_tutorial_temp_save")
+better_predictor.set_num_gpus(1)
+
+# Evaluate new predictor
+better_predictor.evaluate(test_path)
+```
+
+For how to set those hyperparameters and finetune the model with higher performance, 
+see :ref:`sec_automm_detection_high_ft_coco`.
+
+### Inference
+Now that we have gone through the model setup, finetuning, and evaluation, this section details the inference. 
+Specifically, we layout the steps for using the model to make predictions and visualize the results.
+
+To run inference on the entire test set, perform:
+
+```python .input
+pred = predictor.predict(test_path)
+print(pred)
+```
+The output `pred` is a `pandas` `DataFrame` that has two columns, `image` and `bboxes`.
+
+In `image`, each row contains the image path
+
+In `bboxes`, each row is a list of dictionaries, each one representing a bounding box: `{"class": <predicted_class_name>, "bbox": [x1, y1, x2, y2], "score": <confidence_score>}`
+
+Note that, by default, the `predictor.predict` does not save the detection results into a file.
+
+To run inference and save results, run the following:
+```python .input
+pred = better_predictor.predict(test_path, save_results=True)
+```
+Here, we save `pred` into a `.txt` file, which exactly follows the same layout as in `pred`.
+You can use a predictor initialzed in anyway (i.e. finetuned predictor, predictor with pretrained model, etc.).
+Here, we demonstrate using the `better_predictor` loaded previously.
+
+### Visualizing Results
+To run visualizations, ensure that you have `opencv` installed. If you haven't already, install `opencv` by running 
+```python .input
+!pip install opencv-python
+```
+
+To visualize the detection bounding boxes, run the following:
+```python .input
+from autogluon.multimodal.utils import Visualizer
+
+conf_threshold = 0.4  # Specify a confidence threshold to filter out unwanted boxes
+image_result = pred.iloc[30]
+
+img_path = image_result.image  # Select an image to visualize
+
+visualizer = Visualizer(img_path)  # Initialize the Visualizer
+out = visualizer.draw_instance_predictions(image_result, conf_threshold=conf_threshold)  # Draw detections
+visualized = out.get_image()  # Get the visualized image
+
+from PIL import Image
+from IPython.display import display
+img = Image.fromarray(visualized, 'RGB')
+display(img)
+```
+
+### Testing on Your Own Image
+You can also download an image and run inference on that single image. The follow is an example:
+
+Download the example image:
+```python .input
+from autogluon.multimodal import download
+image_url = "https://raw.githubusercontent.com/dmlc/web-data/master/gluoncv/detection/street_small.jpg"
+test_image = download(image_url)
+```
+
+Run inference:
+
+```python .input
+pred_test_image = better_predictor.predict({"image": [test_image]})
+print(pred_test_image)
+```
+
 ### Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ### Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

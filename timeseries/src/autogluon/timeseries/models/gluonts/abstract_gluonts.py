@@ -21,6 +21,7 @@ from autogluon.core.utils.savers import save_pkl
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.features import get_categorical_and_continuous_features
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_root_logger
 
 logger = logging.getLogger(__name__)
@@ -76,7 +77,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             df = self.target_df.loc[item_id]
             time_series = {
                 FieldName.ITEM_ID: item_id,
-                FieldName.TARGET: df.squeeze().to_numpy(dtype=self.float_dtype),
+                FieldName.TARGET: df.to_numpy(dtype=self.float_dtype).ravel(),
                 FieldName.START: pd.Period(df.index[0], freq=self.freq),
             }
             if self.feat_static_cat is not None:
@@ -361,7 +362,11 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                     )
 
         # Make sure the item_ids are sorted in the same order as in data
-        return df.loc[data.item_ids]
+        df = df.loc[data.item_ids]
+        # GluonTS uses pd.Period internally, which may lead to loss of precision (e.g., "2020-01-01 12:00" becomes
+        # "2020-01-01 00:00"). We manually set the index to avoid such problems.
+        df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
+        return df
 
     def _predict_gluonts_forecasts(
         self, data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame] = None, **kwargs

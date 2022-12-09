@@ -1,6 +1,5 @@
 import copy
 import os
-import pickle
 import shutil
 import tempfile
 import uuid
@@ -30,14 +29,17 @@ from autogluon.multimodal.constants import (
     UNIFORM_SOUP,
 )
 from autogluon.multimodal.utils import modify_duplicate_model_names
+from autogluon.multimodal.utils.misc import shopee_dataset
 
 from ..others.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
 from ..others.utils import get_home_dir
 
 ALL_DATASETS = {
-    "petfinder": PetFinderDataset,
-    "hateful_memes": HatefulMeMesDataset,
-    "ae": AEDataset,
+    "petfinder": PetFinderDataset(),
+    "petfinder_bytearray": PetFinderDataset(is_bytearray=True),
+    "hateful_memes": HatefulMeMesDataset(),
+    "hateful_memes_bytearray": HatefulMeMesDataset(is_bytearray=True),
+    "ae": AEDataset(),
 }
 
 
@@ -110,7 +112,7 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
             "auto",
         ),
         (
-            "hateful_memes",
+            "hateful_memes_bytearray",
             ["timm_image", "hf_text", "clip", "fusion_mlp"],
             "monsoon-nlp/hindi-bert",
             "mobilenetv3_small_100",
@@ -119,7 +121,7 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
             "auto",
         ),
         (
-            "petfinder",
+            "petfinder_bytearray",
             ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
             None,
             "mobilenetv3_small_100",
@@ -183,7 +185,7 @@ def test_predictor(
     efficient_finetune,
     loss_function,
 ):
-    dataset = ALL_DATASETS[dataset_name]()
+    dataset = ALL_DATASETS[dataset_name]
     metric_name = dataset.metric
 
     predictor = MultiModalPredictor(
@@ -268,7 +270,7 @@ def test_standalone():  # test standalone feature in MultiModalPredictor.save()
         mock.Mock(side_effect=RuntimeError("Please use the `responses` library to mock HTTP in your tests.")),
     )
 
-    dataset = PetFinderDataset()
+    dataset = ALL_DATASETS["petfinder"]
 
     hyperparameters = {
         "optimization.max_epochs": 1,
@@ -350,7 +352,7 @@ def test_standalone():  # test standalone feature in MultiModalPredictor.save()
 def test_customizing_model_names(
     hyperparameters,
 ):
-    dataset = ALL_DATASETS["petfinder"]()
+    dataset = ALL_DATASETS["petfinder"]
     metric_name = dataset.metric
 
     predictor = MultiModalPredictor(
@@ -411,7 +413,7 @@ def test_customizing_model_names(
 
 
 def test_model_configs():
-    dataset = ALL_DATASETS["petfinder"]()
+    dataset = ALL_DATASETS["petfinder"]
     metric_name = dataset.metric
 
     predictor = MultiModalPredictor(
@@ -566,7 +568,7 @@ def test_model_configs():
 
 
 def test_modifying_duplicate_model_names():
-    dataset = ALL_DATASETS["petfinder"]()
+    dataset = ALL_DATASETS["petfinder"]
     metric_name = dataset.metric
 
     teacher_predictor = MultiModalPredictor(
@@ -621,3 +623,53 @@ def test_modifying_duplicate_model_names():
     for per_modality_processors in teacher_predictor._data_processors.values():
         for per_processor in per_modality_processors:
             assert per_processor.prefix in teacher_predictor._config.model.names
+
+
+def test_image_bytearray():
+    download_dir = "./"
+    train_data_1, test_data_1 = shopee_dataset(download_dir=download_dir)
+    train_data_2, test_data_2 = shopee_dataset(download_dir=download_dir, is_bytearray=True)
+    predictor_1 = MultiModalPredictor(
+        label="label",
+    )
+    predictor_2 = MultiModalPredictor(
+        label="label",
+    )
+    model_names = ["timm_image"]
+    hyperparameters = {
+        "optimization.max_epochs": 2,
+        "model.names": model_names,
+        "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+    }
+    predictor_1.fit(
+        train_data=train_data_1,
+        hyperparameters=hyperparameters,
+        seed=42,
+    )
+    predictor_2.fit(
+        train_data=train_data_2,
+        hyperparameters=hyperparameters,
+        seed=42,
+    )
+
+    score_1 = predictor_1.evaluate(test_data_1)
+    score_2 = predictor_2.evaluate(test_data_2)
+    # train and predict using different image types
+    score_3 = predictor_1.evaluate(test_data_2)
+    score_4 = predictor_2.evaluate(test_data_1)
+
+    prediction_1 = predictor_1.predict(test_data_1, as_pandas=False)
+    prediction_2 = predictor_2.predict(test_data_2, as_pandas=False)
+    prediction_3 = predictor_1.predict(test_data_2, as_pandas=False)
+    prediction_4 = predictor_2.predict(test_data_1, as_pandas=False)
+
+    prediction_prob_1 = predictor_1.predict_proba(test_data_1, as_pandas=False)
+    prediction_prob_2 = predictor_2.predict_proba(test_data_2, as_pandas=False)
+    prediction_prob_3 = predictor_1.predict_proba(test_data_2, as_pandas=False)
+    prediction_prob_4 = predictor_1.predict_proba(test_data_1, as_pandas=False)
+
+    npt.assert_array_equal([score_1, score_2, score_3, score_4], [score_1] * 4)
+    npt.assert_array_equal([prediction_1, prediction_2, prediction_3, prediction_4], [prediction_1] * 4)
+    npt.assert_array_equal(
+        [prediction_prob_1, prediction_prob_2, prediction_prob_3, prediction_prob_4], [prediction_prob_1] * 4
+    )
