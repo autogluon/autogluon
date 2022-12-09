@@ -98,8 +98,7 @@ def test_bagged_model_with_total_resources_but_no_gpu_specified(mock_system_reso
         bagged_model = DummyBaggedModel(model_base)
         resources = bagged_model._preprocess_fit_resources(total_resources=total_resources, k_fold=k_fold)
         resources.pop('k_fold')
-        _, default_model_num_gpus = model_base._get_default_resources()
-        default_model_resources = {'num_cpus': 2, 'num_gpus': default_model_num_gpus * k_fold}
+        default_model_resources = {'num_cpus': 2, 'num_gpus': ResourceManager.get_gpu_count_all()}  # return all gpu resources as default needs gpu
         assert resources == default_model_resources
     
     
