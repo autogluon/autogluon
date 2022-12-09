@@ -50,7 +50,6 @@ from .object_detection import (
     from_dict,
     from_voc,
     get_detection_classes,
-    getCOCOCatIDs,
     save_result_coco_format,
     save_result_df,
     save_result_voc_format,
