@@ -1,10 +1,8 @@
 import logging
-from io import BytesIO
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-import PIL
 from nptyping import NDArray
 from omegaconf import DictConfig, OmegaConf
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -35,7 +33,7 @@ logger = logging.getLogger(AUTOMM)
 
 class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     """
-    Preprocess one multimodal pd.DataFrame including images, texts, numerical features,
+    Preprocess one multimodal pd.DataFrame including image paths, image bytearrays, texts, numerical features,
     and categorical features. Each modality may have multiple columns.
     The preprocessor is designed to output model-agnostic features.
     """
@@ -144,7 +142,11 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         if hasattr(self, "_image_path_names"):
             return self._image_path_names
         else:
-            return [col_name for col_name in self._image_feature_names if self._column_types[col_name] == IMAGE]
+            return [col_name for col_name in self._image_feature_names if self._column_types[col_name] == IMAGE_PATH]
+
+    @property
+    def image_bytearray_names(self):
+        return [col_name for col_name in self._image_feature_names if self._column_types[col_name] == IMAGE_BYTEARRAY]
 
     @property
     def image_feature_names(self):
@@ -211,29 +213,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     @property
     def fit_y_called(self):
         return self._fit_y_called
-
-    def _get_image_feature_type(self, feature: Any):
-        image_type = None
-        if isinstance(feature, str):
-            image_feature = feature.split(";")[0]
-        elif isinstance(feature, bytearray):
-            image_feature = feature
-        elif isinstance(feature, list) and isinstance(feature[0], bytearray):
-            image_feature = feature[0]
-        else:
-            return image_type
-
-        try:
-            with PIL.Image.open(image_feature) as img:
-                image_type = IMAGE_PATH
-        except:
-            try:
-                with PIL.Image.open(BytesIO(image_feature)) as img:
-                    image_type = IMAGE_BYTEARRAY
-            except:
-                return image_type
-
-        return image_type
 
     def get_column_names(self, modality: str):
         if modality.startswith(IMAGE) or modality == ROIS:
@@ -439,12 +418,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
             if col_type == ROIS:
                 processed_data = df[col_name].tolist()
-            elif col_type in [IMAGE, IMAGE_BYTEARRAY, IMAGE_PATH]:  # for backward compatibility
-                image_type = self._get_image_feature_type(df[col_name].iloc[0])
-                if image_type == IMAGE_PATH:
-                    processed_data = col_value.apply(lambda ele: ele.split(";")).tolist()
-                elif image_type == IMAGE_BYTEARRAY:
-                    processed_data = col_value.apply(lambda ele: ele if isinstance(ele, list) else [ele]).tolist()
+            elif col_type in [IMAGE_PATH, IMAGE]:
+                processed_data = col_value.apply(lambda ele: ele.split(";")).tolist()
+            elif col_type == IMAGE_BYTEARRAY:
+                processed_data = col_value.apply(lambda ele: ele if isinstance(ele, list) else [ele]).tolist()
             elif col_type == f"{IMAGE}_{IDENTIFIER}":
                 processed_data = col_value
             else:
