@@ -155,7 +155,7 @@ class TextProcessor:
         else:
             if max_len < self.tokenizer.model_max_length:
                 # TODO, Consider to fix the logic
-                if self.tokenizer.model_max_length < 10**6:
+                if self.tokenizer.model_max_length < 10 ** 6:
                     warnings.warn(
                         f"provided max length: {max_len} "
                         f"is smaller than {model.checkpoint_name}'s default: {self.tokenizer.model_max_length}"
@@ -442,8 +442,10 @@ class TextProcessor:
             try:
                 tokenizer_class = ALL_TOKENIZERS["bert"]
                 tokenizer = tokenizer_class.from_pretrained(checkpoint_name)
-                logger.warning(f"Current checkpoint {checkpoint_name} does not support AutoTokenizer. "
-                               "Switch to BertTokenizer instead.")
+                logger.warning(
+                    f"Current checkpoint {checkpoint_name} does not support AutoTokenizer. "
+                    "Switch to BertTokenizer instead."
+                )
                 return tokenizer
             except:
                 raise e
