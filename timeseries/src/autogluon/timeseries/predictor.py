@@ -27,6 +27,8 @@ DEPRECATED_PRESETS_TO_FALLBACK = {
     "good_quality": "high_quality",
 }
 
+SUPPORTED_FREQUENCIES = {"D", "W", "M", "Q", "A", "Y", "H", "T", "min", "S"}
+
 
 class TimeSeriesPredictor:
     """AutoGluon ``TimeSeriesPredictor`` predicts future values of multiple related time series.
@@ -211,6 +213,16 @@ class TimeSeriesPredictor:
                 "time index of the data being irregularly sampled. Please ensure that the "
                 "data set used has a uniform time index, or create the `TimeSeriesPredictor` "
                 "setting `ignore_time_index=True`."
+            )
+        # Check if frequency is supported
+        offset = pd.tseries.frequencies.to_offset(df.freq)
+        norm_freq_str = offset.name.split("-")[0]
+        if norm_freq_str not in SUPPORTED_FREQUENCIES:
+            warnings.warn(
+                f"Detected frequency '{norm_freq_str}' is not supported by TimeSeriesPredictor. This may lead to some "
+                f"models not working as intended. "
+                f"Please convert the timestamps to one of the supported frequencies: {SUPPORTED_FREQUENCIES}. "
+                f"See https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases for details."
             )
         if df.isna().values.any():
             raise ValueError(
