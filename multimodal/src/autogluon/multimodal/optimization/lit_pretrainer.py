@@ -240,7 +240,7 @@ class PretrainLitModule(LitModule):
         local_path = './' + self.is_pretrain['name'] + '/' + 'ec2/2022_09_14/cross_table_pretrain/' + self.is_pretrain["folder_name"] + '/iter_'
         files = os.listdir(local_path + str(self.current_iter))
 
-        num_files = len(files)
+        num_files = len(files) if "aggregation" in self.is_pretrain and self.is_pretrain["aggregation"] == "mean" else 1
         new_pretrained = copy.deepcopy(self.prev_state_dic)
         for file_name in files:
             ckpt_path = local_path + str(self.current_iter) + '/' + file_name
