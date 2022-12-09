@@ -184,16 +184,57 @@ tests_dict = {
                 }
             }
         ),
-        'total_resources_with_valid_ag_args_fit': (
+        'valid_ag_args_ensemble_and_ag_args_fit': (
             {
-                'total_resources': {'num_cpus': 16, 'num_gpus': 4},
-                'ag_args_fit': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_ensemble': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_fit': {'num_cpus': 4, 'num_gpus': 1},
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 4, 'num_gpus': 1}
+                }
+            }
+        ),
+        'valid_ag_args_ensemble': (
+            {
+                'ag_args_ensemble': {'num_cpus': 8, 'num_gpus': 2},  # should be ignored
+                'model_default_resources': {'num_cpus': 2, 'num_gpus': 1},
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 1}
+                }
+            }
+        ),
+        'total_resources_with_valid_ag_args_ensemble_and_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5}
+                }
+            }
+        ),
+        'total_resources_with_valid_ag_args_ensemble': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},  # should be ignored
+                'model_default_resources': {'num_cpus': 2, 'num_gpus': 1},
                 'expected_answer': {
                     'resources_per_model': {'num_cpus': 8, 'num_gpus': 2}
                 }
             }
         ),
-        'total_resources_without_ag_args_fit': (
+        'total_resources_with_valid_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_fit': {'num_cpus': 4, 'num_gpus': 1},
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 4, 'num_gpus': 1}
+                }
+            }
+        ),
+        'total_resources': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'total_resources': {'num_cpus': 8, 'num_gpus': 2},
@@ -210,7 +251,7 @@ tests_dict = {
                 }
             }
         ),
-        'total_resources_with_valid_ag_args_ensemble_and_valid_ag_args_fit': (
+        'bagging_with_total_resources_and_valid_ag_args_ensemble_and_valid_ag_args_fit': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'total_resources': {'num_cpus': 8, 'num_gpus': 2},
@@ -223,7 +264,7 @@ tests_dict = {
                 }
             }
         ),
-        'valid_ag_args_ensemble_and_valid_ag_args_fit': (
+        'bagging_with_valid_ag_args_ensemble_and_valid_ag_args_fit': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
@@ -235,7 +276,7 @@ tests_dict = {
                 }
             }
         ),
-        'valid_ag_args_ensemble_without_ag_args_fit': (
+        'bagging_with_valid_ag_args_ensemble': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'ag_args_ensemble': {'num_cpus': 8, 'num_gpus': 4},
@@ -247,7 +288,7 @@ tests_dict = {
                 }
             }
         ),
-        'valid_ag_args_fit_without_ag_args_ensemble': (
+        'bagging_with_valid_ag_args_fit': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
@@ -270,7 +311,7 @@ tests_dict = {
                 }
             }
         ),
-        'total_resources_with_valid_ag_args_ensemble_and_valid_ag_args_fit_sequential': (
+        'sequential_bagging_with_total_resources_and_valid_ag_args_ensemble_and_valid_ag_args_fit': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'total_resources': {'num_cpus': 8, 'num_gpus': 2},
@@ -283,7 +324,7 @@ tests_dict = {
                 }
             }
         ),
-        'valid_ag_args_ensemble_with_ag_args_fit_sequential': (
+        'sequential_bagging_with_valid_ag_args_ensemble_and_ag_args_fit': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'ag_args_ensemble': {'num_cpus': 8, 'num_gpus': 2},
@@ -295,7 +336,7 @@ tests_dict = {
                 }
             }
         ),
-        'valid_ag_args_ensemble_without_ag_args_fit_sequential': (
+        'sequential_bagging_with_valid_ag_args_ensemble': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'ag_args_ensemble': {'num_cpus': 2, 'num_gpus': 1},
@@ -306,7 +347,7 @@ tests_dict = {
                 }
             }
         ),
-        'valid_ag_args_fit_with_ag_args_ensemble_sequential': (
+        'sequential_bagging_with_valid_ag_args_fit_and_ag_args_ensemble': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
