@@ -320,6 +320,18 @@ tests_dict = {
         'bagging_without_anything': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0},
+                'num_bag_folds': 8,
+                'expected_answer': {
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0},
+                    'model_in_parallel': 8
+                }
+            }
+        ),
+        'bagging_without_anything_with_gpu': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
                 'model_default_resources': {'num_cpus': 2, 'num_gpus': 1},
                 'num_bag_folds': 8,
@@ -446,6 +458,16 @@ tests_dict = {
         'hpo_without_anything': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_default_resources': {'num_cpus': 2, 'num_gpus': 0},
+                'num_trials': 2,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 8, 'num_gpus': 0}
+                }
+            }
+        ),
+        'hpo_without_anything_with_gpu': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'model_default_resources': {'num_cpus': 2, 'num_gpus': 1},
                 'num_trials': 2,
                 'expected_answer': {
@@ -515,6 +537,17 @@ tests_dict = {
             }
         ),
         'custom_hpo_without_anything': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 1, 'num_gpus': 0}
+                }
+            }
+        ),
+        'custom_hpo_without_anything_with_gpu': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'model_default_resources': {'num_cpus': 1, 'num_gpus': 1},
@@ -630,6 +663,20 @@ tests_dict = {
             }
         ),
         'hpo_and_bagging_without_anything': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0},
+                'num_trials': 2,
+                'num_bag_folds': 4,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 8, 'num_gpus': 0},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0},
+                    'model_in_parallel': 4  # This is models running in parallel in a bagged model
+                }
+            }
+        ),
+        'hpo_and_bagging_without_anything_with_gpu': (
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'model_default_resources': {'num_cpus': 1, 'num_gpus': 1},
