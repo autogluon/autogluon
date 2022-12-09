@@ -614,7 +614,7 @@ def cocoeval_torchmetrics(outputs: List):
 
 
 def cocoeval_pycocotools(
-    outputs: List, data: pd.DataFrame, anno_file: str, cache_path: str, metrics: Optional[str, List]
+    outputs: List, data: pd.DataFrame, anno_file: str, cache_path: str, metrics: Optional[Union[str, List]]
 ):
     """
     Evaluate predictor's output using pycocotool's mAP implementation.
@@ -674,7 +674,7 @@ def cocoeval(
     data: pd.DataFrame,
     anno_file: str,
     cache_path: str,
-    metrics: Optional[str, List],
+    metrics: Optional[Union[str, List]],
     tool="pycocotools",
 ):
     """
@@ -810,7 +810,7 @@ def process_voc_annotations(
         f.writelines("\n".join(xml_file_names))
 
 
-def from_coco_or_voc(file_path: str, splits: Optional[str] = None):
+def from_coco_or_voc(file_path: str, splits: Optional[Union[str]] = None):
     """
     Convert the data from coco or voc format to pandas Dataframe.
 
