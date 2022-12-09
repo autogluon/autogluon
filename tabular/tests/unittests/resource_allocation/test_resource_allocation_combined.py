@@ -471,7 +471,6 @@ tests_dict = {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'total_resources': {'num_cpus': 8, 'num_gpus': 2},
                 'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 1},
-                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
                 'num_trials': 2,
                 'num_bag_folds': 2,
                 'expected_answer': {
@@ -486,7 +485,6 @@ tests_dict = {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'total_resources': {'num_cpus': 8, 'num_gpus': 2},
                 'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
-                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
                 'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
                 'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
                 'num_trials': 2,
@@ -503,7 +501,6 @@ tests_dict = {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'total_resources': {'num_cpus': 8, 'num_gpus': 2},
                 'model_minimum_resources': {'num_cpus': 1, 'num_gpus': 0.5},
-                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
                 'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
                 'num_trials': 2,
                 'num_bag_folds': 4,
@@ -519,7 +516,6 @@ tests_dict = {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'total_resources': {'num_cpus': 8, 'num_gpus': 2},
                 'model_minimum_resources': {'num_cpus': 1, 'num_gpus': 0.5},
-                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
                 'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
                 'num_trials': 2,
                 'num_bag_folds': 4,
@@ -534,7 +530,6 @@ tests_dict = {
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
-                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
                 'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
                 'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
                 'num_trials': 2,
@@ -550,7 +545,6 @@ tests_dict = {
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
-                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
                 'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
                 'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
                 'num_trials': 2,
@@ -566,7 +560,6 @@ tests_dict = {
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
-                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
                 'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
                 'num_trials': 2,
                 'num_bag_folds': 4,
@@ -581,13 +574,216 @@ tests_dict = {
             {
                 'system_resources': {'num_cpus': 16, 'num_gpus': 4},
                 'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 1},
-                'model_default_resources': {'num_cpus': 1, 'num_gpus': 0.5},
                 'num_trials': 2,
                 'num_bag_folds': 4,
                 'expected_answer': {
                     'resources_per_trial': {'num_cpus': 16, 'num_gpus': 4},
                     'resources_per_model': {'num_cpus': 4, 'num_gpus': 1},
                     'model_in_parallel': 4  # This is models running in parallel in a bagged model
+                }
+            }
+        ),
+        'hpo_and_sequential_bagging_with_total_resources_and_ag_args_ensemble_and_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'num_bag_folds': 4,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 4, 'num_gpus': 1},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
+                }
+            }
+        ),
+        'hpo_and_sequential_bagging_with_total_resources_and_ag_args_ensemble': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'num_trials': 2,
+                'num_bag_folds': 4,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 4, 'num_gpus': 1},
+                    'resources_per_model': {'num_cpus': 4, 'num_gpus': 1},
+                }
+            }
+        ),
+        'hpo_and_sequential_bagging_with_total_resources_and_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'ag_args_fit': {'num_cpus': 4, 'num_gpus': 1},
+                'num_trials': 2,
+                'num_bag_folds': 4,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'expected_answer': {
+                    # TODO: This is incorrect but doesn't cause big enough issue...
+                    # hpo resource calculator needs to know which folding strategy will be used, which is only being inferred later...
+                    # we calculate parallel folding for now...
+                    'resources_per_trial': {'num_cpus': 8, 'num_gpus': 2},
+                    'resources_per_model': {'num_cpus': 4, 'num_gpus': 1},
+                }
+            }
+        ),
+        'hpo_and_sequential_bagging_with_total_resources': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'model_default_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'num_bag_folds': 4,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'expected_answer': {
+                    # TODO: This is incorrect but doesn't cause big enough issue...
+                    # hpo resource calculator needs to know which folding strategy will be used, which is only being inferred later...
+                    # we calculate parallel folding for now...
+                    'resources_per_trial': {'num_cpus': 8, 'num_gpus': 2},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
+                }
+            }
+        ),
+        'custom_hpo_and_bagging_with_total_resources_and_ag_args_ensemble_and_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'num_bag_folds': 4,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 4, 'num_gpus': 1},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
+                    'model_in_parallel': 2
+                }
+            }
+        ),
+        'custom_hpo_and_bagging_with_total_resources_and_ag_args_ensemble': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'num_bag_folds': 4,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 4, 'num_gpus': 1},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
+                    'model_in_parallel': 2
+                }
+            }
+        ),
+        'custom_hpo_and_bagging_with_total_resources_and_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'ag_args_fit': {'num_cpus': 4, 'num_gpus': 1},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'num_bag_folds': 4,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 8, 'num_gpus': 2},
+                    'resources_per_model': {'num_cpus': 4, 'num_gpus': 1},
+                    'model_in_parallel': 2
+                }
+            }
+        ),
+        'custom_hpo_and_bagging_with_total_resources': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'num_bag_folds': 4,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 8, 'num_gpus': 2},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
+                    'model_in_parallel': 4
+                }
+            }
+        ),
+        'custom_hpo_and_sequential_bagging_with_total_resources_and_ag_args_ensemble_and_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'num_bag_folds': 4,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 4, 'num_gpus': 1},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
+                }
+            }
+        ),
+        'custom_hpo_and_sequential_bagging_with_total_resources_and_ag_args_ensemble': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'num_bag_folds': 4,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 4, 'num_gpus': 1},
+                    'resources_per_model': {'num_cpus': 4, 'num_gpus': 1},
+                }
+            }
+        ),
+        'custom_hpo_and_sequential_bagging_with_total_resources_and_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'ag_args_fit': {'num_cpus': 4, 'num_gpus': 1},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'num_bag_folds': 4,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'expected_answer': {
+                    # TODO: This is incorrect but doesn't cause big enough issue...
+                    # hpo resource calculator needs to know which folding strategy will be used to determine if need to consider num_folds
+                    # but folding strategy is only being decided later...
+                    # we calculate parallel folding for now...
+                    'resources_per_trial': {'num_cpus': 8, 'num_gpus': 2},
+                    'resources_per_model': {'num_cpus': 4, 'num_gpus': 1},
+                }
+            }
+        ),
+        'custom_hpo_and_sequential_bagging_with_total_resources': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'model_minimum_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'model_default_resources': {'num_cpus': 2, 'num_gpus': 0.5},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'num_bag_folds': 4,
+                'fold_strategy_cls': SequentialLocalFoldFittingStrategy,
+                'expected_answer': {
+                    # TODO: This is incorrect but doesn't cause big enough issue...
+                    # hpo resource calculator needs to know which folding strategy will be used to determine if need to consider num_folds
+                    # but folding strategy is only being decided later...
+                    # we calculate parallel folding for now...
+                    'resources_per_trial': {'num_cpus': 8, 'num_gpus': 2},
+                    'resources_per_model': {'num_cpus': 2, 'num_gpus': 0.5},
                 }
             }
         ),

@@ -2,6 +2,7 @@ import copy
 import gc
 import inspect
 import logging
+import math
 import os
 import pickle
 from autogluon.core.utils import try_import
@@ -479,7 +480,10 @@ class AbstractModel:
         else:
             self.normalize_pred_probas = False
             
-    def _process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(self, system_resource, user_specified_ensemble_resource, resource_type, k_fold):
+    def _process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(self, system_resource, user_specified_total_resource, user_specified_ensemble_resource, resource_type, k_fold):
+        if user_specified_total_resource == 'auto':
+            user_specified_total_resource = math.inf
+        
         # retrieve model level requirement when self is bagged model
         user_specified_model_level_resource = self.model_base._user_params_aux.get(resource_type, None)
         if user_specified_model_level_resource is not None:
@@ -487,10 +491,10 @@ class AbstractModel:
         user_specified_lower_level_resource = user_specified_ensemble_resource
         if user_specified_ensemble_resource is not None:
             if user_specified_model_level_resource is not None:
-                user_specified_lower_level_resource = min(user_specified_model_level_resource * k_fold, user_specified_ensemble_resource, system_resource)
+                user_specified_lower_level_resource = min(user_specified_model_level_resource * k_fold, user_specified_ensemble_resource, system_resource, user_specified_total_resource)
         else:
             if user_specified_model_level_resource is not None:
-                user_specified_lower_level_resource = min(user_specified_model_level_resource * k_fold, system_resource)
+                user_specified_lower_level_resource = min(user_specified_model_level_resource * k_fold, system_resource, user_specified_total_resource)
         return user_specified_lower_level_resource
 
     def _preprocess_fit_resources(self, silent=False, total_resources=None, parallel_hpo=False, **kwargs):
@@ -509,6 +513,10 @@ class AbstractModel:
             return kwargs
         system_num_cpus = ResourceManager.get_cpu_count()
         system_num_gpus = ResourceManager.get_gpu_count_all()
+        if total_resources is None:
+            total_resources = {}
+        num_cpus = total_resources.get('num_cpus', 'auto')
+        num_gpus = total_resources.get('num_gpus', 'auto')
         default_num_cpus, default_num_gpus = self._get_default_resources()
         # This could be resource requirement for bagged model or individual model
         user_specified_lower_level_num_cpus = self._user_params_aux.get('num_cpus', None)
@@ -525,20 +533,18 @@ class AbstractModel:
             default_num_gpus = system_num_gpus
             user_specified_lower_level_num_cpus = self._process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(
                 system_resource=system_num_cpus,
+                user_specified_total_resource=num_cpus,
                 user_specified_ensemble_resource=user_specified_lower_level_num_cpus,
                 resource_type='num_cpus',
                 k_fold=k_fold
             )
             user_specified_lower_level_num_gpus = self._process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(
                 system_resource=system_num_gpus,
+                user_specified_total_resource=num_gpus,
                 user_specified_ensemble_resource=user_specified_lower_level_num_gpus,
                 resource_type='num_gpus',
                 k_fold=k_fold
             )
-        if total_resources is None:
-            total_resources = {}
-        num_cpus = total_resources.get('num_cpus', 'auto')
-        num_gpus = total_resources.get('num_gpus', 'auto')
         if num_cpus != 'auto' and num_cpus > system_num_cpus:
             logger.warning(f'Specified total num_cpus: {num_cpus}, but only {system_num_cpus} are available. Will use {system_num_cpus} instead')
             num_cpus = system_num_cpus
