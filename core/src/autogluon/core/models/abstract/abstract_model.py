@@ -493,7 +493,7 @@ class AbstractModel:
                 user_specified_lower_level_resource = min(user_specified_model_level_resource * k_fold, system_resource)
         return user_specified_lower_level_resource
 
-    def _preprocess_fit_resources(self, silent=False, total_resources=None, hpo=False, **kwargs):
+    def _preprocess_fit_resources(self, silent=False, total_resources=None, parallel_hpo=False, **kwargs):
         """
         This function should be called to process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
@@ -547,33 +547,33 @@ class AbstractModel:
             num_gpus = system_num_gpus
         if num_cpus == 'auto':
             if user_specified_lower_level_num_cpus is not None:
-                if not hpo:
+                if not parallel_hpo:
                     num_cpus = user_specified_lower_level_num_cpus
                 else:
                     num_cpus = system_num_cpus
             else:
-                if not hpo:
+                if not parallel_hpo:
                     num_cpus = default_num_cpus
                 else:
                     num_cpus = system_num_cpus
         else:
-            if not hpo:
+            if not parallel_hpo:
                 if user_specified_lower_level_num_cpus is not None:
                     assert user_specified_lower_level_num_cpus <= num_cpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total specified: {num_cpus}'
                     num_cpus = user_specified_lower_level_num_cpus
         if num_gpus == 'auto':
             if user_specified_lower_level_num_gpus is not None:
-                if not hpo:
+                if not parallel_hpo:
                     num_gpus = user_specified_lower_level_num_gpus
                 else:
                     num_gpus = system_num_gpus if user_specified_lower_level_num_gpus > 0 else 0
             else:
-                if not hpo:
+                if not parallel_hpo:
                     num_gpus = default_num_gpus
                 else:
                     num_gpus = system_num_gpus if default_num_gpus > 0 else 0
         else:
-            if not hpo:
+            if not parallel_hpo:
                 if user_specified_lower_level_num_gpus is not None:
                     assert user_specified_lower_level_num_gpus <= num_gpus, f'Specified num_gpus per {self.__class__.__name__} is more than the total specified: {num_gpus}'
                     num_gpus = user_specified_lower_level_num_gpus
@@ -1233,7 +1233,7 @@ class AbstractModel:
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
-        kwargs = self._preprocess_fit_resources(hpo=True, **kwargs)
+        kwargs = self._preprocess_fit_resources(parallel_hpo=hpo_executor.executor_type=='ray', **kwargs)
         self.validate_fit_resources(**kwargs)
         hpo_executor.register_resources(self, **kwargs)
         return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)

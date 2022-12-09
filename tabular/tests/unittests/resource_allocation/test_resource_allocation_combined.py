@@ -3,7 +3,7 @@ import pytest
 import pandas as pd
 import time
 
-from autogluon.core.hpo.executors import RayHpoExecutor
+from autogluon.core.hpo.executors import RayHpoExecutor, CustomHpoExecutor
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy, SequentialLocalFoldFittingStrategy
 from autogluon.tabular.models import AbstractModel
@@ -121,8 +121,10 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
     num_bag_folds = test_args.get('num_bag_folds', 0)
     fold_strategy_cls = test_args.get('fold_strategy_cls', ParallelLocalFoldFittingStrategy)
     num_trials = test_args.get('num_trials', 0)
+    executor_cls = test_args.get('executor_cls', RayHpoExecutor)
     expected_answer = test_args.get('expected_answer')
     hpo = num_trials > 0
+    parallel_hpo = (hpo and executor_cls == RayHpoExecutor )
     with mock_system_resources_ctx_mgr(num_cpus=system_resources.get('num_cpus'), num_gpus=system_resources.get('num_gpus')):
         model = DummyModel(
             minimum_resources=model_minimum_resources,
@@ -136,7 +138,7 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
                 hyperparameters={'ag_args_fit': ag_args_ensemble}
             )
             model.initialize()
-        resources = model._preprocess_fit_resources(total_resources=total_resources, k_fold=num_bag_folds, hpo=hpo)
+        resources = model._preprocess_fit_resources(total_resources=total_resources, k_fold=num_bag_folds, parallel_hpo=parallel_hpo)
         resources.pop('k_fold')
         if hpo:
             hyperparameter_tune_kwargs = {
@@ -144,7 +146,7 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
                 'searcher': 'random',
                 'num_trials': num_trials
             }
-            executor = _initialize_executor(RayHpoExecutor, hyperparameter_tune_kwargs)
+            executor = _initialize_executor(executor_cls, hyperparameter_tune_kwargs)
             executor.register_resources(model, k_fold=num_bag_folds, X=dummy_x, **resources)
             resources_per_trial = executor.hyperparameter_tune_kwargs['resources_per_trial']
             assert resources_per_trial == expected_answer['resources_per_trial']
@@ -389,6 +391,78 @@ tests_dict = {
                 'num_trials': 2,
                 'expected_answer': {
                     'resources_per_trial': {'num_cpus': 8, 'num_gpus': 2}
+                }
+            }
+        ),
+        'custom_hpo_with_total_resources_and_ag_args_ensemble_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_ensemble': {'num_cpus': 4, 'num_gpus': 1},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 2, 'num_gpus': 1}
+                }
+            }
+        ),
+        'custom_hpo_with_total_resources_and_ag_args_ensemble': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_ensemble': {'num_cpus': 2, 'num_gpus': 1},
+                'model_default_resources': {'num_cpus': 2, 'num_gpus': 1},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 8, 'num_gpus': 2}  # ag_args_ensemble shouldn't affect hpo without bagging
+                }
+            }
+        ),
+        'custom_hpo_with_total_resources_and_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'total_resources': {'num_cpus': 8, 'num_gpus': 2},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 2, 'num_gpus': 1}
+                }
+            }
+        ),
+        'custom_hpo_with_ag_args_ensemble': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_ensemble': {'num_cpus': 2, 'num_gpus': 1},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 1},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 1, 'num_gpus': 1}  # ag_args_ensemble shouldn't affect hpo without bagging
+                }
+            }
+        ),
+        'custom_hpo_with_ag_args_fit': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'ag_args_fit': {'num_cpus': 2, 'num_gpus': 1},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 2, 'num_gpus': 1}
+                }
+            }
+        ),
+        'custom_hpo_without_anything': (
+            {
+                'system_resources': {'num_cpus': 16, 'num_gpus': 4},
+                'model_default_resources': {'num_cpus': 1, 'num_gpus': 1},
+                'num_trials': 2,
+                'executor_cls': CustomHpoExecutor,
+                'expected_answer': {
+                    'resources_per_trial': {'num_cpus': 1, 'num_gpus': 1}
                 }
             }
         ),

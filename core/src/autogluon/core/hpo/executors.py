@@ -208,9 +208,12 @@ class HpoExecutor(ABC):
                 gpu_per_trial = num_gpus // num_trials_in_parallel
             else:
                 num_trials = self.hyperparameter_tune_kwargs.get('num_trials', math.inf)
+                if self.executor_type == 'custom':
+                    # custom backend runs sequentially
+                    num_jobs_in_parallel = 1
                 cpu_per_trial = int(num_cpus // min(num_jobs_in_parallel, num_trials))
                 gpu_per_trial = num_gpus / min(num_jobs_in_parallel, num_trials)
-
+                
             self.hyperparameter_tune_kwargs['resources_per_trial'] = {
                 'num_cpus': cpu_per_trial,
                 'num_gpus': gpu_per_trial
