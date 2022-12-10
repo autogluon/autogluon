@@ -1,11 +1,11 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 import phik  # noqa - required for significance_matrix instrumentation on pandas dataframes
 
 from .base import AbstractAnalysis
 from .. import AnalysisState
 
-__all__ = ["Correlation", "CorrelationSignificance"]
+__all__ = ["Correlation", "CorrelationSignificance", "FeatureInteraction"]
 
 
 class Correlation(AbstractAnalysis):
@@ -109,3 +109,50 @@ class CorrelationSignificance(AbstractAnalysis):
             state.significance_matrix[ds] = df[state.correlations[ds].columns].significance_matrix(
                 **self.args, verbose=False
             )
+
+
+class FeatureInteraction(AbstractAnalysis):
+    def __init__(
+        self,
+        x: Optional[str] = None,
+        y: Optional[str] = None,
+        hue: Optional[str] = None,
+        key: Optional[str] = None,
+        parent: Optional[AbstractAnalysis] = None,
+        children: Optional[List[AbstractAnalysis]] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(parent, children, **kwargs)
+        self.x = x
+        self.y = y
+        self.hue = hue
+        self.key = key
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return self.all_keys_must_be_present(state, "raw_type")
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+        cols = {
+            "x": self.x,
+            "y": self.y,
+            "hue": self.hue,
+        }
+
+        if self.key is None:
+            # if key is not provided, then convert to form: 'x:A|y:B|hue:C'; if values is not provided, then skip the value
+            self.key = "|".join([f"{k}:{v}" for k, v in {k: cols[k] for k in cols.keys()}.items() if v is not None])
+        cols = {k: v for k, v in cols.items() if v is not None}
+
+        interactions: Dict[str, Dict[str, Any]] = state.get("interactions", {})
+        for (ds, df) in self.available_datasets(args):
+            missing_cols = [c for c in cols.values() if c not in df.columns]
+            if len(missing_cols) == 0:
+                df = df[cols.values()]
+                interaction = {
+                    "features": cols,
+                    "data": df,
+                }
+                if ds not in interactions:
+                    interactions[ds] = {}
+                interactions[ds][self.key] = interaction
+        state.interactions = interactions

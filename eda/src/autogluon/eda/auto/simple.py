@@ -1,26 +1,30 @@
 import logging
 from typing import Union, List, Optional
 
+from autogluon.common.utils.log_utils import verbosity2loglevel
 from .. import AnalysisState
+from ..analysis import FeatureInteraction
 from ..analysis.base import BaseAnalysis, AbstractAnalysis
-from ..analysis.dataset import Sampler
+from ..analysis.dataset import Sampler, RawTypesAnalysis
+from ..visualization import FeatureInteractionVisualization
 from ..visualization.base import AbstractVisualization
 from ..visualization.layouts import SimpleVerticalLinearLayout
-from autogluon.common.utils.log_utils import verbosity2loglevel
+
+__all__ = ["analyze", "analyze_interaction"]
 
 
 def analyze(
-    train_data=None,
-    test_data=None,
-    val_data=None,
-    model=None,
-    label: Optional[str] = None,
-    state: Union[None, dict, AnalysisState] = None,
-    sample: Union[None, int, float] = None,
-    anlz_facets: Optional[List[AbstractAnalysis]] = None,
-    viz_facets: Optional[List[AbstractVisualization]] = None,
-    return_state: bool = False,
-    verbosity: int = 2,
+        train_data=None,
+        test_data=None,
+        val_data=None,
+        model=None,
+        label: Optional[str] = None,
+        state: Union[None, dict, AnalysisState] = None,
+        sample: Union[None, int, float] = None,
+        anlz_facets: Optional[List[AbstractAnalysis]] = None,
+        viz_facets: Optional[List[AbstractVisualization]] = None,
+        return_state: bool = False,
+        verbosity: int = 2,
 ):
     """
     This helper creates `BaseAnalysis` wrapping passed analyses into
@@ -103,3 +107,13 @@ def analyze(
 
     if return_state:
         return state
+
+
+def analyze_interaction(x=None, y=None, hue=None, viz_args={}, fig_args={}, **analysis_args):
+    key = '__analysis__'
+    analyze(**analysis_args, anlz_facets=[
+        RawTypesAnalysis(),
+        FeatureInteraction(key=key, x=x, y=y, hue=hue),
+    ], viz_facets=[
+        FeatureInteractionVisualization(key=key, fig_args=fig_args, **viz_args),
+    ])
