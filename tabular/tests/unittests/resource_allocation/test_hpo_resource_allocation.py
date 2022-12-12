@@ -8,12 +8,18 @@ from autogluon.tabular.models import AbstractModel
 
 class DummyBaseModel(AbstractModel):
     
-    def __init__(self, minimum_resources={}, **kwargs):
+    def __init__(self, minimum_resources=None, default_resources=None, **kwargs):
         self._minimum_resources = minimum_resources
+        self._default_resources = default_resources
         super().__init__(**kwargs)
         
     def get_minimum_resources(self, **kwargs):
         return self._minimum_resources
+    
+    def _get_default_resources(self):
+        num_cpus = self._default_resources.get('num_cpus')
+        num_gpus = self._default_resources.get('num_gpus')
+        return num_cpus, num_gpus
 
 
 class DummyModel(DummyBaseModel):
@@ -445,5 +451,9 @@ def test_hpo_without_bagging_no_resources_per_trial(executor_cls):
     )
     model.initialize()
     executor.register_resources(model, X=dummy_x, **total_resources)
-    # 4 trials in parallel, each using 1 cpu and 0.25 gpus(the maximum possible)
-    assert executor.hyperparameter_tune_kwargs['resources_per_trial'] == {'num_cpus': 2, 'num_gpus': 0.25}
+    if executor_cls == RayHpoExecutor:
+        # 4 trials in parallel, each using 1 cpu and 0.25 gpus(the maximum possible)
+        assert executor.hyperparameter_tune_kwargs['resources_per_trial'] == {'num_cpus': 2, 'num_gpus': 0.25}
+    elif executor_cls == CustomHpoExecutor:
+        # custom backend use all resources for one trial
+        assert executor.hyperparameter_tune_kwargs['resources_per_trial'] == {'num_cpus': 8, 'num_gpus': 1}
