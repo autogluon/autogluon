@@ -21,7 +21,7 @@ def default():
         ],
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-        "model.ner_text.checkpoint_name": "google/electra-base-discriminator",
+        "model.ner_text.checkpoint_name": "microsoft/deberta-v3-base",
         "env.num_workers": 2,
     }
 
@@ -40,7 +40,7 @@ def medium_quality_faster_train():
         ],
         "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
         "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
-        "model.ner_text.checkpoint_name": "google/electra-small-discriminator",
+        "model.ner_text.checkpoint_name": "microsoft/deberta-v3-small",
         "optimization.learning_rate": 4e-4,
         "env.num_workers": 2,
     }
