@@ -1,5 +1,5 @@
 import logging
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Dict, Any
 
 from autogluon.common.utils.log_utils import verbosity2loglevel
 from .. import AnalysisState
@@ -14,17 +14,17 @@ __all__ = ["analyze", "analyze_interaction"]
 
 
 def analyze(
-        train_data=None,
-        test_data=None,
-        val_data=None,
-        model=None,
-        label: Optional[str] = None,
-        state: Union[None, dict, AnalysisState] = None,
-        sample: Union[None, int, float] = None,
-        anlz_facets: Optional[List[AbstractAnalysis]] = None,
-        viz_facets: Optional[List[AbstractVisualization]] = None,
-        return_state: bool = False,
-        verbosity: int = 2,
+    train_data=None,
+    test_data=None,
+    val_data=None,
+    model=None,
+    label: Optional[str] = None,
+    state: Union[None, dict, AnalysisState] = None,
+    sample: Union[None, int, float] = None,
+    anlz_facets: Optional[List[AbstractAnalysis]] = None,
+    viz_facets: Optional[List[AbstractVisualization]] = None,
+    return_state: bool = False,
+    verbosity: int = 2,
 ):
     """
     This helper creates `BaseAnalysis` wrapping passed analyses into
@@ -109,11 +109,45 @@ def analyze(
         return state
 
 
-def analyze_interaction(x=None, y=None, hue=None, viz_args={}, fig_args={}, **analysis_args):
-    key = '__analysis__'
-    analyze(**analysis_args, anlz_facets=[
-        RawTypesAnalysis(),
-        FeatureInteraction(key=key, x=x, y=y, hue=hue),
-    ], viz_facets=[
-        FeatureInteractionVisualization(key=key, fig_args=fig_args, **viz_args),
-    ])
+def analyze_interaction(
+    x: Optional[str] = None,
+    y: Optional[str] = None,
+    hue: Optional[str] = None,
+    viz_args: Optional[Dict[str, Any]] = None,
+    fig_args: Optional[Dict[str, Any]] = None,
+    **analysis_args,
+):
+    """
+    This helper performs simple feature interaction analysis.
+
+    Parameters
+    ----------
+    x: Optional[str], default = None
+    y: Optional[str], default = None
+    hue: Optional[str], default = None
+    viz_args: Optional[dict], default = None
+    fig_args: Optional[Dict[str, Any]], default = None,
+        kwargs to pass into chart figure
+    analysis_args
+
+    Returns
+    -------
+
+    """
+    if viz_args is None:
+        viz_args = {}
+
+    if fig_args is None:
+        fig_args = {}
+
+    key = "__analysis__"
+    analyze(
+        **analysis_args,
+        anlz_facets=[
+            RawTypesAnalysis(),
+            FeatureInteraction(key=key, x=x, y=y, hue=hue),
+        ],
+        viz_facets=[
+            FeatureInteractionVisualization(key=key, fig_args=fig_args, **viz_args),
+        ],
+    )

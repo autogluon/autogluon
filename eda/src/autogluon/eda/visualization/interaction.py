@@ -1,5 +1,5 @@
-from abc import ABC
-from typing import Dict, Any, Optional
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional, Type
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,7 +7,7 @@ import pandas as pd
 import seaborn as sns
 from scipy import stats
 
-from autogluon.common.features.types import *
+from autogluon.common.features.types import R_OBJECT, R_CATEGORY, R_BOOL, R_INT, R_FLOAT
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
 from ..state import AnalysisState
@@ -71,7 +71,7 @@ class CorrelationVisualization(_AbstractCorrelationChart):
         if `True` then render headers
     namespace: str, default = None
         namespace to use; can be nested like `ns_a.ns_b.ns_c`
-    fig_args: Optional[Dict[str, Any]] = None,
+    fig_args: Optional[Dict[str, Any]], default = None,
         kwargs to pass into chart figure
 
     See Also
@@ -85,6 +85,17 @@ class CorrelationVisualization(_AbstractCorrelationChart):
     def _render(self, state: AnalysisState) -> None:
         args = {"vmin": 0 if state.correlations_method == "phik" else -1, "vmax": 1, "center": 0, "cmap": "Spectral"}
         self._render_internal(state, "correlations", "correlation matrix", args)
+
+
+class _AbstractFeatureInteractionPlotRenderer(ABC):
+    @abstractmethod
+    def _render(self, state, ds, params, param_types, ax, data, chart_args):
+        raise NotImplementedError
+
+    def render(self, state, ds, params, param_types, data, fig_args, chart_args):
+        fig, ax = plt.subplots(**fig_args)
+        self._render(state, ds, params, param_types, ax, data, chart_args)
+        plt.show(fig)
 
 
 class CorrelationSignificanceVisualization(_AbstractCorrelationChart):
@@ -140,77 +151,115 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
     def can_handle(self, state: AnalysisState) -> bool:
         return self.all_keys_must_be_present(state, "interactions", "raw_type")
 
-    def __get(self, ds, df, state, interaction, param):
-        value = interaction["features"].get(param, None)
-        value_type = map_raw_type_to_feature_type(
-            value, state.raw_type[ds].get(value, None), df, self.numeric_as_categorical_threshold
-        )
-        return value, value_type
-
     def _render(self, state: AnalysisState) -> None:
         for ds in state.interactions.keys():
             if self.key not in state.interactions[ds]:
                 continue
             interaction = state.interactions[ds][self.key]
+            interaction_features = interaction["features"]
             df = interaction["data"].copy()
-            x, x_type = self.__get(ds, df, state, interaction, "x")
-            y, y_type = self.__get(ds, df, state, interaction, "y")
-            hue, hue_type = self.__get(ds, df, state, interaction, "hue")
+            x, x_type = self._get_value_and_type(ds, df, state, interaction_features, "x")
+            y, y_type = self._get_value_and_type(ds, df, state, interaction_features, "y")
+            hue, hue_type = self._get_value_and_type(ds, df, state, interaction_features, "hue")
 
             # swap y <-> hue when category vs category to enable charting
             if (x_type is not None) and y_type == "category" and hue is None:
                 hue, hue_type = y, y_type
                 y, y_type = None, None
 
-            chart_type = self._get_chart_type(x_type, y_type, hue_type)
-            if chart_type is not None:
-                chart_args = {
-                    "x": x,
-                    "y": y,
-                    "hue": hue,
-                    **self._kwargs.get(self.key, {}),
-                }
-                chart_args = {k: v for k, v in chart_args.items() if v is not None}
-                if chart_type != "kdeplot":
-                    chart_args.pop("fill", None)
-                if chart_type == "barplot":
-                    # Don't show ci ticks
-                    chart_args["ci"] = None
+            renderer: Optional[Type[_AbstractFeatureInteractionPlotRenderer]] = self._get_chart_renderer(
+                x_type, y_type, hue_type
+            )
+            if renderer is None:
+                return
+            renderer: _AbstractFeatureInteractionPlotRenderer = renderer()  # Create instance
+            chart_args = {"x": x, "y": y, "hue": hue, **self._kwargs.get(self.key, {})}
 
-                fig, ax = plt.subplots(**self.fig_args.get(self.key, {}))
+            # convert to categoricals for plots
+            for col, typ in zip([x, y, hue], [x_type, y_type, hue_type]):
+                if typ == "category":
+                    df[col] = df[col].astype("object")
 
-                # convert to categoricals for plots
-                for col, typ in zip([x, y, hue], [x_type, y_type, hue_type]):
-                    if typ == "category":
-                        df[col] = df[col].astype("object")
+            chart_args = {k: v for k, v in chart_args.items() if v is not None}
+            data = df
+            single_var = False
+            if y is None and hue is None:
+                single_var = True
+                if x_type == "numeric":
+                    data = df[x]
+                    chart_args.pop("x")
+            elif x is None and hue is None:
+                single_var = True
+                if y_type == "numeric":
+                    data = df[y]
+                    chart_args.pop("y")
 
-                data = df
-                single_var = False
-                if y is None and hue is None:
-                    single_var = True
-                    if x_type == "numeric":
-                        data = df[x]
-                        chart_args.pop("x")
-                elif x is None and hue is None:
-                    single_var = True
-                    if y_type == "numeric":
-                        data = df[y]
-                        chart_args.pop("y")
+            if self.headers:
+                features = "/".join([interaction_features[k] for k in ["x", "y", "hue"] if k in interaction_features])
+                prefix = "" if single_var else "Feature interaction between "
+                self.render_header_if_needed(state, f"{prefix}{features} in {ds}")
 
-                # Handling fitted distributions if present
-                dists = None
-                if (
-                    (chart_type == "histplot")
-                    and ("distributions_fit" in state)
-                    and ((x_type, y_type, hue_type) == ("numeric", None, None))
-                ):
-                    chart_args["stat"] = "density"
-                    dists = state.distributions_fit[ds][x]
+            renderer.render(
+                state=state,
+                ds=ds,
+                params=(x, y, hue),
+                param_types=(x_type, y_type, hue_type),
+                data=data,
+                fig_args=self.fig_args.get(self.key, {}),
+                chart_args=chart_args,
+            )
 
-                chart = self._get_sns_chart_method(chart_type)(ax=ax, data=data, **chart_args)
-                if chart_type in ("countplot", "barplot", "boxplot"):
-                    plt.setp(chart.get_xticklabels(), rotation=90)
+    def _get_value_and_type(self, ds, df, state, interaction_features, param) -> [Any, Optional[str]]:
+        value = interaction_features.get(param, None)
+        value_type = self._map_raw_type_to_feature_type(
+            value, state.raw_type[ds].get(value, None), df, self.numeric_as_categorical_threshold
+        )
+        return value, value_type
 
+    def _get_chart_renderer(
+        self, x_type: str, y_type: str, hue_type: Optional[str]
+    ) -> Optional[Type[_AbstractFeatureInteractionPlotRenderer]]:
+        types = {
+            ("numeric", None, None): self._HistPlotRenderer,
+            ("category", None, None): self._CountPlotRenderer,
+            (None, "category", None): self._CountPlotRenderer,
+            ("category", None, "category"): self._CountPlotRenderer,
+            (None, "category", "category"): self._CountPlotRenderer,
+            ("numeric", None, "category"): self._HistPlotRenderer,
+            (None, "numeric", "category"): self._HistPlotRenderer,
+            ("category", "category", None): self._BarPlotRenderer,
+            ("category", "category", "category"): self._BarPlotRenderer,
+            ("category", "numeric", None): self._BoxPlotRenderer,
+            ("numeric", "category", None): self._KdePlotRenderer,
+            ("category", "numeric", "category"): self._BoxPlotRenderer,
+            ("numeric", "category", "category"): self._KdePlotRenderer,
+            ("numeric", "numeric", None): self._RegPlotRenderer,
+            ("numeric", "numeric", "category"): self._ScatterPlotRenderer,
+        }
+        return types.get((x_type, y_type, hue_type), None)
+
+    def _map_raw_type_to_feature_type(
+        self, col: str, raw_type: str, series: pd.DataFrame, numeric_as_categorical_threshold: int = 20
+    ) -> Optional[str]:
+        if col is None:
+            return None
+        elif series[col].nunique() <= numeric_as_categorical_threshold:
+            return "category"
+        elif raw_type in [R_INT, R_FLOAT]:
+            return "numeric"
+        elif raw_type in [R_OBJECT, R_CATEGORY, R_BOOL]:
+            return "category"
+        else:
+            return None
+
+    class _HistPlotRenderer(_AbstractFeatureInteractionPlotRenderer):
+        def _render(self, state, ds, params, param_types, ax, data, chart_args):
+            sns.histplot(ax=ax, data=data, **chart_args)
+            x, _, _ = params
+            # Handling fitted distributions if present
+            if ("distributions_fit" in state) and (param_types == ("numeric", None, None)):  # types for  x, y, hue
+                chart_args["stat"] = "density"
+                dists = state.distributions_fit[ds][x]
                 if dists is not None:
                     x_min, x_max = ax.get_xlim()
                     xs = np.linspace(x_min, x_max, 200)
@@ -226,58 +275,34 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                     ax.set_xlim(x_min, x_max)  # set the limits back to the ones of the distplot
                     plt.legend()
 
-                if chart_type == "countplot":
-                    for container in ax.containers:
-                        ax.bar_label(container)
+    class _KdePlotRenderer(_AbstractFeatureInteractionPlotRenderer):
+        def _render(self, state, ds, params, param_types, ax, data, chart_args):
+            chart_args.pop("fill", None)
+            chart = sns.kdeplot(ax=ax, data=data, **chart_args)
+            plt.setp(chart.get_xticklabels(), rotation=90)
 
-                if self.headers:
-                    features = "/".join([interaction["features"][k] for k in ["x", "y", "hue"] if k in interaction["features"]])
-                    prefix = "" if single_var else "Feature interaction between "
-                    self.render_header_if_needed(state, f"{prefix}{features} in {ds}")
-                plt.show(fig)
+    class _BoxPlotRenderer(_AbstractFeatureInteractionPlotRenderer):
+        def _render(self, state, ds, params, param_types, ax, data, chart_args):
+            chart = sns.boxplot(ax=ax, data=data, **chart_args)
+            plt.setp(chart.get_xticklabels(), rotation=90)
 
-    def _get_sns_chart_method(self, chart_type):
-        return {
-            "countplot": sns.countplot,
-            "barplot": sns.barplot,
-            "boxplot": sns.boxplot,
-            "kdeplot": sns.kdeplot,
-            "scatterplot": sns.scatterplot,
-            "regplot": sns.regplot,
-            "histplot": sns.histplot,
-        }.get(chart_type)
+    class _CountPlotRenderer(_AbstractFeatureInteractionPlotRenderer):
+        def _render(self, state, ds, params, param_types, ax, data, chart_args):
+            chart = sns.countplot(ax=ax, data=data, **chart_args)
+            plt.setp(chart.get_xticklabels(), rotation=90)
+            for container in ax.containers:
+                ax.bar_label(container)
 
-    def _get_chart_type(self, x_type: str, y_type: str, hue_type: Optional[str]) -> Optional[str]:
-        types = {
-            ("numeric", None, None): "histplot",
-            ("category", None, None): "countplot",
-            (None, "category", None): "countplot",
-            ("category", None, "category"): "countplot",
-            (None, "category", "category"): "countplot",
-            ("numeric", None, "category"): "histplot",
-            (None, "numeric", "category"): "histplot",
-            ("category", "category", None): "barplot",
-            ("category", "category", "category"): "barplot",
-            ("category", "numeric", None): "boxplot",
-            ("numeric", "category", None): "kdeplot",
-            ("category", "numeric", "category"): "boxplot",
-            ("numeric", "category", "category"): "kdeplot",
-            ("numeric", "numeric", None): "regplot",
-            ("numeric", "numeric", "category"): "scatterplot",
-        }
-        return types.get((x_type, y_type, hue_type), None)
+    class _BarPlotRenderer(_AbstractFeatureInteractionPlotRenderer):
+        def _render(self, state, ds, params, param_types, ax, data, chart_args):
+            chart_args["ci"] = None  # Don't show ci ticks
+            chart = sns.barplot(ax=ax, data=data, **chart_args)
+            plt.setp(chart.get_xticklabels(), rotation=90)
 
+    class _ScatterPlotRenderer(_AbstractFeatureInteractionPlotRenderer):
+        def _render(self, state, ds, params, param_types, ax, data, chart_args):
+            sns.scatterplot(ax=ax, data=data, **chart_args)
 
-def map_raw_type_to_feature_type(
-    col: str, raw_type: str, series: pd.DataFrame, numeric_as_categorical_threshold: int = 20
-) -> Optional[str]:
-    if col is None:
-        return None
-    elif series[col].nunique() <= numeric_as_categorical_threshold:
-        return "category"
-    elif raw_type in [R_INT, R_FLOAT]:
-        return "numeric"
-    elif raw_type in [R_OBJECT, R_CATEGORY, R_BOOL]:
-        return "category"
-    else:
-        return None
+    class _RegPlotRenderer(_AbstractFeatureInteractionPlotRenderer):
+        def _render(self, state, ds, params, param_types, ax, data, chart_args):
+            sns.regplot(ax=ax, data=data, **chart_args)
