@@ -286,3 +286,7 @@ def mock_num_cpus():
 @pytest.fixture
 def mock_num_gpus():
     return 2
+
+@pytest.fixture
+def k_fold():
+    return 2
