@@ -167,7 +167,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
     @property
     def ner_feature_names(self):
-        return self._ner_feature_names
+        return self._ner_feature_names if hasattr(self, "_ner_feature_names") else []
 
     @property
     def required_feature_names(self):
