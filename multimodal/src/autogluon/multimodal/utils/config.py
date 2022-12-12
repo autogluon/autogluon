@@ -485,7 +485,9 @@ def update_config_by_rules(
     if problem_type == NER:
         if FUSION_MLP in config.model.names:
             config.model.names.remove(FUSION_MLP)
-        config.model.names.append(FUSION_NER)
+    else:
+        if FUSION_NER in config.model.names:
+            config.model.names.remove(FUSION_NER)
 
     return config
 
