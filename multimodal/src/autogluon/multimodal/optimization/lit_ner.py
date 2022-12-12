@@ -9,7 +9,7 @@ from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
-from ..constants import AUTOMM, LM_TARGET, LOGITS, T_FEW, TEMPLATE_LOGITS, WEIGHT
+from ..constants import AUTOMM, FUSION_NER, LM_TARGET, LOGITS, NER_TEXT, T_FEW, TEMPLATE_LOGITS, WEIGHT
 from ..data.mixup import MixupModule, multimodel_mixup
 from .lit_module import LitModule
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
@@ -139,18 +139,19 @@ class NerLitModule(LitModule):
         label: torch.Tensor,
     ):
         loss = 0
-        for _, per_output in output.items():
-            weight = per_output[WEIGHT] if WEIGHT in per_output else 1
-            active_loss = label.view(-1) != 0
-            active_logits = per_output[LOGITS].view(-1, self.model.num_classes)[active_loss]
-            active_labels = label.view(-1)[active_loss]
-            loss += (
-                self.loss_func(
-                    input=active_logits,
-                    target=active_labels,
+        for prefix, per_output in output.items():
+            if prefix == NER_TEXT or prefix == FUSION_NER:
+                weight = per_output[WEIGHT] if WEIGHT in per_output else 1
+                active_loss = label.view(-1) != 0
+                active_logits = per_output[LOGITS].view(-1, self.model.num_classes)[active_loss]
+                active_labels = label.view(-1)[active_loss]
+                loss += (
+                    self.loss_func(
+                        input=active_logits,
+                        target=active_labels,
+                    )
+                    * weight
                 )
-                * weight
-            )
         return loss
 
     def validation_step(self, batch, batch_idx):

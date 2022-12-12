@@ -220,8 +220,8 @@ def create_fusion_data_processors(
                 )
             )
             requires_label = False
-            if data_types is not None and TEXT in data_types:
-                data_types.remove(TEXT)
+            if data_types is not None and NER in data_types:
+                data_types.remove(NER)
 
         if requires_label:
             # each model has its own label processor
@@ -243,6 +243,9 @@ def create_fusion_data_processors(
 
     # Only keep the modalities with non-empty processors.
     data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
+
+    if NER in data_processors:
+        data_processors[LABEL] = []
     return data_processors
 
 

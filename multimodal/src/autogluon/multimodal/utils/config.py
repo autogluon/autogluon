@@ -10,6 +10,8 @@ from torch import nn
 from ..constants import (
     AUTOMM,
     CATEGORICAL_TRANSFORMER,
+    FUSION_MLP,
+    FUSION_NER,
     FUSION_TRANSFORMER,
     HF_MODELS,
     NER,
@@ -481,7 +483,10 @@ def update_config_by_rules(
                 UserWarning,
             )
     if problem_type == NER:
-        config.model.names = [NER_TEXT]
+        if FUSION_MLP in config.model.names:
+            config.model.names.remove(FUSION_MLP)
+        config.model.names.append(FUSION_NER)
+
     return config
 
 
