@@ -22,7 +22,7 @@ from ..constants import (
     TOKEN_WORD_MAPPING,
     WORD_OFFSETS,
 )
-from .collator import Pad, Stack
+from .collator import PadCollator, StackCollator
 from .template_engine import TemplateEngine
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config, normalize_txt, register_encoding_decoding_error_handlers
@@ -233,14 +233,14 @@ class TextProcessor:
         if self.requires_column_info:
             assert text_column_names, "Empty text column names."
             for col_name in text_column_names:
-                fn[f"{self.text_column_prefix}_{col_name}"] = Stack()
+                fn[f"{self.text_column_prefix}_{col_name}"] = StackCollator()
 
         fn.update(
             {
-                self.text_token_ids_key: Pad(pad_val=self.tokenizer.pad_token_id),
-                self.text_valid_length_key: Stack(),
-                self.text_segment_ids_key: Pad(pad_val=0),
-                self.choices_ids_key: Pad(pad_val=0),
+                self.text_token_ids_key: PadCollator(pad_val=self.tokenizer.pad_token_id),
+                self.text_valid_length_key: StackCollator(),
+                self.text_segment_ids_key: PadCollator(pad_val=0),
+                self.choices_ids_key: PadCollator(pad_val=0),
             }
         )
 
