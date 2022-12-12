@@ -640,6 +640,7 @@ def cocoeval_torchmetrics(outputs):
 
 
 def cocoeval_pycocotools(outputs, data, anno_file, cache_path, metrics):
+    try_import_pycocotools()
     from pycocotools.coco import COCO
     from pycocotools.cocoeval import COCOeval
 

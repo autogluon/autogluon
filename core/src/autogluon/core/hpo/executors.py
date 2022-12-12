@@ -194,7 +194,6 @@ class HpoExecutor(ABC):
             if minimum_model_num_gpus > 0:
                 num_jobs_in_parallel_with_gpu = num_gpus // minimum_model_num_gpus
             num_jobs_in_parallel = min(num_jobs_in_parallel_with_mem, num_jobs_in_parallel_with_cpu, num_jobs_in_parallel_with_gpu)
-
             if model_base != initialized_model:
                 # bagged model
                 if num_jobs_in_parallel // k_fold < 1:
@@ -209,9 +208,12 @@ class HpoExecutor(ABC):
                 gpu_per_trial = num_gpus // num_trials_in_parallel
             else:
                 num_trials = self.hyperparameter_tune_kwargs.get('num_trials', math.inf)
+                if self.executor_type == 'custom':
+                    # custom backend runs sequentially
+                    num_jobs_in_parallel = 1
                 cpu_per_trial = int(num_cpus // min(num_jobs_in_parallel, num_trials))
                 gpu_per_trial = num_gpus / min(num_jobs_in_parallel, num_trials)
-
+                
             self.hyperparameter_tune_kwargs['resources_per_trial'] = {
                 'num_cpus': cpu_per_trial,
                 'num_gpus': gpu_per_trial
