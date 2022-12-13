@@ -30,6 +30,7 @@ from autogluon.multimodal.utils.object_detection import dump_voc_classes, dump_v
 
 MIN_AREA = 4  # TODO: put in arg?
 
+
 def get_label2id(labels_path: str) -> Dict[str, int]:
     """id is 1 start"""
     with open(labels_path, "r") as f:
