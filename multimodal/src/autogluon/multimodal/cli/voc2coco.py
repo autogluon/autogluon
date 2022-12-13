@@ -98,8 +98,8 @@ def get_image_info(annotation_root, extract_num_from_imgid=True):
     else:
         filename = os.path.basename(path)
     img_name = os.path.basename(filename)
-    if not filename[-4:] in [".jpg", ".png"]:
-        filename = filename + ".jpg"
+    if not img_name[-4:] in [".jpg", ".png"]:
+        img_name = img_name + ".jpg"
     img_id = os.path.splitext(img_name)[0]
     if extract_num_from_imgid and isinstance(img_id, str):
         img_id = int("".join(re.findall(r"\d+", img_id)))
@@ -108,7 +108,7 @@ def get_image_info(annotation_root, extract_num_from_imgid=True):
     width = int(size.findtext("width"))
     height = int(size.findtext("height"))
 
-    image_info = {"file_name": os.path.join("JPEGImages", filename), "height": height, "width": width, "id": img_id}
+    image_info = {"file_name": os.path.join("JPEGImages", img_name), "height": height, "width": width, "id": img_id}
     return image_info
 
 
