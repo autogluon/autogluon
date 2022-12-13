@@ -30,7 +30,6 @@ from autogluon.multimodal.utils.object_detection import dump_voc_classes, dump_v
 
 MIN_AREA = 4  # TODO: put in arg?
 
-
 def get_label2id(labels_path: str) -> Dict[str, int]:
     """id is 1 start"""
     with open(labels_path, "r") as f:
@@ -98,8 +97,8 @@ def get_image_info(annotation_root, extract_num_from_imgid=True):
     else:
         filename = os.path.basename(path)
     img_name = os.path.basename(filename)
-    if not filename[-4:] in [".jpg", ".png"]:
-        filename = filename + ".jpg"
+    if not img_name[-4:] in [".jpg", ".png"]:
+        img_name = img_name + ".jpg"
     img_id = os.path.splitext(img_name)[0]
     if extract_num_from_imgid and isinstance(img_id, str):
         img_id = int("".join(re.findall(r"\d+", img_id)))
@@ -108,7 +107,7 @@ def get_image_info(annotation_root, extract_num_from_imgid=True):
     width = int(size.findtext("width"))
     height = int(size.findtext("height"))
 
-    image_info = {"file_name": os.path.join("JPEGImages", filename), "height": height, "width": width, "id": img_id}
+    image_info = {"file_name": os.path.join("JPEGImages", img_name), "height": height, "width": width, "id": img_id}
     return image_info
 
 
@@ -159,14 +158,18 @@ def convert_xmls_to_cocojson(
 
         img_info = get_image_info(annotation_root=ann_root, extract_num_from_imgid=extract_num_from_imgid)
         img_id = img_info["id"]
-        output_json_dict["images"].append(img_info)
 
+        valid_image = False  # remove image without bounding box to speed up mAP calculation
         for obj in ann_root.findall("object"):
             ann = get_coco_annotation_from_obj(obj=obj, label2id=label2id)
             if ann:
                 ann.update({"image_id": img_id, "id": bnd_id})
                 output_json_dict["annotations"].append(ann)
                 bnd_id = bnd_id + 1
+                valid_image = True
+
+        if valid_image:
+            output_json_dict["images"].append(img_info)
 
     for label, label_id in label2id.items():
         category_info = {"supercategory": "none", "id": label_id, "name": label}
