@@ -204,6 +204,10 @@ predictor = TabularPredictor(...).fit(..., hyperparameters= {'CAT': {'ag_args_fi
 ### My custom metric is raising `_pickle.PicklingError: Can't pickle` errors
 See ["Ensuring Metric is Serializable" in Custom Metric Tutorial](tabular-custom-metric.html#ensuring-metric-is-serializable).
 
+### I know AutoGluon uses ray underneath. What's the best practice for me?
+It is generally recommended to not have your custom usage of ray resources, i.e. init ray cluster, along with AutoGluon in a same script.
+Ray does not support multiple runtimes in a same script, hence unexpected behaviors could happen.
+
 ### No space left error on SageMaker Notebook
 If you are using AutoGluon on SageMaker Notebook, it is likely that you will encounter such error: `OSError: [Errno 28] No space left on device`. This is because the default disk size of a SageMaker Notebook instance is 5 GiB regardless of the type. AutoGluon training on some large datasets could end up with artifacts that's larger than 5GiB.
 
