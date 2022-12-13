@@ -1,5 +1,3 @@
-.. include:: install-warning.rst
-
 .. note::
 
   AutoGluon requires `Python <https://www.python.org/downloads/release/python-399/>`_ version 3.7, 3.8, or 3.9.
