@@ -13,12 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 def read_image_bytes_and_encode(image_path):
+    image_path = os.path.abspath(image_path)
     image_obj = open(image_path, "rb")
     image_bytes = image_obj.read()
     image_obj.close()
-    b64_image = base64.b85encode(image_bytes).decode("utf-8")
+    b85_image = base64.b85encode(image_bytes).decode("utf-8")
 
-    return b64_image
+    return b85_image
 
 
 def convert_image_path_to_encoded_bytes_in_dataframe(dataframe, image_column):
