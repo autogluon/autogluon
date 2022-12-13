@@ -19,7 +19,7 @@ In the following example, we will demonstrate how to build a multimodal named en
 This dataset consists of scrapped tweets from 2016 to 2017, and each tweet was composed of one sentence and one image. Let's download the dataset.
 
 ```{.python .input}
-download_dir = './ag_automm_tutorial'
+download_dir = './ag_automm_tutorial_ner'
 zip_file = 'https://automl-mm-bench.s3.amazonaws.com/ner/multimodal_ner.zip'
 from autogluon.core.utils.loaders import load_zip
 load_zip.unzip(zip_file, unzip_dir=download_dir)
