@@ -35,7 +35,7 @@ except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
 from ...constants import AUTOMM, COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
-from ..collator import Pad, Stack
+from ..collator import StackCollator
 from ..utils import is_rois_input
 
 logger = logging.getLogger(AUTOMM)
@@ -127,7 +127,7 @@ class MMLabProcessor:
         if self.requires_column_info:
             assert image_column_names, "Empty image column names."
             for col_name in image_column_names:
-                fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
+                fn[f"{self.image_column_prefix}_{col_name}"] = StackCollator()
 
         assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
 
