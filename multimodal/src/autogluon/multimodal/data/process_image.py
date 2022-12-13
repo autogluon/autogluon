@@ -38,7 +38,7 @@ from ..constants import (
     IMAGE_VALID_NUM,
     TIMM_IMAGE,
 )
-from .collator import Pad, Stack
+from .collator import PadCollator, StackCollator
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config, is_rois_input
 
@@ -168,12 +168,12 @@ class ImageProcessor:
         if self.requires_column_info:
             assert image_column_names, "Empty image column names."
             for col_name in image_column_names:
-                fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
+                fn[f"{self.image_column_prefix}_{col_name}"] = StackCollator()
 
         fn.update(
             {
                 self.image_key: Pad(pad_val=0),
-                self.image_valid_num_key: Stack(),
+                self.image_valid_num_key: StackCollator(),
             }
         )
 

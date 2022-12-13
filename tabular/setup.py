@@ -48,10 +48,10 @@ extras_require = {
         'fastai>=2.3.1,<2.8',
     ],
     'skex': [
-        'scikit-learn-intelex>=2021.5,<2021.6',
+        'scikit-learn-intelex>=2021.6,<2021.8',
     ],
     'imodels': [
-        'imodels>=1.3.0',
+        'imodels>=1.3.0,<1.3.8',  # 1.3.8 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
     ],
     'vowpalwabbit': [
         'vowpalwabbit>=8.10,<8.11'

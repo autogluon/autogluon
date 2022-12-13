@@ -25,7 +25,7 @@ class Sampler(AbstractAnalysis):
         `None` means no sampling
     parent: Optional[AbstractAnalysis], default = None
         parent Analysis
-    children: List[AbstractAnalysis], default []
+    children: Optional[List[AbstractAnalysis]], default None
         wrapped analyses; these will receive sampled `args` during `fit` call
 
     Examples
@@ -153,7 +153,7 @@ class VariableTypeAnalysis(AbstractAnalysis):
         if numeric column has less than this value, then the variable should be considered as categorical
     parent: Optional[AbstractAnalysis], default = None
         parent Analysis
-    children: List[AbstractAnalysis], default []
+    children: Optional[List[AbstractAnalysis]], default None
         wrapped analyses; these will receive sampled `args` during `fit` call
 
     Examples

@@ -151,21 +151,11 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
     @property
     def image_bytearray_names(self):
-        if hasattr(self, "_image_bytearray_names"):
-            return self._image_bytearray_names
-        else:
-            return [
-                col_name for col_name in self._image_feature_names if self._column_types[col_name] == IMAGE_BYTEARRAY
-            ]
+        return [col_name for col_name in self._image_feature_names if self._column_types[col_name] == IMAGE_BYTEARRAY]
 
     @property
     def image_feature_names(self):
-        if hasattr(self, "_image_path_names"):
-            return self._image_path_names
-        elif hasattr(self, "_image_bytearray_names"):
-            return self._image_bytearray_names
-        else:
-            return self._image_feature_names
+        return self._image_path_names if hasattr(self, "_image_path_names") else self._image_feature_names
 
     @property
     def text_feature_names(self):
@@ -181,12 +171,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
     @property
     def required_feature_names(self):
-        if hasattr(self, "_image_path_names"):
-            image_feature_names = self._image_path_names
-        elif hasattr(self, "_image_bytearray_names"):
-            image_feature_names = self._image_bytearray_names
-        else:
-            image_feature_names = self._image_feature_names
+        image_feature_names = (
+            self._image_path_names if hasattr(self, "_image_path_names") else self._image_feature_names
+        )
 
         return (
             image_feature_names
@@ -237,8 +224,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         if modality.startswith(IMAGE):
             if hasattr(self, "_image_path_names"):
                 return self._image_path_names
-            elif hasattr(self, "_image_bytearray_names"):
-                return self._image_bytearray_names
             else:
                 return self._image_feature_names
         elif modality == ROIS:

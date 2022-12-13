@@ -323,7 +323,10 @@ class AbstractFeatureGenerator:
         if self.column_names_as_str:
             X.columns = X.columns.astype(str)  # Ensure all column names are strings
         try:
-            X = X[self.features_in]
+            if list(X.columns) != self.features_in:
+                # It comes at a cost when making a copy of the DataFrame,
+                # therefore, try avoid copying by checking the expected features first.
+                X = X[self.features_in]
         except KeyError:
             missing_cols = []
             for col in self.features_in:

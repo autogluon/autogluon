@@ -2,6 +2,7 @@ import copy
 import gc
 import inspect
 import logging
+import math
 import os
 import pickle
 from autogluon.core.utils import try_import
@@ -478,8 +479,25 @@ class AbstractModel:
             logger.debug(f"{self.name} predicted probabilities will be transformed to never =0 since eval_metric='{self.eval_metric.name}'")
         else:
             self.normalize_pred_probas = False
+            
+    def _process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(self, system_resource, user_specified_total_resource, user_specified_ensemble_resource, resource_type, k_fold):
+        if user_specified_total_resource == 'auto':
+            user_specified_total_resource = math.inf
+        
+        # retrieve model level requirement when self is bagged model
+        user_specified_model_level_resource = self.model_base._user_params_aux.get(resource_type, None)
+        if user_specified_model_level_resource is not None:
+            assert user_specified_model_level_resource <= system_resource, f'Specified {resource_type} per {self.model_base.__class__.__name__} is more than the total: {system_resource}'
+        user_specified_lower_level_resource = user_specified_ensemble_resource
+        if user_specified_ensemble_resource is not None:
+            if user_specified_model_level_resource is not None:
+                user_specified_lower_level_resource = min(user_specified_model_level_resource * k_fold, user_specified_ensemble_resource, system_resource, user_specified_total_resource)
+        else:
+            if user_specified_model_level_resource is not None:
+                user_specified_lower_level_resource = min(user_specified_model_level_resource * k_fold, system_resource, user_specified_total_resource)
+        return user_specified_lower_level_resource
 
-    def _preprocess_fit_resources(self, silent=False, total_resources=None, **kwargs):
+    def _preprocess_fit_resources(self, silent=False, total_resources=None, parallel_hpo=False, **kwargs):
         """
         This function should be called to process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
@@ -495,16 +513,38 @@ class AbstractModel:
             return kwargs
         system_num_cpus = ResourceManager.get_cpu_count()
         system_num_gpus = ResourceManager.get_gpu_count_all()
-        default_num_cpus, default_num_gpus = self._get_default_resources()
-        k_fold = kwargs.get('k_fold', None)
-        if k_fold is not None and k_fold > 0:
-            # bagged model's default resources should be resources * k_fold if the amount is available
-            default_num_cpus = min(default_num_cpus * k_fold, system_num_cpus)
-            default_num_gpus = min(default_num_gpus * k_fold, system_num_gpus)
         if total_resources is None:
             total_resources = {}
         num_cpus = total_resources.get('num_cpus', 'auto')
         num_gpus = total_resources.get('num_gpus', 'auto')
+        default_num_cpus, default_num_gpus = self._get_default_resources()
+        # This could be resource requirement for bagged model or individual model
+        user_specified_lower_level_num_cpus = self._user_params_aux.get('num_cpus', None)
+        user_specified_lower_level_num_gpus = self._user_params_aux.get('num_gpus', None)
+        if user_specified_lower_level_num_cpus is not None:
+            assert user_specified_lower_level_num_cpus <= system_num_cpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total: {system_num_cpus}'
+        if user_specified_lower_level_num_gpus is not None:
+            assert user_specified_lower_level_num_gpus <= system_num_cpus, f'Specified num_gpus per {self.__class__.__name__} is more than the total: {system_num_cpus}'
+        k_fold = kwargs.get('k_fold', None)
+        if k_fold is not None and k_fold > 0:
+            # bagged model will look ag_args_ensemble and ag_args_fit internally to determine resources
+            # pass all resources here by default
+            default_num_cpus = system_num_cpus
+            default_num_gpus = system_num_gpus if default_num_gpus > 0 else 0
+            user_specified_lower_level_num_cpus = self._process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(
+                system_resource=system_num_cpus,
+                user_specified_total_resource=num_cpus,
+                user_specified_ensemble_resource=user_specified_lower_level_num_cpus,
+                resource_type='num_cpus',
+                k_fold=k_fold
+            )
+            user_specified_lower_level_num_gpus = self._process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(
+                system_resource=system_num_gpus,
+                user_specified_total_resource=num_gpus,
+                user_specified_ensemble_resource=user_specified_lower_level_num_gpus,
+                resource_type='num_gpus',
+                k_fold=k_fold
+            )
         if num_cpus != 'auto' and num_cpus > system_num_cpus:
             logger.warning(f'Specified total num_cpus: {num_cpus}, but only {system_num_cpus} are available. Will use {system_num_cpus} instead')
             num_cpus = system_num_cpus
@@ -512,20 +552,48 @@ class AbstractModel:
             logger.warning(f'Specified total num_gpus: {num_gpus}, but only {system_num_gpus} are available. Will use {system_num_gpus} instead')
             num_gpus = system_num_gpus
         if num_cpus == 'auto':
-            num_cpus = default_num_cpus
+            if user_specified_lower_level_num_cpus is not None:
+                if not parallel_hpo:
+                    num_cpus = user_specified_lower_level_num_cpus
+                else:
+                    num_cpus = system_num_cpus
+            else:
+                if not parallel_hpo:
+                    num_cpus = default_num_cpus
+                else:
+                    num_cpus = system_num_cpus
+        else:
+            if not parallel_hpo:
+                if user_specified_lower_level_num_cpus is not None:
+                    assert user_specified_lower_level_num_cpus <= num_cpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total specified: {num_cpus}'
+                    num_cpus = user_specified_lower_level_num_cpus
         if num_gpus == 'auto':
-            num_gpus = default_num_gpus
-        # This will be ag_args_ensemble when bagging, and ag_args_fit when non-bagging
-        params_aux_num_cpus = self._user_params_aux.get('num_cpus', None)
-        params_aux_num_gpus = self._user_params_aux.get('num_gpus', None)
-        if params_aux_num_cpus is not None:
-            assert params_aux_num_cpus <= num_cpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total: {num_cpus}'
-        if params_aux_num_gpus is not None:
-            assert params_aux_num_gpus <= num_gpus, f'Specified num_gpus per {self.__class__.__name__} is more than the total: {num_gpus}'
+            if user_specified_lower_level_num_gpus is not None:
+                if not parallel_hpo:
+                    num_gpus = user_specified_lower_level_num_gpus
+                else:
+                    num_gpus = system_num_gpus if user_specified_lower_level_num_gpus > 0 else 0
+            else:
+                if not parallel_hpo:
+                    num_gpus = default_num_gpus
+                else:
+                    num_gpus = system_num_gpus if default_num_gpus > 0 else 0
+        else:
+            if not parallel_hpo:
+                if user_specified_lower_level_num_gpus is not None:
+                    assert user_specified_lower_level_num_gpus <= num_gpus, f'Specified num_gpus per {self.__class__.__name__} is more than the total specified: {num_gpus}'
+                    num_gpus = user_specified_lower_level_num_gpus
+
+        minimum_model_resources = self.get_minimum_resources(
+            is_gpu_available=(num_gpus > 0)
+        )
+        minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
+        minimum_model_num_gpus = minimum_model_resources.get('num_gpus', 0)
+        assert num_cpus >= minimum_model_num_cpus, f'Specified num_cpus per {self.__class__.__name__} is less than minimum num_cpus requirement {minimum_model_num_cpus}'
+        assert num_gpus >= minimum_model_num_gpus, f'Specified num_gpus per {self.__class__.__name__} is less than minimum num_gpus requirement {minimum_model_num_gpus}'
         
         kwargs['num_cpus'] = num_cpus
         kwargs['num_gpus'] = num_gpus
-        
         if not silent:
             logger.log(15, f"\tFitting {self.name} with 'num_gpus': {kwargs['num_gpus']}, 'num_cpus': {kwargs['num_cpus']}")
         return kwargs
@@ -851,8 +919,9 @@ class AbstractModel:
         model = load_pkl.load(path=file_path, verbose=verbose)
         if reset_paths:
             model.set_contexts(path)
-        if model._compiler is not None and not model._compiler.save_in_pkl:
-            model.model = model._compiler.load(path=path)
+        if hasattr(model, '_compiler'):
+            if model._compiler is not None and not model._compiler.save_in_pkl:
+                model.model = model._compiler.load(path=path)
         return model
 
     def compute_feature_importance(self,
@@ -1170,7 +1239,7 @@ class AbstractModel:
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
-        kwargs = self._preprocess_fit_resources(**kwargs)
+        kwargs = self._preprocess_fit_resources(parallel_hpo=hpo_executor.executor_type=='ray', **kwargs)
         self.validate_fit_resources(**kwargs)
         hpo_executor.register_resources(self, **kwargs)
         return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
@@ -1425,7 +1494,7 @@ class AbstractModel:
             'feature_metadata': self.feature_metadata,
             # 'disk_size': self.get_disk_size(),
             'memory_size': self.get_memory_size(),  # Memory usage of model in bytes
-            'compile_time': self.compile_time,
+            'compile_time': self.compile_time if hasattr(self, 'compile_time') else None,
         }
         return info
 

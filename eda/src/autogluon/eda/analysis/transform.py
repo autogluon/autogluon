@@ -23,7 +23,7 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
         feature generator to use for the transformation. If `None` is provided then `AutoMLPipelineFeatureGenerator` is applied.
     parent: Optional[AbstractAnalysis], default = None
         parent Analysis
-    children: List[AbstractAnalysis], default []
+    children: Optional[List[AbstractAnalysis]], default None
         wrapped analyses; these will receive sampled `args` during `fit` call
     kwargs
 
