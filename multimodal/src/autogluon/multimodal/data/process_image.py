@@ -63,7 +63,7 @@ from ..constants import (
     MMOCR_TEXT_RECOG,
     TIMM_IMAGE,
 )
-from .collator import Pad, Stack
+from .collator import PadCollator, StackCollator
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config, is_rois_input
 
@@ -206,7 +206,7 @@ class ImageProcessor:
         if self.requires_column_info:
             assert image_column_names, "Empty image column names."
             for col_name in image_column_names:
-                fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
+                fn[f"{self.image_column_prefix}_{col_name}"] = StackCollator()
 
         if self.prefix.lower().startswith(MMLAB_MODELS):
             assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
@@ -228,8 +228,8 @@ class ImageProcessor:
         else:
             fn.update(
                 {
-                    self.image_key: Pad(pad_val=0),
-                    self.image_valid_num_key: Stack(),
+                    self.image_key: PadCollator(pad_val=0),
+                    self.image_valid_num_key: StackCollator(),
                 }
             )
 
