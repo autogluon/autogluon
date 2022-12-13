@@ -1,6 +1,7 @@
 import logging
 
 import pandas as pd
+import numpy as np
 from pandas import DataFrame
 
 from autogluon.common.features.types import R_DATETIME, S_DATETIME_AS_OBJECT
@@ -51,11 +52,11 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         #   NaN, empty string, datetime without timezone, and datetime with timezone, all as an object type, all being present in the same column.
         #   I don't know why, but in this specific situation (and not otherwise), NaN will be filled by .fillna, but empty string will be converted to NaT
         #   and refuses to be filled by .fillna, requiring a dedicated replace call. (NaT is filled by .fillna in every other situation...)
-        series = pd.to_datetime(X[feature], utc=True, errors='coerce')
+        series = pd.to_datetime(X[feature].copy(), utc=True, errors='coerce')
         broken_idx = series[(series == 'NaT') | series.isna() | series.isnull()].index
         bad_rows = series.iloc[broken_idx]
         if is_fit:
-            good_rows = series[~series.isin(bad_rows)].astype(int)
+            good_rows = series[~series.isin(bad_rows)].astype(np.int64)
             self._fillna_map[feature] = pd.to_datetime(int(good_rows.mean()), utc=True)
         series[broken_idx] = self._fillna_map[feature]
         return series
@@ -66,7 +67,7 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         for datetime_feature in self.features_in:
             X_datetime[datetime_feature] = self.normalize_timeseries(X, datetime_feature, is_fit=is_fit)
             for feature in self.features:
-                X_datetime[datetime_feature + '.' + feature] = getattr(X_datetime[datetime_feature].dt, feature).astype(int)
+                X_datetime[datetime_feature + '.' + feature] = getattr(X_datetime[datetime_feature].dt, feature).astype(np.int64)
             X_datetime[datetime_feature] = pd.to_numeric(X_datetime[datetime_feature])
         return X_datetime
 
