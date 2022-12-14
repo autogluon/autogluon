@@ -170,7 +170,7 @@ AutoGluon is modularized into `sub-modules <https://packaging.python.org/guides/
     - Optional Dependency: `vowpalwabbit`. This will install the VowpalWabbit package and allow you to fit VowpalWabbit in TabularPredictor.
     - Optional Dependency: `imodels`. This will install the imodels package and allow you to fit interpretable models in TabularPredictor.
 - `autogluon.multimodal` - functionality for image, text, and multimodal problems. Focus on deep learning models.
-    - To try object detection functionality using `MultiModalPredictor`, please install additional dependencies via `mim install mmcv-full` and `pip install mmdet`. Note that Windows users should also install `pycocotools`` by: `pip install pycocotools-windows`, but it only supports python 3.6/3.7/3.8.
+    - To try object detection functionality using `MultiModalPredictor`, please install additional dependencies via `mim install mmcv-full`, `pip install mmdet` and `pip install pycocotools`. Note that Windows users should also install `pycocotools`` by: `pip install pycocotools-windows`, but it only supports python 3.6/3.7/3.8.
 - `autogluon.vision` - only functionality for computer vision (ImagePredictor, ObjectDetector)
 - `autogluon.text` - only functionality for natural language processing (TextPredictor)
 - `autogluon.timeseries` - only functionality for time series data (TimeSeriesPredictor)

@@ -1,6 +1,5 @@
 import copy
 import os
-import pickle
 import shutil
 import tempfile
 import uuid
@@ -642,7 +641,6 @@ def test_image_bytearray():
         "model.names": model_names,
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
     }
-
     predictor_1.fit(
         train_data=train_data_1,
         hyperparameters=hyperparameters,
@@ -653,12 +651,25 @@ def test_image_bytearray():
         hyperparameters=hyperparameters,
         seed=42,
     )
+
     score_1 = predictor_1.evaluate(test_data_1)
     score_2 = predictor_2.evaluate(test_data_2)
+    # train and predict using different image types
+    score_3 = predictor_1.evaluate(test_data_2)
+    score_4 = predictor_2.evaluate(test_data_1)
+
     prediction_1 = predictor_1.predict(test_data_1, as_pandas=False)
     prediction_2 = predictor_2.predict(test_data_2, as_pandas=False)
+    prediction_3 = predictor_1.predict(test_data_2, as_pandas=False)
+    prediction_4 = predictor_2.predict(test_data_1, as_pandas=False)
+
     prediction_prob_1 = predictor_1.predict_proba(test_data_1, as_pandas=False)
     prediction_prob_2 = predictor_2.predict_proba(test_data_2, as_pandas=False)
-    npt.assert_equal(score_1, score_2)
-    npt.assert_equal(prediction_1, prediction_2)
-    npt.assert_equal(prediction_prob_1, prediction_prob_2)
+    prediction_prob_3 = predictor_1.predict_proba(test_data_2, as_pandas=False)
+    prediction_prob_4 = predictor_1.predict_proba(test_data_1, as_pandas=False)
+
+    npt.assert_array_equal([score_1, score_2, score_3, score_4], [score_1] * 4)
+    npt.assert_array_equal([prediction_1, prediction_2, prediction_3, prediction_4], [prediction_1] * 4)
+    npt.assert_array_equal(
+        [prediction_prob_1, prediction_prob_2, prediction_prob_3, prediction_prob_4], [prediction_prob_1] * 4
+    )
