@@ -1819,7 +1819,10 @@ class MultiModalMatcher:
         matcher._match_label = assets["match_label"]
         matcher._label_column = assets["label_column"]
         matcher._problem_type = assets["problem_type"]
-        matcher._presets = assets["presets"]
+        if "pipeline" in assets:  # back compatibility
+            matcher._presets = assets["pipeline"]
+        else:
+            matcher._presets = assets["presets"]
         matcher._eval_metric_name = assets["eval_metric_name"]
         matcher._verbosity = verbosity
         matcher._resume = resume
