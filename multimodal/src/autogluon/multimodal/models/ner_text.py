@@ -69,8 +69,15 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
             Whether using the pretrained weights. If pretrained=True, download the pretrained model.
         """
         super().__init__(
-            prefix, checkpoint_name, num_classes, pooling_mode, gradient_checkpointing, low_cpu_mem_usage, pretrained
+            prefix=prefix,
+            checkpoint_name=checkpoint_name,
+            num_classes=num_classes,
+            pooling_mode=pooling_mode,
+            gradient_checkpointing=gradient_checkpointing,
+            low_cpu_mem_usage=low_cpu_mem_usage,
+            pretrained=pretrained,
         )
+
         logger.debug(f"initializing {checkpoint_name}")
 
         if self.config.model_type in {"gpt2", "roberta"}:
@@ -158,7 +165,7 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
         ret.update(
             {
                 LOGITS: logits,
-                FEATURES: pooled_features,
+                FEATURES: sequence_output,  # input of ner fusion model
                 NER_ANNOTATION: logits_label,
                 TOKEN_WORD_MAPPING: batch[self.text_token_word_mapping_key],
                 WORD_OFFSETS: batch[self.text_word_offsets_key],

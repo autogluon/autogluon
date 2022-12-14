@@ -14,6 +14,7 @@ from ..constants import (
     CATEGORICAL_TRANSFORMER,
     CLIP,
     FUSION_MLP,
+    FUSION_NER,
     FUSION_TRANSFORMER,
     HF_TEXT,
     IMAGE,
@@ -27,6 +28,7 @@ from ..constants import (
     NUMERICAL_TRANSFORMER,
     T_FEW,
     TEXT,
+    TEXT_NER,
     TIMM_IMAGE,
 )
 from ..data import MultiModalFeaturePreprocessor
@@ -40,6 +42,7 @@ from ..models import (
     MMOCRAutoModelForTextDetection,
     MMOCRAutoModelForTextRecognition,
     MultimodalFusionMLP,
+    MultimodalFusionNER,
     MultimodalFusionTransformer,
     NumericalMLP,
     NumericalTransformer,
@@ -91,6 +94,8 @@ def select_model(
         data_status[CATEGORICAL] = True
     if len(df_preprocessor.numerical_feature_names) > 0:
         data_status[NUMERICAL] = True
+    if len(df_preprocessor.ner_feature_names) > 0:
+        data_status[TEXT_NER] = True
 
     names = config.model.names
     if isinstance(names, str):
@@ -306,6 +311,18 @@ def create_model(
     elif model_name.lower().startswith(FUSION_MLP):
         model = functools.partial(
             MultimodalFusionMLP,
+            prefix=model_name,
+            hidden_features=model_config.hidden_sizes,
+            num_classes=num_classes,
+            adapt_in_features=model_config.adapt_in_features,
+            activation=model_config.activation,
+            dropout_prob=model_config.drop_rate,
+            normalization=model_config.normalization,
+            loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
+        )
+    elif model_name.lower().startswith(FUSION_NER):
+        model = functools.partial(
+            MultimodalFusionNER,
             prefix=model_name,
             hidden_features=model_config.hidden_sizes,
             num_classes=num_classes,
