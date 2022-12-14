@@ -24,87 +24,44 @@ function setup_torch_gpu {
     python3 -m pip install torch==1.12.0+cu113 torchvision==0.13.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
 }
 
-function install_common {
-    python3 -m pip install --upgrade -e common/[tests]
-}
-
-function install_core {
-    install_common
-    python3 -m pip install --upgrade -e core/
-}
-
-function install_core_all {
-    install_common
-    python3 -m pip install --upgrade -e core/[all]
-}
-
-function install_core_all_tests {
-    install_common
-    python3 -m pip install --upgrade -e core/[all,tests]
-}
-
-function install_features {
-    python3 -m pip install --upgrade -e features/
-}
-
-function install_eda {
-    python3 -m pip install --upgrade -e eda/[tests]
-}
-
-function install_fair {
-    python3 -m pip install --upgrade -e fair/
-}
-
-function install_tabular {
-    python3 -m pip install --upgrade -e tabular/[tests]
-}
-
-function install_tabular_all {
-    python3 -m pip install --upgrade -e tabular/[all,tests]
+function install_local_packages {
+    while(($#)) ; do
+        python3 -m pip install --upgrade -e $1
+        shift
+    done
 }
 
 function install_multimodal {
     # launch different process for each test to make sure memory is released
     python3 -m pip install --upgrade pytest-xdist
-    python3 -m pip install --upgrade -e multimodal/[tests]
+    install_local_packages "multimodal/$1"
     mim install mmcv-full --timeout 60
     python3 -m pip install --upgrade mmdet
     python3 -m pip install --upgrade mmocr
 }
 
-function install_text {
-    python3 -m pip install --upgrade -e text/
-}
-
 function install_vision {
     python3 -m pip install --upgrade pytest-xdist  # launch different process for each test to avoid resource not being released by either mxnet or torch
-    python3 -m pip install --upgrade -e vision/
-}
-
-function install_timeseries {
-    python3 -m pip install --upgrade -e timeseries/[all,tests]
+    install_local_packages "vision/"
 }
 
 function install_cloud {
     python3 -m pip install --upgrade pytest-xdist # Enable running tests in parallel for speedup
-    python3 -m pip install --upgrade -e cloud/[tests]
-}
-
-function install_autogluon {
-    python3 -m pip install --upgrade -e autogluon/
+    install_local_packages "cloud/[tests]"
 }
 
 function install_all {
-    install_common
-    install_core_all
-    install_features
-    install_tabular_all
-    install_multimodal
-    install_text
+    install_local_packages "common/[tests]" "core/[all]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
+    install_multimodal "[tests]" # multimodal must be install before vision and text
     install_vision
-    install_timeseries
-    install_eda
-    install_autogluon
+    install_local_packages "text/" "autogluon/"
+}
+
+function install_all_no_tests {
+    install_local_packages "common/" "core/[all]" "features/" "tabular/[all]" "timeseries/[all]" "eda/"
+    install_multimodal # multimodal must be installed before vision and text
+    install_vision
+    install_local_packages "text/" "autogluon/"
 }
 
 function build_all {
