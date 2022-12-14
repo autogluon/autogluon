@@ -28,6 +28,7 @@ from tqdm import tqdm
 
 from autogluon.multimodal.utils.object_detection import dump_voc_classes, dump_voc_xml_files, process_voc_annotations
 
+DEFAULT_EXT = ".jpg"
 MIN_AREA = 4  # TODO: put in arg?
 
 
@@ -99,7 +100,7 @@ def get_image_info(annotation_root, extract_num_from_imgid=True):
         filename = os.path.basename(path)
     img_name = os.path.basename(filename)
     if not img_name[-4:] in [".jpg", ".png"]:
-        img_name = img_name + ".jpg"
+        img_name = img_name + DEFAULT_EXT
     img_id = os.path.splitext(img_name)[0]
     if extract_num_from_imgid and isinstance(img_id, str):
         img_id = int("".join(re.findall(r"\d+", img_id)))
@@ -187,12 +188,17 @@ def main():
     parser.add_argument("--root_dir", type=str, default=None, help="path to VOC format dataset root")
     parser.add_argument("--train_ratio", type=float, default=None, help="training set ratio")
     parser.add_argument("--val_ratio", type=float, default=None, help="validation set ratio")
+    parser.add_argument("--ext", type=str, default=".jpg", help="default extension for image file")
+    parser.add_argument("--min_area", type=int, default=4, help="min area for a valid bounding box")
     parser.add_argument(
         "--not_extract_num_from_imgid", action="store_true", help="Extract image number from the image filename"
     )
     args = parser.parse_args()
 
     annpaths_list_path = None
+    DEFAULT_EXT = args.ext
+    MIN_AREA = args.min_area
+    assert DEFAULT_EXT in [".jpg", ".png"]
 
     if not args.root_dir:
         raise ValueError("Must specify the root of the VOC format dataset.")
