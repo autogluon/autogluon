@@ -130,7 +130,7 @@ class NerProcessor:
             self.tokenizer.model_max_length = self.max_len
         text_column, annotation_column = None, None
         for column_name, column_modality in feature_modalities.items():
-            if column_modality == TEXT_NER:
+            if column_modality.startswith((TEXT_NER, TEXT)):
                 text_column = column_name
             if column_modality == NER_ANNOTATION:
                 annotation_column = column_name
