@@ -57,12 +57,12 @@ extras_require = {
         'vowpalwabbit>=8.10,<8.11'
     ],
     'skl2onnx': [
-        'skl2onnx>=1.12.0,<1.13.0',
+        'skl2onnx>=1.13.0,<1.14.0',
         # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
         # Therefore, we install onnxruntime explicitly here just for macOS.
-        'onnxruntime>=1.12.0,<1.13.0'
+        'onnxruntime>=1.13.0,<1.14.0'
     ] if sys.platform == 'darwin' else [
-        'skl2onnx>=1.12.0,<1.13.0'
+        'skl2onnx>=1.13.0,<1.14.0'
     ]
 }
 
