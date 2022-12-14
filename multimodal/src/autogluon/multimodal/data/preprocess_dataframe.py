@@ -168,18 +168,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
     @property
     def ner_feature_names(self):
-        # If there are ner annotations and text columns but no NER feature columns,
-        # we will convert the first text column into a ner column.
         # Added for backward compatibility for v0.6.0 where column_type is not specified.
         if hasattr(self, "_ner_feature_names"):
-            if len(self._ner_feature_names) == 0:
-                if len(self._text_feature_names) != 0:
-                    self._ner_feature_names.append(self._text_feature_names.pop(0))
-                    self.column_types[self._ner_feature_names[0]] = TEXT_NER
-                else:
-                    raise NotImplementedError(
-                        f"Text column is necessary for named entity recognition, however, no text column is detected."
-                    )
             return self._ner_feature_names
         else:
             if len(self.text_feature_names) > 0:
@@ -281,11 +271,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             col_value = X[col_name]
             if col_type == NULL:
                 self._ignore_columns_set.add(col_name)
+            elif col_type.startswith(TEXT_NER):
+                self._ner_feature_names.append(col_name)
             elif col_type.startswith(TEXT):
-                if col_type == TEXT_NER:
-                    self._ner_feature_names.append(col_name)
-                else:
-                    self._text_feature_names.append(col_name)
+                self._text_feature_names.append(col_name)
             elif col_type == CATEGORICAL:
                 if self._config.categorical.convert_to_text:
                     # Convert categorical column as text column
@@ -347,6 +336,17 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif self.label_type == ROIS:
             pass  # Do nothing. TODO: Shall we call fit here?
         elif self.label_type == NER_ANNOTATION:
+            # If there are ner annotations and text columns but no NER feature columns,
+            # we will convert the first text column into a ner column.
+            # Added for backward compatibility for v0.6.0 where column_type is not specified.
+            if len(self._ner_feature_names) == 0:
+                if len(self._text_feature_names) != 0:
+                    self._ner_feature_names.append(self._text_feature_names.pop(0))
+                    self.column_types[self._ner_feature_names[0]] = TEXT_NER
+                else:
+                    raise NotImplementedError(
+                        f"Text column is necessary for named entity recognition, however, no text column is detected."
+                    )
             self._label_generator.fit(y, X[self.ner_feature_names[0]])
         else:
             raise NotImplementedError(f"Type of label column is not supported. Label column type={self.label_type}")
