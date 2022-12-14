@@ -40,9 +40,9 @@ def quantile_transformer_converter(scope, operator, container):
     # We tell in ONNX language how to compute the unique output.
     # op_version=opv tells which opset is requested
     C = op.quantiles_.astype(dtype)
-    C_col = OnnxSplit(C, axis=1, output_names=[f"C_col{x}" for x in range(op.n_features_in_)])
+    C_col = OnnxSplit(C, axis=1, output_names=[f"C_col{x}" for x in range(op.n_features_in_)], op_version=opv)
     C_col.add_to(scope, container)
-    X_col = OnnxSplit(X, axis=1, output_names=[f"X_col{x}" for x in range(op.n_features_in_)])
+    X_col = OnnxSplit(X, axis=1, output_names=[f"X_col{x}" for x in range(op.n_features_in_)], op_version=opv)
     X_col.add_to(scope, container)
     Y_col = []
     for feature_idx in range(op.n_features_in_):
@@ -55,18 +55,18 @@ def quantile_transformer_converter(scope, operator, container):
         # >     return y[idx.argmin(axis=1)]
         # See https://stackoverflow.com/questions/21002799/extraploation-with-nearest-method-in-python
         repeat = OnnxMatMul(
-            OnnxReshape(X_col.outputs[feature_idx], np.array([batch_size, 1])),
+            OnnxReshape(X_col.outputs[feature_idx], np.array([batch_size, 1]), op_version=opv),
             np.ones(shape=(1, n_quantiles)).astype(dtype),
         )
         sub = OnnxSub(
             repeat,
-            OnnxReshape(C_col.outputs[feature_idx], np.array([1, n_quantiles])),
+            OnnxReshape(C_col.outputs[feature_idx], np.array([1, n_quantiles]), op_version=opv),
             op_version=opv,
             output_names=[f"sub_col{feature_idx}"],
         )
         idx = OnnxAbs(sub, op_version=opv, output_names=[f"idx_col{feature_idx}"])
         argmin = OnnxArgMin(
-            OnnxReshape(idx, np.array([batch_size, n_quantiles])),
+            OnnxReshape(idx, np.array([batch_size, n_quantiles]), op_version=opv),
             axis=1,
             op_version=opv,
             output_names=[f"argmin_col{feature_idx}"],
@@ -116,7 +116,7 @@ def ordinal_handle_unknown_transformer_converter(scope, operator, container):
     name_prefix = "ordinal_handle_unknown_"
 
     C_col = op.categories_
-    X_col = OnnxSplit(X, axis=1, output_names=[f"{name_prefix}X_col{x}" for x in range(num_categories)])
+    X_col = OnnxSplit(X, axis=1, output_names=[f"{name_prefix}X_col{x}" for x in range(num_categories)], op_version=opv)
     X_col.add_to(scope, container)
     Y_col = []
     for feature_idx in range(num_categories):
@@ -129,23 +129,23 @@ def ordinal_handle_unknown_transformer_converter(scope, operator, container):
         # >     return idx.argmin(axis=1)
         num_classes = len(C_col[feature_idx])
         repeat = OnnxMatMul(
-            OnnxReshape(X_col.outputs[feature_idx], np.array([batch_size, 1])),
-            np.ones(shape=(1, num_classes)).astype(dtype),
+            OnnxReshape(X_col.outputs[feature_idx], np.array([batch_size, 1]), op_version=opv),
+            np.ones(shape=(1, num_classes)).astype(dtype), op_version=opv
         )
         sub = OnnxSub(
             repeat,
-            OnnxReshape(C_col[feature_idx].astype(dtype), np.array([1, num_classes])),
+            OnnxReshape(C_col[feature_idx].astype(dtype), np.array([1, num_classes]), op_version=opv),
             op_version=opv,
             output_names=[f"{name_prefix}sub_col{feature_idx}"],
         )
         idx = OnnxAbs(sub, op_version=opv, output_names=[f"{name_prefix}idx_col{feature_idx}"])
         argmin = OnnxArgMin(
-            OnnxReshape(idx, np.array([batch_size, num_classes])),
+            OnnxReshape(idx, np.array([batch_size, num_classes]), op_version=opv),
             axis=1,
             op_version=opv,
             output_names=[f"{name_prefix}argmin_col{feature_idx}"],
         )
-        Y_col.append(OnnxReshape(argmin, np.array([batch_size, 1]), output_names=[f"{name_prefix}Y_col{feature_idx}"]))
+        Y_col.append(OnnxReshape(argmin, np.array([batch_size, 1]), output_names=[f"{name_prefix}Y_col{feature_idx}"], op_version=opv))
     Y = OnnxConcat(*Y_col, axis=1, op_version=opv, output_names=out[:1])
     Y.add_to(scope, container)
 
