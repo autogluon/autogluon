@@ -172,7 +172,7 @@ class ImageProcessor:
 
         fn.update(
             {
-                self.image_key: Pad(pad_val=0),
+                self.image_key: PadCollator(pad_val=0),
                 self.image_valid_num_key: StackCollator(),
             }
         )
