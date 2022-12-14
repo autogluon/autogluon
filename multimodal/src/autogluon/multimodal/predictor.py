@@ -78,6 +78,7 @@ from .constants import (
     ROIS,
     SCORE,
     TEXT,
+    TEXT_NER,
     TEXT_SIMILARITY,
     UNIFORM_SOUP,
     Y_PRED,
@@ -2684,16 +2685,13 @@ class MultiModalPredictor:
 
         # Save text tokenizers before saving data processors
         data_processors = copy.deepcopy(self._data_processors)
-        if TEXT in data_processors:
-            data_processors[TEXT] = save_text_tokenizers(
-                text_processors=data_processors[TEXT],
-                path=path,
-            )
-        if NER in data_processors:
-            data_processors[NER] = save_text_tokenizers(
-                text_processors=data_processors[NER],
-                path=path,
-            )
+
+        for modality in [TEXT, TEXT_NER, NER]:
+            if modality in data_processors:
+                data_processors[modality] = save_text_tokenizers(
+                    text_processors=data_processors[modality],
+                    path=path,
+                )
 
         with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
             pickle.dump(data_processors, fp)
@@ -2883,16 +2881,13 @@ class MultiModalPredictor:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
                 data_processors = CustomUnpickler(fp).load()
             # Load text tokenizers after loading data processors.
-            if TEXT in data_processors:
-                data_processors[TEXT] = load_text_tokenizers(
-                    text_processors=data_processors[TEXT],
-                    path=path,
-                )
-            if NER in data_processors:
-                data_processors[NER] = load_text_tokenizers(
-                    text_processors=data_processors[NER],
-                    path=path,
-                )
+            for modality in [TEXT, TEXT_NER, NER]:  # NER is included for backward compatibility
+                if modality in data_processors:
+                    data_processors[modality] = load_text_tokenizers(
+                        text_processors=data_processors[modality],
+                        path=path,
+                    )
+
             # backward compatibility. Add feature column names in each data processor.
             data_processors = assign_feature_column_names(
                 data_processors=data_processors,

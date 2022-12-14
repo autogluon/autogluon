@@ -80,7 +80,7 @@ model:
     gradient_checkpointing: False
     low_cpu_mem_usage: False
     data_types:
-      - "text"
+      - "text_ner"
     tokenizer_name: "hf_auto"
     insert_sep: False
     text_segment_num: 2
@@ -185,6 +185,15 @@ model:
       # - "insert_punc(0.05)"
   fusion_mlp:
     weight: 0.1
+    adapt_in_features: "max"
+    hidden_sizes:
+      - 128
+    activation: "leaky_relu"
+    drop_rate: 0.1
+    normalization: "layer_norm"
+    data_types:
+  fusion_ner:
+    weight:
     adapt_in_features: "max"
     hidden_sizes:
       - 128
