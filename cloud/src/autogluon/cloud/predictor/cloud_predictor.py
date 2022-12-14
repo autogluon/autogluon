@@ -439,8 +439,12 @@ class CloudPredictor(ABC):
         predictor_fit_args = copy.deepcopy(predictor_fit_args)
         train_data = predictor_fit_args.pop("train_data")
         tune_data = predictor_fit_args.pop("tuning_data", None)
-        framework_version, py_version = self._parse_framework_version(framework_version, "training")
-        logger.log(20, f"Training with framework_version=={framework_version}")
+        if custom_image_uri:
+            framework_version, py_version = None, None
+            logger.log(20, f"Training with custom_image_uri=={custom_image_uri}")
+        else:
+            framework_version, py_version = self._parse_framework_version(framework_version, "training")
+            logger.log(20, f"Training with framework_version=={framework_version}")
 
         if not job_name:
             job_name = sagemaker.utils.unique_name_from_base(SAGEMAKER_RESOURCE_PREFIX)
@@ -643,8 +647,12 @@ class CloudPredictor(ABC):
 
         if not endpoint_name:
             endpoint_name = sagemaker.utils.unique_name_from_base(SAGEMAKER_RESOURCE_PREFIX)
-        framework_version, py_version = self._parse_framework_version(framework_version, "inference")
-        logger.log(20, f"Deploying with framework_version=={framework_version}")
+        if custom_image_uri:
+            framework_version, py_version = None, None
+            logger.log(20, f"Deploying with custom_image_uri=={custom_image_uri}")
+        else:
+            framework_version, py_version = self._parse_framework_version(framework_version, "inference")
+            logger.log(20, f"Deploying with framework_version=={framework_version}")
 
         self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
         entry_point = self._serve_script_path
@@ -862,8 +870,12 @@ class CloudPredictor(ABC):
             predictor_path = self._fit_job.get_output_path()
             assert predictor_path, "No cloud trained model found."
 
-        framework_version, py_version = self._parse_framework_version(framework_version, "inference")
-        logger.log(20, f"Predicting with framework_version=={framework_version}")
+        if custom_image_uri:
+            framework_version, py_version = None, None
+            logger.log(20, f"Predicting with custom_image_uri=={custom_image_uri}")
+        else:
+            framework_version, py_version = self._parse_framework_version(framework_version, "inference")
+            logger.log(20, f"Predicting with framework_version=={framework_version}")
 
         output_path = kwargs.get("output_path", None)
         if not output_path:

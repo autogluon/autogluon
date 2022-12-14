@@ -53,7 +53,6 @@ install_requires = [
     "nlpaug>=1.1.10,<=1.1.10",
     "nltk>=3.4.5,<4.0.0",
     "openmim>0.1.5,<=0.2.1",
-    "pycocotools>=2.0.5,<2.0.7;platform_system!='Windows'",
     "defusedxml>=0.7.1,<=0.7.1",
     "albumentations>=1.1.0,<=1.2.0",
 ]
@@ -65,7 +64,7 @@ extras_require = {
         "black~=22.0,>=22.3",
         "isort>=5.10",
         "datasets>=2.3.2,<=2.3.2",
-        "onnxruntime-gpu>=1.12.1,<=1.12.1;platform_system!='Darwin'",
+        "onnxruntime-gpu>=1.13.1,<1.14.0;platform_system!='Darwin'",
     ]
 }
 

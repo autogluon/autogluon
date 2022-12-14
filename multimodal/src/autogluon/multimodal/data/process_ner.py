@@ -20,13 +20,14 @@ from ..constants import (
     NER_ANNOTATION,
     NER_TEXT,
     TEXT,
+    TEXT_NER,
     TEXT_SEGMENT_IDS,
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
     TOKEN_WORD_MAPPING,
     WORD_OFFSETS,
 )
-from .collator import Pad, Stack
+from .collator import PadCollator, StackCollator
 from .utils import process_ner_annotations, tokenize_ner_text
 
 logger = logging.getLogger(AUTOMM)
@@ -92,12 +93,12 @@ class NerProcessor:
         if self.prefix == NER_TEXT:
             fn.update(
                 {
-                    self.model.text_token_ids_key: Pad(pad_val=self.tokenizer.pad_token_id),
-                    self.model.text_valid_length_key: Stack(),
-                    self.model.text_segment_ids_key: Pad(pad_val=0),
-                    self.model.text_token_word_mapping_key: Pad(pad_val=0),
-                    self.model.text_word_offsets_key: Pad(pad_val=0),
-                    self.model.label_key: Stack(),
+                    self.model.text_token_ids_key: PadCollator(pad_val=self.tokenizer.pad_token_id),
+                    self.model.text_valid_length_key: StackCollator(),
+                    self.model.text_segment_ids_key: PadCollator(pad_val=0),
+                    self.model.text_token_word_mapping_key: PadCollator(pad_val=0),
+                    self.model.text_word_offsets_key: PadCollator(pad_val=0),
+                    self.model.label_key: StackCollator(),
                 }
             )
         return fn
@@ -129,7 +130,7 @@ class NerProcessor:
             self.tokenizer.model_max_length = self.max_len
         text_column, annotation_column = None, None
         for column_name, column_modality in feature_modalities.items():
-            if column_modality == TEXT:
+            if column_modality.startswith((TEXT_NER, TEXT)):
                 text_column = column_name
             if column_modality == NER_ANNOTATION:
                 annotation_column = column_name
