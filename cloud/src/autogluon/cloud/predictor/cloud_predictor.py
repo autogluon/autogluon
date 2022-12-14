@@ -367,7 +367,9 @@ class CloudPredictor(ABC):
             path=serving_script, bucket=cloud_bucket, key_prefix=util_key_prefix
         )
 
-        images_input = self._upload_fit_image_artifact(images=common_path, bucket=cloud_bucket, key_prefix=util_key_prefix)
+        images_input = self._upload_fit_image_artifact(
+            images=common_path, bucket=cloud_bucket, key_prefix=util_key_prefix
+        )
         inputs = dict(train=train_input, config=config_input, serving=serving_input)
         if tune_input is not None:
             inputs["tune"] = tune_input
@@ -795,9 +797,7 @@ class CloudPredictor(ABC):
         if isinstance(test_data, pd.DataFrame):
             test_data = self._prepare_data(test_data, "test", output_type="csv")
         logger.log(20, "Uploading data...")
-        test_input = self.sagemaker_session.upload_data(
-            path=test_data, bucket=bucket, key_prefix=key_prefix + "/data"
-        )
+        test_input = self.sagemaker_session.upload_data(path=test_data, bucket=bucket, key_prefix=key_prefix + "/data")
         logger.log(20, "Data uploaded successfully")
 
         return test_input
@@ -888,8 +888,7 @@ class CloudPredictor(ABC):
             if isinstance(test_data, str):
                 test_data = load_pd.load(test_data)
             test_data = convert_image_path_to_encoded_bytes_in_dataframe(
-                dataframe=test_data,
-                image_column=test_data_image_column
+                dataframe=test_data, image_column=test_data_image_column
             )
         test_input = self._upload_batch_predict_data(test_data, cloud_bucket, cloud_key_prefix)
 

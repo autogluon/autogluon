@@ -1,9 +1,10 @@
 import os
+import zipfile
 
 import boto3
 import pandas as pd
 import pytest
-import zipfile
+
 
 class CloudTestHelper:
 
@@ -24,12 +25,12 @@ class CloudTestHelper:
         s3 = boto3.client("s3")
         for arg in args:
             s3.download_file("autogluon-cloud", arg, os.path.basename(arg))
-            
+
     @staticmethod
     def extract_images(image_zip_file):
-        with zipfile.ZipFile(image_zip_file, 'r') as zip_ref:
-          zip_ref.extractall('.')
-            
+        with zipfile.ZipFile(image_zip_file, "r") as zip_ref:
+            zip_ref.extractall(".")
+
     @staticmethod
     def replace_image_abspath(data, image_column):
         data = pd.read_csv(data)

@@ -45,12 +45,7 @@ class MultiModalCloudPredictor(CloudPredictor):
         predictor_cls = multimodal_predictor_cls
         return predictor_cls
 
-    def predict_real_time(
-        self,
-        test_data,
-        test_data_image_column=None,
-        accept="application/x-parquet"
-    ):
+    def predict_real_time(self, test_data, test_data_image_column=None, accept="application/x-parquet"):
         """
         Predict with the deployed SageMaker endpoint. A deployed SageMaker endpoint is required.
         This is intended to provide a low latency inference.
@@ -97,8 +92,7 @@ class MultiModalCloudPredictor(CloudPredictor):
         if isinstance(test_data, pd.DataFrame):
             if test_data_image_column is not None:
                 test_data = convert_image_path_to_encoded_bytes_in_dataframe(
-                    dataframe=test_data,
-                    image_column=test_data_image_column
+                    dataframe=test_data, image_column=test_data_image_column
                 )
             content_type = "application/x-parquet"
 

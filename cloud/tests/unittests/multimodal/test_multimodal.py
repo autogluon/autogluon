@@ -30,10 +30,7 @@ def test_multimodal_tabular_text(test_helper):
             cloud_predictor_no_train,
             test_data,
             fit_instance_type="ml.g4dn.2xlarge",
-            fit_kwargs=dict(
-                instance_type="ml.g4dn.2xlarge",
-                custom_image_uri=test_helper.gpu_training_image
-            ),
+            fit_kwargs=dict(instance_type="ml.g4dn.2xlarge", custom_image_uri=test_helper.gpu_training_image),
             deploy_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
             predict_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
         )
@@ -43,7 +40,7 @@ def test_multimodal_tabular_text_image(test_helper):
     train_data = "tabular_text_image_train.csv"
     test_data = "tabular_text_image_test.csv"
     images = "tabular_text_image_images.zip"
-    image_column = 'Images'
+    image_column = "Images"
     with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, test_data, images)
         test_helper.extract_images(images)
@@ -72,11 +69,9 @@ def test_multimodal_tabular_text_image(test_helper):
             fit_kwargs=dict(
                 instance_type="ml.g4dn.2xlarge",
                 image_column=image_column,
-                custom_image_uri=test_helper.gpu_training_image
+                custom_image_uri=test_helper.gpu_training_image,
             ),
             deploy_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
             predict_real_time_kwargs=dict(test_data_image_column=image_column),
-            predict_kwargs=dict(
-                test_data_image_column=image_column,
-                custom_image_uri=test_helper.cpu_inference_image),
-            )
+            predict_kwargs=dict(test_data_image_column=image_column, custom_image_uri=test_helper.cpu_inference_image),
+        )

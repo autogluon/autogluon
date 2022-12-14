@@ -78,7 +78,7 @@ def test_tabular_tabular_text_image(test_helper):
             fit_kwargs=dict(
                 instance_type="ml.g4dn.2xlarge",
                 image_column=image_column,
-                custom_image_uri=test_helper.gpu_training_image
+                custom_image_uri=test_helper.gpu_training_image,
             ),
             deploy_kwargs=dict(custom_image_uri=test_helper.gpu_inference_image),
             predict_real_time_kwargs=dict(

@@ -24,11 +24,13 @@ def get_real_image_path_in_image_column(image_root_path, path):
     """
     image_root_path = os.path.abspath(image_root_path)
     path = path.split(os.path.sep)
-    while path[0] == '':
+    while path[0] == "":
         # Avoid cases like /foo/test
         path.pop(0)
     image_path_root_head, image_path_tail = os.path.split(image_root_path)
-    assert image_path_tail == path[0], 'Please make sure the image path inside your image column contains the root image directory'
+    assert (
+        image_path_tail == path[0]
+    ), "Please make sure the image path inside your image column contains the root image directory"
 
     return os.path.join(image_path_root_head, *path)
 
