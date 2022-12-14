@@ -442,7 +442,7 @@ class MultiModalPredictor:
                     label=label,
                     match_label=match_label,
                     problem_type=None,  # Ensure that matcher will always infer problem type.
-                    pipeline=problem_type,
+                    presets=problem_type,
                     hyperparameters=hyperparameters,
                     eval_metric=eval_metric,
                     path=path,

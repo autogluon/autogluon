@@ -91,7 +91,7 @@ from .utils import (
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
-    tensor_to_ndarray,
+    is_matching,
     try_to_infer_pos_label,
 )
 
@@ -112,7 +112,7 @@ class MultiModalMatcher:
         label: Optional[str] = None,
         match_label: Optional[Union[int, str]] = None,
         problem_type: Optional[str] = None,
-        pipeline: Optional[str] = None,
+        presets: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -193,7 +193,7 @@ class MultiModalMatcher:
         self._match_label = match_label
         self._label_column = label
         self._problem_type = problem_type.lower() if problem_type is not None else None
-        self._pipeline = pipeline.lower() if pipeline is not None else None
+        self._presets = presets.lower() if presets is not None else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = None
@@ -218,7 +218,7 @@ class MultiModalMatcher:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
-        if self._pipeline is not None:
+        if self._presets is not None:
             (
                 self._config,
                 self._query_config,
@@ -227,7 +227,7 @@ class MultiModalMatcher:
                 self._response_model,
                 self._query_processors,
                 self._response_processors,
-            ) = init_pretrained_matcher(presets=self._pipeline, hyperparameters=hyperparameters)
+            ) = init_pretrained_matcher(presets=self._presets, hyperparameters=hyperparameters)
 
     @property
     def query(self):
@@ -434,7 +434,7 @@ class MultiModalMatcher:
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
                 problem_type=problem_type,
-                pipeline=self._pipeline,
+                is_matching=is_matching(self._presets),
                 eval_metric_name=self._eval_metric_name,
             )
         else:
@@ -671,6 +671,7 @@ class MultiModalMatcher:
             metric_name=validation_metric_name,
             num_classes=self._output_shape,
             pos_label=pos_label,
+            is_matching=is_matching(self._presets),
         )
         logger.debug(f"validation_metric_name: {validation_metric_name}")
         logger.debug(f"validation_metric: {validation_metric}")
@@ -685,9 +686,8 @@ class MultiModalMatcher:
             distance_type=config.matcher.distance.type,
         )
 
-        if self._pipeline == IMAGE_TEXT_SIMILARITY:
-            miner_func = None
-        else:
+        miner_func = None
+        if self._problem_type == BINARY:
             miner_func = get_matcher_miner_func(
                 miner_type=config.matcher.miner.type,
                 pos_margin=config.matcher.miner.pos_margin,
@@ -943,7 +943,7 @@ class MultiModalMatcher:
                         path=top_k_model_paths[0],
                     )
 
-                    if self._pipeline == IMAGE_TEXT_SIMILARITY:
+                    if IMAGE_TEXT_SIMILARITY in self._presets:
                         best_score = self._evaluate_symmetric_ranking(val_df)
                     else:
                         best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
@@ -956,7 +956,7 @@ class MultiModalMatcher:
                             response_model=response_model,
                             state_dict=cand_avg_state_dict,
                         )
-                        if self._pipeline == IMAGE_TEXT_SIMILARITY:
+                        if IMAGE_TEXT_SIMILARITY in self._presets:
                             cand_score = self._evaluate_symmetric_ranking(val_df)
                         else:
                             cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[
@@ -1722,7 +1722,7 @@ class MultiModalMatcher:
                     "column_types": self._column_types,
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
-                    "pipeline": self._pipeline,
+                    "presets": self._presets,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
@@ -1819,7 +1819,7 @@ class MultiModalMatcher:
         matcher._match_label = assets["match_label"]
         matcher._label_column = assets["label_column"]
         matcher._problem_type = assets["problem_type"]
-        matcher._pipeline = assets["pipeline"]
+        matcher._presets = assets["presets"]
         matcher._eval_metric_name = assets["eval_metric_name"]
         matcher._verbosity = verbosity
         matcher._resume = resume
