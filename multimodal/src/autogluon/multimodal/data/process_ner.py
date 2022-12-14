@@ -27,7 +27,7 @@ from ..constants import (
     TOKEN_WORD_MAPPING,
     WORD_OFFSETS,
 )
-from .collator import Pad, Stack
+from .collator import PadCollator, StackCollator
 from .utils import process_ner_annotations, tokenize_ner_text
 
 logger = logging.getLogger(AUTOMM)
@@ -93,12 +93,12 @@ class NerProcessor:
         if self.prefix == NER_TEXT:
             fn.update(
                 {
-                    self.model.text_token_ids_key: Pad(pad_val=self.tokenizer.pad_token_id),
-                    self.model.text_valid_length_key: Stack(),
-                    self.model.text_segment_ids_key: Pad(pad_val=0),
-                    self.model.text_token_word_mapping_key: Pad(pad_val=0),
-                    self.model.text_word_offsets_key: Pad(pad_val=0),
-                    self.model.label_key: Stack(),
+                    self.model.text_token_ids_key: PadCollator(pad_val=self.tokenizer.pad_token_id),
+                    self.model.text_valid_length_key: StackCollator(),
+                    self.model.text_segment_ids_key: PadCollator(pad_val=0),
+                    self.model.text_token_word_mapping_key: PadCollator(pad_val=0),
+                    self.model.text_word_offsets_key: PadCollator(pad_val=0),
+                    self.model.label_key: StackCollator(),
                 }
             )
         return fn

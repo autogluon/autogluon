@@ -1,9 +1,11 @@
 import logging
 import os
+import random
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
+import PIL
 from omegaconf import DictConfig, OmegaConf
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
@@ -432,12 +434,21 @@ def data_to_df(
     elif isinstance(data, dict):
         data = pd.DataFrame(data)
     elif isinstance(data, list):
-        if header is None:
-            data = pd.DataFrame(data)
+        assert len(data) > 0, f"Expected data to have length > 0, but got {data} of len {len(data)}"
+        if contains_valid_images(data):
+            data_dict = {"image": data}
+            data = pd.DataFrame(data_dict)
         else:
-            data = pd.DataFrame({header: data})
+            if header is None:
+                data = pd.DataFrame(data)
+            else:
+                data = pd.DataFrame({header: data})
     elif isinstance(data, str):
-        data = load_pd.load(data)
+        if contains_valid_images(data):
+            data_dict = {"image": [data]}
+            data = pd.DataFrame(data_dict)
+        else:
+            data = load_pd.load(data)
     else:
         raise NotImplementedError(
             f"The format of data is not understood. "
@@ -520,3 +531,38 @@ def infer_dtypes_by_model_names(model_config: DictConfig):
         fallback_dtype = list(allowable_dtypes)[0]
 
     return allowable_dtypes, fallback_dtype
+
+
+def contains_valid_images(data: Union[str, list], sample_n: Optional[int] = 50) -> bool:
+    """
+    Check if the data contains valid uncorrupted images. If data is a list of file paths, as long as there's 1 image
+    that can be opened with PIL, the data contains valid uncorrupted images.
+    Parameters
+    ----------
+    data
+        path to the file to be checked, or list of file paths
+    Returns
+    -------
+    whether the data contains valid uncorrupted images
+    """
+
+    if isinstance(data, str):
+        try:
+            with PIL.Image.open(data) as _:
+                return True
+        except:
+            return False
+    elif isinstance(data, list):
+        data_index = list(range(len(data)))
+        num_samples = min(len(data), sample_n)
+        subsample_index = random.sample(data_index, k=num_samples)
+        for i in subsample_index:
+            image_path = data[i]
+            try:
+                with PIL.Image.open(image_path) as _:
+                    return True
+            except:
+                continue
+        return False
+    else:
+        raise Exception(f"Expected data to be a list or a str, but got {type(data)}")
