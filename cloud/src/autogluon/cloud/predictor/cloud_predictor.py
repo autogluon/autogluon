@@ -805,7 +805,6 @@ class CloudPredictor(ABC):
     def predict(
         self,
         test_data,
-        test_data_image_path=None,
         test_data_image_column=None,
         predictor_path=None,
         framework_version="latest",

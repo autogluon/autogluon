@@ -69,7 +69,7 @@ class MultiModalCloudPredictor(CloudPredictor):
                 Or a local path to a single image file.
                 Or a list of local paths to image files.
         test_data_image_column: default = None
-            If provided a pandas.DataFrame as the test_data and test_data involves image modality,
+            If provided a csv file or pandas.DataFrame as the test_data and test_data involves image modality,
             you must specify the column name corresponding to image paths.
             The path MUST be an abspath
         accept: str, default = application/x-parquet
@@ -123,7 +123,7 @@ class MultiModalCloudPredictor(CloudPredictor):
                 or a local path to a single image.
         test_data_image_column: Optional(str)
             If test_data involves image modality, you must specify the column name corresponding to image paths.
-            Images have to live in the same directory specified by the column.
+            The path MUST be an abspath
         kwargs:
             Refer to `CloudPredictor.predict()`
         """
