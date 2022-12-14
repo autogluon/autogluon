@@ -245,7 +245,7 @@ def create_fusion_data_processors(
     # Only keep the modalities with non-empty processors.
     data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
 
-    if TEXT_NER in data_processors:
+    if TEXT_NER in data_processors and LABEL in data_processors:
         # LabelProcessor is not needed for NER tasks as annotations are handled in NerProcessor.
         data_processors.pop(LABEL)
     return data_processors
