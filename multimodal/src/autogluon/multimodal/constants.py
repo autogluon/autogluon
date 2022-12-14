@@ -122,7 +122,7 @@ MMDET = "mmdet"
 MMOCR = "mmocr"
 
 # Modality keys. may need to update here if new modality keys are added in above.
-ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, NER]
+ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER]
 
 # Keys to compute metrics
 Y_PRED = "y_pred"
