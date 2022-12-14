@@ -10,9 +10,9 @@ from omegaconf import DictConfig
 from torch import nn
 
 from ..constants import AUTOMM, FUSION, QUERY, RESPONSE
+from ..presets import matcher_presets
 from .data import data_to_df
 from .model import create_model
-from ..presets import matcher_presets
 
 logger = logging.getLogger(AUTOMM)
 

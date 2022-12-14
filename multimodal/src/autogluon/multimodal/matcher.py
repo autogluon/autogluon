@@ -86,12 +86,12 @@ from .utils import (
     infer_precision,
     init_df_preprocessor,
     init_pretrained_matcher,
+    is_matching,
     load_text_tokenizers,
     process_save_path,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
-    is_matching,
     try_to_infer_pos_label,
 )
 

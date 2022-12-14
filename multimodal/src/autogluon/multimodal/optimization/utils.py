@@ -29,7 +29,6 @@ from ..constants import (
     DIRECT_LOSS,
     F1,
     FEATURES,
-    RECALL,
     IA3,
     IA3_BIAS,
     IA3_LORA,
@@ -52,6 +51,7 @@ from ..constants import (
     PEFT_STRATEGIES,
     QUADRATIC_KAPPA,
     R2,
+    RECALL,
     REGRESSION,
     RMSE,
     ROC_AUC,
@@ -300,7 +300,7 @@ def get_metric(
     elif metric_name == RECALL:
         if is_matching:
             return CustomHitRate(), None
-        else: # TODO: support recall for general classification tasks.
+        else:  # TODO: support recall for general classification tasks.
             raise ValueError("Recall is not supported yet.")
     else:
         raise ValueError(f"Unknown metric {metric_name}")
