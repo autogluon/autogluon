@@ -471,6 +471,8 @@ def generate_train_test_split(X: DataFrame,
     """
     if (test_size <= 0.0) or (test_size >= 1.0):
         raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
+    valid_problem_types = [BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE]
+    assert problem_type in valid_problem_types, f'Unknown problem type "{problem_type}" | Valid problem types: {valid_problem_types}'
 
     X_split = X
     y_split = y
