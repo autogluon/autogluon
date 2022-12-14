@@ -106,10 +106,9 @@ class TabularCloudPredictor(CloudPredictor):
             Can be a pandas.DataFrame, a local path to a csv file.
             When predicting multimodality with image modality:
                 You need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
-        test_data_image_column: Optional(str)
-            If provided a pandas.DataFrame as the test_data and test_data involves image modality,
-            you must specify the column name corresponding to image paths.
-            Images have to live in the same directory specified by the column.
+        test_data_image_column: default = None
+            If test_data involves image modality, you must specify the column name corresponding to image paths.
+            The path MUST be an abspath
         accept: str, default = application/x-parquet
             Type of accept output content.
             Valid options are application/x-parquet, text/csv, application/json

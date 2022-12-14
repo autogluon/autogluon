@@ -69,19 +69,10 @@ class MultiModalCloudPredictor(CloudPredictor):
                     Similarly, you need to specify `test_data_image_path` and `test_data_image_column`, and make sure the image column contains relative path to the image.
                 Or a local path to a single image file.
                 Or a list of local paths to image files.
-        test_data_image_path: str, default = None
-            A local path to the images. This parameter is REQUIRED if you want to inference with multimodality involving image modality.
-            If you provided this parameter, the image path inside your train/tune data MUST be relative.
-            Path needs to be a folder containing the images.
-
-            Example:
-            If your images live under a root directory `example_images/`, then you would provide `example_images` as the `image_path`.
-            And you want to make sure in your test file, the column corresponding to the images is a relative path prefix with the root directory.
-            For example, `example_images/test/image1.png`. An absolute path will NOT work.
         test_data_image_column: default = None
             If provided a pandas.DataFrame as the test_data and test_data involves image modality,
             you must specify the column name corresponding to image paths.
-            Images have to live in the same directory specified by the column.
+            The path MUST be an abspath
         accept: str, default = application/x-parquet
             Type of accept output content.
             Valid options are application/x-parquet, text/csv, application/json
@@ -105,12 +96,9 @@ class MultiModalCloudPredictor(CloudPredictor):
             test_data = np.array([read_image_bytes_and_encode(image) for image in test_data], dtype="object")
             content_type = "application/x-npy"
         if isinstance(test_data, pd.DataFrame):
-            if test_data_image_path is not None or test_data_image_column is not None:
-                assert test_data_image_path is not None and test_data_image_column is not None, \
-                    "Please specify both `test_data_image_path` and `test_data_image_column` when involves image modality"
+            if test_data_image_column is not None:
                 test_data = convert_image_path_to_encoded_bytes_in_dataframe(
                     dataframe=test_data,
-                    image_root_path=test_data_image_path,
                     image_column=test_data_image_column
                 )
             content_type = "application/x-parquet"

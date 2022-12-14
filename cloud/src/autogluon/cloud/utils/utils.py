@@ -42,10 +42,9 @@ def read_image_bytes_and_encode(image_path):
     return b85_image
 
 
-def convert_image_path_to_encoded_bytes_in_dataframe(dataframe, image_root_path, image_column):
+def convert_image_path_to_encoded_bytes_in_dataframe(dataframe, image_column):
     assert image_column in dataframe, "Please specify a valid image column name"
     dataframe = copy.deepcopy(dataframe)
-    dataframe[image_column] = [get_real_image_path_in_image_column(image_root_path, path) for path in dataframe[image_column]]
     dataframe[image_column] = [read_image_bytes_and_encode(path) for path in dataframe[image_column]]
 
     return dataframe
