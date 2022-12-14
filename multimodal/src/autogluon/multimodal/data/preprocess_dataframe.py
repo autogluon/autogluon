@@ -333,7 +333,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 if len(self._text_feature_names) != 0:
                     # If there are ner annotations and text columns but no NER feature columns,
                     # we will convert the first text column into a ner column.
-                    # Added for backward compatability for v0.6.0 where column_type is not specified.
+                    # Added for backward compatibility for v0.6.0 where column_type is not specified.
                     self._ner_feature_names.append(self._text_feature_names.pop(0))
                     self.column_types[self._ner_feature_names[0]] = TEXT_NER
                 else:
