@@ -75,9 +75,11 @@ def get_annpaths(
                         ann_ids = []
                         for r in rows:
                             data = r.strip().split()
-                            if len(data) == 1:
+                            if len(data) == 1:  # Each row is an annotation id
                                 ann_ids.append(data[0])
-                            elif len(data) == 2:
+                            elif (
+                                len(data) == 2
+                            ):  # Each row contains an annotation id and a flag (0 if we do not use this annotation in this split, and 1 if we use it)
                                 ann_id, used = data
                                 if int(used) == 1:
                                     ann_ids.append(ann_id)
