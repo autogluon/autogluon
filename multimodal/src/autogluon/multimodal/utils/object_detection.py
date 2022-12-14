@@ -560,7 +560,7 @@ class COCODataset:
 
 def cocoeval_torchmetrics(outputs: List):
     """
-    Evaluate predictor's output using torchmetrics' mAP implementation.
+    Evaluate predictor's output using torchmetrics' mAP implementation: https://github.com/Lightning-AI/metrics
 
     Parameters
     ----------
@@ -617,7 +617,7 @@ def cocoeval_pycocotools(
     outputs: List, data: pd.DataFrame, anno_file: str, cache_path: str, metrics: Optional[Union[str, List]]
 ):
     """
-    Evaluate predictor's output using pycocotool's mAP implementation.
+    Evaluate predictor's output using pycocotool's mAP implementation: https://github.com/cocodataset/cocoapi
     Pycocotool's implementation takes COCO format prediction result file as input.
     So here requires a cache_path to store the prediction result file.
 
