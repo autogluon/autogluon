@@ -246,7 +246,8 @@ def create_fusion_data_processors(
     data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
 
     if TEXT_NER in data_processors:
-        data_processors[LABEL] = []
+        # LabelProcessor is not needed for NER tasks as annotations are handled in NerProcessor.
+        data_processors.pop(LABEL)
     return data_processors
 
 
