@@ -2,6 +2,7 @@
 NULL = "null"
 CATEGORICAL = "categorical"
 TEXT = "text"
+TEXT_NER = "text_ner"  # Added for NER text column
 NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
 IMAGE_BYTEARRAY = "image_bytearray"
@@ -115,7 +116,7 @@ MMDET = "mmdet"
 MMOCR = "mmocr"
 
 # Modality keys. may need to update here if new modality keys are added in above.
-ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL]
+ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER]
 
 # Keys to compute metrics
 Y_PRED = "y_pred"
@@ -193,6 +194,7 @@ CATEGORICAL_TRANSFORMER = "categorical_transformer"
 FUSION = "fusion"
 FUSION_MLP = f"{FUSION}_mlp"
 FUSION_TRANSFORMER = f"{FUSION}_transformer"
+FUSION_NER = f"{FUSION}_{NER}"
 MMDET_IMAGE = "mmdet_image"
 MMOCR_TEXT_DET = "mmocr_text_detection"
 MMOCR_TEXT_RECOG = "mmocr_text_recognition"

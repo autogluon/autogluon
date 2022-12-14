@@ -1,9 +1,11 @@
 import logging
 import os
+import random
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
+import PIL
 from omegaconf import DictConfig, OmegaConf
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
@@ -24,6 +26,7 @@ from ..constants import (
     NUMERICAL,
     ROIS,
     TEXT,
+    TEXT_NER,
 )
 from ..data import (
     CategoricalProcessor,
@@ -148,7 +151,7 @@ def create_data_processor(
         )
     elif data_type == LABEL:
         data_processor = LabelProcessor(model=model)
-    elif data_type == NER:
+    elif data_type == TEXT_NER:
         data_processor = NerProcessor(
             model=model,
             max_len=model_config.max_text_len,
@@ -192,7 +195,7 @@ def create_fusion_data_processors(
         CATEGORICAL: [],
         NUMERICAL: [],
         LABEL: [],
-        NER: [],
+        TEXT_NER: [],
     }
 
     model_dict = {model.prefix: model}
@@ -212,16 +215,16 @@ def create_fusion_data_processors(
 
         if per_name == NER_TEXT:
             # create a multimodal processor for NER.
-            data_processors[NER].append(
+            data_processors[TEXT_NER].append(
                 create_data_processor(
-                    data_type=NER,
+                    data_type=TEXT_NER,
                     config=config,
                     model=per_model,
                 )
             )
             requires_label = False
-            if data_types is not None and TEXT in data_types:
-                data_types.remove(TEXT)
+            if data_types is not None and TEXT_NER in data_types:
+                data_types.remove(TEXT_NER)
 
         if requires_label:
             # each model has its own label processor
@@ -243,6 +246,10 @@ def create_fusion_data_processors(
 
     # Only keep the modalities with non-empty processors.
     data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
+
+    if TEXT_NER in data_processors and LABEL in data_processors:
+        # LabelProcessor is not needed for NER tasks as annotations are handled in NerProcessor.
+        data_processors.pop(LABEL)
     return data_processors
 
 
@@ -266,7 +273,7 @@ def assign_feature_column_names(
     The data processors with feature column names added.
     """
     for per_modality in data_processors:
-        if per_modality == LABEL or per_modality == NER:
+        if per_modality == LABEL or per_modality == TEXT_NER:
             continue
         for per_model_processor in data_processors[per_modality]:
             # requires_column_info=True is used for feature column distillation.
@@ -427,12 +434,21 @@ def data_to_df(
     elif isinstance(data, dict):
         data = pd.DataFrame(data)
     elif isinstance(data, list):
-        if header is None:
-            data = pd.DataFrame(data)
+        assert len(data) > 0, f"Expected data to have length > 0, but got {data} of len {len(data)}"
+        if contains_valid_images(data):
+            data_dict = {"image": data}
+            data = pd.DataFrame(data_dict)
         else:
-            data = pd.DataFrame({header: data})
+            if header is None:
+                data = pd.DataFrame(data)
+            else:
+                data = pd.DataFrame({header: data})
     elif isinstance(data, str):
-        data = load_pd.load(data)
+        if contains_valid_images(data):
+            data_dict = {"image": [data]}
+            data = pd.DataFrame(data_dict)
+        else:
+            data = load_pd.load(data)
     else:
         raise NotImplementedError(
             f"The format of data is not understood. "
@@ -515,3 +531,38 @@ def infer_dtypes_by_model_names(model_config: DictConfig):
         fallback_dtype = list(allowable_dtypes)[0]
 
     return allowable_dtypes, fallback_dtype
+
+
+def contains_valid_images(data: Union[str, list], sample_n: Optional[int] = 50) -> bool:
+    """
+    Check if the data contains valid uncorrupted images. If data is a list of file paths, as long as there's 1 image
+    that can be opened with PIL, the data contains valid uncorrupted images.
+    Parameters
+    ----------
+    data
+        path to the file to be checked, or list of file paths
+    Returns
+    -------
+    whether the data contains valid uncorrupted images
+    """
+
+    if isinstance(data, str):
+        try:
+            with PIL.Image.open(data) as _:
+                return True
+        except:
+            return False
+    elif isinstance(data, list):
+        data_index = list(range(len(data)))
+        num_samples = min(len(data), sample_n)
+        subsample_index = random.sample(data_index, k=num_samples)
+        for i in subsample_index:
+            image_path = data[i]
+            try:
+                with PIL.Image.open(image_path) as _:
+                    return True
+            except:
+                continue
+        return False
+    else:
+        raise Exception(f"Expected data to be a list or a str, but got {type(data)}")

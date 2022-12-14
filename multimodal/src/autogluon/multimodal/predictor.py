@@ -52,6 +52,8 @@ from .constants import (
     FEW_SHOT,
     FEW_SHOT_TEXT_CLASSIFICATION,
     GREEDY_SOUP,
+    IMAGE_BYTEARRAY,
+    IMAGE_PATH,
     IMAGE_SIMILARITY,
     IMAGE_TEXT_SIMILARITY,
     LABEL,
@@ -75,6 +77,7 @@ from .constants import (
     REGRESSION,
     SCORE,
     TEXT,
+    TEXT_NER,
     TEXT_SIMILARITY,
     UNIFORM_SOUP,
     Y_PRED,
@@ -88,6 +91,8 @@ from .data.infer_types import (
     infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
     infer_rois_column_type,
+    is_imagebytearray_column,
+    is_imagepath_column,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
@@ -1865,6 +1870,18 @@ class MultiModalPredictor:
                 )
         else:  # called .fit() or .load()
             column_types = self._column_types
+            column_types_copy = copy.deepcopy(column_types)
+            for col_name, col_type in column_types.items():
+                if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
+                    if is_imagepath_column(data=data[col_name], col_name=col_name, sample_n=1):
+                        image_type = IMAGE_PATH
+                    elif is_imagebytearray_column(data=data[col_name], col_name=col_name, sample_n=1):
+                        image_type = IMAGE_BYTEARRAY
+                    else:
+                        raise ValueError(f"Image type in column {col_name} is not supported!")
+                    if col_type != image_type:
+                        column_types_copy[col_name] = image_type
+            self._df_preprocessor._column_types = column_types_copy
 
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
@@ -2667,16 +2684,13 @@ class MultiModalPredictor:
 
         # Save text tokenizers before saving data processors
         data_processors = copy.deepcopy(self._data_processors)
-        if TEXT in data_processors:
-            data_processors[TEXT] = save_text_tokenizers(
-                text_processors=data_processors[TEXT],
-                path=path,
-            )
-        if NER in data_processors:
-            data_processors[NER] = save_text_tokenizers(
-                text_processors=data_processors[NER],
-                path=path,
-            )
+
+        for modality in [TEXT, TEXT_NER, NER]:
+            if modality in data_processors:
+                data_processors[modality] = save_text_tokenizers(
+                    text_processors=data_processors[modality],
+                    path=path,
+                )
 
         with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
             pickle.dump(data_processors, fp)
@@ -2857,16 +2871,13 @@ class MultiModalPredictor:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
                 data_processors = CustomUnpickler(fp).load()
             # Load text tokenizers after loading data processors.
-            if TEXT in data_processors:
-                data_processors[TEXT] = load_text_tokenizers(
-                    text_processors=data_processors[TEXT],
-                    path=path,
-                )
-            if NER in data_processors:
-                data_processors[NER] = load_text_tokenizers(
-                    text_processors=data_processors[NER],
-                    path=path,
-                )
+            for modality in [TEXT, TEXT_NER, NER]:  # NER is included for backward compatibility
+                if modality in data_processors:
+                    data_processors[modality] = load_text_tokenizers(
+                        text_processors=data_processors[modality],
+                        path=path,
+                    )
+
             # backward compatibility. Add feature column names in each data processor.
             data_processors = assign_feature_column_names(
                 data_processors=data_processors,

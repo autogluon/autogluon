@@ -1,7 +1,7 @@
 import codecs
 import random
 import warnings
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -10,12 +10,12 @@ from nlpaug.util import Method
 from text_unidecode import unidecode
 
 from ..constants import IDENTIFIER, MMLAB_MODELS
-from .collator import Dict
+from .collator import DictCollator
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 
 
 def extract_value_from_config(
-    config: dict,
+    config: Dict,
     keys: Tuple[str, ...],
 ):
     """
@@ -130,7 +130,7 @@ class InsertPunctuation(Augmenter):
 
 def get_collate_fn(
     df_preprocessor: Union[MultiModalFeaturePreprocessor, List[MultiModalFeaturePreprocessor]],
-    data_processors: Union[dict, List[dict]],
+    data_processors: Union[Dict, List[Dict]],
     per_gpu_batch_size: Optional[int] = None,
 ):
     """
@@ -170,7 +170,7 @@ def get_collate_fn(
                         )
                     else:
                         collate_fn.update(per_model_processor.collate_fn(per_modality_column_names))
-    return Dict(collate_fn)
+    return DictCollator(collate_fn)
 
 
 def apply_df_preprocessor(
@@ -215,7 +215,7 @@ def apply_df_preprocessor(
 
 
 def apply_data_processor(
-    per_sample_features: dict, data_processors: dict, feature_modalities: dict, is_training: bool
+    per_sample_features: Dict, data_processors: Dict, feature_modalities: Dict, is_training: bool
 ):
     """
     Process one sample's features.
@@ -247,7 +247,7 @@ def apply_data_processor(
 
 
 def get_per_sample_features(
-    modality_features: dict, modality_types: dict, idx: int, id_mappings: Optional[dict] = None
+    modality_features: Dict, modality_types: Dict, idx: int, id_mappings: Optional[Dict] = None
 ):
     """
     Extract the modality features of one sample.
