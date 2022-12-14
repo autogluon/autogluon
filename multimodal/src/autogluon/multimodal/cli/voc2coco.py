@@ -29,7 +29,7 @@ from tqdm import tqdm
 from autogluon.multimodal.utils.object_detection import dump_voc_classes, dump_voc_xml_files, process_voc_annotations
 
 DEFAULT_EXT = ".jpg"
-MIN_AREA = 4  # TODO: put in arg?
+MIN_AREA = 4
 
 
 def get_label2id(labels_path: str) -> Dict[str, int]:
