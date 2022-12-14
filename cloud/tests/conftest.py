@@ -5,6 +5,8 @@ import boto3
 import pandas as pd
 import pytest
 
+from datetime import datetime, timezone
+
 
 class CloudTestHelper:
 
@@ -25,6 +27,10 @@ class CloudTestHelper:
         s3 = boto3.client("s3")
         for arg in args:
             s3.download_file("autogluon-cloud", arg, os.path.basename(arg))
+
+    @staticmethod
+    def get_utc_timestamp_now():
+        return datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
 
     @staticmethod
     def extract_images(image_zip_file):
@@ -55,8 +61,7 @@ class CloudTestHelper:
         fit_kwargs=None,
         deploy_kwargs=None,
         predict_real_time_kwargs=None,
-        predict_kwargs=None,
-        skip_predict=False,  # TODO: remove this after autogluon 0.6 release. Currently, some issues cause some module's batch inference to fail
+        predict_kwargs=None
     ):
         if fit_kwargs is None:
             fit_kwargs = dict(instance_type="ml.m5.2xlarge")
@@ -93,20 +98,19 @@ class CloudTestHelper:
 
         if predict_kwargs is None:
             predict_kwargs = dict()
-        if not skip_predict:
-            cloud_predictor.predict(test_data, **predict_kwargs)
-            info = cloud_predictor.info()
-            assert info["recent_transform_job"]["status"] == "Completed"
+        cloud_predictor.predict(test_data, **predict_kwargs)
+        info = cloud_predictor.info()
+        assert info["recent_transform_job"]["status"] == "Completed"
 
         # Test deploy with already trained predictor
         trained_predictor_path = cloud_predictor._fit_job.get_output_path()
         cloud_predictor_no_train.deploy(predictor_path=trained_predictor_path, **deploy_kwargs)
         CloudTestHelper.test_endpoint(cloud_predictor_no_train, test_data, **predict_real_time_kwargs)
         cloud_predictor_no_train.cleanup_deployment()
-        if not skip_predict:
-            cloud_predictor_no_train.predict(test_data, predictor_path=trained_predictor_path, **predict_kwargs)
-            info = cloud_predictor_no_train.info()
-            assert info["recent_transform_job"]["status"] == "Completed"
+
+        cloud_predictor_no_train.predict(test_data, predictor_path=trained_predictor_path, **predict_kwargs)
+        info = cloud_predictor_no_train.info()
+        assert info["recent_transform_job"]["status"] == "Completed"
 
 
 @pytest.fixture

@@ -7,6 +7,7 @@ def test_text(test_helper):
     train_data = "text_train.csv"
     tune_data = "text_tune.csv"
     test_data = "text_test.csv"
+    timestamp = test_helper.get_utc_timestamp_now()
     with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, tune_data, test_data)
         time_limit = 60
@@ -14,10 +15,11 @@ def test_text(test_helper):
         predictor_init_args = dict(label="label", eval_metric="acc")
         predictor_fit_args = dict(train_data=train_data, tuning_data=tune_data, time_limit=time_limit)
         cloud_predictor = TextCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-text", local_output_path="test_text_cloud_predictor"
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-text/{timestamp}",
+            local_output_path="test_text_cloud_predictor"
         )
         cloud_predictor_no_train = TextCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-text-no-train",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-text-no-train/{timestamp}",
             local_output_path="test_text_cloud_predictor_no_train",
         )
         test_helper.test_functionality(
@@ -39,6 +41,7 @@ def test_multimodal_text_only(test_helper):
     train_data = "text_train.csv"
     tune_data = "text_tune.csv"
     test_data = "text_test.csv"
+    timestamp = test_helper.get_utc_timestamp_now()
     with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, tune_data, test_data)
         time_limit = 60
@@ -46,11 +49,11 @@ def test_multimodal_text_only(test_helper):
         predictor_init_args = dict(label="label", eval_metric="acc")
         predictor_fit_args = dict(train_data=train_data, tuning_data=tune_data, time_limit=time_limit)
         cloud_predictor = MultiModalCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-multimodal-text",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-multimodal-text/{timestamp}",
             local_output_path="test_multimodal_text_cloud_predictor",
         )
         cloud_predictor_no_train = MultiModalCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-multimodal-text-no-train",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-multimodal-text-no-train/{timestamp}",
             local_output_path="test_multimodal_text_cloud_predictor_no_train",
         )
         test_helper.test_functionality(

@@ -8,6 +8,7 @@ def test_image(test_helper):
     train_image = "shopee-iet.zip"
     test_data = "test_images/BabyPants_1035.jpg"
     image_column = "image"
+    timestamp = test_helper.get_utc_timestamp_now()
     with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, train_image, test_data)
         test_helper.extract_images(train_image)
@@ -18,10 +19,10 @@ def test_image(test_helper):
         predictor_init_args = dict(label="label", eval_metric="acc")
         predictor_fit_args = dict(train_data=train_data, time_limit=time_limit)
         cloud_predictor = ImageCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-image", local_output_path="test_image_cloud_predictor"
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-image/{timestamp}", local_output_path="test_image_cloud_predictor"
         )
         cloud_predictor_no_train = ImageCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-image-no-train",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-image-no-train/{timestamp}",
             local_output_path="test_image_cloud_predictor_no_train",
         )
         test_helper.test_functionality(
@@ -45,6 +46,7 @@ def test_multimodal_image_only(test_helper):
     train_image = "shopee-iet.zip"
     test_data = "test_images/BabyPants_1035.jpg"
     image_column = "image"
+    timestamp = test_helper.get_utc_timestamp_now()
     with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, train_image, test_data)
         test_helper.extract_images(train_image)
@@ -55,11 +57,11 @@ def test_multimodal_image_only(test_helper):
         predictor_init_args = dict(label="label", eval_metric="acc")
         predictor_fit_args = dict(train_data=train_data, time_limit=time_limit)
         cloud_predictor = MultiModalCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-multimodal-image",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-multimodal-image/{timestamp}",
             local_output_path="test_multimodal_image_cloud_predictor",
         )
         cloud_predictor_no_train = MultiModalCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-multimodal-image-no-train",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-multimodal-image-no-train/{timestamp}",
             local_output_path="test_multimodal_image_cloud_predictor_no_train",
         )
         test_helper.test_functionality(

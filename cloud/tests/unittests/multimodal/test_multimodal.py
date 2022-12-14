@@ -6,6 +6,7 @@ from autogluon.cloud import MultiModalCloudPredictor
 def test_multimodal_tabular_text(test_helper):
     train_data = "tabular_text_train.csv"
     test_data = "tabular_text_test.csv"
+    timestamp = test_helper.get_utc_timestamp_now()
     with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, test_data)
         time_limit = 60
@@ -15,11 +16,11 @@ def test_multimodal_tabular_text(test_helper):
         )
         predictor_fit_args = dict(train_data=train_data, time_limit=time_limit)
         cloud_predictor = MultiModalCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-multimodal-tabular-text",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-multimodal-tabular-text/{timestamp}",
             local_output_path="test_multimodal_tabular_text_cloud_predictor",
         )
         cloud_predictor_no_train = MultiModalCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-multimodal-tabular-text-no-train",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-multimodal-tabular-text-no-train/{timestamp}",
             local_output_path="test_multimodal_tabular_text_cloud_predictor_no_train",
         )
         test_helper.test_functionality(
@@ -39,6 +40,7 @@ def test_multimodal_tabular_text_image(test_helper):
     test_data = "tabular_text_image_test.csv"
     images = "tabular_text_image_images.zip"
     image_column = "Images"
+    timestamp = test_helper.get_utc_timestamp_now()
     with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, test_data, images)
         test_helper.extract_images(images)
@@ -51,11 +53,11 @@ def test_multimodal_tabular_text_image(test_helper):
         )
         predictor_fit_args = dict(train_data=train_data, time_limit=time_limit)
         cloud_predictor = MultiModalCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-multimodal-tabular-text-image",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-multimodal-tabular-text-image/{timestamp}",
             local_output_path="test_multimodal_tabular_text_image_cloud_predictor",
         )
         cloud_predictor_no_train = MultiModalCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-multimodal-tabular-text-image-no-train",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-multimodal-tabular-text-image-no-train/{timestamp}",
             local_output_path="test_multimodal_tabular_text_image_cloud_predictor_no_train",
         )
         test_helper.test_functionality(

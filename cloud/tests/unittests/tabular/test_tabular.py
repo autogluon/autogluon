@@ -7,6 +7,7 @@ def test_tabular(test_helper):
     train_data = "tabular_train.csv"
     tune_data = "tabular_tune.csv"
     test_data = "tabular_test.csv"
+    timestamp = test_helper.get_utc_timestamp_now()
     with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, tune_data, test_data)
         time_limit = 60
@@ -18,10 +19,11 @@ def test_tabular(test_helper):
             time_limit=time_limit,
         )
         cloud_predictor = TabularCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-tabular", local_output_path="test_tabular_cloud_predictor"
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-tabular/{timestamp}",
+            local_output_path="test_tabular_cloud_predictor"
         )
         cloud_predictor_no_train = TabularCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-tabular-no-train",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-tabular-no-train/{timestamp}",
             local_output_path="test_tabular_cloud_predictor_no_train",
         )
         test_helper.test_functionality(
@@ -41,6 +43,7 @@ def test_tabular_tabular_text_image(test_helper):
     test_data = "tabular_text_image_test.csv"
     images = "tabular_text_image_images.zip"
     image_column = "Images"
+    timestamp = test_helper.get_utc_timestamp_now()
     with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, test_data, images)
         test_helper.extract_images(images)
@@ -61,11 +64,11 @@ def test_tabular_tabular_text_image(test_helper):
             },
         )
         cloud_predictor = TabularCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-tabular-tabular-text-image",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-tabular-tabular-text-image/{timestamp}",
             local_output_path="test_tabular_tabular_text_image_cloud_predictor",
         )
         cloud_predictor_no_train = TabularCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-tabular-tabular-text-image-no-train",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-tabular-tabular-text-image-no-train/{timestamp}",
             local_output_path="test_tabular_tabular_text_image_cloud_predictor_no_train",
         )
         test_helper.test_functionality(
@@ -79,13 +82,13 @@ def test_tabular_tabular_text_image(test_helper):
                 image_column=image_column,
                 custom_image_uri=test_helper.gpu_training_image,
             ),
-            deploy_kwargs=dict(custom_image_uri=test_helper.gpu_inference_image),
+            deploy_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
             predict_real_time_kwargs=dict(
                 test_data_image_column="Images",
             ),
             predict_kwargs=dict(
                 test_data_image_column="Images",
-                custom_image_uri=test_helper.gpu_inference_image,
+                custom_image_uri=test_helper.cpu_inference_image,
             ),
         )
 
@@ -93,6 +96,7 @@ def test_tabular_tabular_text_image(test_helper):
 def test_tabular_tabular_text(test_helper):
     train_data = "tabular_text_train.csv"
     test_data = "tabular_text_test.csv"
+    timestamp = test_helper.get_utc_timestamp_now()
     with tempfile.TemporaryDirectory() as _:
         test_helper.prepare_data(train_data, test_data)
         time_limit = 120
@@ -109,11 +113,11 @@ def test_tabular_tabular_text(test_helper):
             },
         )
         cloud_predictor = TabularCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-tabular-tabular-text",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-tabular-tabular-text/{timestamp}",
             local_output_path="test_tabular_tabular_text_cloud_predictor",
         )
         cloud_predictor_no_train = TabularCloudPredictor(
-            cloud_output_path="s3://autogluon-cloud-ci/test-tabular-tabular-text-no-train",
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-tabular-tabular-text-no-train/{timestamp}",
             local_output_path="test_tabular_tabular_text_cloud_predictor_no_train",
         )
         test_helper.test_functionality(
@@ -126,6 +130,6 @@ def test_tabular_tabular_text(test_helper):
                 instance_type="ml.g4dn.2xlarge",
                 custom_image_uri=test_helper.gpu_training_image,
             ),
-            deploy_kwargs=dict(custom_image_uri=test_helper.gpu_inference_image),
-            predict_kwargs=dict(custom_image_uri=test_helper.gpu_inference_image),
+            deploy_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
+            predict_kwargs=dict(custom_image_uri=test_helper.cpu_inference_image),
         )
