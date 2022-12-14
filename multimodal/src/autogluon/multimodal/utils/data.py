@@ -430,18 +430,13 @@ def data_to_df(
         data = pd.DataFrame(data)
     elif isinstance(data, list):
         assert len(data) > 0, f"Expected data to have length > 0, but got {data} of len {len(data)}"
-        if contains_valid_images(data):
-            data_dict = {"image": data}
-            data = pd.DataFrame(data_dict)
+        if header is None:
+            data = pd.DataFrame(data)
         else:
-            if header is None:
-                data = pd.DataFrame(data)
-            else:
-                data = pd.DataFrame({header: data})
+            data = pd.DataFrame({header: data})
     elif isinstance(data, str):
-        if contains_valid_images(data):
-            data_dict = {"image": [data]}
-            data = pd.DataFrame(data_dict)
+        if is_valid_imagepath(data):
+            data = pd.DataFrame([data])
         else:
             data = load_pd.load(data)
     else:
@@ -528,14 +523,13 @@ def infer_dtypes_by_model_names(model_config: DictConfig):
     return allowable_dtypes, fallback_dtype
 
 
-def contains_valid_images(data: Union[str, list], sample_n: Optional[int] = 50) -> bool:
+def is_valid_imagepath(data: str, sample_n: Optional[int] = 50) -> bool:
     """
-    Check if the data contains valid uncorrupted images. If data is a list of file paths, as long as there's 1 image
-    that can be opened with PIL, the data contains valid uncorrupted images.
+    Check if the data contains valid uncorrupted images.
     Parameters
     ----------
     data
-        path to the file to be checked, or list of file paths
+        path to the file to be checked
     Returns
     -------
     whether the data contains valid uncorrupted images
@@ -547,17 +541,5 @@ def contains_valid_images(data: Union[str, list], sample_n: Optional[int] = 50) 
                 return True
         except:
             return False
-    elif isinstance(data, list):
-        data_index = list(range(len(data)))
-        num_samples = min(len(data), sample_n)
-        subsample_index = random.sample(data_index, k=num_samples)
-        for i in subsample_index:
-            image_path = data[i]
-            try:
-                with PIL.Image.open(image_path) as _:
-                    return True
-            except:
-                continue
-        return False
     else:
         raise Exception(f"Expected data to be a list or a str, but got {type(data)}")
