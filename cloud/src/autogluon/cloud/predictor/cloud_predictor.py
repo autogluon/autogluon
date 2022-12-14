@@ -47,7 +47,6 @@ from ..utils.sagemaker_utils import (
 )
 from ..utils.utils import (
     convert_image_path_to_encoded_bytes_in_dataframe,
-    is_compressed_file,
     is_image_file,
     rename_file_with_uuid,
     unzip_file,

@@ -1,4 +1,3 @@
-import os
 import tempfile
 
 from autogluon.cloud import ImageCloudPredictor, MultiModalCloudPredictor

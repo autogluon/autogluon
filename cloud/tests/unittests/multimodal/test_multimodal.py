@@ -1,5 +1,4 @@
 import tempfile
-import zipfile
 
 from autogluon.cloud import MultiModalCloudPredictor
 

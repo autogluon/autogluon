@@ -5,11 +5,9 @@ import os
 import pandas as pd
 
 from autogluon.common.loaders import load_pd
-from autogluon.common.utils.s3_utils import is_s3_url, s3_path_to_bucket_prefix
 
 from ..utils.ag_sagemaker import AutoGluonMultiModalRealtimePredictor
 from ..utils.constants import VALID_ACCEPT
-from ..utils.s3_utils import is_s3_folder
 from ..utils.utils import convert_image_path_to_encoded_bytes_in_dataframe, is_image_file, read_image_bytes_and_encode
 from .cloud_predictor import CloudPredictor
 
