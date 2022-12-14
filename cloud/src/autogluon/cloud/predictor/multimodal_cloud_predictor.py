@@ -48,7 +48,6 @@ class MultiModalCloudPredictor(CloudPredictor):
     def predict_real_time(
         self,
         test_data,
-        test_data_image_path=None,
         test_data_image_column=None,
         accept="application/x-parquet"
     ):
@@ -63,10 +62,10 @@ class MultiModalCloudPredictor(CloudPredictor):
             The test data to be inferenced.
             Can be a pandas.DataFrame, a local path to a csv file.
             When predicting multimodality with image modality:
-                You need to specify `test_data_image_path` and `test_data_image_column`, and make sure the image column contains relative path to the image.
+                You need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
             When predicting with only images:
                 Can be a pandas.DataFrame, a local path to a csv file.
-                    Similarly, you need to specify `test_data_image_path` and `test_data_image_column`, and make sure the image column contains relative path to the image.
+                    Similarly, you need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
                 Or a local path to a single image file.
                 Or a list of local paths to image files.
         test_data_image_column: default = None

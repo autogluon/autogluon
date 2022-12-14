@@ -1,8 +1,9 @@
 import os
 
 import boto3
+import pandas as pd
 import pytest
-
+import zipfile
 
 class CloudTestHelper:
 
@@ -23,6 +24,17 @@ class CloudTestHelper:
         s3 = boto3.client("s3")
         for arg in args:
             s3.download_file("autogluon-cloud", arg, os.path.basename(arg))
+            
+    @staticmethod
+    def extract_images(image_zip_file):
+        with zipfile.ZipFile(image_zip_file, 'r') as zip_ref:
+          zip_ref.extractall('.')
+            
+    @staticmethod
+    def replace_image_abspath(data, image_column):
+        data = pd.read_csv(data)
+        data[image_column] = [os.path.abspath(path) for path in data[image_column]]
+        return data
 
     @staticmethod
     def test_endpoint(cloud_predictor, test_data, **predict_real_time_kwargs):
@@ -39,8 +51,6 @@ class CloudTestHelper:
         predictor_fit_args,
         cloud_predictor_no_train,
         test_data,
-        image_path=None,
-        fit_instance_type="ml.m5.2xlarge",
         fit_kwargs=None,
         deploy_kwargs=None,
         predict_real_time_kwargs=None,
@@ -48,12 +58,10 @@ class CloudTestHelper:
         skip_predict=False,  # TODO: remove this after autogluon 0.6 release. Currently, some issues cause some module's batch inference to fail
     ):
         if fit_kwargs is None:
-            fit_kwargs = dict()
+            fit_kwargs = dict(instance_type="ml.m5.2xlarge")
         cloud_predictor.fit(
             predictor_init_args=predictor_init_args,
             predictor_fit_args=predictor_fit_args,
-            image_path=image_path,
-            instance_type=fit_instance_type,
             **fit_kwargs,
         )
         info = cloud_predictor.info()

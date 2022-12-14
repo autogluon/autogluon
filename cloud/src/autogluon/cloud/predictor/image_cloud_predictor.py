@@ -24,11 +24,11 @@ class ImageCloudPredictor(CloudPredictor):
         predictor_cls = ImagePredictor
         return predictor_cls
 
-    def fit(self, *, predictor_init_args, predictor_fit_args, image_path, **kwargs):
+    def fit(self, *, predictor_init_args, predictor_fit_args, image_column, **kwargs):
         super().fit(
             predictor_init_args=predictor_init_args,
             predictor_fit_args=predictor_fit_args,
-            image_path=image_path,
+            image_column=image_column,
             **kwargs,
         )
 

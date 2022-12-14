@@ -297,6 +297,7 @@ class CloudPredictor(ABC):
             image_zip_filename = images
             assert os.path.isdir(images), "Please provide a folder containing the images"
             image_zip_filename = os.path.basename(os.path.normpath(images))
+            logger.log(20, "Zipping images ...")
             zipfolder(image_zip_filename, images)
             image_zip_filename += ".zip"
             logger.log(20, "Uploading images ...")
@@ -336,9 +337,12 @@ class CloudPredictor(ABC):
             if tune_data is not None:
                 common_tune_data_path = os.path.commonpath(tune_data[image_column].tolist())
             common_path = os.path.commonpath([common_train_data_path, common_tune_data_path])
-            train_data[image_column] = [os.path.relpath(path, common_path) for path in train_data[image_column]]
+            common_path_head = os.path.split(common_path)[0]  # we keep the base dir to match zipping behavior
+            print(common_path)
+            print(common_path_head)
+            train_data[image_column] = [os.path.relpath(path, common_path_head) for path in train_data[image_column]]
             if tune_data is not None:
-                tune_data[image_column] = [os.path.relpath(path, common_path) for path in tune_data[image_column]]
+                tune_data[image_column] = [os.path.relpath(path, common_path_head) for path in tune_data[image_column]]
 
         train_input = train_data
         train_data = self._prepare_data(train_data, "train")
@@ -882,7 +886,8 @@ class CloudPredictor(ABC):
             logger.warning(
                 "You can always retrieve the model trained with CloudPredictor and do batch inference using your custom solution."
             )
-            test_data = load_pd.load(test_data)
+            if isinstance(test_data, str):
+                test_data = load_pd.load(test_data)
             test_data = convert_image_path_to_encoded_bytes_in_dataframe(
                 dataframe=test_data,
                 image_column=test_data_image_column
