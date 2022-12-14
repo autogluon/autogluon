@@ -68,7 +68,7 @@ def test_multi_ner(checkpoint_name):
     predictor.fit(
         train_data=train_data,
         time_limit=40,
-        column_types={"text_snippet": "ner"},
+        column_types={"text_snippet": "text_ner"},
         hyperparameters={"model.ner_text.checkpoint_name": checkpoint_name},
     )
     scores = predictor.evaluate(train_data)

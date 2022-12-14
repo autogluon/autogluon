@@ -28,6 +28,7 @@ from ..constants import (
     NUMERICAL_TRANSFORMER,
     T_FEW,
     TEXT,
+    TEXT_NER,
     TIMM_IMAGE,
 )
 from ..data import MultiModalFeaturePreprocessor
@@ -94,7 +95,7 @@ def select_model(
     if len(df_preprocessor.numerical_feature_names) > 0:
         data_status[NUMERICAL] = True
     if len(df_preprocessor.ner_feature_names) > 0:
-        data_status[NER] = True
+        data_status[TEXT_NER] = True
 
     names = config.model.names
     if isinstance(names, str):

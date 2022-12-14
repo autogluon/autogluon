@@ -21,7 +21,6 @@ def default():
         ],
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-        "model.ner_text.checkpoint_name": "microsoft/deberta-v3-base",
         "env.num_workers": 2,
     }
 

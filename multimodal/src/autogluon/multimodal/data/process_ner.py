@@ -20,6 +20,7 @@ from ..constants import (
     NER_ANNOTATION,
     NER_TEXT,
     TEXT,
+    TEXT_NER,
     TEXT_SEGMENT_IDS,
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
@@ -129,7 +130,7 @@ class NerProcessor:
             self.tokenizer.model_max_length = self.max_len
         text_column, annotation_column = None, None
         for column_name, column_modality in feature_modalities.items():
-            if column_modality == NER:
+            if column_modality == TEXT_NER:
                 text_column = column_name
             if column_modality == NER_ANNOTATION:
                 annotation_column = column_name

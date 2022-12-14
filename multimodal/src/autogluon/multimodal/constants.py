@@ -2,6 +2,7 @@
 NULL = "null"
 CATEGORICAL = "categorical"
 TEXT = "text"
+TEXT_NER = "text_ner"  # Added for NER text column
 NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
 IMAGE_BYTEARRAY = "image_bytearray"

@@ -75,8 +75,9 @@ As you can see, this photo contains the logos of the Real Madrid football club, 
 
 ## Training
 Now let’s fit the predictor with the training data.
-Firstly, we need to specify the problem_type to **ner**.
-And to ensure the model to locate the correct text column for entity extraction, we need to set the corresponding column type to `ner` using the **column_types** parameter.
+Firstly, we need to specify the problem_type to **ner**. 
+As our annotations are used for text columns, to ensure the model to locate the correct text column for entity extraction, 
+we need to set the corresponding column type to `text_ner` using the **column_types** parameter in cases where multiple text columns are present.
 Here we set a tight time budget for a quick demo.
 
 ```{.python .input}
@@ -88,7 +89,7 @@ model_path = f"./tmp/{uuid.uuid4().hex}-automm_multimodal_ner"
 predictor = MultiModalPredictor(problem_type="ner", label=label_col, path=model_path)
 predictor.fit(
 	train_data=train_data,
-	column_types={"text_snippet":"ner"},
+	column_types={"text_snippet":"text_ner"},
 	time_limit=300, #second
 )
 ```

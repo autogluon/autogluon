@@ -26,6 +26,7 @@ from ..constants import (
     NUMERICAL,
     ROIS,
     TEXT,
+    TEXT_NER,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -87,7 +88,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
-            if col_type.startswith((TEXT, IMAGE, ROIS, NER)) or col_type == NULL:
+            if col_type.startswith((TEXT, IMAGE, ROIS, TEXT_NER)) or col_type == NULL:
                 continue
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(
@@ -225,7 +226,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 return self._image_path_names
             else:
                 return self._image_feature_names
-        elif modality.startswith(TEXT):
+        elif modality == TEXT:
             return self._text_feature_names
         elif modality == CATEGORICAL:
             return self._categorical_feature_names
@@ -263,9 +264,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             col_value = X[col_name]
             if col_type == NULL:
                 self._ignore_columns_set.add(col_name)
-            elif col_type.startswith(TEXT):
+            elif col_type == TEXT:
                 self._text_feature_names.append(col_name)
-            elif col_type.startswith(NER):
+            elif col_type == TEXT_NER:
                 self._ner_feature_names.append(col_name)
             elif col_type == CATEGORICAL:
                 if self._config.categorical.convert_to_text:
@@ -332,8 +333,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 if len(self._text_feature_names) != 0:
                     # If there are ner annotations and text columns but no NER feature columns,
                     # we will convert the first text column into a ner column.
+                    # Added for backward compatability for v0.6.0 where column_type is not specified.
                     self._ner_feature_names.append(self._text_feature_names.pop(0))
-                    self.column_types[self._ner_feature_names[0]] = NER
+                    self.column_types[self._ner_feature_names[0]] = TEXT_NER
                 else:
                     raise NotImplementedError(
                         f"Text column is necessary for named entity recognition, however, no text column is detected."
@@ -559,7 +561,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         return {self._label_column: y}, {self._label_column: self.label_type}
 
-    def transform_ner(
+    def transform_text_ner(
         self,
         df: pd.DataFrame,
     ) -> Tuple[Dict[str, NDArray[(Any,), Any]], Dict[str, str]]:
@@ -572,7 +574,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         for col_name in self._ner_feature_names:
             col_value = df[col_name]
             col_type = self._column_types[col_name]
-            if col_type == NER:
+            if col_type == TEXT_NER:
                 col_value = col_value.astype("object")
                 processed_data = col_value.apply(lambda ele: "" if pd.isnull(ele) else str(ele))
             else:
@@ -580,7 +582,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             ner_text_features[col_name] = processed_data.values.tolist()
             ner_text_types[col_name] = col_type
         if self.label_type == NER_ANNOTATION:
-            x = self.transform_text(df)
             ret_data.update(ner_text_features)
             ret_type.update(ner_text_types)
             if self._label_column in df:
