@@ -1,4 +1,5 @@
 import base64
+import copy
 import logging
 import os
 import shutil
@@ -12,8 +13,27 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 
+def get_real_image_path_in_image_column(image_root_path, path):
+    """
+    Combine root path and path, where path contains root path's basename.
+    For example,
+        image_root_path = /home/user/example_images/
+        path = example_images/test/a.jpg
+        would return /home/user/example_images/test/a.jpg
+    This is needed to make sure the fit and predict api of CloudPredictor follows the same logic.
+    """
+    image_root_path = os.path.abspath(image_root_path)
+    path = path.split(os.path.sep)
+    while path[0] == '':
+        # Avoid cases like /foo/test
+        path.pop(0)
+    image_path_root_head, image_path_tail = os.path.split(image_root_path)
+    assert image_path_tail == path[0], 'Please make sure the image path inside your image column contains the root image directory'
+
+    return os.path.join(image_path_root_head, *path)
+
+
 def read_image_bytes_and_encode(image_path):
-    image_path = os.path.abspath(image_path)
     image_obj = open(image_path, "rb")
     image_bytes = image_obj.read()
     image_obj.close()
@@ -22,8 +42,10 @@ def read_image_bytes_and_encode(image_path):
     return b85_image
 
 
-def convert_image_path_to_encoded_bytes_in_dataframe(dataframe, image_column):
+def convert_image_path_to_encoded_bytes_in_dataframe(dataframe, image_root_path, image_column):
     assert image_column in dataframe, "Please specify a valid image column name"
+    dataframe = copy.deepcopy(dataframe)
+    dataframe[image_column] = [get_real_image_path_in_image_column(image_root_path, path) for path in dataframe[image_column]]
     dataframe[image_column] = [read_image_bytes_and_encode(path) for path in dataframe[image_column]]
 
     return dataframe

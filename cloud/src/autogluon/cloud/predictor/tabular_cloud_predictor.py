@@ -103,7 +103,7 @@ class TabularCloudPredictor(CloudPredictor):
         ----------
         test_data: Union(str, pandas.DataFrame)
             The test data to be inferenced.
-            Can be a pandas.DataFrame, a local path or a s3 path to a csv file.
+            Can be a pandas.DataFrame, a local path to a csv file.
             When predicting multimodality with image modality:
                 You need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
         test_data_image_column: Optional(str)

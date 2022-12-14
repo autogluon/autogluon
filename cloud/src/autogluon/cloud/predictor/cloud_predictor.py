@@ -294,26 +294,18 @@ class CloudPredictor(ABC):
 
     def _upload_fit_image_artifact(self, images, bucket, key_prefix):
         if images is not None:
-            if is_s3_url(images):
-                fileexts = (".tar.gz", ".bz2", ".zip")  # More extensions?
-                assert images.endswith(fileexts), "Please provide a s3 path to a compressed file"
-            else:
-                image_zip_filename = images
-                if os.path.isdir(images):
-                    image_zip_filename = os.path.basename(os.path.normpath(images))
-                    zipfolder(image_zip_filename, images)
-                    image_zip_filename += ".zip"
-                else:
-                    assert is_compressed_file(
-                        images
-                    ), "Please provide a compressed file or a folder containing the images"
-                logger.log(20, "Uploading images ...")
-                images = self.sagemaker_session.upload_data(
-                    path=image_zip_filename,
-                    bucket=bucket,
-                    key_prefix=key_prefix,
-                )
-                logger.log(20, "Images uploaded successfully")
+            image_zip_filename = images
+            assert os.path.isdir(images), "Please provide a folder containing the images"
+            image_zip_filename = os.path.basename(os.path.normpath(images))
+            zipfolder(image_zip_filename, images)
+            image_zip_filename += ".zip"
+            logger.log(20, "Uploading images ...")
+            images = self.sagemaker_session.upload_data(
+                path=image_zip_filename,
+                bucket=bucket,
+                key_prefix=key_prefix,
+            )
+            logger.log(20, "Images uploaded successfully")
         return images
 
     def _upload_fit_artifact(
@@ -322,28 +314,48 @@ class CloudPredictor(ABC):
         tune_data,
         config,
         serving_script,
-        images=None,
+        image_column=None,
     ):
         cloud_bucket, cloud_key_prefix = s3_path_to_bucket_prefix(self.cloud_output_path)
         util_key_prefix = cloud_key_prefix + "/utils"
+
+        common_path = None
+        if image_column is not None:
+            # Find common path to zip and replace image column with relative path to be used in remote environment
+            if isinstance(train_data, str):
+                train_data = load_pd.load(train_data)
+            else:
+                train_data = copy.deepcopy(train_data)
+            if tune_data is not None:
+                if isinstance(tune_data, str):
+                    tune_data = load_pd.load(tune_data)
+                else:
+                    tune_data = copy.deepcopy(tune_data)
+            common_train_data_path = os.path.commonpath(train_data[image_column].tolist())
+            common_tune_data_path = common_train_data_path
+            if tune_data is not None:
+                common_tune_data_path = os.path.commonpath(tune_data[image_column].tolist())
+            common_path = os.path.commonpath([common_train_data_path, common_tune_data_path])
+            train_data[image_column] = [os.path.relpath(path, common_path) for path in train_data[image_column]]
+            if tune_data is not None:
+                tune_data[image_column] = [os.path.relpath(path, common_path) for path in tune_data[image_column]]
+
         train_input = train_data
-        if isinstance(train_data, pd.DataFrame) or not is_s3_url(train_data):
-            train_data = self._prepare_data(train_data, "train")
-            logger.log(20, "Uploading train data...")
-            train_input = self.sagemaker_session.upload_data(
-                path=train_data, bucket=cloud_bucket, key_prefix=util_key_prefix
-            )
-            logger.log(20, "Train data uploaded successfully")
+        train_data = self._prepare_data(train_data, "train")
+        logger.log(20, "Uploading train data...")
+        train_input = self.sagemaker_session.upload_data(
+            path=train_data, bucket=cloud_bucket, key_prefix=util_key_prefix
+        )
+        logger.log(20, "Train data uploaded successfully")
 
         tune_input = tune_data
         if tune_data is not None:
-            if isinstance(tune_data, pd.DataFrame) or not is_s3_url(tune_data):
-                tune_data = self._prepare_data(tune_data, "tune")
-                logger.log(20, "Uploading tune data...")
-                tune_input = self.sagemaker_session.upload_data(
-                    path=tune_data, bucket=cloud_bucket, key_prefix=util_key_prefix
-                )
-                logger.log(20, "Tune data uploaded successfully")
+            tune_data = self._prepare_data(tune_data, "tune")
+            logger.log(20, "Uploading tune data...")
+            tune_input = self.sagemaker_session.upload_data(
+                path=tune_data, bucket=cloud_bucket, key_prefix=util_key_prefix
+            )
+            logger.log(20, "Tune data uploaded successfully")
 
         config_input = self.sagemaker_session.upload_data(path=config, bucket=cloud_bucket, key_prefix=util_key_prefix)
 
@@ -351,7 +363,7 @@ class CloudPredictor(ABC):
             path=serving_script, bucket=cloud_bucket, key_prefix=util_key_prefix
         )
 
-        images_input = self._upload_fit_image_artifact(images=images, bucket=cloud_bucket, key_prefix=util_key_prefix)
+        images_input = self._upload_fit_image_artifact(images=common_path, bucket=cloud_bucket, key_prefix=util_key_prefix)
         inputs = dict(train=train_input, config=config_input, serving=serving_input)
         if tune_input is not None:
             inputs["tune"] = tune_input
@@ -365,7 +377,6 @@ class CloudPredictor(ABC):
         *,
         predictor_init_args,
         predictor_fit_args,
-        image_path=None,
         image_column=None,
         leaderboard=True,
         framework_version="latest",
@@ -389,19 +400,9 @@ class CloudPredictor(ABC):
             Init args for the predictor
         predictor_fit_args: dict
             Fit args for the predictor
-        image_path: str, default = None
-            A local path or s3 path to the images. This parameter is REQUIRED if you want to train predictor with image modality.
-            If you provided this parameter, the image path inside your train/tune data MUST be relative.
-            If local path, path needs to be either a compressed file containing the images or a folder containing the images.
-            If it's a folder, we will zip it for you and upload it to the s3.
-            If s3 path, the path needs to be a path to a compressed file containing the images
-
-            Example:
-            If your images live under a root directory `example_images/`, then you would provide `example_images` as the `image_path`.
-            And you want to make sure in your training/tuning file, the column corresponding to the images is a relative path prefix with the root directory.
-            For example, `example_images/train/image1.png`. An absolute path will NOT work as the file will be moved to a remote system.
         image_column: str, default = None
             The column name in the training/tuning data that contains the image paths.
+            The image paths MUST be absolute paths to you local system.
         leaderboard: bool, default = True
             Whether to include the leaderboard in the output artifact
         framework_version: str, default = `latest`
@@ -477,7 +478,7 @@ class CloudPredictor(ABC):
             train_data=train_data,
             tune_data=tune_data,
             config=config,
-            images=image_path,
+            image_column=image_column,
             serving_script=ScriptManager.get_serve_script(
                 self.predictor_type, framework_version
             ),  # Training and Inference should have the same framework_version
@@ -757,7 +758,7 @@ class CloudPredictor(ABC):
         Parameters
         ----------
         test_data: Union(str, pandas.DataFrame)
-            The test data to be inferenced. Can be a pandas.DataFrame, a local path or a s3 path.
+            The test data to be inferenced. Can be a pandas.DataFrame, or a local path to csv file.
         accept: str, default = application/x-parquet
             Type of accept output content.
             Valid options are application/x-parquet, text/csv, application/json
@@ -777,32 +778,30 @@ class CloudPredictor(ABC):
         return self._predict_real_time(test_data=test_data, accept=accept)
 
     def _upload_batch_predict_data(self, test_data, bucket, key_prefix):
-        if isinstance(test_data, str) and is_s3_url(test_data):
-            test_input = test_data
-        else:
-            # If a directory of images, upload directly
-            if isinstance(test_data, str) and not os.path.isdir(test_data):
-                # either a file to a dataframe, or a file to an image
-                if is_image_file(test_data):
-                    logger.warning(
-                        "Are you sure you want to do batch inference on a single image? You might want to try `deploy()` and `predict_realtime()` instead"
-                    )
-                else:
-                    test_data = load_pd.load(test_data)
+        # If a directory of images, upload directly
+        if isinstance(test_data, str) and not os.path.isdir(test_data):
+            # either a file to a dataframe, or a file to an image
+            if is_image_file(test_data):
+                logger.warning(
+                    "Are you sure you want to do batch inference on a single image? You might want to try `deploy()` and `predict_realtime()` instead"
+                )
+            else:
+                test_data = load_pd.load(test_data)
 
-            if isinstance(test_data, pd.DataFrame):
-                test_data = self._prepare_data(test_data, "test", output_type="csv")
-            logger.log(20, "Uploading data...")
-            test_input = self.sagemaker_session.upload_data(
-                path=test_data, bucket=bucket, key_prefix=key_prefix + "/data"
-            )
-            logger.log(20, "Data uploaded successfully")
+        if isinstance(test_data, pd.DataFrame):
+            test_data = self._prepare_data(test_data, "test", output_type="csv")
+        logger.log(20, "Uploading data...")
+        test_input = self.sagemaker_session.upload_data(
+            path=test_data, bucket=bucket, key_prefix=key_prefix + "/data"
+        )
+        logger.log(20, "Data uploaded successfully")
 
         return test_input
 
     def predict(
         self,
         test_data,
+        test_data_image_path=None,
         test_data_image_column=None,
         predictor_path=None,
         framework_version="latest",
@@ -825,8 +824,17 @@ class CloudPredictor(ABC):
         Parameters
         ----------
         test_data: Union(str, pandas.DataFrame)
-            The test data to be inferenced. Can be a pandas.DataFrame, a local path or a s3 path.
-        test_data_image_column: Optional(str)
+            The test data to be inferenced. Can be a pandas.DataFrame, or a local path to a csv.
+        test_data_image_path: str, default = None
+            A local path to the images. This parameter is REQUIRED if you want to inference with multimodality involving image modality.
+            If you provided this parameter, the image path inside your train/tune data MUST be relative.
+            Path needs to be a folder containing the images.
+
+            Example:
+            If your images live under a root directory `example_images/`, then you would provide `example_images` as the `image_path`.
+            And you want to make sure in your test file, the column corresponding to the images is a relative path prefix with the root directory.
+            For example, `example_images/test/image1.png`. An absolute path will NOT work.
+        test_data_image_column: str, default = None
             If test_data involves image modality, you must specify the column name corresponding to image paths.
             Images have to live in the same directory specified by the column.
         predictor_path: str
@@ -878,13 +886,19 @@ class CloudPredictor(ABC):
         if not job_name:
             job_name = sagemaker.utils.unique_name_from_base(SAGEMAKER_RESOURCE_PREFIX)
 
-        if test_data_image_column is not None:
+        if test_data_image_path is not None or test_data_image_column is not None:
+            assert test_data_image_path is not None and test_data_image_column is not None, \
+                "Please specify both `test_data_image_path` and `test_data_image_column` when involves image modality"
             logger.warning("Batch inference with image modality could be slow because of some technical details.")
             logger.warning(
                 "You can always retrieve the model trained with CloudPredictor and do batch inference using your custom solution."
             )
             test_data = load_pd.load(test_data)
-            test_data = convert_image_path_to_encoded_bytes_in_dataframe(test_data, test_data_image_column)
+            test_data = convert_image_path_to_encoded_bytes_in_dataframe(
+                dataframe=test_data,
+                image_root_path=test_data_image_path,
+                image_column=test_data_image_column
+            )
         test_input = self._upload_batch_predict_data(test_data, cloud_bucket, cloud_key_prefix)
 
         self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
