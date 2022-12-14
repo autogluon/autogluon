@@ -8,11 +8,9 @@ source $(dirname "$0")/env_setup.sh
 
 setup_build_env
 export CUDA_VISIBLE_DEVICES=0
-install_core_all_tests
-install_features
-install_tabular_all
-install_multimodal
-install_text
+install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/[all,tests]"
+install_multimodal "[tests]"
+install_local_packages "text/"
 install_vision
 
 cd tabular/
