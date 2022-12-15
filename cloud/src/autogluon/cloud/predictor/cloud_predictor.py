@@ -291,22 +291,30 @@ class CloudPredictor(ABC):
         converter = FormatConverterFactory.get_converter(output_type)
         return converter.convert(data, path, filename)
 
-    def _upload_fit_image_artifact(self, images, bucket, key_prefix):
-        if images is not None:
-            image_zip_filename = images
-            assert os.path.isdir(images), "Please provide a folder containing the images"
-            image_zip_filename = os.path.basename(os.path.normpath(images))
+    def _upload_fit_image_artifact(self, image_dir_path, bucket, key_prefix):
+        upload_image_path = None
+        if image_dir_path is not None:
+            image_zip_filename = image_dir_path
+            assert os.path.isdir(image_dir_path), "Please provide a folder containing the images"
+            image_zip_filename = os.path.basename(os.path.normpath(image_dir_path))
             logger.log(20, "Zipping images ...")
-            zipfolder(image_zip_filename, images)
+            zipfolder(image_zip_filename, image_dir_path)
             image_zip_filename += ".zip"
             logger.log(20, "Uploading images ...")
-            images = self.sagemaker_session.upload_data(
+            upload_image_path = self.sagemaker_session.upload_data(
                 path=image_zip_filename,
                 bucket=bucket,
                 key_prefix=key_prefix,
             )
             logger.log(20, "Images uploaded successfully")
-        return images
+        return upload_image_path
+    
+    def _find_common_path_and_replace_image_column(self, data, image_column):
+        common_path = os.path.commonpath(data[image_column].tolist())
+        common_path_head = os.path.split(common_path)[0]  # we keep the base dir to match zipping behavior
+        data[image_column] = [os.path.relpath(path, common_path_head) for path in data[image_column]]
+        
+        return data, common_path
 
     def _upload_fit_artifact(
         self,
@@ -319,7 +327,8 @@ class CloudPredictor(ABC):
         cloud_bucket, cloud_key_prefix = s3_path_to_bucket_prefix(self.cloud_output_path)
         util_key_prefix = cloud_key_prefix + "/utils"
 
-        common_path = None
+        common_train_data_path = None
+        common_tune_data_path = None
         if image_column is not None:
             # Find common path to zip and replace image column with relative path to be used in remote environment
             if isinstance(train_data, str):
@@ -331,15 +340,15 @@ class CloudPredictor(ABC):
                     tune_data = load_pd.load(tune_data)
                 else:
                     tune_data = copy.deepcopy(tune_data)
-            common_train_data_path = os.path.commonpath(train_data[image_column].tolist())
-            common_tune_data_path = common_train_data_path
+            train_data, common_train_data_path = self._find_common_path_and_replace_image_column(
+                data=train_data,
+                image_column=image_column
+            )
             if tune_data is not None:
-                common_tune_data_path = os.path.commonpath(tune_data[image_column].tolist())
-            common_path = os.path.commonpath([common_train_data_path, common_tune_data_path])
-            common_path_head = os.path.split(common_path)[0]  # we keep the base dir to match zipping behavior
-            train_data[image_column] = [os.path.relpath(path, common_path_head) for path in train_data[image_column]]
-            if tune_data is not None:
-                tune_data[image_column] = [os.path.relpath(path, common_path_head) for path in tune_data[image_column]]
+                tune_data, common_tune_data_path = self._find_common_path_and_replace_image_column(
+                data=train_data,
+                image_column=image_column
+            )
 
         train_input = train_data
         train_data = self._prepare_data(train_data, "train")
@@ -364,14 +373,19 @@ class CloudPredictor(ABC):
             path=serving_script, bucket=cloud_bucket, key_prefix=util_key_prefix
         )
 
-        images_input = self._upload_fit_image_artifact(
-            images=common_path, bucket=cloud_bucket, key_prefix=util_key_prefix
+        train_images_input = self._upload_fit_image_artifact(
+            image_dir_path=common_train_data_path, bucket=cloud_bucket, key_prefix=util_key_prefix
+        )
+        tune_images_input = self._upload_fit_image_artifact(
+            image_dir_path=common_tune_data_path, bucket=cloud_bucket, key_prefix=util_key_prefix
         )
         inputs = dict(train=train_input, config=config_input, serving=serving_input)
         if tune_input is not None:
             inputs["tune"] = tune_input
-        if images_input is not None:
-            inputs["images"] = images_input
+        if train_images_input is not None:
+            inputs["train_images"] = train_images_input
+        if tune_images_input is not None:
+            inputs["tune_images"] = tune_images_input
 
         return inputs
 
@@ -786,7 +800,7 @@ class CloudPredictor(ABC):
             # either a file to a dataframe, or a file to an image
             if is_image_file(test_data):
                 logger.warning(
-                    "Are you sure you want to do batch inference on a single image? You might want to try `deploy()` and `predict_realtime()` instead"
+                    "Are you sure you want to do batch inference on a single image? You might want to try `deploy()` and `predict_real_time()` instead"
                 )
             else:
                 test_data = load_pd.load(test_data)
