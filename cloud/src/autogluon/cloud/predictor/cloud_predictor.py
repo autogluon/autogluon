@@ -337,8 +337,6 @@ class CloudPredictor(ABC):
                 common_tune_data_path = os.path.commonpath(tune_data[image_column].tolist())
             common_path = os.path.commonpath([common_train_data_path, common_tune_data_path])
             common_path_head = os.path.split(common_path)[0]  # we keep the base dir to match zipping behavior
-            print(common_path)
-            print(common_path_head)
             train_data[image_column] = [os.path.relpath(path, common_path_head) for path in train_data[image_column]]
             if tune_data is not None:
                 tune_data[image_column] = [os.path.relpath(path, common_path_head) for path in tune_data[image_column]]
