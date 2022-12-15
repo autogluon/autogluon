@@ -504,5 +504,5 @@ def convert_data_for_ranking(
     return data_with_label, query_data, response_data, label_column
 
 
-def is_matching(presets: str):
-    return presets in matcher_presets.list_keys()
+def is_matching(pipeline: str):
+    return pipeline in matcher_presets.list_keys()

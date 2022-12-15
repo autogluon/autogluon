@@ -29,6 +29,7 @@ from ..constants import (
     DIRECT_LOSS,
     F1,
     FEATURES,
+    HIT_RATE,
     IA3,
     IA3_BIAS,
     IA3_LORA,
@@ -297,7 +298,7 @@ def get_metric(
             torchmetrics.MeanMetric(nan_strategy="warn"),
             None,
         )  # This only works for detection where custom_metric is not required for BaseAggregator
-    elif metric_name == RECALL:
+    elif metric_name in [RECALL, HIT_RATE]:
         if is_matching:
             return CustomHitRate(), None
         else:  # TODO: support recall for general classification tasks.
