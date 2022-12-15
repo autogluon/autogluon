@@ -436,7 +436,7 @@ def data_to_df(
             data = pd.DataFrame({header: data})
     elif isinstance(data, str):
         if is_valid_imagepath(data):
-            data = pd.DataFrame([data])
+            data = pd.DataFrame({"image": data})
         else:
             data = load_pd.load(data)
     else:
