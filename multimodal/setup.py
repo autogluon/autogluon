@@ -41,7 +41,7 @@ install_requires = [
     "smart_open>=5.2.1,<5.3.0",
     "pytorch_lightning>=1.7.4,<1.8.0",
     "text-unidecode<=1.3",
-    "torchmetrics>=0.8.0,<0.9.0",
+    "torchmetrics>=0.11.0,<=0.11.0",
     "transformers>=4.23.0,<4.24.0",
     "nptyping>=1.4.4,<1.5.0",
     "omegaconf>=2.1.1,<2.2.0",
