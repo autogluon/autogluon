@@ -70,9 +70,9 @@ def get_hp(short_name, lr_mode):
 def get_data_path(dataset_name):
     if dataset_name == "KITTI":
         return (
-            "/media/code/detdata/DetBenchmark/KITTI/Annotations/train_cocoformat.json",
-            "/media/code/detdata/DetBenchmark/KITTI/Annotations/val_cocoformat.json",
-            "/media/code/detdata/DetBenchmark/KITTI/Annotations/test_cocoformat.json",
+            "/media/code/datasets/detection/KITTI/Annotations/train_cocoformat.json",
+            "/media/code/datasets/detection/KITTI/Annotations/val_cocoformat.json",
+            "/media/code/datasets/detection/KITTI/Annotations/test_cocoformat.json",
         )
     elif dataset_name == "Kitchen":
         return (
