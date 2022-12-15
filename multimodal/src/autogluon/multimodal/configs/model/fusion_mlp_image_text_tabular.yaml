@@ -124,16 +124,7 @@ model:
     checkpoint_name: "yolov3_mobilenetv2_320_300e_coco"
     data_types:
       - "image"
-    train_transform_types:
-      - "resize_shorter_side"
-      - "center_crop"
-      - "trivial_augment"
-    val_transform_types:
-      - "resize_shorter_side"
-      - "center_crop"
-    image_norm: "imagenet"
-    image_size: 224
-    max_img_num_per_col: 2
+    max_img_num_per_col: 1
 
   mmocr_text_detection:
     checkpoint_name: "TextSnake"

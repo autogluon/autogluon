@@ -129,6 +129,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self._categorical_num_categories = []
         self._numerical_feature_names = []
         self._image_feature_names = []
+        self._rois_feature_names = []
         self._ner_feature_names = []
 
     @property
@@ -145,6 +146,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             return self._image_path_names
         else:
             return [col_name for col_name in self._image_feature_names if self._column_types[col_name] == IMAGE_PATH]
+
+    @property
+    def rois_feature_names(self):
+        return self._rois_feature_names
 
     @property
     def image_bytearray_names(self):
@@ -188,6 +193,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             + self._text_feature_names
             + self._numerical_feature_names
             + self._categorical_feature_names
+            + self._rois_feature_names
         )
 
     @property
@@ -228,11 +234,13 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return self._fit_y_called
 
     def get_column_names(self, modality: str):
-        if modality.startswith(IMAGE) or modality == ROIS:
+        if modality.startswith(IMAGE):
             if hasattr(self, "_image_path_names"):
                 return self._image_path_names
             else:
                 return self._image_feature_names
+        elif modality == ROIS:
+            return self._rois_feature_names
         elif modality == TEXT:
             return self._text_feature_names
         elif modality == CATEGORICAL:
@@ -308,8 +316,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     generator = self._feature_generators[col_name]
                     generator.fit(np.expand_dims(processed_data.to_numpy(), axis=-1))
                     self._numerical_feature_names.append(col_name)
-            elif col_type.startswith(IMAGE) or col_type == ROIS:  # TODO: Use transform_multimodal and remove this hack
+            elif col_type.startswith(IMAGE):
                 self._image_feature_names.append(col_name)
+            elif col_type == ROIS:
+                self._rois_feature_names.append(col_name)
             else:
                 raise NotImplementedError(
                     f"Type of the column is not supported currently. Received {col_name}={col_type}."
@@ -411,6 +421,50 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             text_types[col_name] = col_type
 
         return text_features, text_types
+
+    def transform_rois(
+        self,
+        df: pd.DataFrame,
+    ) -> Tuple[Dict[str, List[List[str]]], Dict[str, str]]:
+        """
+        Preprocess image + rois data.
+        For image data we preprocess them by collecting their paths together. If one sample has multiple images
+        in an image column, assume that their image paths are separated by ";".
+        For rois data we simply convert them from a column of pandas dataframe to a list.
+        This function needs to be called preceding the rois processor in "process_rois.py".
+
+        Parameters
+        ----------
+        df
+            The multimodal pd.DataFrame.
+
+        Returns
+        -------
+        image_features
+            All the image data stored in a dictionary.
+        image_types
+            The column types of these image data, e.g., image_path or image_identifier.
+        """
+        assert (
+            self._fit_called or self._fit_x_called
+        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_rois."
+
+        x = self.transform_image(df)
+        ret_data = x[0]
+        ret_type = x[1]
+
+        for col_name in self._rois_feature_names:
+            col_type = self._column_types[col_name]
+
+            if col_type == ROIS:
+                processed_data = df[col_name].tolist()
+            else:
+                raise ValueError(f"Unknown image type {col_type} for column {col_name}")
+
+            ret_data[col_name] = processed_data
+            ret_type[col_name] = self._column_types[col_name]
+
+        return ret_data, ret_type
 
     def transform_image(
         self,

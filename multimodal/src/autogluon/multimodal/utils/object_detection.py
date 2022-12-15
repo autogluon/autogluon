@@ -133,7 +133,7 @@ def from_voc(
             d["image"].append(str(rpath / "JPEGImages" / im_path))
             d["rois"].append(rois)
     df = pd.DataFrame(d)
-    df["label"] = df.loc[:, "rois"].copy()
+    df["label"] = df.loc[:, "rois"].copy()  # TODO: remove duplicate column
 
     return df.sort_values("image").reset_index(drop=True)
 
