@@ -730,7 +730,7 @@ def test_when_static_features_are_modified_on_shallow_copy_then_original_df_does
     ],
 )
 def test_when_raw_timestamps_are_not_sorted_then_ts_dataframe_has_sorted_timestamps(data):
-    tsdf = TimeSeriesDataFrame(data)
+    tsdf = TimeSeriesDataFrame(data, sort_timestamps=True)
     for item_id in tsdf.item_ids:
         assert tsdf.loc[item_id].index.is_monotonic_increasing
 
@@ -743,6 +743,6 @@ def test_when_raw_timestamps_are_not_sorted_then_ts_dataframe_has_sorted_timesta
     ],
 )
 def test_when_raw_timestamps_are_not_sorted_then_freq_inference_works(data):
-    tsdf = TimeSeriesDataFrame(data)
+    tsdf = TimeSeriesDataFrame(data, sort_timestamps=True)
     assert tsdf.freq is not None
     assert tsdf.freq == SAMPLE_TS_DATAFRAME.freq
