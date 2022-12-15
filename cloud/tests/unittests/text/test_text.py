@@ -16,7 +16,7 @@ def test_text(test_helper):
         predictor_fit_args = dict(train_data=train_data, tuning_data=tune_data, time_limit=time_limit)
         cloud_predictor = TextCloudPredictor(
             cloud_output_path=f"s3://autogluon-cloud-ci/test-text/{timestamp}",
-            local_output_path="test_text_cloud_predictor"
+            local_output_path="test_text_cloud_predictor",
         )
         cloud_predictor_no_train = TextCloudPredictor(
             cloud_output_path=f"s3://autogluon-cloud-ci/test-text-no-train/{timestamp}",

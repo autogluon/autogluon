@@ -19,7 +19,8 @@ def test_image(test_helper):
         predictor_init_args = dict(label="label", eval_metric="acc")
         predictor_fit_args = dict(train_data=train_data, time_limit=time_limit)
         cloud_predictor = ImageCloudPredictor(
-            cloud_output_path=f"s3://autogluon-cloud-ci/test-image/{timestamp}", local_output_path="test_image_cloud_predictor"
+            cloud_output_path=f"s3://autogluon-cloud-ci/test-image/{timestamp}",
+            local_output_path="test_image_cloud_predictor",
         )
         cloud_predictor_no_train = ImageCloudPredictor(
             cloud_output_path=f"s3://autogluon-cloud-ci/test-image-no-train/{timestamp}",

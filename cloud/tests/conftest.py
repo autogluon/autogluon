@@ -1,11 +1,10 @@
 import os
 import zipfile
+from datetime import datetime, timezone
 
 import boto3
 import pandas as pd
 import pytest
-
-from datetime import datetime, timezone
 
 
 class CloudTestHelper:
@@ -61,7 +60,7 @@ class CloudTestHelper:
         fit_kwargs=None,
         deploy_kwargs=None,
         predict_real_time_kwargs=None,
-        predict_kwargs=None
+        predict_kwargs=None,
     ):
         if fit_kwargs is None:
             fit_kwargs = dict(instance_type="ml.m5.2xlarge")

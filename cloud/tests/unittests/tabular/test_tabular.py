@@ -20,7 +20,7 @@ def test_tabular(test_helper):
         )
         cloud_predictor = TabularCloudPredictor(
             cloud_output_path=f"s3://autogluon-cloud-ci/test-tabular/{timestamp}",
-            local_output_path="test_tabular_cloud_predictor"
+            local_output_path="test_tabular_cloud_predictor",
         )
         cloud_predictor_no_train = TabularCloudPredictor(
             cloud_output_path=f"s3://autogluon-cloud-ci/test-tabular-no-train/{timestamp}",
