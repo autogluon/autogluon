@@ -58,5 +58,5 @@ from .object_detection import (
 )
 from .object_detection_visualizer import Visualizer
 from .onnx import get_onnx_input
-from .pipeline import init_pretrained, init_pretrained_matcher
+from .pipeline import init_pretrained, init_pretrained_matcher, setup_problem_type_and_presets
 from .save import process_save_path, save_pretrained_model_configs, save_text_tokenizers, setup_save_path

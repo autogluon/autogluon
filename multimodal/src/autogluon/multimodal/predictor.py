@@ -159,6 +159,7 @@ from .utils import (
     update_config_by_rules,
     update_tabular_config_by_resources,
     use_realtime,
+    setup_problem_type_and_presets,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -225,6 +226,7 @@ class MultiModalPredictor:
         response: Optional[Union[str, List[str]]] = None,
         match_label: Optional[Union[int, str]] = None,
         pipeline: Optional[str] = None,
+        presets: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -339,20 +341,11 @@ class MultiModalPredictor:
             This is used for automatically inference num_classes, classes, or label.
 
         """
-        if pipeline is not None:
-            pipeline = pipeline.lower()
-            warnings.warn(
-                f"pipeline argument has been deprecated and moved to problem_type. "
-                f"Use problem_type='{pipeline}' instead.",
-                DeprecationWarning,
-            )
-            if problem_type is not None:
-                assert pipeline == problem_type, (
-                    f"Mismatched pipeline and problem_type. "
-                    f"Received pipeline={pipeline}, problem_type={problem_type}. "
-                    f"Consider to revise the arguments."
-                )
-            problem_type = pipeline
+        problem_type, presets = setup_problem_type_and_presets(
+            problem_type=problem_type,
+            presets=presets,
+            pipeline=pipeline,
+        )
         # Sanity check of problem_type
         if problem_type is not None:
             problem_type = problem_type.lower()
