@@ -42,8 +42,12 @@ if __name__ == "__main__":
     parser.add_argument("--n_gpus", type=str, default=get_env_if_present("SM_NUM_GPUS"))
     parser.add_argument("--training_dir", type=str, default=get_env_if_present("SM_CHANNEL_TRAIN"))
     parser.add_argument("--tune_dir", type=str, required=False, default=get_env_if_present("SM_CHANNEL_TUNE"))
-    parser.add_argument("--train_images", type=str, required=False, default=get_env_if_present("SM_CHANNEL_TRAIN_IMAGES"))
-    parser.add_argument("--tune_images", type=str, required=False, default=get_env_if_present("SM_CHANNEL_TUNE_IMAGES"))
+    parser.add_argument(
+        "--train_images", type=str, required=False, default=get_env_if_present("SM_CHANNEL_TRAIN_IMAGES")
+    )
+    parser.add_argument(
+        "--tune_images", type=str, required=False, default=get_env_if_present("SM_CHANNEL_TUNE_IMAGES")
+    )
     parser.add_argument("--ag_config", type=str, default=get_env_if_present("SM_CHANNEL_CONFIG"))
     parser.add_argument("--serving_script", type=str, default=get_env_if_present("SM_CHANNEL_SERVING"))
 
@@ -111,7 +115,7 @@ if __name__ == "__main__":
         shutil.unpack_archive(train_image_compressed_file, train_images_dir)
         image_column = config["image_column"]
         training_data[image_column] = [os.path.join(train_images_dir, path) for path in training_data[image_column]]
-    
+
     if args.tune_images:
         tune_image_compressed_file = get_input_path(args.tune_images)
         tune_images_dir = "tune_images"

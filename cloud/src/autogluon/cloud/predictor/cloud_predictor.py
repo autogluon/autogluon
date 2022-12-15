@@ -308,12 +308,12 @@ class CloudPredictor(ABC):
             )
             logger.log(20, "Images uploaded successfully")
         return upload_image_path
-    
+
     def _find_common_path_and_replace_image_column(self, data, image_column):
         common_path = os.path.commonpath(data[image_column].tolist())
         common_path_head = os.path.split(common_path)[0]  # we keep the base dir to match zipping behavior
         data[image_column] = [os.path.relpath(path, common_path_head) for path in data[image_column]]
-        
+
         return data, common_path
 
     def _upload_fit_artifact(
@@ -341,14 +341,12 @@ class CloudPredictor(ABC):
                 else:
                     tune_data = copy.deepcopy(tune_data)
             train_data, common_train_data_path = self._find_common_path_and_replace_image_column(
-                data=train_data,
-                image_column=image_column
+                data=train_data, image_column=image_column
             )
             if tune_data is not None:
                 tune_data, common_tune_data_path = self._find_common_path_and_replace_image_column(
-                data=train_data,
-                image_column=image_column
-            )
+                    data=train_data, image_column=image_column
+                )
 
         train_input = train_data
         train_data = self._prepare_data(train_data, "train")
