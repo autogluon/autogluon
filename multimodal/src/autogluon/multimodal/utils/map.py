@@ -30,6 +30,7 @@ log = logging.getLogger(__name__)
 try:
     from torchmetrics.detection.mean_ap import MeanAveragePrecision
 except:
+
     class BaseMetricResults(dict):
         """Base metric class, that allows fields for pre-defined metrics."""
 
@@ -47,18 +48,15 @@ except:
                 del self[key]
             raise AttributeError(f"No such attribute: {key}")
 
-
     class MAPMetricResults(BaseMetricResults):
         """Class to wrap the final mAP results."""
 
         __slots__ = ("map", "map_50", "map_75", "map_small", "map_medium", "map_large")
 
-
     class MARMetricResults(BaseMetricResults):
         """Class to wrap the final mAR results."""
 
         __slots__ = ("mar_1", "mar_10", "mar_100", "mar_small", "mar_medium", "mar_large")
-
 
     class COCOMetricResults(BaseMetricResults):
         """Class to wrap the final COCO metric results including various mAP/mAR values."""
@@ -79,7 +77,6 @@ except:
             "map_per_class",
             "mar_100_per_class",
         )
-
 
     def _input_validator(preds: Sequence[Dict[str, Tensor]], targets: Sequence[Dict[str, Tensor]]) -> None:
         """Ensure the correct input format of `preds` and `targets`"""
@@ -123,13 +120,11 @@ except:
                     f" got {item['labels'].size(0)} labels and {item['scores'].size(0)})"
                 )
 
-
     def _fix_empty_tensors(boxes: Tensor) -> Tensor:
         """Empty tensors can cause problems in DDP mode, this methods corrects them."""
         if boxes.numel() == 0 and boxes.ndim == 1:
             return boxes.unsqueeze(0)
         return boxes
-
 
     class MeanAveragePrecision(Metric):
         r"""
@@ -210,17 +205,19 @@ except:
 
             allowed_box_formats = ("xyxy", "xywh", "cxcywh")
             if box_format not in allowed_box_formats:
-                raise ValueError(f"Expected argument `box_format` to be one of {allowed_box_formats} but got {box_format}")
+                raise ValueError(
+                    f"Expected argument `box_format` to be one of {allowed_box_formats} but got {box_format}"
+                )
             self.box_format = box_format
             self.iou_thresholds = iou_thresholds or torch.linspace(0.5, 0.95, round((0.95 - 0.5) / 0.05) + 1).tolist()
             self.rec_thresholds = rec_thresholds or torch.linspace(0.0, 1.00, round(1.00 / 0.01) + 1).tolist()
             max_det_thr, _ = torch.sort(IntTensor(max_detection_thresholds or [1, 10, 100]))
             self.max_detection_thresholds = max_det_thr.tolist()
             self.bbox_area_ranges = {
-                "all": (0**2, int(1e5**2)),
-                "small": (0**2, 32**2),
-                "medium": (32**2, 96**2),
-                "large": (96**2, int(1e5**2)),
+                "all": (0 ** 2, int(1e5 ** 2)),
+                "small": (0 ** 2, 32 ** 2),
+                "medium": (32 ** 2, 96 ** 2),
+                "large": (96 ** 2, int(1e5 ** 2)),
             }
 
             if not isinstance(class_metrics, bool):
