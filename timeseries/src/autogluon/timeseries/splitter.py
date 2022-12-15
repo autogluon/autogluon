@@ -217,14 +217,19 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
         return train_data, val_data
 
 
-class LastWindowSplitter(MultiWindowSplitter):
+class LastWindowSplitter(AbstractTimeSeriesSplitter):
     """Reserves the last prediction_length steps of each time series for validation."""
-
-    def __init__(self):
-        super().__init__(num_windows=1)
 
     def describe_validation_strategy(self, prediction_length: int):
         return (
             f"Will use the last prediction_length = {prediction_length} time steps of each time series as a hold-out "
             "validation set."
         )
+
+    def _split(
+        self, ts_dataframe: TimeSeriesDataFrame, prediction_length: int
+    ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
+        train_data = ts_dataframe.slice_by_timestep(None, -prediction_length)
+        val_data = ts_dataframe
+        train_data._cached_freq = ts_dataframe._cached_freq
+        return train_data, val_data

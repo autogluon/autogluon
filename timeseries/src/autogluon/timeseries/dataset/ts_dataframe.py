@@ -99,7 +99,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
     _metadata = ["_static_features", "_cached_freq"]
 
     def __init__(
-        self, data: Any, static_features: Optional[pd.DataFrame] = None, sort_timestamps: bool = True, *args, **kwargs
+        self, data: Any, static_features: Optional[pd.DataFrame] = None, sort_timestamps: bool = False, *args, **kwargs
     ):
         if isinstance(data, (BlockManager, ArrayManager)):
             # necessary for copy constructor to work. see _constructor
@@ -527,15 +527,14 @@ class TimeSeriesDataFrame(pd.DataFrame):
             start_index = time_step_slice.start
             end_index = time_step_slice.stop
 
-        num_timesteps_per_item = self.num_timesteps_per_item()
-        # Create a boolean index that selects the correct slice in each timeseries
-        boolean_indicators = []
-        for length in num_timesteps_per_item:
-            indicator = np.zeros(length, dtype=bool)
-            indicator[start_index:end_index] = True
-            boolean_indicators.append(indicator)
-        index = np.concatenate(boolean_indicators)
-        result = TimeSeriesDataFrame(self[index].copy(), static_features=self.static_features, sort_timestamps=False)
+        time_step_slice = slice(start_index, end_index)
+        result = (
+            self.reset_index()
+            .groupby(ITEMID, sort=False, as_index=False)
+            .nth(time_step_slice)
+            .set_index([ITEMID, TIMESTAMP])
+        )
+        result.static_features = self.static_features
         result._cached_freq = self._cached_freq
         return result
 
