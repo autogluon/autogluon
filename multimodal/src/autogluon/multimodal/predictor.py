@@ -1,3 +1,5 @@
+"""Implementation of the multimodal predictor"""
+
 from __future__ import annotations
 
 import copy
@@ -69,6 +71,7 @@ from .constants import (
     NAMED_ENTITY_RECOGNITION,
     NER,
     NER_RET,
+    NUMERICAL,
     OBJECT_DETECTION,
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
@@ -109,6 +112,7 @@ from .optimization.utils import (
     get_norm_layer_param_names,
     get_trainable_params_efficient_finetune,
 )
+from .problem_types import problem_type_reg, is_problem_type_compatible
 from .utils import (
     AutoMMModelCheckpoint,
     AutoMMModelCheckpointIO,
@@ -161,48 +165,6 @@ from .utils import (
 )
 
 logger = logging.getLogger(AUTOMM)
-
-
-@dataclass
-class ProblemProperty:
-    name: str  # Name of the problem
-    support_fit: bool = True  # Whether the problem type support `.fit()`
-    inference_ready: bool = False  # Support `.predict()` and `.evaluate()` without calling `.fit()`
-    is_matching: bool = False  # Whether the problem belongs to the matching category
-    experimental: bool = False  # Indicate whether the problem is experimental
-
-
-problem_property_dict = OrderedDict(
-    [
-        (CLASSIFICATION, ProblemProperty(CLASSIFICATION)),
-        (BINARY, ProblemProperty(BINARY)),
-        (MULTICLASS, ProblemProperty(MULTICLASS)),
-        (REGRESSION, ProblemProperty(REGRESSION)),
-        (OBJECT_DETECTION, ProblemProperty(OBJECT_DETECTION, inference_ready=True)),
-        (TEXT_SIMILARITY, ProblemProperty(TEXT_SIMILARITY, inference_ready=True, is_matching=True)),
-        (IMAGE_SIMILARITY, ProblemProperty(IMAGE_SIMILARITY, inference_ready=True, is_matching=True)),
-        (IMAGE_TEXT_SIMILARITY, ProblemProperty(IMAGE_TEXT_SIMILARITY, inference_ready=True, is_matching=True)),
-        (NER, ProblemProperty(NER)),
-        (NAMED_ENTITY_RECOGNITION, ProblemProperty(NER)),
-        (FEATURE_EXTRACTION, ProblemProperty(FEATURE_EXTRACTION, support_fit=False, inference_ready=True)),
-        (
-            ZERO_SHOT_IMAGE_CLASSIFICATION,
-            ProblemProperty(ZERO_SHOT_IMAGE_CLASSIFICATION, support_fit=False, inference_ready=True),
-        ),
-        (
-            FEW_SHOT_TEXT_CLASSIFICATION,
-            ProblemProperty(FEW_SHOT_TEXT_CLASSIFICATION, support_fit=True, inference_ready=False, experimental=True),
-        ),
-        (
-            OCR_TEXT_DETECTION,
-            ProblemProperty(OCR_TEXT_DETECTION, support_fit=False, inference_ready=True, experimental=True),
-        ),
-        (
-            OCR_TEXT_RECOGNITION,
-            ProblemProperty(OCR_TEXT_RECOGNITION, support_fit=False, inference_ready=True, experimental=True),
-        ),
-    ]
-)
 
 
 class MultiModalPredictor:
@@ -338,6 +300,8 @@ class MultiModalPredictor:
             This is used for automatically inference num_classes, classes, or label.
 
         """
+
+        # Handle the deprecated pipeline flag
         if pipeline is not None:
             pipeline = pipeline.lower()
             warnings.warn(
@@ -352,6 +316,7 @@ class MultiModalPredictor:
                     f"Consider to revise the arguments."
                 )
             problem_type = pipeline
+
         # Sanity check of problem_type
         if problem_type is not None:
             problem_type = problem_type.lower()
@@ -362,16 +327,15 @@ class MultiModalPredictor:
                     DeprecationWarning,
                 )
                 problem_type = ZERO_SHOT_IMAGE_CLASSIFICATION
-            assert problem_type in problem_property_dict, (
+            assert problem_type in problem_type_reg, (
                 f"problem_type='{problem_type}' is not supported yet. You may pick a problem type from"
-                f" {problem_property_dict.keys()}."
+                f" {problem_type_reg.list_keys()}."
             )
-            problem_property = problem_property_dict.get(problem_type)
-            problem_type = problem_property.name
-            if problem_property.experimental:
-                warnings.warn(f"problem_type='{problem_type}' is currently experimental.", UserWarning)
+            problem_type = problem_type_reg.get(problem_type)
+            if problem_type.experimental:
+                warnings.warn(f"problem_type='{problem_type.name}' is currently experimental.", UserWarning)
 
-        check_if_packages_installed(problem_type=problem_type)
+        check_if_packages_installed(problem_type=problem_type.name)
 
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
@@ -382,11 +346,18 @@ class MultiModalPredictor:
             "pearsonr",
             "spearmanr",
         ]:
-            logger.debug(
-                f"Infer problem type to be a regression problem "
-                f"since the evaluation metric is set as {eval_metric}."
-            )
-            problem_type = REGRESSION
+            if problem_type is None:
+                logger.debug(
+                    f"Infer problem type to be a regression problem "
+                    f"since the evaluation metric is set as {eval_metric}."
+                )
+                problem_type = problem_type_reg.get(REGRESSION)
+            else:
+                if NUMERICAL not in problem_type.supported_label_type:
+                    raise ValueError(f"The provided evaluation metric will require the problem "
+                                     f"to support label type = {NUMERICAL}. However, "
+                                     f"the provided problem type = {problem_type.name} only "
+                                     f"supports label type = {problem_type.supported_label_type}.")
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
             verbosity = 1  # don't use 3, which doesn't suppress logger.info() in .load().
@@ -398,7 +369,7 @@ class MultiModalPredictor:
             set_logger_verbosity(verbosity, logger=logger)
 
         self._label_column = label
-        self._problem_type = problem_type if problem_type is not None else None
+        self._problem_type = problem_type
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = num_classes
@@ -422,6 +393,10 @@ class MultiModalPredictor:
         self._model_loaded = False  # Whether the model has been loaded
         self._matcher = None
 
+        # Summary statistics used in fit summary. TODO: wrap it in a class.
+        self._total_train_time = None
+        self._best_score = None
+
         if path is not None:
             self._save_path = setup_save_path(
                 resume=self._resume,
@@ -433,43 +408,35 @@ class MultiModalPredictor:
         else:
             self._save_path = None
 
-        if self._problem_type == OBJECT_DETECTION:
-            warnings.warn(
-                "Running object detection. Make sure that you have installed mmdet and mmcv-full, "
-                "by running 'mim install mmcv-full' and 'pip install mmdet'"
+        if self._problem_type and self._problem_type.is_matching:
+            self._matcher = MultiModalMatcher(
+                query=query,
+                response=response,
+                label=label,
+                match_label=match_label,
+                problem_type=None,  # Ensure that matcher will always infer problem type.
+                pipeline=self._problem_type.name,
+                hyperparameters=hyperparameters,
+                eval_metric=eval_metric,
+                path=path,
+                verbosity=verbosity,
+                warn_if_exist=warn_if_exist,
+                enable_progress_bar=enable_progress_bar,
             )
+            return
 
-        if self._problem_type is not None:
-            if problem_property_dict.get(self._problem_type).is_matching:
-                self._matcher = MultiModalMatcher(
-                    query=query,
-                    response=response,
-                    label=label,
-                    match_label=match_label,
-                    problem_type=None,  # Ensure that matcher will always infer problem type.
-                    pipeline=problem_type,
-                    hyperparameters=hyperparameters,
-                    eval_metric=eval_metric,
-                    path=path,
-                    verbosity=verbosity,
-                    warn_if_exist=warn_if_exist,
-                    enable_progress_bar=enable_progress_bar,
-                )
-                return
-
-        if self._problem_type == OBJECT_DETECTION:
+        if self._problem_type.name == OBJECT_DETECTION:
             self._label_column = "label"
             if self._sample_data_path:
                 self._classes = get_detection_classes(self._sample_data_path)
                 self._output_shape = len(self._classes)
 
-        if self._problem_type is not None:
-            problem_property = problem_property_dict.get(problem_type)
-            if problem_property.inference_ready:
+        if self._problem_type.name is not None:
+            if self._problem_type.inference_ready:
                 # Load pretrained model via the provided hyperparameters and presets
-                # FIXME, Revise the logic to use presets
+                # FIXME!, Revise the logic to use presets and add problem_type in init_pretrained
                 self._config, self._model, self._data_processors = init_pretrained(
-                    presets=self._problem_type,
+                    presets=self._problem_type.name,
                     hyperparameters=hyperparameters,
                     num_classes=self._output_shape,
                     classes=self._classes,
@@ -676,12 +643,11 @@ class MultiModalPredictor:
         fit_called = self._fit_called  # used in current function
         self._fit_called = True
 
-        if self.problem_type is not None:
-            if not problem_property_dict.get(self.problem_type).support_fit:
-                raise RuntimeError(
-                    f"The problem_type='{self.problem_type}' does not support `predictor.fit()`. "
-                    f"You may try to use `predictor.predict()` or `predictor.evaluate()`."
-                )
+        if self._problem_type and not self._problem_type.support_fit:
+            raise RuntimeError(
+                f"The problem_type='{self._problem_type.name}' does not support `predictor.fit()`. "
+                f"You may try to use `predictor.predict()` or `predictor.evaluate()`."
+            )
 
         training_start = time.time()
         if self._matcher:
@@ -699,8 +665,8 @@ class MultiModalPredictor:
             )
             return self
 
-        if self._problem_type == OBJECT_DETECTION:
-            self.detection_anno_train = train_data
+        if self._problem_type.name == OBJECT_DETECTION:
+            self._detection_anno_train = train_data
             train_data = from_coco_or_voc(train_data, "train")
             if tuning_data is not None:
                 tuning_data = from_coco_or_voc(tuning_data, "val")
@@ -738,7 +704,7 @@ class MultiModalPredictor:
 
         # Generate general info that's not config specific
         if tuning_data is None:
-            if self._problem_type in [BINARY, MULTICLASS, CLASSIFICATION]:
+            if self._problem_type.is_classification:
                 stratify = train_data[self._label_column]
             else:
                 stratify = None
@@ -762,7 +728,7 @@ class MultiModalPredictor:
         column_types = infer_label_column_type_by_problem_type(
             column_types=column_types,
             label_columns=self._label_column,
-            problem_type=self._problem_type,
+            problem_type=self._problem_type.name,
             data=train_data,
             valid_data=tuning_data,
         )
@@ -774,8 +740,11 @@ class MultiModalPredictor:
             label_column=self._label_column,
             column_types=column_types,
             data=train_data,
-            provided_problem_type=self._problem_type,
+            provided_problem_type=self._problem_type.name,
         )
+        if problem_type is not None:
+            problem_type = problem_type_reg.get(problem_type)
+            self._problem_type = problem_type  # In case problem type isn't provided in __init__().
 
         # Determine data scarcity mode, i.e. a few-shot scenario
         scarcity_mode = infer_scarcity_mode_by_data_size(
@@ -798,18 +767,7 @@ class MultiModalPredictor:
             # use previous column types to avoid inconsistency with previous numerical mlp and categorical mlp
             column_types = self._column_types
 
-        if self._problem_type is not None:
-            if self._problem_type == CLASSIFICATION:
-                # Set the problem type to be inferred problem type
-                self._problem_type = problem_type
-            if problem_type is not None:
-                assert self._problem_type == problem_type, (
-                    f"Inferred problem type {problem_type} is different from " f"the previous {self._problem_type}"
-                )
-            else:
-                problem_type = self._problem_type
-
-        if self._problem_type != OBJECT_DETECTION:
+        if self._problem_type.name != OBJECT_DETECTION:
             if self._output_shape is not None:
                 assert self._output_shape == output_shape, (
                     f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
@@ -819,7 +777,7 @@ class MultiModalPredictor:
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
-                problem_type=problem_type,
+                problem_type=problem_type.name,
                 eval_metric_name=self._eval_metric_name,
                 validation_metric_name=self._validation_metric_name,
             )
@@ -832,7 +790,6 @@ class MultiModalPredictor:
             time_limit = timedelta(seconds=time_limit)
 
         # set attributes for saving and prediction
-        self._problem_type = problem_type  # In case problem type isn't provided in __init__().
         self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
         self._column_types = column_types
@@ -870,19 +827,18 @@ class MultiModalPredictor:
 
         self._fit(**_fit_args)
         training_end = time.time()
-        self.elapsed_time = (training_end - training_start) / 60.0
+        self._total_train_time = training_end - training_start
         logger.info(f"Models and intermediate outputs are saved to {self._save_path} ")
         return self
 
     def _verify_inference_ready(self):
         if not self._fit_called and not self._model_loaded:
-            if self._problem_type is not None:
-                if not problem_property_dict.get(self._problem_type).inference_ready:
-                    raise RuntimeError(
-                        f"problem_type='{self._problem_type}' does not support running inference directly. "
-                        f"You need to call `predictor.fit()`, or load a predictor first before "
-                        f"running `predictor.predict()`, `predictor.evaluate()` or `predictor.extract_embedding()`."
-                    )
+            if self._problem_type and self._problem_type.inference_ready:
+                raise RuntimeError(
+                    f"problem_type='{self._problem_type.name}' does not support running inference directly. "
+                    f"You need to call `predictor.fit()`, or load a predictor first before "
+                    f"running `predictor.predict()`, `predictor.evaluate()` or `predictor.extract_embedding()`."
+                )
 
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
         from ray.air.config import CheckpointConfig
@@ -1051,7 +1007,7 @@ class MultiModalPredictor:
         critics, baseline_funcs = None, None
         if not self._config.distiller.soft_label_loss_type:
             # automatically infer loss func based on problem type if not specified
-            if self._problem_type == "regression":
+            if self._problem_type.name == REGRESSION:
                 soft_label_loss_func = nn.MSELoss()
             else:
                 assert self._output_shape > 1
@@ -1065,7 +1021,7 @@ class MultiModalPredictor:
 
         if not self._config.distiller.softmax_regression_loss_type:
             # automatically infer loss func based on problem type if not specified
-            if self._problem_type == "regression":
+            if self._problem_type.name == REGRESSION:
                 softmax_regression_loss_func = nn.MSELoss()
             else:
                 assert self._output_shape > 1
@@ -1152,7 +1108,7 @@ class MultiModalPredictor:
         )
 
         config = update_config_by_rules(
-            problem_type=self._problem_type,
+            problem_type=self._problem_type.name,
             config=config,
         )
 
@@ -1207,7 +1163,7 @@ class MultiModalPredictor:
         pos_label = try_to_infer_pos_label(
             data_config=config.data,
             label_encoder=df_preprocessor.label_generator,
-            problem_type=self._problem_type,
+            problem_type=self._problem_type.name,
         )
         if validation_metric_name is not None:
             validation_metric, custom_metric_func = get_metric(
@@ -1231,13 +1187,13 @@ class MultiModalPredictor:
             )
 
         loss_func = get_loss_func(
-            problem_type=self._problem_type,
+            problem_type=self._problem_type.name,
             mixup_active=mixup_active,
             loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
         )
 
         model_postprocess_fn = get_model_postprocess_fn(
-            problem_type=self._problem_type,
+            problem_type=self._problem_type.name,
             loss_func=loss_func,
         )
 
@@ -1297,7 +1253,7 @@ class MultiModalPredictor:
         if teacher_data_processors is not None:
             data_processors = [data_processors, teacher_data_processors]
 
-        val_use_training_mode = (self._problem_type == OBJECT_DETECTION) and (validation_metric_name != MAP)
+        val_use_training_mode = (self._problem_type.name == OBJECT_DETECTION) and (validation_metric_name != MAP)
 
         train_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
@@ -1353,7 +1309,7 @@ class MultiModalPredictor:
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
-        elif self._problem_type == NER:
+        elif self._problem_type.name == NER:
             task = NerLitModule(
                 model=model,
                 loss_func=loss_func,
@@ -1365,7 +1321,7 @@ class MultiModalPredictor:
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
-        elif self._problem_type == OBJECT_DETECTION:
+        elif self._problem_type.name == OBJECT_DETECTION:
             task = MMDetLitModule(
                 model=model,
                 **metrics_kwargs,
@@ -1659,8 +1615,8 @@ class MultiModalPredictor:
             strict=strict_loading,
         )
 
-        if self._problem_type != OBJECT_DETECTION:  # TODO: update detection's evaluation to support this
-            self.best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+        if self._problem_type.name != OBJECT_DETECTION:  # TODO: update detection's evaluation to support this
+            self._best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
 
         if is_distill:
             avg_state_dict = self._replace_model_name_prefix(
@@ -1750,13 +1706,13 @@ class MultiModalPredictor:
 
         callbacks = []
         if strategy == "ddp":
-            if self._problem_type != OBJECT_DETECTION:
+            if self._problem_type.name != OBJECT_DETECTION:
                 raise NotImplementedError(f"inference using ddp is only implemented for {OBJECT_DETECTION}")
             else:
-                pred_writer = DDPCacheWriter(pipeline=self._problem_type, write_interval="epoch")
+                pred_writer = DDPCacheWriter(pipeline=self._problem_type.name, write_interval="epoch")
                 callbacks = [pred_writer]
 
-        if self._problem_type == NER:
+        if self._problem_type.name == NER:
             task = NerLitModule(
                 model=self._model,
                 model_postprocess_fn=self._model_postprocess_fn,
@@ -1764,7 +1720,7 @@ class MultiModalPredictor:
                 trainable_param_names=trainable_param_names,
                 **optimization_kwargs,
             )
-        elif self._problem_type == OBJECT_DETECTION:
+        elif self._problem_type.name == OBJECT_DETECTION:
             task = MMDetLitModule(
                 model=self._model,
                 **optimization_kwargs,
@@ -1824,7 +1780,7 @@ class MultiModalPredictor:
                         sys.exit(f"Prediction finished, exit the process with global_rank={evaluator.global_rank}...")
                     else:
                         outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
-                elif self._problem_type == OBJECT_DETECTION:
+                elif self._problem_type.name == OBJECT_DETECTION:
                     # reformat single gpu output for object detection
                     # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
                     # output LABEL if exists for evaluations
@@ -1860,10 +1816,10 @@ class MultiModalPredictor:
                 column_types = infer_label_column_type_by_problem_type(
                     column_types=column_types,
                     label_columns=self._label_column,
-                    problem_type=self._problem_type,
+                    problem_type=self._problem_type.name,
                     data=data,
                 )
-            if self._problem_type == OBJECT_DETECTION:
+            if self._problem_type.name == OBJECT_DETECTION:
                 column_types = infer_rois_column_type(
                     column_types=column_types,
                     data=data,
@@ -1923,7 +1879,7 @@ class MultiModalPredictor:
         """
         # TODO: support saving results to file
         self._verify_inference_ready()
-        assert self._problem_type == OBJECT_DETECTION, (
+        assert self._problem_type.name == OBJECT_DETECTION, (
             f"predictor.evaluate_coco() is only supported when problem_type is {OBJECT_DETECTION}. "
             f"Received problem_type={self.problem_type}."
         )
@@ -1937,7 +1893,7 @@ class MultiModalPredictor:
                 eval_tool = "torchmetrics"  # we can only use torchmetrics for VOC format evaluation.
         else:
             # during validation, it will call evaluate with df as input
-            anno_file = self.detection_anno_train
+            anno_file = self._detection_anno_train
             data = anno_file_or_df
 
         outputs = self._predict(
@@ -2046,7 +2002,7 @@ class MultiModalPredictor:
 
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
 
-        if self._problem_type == OBJECT_DETECTION:
+        if self._problem_type.name == OBJECT_DETECTION:
             strategy = "ddp"
 
         if strategy == "ddp" and self._fit_called:
@@ -2070,7 +2026,7 @@ class MultiModalPredictor:
         if realtime is None:
             realtime = use_realtime(data=data, data_processors=data_processors, batch_size=batch_size)
 
-        if self._problem_type and self._problem_type == OBJECT_DETECTION:
+        if self._problem_type and self._problem_type.name == OBJECT_DETECTION:
             realtime = False
 
         if realtime:
@@ -2177,10 +2133,10 @@ class MultiModalPredictor:
                 metrics=metrics,
                 return_pred=return_pred,
             )
-        if self.problem_type == OBJECT_DETECTION:
+        if self._problem_type.name == OBJECT_DETECTION:
             if realtime:
                 return NotImplementedError(
-                    f"Current problem type {self.problem_type} does not support realtime predict."
+                    f"Current problem type {self._problem_type.name} does not support realtime predict."
                 )
             return self.evaluate_coco(
                 anno_file_or_df=data, metrics=metrics, return_pred=return_pred, seed=seed, eval_tool=eval_tool
@@ -2708,6 +2664,8 @@ class MultiModalPredictor:
                     "classes": self._classes,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
+                    "best_score": self._best_score,
+                    "total_train_time": self._total_train_time,
                     "version": ag_version.__version__,
                 },
                 fp,
@@ -2891,8 +2849,12 @@ class MultiModalPredictor:
 
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]
-        if "pipeline" in assets:  # back compatibility
+        if "pipeline" in assets:  # backward compatibility
             predictor._problem_type = assets["pipeline"]
+        if "best_score" in assets:  # backward compatibility
+            predictor._best_score = assets["best_score"]
+        if "total_train_time" in assets:  # backward compatibility
+            predictor._total_train_time = assets["total_train_time"]
         predictor._eval_metric_name = assets["eval_metric_name"]
         predictor._verbosity = verbosity
         predictor._resume = resume
@@ -3071,7 +3033,7 @@ class MultiModalPredictor:
         -------
         The positive class name in binary classification or None if the problem is not binary classification.
         """
-        if self.problem_type != BINARY:
+        if self.problem_type.name != BINARY:
             logger.warning(
                 f"Warning: Attempted to retrieve positive class label in a non-binary problem. "
                 f"Positive class labels only exist in binary classification. "
@@ -3100,7 +3062,12 @@ class MultiModalPredictor:
         Dict containing various detailed information.
         We do not recommend directly printing this dict as it may be very large.
         """
-        results = {f"val_{self._validation_metric_name}": self.best_score, "training_time": self.elapsed_time}
+        logging.info(f"Here's the model summary:"
+                     f""
+                     f"The model achieved score '{self._best_score}' on the validation metric"
+                     f" '{self._validation_metric_name}'. "
+                     f"The total training time is {timedelta(seconds=self._total_train_time)}")
+        results = {f"val_{self._validation_metric_name}": self._best_score, "training_time": self._total_train_time}
         return results
 
     def list_supported_models(self, pretrained=True):
@@ -3118,10 +3085,10 @@ class MultiModalPredictor:
         -------
         a list of model names
         """
-        if self._problem_type == "classification":
+        if self.problem_type.is_classification:  #FIXME (Need to list the supported models for each modality)
             return list_timm_models(pretrained=pretrained)
         else:
-            raise ValueError(f"list_supported_models() is not available for problem type: {self._problem_type}")
+            raise ValueError(f"list_supported_models() is not available for problem type: {self.problem_type}")
 
 
 class AutoMMPredictor(MultiModalPredictor):

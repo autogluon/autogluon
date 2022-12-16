@@ -27,8 +27,8 @@ Here are some example use-cases of AutoMM:
 In the following, we decomposed the functionalities of AutoMM and prepared step-by-step guide for each functionality.
 
 
-Text Prediction and Entity Extraction
--------------------------------------
+Text Data
+---------
 .. container:: cards
 
    .. card::
@@ -50,8 +50,8 @@ Text Prediction and Entity Extraction
       How to use MultiModalPredictor for entity extraction.
 
 
-Image Prediction
-----------------
+Image Data -- Classification / Regression
+-------------------------------------------
 .. container:: cards
 
    .. card::
@@ -67,8 +67,8 @@ Image Prediction
       How to enable zero-shot image classification in AutoMM via pretrained CLIP model.
 
 
-Object Detection
-----------------
+Image Data -- Object Detection
+--------------------------
 .. container:: cards
 
    .. card::
@@ -161,8 +161,8 @@ Matching
       How to use CLIP to extract embeddings for retrieval problem.
 
 
-Multimodal Classification / Regression
---------------------------------------
+Multimodal Data
+---------------
 .. container:: cards
 
    .. card::
@@ -177,6 +177,12 @@ Multimodal Classification / Regression
       :link: multimodal_prediction/beginner_multimodal.html
 
       How to use MultiModalPredictor to train a model that predicts the adoption speed of pets.
+
+   .. card::
+      :title: AutoMM for Entity Extraction with Text and Image - Quick Start
+      :link: multimodal_prediction/multimodal_ner.html
+
+      How to use MultiModalPredictor to train a model for multimodal named entity recognition.
 
 
 Advanced Topics
@@ -208,6 +214,16 @@ Advanced Topics
 
       How to customize AutoMM configurations.
 
+FAQ
+---
+.. container:: cards
+
+   .. card::
+      :title: Frequently Asked Questions
+      :link: multimodal-faq.html
+
+      Frequently Asked Questions
+
 
 .. toctree::
    :maxdepth: 2
@@ -215,7 +231,8 @@ Advanced Topics
 
    text_prediction/index
    image_prediction/index
+   object_detection/index
    matching/index
    multimodal_prediction/index
-   object_detection/index
    advanced_topics/index
+   multimodal-faq

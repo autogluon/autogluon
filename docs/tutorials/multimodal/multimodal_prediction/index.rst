@@ -1,5 +1,5 @@
-Multimodal Classification / Regression / Entity Extraction
---------------------------------------
+Multimodal Data
+---------------
 .. container:: cards
 
    .. card::
@@ -16,10 +16,10 @@ Multimodal Classification / Regression / Entity Extraction
       How to use MultiModalPredictor to train a model on data with image, text, numerical, and categorical features.
 
    .. card::
-      :title: AutoMM for Multimodal Named Entity Recognition - Quick Start
-      :link: multimodel_ner.html
+      :title: AutoMM for Entity Extraction with Text and Image - Quick Start
+      :link: multimodal_ner.html
 
-      How to use MultiModalPredictor to train a model for multimodel named entity recognition.
+      How to use MultiModalPredictor to train a model for multimodal named entity recognition.
 
 
 .. toctree::
@@ -28,5 +28,5 @@ Multimodal Classification / Regression / Entity Extraction
 
    beginner_multimodal
    multimodal_text_tabular
-   multimodel_ner
+   multimodal_ner
 
