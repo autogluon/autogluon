@@ -44,12 +44,11 @@ def tutorial_script_for_finetune_fast_voc_in_coco_format():
         sample_data_path=train_path,
     )
 
-
     start = time.time()
     predictor.fit(
         train_path,
         hyperparameters={
-            "optimization.learning_rate": 1e-4, # we use two stage and detection head has 100x lr
+            "optimization.learning_rate": 1e-4,  # we use two stage and detection head has 100x lr
             "optimization.max_epochs": 5,
             "env.per_gpu_batch_size": 32,  # decrease it when model is large
         },
@@ -83,13 +82,12 @@ def tutorial_script_for_finetune_fast_pothole_in_coco_format():
         sample_data_path=train_path,
     )
 
-
     start = time.time()
     predictor.fit(
         train_path,
         tuning_data=val_path,
         hyperparameters={
-            "optimization.learning_rate": 2e-4, # we use two stage and detection head has 100x lr
+            "optimization.learning_rate": 2e-4,  # we use two stage and detection head has 100x lr
             "optimization.max_epochs": 30,
             "env.per_gpu_batch_size": 32,  # decrease it when model is large
         },
@@ -100,6 +98,45 @@ def tutorial_script_for_finetune_fast_pothole_in_coco_format():
 
     predictor.evaluate(test_path)
 
+
+def tutorial_script_for_finetune_yolox_pothole_in_coco_format():
+    zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/dataset/pothole.zip"
+    download_dir = "./pothole"
+
+    load_zip.unzip(zip_file, unzip_dir=download_dir)
+    data_dir = os.path.join(download_dir, "pothole")
+    train_path = os.path.join(data_dir, "Annotations", "usersplit_train_cocoformat.json")
+    val_path = os.path.join(data_dir, "Annotations", "usersplit_val_cocoformat.json")
+    test_path = os.path.join(data_dir, "Annotations", "usersplit_test_cocoformat.json")
+
+    checkpoint_name = "yolox_l_8x8_300e_coco"
+    num_gpus = 1
+
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": num_gpus,
+            "optimization.val_metric": "map",
+        },
+        problem_type="object_detection",
+        sample_data_path=train_path,
+    )
+
+    start = time.time()
+    predictor.fit(
+        train_path,
+        tuning_data=val_path,
+        hyperparameters={
+            "optimization.learning_rate": 5e-5,  # we use two stage and detection head has 100x lr
+            "optimization.max_epochs": 30,
+            "env.per_gpu_batch_size": 8,  # decrease it when model is large
+        },
+    )
+    end = time.time()
+
+    print("This finetuning takes %.2f seconds." % (end - start))
+
+    predictor.evaluate(test_path)
 
 def tutorial_script_for_finetune_high_performance_pothole_in_coco_format():
     zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/dataset/pothole.zip"
@@ -129,7 +166,7 @@ def tutorial_script_for_finetune_high_performance_pothole_in_coco_format():
         train_path,
         tuning_data=val_path,
         hyperparameters={
-            "optimization.learning_rate": 5e-6, # we use two stage and detection head has 100x lr
+            "optimization.learning_rate": 5e-6,  # we use two stage and detection head has 100x lr
             "optimization.max_epochs": 1,
             "env.per_gpu_batch_size": 4,  # decrease it when model is large
         },
@@ -173,7 +210,7 @@ def tutorial_script_for_finetune_high_performance_voc_in_coco_format():
     predictor.fit(
         train_path,
         hyperparameters={
-            "optimization.learning_rate": 1e-5, # we use two stage and detection head has 100x lr
+            "optimization.learning_rate": 1e-5,  # we use two stage and detection head has 100x lr
             "optimization.max_epochs": 20,
             "env.per_gpu_batch_size": 2,  # decrease it when model is large
         },
@@ -214,7 +251,7 @@ def detection_train(
         train_path,
         tuning_data=val_path,
         hyperparameters={
-            "optimization.learning_rate": lr, # we use two stage and lr_mult=100 for detection
+            "optimization.learning_rate": lr,  # we use two stage and lr_mult=100 for detection
             "optimization.max_epochs": epochs,
             "env.per_gpu_batch_size": per_gpu_batch_size,  # decrease it when model is large
         },
@@ -228,9 +265,7 @@ def detection_train(
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--train_path", default="./VOCdevkit/VOC2007/Annotations/train_cocoformat.json", type=str
-    )
+    parser.add_argument("--train_path", default="./VOCdevkit/VOC2007/Annotations/train_cocoformat.json", type=str)
     parser.add_argument("--val_path", default=None, type=str)
     parser.add_argument("--test_path", default=None, type=str)
     parser.add_argument("--checkpoint_name", default="yolov3_mobilenetv2_320_300e_coco", type=str)
@@ -253,6 +288,6 @@ def main():
         per_gpu_batch_size=args.per_gpu_batch_size,
     )
 
+
 if __name__ == "__main__":
-    # main()
-    tutorial_script_for_finetune_high_performance_pothole_in_coco_format()
+    tutorial_script_for_finetune_yolox_pothole_in_coco_format()
