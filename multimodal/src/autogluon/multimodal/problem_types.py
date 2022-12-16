@@ -42,6 +42,7 @@ class ProblemType:
     support_fit: bool = True  # Whether the problem type support `.fit()`
     inference_ready: bool = False  # Support `.predict()` and `.evaluate()` without calling `.fit()`
     is_matching: bool = False  # Whether the problem belongs to the matching category
+    is_classification: bool = False  # Whether the problem is a classification problem
     experimental: bool = False  # Indicate whether the problem is experimental
 
     # The collection of modality types the problem supports.
@@ -74,6 +75,7 @@ problem_type_reg.register(
         name=CLASSIFICATION,
         supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
+        is_classification=True,
     ),
 )
 problem_type_reg.register(
@@ -82,6 +84,7 @@ problem_type_reg.register(
         name=BINARY,
         supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
+        is_classification=True,
     ),
 )
 problem_type_reg.register(
@@ -90,6 +93,7 @@ problem_type_reg.register(
         name=MULTICLASS,
         supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
+        is_classification=True,
     ),
 )
 

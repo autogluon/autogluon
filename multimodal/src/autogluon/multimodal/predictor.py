@@ -706,6 +706,7 @@ class MultiModalPredictor:
 
         # Generate general info that's not config specific
         if tuning_data is None:
+            # TODO(Refactor) Refactor the data split function into another file.
             if self._problem_type.is_classification:
                 stratify = train_data[self._label_column]
             else:
