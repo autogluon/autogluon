@@ -1,7 +1,7 @@
 import pytest
 
-from autogluon.multimodal.problem_types import problem_type_reg
 from autogluon.multimodal import MultiModalPredictor
+from autogluon.multimodal.problem_types import problem_type_reg
 
 
 @pytest.mark.parametrize(
