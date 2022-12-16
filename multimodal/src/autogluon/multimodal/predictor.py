@@ -2660,7 +2660,7 @@ class MultiModalPredictor:
                     "class_name": self.__class__.__name__,
                     "column_types": self._column_types,
                     "label_column": self._label_column,
-                    "problem_type": self._problem_type,
+                    "problem_type": self._problem_type.name,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
