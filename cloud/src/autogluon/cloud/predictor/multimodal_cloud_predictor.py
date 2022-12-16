@@ -53,11 +53,11 @@ class MultiModalCloudPredictor(CloudPredictor):
         ----------
         test_data: Union(str, pandas.DataFrame)
             The test data to be inferenced.
-            Can be a pandas.DataFrame, a local path to a csv file.
+            Can be a pandas.DataFrame or a local path to a csv file.
             When predicting multimodality with image modality:
                 You need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
             When predicting with only images:
-                Can be a pandas.DataFrame, a local path to a csv file.
+                Can be a pandas.DataFrame or a local path to a csv file.
                     Similarly, you need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
                 Or a local path to a single image file.
                 Or a list of local paths to image files.
@@ -107,12 +107,11 @@ class MultiModalCloudPredictor(CloudPredictor):
         """
         test_data: str
             The test data to be inferenced.
-            Can be a pandas.DataFrame, a local path to a csv file.
+            Can be a pandas.DataFrame or a local path to a csv file.
             When predicting multimodality with image modality:
                 You need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
             When predicting with only images:
-                Can be a local path to a directory containing the images.
-                or a local path to a single image.
+                Can be a local path to a directory containing the images or a local path to a single image.
         test_data_image_column: Optional(str)
             If test_data involves image modality, you must specify the column name corresponding to image paths.
             The path MUST be an abspath

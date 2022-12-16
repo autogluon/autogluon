@@ -39,7 +39,7 @@ class CloudTestHelper:
     @staticmethod
     def replace_image_abspath(data, image_column):
         data = pd.read_csv(data)
-        data[image_column] = [os.path.abspath(path) for path in data[image_column]]
+        data[image_column] = data[image_column].apply(os.path.abspath)
         return data
 
     @staticmethod

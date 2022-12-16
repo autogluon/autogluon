@@ -312,7 +312,7 @@ class CloudPredictor(ABC):
     def _find_common_path_and_replace_image_column(self, data, image_column):
         common_path = os.path.commonpath(data[image_column].tolist())
         common_path_head = os.path.split(common_path)[0]  # we keep the base dir to match zipping behavior
-        data[image_column] = [os.path.relpath(path, common_path_head) for path in data[image_column]]
+        data[image_column] = data[image_column].apply(lambda path: os.path.relpath(path, common_path_head))
 
         return data, common_path
 
@@ -345,7 +345,7 @@ class CloudPredictor(ABC):
             )
             if tune_data is not None:
                 tune_data, common_tune_data_path = self._find_common_path_and_replace_image_column(
-                    data=train_data, image_column=image_column
+                    data=tune_data, image_column=image_column
                 )
 
         train_input = train_data
