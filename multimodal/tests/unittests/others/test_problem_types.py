@@ -1,4 +1,5 @@
 import pytest
+
 from autogluon.multimodal.problem_types import problem_type_reg
 
 

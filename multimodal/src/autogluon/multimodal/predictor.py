@@ -112,7 +112,7 @@ from .optimization.utils import (
     get_norm_layer_param_names,
     get_trainable_params_efficient_finetune,
 )
-from .problem_types import problem_type_reg, is_problem_type_compatible
+from .problem_types import is_problem_type_compatible, problem_type_reg
 from .utils import (
     AutoMMModelCheckpoint,
     AutoMMModelCheckpointIO,

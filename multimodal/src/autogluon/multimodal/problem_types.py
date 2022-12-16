@@ -1,34 +1,34 @@
 """Problem types supported in MultiModalPredictor"""
 
 from dataclasses import dataclass, field
-from .registry import Registry
-from .constants import (
-    CLASSIFICATION,
-    BINARY,
-    MULTICLASS,
-    REGRESSION,
-    OBJECT_DETECTION,
-    TEXT_SIMILARITY,
-    IMAGE_SIMILARITY,
-    IMAGE_TEXT_SIMILARITY,
-    NER,
-    NAMED_ENTITY_RECOGNITION,
-    FEATURE_EXTRACTION,
-    ZERO_SHOT_IMAGE_CLASSIFICATION,
-    FEW_SHOT_TEXT_CLASSIFICATION,
-    OCR_TEXT_DETECTION,
-    OCR_TEXT_RECOGNITION,
-    IMAGE,
-    IMAGE_BYTEARRAY,
-    TEXT,
-    CATEGORICAL,
-    NUMERICAL,
-    ROIS,
-    TEXT_NER,
-    NER_ANNOTATION,
-)
 from typing import Optional, Set
 
+from .constants import (
+    BINARY,
+    CATEGORICAL,
+    CLASSIFICATION,
+    FEATURE_EXTRACTION,
+    FEW_SHOT_TEXT_CLASSIFICATION,
+    IMAGE,
+    IMAGE_BYTEARRAY,
+    IMAGE_SIMILARITY,
+    IMAGE_TEXT_SIMILARITY,
+    MULTICLASS,
+    NAMED_ENTITY_RECOGNITION,
+    NER,
+    NER_ANNOTATION,
+    NUMERICAL,
+    OBJECT_DETECTION,
+    OCR_TEXT_DETECTION,
+    OCR_TEXT_RECOGNITION,
+    REGRESSION,
+    ROIS,
+    TEXT,
+    TEXT_NER,
+    TEXT_SIMILARITY,
+    ZERO_SHOT_IMAGE_CLASSIFICATION,
+)
+from .registry import Registry
 
 problem_type_reg = Registry("problem_types")
 
