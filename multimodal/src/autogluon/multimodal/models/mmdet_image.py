@@ -156,6 +156,18 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 url="https://automl-mm-bench.s3.amazonaws.com/voc_script/voc0712.py",
                 path="voc_config",
             )
+        elif checkpoint_name == "yolox_s_8x8_300e_coco":
+            from ..utils import download
+            checkpoint = download(
+                url="https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_s_8x8_300e_coco/yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth",
+            )
+            config_file = "/media/code/autogluon/examples/automm/object_detection/mmdet_configs/yolox_s_8x8_300e_coco.py"
+        elif checkpoint_name == "yolox_l_8x8_300e_coco":
+            from ..utils import download
+            checkpoint = download(
+                url="https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_l_8x8_300e_coco/yolox_l_8x8_300e_coco_20211126_140236-d3bd2b23.pth",
+            )
+            config_file = "/media/code/autogluon/examples/automm/object_detection/mmdet_configs/yolox_l_8x8_300e_coco.py"
         else:
             from mim.commands import download
 
