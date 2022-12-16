@@ -114,7 +114,9 @@ if __name__ == "__main__":
         train_images_dir = "train_images"
         shutil.unpack_archive(train_image_compressed_file, train_images_dir)
         image_column = config["image_column"]
-        training_data[image_column] = training_data[image_column].apply(lambda path: os.path.join(train_images_dir, path))
+        training_data[image_column] = training_data[image_column].apply(
+            lambda path: os.path.join(train_images_dir, path)
+        )
 
     if args.tune_images:
         tune_image_compressed_file = get_input_path(args.tune_images)
