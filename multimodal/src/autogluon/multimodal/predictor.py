@@ -354,10 +354,12 @@ class MultiModalPredictor:
                 problem_type = problem_type_reg.get(REGRESSION)
             else:
                 if NUMERICAL not in problem_type.supported_label_type:
-                    raise ValueError(f"The provided evaluation metric will require the problem "
-                                     f"to support label type = {NUMERICAL}. However, "
-                                     f"the provided problem type = {problem_type.name} only "
-                                     f"supports label type = {problem_type.supported_label_type}.")
+                    raise ValueError(
+                        f"The provided evaluation metric will require the problem "
+                        f"to support label type = {NUMERICAL}. However, "
+                        f"the provided problem type = {problem_type.name} only "
+                        f"supports label type = {problem_type.supported_label_type}."
+                    )
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
             verbosity = 1  # don't use 3, which doesn't suppress logger.info() in .load().
@@ -3062,11 +3064,13 @@ class MultiModalPredictor:
         Dict containing various detailed information.
         We do not recommend directly printing this dict as it may be very large.
         """
-        logging.info(f"Here's the model summary:"
-                     f""
-                     f"The model achieved score '{self._best_score}' on the validation metric"
-                     f" '{self._validation_metric_name}'. "
-                     f"The total training time is {timedelta(seconds=self._total_train_time)}")
+        logging.info(
+            f"Here's the model summary:"
+            f""
+            f"The model achieved score '{self._best_score}' on the validation metric"
+            f" '{self._validation_metric_name}'. "
+            f"The total training time is {timedelta(seconds=self._total_train_time)}"
+        )
         results = {f"val_{self._validation_metric_name}": self._best_score, "training_time": self._total_train_time}
         return results
 
@@ -3085,7 +3089,7 @@ class MultiModalPredictor:
         -------
         a list of model names
         """
-        if self.problem_type.is_classification:  #FIXME (Need to list the supported models for each modality)
+        if self.problem_type.is_classification:  # FIXME (Need to list the supported models for each modality)
             return list_timm_models(pretrained=pretrained)
         else:
             raise ValueError(f"list_supported_models() is not available for problem type: {self.problem_type}")
