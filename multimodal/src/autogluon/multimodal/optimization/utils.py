@@ -283,7 +283,7 @@ def get_metric(
         return torchmetrics.PearsonCorrCoef(), None
     elif metric_name == SPEARMANR:
         if is_matching:  # TODO: add support for matching.
-            raise ValueError("spearman relation is supported for matching yet.")
+            raise ValueError("spearman relation is not supported for matching yet.")
         else:
             return torchmetrics.SpearmanCorrCoef(), None
     elif metric_name == F1:

@@ -60,6 +60,7 @@ from .data.infer_types import (
 )
 from .optimization.lit_matcher import MatcherLitModule
 from .optimization.utils import get_matcher_loss_func, get_matcher_miner_func, get_metric
+from .presets import matcher_presets
 from .utils import (
     AutoMMModelCheckpoint,
     CustomUnpickler,
@@ -86,7 +87,6 @@ from .utils import (
     infer_precision,
     init_df_preprocessor,
     init_pretrained_matcher,
-    is_matching,
     load_text_tokenizers,
     process_save_path,
     save_pretrained_model_configs,
@@ -438,7 +438,7 @@ class MultiModalMatcher:
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
                 problem_type=problem_type,
-                is_matching=is_matching(self._pipeline),
+                is_matching=self._pipeline in matcher_presets.list_keys(),
                 eval_metric_name=self._eval_metric_name,
             )
         else:
@@ -675,7 +675,7 @@ class MultiModalMatcher:
             metric_name=validation_metric_name,
             num_classes=self._output_shape,
             pos_label=pos_label,
-            is_matching=is_matching(self._pipeline),
+            is_matching=self._pipeline in matcher_presets.list_keys(),
         )
         logger.debug(f"validation_metric_name: {validation_metric_name}")
         logger.debug(f"validation_metric: {validation_metric}")

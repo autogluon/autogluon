@@ -10,7 +10,6 @@ from omegaconf import DictConfig
 from torch import nn
 
 from ..constants import AUTOMM, FUSION, QUERY, RESPONSE
-from ..presets import matcher_presets
 from .data import data_to_df
 from .model import create_model
 
@@ -502,7 +501,3 @@ def convert_data_for_ranking(
     response_data = pd.DataFrame({response_column: data[response_column].unique().tolist()})
 
     return data_with_label, query_data, response_data, label_column
-
-
-def is_matching(pipeline: str):
-    return pipeline in matcher_presets.list_keys()
