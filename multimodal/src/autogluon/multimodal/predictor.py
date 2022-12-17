@@ -910,6 +910,7 @@ class MultiModalPredictor:
             config = self._config
 
         is_pretrain = hyperparameters.pop("pretrainer") if "pretrainer" in hyperparameters else False
+        finetune_on = hyperparameters.pop("finetune_on") if "finetune_on" in hyperparameters else None
 
         extra = []
         if teacher_predictor is not None:
@@ -959,11 +960,10 @@ class MultiModalPredictor:
             model = self._model
 
         while True:
-            if (not is_pretrain_["is_pretrain"]) and ("finetune_on" not in is_pretrain_):
+            if (not is_pretrain_["is_pretrain"]):
                 break
             try:
-                foundation_model = is_pretrain_[
-                    "finetune_on"] if "finetune_on" in is_pretrain_ else "pretrained_hogwild.ckpt"
+                foundation_model = finetune_on
                 s3 = boto3.resource('s3')
                 s3.Bucket('automl-benchmark-bingzzhu').download_file(
                     'ec2/2022_09_14/cross_table_pretrain/' + foundation_model,
