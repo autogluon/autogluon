@@ -256,7 +256,7 @@ def check_if_packages_installed(problem_type: ProblemType):
     if not problem_type:
         return
 
-    problem_type = problem_type.name.lower()
+    problem_type = problem_type.lower()
     if any(p in problem_type for p in [OBJECT_DETECTION, OCR]):
         try:
             with warnings.catch_warnings():

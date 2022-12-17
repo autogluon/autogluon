@@ -30,13 +30,13 @@ from .constants import (
 )
 from .registry import Registry
 
-problem_type_reg = Registry("problem_types")
+PROBLEM_TYPES_REG = Registry("problem_type_properties")
 
 
 @dataclass
-class ProblemType:
-    """Problem type class. Stores the name of the problem
-    and its related properties. Some of the properties will be useful for the label / feature inference logic."""
+class ProblemTypeProperty:
+    """Property of the problem. Stores the name of the problem
+    and its related properties. Some properties are used in the label / feature inference logic."""
 
     name: str  # Name of the problem
     support_fit: bool = True  # Whether the problem type support `.fit()`
@@ -69,27 +69,27 @@ class ProblemType:
 
 
 # Classification: Arbitrary combination of image, text, tabular data --> categorical value
-problem_type_reg.register(
+PROBLEM_TYPES_REG.register(
     CLASSIFICATION,
-    ProblemType(
+    ProblemTypeProperty(
         name=CLASSIFICATION,
         supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
         is_classification=True,
     ),
 )
-problem_type_reg.register(
+PROBLEM_TYPES_REG.register(
     BINARY,
-    ProblemType(
+    ProblemTypeProperty(
         name=BINARY,
         supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
         is_classification=True,
     ),
 )
-problem_type_reg.register(
+PROBLEM_TYPES_REG.register(
     MULTICLASS,
-    ProblemType(
+    ProblemTypeProperty(
         name=MULTICLASS,
         supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
@@ -98,9 +98,9 @@ problem_type_reg.register(
 )
 
 # Regression: Arbitrary combination of image, text, tabular data --> numeric value
-problem_type_reg.register(
+PROBLEM_TYPES_REG.register(
     REGRESSION,
-    ProblemType(
+    ProblemTypeProperty(
         name=REGRESSION,
         supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={NUMERICAL},
@@ -108,9 +108,9 @@ problem_type_reg.register(
 )
 
 # Object detection: image --> bounding boxes
-problem_type_reg.register(
+PROBLEM_TYPES_REG.register(
     OBJECT_DETECTION,
-    ProblemType(
+    ProblemTypeProperty(
         name=OBJECT_DETECTION,
         inference_ready=True,
         supported_modality_type={IMAGE},
@@ -120,9 +120,9 @@ problem_type_reg.register(
 )
 
 # Matching: text <--> text, image <--> image, text <--> image
-problem_type_reg.register(
+PROBLEM_TYPES_REG.register(
     TEXT_SIMILARITY,
-    ProblemType(
+    ProblemTypeProperty(
         name=TEXT_SIMILARITY,
         inference_ready=True,
         is_matching=True,
@@ -131,9 +131,9 @@ problem_type_reg.register(
         force_exist_modality={TEXT},
     ),
 )
-problem_type_reg.register(
+PROBLEM_TYPES_REG.register(
     IMAGE_SIMILARITY,
-    ProblemType(
+    ProblemTypeProperty(
         name=IMAGE_SIMILARITY,
         inference_ready=True,
         is_matching=True,
@@ -142,9 +142,9 @@ problem_type_reg.register(
         force_exist_modality={IMAGE},
     ),
 )
-problem_type_reg.register(
+PROBLEM_TYPES_REG.register(
     IMAGE_TEXT_SIMILARITY,
-    ProblemType(
+    ProblemTypeProperty(
         name=IMAGE_TEXT_SIMILARITY,
         inference_ready=True,
         is_matching=True,
@@ -155,27 +155,27 @@ problem_type_reg.register(
 )
 
 # Entity Extraction: text (tied to the entity), [other text], [image], [tabular] --> entity
-_ner_type = ProblemType(
+_ner_property = ProblemTypeProperty(
     name=NER,
     supported_modality_type={IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER},
     supported_label_type={NER_ANNOTATION},
     force_exist_modality={TEXT_NER},
 )
-problem_type_reg.register(NER, _ner_type),
-problem_type_reg.register(NAMED_ENTITY_RECOGNITION, _ner_type),
+PROBLEM_TYPES_REG.register(NER, _ner_property),
+PROBLEM_TYPES_REG.register(NAMED_ENTITY_RECOGNITION, _ner_property),
 
 # Feature Extraction: text --> feature, image --> features
-problem_type_reg.register(
+PROBLEM_TYPES_REG.register(
     FEATURE_EXTRACTION,
-    ProblemType(
+    ProblemTypeProperty(
         name=FEATURE_EXTRACTION, support_fit=False, inference_ready=True, supported_modality_type={IMAGE, TEXT}
     ),
 )
 
 # Zero-shot Image classification
-problem_type_reg.register(
+PROBLEM_TYPES_REG.register(
     ZERO_SHOT_IMAGE_CLASSIFICATION,
-    ProblemType(
+    ProblemTypeProperty(
         name=ZERO_SHOT_IMAGE_CLASSIFICATION,
         support_fit=False,
         inference_ready=True,
@@ -185,9 +185,9 @@ problem_type_reg.register(
 )
 
 # Few-shot Text classification. TODO: For few-shot problems, they may be revised to be presets
-problem_type_reg.register(
+PROBLEM_TYPES_REG.register(
     FEW_SHOT_TEXT_CLASSIFICATION,
-    ProblemType(
+    ProblemTypeProperty(
         name=FEW_SHOT_TEXT_CLASSIFICATION,
         support_fit=True,
         inference_ready=False,
@@ -198,9 +198,9 @@ problem_type_reg.register(
 )
 
 # OCR. TODO: Improve the definition of OCR.
-problem_type_reg.register(
+PROBLEM_TYPES_REG.register(
     OCR_TEXT_DETECTION,
-    ProblemType(
+    ProblemTypeProperty(
         name=OCR_TEXT_DETECTION,
         support_fit=False,
         inference_ready=True,
@@ -209,9 +209,9 @@ problem_type_reg.register(
     ),
 )
 
-problem_type_reg.register(
+PROBLEM_TYPES_REG.register(
     OCR_TEXT_RECOGNITION,
-    ProblemType(
+    ProblemTypeProperty(
         name=OCR_TEXT_RECOGNITION,
         support_fit=False,
         inference_ready=True,

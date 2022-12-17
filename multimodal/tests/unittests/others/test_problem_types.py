@@ -1,7 +1,7 @@
 import pytest
 
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.problem_types import problem_type_reg
+from autogluon.multimodal.problem_types import PROBLEM_TYPES_REG
 
 
 @pytest.mark.parametrize(
@@ -25,11 +25,11 @@ from autogluon.multimodal.problem_types import problem_type_reg
     ],
 )
 def test_get_problem_type(name):
-    problem_type = problem_type_reg.get(name)
-    print(problem_type)
-    assert problem_type.name == problem_type_reg.get(problem_type.name).name
+    problem_prop = PROBLEM_TYPES_REG.get(name)
+    print(problem_prop)
+    assert problem_prop.name == PROBLEM_TYPES_REG.get(problem_prop.name).name
 
 
-@pytest.mark.parametrize("name", problem_type_reg.list_keys())
+@pytest.mark.parametrize("name", PROBLEM_TYPES_REG.list_keys())
 def fetch_predictor_via_problem_types(name):
     predictor = MultiModalPredictor(problem_type=name)
