@@ -14,7 +14,6 @@ except:
     pass
 
 from ..constants import AUTOMM, OBJECT_DETECTION, OCR
-from ..problem_types import ProblemType
 
 logger = logging.getLogger(AUTOMM)
 
@@ -243,7 +242,7 @@ def get_precision_context(precision: Union[int, str], device_type: Optional[str]
         raise ValueError(f"Unknown precision: {precision}")
 
 
-def check_if_packages_installed(problem_type: ProblemType):
+def check_if_packages_installed(problem_type: str):
     """
     Check if necessary packages are installed for some problem types.
     Raise an error if an package can't be imported.
