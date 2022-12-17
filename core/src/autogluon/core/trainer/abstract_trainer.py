@@ -22,7 +22,7 @@ from ..calibrate.temperature_scaling import tune_temperature_scaling
 from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from ..data.label_cleaner import LabelCleanerMulticlassToBinary
 from ..models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel
-from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
+from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric, ResourceManager
 from ..utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError, NotEnoughCudaMemoryError
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
@@ -1237,8 +1237,7 @@ class AbstractTrainer:
                         for child in info[model]['children_info'].values():
                             model_mem_size_map[model] += child['memory_size']
                 total_mem_required = sum(model_mem_size_map.values())
-                import psutil
-                available_mem = psutil.virtual_memory().available
+                available_mem = ResourceManager.get_available_virtual_mem()
                 memory_proportion = total_mem_required / available_mem
                 if memory_proportion > max_memory:
                     logger.log(30, f'Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory*100, 2)}%.')

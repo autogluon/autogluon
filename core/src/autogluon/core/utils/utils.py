@@ -26,9 +26,9 @@ from ..metrics import accuracy, root_mean_squared_error, pinball_loss, Scorer
 logger = logging.getLogger(__name__)
 
 
-class ResourceManager():
+class ResourceManager:
     """Manager that fetches system related info"""
-    
+
     @staticmethod
     def get_cpu_count():
         return multiprocessing.cpu_count()
@@ -96,7 +96,13 @@ class ResourceManager():
         return bytes_to_mega_bytes(psutil.virtual_memory().total)
 
     @staticmethod
-    @disable_if_lite_mode(ret=1073741824)
+    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
+    def get_memory_rss():
+        import psutil
+        return psutil.Process().memory_info().rss
+
+    @staticmethod
+    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
     def get_available_virtual_mem():
         import psutil
         return psutil.virtual_memory().available
@@ -112,7 +118,7 @@ class ResourceManager():
             return bytes_to_mega_bytes(available_blocks)
         except Exception:
             return None
-    
+
     @staticmethod
     def _get_gpu_count_cuda():
         # FIXME: Sometimes doesn't detect GPU on Windows
@@ -1006,14 +1012,12 @@ def _compute_mean_stddev_and_p_value(values: list):
     return mean, stddev, p_value, n
 
 
-@disable_if_lite_mode(ret=1)
 def _get_safe_fi_batch_count(X, num_features, X_transformed=None, max_memory_ratio=0.2, max_feature_batch_count=200):
-    import psutil
     # calculating maximum number of features that are safe to process in parallel
     X_size_bytes = sys.getsizeof(pickle.dumps(X, protocol=4))
     if X_transformed is not None:
         X_size_bytes += sys.getsizeof(pickle.dumps(X_transformed, protocol=4))
-    available_mem = psutil.virtual_memory().available
+    available_mem = ResourceManager.get_available_virtual_mem()
     X_memory_ratio = X_size_bytes / available_mem
 
     feature_batch_count_safe = math.floor(max_memory_ratio / X_memory_ratio)

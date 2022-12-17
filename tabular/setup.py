@@ -34,7 +34,6 @@ install_requires = [
     'scipy',
     'pandas',
     'scikit-learn',
-    'xgboost',
     'networkx>=2.3,<3.0',
     f'{ag.PACKAGE_NAME}.core=={version}',
     f'{ag.PACKAGE_NAME}.features=={version}',

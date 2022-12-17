@@ -1362,10 +1362,9 @@ class AbstractModel:
 
     @disable_if_lite_mode()
     def _validate_fit_memory_usage(self, **kwargs):
-        import psutil
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         approx_mem_size_req = self.estimate_memory_usage(**kwargs)
-        available_mem = psutil.virtual_memory().available
+        available_mem = ResourceManager.get_available_virtual_mem()
         ratio = approx_mem_size_req / available_mem
         if ratio > (0.9 * max_memory_usage_ratio):
             logger.warning('\tWarning: Not enough memory to safely train model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))

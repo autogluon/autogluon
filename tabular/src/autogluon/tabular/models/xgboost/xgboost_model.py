@@ -131,7 +131,6 @@ class XGBoostModel(AbstractModel):
             callbacks.append(EarlyStoppingCustom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
             params['callbacks'] = callbacks
 
-        import xgboost
         from xgboost import XGBClassifier, XGBRegressor
         model_type = XGBClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else XGBRegressor
         self.model = model_type(**params)
@@ -185,13 +184,11 @@ class XGBoostModel(AbstractModel):
         approx_mem_size_req = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
         return approx_mem_size_req
 
-    @disable_if_lite_mode()
     def _validate_fit_memory_usage(self, **kwargs):
-        import psutil
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         approx_mem_size_req = self.estimate_memory_usage(**kwargs)
         if approx_mem_size_req > 1e9:  # > 1 GB
-            available_mem = psutil.virtual_memory().available
+            available_mem = ResourceManager.get_available_virtual_mem()
             ratio = approx_mem_size_req / available_mem
             if ratio > (1 * max_memory_usage_ratio):
                 logger.warning('\tWarning: Not enough memory to safely train XGBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))

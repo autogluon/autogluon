@@ -16,8 +16,7 @@ from ..ray.resources_calculator import ResourceCalculator
 from ..scheduler.scheduler_factory import scheduler_factory
 
 from typing import TYPE_CHECKING
-from autogluon.core.utils import ResourceManager
-from autogluon.common.utils.lite import disable_if_lite_mode
+from ..utils import ResourceManager
 
 if TYPE_CHECKING:
     from ..models import AbstractModel

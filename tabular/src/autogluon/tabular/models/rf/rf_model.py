@@ -8,7 +8,6 @@ import time
 import numpy as np
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
-from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.core.utils import ResourceManager
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
@@ -129,20 +128,16 @@ class RFModel(AbstractModel):
         expected_min_memory_usage = bytes_per_estimator * n_estimators_minimum
         return expected_min_memory_usage
 
-    @disable_if_lite_mode()
     def _validate_fit_memory_usage(self, **kwargs):
-        import psutil
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
-        available_mem = psutil.virtual_memory().available
+        available_mem = ResourceManager.get_available_virtual_mem()
         expected_min_memory_usage = self.estimate_memory_usage(**kwargs) / available_mem
         if expected_min_memory_usage > (0.5 * max_memory_usage_ratio):  # if minimum estimated size is greater than 50% memory
             logger.warning(f'\tWarning: Model is expected to require {round(expected_min_memory_usage * 100, 2)}% of available memory (Estimated before training)...')
             raise NotEnoughMemoryError
 
-    @disable_if_lite_mode(ret=0)
     def _expected_mem_usage(self, n_estimators_final, bytes_per_estimator):
-        import psutil
-        available_mem = psutil.virtual_memory().available
+        available_mem = ResourceManager.get_available_virtual_mem()
         return n_estimators_final * bytes_per_estimator / available_mem
 
     def _fit(self,

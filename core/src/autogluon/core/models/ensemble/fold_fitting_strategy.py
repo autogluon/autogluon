@@ -15,6 +15,7 @@ from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 
 from ...ray.resources_calculator import ResourceCalculatorFactory
+from ...utils import ResourceManager
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NotEnoughCudaMemoryError
 from ...utils.try_import import try_import_ray
 
@@ -417,12 +418,11 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
     @disable_if_lite_mode(ret=True)
     def is_mem_sufficient(self):
         '''Check if the memory is sufficient to do parallel training'''
-        import psutil
         model_mem_est = self._initialized_model_base.estimate_memory_usage(X=self.X)
         total_model_mem_est = self.num_parallel_jobs * model_mem_est
         data_mem_est = self._estimate_data_memory_usage()
         total_data_mem_est = self.num_parallel_jobs * data_mem_est
-        mem_available = psutil.virtual_memory().available
+        mem_available = ResourceManager.get_available_virtual_mem()
         return (mem_available * self.max_memory_usage_ratio) > (total_model_mem_est + total_data_mem_est)
 
     def _estimate_data_memory_usage(self):
