@@ -528,12 +528,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             end_index = time_step_slice.stop
 
         time_step_slice = slice(start_index, end_index)
-        result = (
-            self.reset_index()
-            .groupby(ITEMID, sort=False, as_index=False)
-            .nth(time_step_slice)
-            .set_index([ITEMID, TIMESTAMP])
-        )
+        result = self.groupby(level=ITEMID, sort=False, as_index=False).nth(time_step_slice)
         result.static_features = self.static_features
         result._cached_freq = self._cached_freq
         return result
