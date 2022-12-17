@@ -52,6 +52,7 @@ from ..constants import (
     PEFT_STRATEGIES,
     QUADRATIC_KAPPA,
     R2,
+    RECALL,
     REGRESSION,
     RMSE,
     ROC_AUC,
@@ -234,6 +235,7 @@ def get_metric(
     metric_name: str,
     num_classes: Optional[int] = None,
     pos_label: Optional[int] = None,
+    is_matching: Optional[bool] = False,
 ):
     """
     Obtain a torchmerics.Metric from its name.
@@ -247,6 +249,8 @@ def get_metric(
         Number of classes.
     pos_label
         The label (0 or 1) of binary classification's positive class, which is used in some metrics, e.g., AUROC.
+    is_matching
+        Whether is matching.
 
     Returns
     -------
@@ -278,7 +282,10 @@ def get_metric(
     elif metric_name == PEARSONR:
         return torchmetrics.PearsonCorrCoef(), None
     elif metric_name == SPEARMANR:
-        return torchmetrics.SpearmanCorrCoef(), None
+        if is_matching:  # TODO: add support for matching.
+            raise ValueError("spearman relation is not supported for matching yet.")
+        else:
+            return torchmetrics.SpearmanCorrCoef(), None
     elif metric_name == F1:
         return CustomF1Score(num_classes=num_classes, pos_label=pos_label), None
     elif metric_name == MAP.lower():
@@ -291,8 +298,11 @@ def get_metric(
             torchmetrics.MeanMetric(nan_strategy="warn"),
             None,
         )  # This only works for detection where custom_metric is not required for BaseAggregator
-    elif metric_name == HIT_RATE:
-        return CustomHitRate(), None
+    elif metric_name in [RECALL, HIT_RATE]:
+        if is_matching:
+            return CustomHitRate(), None
+        else:  # TODO: support recall for general classification tasks.
+            raise ValueError("Recall is not supported yet.")
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 

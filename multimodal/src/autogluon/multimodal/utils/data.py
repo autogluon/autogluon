@@ -20,6 +20,7 @@ from ..constants import (
     FEW_SHOT,
     IMAGE,
     LABEL,
+    MMLAB_MODELS,
     NER,
     NER_ANNOTATION,
     NER_TEXT,
@@ -33,6 +34,8 @@ from ..data import (
     ImageProcessor,
     LabelProcessor,
     MixupModule,
+    MMDetProcessor,
+    MMOcrProcessor,
     MultiModalFeaturePreprocessor,
     NerLabelEncoder,
     NerProcessor,
@@ -156,6 +159,12 @@ def create_data_processor(
             model=model,
             max_len=model_config.max_text_len,
         )
+    elif data_type == ROIS:
+        data_processor = MMDetProcessor(
+            model=model,
+            max_img_num_per_col=model_config.max_img_num_per_col,
+            missing_value_strategy=config.data.image.missing_value_strategy,
+        )
     else:
         raise ValueError(f"unknown data type: {data_type}")
 
@@ -195,6 +204,7 @@ def create_fusion_data_processors(
         CATEGORICAL: [],
         NUMERICAL: [],
         LABEL: [],
+        ROIS: [],
         TEXT_NER: [],
     }
 
@@ -225,6 +235,17 @@ def create_fusion_data_processors(
             requires_label = False
             if data_types is not None and TEXT_NER in data_types:
                 data_types.remove(TEXT_NER)
+        elif per_name.lower().startswith(MMLAB_MODELS):
+            # create a multimodal processor for NER.
+            data_processors[ROIS].append(
+                create_data_processor(
+                    data_type=ROIS,
+                    config=config,
+                    model=per_model,
+                )
+            )
+            if data_types is not None and IMAGE in data_types:
+                data_types.remove(IMAGE)
 
         if requires_label:
             # each model has its own label processor

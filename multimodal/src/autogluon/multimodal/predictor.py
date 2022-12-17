@@ -78,6 +78,7 @@ from .constants import (
     PROBABILITY,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
+    ROIS,
     SCORE,
     TEXT,
     TEXT_NER,
@@ -418,8 +419,7 @@ class MultiModalPredictor:
                 response=response,
                 label=label,
                 match_label=match_label,
-                problem_type=None,  # Ensure that matcher will always infer problem type.
-                pipeline=self.problem_type,
+                problem_type=self.problem_type,  # Ensure that matcher will always infer problem type.
                 hyperparameters=hyperparameters,
                 eval_metric=eval_metric,
                 path=path,
@@ -2833,6 +2833,15 @@ class MultiModalPredictor:
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = CustomUnpickler(fp).load()
+            if (
+                not hasattr(df_preprocessor, "_rois_feature_names")
+                and hasattr(df_preprocessor, "_image_feature_names")
+                and ROIS in df_preprocessor._image_feature_names
+            ):  # backward compatibility for mmlab models
+                df_preprocessor._image_feature_names = [
+                    name for name in df_preprocessor._image_feature_names if name != ROIS
+                ]
+                df_preprocessor._rois_feature_names = [ROIS]
 
         try:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
@@ -2854,6 +2863,12 @@ class MultiModalPredictor:
             # Only keep the modalities with non-empty processors.
             data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
         except:  # backward compatibility. reconstruct the data processor in case something went wrong.
+            data_processors = None
+
+        # backward compatibility. Use ROISProcessor for old mmdet/mmocr models.
+        if assets["problem_type"] == OBJECT_DETECTION or (
+            "pipeline" in assets and assets["pipeline"] == OBJECT_DETECTION
+        ):
             data_processors = None
 
         predictor._label_column = assets["label_column"]

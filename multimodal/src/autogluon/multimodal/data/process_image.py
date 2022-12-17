@@ -20,26 +20,6 @@ from torchvision import transforms
 from .randaug import RandAugment
 
 try:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        import mmcv
-    from mmcv.parallel import collate
-except ImportError as e:
-    mmcv = None
-
-try:
-    import mmdet
-    from mmdet.datasets import replace_ImageToTensor
-    from mmdet.datasets.pipelines import Compose
-except ImportError as e:
-    mmdet = None
-
-try:
-    import mmocr
-except ImportError:
-    mmocr = None
-
-try:
     from torchvision.transforms import InterpolationMode
 
     BICUBIC = InterpolationMode.BICUBIC
@@ -56,11 +36,6 @@ from ..constants import (
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
     IMAGE_VALID_NUM,
-    MMDET_IMAGE,
-    MMLAB_MODELS,
-    MMOCR,
-    MMOCR_TEXT_DET,
-    MMOCR_TEXT_RECOG,
     TIMM_IMAGE,
 )
 from .collator import PadCollator, StackCollator
@@ -163,21 +138,8 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        if self.prefix.lower().startswith(MMLAB_MODELS):
-            if self.prefix.lower().startswith(MMDET_IMAGE):
-                assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
-            else:
-                assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
-            cfg = model.model.cfg
-            try:  # yolov3
-                training_pipeline = cfg.data.train.dataset.pipeline
-            except:  # faster_rcnn
-                training_pipeline = cfg.data.train.pipeline
-            self.val_processor = Compose(replace_ImageToTensor(cfg.data.val.pipeline))
-            self.train_processor = Compose(replace_ImageToTensor(training_pipeline))
-        else:
-            self.train_processor = self.construct_processor(self.train_transform_types)
-            self.val_processor = self.construct_processor(self.val_transform_types)
+        self.train_processor = self.construct_processor(self.train_transform_types)
+        self.val_processor = self.construct_processor(self.val_transform_types)
 
     @property
     def image_key(self):
@@ -208,30 +170,12 @@ class ImageProcessor:
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = StackCollator()
 
-        if self.prefix.lower().startswith(MMLAB_MODELS):
-            assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-            if self.prefix.lower().startswith(MMDET_IMAGE):
-                from ..utils import CollateMMCV
-
-                fn.update(
-                    {
-                        self.image_key: CollateMMCV(samples_per_gpu=per_gpu_batch_size),
-                    }
-                )
-            else:
-                # TODO: update MMOCR
-                fn.update(
-                    {
-                        self.image_key: lambda x: collate(x, samples_per_gpu=per_gpu_batch_size),
-                    }
-                )
-        else:
-            fn.update(
-                {
-                    self.image_key: PadCollator(pad_val=0),
-                    self.image_valid_num_key: StackCollator(),
-                }
-            )
+        fn.update(
+            {
+                self.image_key: PadCollator(pad_val=0),
+                self.image_valid_num_key: StackCollator(),
+            }
+        )
 
         return fn
 
@@ -277,35 +221,7 @@ class ImageProcessor:
         std
             Image normalizaiton std.
         """
-        if self.prefix.lower().startswith(MMDET_IMAGE):
-            if "img_scale" in config.test_pipeline[1]:
-                image_size = config.test_pipeline[1]["img_scale"][0]
-            else:
-                image_size = (320, 320)  # TODO: remove self.size for mmdet since it's not used
-            if "mean" in config.test_pipeline[1]["transforms"][2]:
-                mean = config.test_pipeline[1]["transforms"][2]["mean"]
-                std = config.test_pipeline[1]["transforms"][2]["std"]
-            else:  # yolox does not need normalization
-                mean = 0
-                std = 1
-        elif self.prefix.lower().startswith(MMOCR_TEXT_DET):
-            image_size = config.data.test.pipeline[1]["img_scale"][0]
-            mean = config.data.test.pipeline[1]["transforms"][1]["mean"]
-            std = config.data.test.pipeline[1]["transforms"][1]["std"]
-        elif self.prefix.lower().startswith(MMOCR_TEXT_RECOG):
-            tmp_config_dict = {}
-            for d in config.data.test.pipeline:
-                for k, v in d.items():
-                    tmp_config_dict[k] = v
-            if "transforms" in tmp_config_dict:
-                image_size = tmp_config_dict["transforms"][0]["min_width"]
-                mean = tmp_config_dict["transforms"][2]["mean"]
-                std = tmp_config_dict["transforms"][2]["std"]
-            else:
-                image_size = tmp_config_dict["min_width"]
-                mean = tmp_config_dict["mean"]
-                std = tmp_config_dict["std"]
-        elif self.prefix.lower().startswith(TIMM_IMAGE):
+        if self.prefix.lower().startswith(TIMM_IMAGE):
             image_size = config["input_size"][-1]
             mean = config["mean"]
             std = config["std"]
@@ -427,77 +343,59 @@ class ImageProcessor:
         """
         images = []
         zero_images = []
-        mm_data = dict(img_prefix=None, bbox_fields=[], mask_fields=[])
         ret = {}
         column_start = 0
-        if self.prefix.lower().startswith(MMLAB_MODELS):
-            for per_col_name, per_col_content in image_features.items():
-                if is_rois_input(per_col_content):
-                    rois = np.array(per_col_content)
-                    # TODO: add gt masks
-                    mm_data["ann_info"] = dict(bboxes=rois[:, :4], labels=rois[:, 4], masks=[])
-                else:
-                    if feature_modalities.get(per_col_name) == IMAGE_PATH:
-                        with PIL.Image.open(per_col_content[0]) as img:
-                            mm_data["img_info"] = dict(filename=per_col_content[0], height=img.height, width=img.width)
-                    elif feature_modalities.get(per_col_name) == IMAGE_BYTEARRAY:
-                        # TODO: add bytearray support for detection
-                        raise NotImplementedError
-            if self.requires_column_info:
-                pass  # TODO
-        else:
-            for per_col_name, per_col_image_features in image_features.items():
-                for img_feature in per_col_image_features[: self.max_img_num_per_col]:
-                    with warnings.catch_warnings():
-                        warnings.filterwarnings(
-                            "ignore",
-                            message=(
-                                "Palette images with Transparency expressed in bytes should be converted to RGBA images"
-                            ),
-                        )
-                        is_zero_img = False
-                        try:
-                            if feature_modalities.get(per_col_name) == IMAGE_BYTEARRAY:
-                                image_feature = BytesIO(img_feature)
-                            else:
-                                image_feature = img_feature
-                            with PIL.Image.open(image_feature) as img:
-                                img = img.convert(image_mode)
-                        except Exception as e:
-                            if self.missing_value_strategy.lower() == "zero":
-                                logger.debug(f"Using a zero image due to '{e}'")
-                                img = PIL.Image.new(image_mode, (self.size, self.size), color=0)
-                                is_zero_img = True
-                            else:
-                                raise e
 
-                    if is_training:
-                        img = self.train_processor(img)
-                    else:
-                        img = self.val_processor(img)
-
-                    if is_zero_img:
-                        zero_images.append(img)
-                    else:
-                        images.append(img)
-
-                if self.requires_column_info:
-                    # only count the valid images since they are put ahead of the zero images in the below returning
-                    ret[f"{self.image_column_prefix}_{per_col_name}"] = np.array(
-                        [column_start, len(images)], dtype=np.int64
+        for per_col_name, per_col_image_features in image_features.items():
+            for img_feature in per_col_image_features[: self.max_img_num_per_col]:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings(
+                        "ignore",
+                        message=(
+                            "Palette images with Transparency expressed in bytes should be converted to RGBA images"
+                        ),
                     )
-                    column_start = len(images)
-        if self.prefix.lower().startswith(MMLAB_MODELS):
-            ret.update({self.image_key: self.train_processor(mm_data) if is_training else self.val_processor(mm_data)})
-        else:
-            ret.update(
-                {
-                    self.image_key: torch.tensor([])
-                    if len(images + zero_images) == 0
-                    else torch.stack(images + zero_images, dim=0),
-                    self.image_valid_num_key: len(images),
-                }
-            )
+                    is_zero_img = False
+                    try:
+                        if feature_modalities.get(per_col_name) == IMAGE_BYTEARRAY:
+                            image_feature = BytesIO(img_feature)
+                        else:
+                            image_feature = img_feature
+                        with PIL.Image.open(image_feature) as img:
+                            img = img.convert(image_mode)
+                    except Exception as e:
+                        if self.missing_value_strategy.lower() == "zero":
+                            logger.debug(f"Using a zero image due to '{e}'")
+                            img = PIL.Image.new(image_mode, (self.size, self.size), color=0)
+                            is_zero_img = True
+                        else:
+                            raise e
+
+                if is_training:
+                    img = self.train_processor(img)
+                else:
+                    img = self.val_processor(img)
+
+                if is_zero_img:
+                    zero_images.append(img)
+                else:
+                    images.append(img)
+
+            if self.requires_column_info:
+                # only count the valid images since they are put ahead of the zero images in the below returning
+                ret[f"{self.image_column_prefix}_{per_col_name}"] = np.array(
+                    [column_start, len(images)], dtype=np.int64
+                )
+                column_start = len(images)
+
+        ret.update(
+            {
+                self.image_key: torch.tensor([])
+                if len(images + zero_images) == 0
+                else torch.stack(images + zero_images, dim=0),
+                self.image_valid_num_key: len(images),
+            }
+        )
         return ret
 
     def __call__(

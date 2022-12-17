@@ -1,4 +1,5 @@
 import base64
+import copy
 import logging
 import os
 import shutil
@@ -16,13 +17,14 @@ def read_image_bytes_and_encode(image_path):
     image_obj = open(image_path, "rb")
     image_bytes = image_obj.read()
     image_obj.close()
-    b64_image = base64.b85encode(image_bytes).decode("utf-8")
+    b85_image = base64.b85encode(image_bytes).decode("utf-8")
 
-    return b64_image
+    return b85_image
 
 
 def convert_image_path_to_encoded_bytes_in_dataframe(dataframe, image_column):
     assert image_column in dataframe, "Please specify a valid image column name"
+    dataframe = copy.deepcopy(dataframe)
     dataframe[image_column] = [read_image_bytes_and_encode(path) for path in dataframe[image_column]]
 
     return dataframe

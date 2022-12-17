@@ -40,9 +40,14 @@ if __name__ == "__main__":
     parser.add_argument("--output-data-dir", type=str, default=get_env_if_present("SM_OUTPUT_DATA_DIR"))
     parser.add_argument("--model-dir", type=str, default=get_env_if_present("SM_MODEL_DIR"))
     parser.add_argument("--n_gpus", type=str, default=get_env_if_present("SM_NUM_GPUS"))
-    parser.add_argument("--training_dir", type=str, default=get_env_if_present("SM_CHANNEL_TRAIN"))
+    parser.add_argument("--train_dir", type=str, default=get_env_if_present("SM_CHANNEL_TRAIN"))
     parser.add_argument("--tune_dir", type=str, required=False, default=get_env_if_present("SM_CHANNEL_TUNE"))
-    parser.add_argument("--images_dir", type=str, required=False, default=get_env_if_present("SM_CHANNEL_IMAGES"))
+    parser.add_argument(
+        "--train_images", type=str, required=False, default=get_env_if_present("SM_CHANNEL_TRAIN_IMAGES")
+    )
+    parser.add_argument(
+        "--tune_images", type=str, required=False, default=get_env_if_present("SM_CHANNEL_TUNE_IMAGES")
+    )
     parser.add_argument("--ag_config", type=str, default=get_env_if_present("SM_CHANNEL_CONFIG"))
     parser.add_argument("--serving_script", type=str, default=get_env_if_present("SM_CHANNEL_SERVING"))
 
@@ -90,7 +95,7 @@ if __name__ == "__main__":
 
         predictor_cls = MultiModalPredictor
 
-    train_file = get_input_path(args.training_dir)
+    train_file = get_input_path(args.train_dir)
     training_data = TabularDataset(train_file)
     if predictor_type == "tabular" and "image_column" in config:
         feature_metadata = predictor_fit_args.get("feature_metadata", None)
@@ -104,9 +109,21 @@ if __name__ == "__main__":
         tune_file = get_input_path(args.tune_dir)
         tuning_data = TabularDataset(tune_file)
 
-    if args.images_dir:
-        image_compressed_file = get_input_path(args.images_dir)
-        shutil.unpack_archive(image_compressed_file)
+    if args.train_images:
+        train_image_compressed_file = get_input_path(args.train_images)
+        train_images_dir = "train_images"
+        shutil.unpack_archive(train_image_compressed_file, train_images_dir)
+        image_column = config["image_column"]
+        training_data[image_column] = training_data[image_column].apply(
+            lambda path: os.path.join(train_images_dir, path)
+        )
+
+    if args.tune_images:
+        tune_image_compressed_file = get_input_path(args.tune_images)
+        tune_images_dir = "tune_images"
+        shutil.unpack_archive(tune_image_compressed_file, tune_images_dir)
+        image_column = config["image_column"]
+        tuning_data[image_column] = tuning_data[image_column].apply(lambda path: os.path.join(tune_images_dir, path))
 
     predictor = predictor_cls(**predictor_init_args).fit(training_data, tuning_data=tuning_data, **predictor_fit_args)
 
