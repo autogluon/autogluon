@@ -335,7 +335,7 @@ class MultiModalPredictor:
             if problem_type.experimental:
                 warnings.warn(f"problem_type='{problem_type.name}' is currently experimental.", UserWarning)
 
-        check_if_packages_installed(problem_type=problem_type.name)
+        check_if_packages_installed(problem_type=problem_type)
 
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
