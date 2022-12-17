@@ -4,6 +4,8 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 import pandas as pd
 import torch
 from torch import nn
+import pytorch_lightning as pl
+import OmegaConf
 
 from ..constants import (
     AUTOMM,
@@ -24,6 +26,8 @@ from ..constants import (
 )
 from .environment import get_precision_context, move_to_device
 from .misc import tensor_to_ndarray
+from .log import apply_log_filter, LogFilter
+
 
 logger = logging.getLogger(AUTOMM)
 
@@ -180,3 +184,73 @@ def use_realtime(data: pd.DataFrame, data_processors: Dict, batch_size: int):
             realtime = True
 
     return realtime
+
+
+def predict(
+    predictor,
+    data: Union[pd.DataFrame, dict, list],
+    requires_label: bool,
+    realtime: Optional[bool] = None,
+    seed: Optional[int] = 123,
+) -> List[Dict]:
+
+    with apply_log_filter(LogFilter("Global seed set to")):  # Ignore the log "Global seed set to"
+        pl.seed_everything(seed, workers=True)
+
+    data, df_preprocessor, data_processors = predictor._on_predict_start(
+        config=predictor._config,
+        data=data,
+        requires_label=requires_label,
+    )
+
+    strategy = "dp"  # default used in inference.
+
+    num_gpus = compute_num_gpus(config_num_gpus=predictor._config.env.num_gpus, strategy=strategy)
+
+    if predictor._problem_type == OBJECT_DETECTION:
+        strategy = "ddp"
+
+    if strategy == "ddp" and predictor._fit_called:
+        num_gpus = 1  # While using DDP, we can only use single gpu after fit is called
+
+    if num_gpus <= 1:
+        # Force set strategy to be None if it's cpu-only or we have only one GPU.
+        strategy = None
+
+    precision = infer_precision(num_gpus=num_gpus, precision=predictor._config.env.precision, cpu_only_warning=False)
+
+    if not realtime:
+        batch_size = compute_inference_batch_size(
+            per_gpu_batch_size=predictor._config.env.per_gpu_batch_size,
+            eval_batch_size_ratio=OmegaConf.select(predictor._config, "env.eval_batch_size_ratio"),
+            per_gpu_batch_size_evaluation=predictor._config.env.per_gpu_batch_size_evaluation,  # backward compatibility.
+            num_gpus=num_gpus,
+            strategy=strategy,
+        )
+
+    if realtime is None:
+        realtime = use_realtime(data=data, data_processors=data_processors, batch_size=batch_size)
+
+    if predictor._problem_type and predictor._problem_type == OBJECT_DETECTION:
+        realtime = False
+
+    if realtime:
+        outputs = predictor._realtime_predict(
+            data=data,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            num_gpus=num_gpus,
+            precision=precision,
+        )
+    else:
+        outputs = predictor._default_predict(
+            data=data,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            num_gpus=num_gpus,
+            precision=precision,
+            batch_size=batch_size,
+            strategy=strategy,
+        )
+
+    return outputs

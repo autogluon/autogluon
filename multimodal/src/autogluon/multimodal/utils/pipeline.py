@@ -3,7 +3,7 @@ import logging
 from typing import Dict, List, Optional, Tuple, Union
 import warnings
 
-from ..constants import AUTOMM, QUERY, RESPONSE, BASIC_PROBLEM_TYPES
+from ..constants import AUTOMM, QUERY, RESPONSE
 from .config import customize_model_names, get_config
 from .data import create_fusion_data_processors
 from .matcher import create_siamese_model
