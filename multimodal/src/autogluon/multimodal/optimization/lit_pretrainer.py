@@ -419,16 +419,19 @@ class PretrainLitModule(LitModule):
         output, loss, pretrain_data = self._shared_step(batch)
         self.log("train_loss", loss)
 
-        pretrain_loss = self._compute_pretrain_loss(*pretrain_data)
-
         if self.current_epoch < self.pretrain_epochs:
+            pretrain_loss = self._compute_pretrain_loss(*pretrain_data)
             return pretrain_loss
         else:
             lam = self.start_loss_coefficient * (
                 self.decay_loss_coefficient ** (self.current_epoch - self.pretrain_epochs + 1)
             )
             lam = max(lam, self.end_loss_coefficient)
-            return pretrain_loss * lam + loss  # * (1-lam)
+            if lam == 0:
+                return loss
+            else:
+                pretrain_loss = self._compute_pretrain_loss(*pretrain_data)
+                return pretrain_loss * lam + loss  # * (1-lam)
 
     def validation_step(self, batch, batch_idx):
         """
