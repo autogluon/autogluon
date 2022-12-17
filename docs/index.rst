@@ -1,7 +1,7 @@
 AutoGluon: AutoML for Text, Image, Time Series, and Tabular Data
 ================================================================
 
-.. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.6.0-blue
+.. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.6.1-blue
     :target: https://auto.gluon.ai/dev/versions.html
     :scale: 100%
 .. |StableVersion| image:: https://img.shields.io/github/v/release/autogluon/autogluon?color=blue&label=stable%20release&sort=semver
@@ -101,6 +101,12 @@ Tutorials
       :link: tutorials/text_prediction/index.html
 
       How to solve NLP problems via supervised learning from raw text.
+
+Managed Solutions Featuring AutoGluon
+-------------------------------------
+
+.. raw:: html
+   :file: static/managed_solutions.html
 
 Launch Tutorial Notebooks
 -------------------------

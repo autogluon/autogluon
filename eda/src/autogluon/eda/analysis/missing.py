@@ -34,7 +34,7 @@ class MissingValuesAnalysis(AbstractAnalysis):
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return True
 
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         s: Dict[str, Any] = {}
         for (ds, df) in self.available_datasets(args):
             s[ds] = {

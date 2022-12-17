@@ -602,7 +602,16 @@ def test_when_dataset_sliced_by_step_then_static_features_are_correct():
     assert dfv.static_features.equals(df.static_features)
 
 
-def test_when_dataset_subsequenced_then_static_features_are_correct():
+def test_when_static_features_index_has_wrong_name_then_its_renamed_to_item_id():
+    original_df = SAMPLE_TS_DATAFRAME.copy()
+    item_ids = original_df.item_ids
+    static_features = pd.DataFrame({"feat1": np.zeros_like(item_ids)}, index=item_ids.rename("wrong_index_name"))
+    original_df.static_features = static_features
+    assert static_features.index.name != ITEMID
+    assert original_df.static_features.index.name == ITEMID
+
+
+def test_when_dataset_sliced_by_time_then_static_features_are_correct():
     df = SAMPLE_TS_DATAFRAME_STATIC
     dfv = df.subsequence(START_TIMESTAMP, START_TIMESTAMP + datetime.timedelta(days=1))
 
@@ -659,7 +668,7 @@ def test_given_wrong_static_feature_index_when_constructing_data_frame_then_erro
         },
         index=static_feature_index,  # noqa
     )
-    with pytest.raises(ValueError, match="match item index"):
+    with pytest.raises(ValueError, match="are missing from the index of static_features"):
         TimeSeriesDataFrame(data=SAMPLE_DATAFRAME, static_features=static_features)
 
 
@@ -681,7 +690,7 @@ def test_when_dataframe_sliced_by_item_array_then_static_features_stay_consisten
 
 def test_when_dataframe_reindexed_view_called_then_static_features_stay_consistent():
     view = SAMPLE_TS_DATAFRAME_STATIC.get_reindexed_view()
-    assert view._static_features is SAMPLE_TS_DATAFRAME_STATIC._static_features
+    assert view._static_features.equals(SAMPLE_TS_DATAFRAME_STATIC._static_features)
 
 
 SAMPLE_DATAFRAME_WITH_MIXED_INDEX = pd.DataFrame(
@@ -711,3 +720,29 @@ def test_when_static_features_are_modified_on_shallow_copy_then_original_df_does
     new_df = old_df.copy(deep=False)
     new_df.static_features = None
     assert old_df.static_features is not None
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        SAMPLE_DATAFRAME.sample(frac=1),
+        SAMPLE_TS_DATAFRAME.sample(frac=1),
+    ],
+)
+def test_when_raw_timestamps_are_not_sorted_then_ts_dataframe_has_sorted_timestamps(data):
+    tsdf = TimeSeriesDataFrame(data)
+    for item_id in tsdf.item_ids:
+        assert tsdf.loc[item_id].index.is_monotonic_increasing
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        SAMPLE_DATAFRAME.sample(frac=1),
+        SAMPLE_TS_DATAFRAME.sample(frac=1),
+    ],
+)
+def test_when_raw_timestamps_are_not_sorted_then_freq_inference_works(data):
+    tsdf = TimeSeriesDataFrame(data)
+    assert tsdf.freq is not None
+    assert tsdf.freq == SAMPLE_TS_DATAFRAME.freq

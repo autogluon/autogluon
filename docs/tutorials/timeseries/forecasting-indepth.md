@@ -309,7 +309,7 @@ The beginning of each time series (except the last `prediction_length` time step
 If we want to perform _multi-window backtesting_ (i.e., evaluate performance on multiple forecast horizons generated from the same time series), we need to generate a new test set with multiple copies for each original time series.
 This can be done using a `MultiWindowSplitter`.
 ```python
-from autogluon.timeseries.spitter import MultiWindowSplitter
+from autogluon.timeseries.splitter import MultiWindowSplitter
 
 splitter = MultiWindowSplitter(num_windows=5)
 _, test_data_multi_window = splitter.split(test_data, prediction_length)

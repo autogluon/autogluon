@@ -48,7 +48,7 @@ def test_when_sktime_converts_dataframe_then_data_not_duplicated_and_index_corre
     assert df.values.base is sktime_df.values.base
 
 
-def test_when_sktime_converts_from_dataframe_then_data_not_duplicated_and_index_correct():
+def test_when_sktime_converts_from_dataframe_then_index_correct():
     model = AutoETSSktimeModel()
 
     sktime_df = model._to_sktime_data_frame(DUMMY_TS_DATAFRAME.copy(deep=True))
@@ -63,9 +63,6 @@ def test_when_sktime_converts_from_dataframe_then_data_not_duplicated_and_index_
             df.index.get_level_values(-1),
         )
     )
-
-    # data is not copied
-    assert df.values.base is sktime_df.values.base
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)

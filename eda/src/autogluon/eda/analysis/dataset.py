@@ -25,7 +25,7 @@ class Sampler(AbstractAnalysis):
         `None` means no sampling
     parent: Optional[AbstractAnalysis], default = None
         parent Analysis
-    children: List[AbstractAnalysis], default []
+    children: Optional[List[AbstractAnalysis]], default None
         wrapped analyses; these will receive sampled `args` during `fit` call
 
     Examples
@@ -59,7 +59,7 @@ class Sampler(AbstractAnalysis):
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return True
 
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         if self.sample is not None:
             state.sample_size = self.sample
             for (ds, df) in self.available_datasets(args):
@@ -96,7 +96,7 @@ class DatasetSummary(AbstractAnalysis):
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return True
 
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         s = {}
         for (ds, df) in self.available_datasets(args):
             summary = df.describe(include="all").T
@@ -135,7 +135,7 @@ class RawTypesAnalysis(AbstractAnalysis):
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return True
 
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         state.raw_type = {}
         for (ds, df) in self.available_datasets(args):
             state.raw_type[ds] = get_type_map_raw(df)
@@ -153,7 +153,7 @@ class VariableTypeAnalysis(AbstractAnalysis):
         if numeric column has less than this value, then the variable should be considered as categorical
     parent: Optional[AbstractAnalysis], default = None
         parent Analysis
-    children: List[AbstractAnalysis], default []
+    children: Optional[List[AbstractAnalysis]], default None
         wrapped analyses; these will receive sampled `args` during `fit` call
 
     Examples
@@ -242,7 +242,7 @@ class SpecialTypesAnalysis(AbstractAnalysis):
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return True
 
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         state.special_types = {}
         for (ds, df) in self.available_datasets(args):
             state.special_types[ds] = self.infer_special_types(df)

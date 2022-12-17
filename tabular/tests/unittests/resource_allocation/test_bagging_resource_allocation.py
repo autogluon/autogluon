@@ -10,12 +10,18 @@ from autogluon.tabular.models import AbstractModel
 
 class DummyBaseModel(AbstractModel):
     
-    def __init__(self, minimum_resources={}, **kwargs):
+    def __init__(self, minimum_resources=None, default_resources=None, **kwargs):
         self._minimum_resources = minimum_resources
+        self._default_resources = default_resources
         super().__init__(**kwargs)
         
     def get_minimum_resources(self, **kwargs):
         return self._minimum_resources
+    
+    def _get_default_resources(self):
+        num_cpus = self._default_resources.get('num_cpus')
+        num_gpus = self._default_resources.get('num_gpus')
+        return num_cpus, num_gpus
 
 
 class DummyModel(DummyBaseModel):
@@ -42,7 +48,8 @@ def _construct_dummy_fold_strategy(
     num_folds_parallel,
     bagged_resources=None,
     model_base_resources=None,
-    model_base_minimum_resources=None
+    model_base_minimum_resources=None,
+    model_base_default_resources=None
 ):
     if bagged_resources is None:
         bagged_resources = {}
@@ -52,6 +59,7 @@ def _construct_dummy_fold_strategy(
         model_base_minimum_resources = {}
     dummy_model_base = DummyModel(
         minimum_resources= model_base_minimum_resources,
+        default_resources=model_base_default_resources,
         hyperparameters={'ag_args_fit': model_base_resources}
     )
     dummy_bagged_ensemble_model = DummyBaggedModel(
@@ -206,7 +214,7 @@ def test_sequential_bagging_resources_per_fold():
             'num_gpus': 0.1
         }
     )
-    assert fold_fitting_strategy.num_cpus == 8
+    assert fold_fitting_strategy.num_cpus == 4
     assert fold_fitting_strategy.num_gpus == 1
     assert fold_fitting_strategy.user_resources_per_job == {'num_cpus': 4, 'num_gpus': 1}
     
@@ -227,11 +235,11 @@ def test_sequential_bagging_resources_per_fold():
             'num_gpus': 0.1
         }
     )
-    assert fold_fitting_strategy.num_cpus == 8
-    assert fold_fitting_strategy.num_gpus == 1
+    assert fold_fitting_strategy.num_cpus == 1
+    assert fold_fitting_strategy.num_gpus == 0.1
     assert fold_fitting_strategy.user_resources_per_job == {'num_cpus': 1, 'num_gpus': 0.1}
 
-def test_parallel_bagging_no_resources_per_fold():
+def test_sequential_bagging_no_resources_per_fold():
     fold_fitting_strategy = _construct_dummy_fold_strategy(
         fold_strategy_cls=SequentialLocalFoldFittingStrategy,
         num_jobs=8,
@@ -243,6 +251,10 @@ def test_parallel_bagging_no_resources_per_fold():
         model_base_minimum_resources={
             'num_cpus': 1,
             'num_gpus': 0.1
+        },
+        model_base_default_resources={
+            'num_cpus': 4,
+            'num_gpus': 0.5
         }
     )
     assert fold_fitting_strategy.num_cpus == 8

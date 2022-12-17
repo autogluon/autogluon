@@ -5,11 +5,9 @@ import os
 import pandas as pd
 
 from autogluon.common.loaders import load_pd
-from autogluon.common.utils.s3_utils import is_s3_url, s3_path_to_bucket_prefix
 
 from ..utils.ag_sagemaker import AutoGluonMultiModalRealtimePredictor
 from ..utils.constants import VALID_ACCEPT
-from ..utils.s3_utils import is_s3_folder
 from ..utils.utils import convert_image_path_to_encoded_bytes_in_dataframe, is_image_file, read_image_bytes_and_encode
 from .cloud_predictor import CloudPredictor
 
@@ -55,18 +53,18 @@ class MultiModalCloudPredictor(CloudPredictor):
         ----------
         test_data: Union(str, pandas.DataFrame)
             The test data to be inferenced.
-            Can be a pandas.DataFrame, a local path or a s3 path to a csv file.
+            Can be a pandas.DataFrame or a local path to a csv file.
             When predicting multimodality with image modality:
                 You need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
             When predicting with only images:
-                Can be a pandas.DataFrame, a local path or a s3 path to a csv file.
-                    Similarly, You need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
+                Can be a pandas.DataFrame or a local path to a csv file.
+                    Similarly, you need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
                 Or a local path to a single image file.
                 Or a list of local paths to image files.
-        test_data_image_column: Optional(str)
-            If provided a pandas.DataFrame as the test_data and test_data involves image modality,
+        test_data_image_column: default = None
+            If provided a csv file or pandas.DataFrame as the test_data and test_data involves image modality,
             you must specify the column name corresponding to image paths.
-            Images have to live in the same directory specified by the column.
+            The path MUST be an abspath
         accept: str, default = application/x-parquet
             Type of accept output content.
             Valid options are application/x-parquet, text/csv, application/json
@@ -82,21 +80,18 @@ class MultiModalCloudPredictor(CloudPredictor):
         import numpy as np
 
         if isinstance(test_data, str):
-            if is_s3_url(test_data):
-                test_data = load_pd.load(test_data)
+            if is_image_file(test_data):
+                test_data = [test_data]
             else:
-                if is_image_file(test_data):
-                    test_data = np.array([read_image_bytes_and_encode(test_data)], dtype="object")
-                    content_type = "application/x-npy"
-                else:
-                    test_data = load_pd.load(test_data)
+                test_data = load_pd.load(test_data)
         if isinstance(test_data, list):
-            images = []
-            test_data = np.array([read_image_bytes_and_encode(image) for image in images], dtype="object")
+            test_data = np.array([read_image_bytes_and_encode(image) for image in test_data], dtype="object")
             content_type = "application/x-npy"
         if isinstance(test_data, pd.DataFrame):
             if test_data_image_column is not None:
-                test_data = convert_image_path_to_encoded_bytes_in_dataframe(test_data, test_data_image_column)
+                test_data = convert_image_path_to_encoded_bytes_in_dataframe(
+                    dataframe=test_data, image_column=test_data_image_column
+                )
             content_type = "application/x-parquet"
 
         # Providing content type here because sagemaker serializer doesn't support change content type dynamically.
@@ -112,31 +107,20 @@ class MultiModalCloudPredictor(CloudPredictor):
         """
         test_data: str
             The test data to be inferenced.
-            Can be a pandas.DataFrame, a local path or a s3 path to a csv file.
+            Can be a pandas.DataFrame or a local path to a csv file.
             When predicting multimodality with image modality:
                 You need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
             When predicting with only images:
-                Can be a local path or a s3 path to a directory containing the images.
-                or a local path or a s3 path to a single image.
+                Can be a local path to a directory containing the images or a local path to a single image.
         test_data_image_column: Optional(str)
             If test_data involves image modality, you must specify the column name corresponding to image paths.
-            Images have to live in the same directory specified by the column.
+            The path MUST be an abspath
         kwargs:
             Refer to `CloudPredictor.predict()`
         """
         image_modality_only = False
         if isinstance(test_data, str):
-            if is_s3_url(test_data):
-                if is_s3_folder(test_data, session=self.sagemaker_session):
-                    image_modality_only = True
-                else:
-                    bucket, prefix = s3_path_to_bucket_prefix(test_data)
-                    utils_folder = "utils"
-                    self.sagemaker_session.download_data(utils_folder, bucket, key_prefix=prefix)
-                    filename = prefix.rsplit("/")[-1]
-                    if is_image_file(os.path.join(utils_folder, filename)):
-                        image_modality_only = True
-            elif os.path.isdir(test_data) or is_image_file(test_data):
+            if os.path.isdir(test_data) or is_image_file(test_data):
                 image_modality_only = True
 
         if image_modality_only:

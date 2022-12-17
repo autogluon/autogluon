@@ -1,6 +1,6 @@
 import logging
 
-from autogluon.common.features.types import R_INT, R_FLOAT, S_TEXT, R_OBJECT, S_IMAGE_PATH
+from autogluon.common.features.types import R_INT, R_FLOAT, S_TEXT, R_OBJECT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY
 
 from .pipeline import PipelineFeatureGenerator
 from .category import CategoryFeatureGenerator
@@ -114,7 +114,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
                 valid_raw_types=[R_INT, R_FLOAT])))
         if self.enable_raw_text_features:
             generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(
-                required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH]), name_suffix='_raw_text'))
+                required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY]), name_suffix='_raw_text'))
         if self.enable_categorical_features:
             generator_group.append(CategoryFeatureGenerator())
         if self.enable_datetime_features:
@@ -125,10 +125,10 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
             generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer, **self.text_ngram_params))
         if self.enable_vision_features:
             generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(
-                valid_raw_types=[R_OBJECT], required_special_types=[S_IMAGE_PATH],
+                valid_raw_types=[R_OBJECT], valid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY], required_at_least_one_special=True,
             )))
             generator_group.append(IsNanFeatureGenerator(infer_features_in_args=dict(
-                valid_raw_types=[R_OBJECT], required_special_types=[S_IMAGE_PATH],
+                valid_raw_types=[R_OBJECT], valid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY], required_at_least_one_special=True,
             )))
         generators = [generator_group]
         return generators

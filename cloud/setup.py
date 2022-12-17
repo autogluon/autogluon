@@ -23,25 +23,20 @@ install_requires = [
     "autogluon.common<0.7",
     "boto3",
     "numpy",
-    "opencv-python>=4.6,<4.7",
     "packaging<22",
     "pandas",
     # TODO: update to the latest after 0.6 container is out
     "sagemaker>=2.94",
     "pyarrow>=9.0",
-    "Pillow>=9.0.0",
+    "Pillow>=9.3.0",
 ]
 
 extras_require = dict()
 
-test_requirements = [
-    'tox',
-    'pytest',
-    'pytest-cov'
-]
+test_requirements = ["tox", "pytest", "pytest-cov"]
 
 test_requirements = list(set(test_requirements))
-extras_require['tests'] = test_requirements
+extras_require["tests"] = test_requirements
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 for key in extras_require:
