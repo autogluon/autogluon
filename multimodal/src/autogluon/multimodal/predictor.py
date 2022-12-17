@@ -3111,7 +3111,8 @@ class MultiModalPredictor:
         -------
         a list of model names
         """
-        if self.problem_property.is_classification:  # FIXME (Need to list the supported models for each modality)
+        if self.problem_property and self.problem_property.is_classification:
+            # FIXME (Need to list the supported models for each modality)
             return list_timm_models(pretrained=pretrained)
         else:
             raise ValueError(f"list_supported_models() is not available for problem type: {self.problem_type}")
