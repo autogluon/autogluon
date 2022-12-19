@@ -960,7 +960,7 @@ class MultiModalPredictor:
             model = self._model
 
         while True:
-            if (not is_pretrain_["is_pretrain"]):
+            if finetune_on is None:
                 break
             try:
                 foundation_model = finetune_on
