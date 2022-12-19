@@ -3086,13 +3086,17 @@ class MultiModalPredictor:
         Dict containing various detailed information.
         We do not recommend directly printing this dict as it may be very large.
         """
-        logging.info(
-            f"Here's the model summary:"
-            f""
-            f"The model achieved score '{self._best_score}' on the validation metric"
-            f" '{self._validation_metric_name}'. "
-            f"The total training time is {timedelta(seconds=self._total_train_time)}"
-        )
+        if self._total_train_time is None:
+            logging.info("There is no `best_score` or `total_train_time`. "
+                         "Have you called `predictor.fit()`?")
+        else:
+            logging.info(
+                f"Here's the model summary:"
+                f""
+                f"The model achieved score '{self._best_score}' on the validation metric"
+                f" '{self._validation_metric_name}'. "
+                f"The total training time is {timedelta(seconds=self._total_train_time)}"
+            )
         results = {f"val_{self._validation_metric_name}": self._best_score, "training_time": self._total_train_time}
         return results
 
