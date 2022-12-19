@@ -569,13 +569,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         return num_cpus, num_gpus
 
     def save(self, path: str = None, verbose=True) -> str:
-        if self.model is not None:
-            self._architecture_desc = self.model.architecture_desc
         temp_model = self.model
         self.model = None
         path_final = super().save(path=path, verbose=verbose)
         self.model = temp_model
-        self._architecture_desc = None
 
         # Export model
         if self.model is not None:
@@ -590,13 +587,11 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
         model: TabularNeuralNetTorchModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-        if model._architecture_desc is not None:
-            import torch
-            model._architecture_desc = None
-            model.model = torch.load(os.path.join(model.path, model.params_file_name))
-            if model._compiler:
-                model.model.eval()
-                model.processor = model._compiler.load(path=model.path)
+        import torch
+        model.model = torch.load(os.path.join(model.path, model.params_file_name))
+        if hasattr(model, '_compiler') and model._compiler:
+            model.model.eval()
+            model.processor = model._compiler.load(path=model.path)
         return model
     
     def _get_hpo_backend(self):
@@ -643,14 +638,21 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         assert self.is_fit(), "The model must be fit before calling the compile method."
         if compiler_configs is None:
             compiler_configs = {}
-        compiler = compiler_configs.get("compiler", "native")
+        # Take self.max_batch_size as default batch size, instead of None in AbstractModel
         batch_size = compiler_configs.get("batch_size", self.max_batch_size)
-        compiler_fallback_to_native = compiler_configs.get('compiler_fallback_to_native', False)
+        compiler_configs.update(batch_size=batch_size)
+        super().compile(compiler_configs)
 
-        self._compiler = self._get_compiler(compiler=compiler,
-                                            compiler_fallback_to_native=compiler_fallback_to_native)
-        if self._compiler is not None:
-            input_types = self._get_input_types(batch_size=batch_size)
-            self.processor = self._compiler.compile(model=(self.processor, self.model),
-                                                    path=self.path,
-                                                    input_types=input_types)
+    def _compile(self, **kwargs):
+        """
+        Take the compiler to perform actual compilation.
+
+        This overrides the _compile() in AbstractModel, since we won't
+        overwrite self.model in the compilation process.
+        Instead, self.processor would be converted from sklearn ColumnTransformer
+        to TabularNeuralNetTorchOnnxTransformer.
+        """
+        input_types = kwargs.get('input_types', self._get_input_types(batch_size=self.max_batch_size))
+        self.processor = self._compiler.compile(model=(self.processor, self.model),
+                                                path=self.path,
+                                                input_types=input_types)
