@@ -1,6 +1,6 @@
 import os
-import numpy as np
 
+import numpy as np
 
 
 def quantile_transformer_shape_calculator(operator):
@@ -14,12 +14,15 @@ def quantile_transformer_shape_calculator(operator):
 def quantile_transformer_converter(scope, operator, container):
     from scipy.stats import norm
     from skl2onnx.algebra.onnx_ops import (
-        OnnxSub,
         OnnxAbs,
-        OnnxSplit,
+        OnnxArgMin,
+        OnnxConcat,
         OnnxGatherElements,
+        OnnxMatMul,
+        OnnxReshape,
+        OnnxSplit,
+        OnnxSub,
     )
-    from skl2onnx.algebra.onnx_ops import OnnxArgMin, OnnxConcat, OnnxMatMul, OnnxReshape
     from skl2onnx.common.data_types import guess_numpy_type
 
     op = operator.raw_operator
@@ -82,6 +85,18 @@ def quantile_transformer_converter(scope, operator, container):
     Y.add_to(scope, container)
 
 
+def onehot_handle_unknown_transformer_shape_calculator(operator):
+    op = operator.raw_operator
+    input_type = operator.inputs[0].type.__class__
+    input_dim = operator.inputs[0].type.shape[0]
+    output_type = input_type([input_dim, sum([len(c) for c in op.categories_])])
+    operator.outputs[0].type = output_type
+
+
+def onehot_handle_unknown_transformer_converter(scope, operator, container):
+    return _encoder_handle_unknown_transformer_converter(scope, operator, container, "onehot_")
+
+
 def ordinal_handle_unknown_transformer_shape_calculator(operator):
     op = operator.raw_operator
     input_type = operator.inputs[0].type.__class__
@@ -91,12 +106,20 @@ def ordinal_handle_unknown_transformer_shape_calculator(operator):
 
 
 def ordinal_handle_unknown_transformer_converter(scope, operator, container):
+    return _encoder_handle_unknown_transformer_converter(scope, operator, container, "ordinal_")
+
+
+def _encoder_handle_unknown_transformer_converter(scope, operator, container, name_prefix):
     from skl2onnx.algebra.onnx_ops import (
-        OnnxSub,
         OnnxAbs,
+        OnnxArgMin,
+        OnnxConcat,
+        OnnxMatMul,
+        OnnxOneHot,
+        OnnxReshape,
         OnnxSplit,
+        OnnxSub,
     )
-    from skl2onnx.algebra.onnx_ops import OnnxArgMin, OnnxConcat, OnnxMatMul, OnnxReshape
     from skl2onnx.common.data_types import guess_numpy_type
 
     op = operator.raw_operator
@@ -113,10 +136,11 @@ def ordinal_handle_unknown_transformer_converter(scope, operator, container):
     dtype = guess_numpy_type(X.type)
     batch_size = X.type.shape[0]
     num_categories = len(op.categories_)
-    name_prefix = "ordinal_handle_unknown_"
 
     C_col = op.categories_
-    X_col = OnnxSplit(X, axis=1, output_names=[f"{name_prefix}X_col{x}" for x in range(num_categories)], op_version=opv)
+    X_col = OnnxSplit(
+        X, axis=1, output_names=[f"{name_prefix}X_col{x}" for x in range(num_categories)], op_version=opv
+    )
     X_col.add_to(scope, container)
     Y_col = []
     for feature_idx in range(num_categories):
@@ -130,7 +154,8 @@ def ordinal_handle_unknown_transformer_converter(scope, operator, container):
         num_classes = len(C_col[feature_idx])
         repeat = OnnxMatMul(
             OnnxReshape(X_col.outputs[feature_idx], np.array([batch_size, 1]), op_version=opv),
-            np.ones(shape=(1, num_classes)).astype(dtype), op_version=opv
+            np.ones(shape=(1, num_classes)).astype(dtype),
+            op_version=opv,
         )
         sub = OnnxSub(
             repeat,
@@ -145,7 +170,27 @@ def ordinal_handle_unknown_transformer_converter(scope, operator, container):
             op_version=opv,
             output_names=[f"{name_prefix}argmin_col{feature_idx}"],
         )
-        Y_col.append(OnnxReshape(argmin, np.array([batch_size, 1]), output_names=[f"{name_prefix}Y_col{feature_idx}"], op_version=opv))
+        if name_prefix.startswith("onehot"):
+            onehot = OnnxOneHot(
+                argmin,
+                np.array([num_classes]).astype(np.int64),  # number of classes
+                np.array([0, 1]).astype(dtype),  # [off_value, on_value]
+                axis=1,
+                op_version=opv,
+                output_names=[f"{name_prefix}onehot_col{feature_idx}"],
+            )
+            onehot_reshaped = OnnxReshape(
+                onehot,
+                np.array([batch_size, num_classes]),
+                output_names=[f"{name_prefix}Y_col{feature_idx}"],
+                op_version=opv,
+            )
+            Y_col.append(onehot_reshaped)
+        else:
+            argmin_reshaped = OnnxReshape(
+                argmin, np.array([batch_size, 1]), output_names=[f"{name_prefix}Y_col{feature_idx}"], op_version=opv
+            )
+            Y_col.append(argmin_reshaped)
     Y = OnnxConcat(*Y_col, axis=1, op_version=opv, output_names=out[:1])
     Y.add_to(scope, container)
 
@@ -183,14 +228,14 @@ class TabularNeuralNetTorchOnnxTransformer:
         self.sess = InferenceSessionWrapper(model)
         self.batch_size = self.sess.get_inputs()[0].shape[0]
         self.onnx_input_names = [x.name for x in self.sess.get_inputs()]
-        self.input_names = [] # raw_name
+        self.input_names = []  # raw_name
 
     def transform(self, X):
         """Run the model with the input and return the result."""
         if not self.input_names:
             raw_names = list(X.columns)
-            onnx_names = [n.replace("-", "_") for n in raw_names]
-            onnx_to_raw = {o : r for o, r in zip(onnx_names, raw_names)}
+            onnx_names = [n.replace("-", "_").replace(".", "_") for n in raw_names]
+            onnx_to_raw = {o: r for o, r in zip(onnx_names, raw_names)}
             self.input_names = [onnx_to_raw[oname] for oname in self.onnx_input_names]
 
         input_dict = {}
@@ -232,8 +277,8 @@ class TabularNeuralNetTorchOnnxCompiler:
     def can_compile():
         """Verify whether the required package has been installed."""
         try:
-            import skl2onnx
             import onnxruntime
+            import skl2onnx
 
             return True
         except ImportError:
@@ -251,19 +296,22 @@ class TabularNeuralNetTorchOnnxCompiler:
         """
         if isinstance(model, TabularNeuralNetTorchOnnxTransformer):
             return model
-        from sklearn.pipeline import Pipeline
         import skl2onnx
-        from skl2onnx import convert_sklearn
+        from skl2onnx import convert_sklearn, update_registered_converter
         from skl2onnx.common.data_types import FloatTensorType
-        from skl2onnx import update_registered_converter
+        from sklearn.pipeline import Pipeline
         from sklearn.preprocessing import QuantileTransformer
-        from ..utils.categorical_encoders import OrdinalMergeRaresHandleUnknownEncoder
+
+        from ..utils.categorical_encoders import (
+            OneHotMergeRaresHandleUnknownEncoder,
+            OrdinalMergeRaresHandleUnknownEncoder,
+        )
 
         # BIG HACK!
         # It is required to take raw_name instead of onnx_name for inputs.
         # TODO: Remove this hack after upgrading skl2onnx to >1.13
         # See https://github.com/onnx/sklearn-onnx/pull/938
-        if int(skl2onnx.__version__.split('.')[1]) <= 13:
+        if int(skl2onnx.__version__.split(".")[1]) <= 13:
             skl2onnx.common.utils.get_column_index = skl2onnx_common_utils_get_column_index
 
         update_registered_converter(
@@ -273,6 +321,12 @@ class TabularNeuralNetTorchOnnxCompiler:
             quantile_transformer_converter,
         )
         update_registered_converter(
+            OneHotMergeRaresHandleUnknownEncoder,
+            "OneHotMergeRaresHandleUnknownEncoder",
+            onehot_handle_unknown_transformer_shape_calculator,
+            onehot_handle_unknown_transformer_converter,
+        )
+        update_registered_converter(
             OrdinalMergeRaresHandleUnknownEncoder,
             "OrdinalMergeRaresHandleUnknownEncoder",
             ordinal_handle_unknown_transformer_shape_calculator,
@@ -280,9 +334,7 @@ class TabularNeuralNetTorchOnnxCompiler:
         )
 
         if input_types is None or not isinstance(input_types[0], tuple):
-            raise RuntimeError(
-                "input_types argument should contain at least one tuple, e.g. [((1, 14), np.float32)]"
-            )
+            raise RuntimeError("input_types argument should contain at least one tuple, e.g. [((1, 14), np.float32)]")
         pipeline = Pipeline(
             steps=[
                 ("processor", model[0]),
@@ -338,6 +390,7 @@ def skl2onnx_common_utils_get_column_index(i, inputs):
         get_column_index(4, inputs) -> (1, 2)
     """
     from skl2onnx.common.data_types import TensorType
+
     if isinstance(i, int):
         if i == 0:
             # Useful shortcut, skips the case when end is None
@@ -345,12 +398,13 @@ def skl2onnx_common_utils_get_column_index(i, inputs):
             return 0, 0
         vi = 0
         pos = 0
-        end = (inputs[0].type.shape[1]
-               if isinstance(inputs[0].type, TensorType) else 1)
+        end = inputs[0].type.shape[1] if isinstance(inputs[0].type, TensorType) else 1
         if end is None:
-            raise RuntimeError("Cannot extract a specific column {0} when "
-                               "one input ('{1}') has unknown "
-                               "dimension.".format(i, inputs[0]))
+            raise RuntimeError(
+                "Cannot extract a specific column {0} when "
+                "one input ('{1}') has unknown "
+                "dimension.".format(i, inputs[0])
+            )
         while True:
             if pos <= i < end:
                 return (vi, i - pos)
@@ -358,14 +412,15 @@ def skl2onnx_common_utils_get_column_index(i, inputs):
             pos = end
             if vi >= len(inputs):
                 raise RuntimeError(
-                    "Input {} (i={}, end={}) is not available in\n{}".format(
-                        vi, i, end, pprint.pformat(inputs)))
-            rel_end = (inputs[vi].type.shape[1]
-                       if isinstance(inputs[vi].type, TensorType) else 1)
+                    "Input {} (i={}, end={}) is not available in\n{}".format(vi, i, end, pprint.pformat(inputs))
+                )
+            rel_end = inputs[vi].type.shape[1] if isinstance(inputs[vi].type, TensorType) else 1
             if rel_end is None:
-                raise RuntimeError("Cannot extract a specific column {0} when "
-                                   "one input ('{1}') has unknown "
-                                   "dimension.".format(i, inputs[vi]))
+                raise RuntimeError(
+                    "Cannot extract a specific column {0} when "
+                    "one input ('{1}') has unknown "
+                    "dimension.".format(i, inputs[vi])
+                )
             end += rel_end
     else:
         for ind, inp in enumerate(inputs):
@@ -377,5 +432,5 @@ def skl2onnx_common_utils_get_column_index(i, inputs):
             "initial_types fits the column names specified in the "
             "pipeline to convert. This may happen because a "
             "ColumnTransformer follows a transformer without "
-            "any mapped converter in a pipeline." % (
-                i, [n.raw_name for n in inputs]))
+            "any mapped converter in a pipeline." % (i, [n.raw_name for n in inputs])
+        )
