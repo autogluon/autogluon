@@ -3087,8 +3087,7 @@ class MultiModalPredictor:
         We do not recommend directly printing this dict as it may be very large.
         """
         if self._total_train_time is None:
-            logging.info("There is no `best_score` or `total_train_time`. "
-                         "Have you called `predictor.fit()`?")
+            logging.info("There is no `best_score` or `total_train_time`. Have you called `predictor.fit()`?")
         else:
             logging.info(
                 f"Here's the model summary:"
