@@ -254,7 +254,7 @@ class BaggedEnsembleModel(AbstractModel):
                 return self
 
     def _get_child_aux_val(self, key: str, default=None):
-        assert self.is_initialized()
+        assert self.is_initialized(), "Model must be initialized before calling self._get_child_aux_val!"
         return self._params_aux_child.get(key, default)
 
     def _validate_bag_kwargs(self, *,
