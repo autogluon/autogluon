@@ -2009,6 +2009,7 @@ class TabularPredictor:
                 compiler_configs = {
                     "RF": {"compiler": "onnx"},
                     "XT": {"compiler": "onnx"},
+                    "NN_TORCH": {"compiler": "onnx"},
                 }
             Otherwise, specify a compiler_configs dictionary manually. Keys can be exact model names or model types.
             Exact model names take priority over types if both are valid for a model.
@@ -2032,6 +2033,7 @@ class TabularPredictor:
                 compiler_configs = {
                     "RF": {"compiler": "onnx"},
                     "XT": {"compiler": "onnx"},
+                    "NN_TORCH": {"compiler": "onnx"},
                 }
             else:
                 raise ValueError(f'Unknown compiler_configs preset: "{compiler_configs}"')
