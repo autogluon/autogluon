@@ -166,14 +166,20 @@ class DefaultLearner(AbstractTabularLearner):
         """ General data processing steps used for all models. """
         X = copy.deepcopy(X)
 
-        # Remove all examples with missing labels from this dataset:
-        missinglabel_inds = list(X[X[self.label].isna()].index)
-        if len(missinglabel_inds) > 0:
-            logger.warning(f"Warning: Ignoring {len(missinglabel_inds)} (out of {len(X)}) training examples for which the label value in column '{self.label}' is missing")
-            X = X.drop(missinglabel_inds, axis=0)
+        with pd.option_context('mode.use_inf_as_na', True): # treat None, NaN, INF, NINF as NA
+            invalid_labels = X[self.label].isna()
+        if invalid_labels.any():
+            first_invalid_label_idx = invalid_labels.idxmax()
+            raise ValueError(f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at idx: {first_invalid_label_idx}")
 
         holdout_frac_og = holdout_frac
         if X_val is not None and self.label in X_val.columns:
+            with pd.option_context('mode.use_inf_as_na', True): # treat None, NaN, INF, NINF as NA
+                invalid_tuning_labels = X_val[self.label].isna()
+            if invalid_tuning_labels.any():
+                first_invalid_label_idx = invalid_tuning_labels.idxmax()
+                raise ValueError(f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at idx: {first_invalid_label_idx}")
+
             holdout_frac = 1
 
         if (self.eval_metric is not None) and (self.eval_metric.name in ['log_loss', 'pac_score']) and (self.problem_type == MULTICLASS):

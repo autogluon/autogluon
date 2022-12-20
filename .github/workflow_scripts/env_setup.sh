@@ -45,11 +45,6 @@ function install_vision {
     install_local_packages "vision/"
 }
 
-function install_cloud {
-    python3 -m pip install --upgrade pytest-xdist # Enable running tests in parallel for speedup
-    install_local_packages "cloud/[tests]"
-}
-
 function install_all {
     install_local_packages "common/[tests]" "core/[all]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
     install_multimodal "[tests]" # multimodal must be install before vision and text
