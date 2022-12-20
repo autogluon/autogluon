@@ -325,7 +325,7 @@ jobs:
   build_multimodal_tutorial:
     strategy:
       matrix:
-        SUB_DOC: ["advanced_topics", "image_prediction", "matching", "object_detection", "text_prediction", "multimodal_prediction", "faq"]
+        SUB_DOC: ["advanced_topics", "image_prediction", "matching", "object_detection", "text_prediction", "multimodal_prediction"]
     needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:

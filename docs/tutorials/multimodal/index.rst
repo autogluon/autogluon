@@ -50,7 +50,7 @@ Text Data
 
 
 Image Data -- Classification / Regression
--------------------------------------------
+-----------------------------------------
 .. container:: cards
 
    .. card::
@@ -219,7 +219,7 @@ FAQ
 
    .. card::
       :title: Frequently Asked Questions
-      :link: faq/multimodal_faq.html
+      :link: advanced_topics/multimodal_faq.html
 
       Frequently Asked Questions
 
@@ -234,4 +234,4 @@ FAQ
    matching/index
    multimodal_prediction/index
    advanced_topics/index
-   faq/multimodal_faq.md
+   advanced_topics/multimodal_faq.md
