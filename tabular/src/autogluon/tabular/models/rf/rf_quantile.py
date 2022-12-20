@@ -166,7 +166,7 @@ class BaseTreeQuantileRegressor(BaseDecisionTree):
             quantiles[X_leaves == leaf] = weighted_percentile(self.y_train_[self.y_train_leaves_ == leaf], quantile)
         return quantiles
 
-    def fit(self, X, y, sample_weight=None, check_input=True, X_idx_sorted=None):
+    def fit(self, X, y, sample_weight=None, check_input=True):
         """
         Build a decision tree classifier from the training set (X, y).
 
@@ -191,12 +191,6 @@ class BaseTreeQuantileRegressor(BaseDecisionTree):
             Allow to bypass several input checking.
             Don't use this parameter unless you know what you do.
 
-        X_idx_sorted : array-like, shape = [n_samples, n_features], optional
-            The indexes of the sorted training input samples. If many tree
-            are grown on the same dataset, this allows the ordering to be
-            cached between trees. If None, the data will be sorted here.
-            Don't use this parameter unless you know what to do.
-
         Returns
         -------
         self : object
@@ -210,9 +204,7 @@ class BaseTreeQuantileRegressor(BaseDecisionTree):
 
         # apply method requires X to be of dtype np.float32
         X, y = check_X_y(X, y, accept_sparse="csc", dtype=np.float32, multi_output=False)
-        super(BaseTreeQuantileRegressor, self).fit(
-            X, y, sample_weight=sample_weight, check_input=check_input, X_idx_sorted=X_idx_sorted
-        )
+        super(BaseTreeQuantileRegressor, self).fit(X, y, sample_weight=sample_weight, check_input=check_input)
         self.y_train_ = y
 
         # Stores the leaf nodes that the samples lie in.
