@@ -182,10 +182,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             y, y_type = self._get_value_and_type(ds, df, state, interaction_features, "y")
             hue, hue_type = self._get_value_and_type(ds, df, state, interaction_features, "hue")
 
-            # swap y <-> hue when category vs category to enable charting
-            if (x_type is not None) and y_type == "category" and hue is None:
-                hue, hue_type = y, y_type
-                y, y_type = None, None
+            y, y_type, hue, hue_type = self._swap_y_and_hue_if_necessary(x_type, y, y_type, hue, hue_type)
 
             renderer: Optional[Type[_AbstractFeatureInteractionPlotRenderer]] = self._get_chart_renderer(
                 x_type, y_type, hue_type
@@ -193,30 +190,13 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             if renderer is None:
                 return
             renderer: _AbstractFeatureInteractionPlotRenderer = renderer()  # Create instance
-            chart_args = {"x": x, "y": y, "hue": hue, **self._kwargs}
 
-            # convert to categoricals for plots
-            for col, typ in zip([x, y, hue], [x_type, y_type, hue_type]):
-                if typ == "category":
-                    df[col] = df[col].astype("object")
-
-            chart_args = {k: v for k, v in chart_args.items() if v is not None}
-            data = df
-            single_var = False
-            if y is None and hue is None:
-                single_var = True
-                if x_type == "numeric":
-                    data = df[x]
-                    chart_args.pop("x")
-            elif x is None and hue is None:
-                single_var = True
-                if y_type == "numeric":
-                    data = df[y]
-                    chart_args.pop("y")
+            df = self._convert_categoricals_to_objects(df, x, x_type, y, y_type, hue, hue_type)
+            chart_args, data, is_single_var = self._prepare_chart_args(df, x, x_type, y, y_type, hue)
 
             if self.headers:
                 features = "/".join([interaction_features[k] for k in ["x", "y", "hue"] if k in interaction_features])
-                prefix = "" if single_var else "Feature interaction between "
+                prefix = "" if is_single_var else "Feature interaction between "
                 self.render_header_if_needed(state, f"{prefix}{features} in {ds}")
 
             renderer.render(
@@ -228,6 +208,38 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                 fig_args=self.fig_args,
                 chart_args=chart_args,
             )
+
+    def _prepare_chart_args(self, df, x, x_type, y, y_type, hue) -> (Dict[str, Any], pd.DataFrame, bool):
+        chart_args = {"x": x, "y": y, "hue": hue, **self._kwargs}
+        print(chart_args)
+        chart_args = {k: v for k, v in chart_args.items() if v is not None}
+        data = df
+        is_single_var = False
+        if x is not None and y is None and hue is None:
+            is_single_var = True
+            if x_type == "numeric":
+                data = df[x]
+                chart_args.pop("x")
+        elif y is not None and x is None and hue is None:
+            is_single_var = True
+            if y_type == "numeric":
+                data = df[y]
+                chart_args.pop("y")
+        return chart_args, data, is_single_var
+
+    def _convert_categoricals_to_objects(self, df, x, x_type, y, y_type, hue, hue_type):
+        # convert to categoricals for plots
+        for col, typ in zip([x, y, hue], [x_type, y_type, hue_type]):
+            if typ == "category":
+                df[col] = df[col].astype("object")
+        return df
+
+    def _swap_y_and_hue_if_necessary(self, x_type, y, y_type, hue, hue_type):
+        # swap y <-> hue when category vs category is provided and no hue is specified
+        if (x_type is not None) and y_type == "category" and hue_type is None:
+            hue, hue_type = y, y_type
+            y, y_type = None, None
+        return y, y_type, hue, hue_type
 
     def _get_value_and_type(self, ds, df, state, interaction_features, param) -> [Any, Optional[str]]:
         value = interaction_features.get(param, None)
@@ -275,25 +287,26 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
     class _HistPlotRenderer(_AbstractFeatureInteractionPlotRenderer):
         def _render(self, state, ds, params, param_types, ax, data, chart_args):
             sns.histplot(ax=ax, data=data, **chart_args)
-            x, _, _ = params
-            # Handling fitted distributions if present
-            if ("distributions_fit" in state) and (param_types == ("numeric", None, None)):  # types for  x, y, hue
-                chart_args["stat"] = "density"
-                dists = state.distributions_fit[ds][x]
-                if dists is not None:
-                    x_min, x_max = ax.get_xlim()
-                    xs = np.linspace(x_min, x_max, 200)
-                    for dist, v in dists.items():
-                        _dist = getattr(stats, dist)
-                        ax.plot(
-                            xs,
-                            _dist.pdf(xs, *dists[dist]["param"]),
-                            ls="--",
-                            lw=0.7,
-                            label=f'{dist}: pvalue {dists[dist]["pvalue"]:.2f}',
-                        )
-                    ax.set_xlim(x_min, x_max)  # set the limits back to the ones of the distplot
-                    plt.legend()
+            # TODO: uncomment later when distributions fit is added
+            # x, _, _ = params
+            # # Handling fitted distributions if present
+            # if ("distributions_fit" in state) and (param_types == ("numeric", None, None)):  # types for  x, y, hue
+            #     chart_args["stat"] = "density"
+            #     dists = state.distributions_fit[ds][x]
+            #     if dists is not None:
+            #         x_min, x_max = ax.get_xlim()
+            #         xs = np.linspace(x_min, x_max, 200)
+            #         for dist, v in dists.items():
+            #             _dist = getattr(stats, dist)
+            #             ax.plot(
+            #                 xs,
+            #                 _dist.pdf(xs, *dists[dist]["param"]),
+            #                 ls="--",
+            #                 lw=0.7,
+            #                 label=f'{dist}: pvalue {dists[dist]["pvalue"]:.2f}',
+            #             )
+            #         ax.set_xlim(x_min, x_max)  # set the limits back to the ones of the distplot
+            #         plt.legend()
 
     class _KdePlotRenderer(_AbstractFeatureInteractionPlotRenderer):
         def _render(self, state, ds, params, param_types, ax, data, chart_args):

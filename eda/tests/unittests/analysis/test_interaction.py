@@ -208,7 +208,7 @@ def test_FeatureInteraction():
             RawTypesAnalysis(),
             FeatureInteraction(x="a", y="b", hue="c", key="abc"),
             FeatureInteraction(x="a", y="b", hue="d"),
-            FeatureInteraction(x="a", y="b", hue="q", key='missing_col'),
+            FeatureInteraction(x="a", y="b", hue="q", key="missing_col"),
         ],
     )
 
