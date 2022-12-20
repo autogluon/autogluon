@@ -14,7 +14,7 @@ from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
-from autogluon.timeseries.dataset import TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID, TIMESTAMP
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
 from autogluon.timeseries.splitter import AbstractTimeSeriesSplitter, LastWindowSplitter, MultiWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
@@ -207,6 +207,14 @@ class TimeSeriesPredictor:
             return df
         if self.ignore_time_index:
             df = df.get_reindexed_view(freq="S")
+        timestamps = df.reset_index(level=TIMESTAMP)[TIMESTAMP]
+        is_sorted = timestamps.groupby(level=ITEMID, sort=False).apply(lambda x: x.is_monotonic_increasing).all()
+        if not is_sorted:
+            warnings.warn(
+                "Provided data contains timestamps that are not sorted chronologically. "
+                "This will lead to TimeSeriesPredictor not working as intended. "
+                "Please make sure that the timestamps are sorted in increasing order for all time series."
+            )
         if df.freq is None:
             raise ValueError(
                 "Frequency not provided and cannot be inferred. This is often due to the "
