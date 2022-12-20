@@ -1,37 +1,77 @@
+
+# AutoGluon Roadmap 2023
+
+In 2023, our top priorities are:
+
+- [ ] Meta-Learning
+- [ ] Pre-Training
+- [ ] Exploratory Data Analysis
+- [ ] Enhanced Cloud Integration
+- [ ] Website Overhaul
+- [ ] Documentation & Tutorial Overhaul
+- [ ] Model Fairness Analysis
+- [ ] Enhanced Model Distillation
+- [ ] Model Compilation & Optimization
+- [ ] Distributed Model Training
+- [ ] Distributed Hyperparameter Tuning
+- [ ] Improved Large-scale Data Handling (100M+ Rows)
+- [ ] Improved Feature Type Inference
+- [ ] Enhanced Tabular GPU Support
+- [ ] Co-variate Shift Detection
+- [ ] Co-variate Shift Correction
+- [ ] Model Interpretability
+- [ ] Model Uncertainty
+- [ ] Model Monitoring
+- [ ] Advanced Custom Model Tutorial
+
 # AutoGluon Roadmap 2022
 
 In 2022, our top priorities are:
 
 - [x] (v0.4) Windows OS Support
 - [x] (v0.4) Python 3.9 Support
-- [ ] Time-Series Support
+- [x] (v0.5) Time-Series Support (autogluon.timeseries)
 - [x] (v0.4) HuggingFace Integration
-- [ ] Improved Multi-modal Modeling
-- [ ] Advance SOTA in Stack Ensemble Research (Deeper Stack Ensembles)
+- [x] (v0.5) TIMM Integration
+- [x] (v0.5) Improved Multi-modal Modeling (autogluon.multimodal)
 - [x] (v0.4) Cloud Training & Deployment
 - [x] (v0.4) Parallel Model Training
-- [ ] Parallel Hyperparameter Tuning
-- [ ] Distributed Model Training
-- [ ] Distributed Hyperparameter Tuning
+- [x] (v0.6) Parallel Hyperparameter Tuning
 - [x] (v0.4) Semi-supervised Learning
 - [x] (v0.4) Automated Model Calibration via Temperature Scaling
-- [ ] Enhanced Model Distillation
 - [x] (v0.4) Online Inference Optimization
-- [ ] Meta-Learning
-- [ ] Improved Large-scale Data Handling (10M+ Rows)
-- [ ] Improved Feature Type Inference
-- [ ] Improved Feature Preprocessing
-- [ ] Refactor autogluon.features into Standalone Module
-- [ ] Covariate Shift Detection
-- [ ] Covariate Shift Correction
-- [ ] Exploratory Analysis
-- [ ] Model Interpretability
-- [ ] Model Uncertainty
-- [ ] Model Monitoring
-- [ ] Model Calibration (Conformal Methods)
-- [ ] Image Model Inference Optimization
-- [ ] Text Model Inference Optimization
-- [ ] Advanced Custom Model Tutorial
+- [x] (v0.5) Improved Large-scale Data Handling (10M+ Rows)
+- [x] (v0.6) Faster Feature Preprocessing
+- [x] (v0.6) Image Model Inference Optimization
+- [x] (v0.6) Text Model Inference Optimization
+
+## AutoGluon 0.6 Features, Released: November 2022
+
+[v0.6 Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.6.0)
+
+### Themes and Major Features
+
+- [x] Named Entity Recognition Support
+- [x] Object Detection Support in autogluon.multimodal
+- [x] Multimodal Matching Support
+- [x] Parallel Hyperparameter Tuning
+- [x] Image Model Inference Optimization (~10x faster for online inference)
+- [x] Text Model Inference Optimization (~10x faster for online inference)
+- [x] FT-Transformer model to Tabular
+- [x] Faster Feature Preprocessing (~25%)
+- [x] Few-shot learning with 11B-scale models on single GPU
+- [x] Prototype model compilation support to Tabular
+
+## AutoGluon 0.5 Features, Released: June 2022
+
+[v0.5 Release Notes](https://github.com/autogluon/autogluon/releases/tag/v0.5.0)
+
+### Themes and Major Features
+
+- [x] Time-Series Support (autogluon.timeseries)
+- [x] Improved Multi-modal Modeling (autogluon.multimodal)
+- [x] TIMM Integration
+- [x] imodels Integration
 
 ## AutoGluon 0.4 Features, Released: March 2022
 
