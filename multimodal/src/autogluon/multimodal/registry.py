@@ -3,7 +3,6 @@ from collections import OrderedDict
 from json import JSONDecodeError
 from typing import List
 from typing import OrderedDict as t_OrderedDict
-from typing import Union
 
 
 class Registry:
