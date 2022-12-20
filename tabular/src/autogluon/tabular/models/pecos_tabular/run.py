@@ -16,6 +16,12 @@ X = train_data.drop(columns=[label])
 y = train_data[label]
 X_test = test_data.drop(columns=[label])
 y_test = test_data[label]
+test_multiclass = False
+if test_multiclass:
+    # Dummy data to test basic functionality
+    for i in range(10):
+        y_test[i*10] = 2
+        y[i*10] = 2
 
 from autogluon.core.data import LabelCleaner
 from autogluon.core.utils import infer_problem_type

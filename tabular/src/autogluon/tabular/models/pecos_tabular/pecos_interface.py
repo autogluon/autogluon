@@ -6,7 +6,7 @@ import numpy as np
 import random
 
 from autogluon.core.constants import BINARY, MULTICLASS
-from .pecos_utils import read_pred_outfile
+from .pecos_utils import read_pred_outfile, load_json_multi
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class PecosInterface():
             for label in self.label_dict:
                 f.write(f'{label}\n')
         
-        self.max_label_value = y.max() + 1
+        self.max_label_value = y.nunique()
 
         # Run the model
         if self.model_type == 'XRLinear':
@@ -139,18 +139,14 @@ python3 -m pecos.apps.text2text.predict  \
 
         # Read predictions from file
         pred_file = self.workdir / 'pred.json'
-        df_pred = read_pred_outfile(pred_file, k=k)
-        
-        if self.problem_type == BINARY:
-            labels = df_pred.labels.apply(lambda x: x[0])
-        elif self.problem_type == MULTICLASS:
-            def get_one_hot(x, length):
-                out = np.zeros((length,))
-                out[int(x)] = 1
-                return out
-            labels = []
-            for x in df_pred['labels']:
-                labels += [get_one_hot(x[0], self.max_label_value)]
+        if self.problem_type in [MULTICLASS, BINARY]:
+            probs = np.zeros((len(X), self.max_label_value))
+            for i,r in enumerate(load_json_multi(pred_file)):
+                for ent in r['data']:
+                    label = int(ent[0])
+                    score = float(ent[1])
+                    probs[i, label] = score
+                probs[i] /= sum(probs[i])
         else:
             print(f"Problem type not supported: {self.problem_type}")
-        return np.array(labels)
+        return np.array(probs)
