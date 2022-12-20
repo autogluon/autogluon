@@ -12,6 +12,7 @@ source $(dirname "$0")/env_setup.sh
 source $(dirname "$0")/build_doc.sh
 
 setup_mxnet_gpu
+setup_torch_gpu
 export CUDA_VISIBLE_DEVICES=0
 
 build_doc object_detection $BRANCH $GIT_REPO $COMMIT_SHA $PR_NUMBER
