@@ -60,11 +60,11 @@ def append_suffix_to_item_id(
 ) -> TimeSeriesDataFrame:
     """Append a suffix to each item_id in a TimeSeriesDataFrame."""
     result = ts_dataframe.copy(deep=False)
-    new_item_id = result.index.get_level_values(ITEMID).astype(str) + suffix
     if result.index.nlevels == 1:
-        result.index = new_item_id
+        result.index = result.index.astype(str) + suffix
     elif result.index.nlevels == 2:
-        result.index = pd.MultiIndex.from_arrays([new_item_id, result.index.get_level_values(TIMESTAMP)])
+        new_item_id = result.index.levels[0].astype(str) + suffix
+        result.index = result.index.set_levels(levels=new_item_id, level=0)
     return result
 
 
@@ -154,7 +154,6 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
     def _split(
         self, ts_dataframe: TimeSeriesDataFrame, prediction_length: int
     ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
-        original_item_order = ts_dataframe.item_ids
         original_freq = ts_dataframe.freq
 
         static_features_available = ts_dataframe.static_features is not None
@@ -172,11 +171,11 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
             can_be_split = item_index[long_enough]
             cannot_be_split = item_index[~long_enough]
 
-            train_dataframes.append(ts_dataframe.loc[cannot_be_split])
+            train_dataframes.append(ts_dataframe.query("item_id in @cannot_be_split"))
             if static_features_available:
-                train_static_features.append(ts_dataframe.static_features.loc[cannot_be_split])
+                train_static_features.append(ts_dataframe.static_features.query("item_id in @cannot_be_split"))
             # Keep timeseries that are long enough for the next round of splitting
-            ts_dataframe = ts_dataframe.loc[can_be_split]
+            ts_dataframe = ts_dataframe.query("item_id in @can_be_split")
 
             if window_idx == 0:
                 suffix = "_[None:None]"
@@ -202,7 +201,7 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
 
         train_dataframes.append(ts_dataframe)
 
-        train_data = pd.concat(train_dataframes).loc[original_item_order]
+        train_data = pd.concat(train_dataframes)
         train_data._cached_freq = original_freq
         val_data = pd.concat(validation_dataframes)
 
@@ -211,7 +210,7 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
 
         if static_features_available:
             train_static_features.append(ts_dataframe.static_features)
-            train_data.static_features = pd.concat(train_static_features).loc[original_item_order]
+            train_data.static_features = pd.concat(train_static_features)
             val_data.static_features = pd.concat(validation_static_features)
 
         return train_data, val_data
