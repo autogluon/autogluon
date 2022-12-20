@@ -844,7 +844,7 @@ class MultiModalPredictor:
 
     def _verify_inference_ready(self):
         if not self._fit_called and not self._model_loaded:
-            if self.problem_type and self.problem_property.inference_ready:
+            if self.problem_type and not self.problem_property.inference_ready:
                 raise RuntimeError(
                     f"problem_type='{self.problem_type}' does not support running inference directly. "
                     f"You need to call `predictor.fit()`, or load a predictor first before "
