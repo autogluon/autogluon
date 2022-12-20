@@ -2,7 +2,8 @@ import pandas as pd
 
 import autogluon.eda.auto as auto
 from autogluon.eda import AnalysisState
-from autogluon.eda.analysis import Correlation, CorrelationSignificance
+from autogluon.eda.analysis import Correlation, CorrelationSignificance, FeatureInteraction
+from autogluon.eda.analysis.dataset import RawTypesAnalysis
 
 
 def test_Correlation_spearman():
@@ -196,3 +197,29 @@ def __compare_outputs(expected: AnalysisState, actual: AnalysisState):
     actual.correlations.train_data = "--"
     expected.correlations.train_data = "--"
     assert actual == expected
+
+
+def test_FeatureInteraction():
+    df = __create_test_df()
+    state = auto.analyze(
+        train_data=df,
+        return_state=True,
+        anlz_facets=[
+            RawTypesAnalysis(),
+            FeatureInteraction(x="a", y="b", hue="c", key="abc"),
+            FeatureInteraction(x="a", y="b", hue="d"),
+            FeatureInteraction(x="a", y="b", hue="q", key='missing_col'),
+        ],
+    )
+
+    assert sorted(state.interactions.train_data.keys()) == ["abc", "x:a|y:b|hue:d"]
+    assert state.interactions.train_data.abc.data.equals(df[["a", "b", "c"]])
+    assert state.interactions.train_data.abc.features == {"hue": "c", "x": "a", "y": "b"}
+    assert state.interactions.train_data["x:a|y:b|hue:d"].data.equals(df[["a", "b", "d"]])
+    assert state.interactions.train_data["x:a|y:b|hue:d"].features == {"hue": "d", "x": "a", "y": "b"}
+
+
+def test_FeatureInteraction__can_handle():
+    args = AnalysisState()
+    assert FeatureInteraction().can_handle(AnalysisState({"raw_type": "something"}), args) is True
+    assert FeatureInteraction().can_handle(AnalysisState({"something": 123}), args) is False

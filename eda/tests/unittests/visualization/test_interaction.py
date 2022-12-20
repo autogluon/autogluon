@@ -3,10 +3,12 @@ from unittest.mock import MagicMock
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from hamcrest.library.integration import match_equality
+from pandas import DataFrame
 
 import autogluon.eda.auto as auto
 from autogluon.eda import AnalysisState
-from autogluon.eda.visualization import CorrelationVisualization, CorrelationSignificanceVisualization
+from autogluon.eda.visualization import CorrelationVisualization, CorrelationSignificanceVisualization, FeatureInteractionVisualization
 
 
 def test_CorrelationVisualization_single_value(monkeypatch):
@@ -67,17 +69,17 @@ def test_CorrelationVisualization_focus(monkeypatch):
 
 def test_CorrelationVisualization__can_handle():
     assert (
-        CorrelationVisualization().can_handle(AnalysisState({"correlations": 123, "something": "something"})) is True
+            CorrelationVisualization().can_handle(AnalysisState({"correlations": 123, "something": "something"})) is True
     )
     assert CorrelationVisualization().can_handle(AnalysisState({"something": "something"})) is False
 
 
 def test_CorrelationSignificanceVisualization__can_handle():
     assert (
-        CorrelationSignificanceVisualization().can_handle(
-            AnalysisState({"significance_matrix": 123, "something": "something"})
-        )
-        is True
+            CorrelationSignificanceVisualization().can_handle(
+                AnalysisState({"significance_matrix": 123, "something": "something"})
+            )
+            is True
     )
     assert CorrelationSignificanceVisualization().can_handle(AnalysisState({"something": "something"})) is False
 
@@ -147,3 +149,51 @@ def __test_internal(monkeypatch, render_key, state, heatmap_args, facet_cls, tex
         call_render_text.assert_called_with(text_render, text_type="h3")
     else:
         call_render_text.assert_not_called()
+
+
+def test_FeatureInteractionVisualization_(monkeypatch):
+    class EqualDataFrames(DataFrame):
+        def __eq__(self, other):
+            return self.equals(other)
+
+    state = AnalysisState(
+        {'interactions': {
+            'train_data': {
+                'abc': {
+                    'data': EqualDataFrames(data={'a': [1, 2, 3], 'b': ['a', 'b', 'c'], 'c': [0.1, 0.2, 0.3]}),
+                    'features': {'x': 'a', 'y': 'b'}
+                }
+            }
+        }, 'raw_type': {
+            'train_data': {
+                'a': 'int',
+                'b': 'int',
+                'c': 'int',
+                'd': 'int',
+                'e': 'object',
+                'f': 'object'}
+        }}
+    )
+    call_render = MagicMock()
+    call_show = MagicMock()
+    call_subplots = MagicMock(return_value=("fig", "ax"))
+
+    viz = FeatureInteractionVisualization(key='abc', numeric_as_categorical_threshold=2, some_chart_arg=123, fig_args=dict(key='value'))
+
+    with monkeypatch.context() as m:
+        m.setattr(plt, "subplots", call_subplots)
+        m.setattr(plt, "show", call_show)
+        m.setattr(viz._RegPlotRenderer, "_render", call_render)
+        auto.analyze(state=state, viz_facets=[viz])
+
+    call_render.assert_called_with(
+        match_equality(state),  # noqa
+        'train_data',
+        ('a', 'b', None),
+        ('numeric', 'numeric', None),
+        'ax',
+        match_equality(state.interactions.train_data.abc.data),
+        dict(x='a', y='b', some_chart_arg=123)
+    )
+    call_show.assert_called_with('fig')
+    call_subplots.assert_called_with(key='value')

@@ -141,7 +141,7 @@ def analyze_interaction(
         fig_args = {}
 
     key = "__analysis__"
-    analyze(
+    return analyze(
         **analysis_args,
         anlz_facets=[
             RawTypesAnalysis(),

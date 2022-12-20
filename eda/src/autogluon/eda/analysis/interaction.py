@@ -112,6 +112,55 @@ class CorrelationSignificance(AbstractAnalysis):
 
 
 class FeatureInteraction(AbstractAnalysis):
+    """
+
+    Parameters
+    ----------
+    x: Optional[str], default = None
+        variable to analyse which would be placed on x-axis
+    y: Optional[str], default = None
+        variable to analyse which would be placed on y-axis
+    hue: Optional[str], default = None
+        variable to use as hue in x/y-analysis.
+    key: Optional[str], default = None
+        key to use to store the analysis in the state; the value is later to be used by FeatureInteractionVisualization.
+        If the key is not provided, then use one of theform: 'x:A|y:B|hue:C' (omit corresponding x/y/hue if the value not provided)
+        See also :class:`autogluon.eda.visualization.interaction.FeatureInteractionVisualization`
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: Optional[List[AbstractAnalysis]], default None
+        wrapped analyses; these will receive sampled `args` during `fit` call
+    kwargs
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import numpy as np
+    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.visualization as viz
+    >>> import autogluon.eda.auto as auto
+    >>>
+    >>> df_train = pd.DataFrame(...)
+    >>>
+    >>> state = auto.analyze(
+    >>>     train_data=df_train, label='Survived',
+    >>>     anlz_facets=[
+    >>>         eda.dataset.RawTypesAnalysis(),
+    >>>         eda.interaction.FeatureInteraction(key='target_col', x='Survived'),
+    >>>         eda.interaction.FeatureInteraction(key='target_col_vs_age', x='Survived', y='Age')
+    >>>     ],
+    >>>     viz_facets=[
+    >>>         # Bar Plot with counts per each of the values in Survived
+    >>>         viz.interaction.FeatureInteractionVisualization(key='target_col', headers=True),
+    >>>         # Box Plot Survived vs Age
+    >>>         viz.interaction.FeatureInteractionVisualization(key='target_col_vs_age', headers=True),
+    >>>     ]
+    >>> )
+    >>>
+    >>> # Simplified shortcut for interactions: scatter plot of Fare vs Age colored based on Survived values.
+    >>> auto.analyze_interaction(x='Fare', y='Age', hue='Survived', train_data=df_train)
+    """
+
     def __init__(
         self,
         x: Optional[str] = None,

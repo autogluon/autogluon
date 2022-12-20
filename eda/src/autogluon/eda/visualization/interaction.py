@@ -69,7 +69,7 @@ class CorrelationVisualization(_AbstractCorrelationChart):
     ----------
     headers: bool, default = False
         if `True` then render headers
-    namespace: str, default = None
+    namespace: Optional[str], default = None
         namespace to use; can be nested like `ns_a.ns_b.ns_c`
     fig_args: Optional[Dict[str, Any]], default = None,
         kwargs to pass into chart figure
@@ -111,7 +111,7 @@ class CorrelationSignificanceVisualization(_AbstractCorrelationChart):
     ----------
     headers: bool, default = False
         if `True` then render headers
-    namespace: str, default = None
+    namespace: Optional[str], default = None
         namespace to use; can be nested like `ns_a.ns_b.ns_c`
     fig_args: Optional[Dict[str, Any]] = None,
         kwargs to pass into chart figure
@@ -131,12 +131,32 @@ class CorrelationSignificanceVisualization(_AbstractCorrelationChart):
 
 
 class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
+    """
+
+    Parameters
+    ----------
+    key: str
+        key used to store the analysis in the state; the value is placed in the state by FeatureInteraction.
+        If the key is not provided, then use one of theform: 'x:A|y:B|hue:C' (omit corresponding x/y/hue if the value not provided)
+        See also :class:`autogluon.eda.analysis.interaction.FeatureInteraction`
+    numeric_as_categorical_threshold
+    headers: bool, default = False
+        if `True` then render headers
+    namespace: Optional[str], default = None
+        namespace to use; can be nested like `ns_a.ns_b.ns_c`
+    fig_args: Optional[Dict[str, Any]] = None,
+        kwargs to pass into chart figure
+    kwargs
+        parameters to pass as a chart args
+
+    """
+
     def __init__(
         self,
         key: str,
+        numeric_as_categorical_threshold=20,
         headers: bool = False,
         namespace: Optional[str] = None,
-        numeric_as_categorical_threshold=20,
         fig_args: Optional[Dict[str, Any]] = None,
         **kwargs,
     ) -> None:
@@ -173,7 +193,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             if renderer is None:
                 return
             renderer: _AbstractFeatureInteractionPlotRenderer = renderer()  # Create instance
-            chart_args = {"x": x, "y": y, "hue": hue, **self._kwargs.get(self.key, {})}
+            chart_args = {"x": x, "y": y, "hue": hue, **self._kwargs}
 
             # convert to categoricals for plots
             for col, typ in zip([x, y, hue], [x_type, y_type, hue_type]):
@@ -205,7 +225,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                 params=(x, y, hue),
                 param_types=(x_type, y_type, hue_type),
                 data=data,
-                fig_args=self.fig_args.get(self.key, {}),
+                fig_args=self.fig_args,
                 chart_args=chart_args,
             )
 
