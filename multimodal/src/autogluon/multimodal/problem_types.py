@@ -40,7 +40,7 @@ class ProblemTypeProperty:
 
     name: str  # Name of the problem
     support_fit: bool = True  # Whether the problem type support `.fit()`
-    inference_ready: bool = False  # Support `.predict()` and `.evaluate()` without calling `.fit()`
+    support_zero_shot: bool = False  # Support `.predict()` and `.evaluate()` without calling `.fit()`
     is_matching: bool = False  # Whether the problem belongs to the matching category
     is_classification: bool = False  # Whether the problem is a classification problem
     experimental: bool = False  # Indicate whether the problem is experimental
@@ -112,7 +112,7 @@ PROBLEM_TYPES_REG.register(
     OBJECT_DETECTION,
     ProblemTypeProperty(
         name=OBJECT_DETECTION,
-        inference_ready=True,
+        support_zero_shot=True,
         supported_modality_type={IMAGE},
         supported_label_type={ROIS},
         force_exist_modality={IMAGE},
@@ -124,7 +124,7 @@ PROBLEM_TYPES_REG.register(
     TEXT_SIMILARITY,
     ProblemTypeProperty(
         name=TEXT_SIMILARITY,
-        inference_ready=True,
+        support_zero_shot=True,
         is_matching=True,
         supported_modality_type={TEXT},
         supported_label_type={CATEGORICAL, NUMERICAL},
@@ -135,7 +135,7 @@ PROBLEM_TYPES_REG.register(
     IMAGE_SIMILARITY,
     ProblemTypeProperty(
         name=IMAGE_SIMILARITY,
-        inference_ready=True,
+        support_zero_shot=True,
         is_matching=True,
         supported_modality_type={IMAGE},
         supported_label_type={CATEGORICAL, NUMERICAL},
@@ -146,7 +146,7 @@ PROBLEM_TYPES_REG.register(
     IMAGE_TEXT_SIMILARITY,
     ProblemTypeProperty(
         name=IMAGE_TEXT_SIMILARITY,
-        inference_ready=True,
+        support_zero_shot=True,
         is_matching=True,
         supported_modality_type={IMAGE, TEXT},
         supported_label_type={CATEGORICAL, NUMERICAL},
@@ -168,7 +168,7 @@ PROBLEM_TYPES_REG.register(NAMED_ENTITY_RECOGNITION, _ner_property),
 PROBLEM_TYPES_REG.register(
     FEATURE_EXTRACTION,
     ProblemTypeProperty(
-        name=FEATURE_EXTRACTION, support_fit=False, inference_ready=True, supported_modality_type={IMAGE, TEXT}
+        name=FEATURE_EXTRACTION, support_fit=False, support_zero_shot=True, supported_modality_type={IMAGE, TEXT}
     ),
 )
 
@@ -178,7 +178,7 @@ PROBLEM_TYPES_REG.register(
     ProblemTypeProperty(
         name=ZERO_SHOT_IMAGE_CLASSIFICATION,
         support_fit=False,
-        inference_ready=True,
+        support_zero_shot=True,
         supported_modality_type={IMAGE},
         force_exist_modality={IMAGE},
     ),
@@ -190,7 +190,7 @@ PROBLEM_TYPES_REG.register(
     ProblemTypeProperty(
         name=FEW_SHOT_TEXT_CLASSIFICATION,
         support_fit=True,
-        inference_ready=False,
+        support_zero_shot=False,
         experimental=True,
         supported_modality_type={TEXT},
         force_exist_modality={TEXT},
@@ -203,7 +203,7 @@ PROBLEM_TYPES_REG.register(
     ProblemTypeProperty(
         name=OCR_TEXT_DETECTION,
         support_fit=False,
-        inference_ready=True,
+        support_zero_shot=True,
         experimental=True,
         supported_modality_type={IMAGE},
     ),
@@ -214,7 +214,7 @@ PROBLEM_TYPES_REG.register(
     ProblemTypeProperty(
         name=OCR_TEXT_RECOGNITION,
         support_fit=False,
-        inference_ready=True,
+        support_zero_shot=True,
         experimental=True,
         supported_modality_type={IMAGE},
     ),

@@ -2,14 +2,13 @@ Multimodal Prediction
 =====================
 
 For problems on multimodal data tables that contain image, text, and tabular data, AutoGluon provides `MultiModalPredictor` (abbreviated as `AutoMM`)
-that automatically selects, fuses, and tunes deep learning backbones from popular packages like `timm <https://github.com/rwightman/pytorch-image-models>`_,
+that automatically selects, fuses, and tunes foundation models from popular packages like `timm <https://github.com/rwightman/pytorch-image-models>`_,
 `huggingface/transformers <https://github.com/huggingface/transformers>`_,
-`CLIP <https://github.com/openai/CLIP>`_, `MMDetection <https://github.com/open-mmlab/mmdetection>`_ etc. You can use AutoMM to build models for
-multimodal problems that involve image, text, tabular features, object bounding boxes, named entities, etc.
+`CLIP <https://github.com/openai/CLIP>`_, `MMDetection <https://github.com/open-mmlab/mmdetection>`_ etc.
 
-In addition, being good at multimodal problems implies that the predictor will be good for **each specific modality**.
-Thus, you can also use `AutoMM` to solve standard NLP/Vision tasks like sentiment classification,
-intent detection, paraphrase detection, image classification. Moreover, `AutoMM` can be used as a basic model in the multi-layer
+You can not only use `AutoMM` to solve standard NLP/Vision tasks
+such as sentiment classification, intent detection, paraphrase detection, image classification, but also use it for multimodal problems that involve image,
+text, tabular features, object bounding boxes, named entities, etc. Moreover, `AutoMM` can be used as a basic model in the multi-layer
 stack-ensemble of `AutoGluon Tabular <https://auto.gluon.ai/stable/tutorials/tabular_prediction/index.html>`_, and is powering up the FT-Transformer in `TabularPredictor`.
 
 Here are some example use-cases of AutoMM:
@@ -220,7 +219,7 @@ FAQ
 
    .. card::
       :title: Frequently Asked Questions
-      :link: multimodal-faq.html
+      :link: faq/multimodal_faq.html
 
       Frequently Asked Questions
 
@@ -235,4 +234,4 @@ FAQ
    matching/index
    multimodal_prediction/index
    advanced_topics/index
-   multimodal-faq
+   faq/multimodal_faq.md
