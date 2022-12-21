@@ -338,8 +338,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             f"\tProvided data for prediction with {len(data)} rows, {data.num_items} items. "
             f"Average time series length is {len(data) / data.num_items}."
         )
-        input_index_type = type(data.index.levels[0][0])
-
         with warning_filter(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
             quantiles = quantile_levels or self.quantile_levels
             if not all(0 < q < 1 for q in quantiles):
@@ -350,22 +348,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
                 quantile_levels=quantile_levels or self.quantile_levels,
+                data=data,
             )
 
-            # if index type is different than the input data, cast it back
-            if len(df.index.levels[0]) > 0:
-                prediction_index_type = type(df.index.levels[0][0])
-                if prediction_index_type is not input_index_type:
-                    df.set_index(
-                        df.index.set_levels([input_index_type(i) for i in df.index.levels[0]], level=0),
-                        inplace=True,
-                    )
-
-        # Make sure the item_ids are sorted in the same order as in data
-        df = df.loc[data.item_ids]
-        # GluonTS uses pd.Period internally, which may lead to loss of precision (e.g., "2020-01-01 12:00" becomes
-        # "2020-01-01 00:00"). We manually set the index to avoid such problems.
-        df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
         return df
 
     def _predict_gluonts_forecasts(
@@ -397,12 +382,13 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         return QuantileForecast(**forecast_init_args)
 
     def _gluonts_forecasts_to_data_frame(
-        self, forecasts: List[Forecast], quantile_levels: List[float]
+        self,
+        forecasts: List[Forecast],
+        quantile_levels: List[float],
+        data: TimeSeriesDataFrame,
     ) -> TimeSeriesDataFrame:
         if not isinstance(forecasts[0], (QuantileForecast, SampleForecast)):
             raise TypeError("DistributionForecast is not supported.")
-
-        forecast_means = [f.mean for f in forecasts]
 
         # if predictions are gluonts SampleForecasts, convert to quantile forecasts
         if isinstance(forecasts[0], SampleForecast):
@@ -413,23 +399,19 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             "Some forecast quantiles are missing from GluonTS forecast outputs. Was"
             " the model trained to forecast all quantiles?"
         )
-
+        forecast_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
+        item_id_to_forecast = {f.item_id: f for f in forecasts}
         result_dfs = []
-        for i, forecast in enumerate(forecasts):
-            item_forecast_dict = dict(mean=forecast_means[i])
+        for item_id in forecast_index.unique(level=ITEMID):
+            forecast = item_id_to_forecast[item_id]
+            item_forecast_dict = {"mean": forecast.mean}
             for quantile in quantile_levels:
                 item_forecast_dict[str(quantile)] = forecast.quantile(str(quantile))
+            result_dfs.append(pd.DataFrame(item_forecast_dict))
 
-            df = pd.DataFrame(item_forecast_dict)
-            df[ITEMID] = forecast.item_id
-            df[TIMESTAMP] = pd.date_range(
-                start=forecasts[i].start_date.to_timestamp(how="S"),
-                periods=self.prediction_length,
-                freq=self.freq,
-            )
-            result_dfs.append(df)
-
-        return TimeSeriesDataFrame.from_data_frame(pd.concat(result_dfs))
+        result = pd.concat(result_dfs)
+        result.index = forecast_index
+        return TimeSeriesDataFrame(result)
 
     def _get_hpo_backend(self):
         return RAY_BACKEND
