@@ -58,29 +58,31 @@ def quantile_transformer_converter(scope, operator, container):
         # >     return y[idx.argmin(axis=1)]
         # See https://stackoverflow.com/questions/21002799/extraploation-with-nearest-method-in-python
         repeat = OnnxMatMul(
-            OnnxReshape(X_col.outputs[feature_idx], np.array([batch_size, 1]), op_version=opv),
+            OnnxReshape(X_col.outputs[feature_idx], np.array([batch_size, 1], dtype=np.int64), op_version=opv),
             np.ones(shape=(1, n_quantiles)).astype(dtype),
         )
         sub = OnnxSub(
             repeat,
-            OnnxReshape(C_col.outputs[feature_idx], np.array([1, n_quantiles]), op_version=opv),
+            OnnxReshape(C_col.outputs[feature_idx], np.array([1, n_quantiles], dtype=np.int64), op_version=opv),
             op_version=opv,
             output_names=[f"sub_col{feature_idx}"],
         )
         idx = OnnxAbs(sub, op_version=opv, output_names=[f"idx_col{feature_idx}"])
         argmin = OnnxArgMin(
-            OnnxReshape(idx, np.array([batch_size, n_quantiles]), op_version=opv),
+            OnnxReshape(idx, np.array([batch_size, n_quantiles], dtype=np.int64), op_version=opv),
             axis=1,
             op_version=opv,
             output_names=[f"argmin_col{feature_idx}"],
         )
         references = np.clip(norm.ppf(op.references_), -5.2, 5.2).astype(dtype)
         cst = np.broadcast_to(references, (batch_size, n_quantiles))
-        argmin_reshaped = OnnxReshape(argmin, np.array([batch_size, 1]), output_names=[f"reshape_col{feature_idx}"])
+        argmin_reshaped = OnnxReshape(
+            argmin, np.array([batch_size, 1], dtype=np.int64), output_names=[f"reshape_col{feature_idx}"]
+        )
         ref = OnnxGatherElements(
             cst, argmin_reshaped, axis=1, op_version=opv, output_names=[f"gathernd_col{feature_idx}"]
         )
-        Y_col.append(OnnxReshape(ref, np.array([batch_size, 1]), output_names=[f"Y_col{feature_idx}"]))
+        Y_col.append(OnnxReshape(ref, np.array([batch_size, 1], dtype=np.int64), output_names=[f"Y_col{feature_idx}"]))
     Y = OnnxConcat(*Y_col, axis=1, op_version=opv, output_names=out[:1])
     Y.add_to(scope, container)
 
@@ -153,19 +155,19 @@ def _encoder_handle_unknown_transformer_converter(scope, operator, container, na
         # >     return idx.argmin(axis=1)
         num_classes = len(C_col[feature_idx])
         repeat = OnnxMatMul(
-            OnnxReshape(X_col.outputs[feature_idx], np.array([batch_size, 1]), op_version=opv),
+            OnnxReshape(X_col.outputs[feature_idx], np.array([batch_size, 1], dtype=np.int64), op_version=opv),
             np.ones(shape=(1, num_classes)).astype(dtype),
             op_version=opv,
         )
         sub = OnnxSub(
             repeat,
-            OnnxReshape(C_col[feature_idx].astype(dtype), np.array([1, num_classes]), op_version=opv),
+            OnnxReshape(C_col[feature_idx].astype(dtype), np.array([1, num_classes], dtype=np.int64), op_version=opv),
             op_version=opv,
             output_names=[f"{name_prefix}sub_col{feature_idx}"],
         )
         idx = OnnxAbs(sub, op_version=opv, output_names=[f"{name_prefix}idx_col{feature_idx}"])
         argmin = OnnxArgMin(
-            OnnxReshape(idx, np.array([batch_size, num_classes]), op_version=opv),
+            OnnxReshape(idx, np.array([batch_size, num_classes], dtype=np.int64), op_version=opv),
             axis=1,
             op_version=opv,
             output_names=[f"{name_prefix}argmin_col{feature_idx}"],
@@ -181,14 +183,17 @@ def _encoder_handle_unknown_transformer_converter(scope, operator, container, na
             )
             onehot_reshaped = OnnxReshape(
                 onehot,
-                np.array([batch_size, num_classes]),
+                np.array([batch_size, num_classes], dtype=np.int64),
                 output_names=[f"{name_prefix}Y_col{feature_idx}"],
                 op_version=opv,
             )
             Y_col.append(onehot_reshaped)
         else:
             argmin_reshaped = OnnxReshape(
-                argmin, np.array([batch_size, 1]), output_names=[f"{name_prefix}Y_col{feature_idx}"], op_version=opv
+                argmin,
+                np.array([batch_size, 1], dtype=np.int64),
+                output_names=[f"{name_prefix}Y_col{feature_idx}"],
+                op_version=opv,
             )
             Y_col.append(argmin_reshaped)
     Y = OnnxConcat(*Y_col, axis=1, op_version=opv, output_names=out[:1])
