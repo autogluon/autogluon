@@ -1,9 +1,11 @@
-import pandas as pd
-import numpy as np
-import pytest
 from typing import Tuple
+
+import numpy as np
+import pandas as pd
+import pytest
+
 from autogluon.timeseries import TimeSeriesPredictor
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID, TIMESTAMP
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 
 TARGET_COLUMN = "custom_target"
 ITEM_IDS = ["Z", "A", "1", "C"]
