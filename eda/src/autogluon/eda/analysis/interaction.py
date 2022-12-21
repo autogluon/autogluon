@@ -1,11 +1,14 @@
-from typing import List, Optional, Dict, Any
+import warnings
+from typing import List, Optional, Dict, Any, Union
 
+import pandas as pd
 import phik  # noqa - required for significance_matrix instrumentation on pandas dataframes
+from scipy import stats
 
 from .base import AbstractAnalysis
 from .. import AnalysisState
 
-__all__ = ["Correlation", "CorrelationSignificance", "FeatureInteraction"]
+__all__ = ["Correlation", "CorrelationSignificance", "FeatureInteraction", "DistributionFit"]
 
 
 class Correlation(AbstractAnalysis):
@@ -210,3 +213,158 @@ class FeatureInteraction(AbstractAnalysis):
                     interactions[ds] = {}
                 interactions[ds][self.key] = interaction
         state.interactions = interactions
+
+
+class DistributionFit(AbstractAnalysis):
+    AVAILABLE_DISTRIBUTIONS = [
+        "alpha",
+        "anglit",
+        "arcsine",
+        "beta",
+        "betaprime",
+        "bradford",
+        "burr",
+        "burr12",
+        "cauchy",
+        "chi",
+        "chi2",
+        "cosine",
+        "dgamma",
+        "dweibull",
+        "erlang",
+        "expon",
+        "exponnorm",
+        "exponweib",
+        "exponpow",
+        "f",
+        "fatiguelife",
+        "fisk",
+        "foldcauchy",
+        "foldnorm",
+        "genlogistic",
+        "genpareto",
+        "gennorm",
+        "genexpon",
+        "genextreme",
+        "gausshyper",
+        "gamma",
+        "gengamma",
+        "genhalflogistic",
+        "gilbrat",
+        "gompertz",
+        "gumbel_r",
+        "gumbel_l",
+        "halfcauchy",
+        "halflogistic",
+        "halfnorm",
+        "halfgennorm",
+        "hypsecant",
+        "invgamma",
+        "invgauss",
+        "invweibull",
+        "johnsonsb",
+        "johnsonsu",
+        "kstwobign",
+        "laplace",
+        "levy",
+        "levy_l",
+        "logistic",
+        "loggamma",
+        "loglaplace",
+        "lognorm",
+        "lomax",
+        "maxwell",
+        "mielke",
+        "nakagami",
+        "ncx2",
+        "ncf",
+        "nct",
+        "norm",
+        "pareto",
+        "pearson3",
+        "powerlaw",
+        "powerlognorm",
+        "powernorm",
+        "rdist",
+        "reciprocal",
+        "rayleigh",
+        "rice",
+        "recipinvgauss",
+        "semicircular",
+        "t",
+        "triang",
+        "truncexpon",
+        "truncnorm",
+        "tukeylambda",
+        "uniform",
+        "vonmises",
+        "vonmises_line",
+        "wald",
+        "weibull_min",
+        "weibull_max",
+    ]
+
+    def __init__(
+        self,
+        columns: Union[str, List[str]],
+        pvalue_min: float = 0.01,
+        keep_top_n: Optional[int] = None,
+        distributions_to_fit: Optional[Union[str, List[str]]] = None,
+        parent: Optional[AbstractAnalysis] = None,
+        children: Optional[List[AbstractAnalysis]] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(parent, children, **kwargs)
+        if keep_top_n is None and distributions_to_fit is None:
+            keep_top_n = 3
+
+        if isinstance(columns, str):
+            columns = [columns]
+        self.columns = columns
+        self.pvalue_min = pvalue_min
+        self.keep_top_n = keep_top_n
+
+        if distributions_to_fit is None:
+            distributions_to_fit = self.AVAILABLE_DISTRIBUTIONS
+        if isinstance(distributions_to_fit, str):
+            distributions_to_fit = [distributions_to_fit]
+        not_supported = [d for d in distributions_to_fit if d not in self.AVAILABLE_DISTRIBUTIONS]
+        if len(not_supported) > 0:
+            raise ValueError(
+                f"The following distributions are not supported: {sorted(not_supported)}. "
+                f"Supported distributions are {sorted(self.AVAILABLE_DISTRIBUTIONS)}"
+            )
+        self.distributions_to_fit = distributions_to_fit
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
+        state.distributions_fit = {}
+        for (ds, df) in self.available_datasets(args):
+            state.distributions_fit[ds] = {}
+            for c in self.columns:
+                if c in df.columns:
+                    col = df[c]
+                    col = col[col.notna()]  # skip NaNs
+                    state.distributions_fit[ds][c] = self._fit_dist(col, self.pvalue_min)
+
+    def _fit_dist(self, series, pvalue_min=0.01):
+        results = {}
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            for i in self.distributions_to_fit:
+                dist = getattr(stats, i)
+                param = dist.fit(series)
+                statistic, pvalue = stats.kstest(series, i, args=param)
+                if pvalue >= pvalue_min:
+                    results[i] = {
+                        "param": param,
+                        "statistic": statistic,
+                        "pvalue": pvalue,
+                    }
+            results = pd.DataFrame(results).T.sort_values("pvalue", ascending=False)
+            if self.keep_top_n is not None:
+                results = results[: self.keep_top_n]
+            results = results.T.to_dict()
+            return results

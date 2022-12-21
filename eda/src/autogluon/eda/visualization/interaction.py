@@ -2,8 +2,10 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Type, Tuple
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
+from scipy import stats
 
 from autogluon.common.features.types import R_OBJECT, R_CATEGORY, R_BOOL, R_INT, R_FLOAT
 from .base import AbstractVisualization
@@ -293,27 +295,30 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
 
     class _HistPlotRenderer(_AbstractFeatureInteractionPlotRenderer):
         def _render(self, state, ds, params, param_types, ax, data, chart_args):
+            # param_types: (x, y, hue)
+            fitted_distributions_present = ("distributions_fit" in state) and (param_types == ("numeric", None, None))
+
+            if fitted_distributions_present:
+                chart_args["stat"] = "density"
             sns.histplot(ax=ax, data=data, **chart_args)
-            # TODO: uncomment later when distributions fit is added
-            # x, _, _ = params
-            # # Handling fitted distributions if present
-            # if ("distributions_fit" in state) and (param_types == ("numeric", None, None)):  # types for  x, y, hue
-            #     chart_args["stat"] = "density"
-            #     dists = state.distributions_fit[ds][x]
-            #     if dists is not None:
-            #         x_min, x_max = ax.get_xlim()
-            #         xs = np.linspace(x_min, x_max, 200)
-            #         for dist, v in dists.items():
-            #             _dist = getattr(stats, dist)
-            #             ax.plot(
-            #                 xs,
-            #                 _dist.pdf(xs, *dists[dist]["param"]),
-            #                 ls="--",
-            #                 lw=0.7,
-            #                 label=f'{dist}: pvalue {dists[dist]["pvalue"]:.2f}',
-            #             )
-            #         ax.set_xlim(x_min, x_max)  # set the limits back to the ones of the distplot
-            #         plt.legend()
+
+            if fitted_distributions_present:  # types for  x, y, hue
+                x = params[0]
+                chart_args["stat"] = "density"
+                dists = state.distributions_fit[ds][x]
+                if dists is not None:
+                    x_min, x_max = ax.get_xlim()
+                    xs = np.linspace(x_min, x_max, 200)
+                    for dist, v in dists.items():
+                        _dist = getattr(stats, dist)
+                        ax.plot(
+                            xs,
+                            _dist.pdf(xs, *v["param"]),
+                            ls="--",
+                            label=f'{dist}: pvalue {v["pvalue"]:.2f}',
+                        )
+                    ax.set_xlim(x_min, x_max)  # set the limits back to the ones of the distplot
+                    plt.legend()
 
     class _KdePlotRenderer(_AbstractFeatureInteractionPlotRenderer):
         def _render(self, state, ds, params, param_types, ax, data, chart_args):
