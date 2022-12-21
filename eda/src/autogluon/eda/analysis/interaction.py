@@ -209,7 +209,7 @@ class FeatureInteraction(AbstractAnalysis):
                 interactions[ds][self.key] = interaction
         state.interactions = interactions
 
-    def _generate_key_if_not_provided(self, key, cols):
+    def _generate_key_if_not_provided(self, key: Optional[str], cols: Dict[str, Optional[str]]) -> str:
         # if key is not provided, then convert to form: 'x:A|y:B|hue:C'; if values is not provided, then skip the value
         if key is None:
             key_parts = []
@@ -380,8 +380,8 @@ class DistributionFit(AbstractAnalysis):
                     f"{series.name}: none of the distributions were able to fit to satisfy specified pvalue_min: {self.pvalue_min}"
                 )
                 return None
-            results = pd.DataFrame(results).T.sort_values("pvalue", ascending=False)
+            df = pd.DataFrame(results).T.sort_values("pvalue", ascending=False)
             if self.keep_top_n is not None:
-                results = results[: self.keep_top_n]
-            results = results.T.to_dict()
+                df = df[: self.keep_top_n]
+            results = df.T.to_dict()
             return results
