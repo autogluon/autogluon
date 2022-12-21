@@ -8,6 +8,7 @@ from hamcrest.library.integration import match_equality
 from pandas import DataFrame
 
 import autogluon.eda.auto as auto
+from autogluon.common.features.types import R_INT, R_FLOAT, R_OBJECT, R_CATEGORY, R_BOOL
 from autogluon.eda import AnalysisState
 from autogluon.eda.visualization import (
     CorrelationVisualization,
@@ -185,6 +186,33 @@ def test_FeatureInteractionVisualization__happy_path(monkeypatch):
     call_subplots.assert_called_with(key="value")
 
 
+@pytest.mark.parametrize("is_single", [True, False])
+def test_FeatureInteractionVisualization__headers(monkeypatch, is_single):
+    state = __get_feature_interaction_state()
+    if is_single:
+        state.interactions.train_data.abc.features.pop("y")
+    call_render = MagicMock()
+    call_show = MagicMock()
+    call_subplots = MagicMock(return_value=("fig", "ax"))
+
+    viz = FeatureInteractionVisualization(key="abc", numeric_as_categorical_threshold=2, headers=True)
+    viz.render_text = MagicMock()
+
+    with monkeypatch.context() as m:
+        m.setattr(plt, "subplots", call_subplots)
+        m.setattr(plt, "show", call_show)
+        if is_single:
+            m.setattr(viz._HistPlotRenderer, "_render", call_render)
+        else:
+            m.setattr(viz._RegPlotRenderer, "_render", call_render)
+        auto.analyze(state=state, viz_facets=[viz])
+
+    if is_single:
+        viz.render_text.assert_called_with("a in train_data", text_type="h3")
+    else:
+        viz.render_text.assert_called_with("Feature interaction between a/b in train_data", text_type="h3")
+
+
 def test_FeatureInteractionVisualization__state_different_key(monkeypatch):
     state = __get_feature_interaction_state()
     call_render = MagicMock()
@@ -334,6 +362,31 @@ def test_FeatureInteractionVisualization__fig_args(x_type, y_type, hue_type, swa
         assert _y_type == y_type
         assert _hue == hue
         assert _hue_type == hue_type
+
+
+@pytest.mark.parametrize(
+    "col, raw_type, numeric_as_categorical_threshold, expected_type",
+    [
+        (None, R_INT, 20, None),
+        ("a", R_INT, 20, "category"),
+        ("a", R_INT, 2, "numeric"),
+        ("a", R_FLOAT, 2, "numeric"),
+        ("a", R_OBJECT, 2, "category"),
+        ("a", R_CATEGORY, 2, "category"),
+        ("a", R_BOOL, 2, "category"),
+        ("a", "some_type", 2, None),
+    ],
+)
+def test_FeatureInteractionVisualization__map_raw_type_to_feature_type(
+    monkeypatch, col, raw_type, numeric_as_categorical_threshold, expected_type
+):
+    df = pd.DataFrame({"a": [1, 2, 3]})
+    v = FeatureInteractionVisualization(key="abc")
+    actual_type = v._map_raw_type_to_feature_type(col, raw_type, df, numeric_as_categorical_threshold)
+    if expected_type is None:
+        assert actual_type is None
+    else:
+        assert actual_type == expected_type
 
 
 def __get_feature_interaction_state():

@@ -1,11 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Type
+from typing import Dict, Any, Optional, Type, Tuple
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy import stats
 
 from autogluon.common.features.types import R_OBJECT, R_CATEGORY, R_BOOL, R_INT, R_FLOAT
 from .base import AbstractVisualization
@@ -184,12 +182,12 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
 
             y, y_type, hue, hue_type = self._swap_y_and_hue_if_necessary(x_type, y, y_type, hue, hue_type)
 
-            renderer: Optional[Type[_AbstractFeatureInteractionPlotRenderer]] = self._get_chart_renderer(
+            renderer_cls: Optional[Type[_AbstractFeatureInteractionPlotRenderer]] = self._get_chart_renderer(
                 x_type, y_type, hue_type
             )
-            if renderer is None:
+            if renderer_cls is None:
                 return
-            renderer: _AbstractFeatureInteractionPlotRenderer = renderer()  # Create instance
+            renderer: _AbstractFeatureInteractionPlotRenderer = renderer_cls()  # Create instance
 
             df = self._convert_categoricals_to_objects(df, x, x_type, y, y_type, hue, hue_type)
             chart_args, data, is_single_var = self._prepare_chart_args(df, x, x_type, y, y_type, hue)
@@ -209,9 +207,8 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                 chart_args=chart_args,
             )
 
-    def _prepare_chart_args(self, df, x, x_type, y, y_type, hue) -> (Dict[str, Any], pd.DataFrame, bool):
+    def _prepare_chart_args(self, df, x, x_type, y, y_type, hue) -> Tuple[Dict[str, Any], pd.DataFrame, bool]:
         chart_args = {"x": x, "y": y, "hue": hue, **self._kwargs}
-        print(chart_args)
         chart_args = {k: v for k, v in chart_args.items() if v is not None}
         data = df
         is_single_var = False
@@ -241,15 +238,17 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             y, y_type = None, None
         return y, y_type, hue, hue_type
 
-    def _get_value_and_type(self, ds, df, state, interaction_features, param) -> [Any, Optional[str]]:
-        value = interaction_features.get(param, None)
+    def _get_value_and_type(
+        self, ds: str, df: pd.DataFrame, state: AnalysisState, interaction_features: Dict[str, Any], param: str
+    ) -> Tuple[Any, Optional[str]]:
+        col = interaction_features.get(param, None)
         value_type = self._map_raw_type_to_feature_type(
-            value, state.raw_type[ds].get(value, None), df, self.numeric_as_categorical_threshold
+            col, state.raw_type[ds].get(col, None), df, self.numeric_as_categorical_threshold
         )
-        return value, value_type
+        return col, value_type
 
     def _get_chart_renderer(
-        self, x_type: str, y_type: str, hue_type: Optional[str]
+        self, x_type: Optional[str], y_type: Optional[str], hue_type: Optional[str]
     ) -> Optional[Type[_AbstractFeatureInteractionPlotRenderer]]:
         types = {
             ("numeric", None, None): self._HistPlotRenderer,
@@ -271,11 +270,11 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
         return types.get((x_type, y_type, hue_type), None)
 
     def _map_raw_type_to_feature_type(
-        self, col: str, raw_type: str, series: pd.DataFrame, numeric_as_categorical_threshold: int = 20
+        self, col: str, raw_type: str, df: pd.DataFrame, numeric_as_categorical_threshold: int = 20
     ) -> Optional[str]:
         if col is None:
             return None
-        elif series[col].nunique() <= numeric_as_categorical_threshold:
+        elif df[col].nunique() <= numeric_as_categorical_threshold:
             return "category"
         elif raw_type in [R_INT, R_FLOAT]:
             return "numeric"
