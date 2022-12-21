@@ -1,5 +1,12 @@
 # Run PECOS with AutoGluon. Testing file provided for convenience
 from autogluon.tabular import TabularDataset
+from autogluon.core.data import LabelCleaner
+from autogluon.core.utils import infer_problem_type
+from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.features.generators import AutoMLPipelineFeatureGenerator
+from autogluon.core.models import BaggedEnsembleModel
+from autogluon.tabular import TabularPredictor
+from autogluon.core.space import Categorical, Int, Real, Bool
 from .pecos_model import PecosModel
 import pandas as pd
 
@@ -23,8 +30,6 @@ if test_multiclass:
         y_test[i*10] = 2
         y[i*10] = 2
 
-from autogluon.core.data import LabelCleaner
-from autogluon.core.utils import infer_problem_type
 # Construct a LabelCleaner to neatly convert labels to float/integers during model training/inference, can also use to inverse_transform back to original.
 problem_type = infer_problem_type(y=y)  # Infer problem type (or else specify directly)
 label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=y)
@@ -38,8 +43,6 @@ print(y_clean.head(5))
 
 # Clean features (i.e. strings)
 
-from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.features.generators import AutoMLPipelineFeatureGenerator
 set_logger_verbosity(2)  # Set logger so more detailed logging is shown for tutorial
 
 feature_generator = AutoMLPipelineFeatureGenerator()
@@ -82,16 +85,12 @@ print(f'Test score ({model.eval_metric.name}) = {score}')
 
 run_bagged = True
 if run_bagged:
-    from autogluon.core.models import BaggedEnsembleModel
     bagged_model = BaggedEnsembleModel(PecosModel())
     bagged_model.params['fold_fitting_strategy'] = 'sequential_local'
     bagged_model.fit(X=X_clean, y=y_clean, k_fold=10)  # Perform 10-fold bagging
     bagged_score = bagged_model.score(X_test_clean, y_test_clean)
     print(f'Test score ({bagged_model.eval_metric.name}) = {bagged_score} (bagged)')
     print(f'Bagging increased model accuracy by {round(bagged_score - score, 4) * 100}%!')
-
-
-from autogluon.tabular import TabularPredictor
 
 run_with_defined_hyperparameters = True
 if run_with_defined_hyperparameters:
@@ -100,16 +99,15 @@ if run_with_defined_hyperparameters:
     predictor.leaderboard(test_data, silent=True)
 
 
-from autogluon.core.space import Categorical, Int, Real, Bool
 custom_hyperparameters_hpo = {PecosModel: {
     'max_leaf_size': Int(lower=50, upper=200),
     'nr_splits': Categorical(2, 4, 8, 16, 32, 64, 128),
     'spherical': Bool(),
     'kmeans_max_iter': Int(lower=5, upper=100),
     'solver_type': Categorical("L2R_L2LOSS_SVC_DUAL", "L2R_L1LOSS_SVC_DUAL", "L2R_LR_DUAL", "L2R_L2LOSS_SVC_PRIMAL"),
-    #'coefficient_positive': Real(lower=0.1, upper=1.0),
-    #'coefficient_negative': Real(lower=0.1, upper=1.0),
-    #'bias': Real(lower=0.5, upper=2.0),
+    # 'coefficient_positive': Real(lower=0.1, upper=1.0),
+    # 'coefficient_negative': Real(lower=0.1, upper=1.0),
+    # 'bias': Real(lower=0.5, upper=2.0),
     'negative_sampling': Categorical("tfn", "man", "tfn+man"),
     'sparsity_threshold': Real(lower=0.05, upper=0.2),
     }}

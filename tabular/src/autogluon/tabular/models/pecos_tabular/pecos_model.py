@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import tempfile
 import pathlib
 import logging
 import uuid
@@ -19,7 +18,7 @@ class PecosModel(AbstractModel):
     """
     PECOS Custom Model for AutoGluon.
     Wrapper for the PecosInterface to preprocess data and integrate with AutoGluon.
-    
+
     PECOS github: https://github.com/amzn/pecos
     PECOS paper: https://arxiv.org/pdf/2010.05878.pdf
     More info on hyperparameters: https://github.com/amzn/pecos/blob/mainline/pecos/apps/text2text/train.py#L24
@@ -44,12 +43,12 @@ class PecosModel(AbstractModel):
         """
         print(f'Entering the `_preprocess` method: {len(X)} rows of data, (is_train={is_train})')
         X = super()._preprocess(X, **kwargs)
-        
+
         feature_metadata = FeatureMetadata.from_df(X)
         num_features = feature_metadata.get_features(valid_raw_types=[R_BOOL, R_FLOAT, R_INT])
         cat_features = feature_metadata.get_features(valid_raw_types=[R_CATEGORY])
         text_features = feature_metadata.get_features(valid_raw_types=[R_OBJECT])
-        
+
         print(f'Using {len(num_features + cat_features + text_features)} features')
 
         text_cols = X[text_features] if text_features else None
@@ -81,12 +80,12 @@ class PecosModel(AbstractModel):
     def _fit(self,
              X: pd.DataFrame,
              y: pd.Series,
-             X_val: Optional[pd.DataFrame]=None,
-             y_val: Optional[pd.Series]=None,
+             X_val: Optional[pd.DataFrame] = None,
+             y_val: Optional[pd.Series] = None,
              time_limit=None,
              model_type="XRLinear",
-             workdir = None,
-             model_dir = None,
+             workdir=None,
+             model_dir=None,
              **kwargs):
         """
         Fit model on X and y
@@ -95,7 +94,7 @@ class PecosModel(AbstractModel):
         print('Entering the `_fit` method')
         if model_type not in self.SUPPORTED_MODEL_TYPES:
             raise f"model_type {model_type} not supported. model_type should be one of the following: {self.SUPPORTED_MODEL_TYPES}"
-        
+
         # Create directory to house model artifacts
         run_id = str(uuid.uuid4())[:10]
         if model_dir is None:
@@ -110,7 +109,7 @@ class PecosModel(AbstractModel):
         else:
             workdir = pathlib.Path(workdir + f'{run_id}/')
         workdir.mkdir(parents=True, exist_ok=True)
-        
+
         # Preprocess training data
         X = self.preprocess(X, is_train=True)
         X_input = self._format_input_with_labels(X, y, is_train=True)
@@ -125,7 +124,7 @@ class PecosModel(AbstractModel):
     def _format_input_with_labels(self, X, y, is_train=False):
         """
         Convert X and y to the required format for PECOS.
-        
+
         Currently only supports one label per training example
 
         Required text format for each line for PECOS:
@@ -136,7 +135,7 @@ class PecosModel(AbstractModel):
                 (2) double colon separated label index and label relevance
             w_t is the t-th token in the string
         """
-        label_dict = {label:i for i, label in enumerate(y.unique())}
+        label_dict = {label: i for i, label in enumerate(y.unique())}
         preprocessed_X = []
         for i, r in enumerate(X):
             label = y.iloc[i] if is_train else -1
@@ -152,7 +151,7 @@ class PecosModel(AbstractModel):
                 "max_leaf_size": 100,  # The max size of the leaf nodes of hierarchical 2-means clustering
                 "nr_splits": 16,  # number of splits used to construct hierarchy (a power of 2 is recommended)
                 "spherical": True,  # If true, do l2-normalize cluster centers while clustering
-                "kmeans_max_iter": 20,  # The max number of k-means iteration for indexing 
+                "kmeans_max_iter": 20,  # The max number of k-means iteration for indexing
                 'solver_type': "L2R_L2LOSS_SVC_DUAL",
                 'coefficient_positive': 1.0,  # Coefficient for positive class in the loss function
                 'coefficient_negative': 1.0,  # Coefficient for negative class in the loss function
