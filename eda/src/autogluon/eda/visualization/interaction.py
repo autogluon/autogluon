@@ -295,9 +295,12 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
 
     class _HistPlotRenderer(_AbstractFeatureInteractionPlotRenderer):
         def _render(self, state, ds, params, param_types, ax, data, chart_args):
-            # param_types: (x, y, hue)
             x = params[0]
-            fitted_distributions_present = ("distributions_fit" in state) and (param_types == ("numeric", None, None)) and (x in state.distributions_fit[ds])
+            fitted_distributions_present = (
+                ("distributions_fit" in state)
+                and (param_types == ("numeric", None, None))  # (x, y, hue)
+                and (x in state.distributions_fit[ds])
+            )
 
             if fitted_distributions_present:
                 chart_args["stat"] = "density"

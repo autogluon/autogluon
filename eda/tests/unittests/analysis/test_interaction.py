@@ -1,8 +1,9 @@
 import pandas as pd
+import pytest
 
 import autogluon.eda.auto as auto
 from autogluon.eda import AnalysisState
-from autogluon.eda.analysis import Correlation, CorrelationSignificance, FeatureInteraction
+from autogluon.eda.analysis import Correlation, CorrelationSignificance, FeatureInteraction, DistributionFit
 from autogluon.eda.analysis.dataset import RawTypesAnalysis
 
 
@@ -219,7 +220,117 @@ def test_FeatureInteraction():
     assert state.interactions.train_data["x:a|y:b|hue:d"].features == {"hue": "d", "x": "a", "y": "b"}
 
 
+def test_FeatureInteraction__key_provided():
+    assert (
+        FeatureInteraction()._generate_key_if_not_provided(key="abc", cols={"x": "a", "y": "b", "hue": "c"}) == "abc"
+    )
+
+
+@pytest.mark.parametrize(
+    "cols, expected",
+    [
+        ({"x": "a"}, "x:a"),
+        ({"y": "b"}, "y:b"),
+        ({"hue": "c"}, "hue:c"),
+        ({"x": "a", "y": "b"}, "x:a|y:b"),
+        ({"x": "a", "hue": "c"}, "x:a|hue:c"),
+        ({"y": "b", "hue": "c"}, "y:b|hue:c"),
+        ({"x": "a", "y": "b", "hue": "c"}, "x:a|y:b|hue:c"),
+        ({"x": "a", "y": None, "hue": None}, "x:a"),
+        ({"x": None, "y": "b", "hue": None}, "y:b"),
+    ],
+)
+def test_FeatureInteraction__generate_key_if_not_provided(cols, expected):
+    assert FeatureInteraction()._generate_key_if_not_provided(key=None, cols=cols) == expected
+
+
 def test_FeatureInteraction__can_handle():
     args = AnalysisState()
     assert FeatureInteraction().can_handle(AnalysisState({"raw_type": "something"}), args) is True
     assert FeatureInteraction().can_handle(AnalysisState({"something": 123}), args) is False
+
+
+def test_DistributionFit__happy_path():
+    df = __create_test_df()
+    df["e"] = [1000, 100, 10, 1, 0.1, 0.001]
+    state = auto.analyze(
+        train_data=df,
+        return_state=True,
+        anlz_facets=[
+            DistributionFit(
+                columns=["a", "unknown"],
+                keep_top_n=3,
+                distributions_to_fit=["dweibull", "dgamma", "logistic", "lognorm"],
+            )
+        ],
+    )
+    assert state.distributions_fit.train_data.a == {
+        "dweibull": {
+            "param": (1.9212313611673846, 3.5000360875942134, 1.6939405342565321),
+            "statistic": 0.12094344045455918,
+            "pvalue": 0.9998695812922455,
+        },
+        "dgamma": {
+            "param": (2.7071122240167984, 3.4999828973430622, 0.5541010748597517),
+            "statistic": 0.12375823666401586,
+            "pvalue": 0.9997989026208239,
+        },
+        "logistic": {
+            "param": (3.5, 1.0421523470240495),
+            "statistic": 0.14168404087671216,
+            "pvalue": 0.9981811820582718,
+        },
+    }
+
+    state = auto.analyze(
+        train_data=df,
+        return_state=True,
+        anlz_facets=[
+            DistributionFit(
+                columns=["e"],
+                keep_top_n=3,
+                pvalue_min=0.9,
+                distributions_to_fit=["dweibull", "dgamma", "logistic", "lognorm"],
+            )
+        ],
+    )
+    assert state.distributions_fit.train_data.e is None
+
+
+def test_DistributionFit__constructor_defaults():
+    a = DistributionFit("a")
+    assert a.distributions_to_fit == a.AVAILABLE_DISTRIBUTIONS
+    assert a.keep_top_n == 3
+    assert a.columns == ["a"]
+
+    a = DistributionFit(["a"], distributions_to_fit="lognorm")
+    assert a.columns == ["a"]
+    assert a.distributions_to_fit == ["lognorm"]
+
+    a = DistributionFit(["a"], distributions_to_fit=["lognorm", "gamma"])
+    assert a.columns == ["a"]
+    assert a.distributions_to_fit == ["lognorm", "gamma"]
+
+
+def test_DistributionFit__constructor_unsupported_dist():
+    with pytest.raises(ValueError) as exc_info:
+        DistributionFit("a", distributions_to_fit="unknown")
+    assert exc_info.value.args[0].startswith(
+        "The following distributions are not supported: ['unknown']. Supported distributions are"
+    )
+
+
+def test_DistributionFit__non_numeric_col():
+    df = __create_test_df()
+    state = auto.analyze(
+        train_data=df,
+        return_state=True,
+        anlz_facets=[
+            DistributionFit(
+                columns=["a", "f"],
+                distributions_to_fit=["dweibull", "dgamma", "logistic", "lognorm"],
+            )
+        ],
+    )
+    assert len(state.distributions_fit.train_data.a) == 4
+    assert state.distributions_fit.train_data.f is None

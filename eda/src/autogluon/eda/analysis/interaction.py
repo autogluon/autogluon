@@ -2,7 +2,6 @@ import warnings
 from typing import List, Optional, Dict, Any, Union
 
 import pandas as pd
-import numpy as np
 import phik  # noqa - required for significance_matrix instrumentation on pandas dataframes
 from pandas.core.dtypes.common import is_numeric_dtype
 from scipy import stats
@@ -192,13 +191,7 @@ class FeatureInteraction(AbstractAnalysis):
             "hue": self.hue,
         }
 
-        # if key is not provided, then convert to form: 'x:A|y:B|hue:C'; if values is not provided, then skip the value
-        if self.key is None:
-            key_parts = []
-            for k, v in cols.items():
-                if v is not None:
-                    key_parts.append(f"{k}:{v}")
-            self.key = "|".join(key_parts)
+        self.key = self._generate_key_if_not_provided(self.key, cols)
 
         cols = {k: v for k, v in cols.items() if v is not None}
 
@@ -215,6 +208,16 @@ class FeatureInteraction(AbstractAnalysis):
                     interactions[ds] = {}
                 interactions[ds][self.key] = interaction
         state.interactions = interactions
+
+    def _generate_key_if_not_provided(self, key, cols):
+        # if key is not provided, then convert to form: 'x:A|y:B|hue:C'; if values is not provided, then skip the value
+        if key is None:
+            key_parts = []
+            for k, v in cols.items():
+                if v is not None:
+                    key_parts.append(f"{k}:{v}")
+            key = "|".join(key_parts)
+        return key
 
 
 class DistributionFit(AbstractAnalysis):
@@ -317,12 +320,14 @@ class DistributionFit(AbstractAnalysis):
         **kwargs,
     ) -> None:
         super().__init__(parent, children, **kwargs)
+
         if keep_top_n is None and distributions_to_fit is None:
             keep_top_n = 3
 
         if isinstance(columns, str):
             columns = [columns]
         self.columns = columns
+
         self.pvalue_min = pvalue_min
         self.keep_top_n = keep_top_n
 
@@ -356,7 +361,7 @@ class DistributionFit(AbstractAnalysis):
     def _fit_dist(self, series, pvalue_min=0.01):
         results = {}
         if not is_numeric_dtype(series):
-            self.logger.warning(f'{series.name}: distribution cannot be fit; only numeric columns are supported')
+            self.logger.warning(f"{series.name}: distribution cannot be fit; only numeric columns are supported")
             return None
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -371,7 +376,9 @@ class DistributionFit(AbstractAnalysis):
                         "pvalue": pvalue,
                     }
             if len(results) == 0:
-                self.logger.warning(f'{series.name}: none of the distributions were able to fit to satisfy specified pvalue_min: {self.pvalue_min}')
+                self.logger.warning(
+                    f"{series.name}: none of the distributions were able to fit to satisfy specified pvalue_min: {self.pvalue_min}"
+                )
                 return None
             results = pd.DataFrame(results).T.sort_values("pvalue", ascending=False)
             if self.keep_top_n is not None:
