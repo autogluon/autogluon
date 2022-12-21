@@ -47,6 +47,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
     ):
         assert target_df is not None
         assert target_df.freq, "Initializing GluonTS data sets without freq is not allowed"
+        assert len(target_df.columns) == 1
         # Convert TimeSeriesDataFrame to pd.Series for faster processing
         self.target_series = target_df.squeeze()
         self.item_ids = target_df.item_ids
@@ -367,7 +368,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     @staticmethod
     def _sample_to_quantile_forecast(forecast: SampleForecast, quantile_levels: List[float]) -> QuantileForecast:
-        forecast_arrays = []
+        forecast_arrays = [forecast.mean]
 
         quantile_keys = [str(q) for q in quantile_levels]
         for q in quantile_keys:
@@ -376,7 +377,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         forecast_init_args = dict(
             forecast_arrays=np.array(forecast_arrays),
             start_date=forecast.start_date,
-            forecast_keys=quantile_keys,
+            forecast_keys=["mean"] + quantile_keys,
             item_id=forecast.item_id,
         )
         if isinstance(forecast.start_date, pd.Timestamp):  # GluonTS version is <0.10
