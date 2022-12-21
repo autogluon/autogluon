@@ -25,6 +25,7 @@ from autogluon.core.hpo.constants import CUSTOM_BACKEND
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import torch_warning_filter
 
 # FIXME: introduces cpflows dependency. We exclude this model until a future release.
@@ -234,13 +235,19 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
         return init_kwargs
 
     def _gluonts_forecasts_to_data_frame(
-        self, forecasts: List[Forecast], quantile_levels: List[float]
+        self,
+        forecasts: List[Forecast],
+        quantile_levels: List[float],
+        data: TimeSeriesDataFrame,
     ) -> TimeSeriesDataFrame:
         assert isinstance(forecasts[0], DistributionForecast)
 
+        forecast_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
+        item_id_to_forecast = {f.item_id: f for f in forecasts}
         result_dfs = []
-        for i, forecast in enumerate(forecasts):
-            item_forecast_dict = dict(mean=forecast.mean)
+        for item_id in forecast_index.unique(level=ITEMID):
+            forecast = item_id_to_forecast[item_id]
+            item_forecast_dict = {"mean": forecast.mean}
             if isinstance(forecast.distribution, AffineTransformed):
                 # FIXME: this is a hack to get around GluonTS not implementing quantiles for
                 # torch AffineTransformed. We hence force PyTorch SFF to always use Gaussian error.
@@ -255,15 +262,8 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
             else:
                 for quantile in quantile_levels:
                     item_forecast_dict[str(quantile)] = forecast.quantile(str(quantile))
+            result_dfs.append(pd.DataFrame(item_forecast_dict))
 
-            df = pd.DataFrame(item_forecast_dict)
-            df[ITEMID] = forecast.item_id
-            # TODO: replace with get_forecast_horizon_index_single_time_series
-            df[TIMESTAMP] = pd.date_range(
-                start=forecasts[i].start_date.to_timestamp(how="S"),
-                periods=self.prediction_length,
-                freq=self.freq,
-            )
-            result_dfs.append(df)
-
-        return TimeSeriesDataFrame.from_data_frame(pd.concat(result_dfs))
+        result = pd.concat(result_dfs)
+        result.index = forecast_index
+        return TimeSeriesDataFrame(result)

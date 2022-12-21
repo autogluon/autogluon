@@ -47,7 +47,10 @@ class SimpleGluonTSDataset(GluonTSDataset):
     ):
         assert target_df is not None
         assert target_df.freq, "Initializing GluonTS data sets without freq is not allowed"
-        self.target_df = target_df
+        # Convert TimeSeriesDataFrame to pd.Series for faster processing
+        self.target_series = target_df.squeeze()
+        self.item_ids = target_df.item_ids
+        self.freq_ = target_df.freq
         self.feat_static_cat = feat_static_cat
         self.feat_static_real = feat_static_real
         self.feat_dynamic_real = feat_dynamic_real
@@ -61,24 +64,23 @@ class SimpleGluonTSDataset(GluonTSDataset):
         # for feature generation. If the frequency string doesn't match or is not provided, it raises an exception.
         # Here we bypass this by issuing a default "yearly" frequency, tricking it into not producing
         # any lags or features.
-        freq_ = self.target_df.freq
-        pd_offset = to_offset(freq_)
+        pd_offset = to_offset(self.freq_)
 
         # normalize freq str to handle peculiarities such as W-SUN
         offset_base_alias = pd_offset.name.split("-")[0]
 
-        return "A" if offset_base_alias is None or offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS else freq_
+        return "A" if offset_base_alias is None or offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS else self.freq_
 
     def __len__(self):
-        return len(self.target_df.item_ids)  # noqa
+        return len(self.item_ids)  # noqa
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
-        for item_id in self.target_df.item_ids:  # noqa
-            df = self.target_df.loc[item_id]
+        for item_id in self.item_ids:  # noqa
+            ts = self.target_series.loc[item_id]
             time_series = {
                 FieldName.ITEM_ID: item_id,
-                FieldName.TARGET: df.to_numpy(dtype=self.float_dtype).ravel(),
-                FieldName.START: pd.Period(df.index[0], freq=self.freq),
+                FieldName.TARGET: ts.to_numpy(dtype=self.float_dtype).ravel(),
+                FieldName.START: pd.Period(ts.index[0], freq=self.freq),
             }
             if self.feat_static_cat is not None:
                 time_series[FieldName.FEAT_STATIC_CAT] = self.feat_static_cat.loc[item_id].to_numpy(
