@@ -187,9 +187,14 @@ class FeatureInteraction(AbstractAnalysis):
             "hue": self.hue,
         }
 
+        # if key is not provided, then convert to form: 'x:A|y:B|hue:C'; if values is not provided, then skip the value
         if self.key is None:
-            # if key is not provided, then convert to form: 'x:A|y:B|hue:C'; if values is not provided, then skip the value
-            self.key = "|".join([f"{k}:{v}" for k, v in {k: cols[k] for k in cols.keys()}.items() if v is not None])
+            key_parts = []
+            for k, v in cols.items():
+                if v is not None:
+                    key_parts.append(f"{k}:{v}")
+            self.key = "|".join(key_parts)
+
         cols = {k: v for k, v in cols.items() if v is not None}
 
         interactions: Dict[str, Dict[str, Any]] = state.get("interactions", {})
