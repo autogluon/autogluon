@@ -1,1 +1,1 @@
-from .simple import analyze
+from .simple import analyze, analyze_interaction
