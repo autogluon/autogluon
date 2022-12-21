@@ -58,7 +58,7 @@ extras_require = {
     ],
     'pecos': [
         'libpecos>=0.4.0,<0.5.0'
-    ]
+    ],
     'skl2onnx': [
         'skl2onnx>=1.13.0,<1.14.0',
         # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
