@@ -1,5 +1,5 @@
-Object Detection
-================
+Image Data -- Object Detection
+==============================
 
 Pre-requisite
 -------------

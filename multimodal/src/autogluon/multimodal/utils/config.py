@@ -10,6 +10,8 @@ from torch import nn
 from ..constants import (
     AUTOMM,
     CATEGORICAL_TRANSFORMER,
+    FUSION_MLP,
+    FUSION_NER,
     FUSION_TRANSFORMER,
     HF_MODELS,
     NER,
@@ -74,7 +76,7 @@ def get_config(
         Name of the presets.
     config
         A dictionary including four keys: "model", "data", "optimization", and "environment".
-        If any key is not not given, we will fill in with the default value.
+        If any key is not given, we will fill in with the default value.
 
         The value of each key can be a string, yaml path, or DictConfig object. For example:
         config = {
@@ -481,7 +483,12 @@ def update_config_by_rules(
                 UserWarning,
             )
     if problem_type == NER:
-        config.model.names = [NER_TEXT]
+        if FUSION_MLP in config.model.names:
+            config.model.names.remove(FUSION_MLP)
+    else:
+        if FUSION_NER in config.model.names:
+            config.model.names.remove(FUSION_NER)
+
     return config
 
 

@@ -9,4 +9,5 @@ python3 -m pip install -e text/[tests]
 python3 -m pip install -e vision/
 python3 -m pip install -e timeseries/[all,tests]
 python3 -m pip install -e eda/
+python3 -m pip install -e fair/
 python3 -m pip install -e autogluon/

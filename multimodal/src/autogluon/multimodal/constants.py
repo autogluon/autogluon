@@ -1,7 +1,10 @@
+"""Storing the constants"""
+
 # Column/Label Types
 NULL = "null"
 CATEGORICAL = "categorical"
 TEXT = "text"
+TEXT_NER = "text_ner"  # Added for NER text column
 NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
 IMAGE_BYTEARRAY = "image_bytearray"
@@ -18,8 +21,6 @@ DEFAULT_SHOT = "default_shot"
 DEPRECATED_ZERO_SHOT = "zero_shot"
 NER = "ner"
 NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
-
-# Pipelines
 FEATURE_EXTRACTION = "feature_extraction"
 ZERO_SHOT_IMAGE_CLASSIFICATION = "zero_shot_image_classification"
 OBJECT_DETECTION = "object_detection"
@@ -83,6 +84,7 @@ NDCG = "ndcg"
 PRECISION = "precision"
 RECALL = "recall"
 MRR = "mrr"
+RETRIEVAL_METRICS = [NDCG, PRECISION, RECALL, MRR]
 METRIC_MODE_MAP = {
     ACC: MAX,
     ACCURACY: MAX,
@@ -100,11 +102,7 @@ METRIC_MODE_MAP = {
     MAP: MAX,
     MEAN_AVERAGE_PRECISION: MAX,
     OVERALL_ACCURACY: MAX,
-    HIT_RATE: MAX,
-    NDCG: MAX,
-    PRECISION: MAX,
     RECALL: MAX,
-    MRR: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
@@ -121,7 +119,7 @@ MMDET = "mmdet"
 MMOCR = "mmocr"
 
 # Modality keys. may need to update here if new modality keys are added in above.
-ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL]
+ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER]
 
 # Keys to compute metrics
 Y_PRED = "y_pred"
@@ -199,6 +197,7 @@ CATEGORICAL_TRANSFORMER = "categorical_transformer"
 FUSION = "fusion"
 FUSION_MLP = f"{FUSION}_mlp"
 FUSION_TRANSFORMER = f"{FUSION}_transformer"
+FUSION_NER = f"{FUSION}_{NER}"
 MMDET_IMAGE = "mmdet_image"
 MMOCR_TEXT_DET = "mmocr_text_detection"
 MMOCR_TEXT_RECOG = "mmocr_text_recognition"

@@ -21,18 +21,22 @@ from ..constants import (
     FEW_SHOT,
     IMAGE,
     LABEL,
+    MMLAB_MODELS,
     NER,
     NER_ANNOTATION,
     NER_TEXT,
     NUMERICAL,
     ROIS,
     TEXT,
+    TEXT_NER,
 )
 from ..data import (
     CategoricalProcessor,
     ImageProcessor,
     LabelProcessor,
     MixupModule,
+    MMDetProcessor,
+    MMOcrProcessor,
     MultiModalFeaturePreprocessor,
     NerLabelEncoder,
     NerProcessor,
@@ -151,10 +155,16 @@ def create_data_processor(
         )
     elif data_type == LABEL:
         data_processor = LabelProcessor(model=model)
-    elif data_type == NER:
+    elif data_type == TEXT_NER:
         data_processor = NerProcessor(
             model=model,
             max_len=model_config.max_text_len,
+        )
+    elif data_type == ROIS:
+        data_processor = MMDetProcessor(
+            model=model,
+            max_img_num_per_col=model_config.max_img_num_per_col,
+            missing_value_strategy=config.data.image.missing_value_strategy,
         )
     else:
         raise ValueError(f"unknown data type: {data_type}")
@@ -195,7 +205,8 @@ def create_fusion_data_processors(
         CATEGORICAL: [],
         NUMERICAL: [],
         LABEL: [],
-        NER: [],
+        ROIS: [],
+        TEXT_NER: [],
     }
 
     model_dict = {model.prefix: model}
@@ -215,16 +226,27 @@ def create_fusion_data_processors(
 
         if per_name == NER_TEXT:
             # create a multimodal processor for NER.
-            data_processors[NER].append(
+            data_processors[TEXT_NER].append(
                 create_data_processor(
-                    data_type=NER,
+                    data_type=TEXT_NER,
                     config=config,
                     model=per_model,
                 )
             )
             requires_label = False
-            if data_types is not None and TEXT in data_types:
-                data_types.remove(TEXT)
+            if data_types is not None and TEXT_NER in data_types:
+                data_types.remove(TEXT_NER)
+        elif per_name.lower().startswith(MMLAB_MODELS):
+            # create a multimodal processor for NER.
+            data_processors[ROIS].append(
+                create_data_processor(
+                    data_type=ROIS,
+                    config=config,
+                    model=per_model,
+                )
+            )
+            if data_types is not None and IMAGE in data_types:
+                data_types.remove(IMAGE)
 
         if requires_label:
             # each model has its own label processor
@@ -246,6 +268,10 @@ def create_fusion_data_processors(
 
     # Only keep the modalities with non-empty processors.
     data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
+
+    if TEXT_NER in data_processors and LABEL in data_processors:
+        # LabelProcessor is not needed for NER tasks as annotations are handled in NerProcessor.
+        data_processors.pop(LABEL)
     return data_processors
 
 
@@ -269,7 +295,7 @@ def assign_feature_column_names(
     The data processors with feature column names added.
     """
     for per_modality in data_processors:
-        if per_modality == LABEL or per_modality == NER:
+        if per_modality == LABEL or per_modality == TEXT_NER:
             continue
         for per_model_processor in data_processors[per_modality]:
             # requires_column_info=True is used for feature column distillation.

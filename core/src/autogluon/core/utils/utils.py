@@ -18,7 +18,10 @@ from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold, Leav
 from sklearn.model_selection import train_test_split
 
 from .miscs import warning_filter
-from ..constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS, QUANTILE
+from ..constants import (
+    BINARY, LARGE_DATA_THRESHOLD, MULTICLASS, MULTICLASS_UPPER_LIMIT, QUANTILE,
+    REGRESS_THRESHOLD_LARGE_DATA, REGRESS_THRESHOLD_SMALL_DATA, REGRESSION, SOFTCLASS
+)
 from ..metrics import accuracy, root_mean_squared_error, pinball_loss, Scorer
 
 
@@ -471,6 +474,8 @@ def generate_train_test_split(X: DataFrame,
     """
     if (test_size <= 0.0) or (test_size >= 1.0):
         raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
+    valid_problem_types = [BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE]
+    assert problem_type in valid_problem_types, f'Unknown problem type "{problem_type}" | Valid problem types: {valid_problem_types}'
 
     X_split = X
     y_split = y
@@ -572,18 +577,19 @@ def infer_problem_type(y: Series, silent=False) -> str:
     """ Identifies which type of prediction problem we are interested in (if user has not specified).
         Ie. binary classification, multi-class classification, or regression.
     """
-    if len(y) == 0:
-        raise ValueError("provided labels cannot have length = 0")
-    y = y.dropna()  # Remove missing values from y (there should not be any though as they were removed in Learner.general_data_processing())
+    with pd.option_context('mode.use_inf_as_na', True): # treat None, NaN, INF, NINF as NA
+        y = y.dropna()
     num_rows = len(y)
+
+    if num_rows == 0:
+        raise ValueError("Label column cannot have 0 valid values")
 
     unique_values = y.unique()
 
-    MULTICLASS_LIMIT = 1000  # if numeric and class count would be above this amount, assume it is regression
-    if num_rows > 1000:
-        REGRESS_THRESHOLD = 0.05  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
+    if num_rows > LARGE_DATA_THRESHOLD:
+        regression_threshold = REGRESS_THRESHOLD_LARGE_DATA  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
     else:
-        REGRESS_THRESHOLD = 0.1
+        regression_threshold = REGRESS_THRESHOLD_SMALL_DATA
 
     unique_count = len(unique_values)
     if unique_count == 2:
@@ -594,7 +600,7 @@ def infer_problem_type(y: Series, silent=False) -> str:
         reason = f"dtype of label-column == {y.dtype.name}"
     elif np.issubdtype(y.dtype, np.floating):
         unique_ratio = unique_count / float(num_rows)
-        if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
+        if (unique_ratio <= regression_threshold) and (unique_count <= MULTICLASS_UPPER_LIMIT):
             try:
                 can_convert_to_int = np.array_equal(y, y.astype(int))
                 if can_convert_to_int:
@@ -611,7 +617,7 @@ def infer_problem_type(y: Series, silent=False) -> str:
             reason = "dtype of label-column == float and many unique label-values observed"
     elif np.issubdtype(y.dtype, np.integer):
         unique_ratio = unique_count / float(num_rows)
-        if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
+        if (unique_ratio <= regression_threshold) and (unique_count <= MULTICLASS_UPPER_LIMIT):
             problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression
             reason = "dtype of label-column == int, but few unique label-values observed"
         else:

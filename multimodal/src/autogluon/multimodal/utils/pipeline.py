@@ -36,10 +36,6 @@ def init_pretrained(
         The model with pre-trained weights.
     data_processors
         The data processors associated with the pre-trained model.
-    num_classes
-        The number of classes.
-    classes
-        All classes in this dataset.
     """
     # TODO: Fix the logic and add presets
     config = get_config(presets=presets, overrides=hyperparameters)
