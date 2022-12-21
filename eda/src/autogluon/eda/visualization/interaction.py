@@ -327,7 +327,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
 
     class _BarPlotRenderer(_AbstractFeatureInteractionPlotRenderer):
         def _render(self, state, ds, params, param_types, ax, data, chart_args):
-            chart_args["ci"] = None  # Don't show ci ticks
+            chart_args["errorbar"] = None  # Don't show ci ticks
             chart = sns.barplot(ax=ax, data=data, **chart_args)
             plt.setp(chart.get_xticklabels(), rotation=90)
 
