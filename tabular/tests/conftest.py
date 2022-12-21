@@ -4,6 +4,10 @@ import shutil
 import uuid
 import pytest
 
+from contextlib import contextmanager
+from typing import List
+
+from autogluon.core.utils import ResourceManager
 from autogluon.core.utils import download, unzip
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
@@ -129,7 +133,11 @@ class FitHelper:
                                  refit_full=True,
                                  delete_directory=True,
                                  extra_metrics=None,
-                                 expected_model_count=2):
+                                 expected_model_count=2,
+                                 compile_models=False,
+                                 compiler_configs=None):
+        if compiler_configs is None:
+            compiler_configs = {}
         directory_prefix = './datasets/'
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
         label = dataset_info['label']
@@ -139,6 +147,9 @@ class FitHelper:
             path=save_path,
         )
         predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)
+        if compile_models:
+            predictor.compile_models(models="all", compiler_configs=compiler_configs)
+            predictor.persist_models(models="all")
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)
         predictor.predict(test_data)
@@ -163,6 +174,31 @@ class FitHelper:
         if delete_directory:
             shutil.rmtree(save_path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
         return predictor
+
+    @staticmethod
+    def fit_and_validate_dataset_with_cascade(dataset_name,
+                                              fit_args,
+                                              cascade: List[str],
+                                              sample_size=1000,
+                                              refit_full=True,
+                                              delete_directory=True,
+                                              expected_model_count=2):
+        predictor = FitHelper.fit_and_validate_dataset(
+            dataset_name=dataset_name,
+            fit_args=fit_args,
+            sample_size=sample_size,
+            refit_full=refit_full,
+            expected_model_count=expected_model_count,
+            delete_directory=False,
+        )
+        directory_prefix = './datasets/'
+        train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+
+        predictor.predict(test_data, model=cascade)
+        predictor.predict_proba(test_data, model=cascade)
+
+        if delete_directory:
+            shutil.rmtree(predictor.path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
 
     @staticmethod
     def fit_dataset(train_data, init_args, fit_args, sample_size=None):
@@ -207,6 +243,19 @@ class ModelFitHelper:
 
         model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **fit_args)
         return model, label_cleaner, feature_generator
+    
+    
+@contextmanager
+def mock_system_resourcses(num_cpus=None, num_gpus=None):
+    original_get_cpu_count = ResourceManager.get_cpu_count
+    original_get_gpu_count_all = ResourceManager.get_gpu_count_all
+    if num_cpus is not None:
+        ResourceManager.get_cpu_count = lambda: num_cpus
+    if num_gpus is not None:
+        ResourceManager.get_gpu_count_all = lambda: num_gpus
+    yield
+    ResourceManager.get_cpu_count = original_get_cpu_count
+    ResourceManager.get_gpu_count_all = original_get_gpu_count_all
 
 
 @pytest.fixture
@@ -222,3 +271,22 @@ def fit_helper():
 @pytest.fixture
 def model_fit_helper():
     return ModelFitHelper
+
+
+@pytest.fixture
+def mock_system_resources_ctx_mgr():
+    return mock_system_resourcses
+
+
+@pytest.fixture
+def mock_num_cpus():
+    return 16
+
+
+@pytest.fixture
+def mock_num_gpus():
+    return 2
+
+@pytest.fixture
+def k_fold():
+    return 2

@@ -7,6 +7,8 @@
 
 In this tutorial, we will explain how to automatically use interpretable models powered by integration with [🔍 the imodels package](https://github.com/csinva/imodels). This allows for automatically learning models based on rules which are extremely concise and can be useful for (1) understanding data or (2) building a transparent predictive model.
 
+*Note*: `imodels` must be installed for this tutorial. You can ensure `imodels` is installed via `pip install autogluon.tabular[imodels]`. `imodels` is not installed by default.
+
 Begin by loading in data to predict. Note: interpretable rule-based modeling is currently only supported for binary classification.
 
 ```{.python .input}

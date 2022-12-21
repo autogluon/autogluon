@@ -28,20 +28,24 @@ install_requires = [
     "tqdm",
     "boto3",
     "requests",
-    "timm<0.6.0",
+    "jsonschema<=4.8.0",
+    "seqeval<=1.2.2",
+    "evaluate<=0.3.0",
+    "accelerate>=0.9,<0.14",
+    "timm<0.7.0",
     "torch>=1.9,<1.13",
     "torchvision<0.14.0",
     "torchtext<0.14.0",
     "fairscale>=0.4.5,<=0.4.6",
     "scikit-image>=0.19.1,<0.20.0",
     "smart_open>=5.2.1,<5.3.0",
-    "pytorch_lightning>=1.6.0,<1.7.0",
-    "torchmetrics>=0.7.2,<0.8.0",
-    "transformers>=4.18.0,<4.21.0",
+    "pytorch_lightning>=1.7.4,<1.8.0",
+    "text-unidecode<=1.3",
+    "torchmetrics>=0.8.0,<0.9.0",
+    "transformers>=4.23.0,<4.24.0",
     "nptyping>=1.4.4,<1.5.0",
     "omegaconf>=2.1.1,<2.2.0",
     "sentencepiece>=0.1.95,<0.2.0",
-    "protobuf<=3.18.1",  # https://github.com/awslabs/autogluon/issues/1762
     f"autogluon.core[raytune]=={version}",
     f"autogluon.features=={version}",
     f"autogluon.common=={version}",
@@ -49,8 +53,8 @@ install_requires = [
     "nlpaug>=1.1.10,<=1.1.10",
     "nltk>=3.4.5,<4.0.0",
     "openmim>0.1.5,<=0.2.1",
-    "pycocotools>=2.0.4,<=2.0.4",
     "defusedxml>=0.7.1,<=0.7.1",
+    "albumentations>=1.1.0,<=1.2.0",
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
@@ -59,6 +63,8 @@ extras_require = {
     "tests": [
         "black~=22.0,>=22.3",
         "isort>=5.10",
+        "datasets>=2.3.2,<=2.3.2",
+        "onnxruntime-gpu>=1.13.1,<1.14.0;platform_system!='Darwin'",
     ]
 }
 

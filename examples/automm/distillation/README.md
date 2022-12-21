@@ -86,19 +86,35 @@ of teacher and student.
 
 Here we show the importance of output feature loss.
 
-```
-glue_task = qnli
-Teacher Model = google/bert_uncased_L-12_H-768_A-12
-Student Model = google/bert_uncased_L-6_H-768_A-12
-seed = 123
-max_epoch = 12
-metric = "accuracy"
-temperature = 5
-hard_label_weight = 0.1
-soft_label_weight = 1
+```bash
+glue_task=qnli
+teacher_model=google/bert_uncased_L-12_H-768_A-12
+student_model=google/bert_uncased_L-6_H-768_A-12
+seed=123
+max_epoch=12
+metric="accuracy"
+temperature=5
+hard_label_weight=0.1
+soft_label_weight=1
+
+python3 automm_distillation_glue.py --teacher_model ${teacher_model} \
+                                    --student_model ${student_model} \
+                                    --seed ${seed} \
+                                    --max_epoch ${max_epoch} \
+                                    --hard_label_weight ${hard_label_weight} \
+                                    --soft_label_weight ${soft_label_weight} \
+                                    --glue_task ${glue_task}
 ```
 
-`python3 automm_distillation.py --teacher_model google/bert_uncased_L-12_H-768_A-12 --student_model google/bert_uncased_L-6_H-768_A-12 --seed 123 --max_epoch 8 --hard_label_weight 0.5 --soft_label_weight 5`
+To reproduce the best performance
+```bash
+`python3 automm_distillation.py --teacher_model google/bert_uncased_L-12_H-768_A-12 \
+                                --student_model google/bert_uncased_L-6_H-768_A-12 \
+                                --seed 123 \
+                                --max_epoch 8 \
+                                --hard_label_weight 0.5 \
+                                --soft_label_weight 5
+```
 
 | output_feature_loss_weight | Teacher Model Acc | Pretrained Model Acc | Student Model Acc | Distillation Ratio [2] | Speed Up |
 | -------------------------- | ----------------- | -------------------- | ----------------- | ---------------------- | -------- |
@@ -110,25 +126,30 @@ soft_label_weight = 1
 
 Here we show the importance of softmax regression loss and rkd loss. Some common settings:
 
-```
-pawsx_teacher_tasks = ["en", "de", "es", "fr", "ja", "ko", "zh"]
-pawsx_student_tasks = ["en", "de", "es", "fr", "ja", "ko", "zh"]
-Teacher Model = microsoft/mdeberta-v3-base
-Student Model = nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large
-seed = 123
-precision = 16
-max_epochs = 10
-time_limit = None
-num_gpu = -1
-temperature = 5
-hard_label_weight = 0.1
-soft_label_weight = 1
-softmax_regression_loss_type = mse
-output_feature_loss_type = mse
+```bash
+# pawsx_teacher_tasks = ["en","de","es","fr", "ja", "ko", "zh"]
+# pawsx_student_tasks = ["en", "de", "es", "fr", "ja", "ko", "zh"]
+teacher_model=microsoft/mdeberta-v3-base
+student_model=nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large
+seed=123
+precision=16
+max_epochs=10
+num_gpu=-1
+temperature=5
+hard_label_weight=0.1
+soft_label_weight=1
+softmax_regression_loss_type=mse
+output_feature_loss_type=mse
 ```
 
 To reproduce the best model, run
-`python3 automm_distillation_pawsx.py --precision 16 --output_feature_loss_weight 0.01 --softmax_regression_weight 0.1 --rkd_distance_loss_weight 1 --rkd_angle_loss_weight 2`
+```bash
+python3 automm_distillation_pawsx.py --precision 16 \
+                                     --output_feature_loss_weight 0.01 \
+                                     --softmax_regression_weight 0.1 \
+                                     --rkd_distance_loss_weight 1 \
+                                     --rkd_angle_loss_weight 2
+```
 
 |       Teacher Model        |                    Student Model                     | Softmax Regression Weight | RKD Distance Weight | RKD Angle Weight | Teacher Performance | No Distill Performance | Student Performance | Distillation Ratio | Speed Up |
 | :------------------------: | :--------------------------------------------------: | :-----------------------: | :-----------------: | :--------------: | :-----------------: | :--------------------: | :-----------------: | :----------------: | :------: |

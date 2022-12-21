@@ -1,14 +1,16 @@
 """Wrapper of the MultiModalPredictor."""
-from typing import Dict, Optional
+
 import logging
 import os
-import pandas as pd
+from typing import Dict, Optional
 
+import pandas as pd
 
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
     S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
 from autogluon.core.constants import REGRESSION
-from autogluon.core.utils import get_cpu_count, get_gpu_count_torch, try_import_autogluon_text
+from autogluon.core.utils import ResourceManager
+from autogluon.core.utils import try_import_autogluon_text
 from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
@@ -72,6 +74,14 @@ class MultiModalPredictorModel(AbstractModel):
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
+    # FIXME: Enable parallel bagging once AutoMM supports being run within Ray without hanging
+    @classmethod
+    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
+        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
+        extra_ag_args_ensemble = {'fold_fitting_strategy': 'sequential_local'}
+        default_ag_args_ensemble.update(extra_ag_args_ensemble)
+        return default_ag_args_ensemble
+
     def _set_default_params(self):
         super()._set_default_params()
         try_import_autogluon_text()
@@ -117,47 +127,72 @@ class MultiModalPredictorModel(AbstractModel):
                 label_col_id += 1
         else:
             self._label_column_name = 'label'
-        X_train = self.preprocess(X, fit=True)
+
+        X = self.preprocess(X, fit=True)
+        params = self._get_model_params()
+        max_features = params.pop('_max_features', None)  # FIXME: `_max_features` is a hack. Instead use ag_args_fit and make generic
+        num_features = len(X.columns)
+        if max_features is not None and num_features > max_features:
+            raise AssertionError(f'Feature count ({num_features}) is greater than max allowed features ({max_features}) for {self.name}. Skipping model... '
+                                 f'To increase the max allowed features, specify the value via the `_max_features` parameter '
+                                 f'(Fully ignore by specifying `None`. '
+                                 f'`_max_features` is experimental and will likely change API without warning in future releases.')
+
         if X_val is not None:
             X_val = self.preprocess(X_val)
         # Get arguments from kwargs
         verbosity = kwargs.get('verbosity', 2)
+        if verbosity <= 2:
+            enable_progress_bar = False
+        else:
+            enable_progress_bar = True
         num_gpus = kwargs.get('num_gpus', None)
         if sample_weight is not None:  # TODO: support
             logger.log(15, "sample_weight not yet supported for MultiModalPredictorModel, "
                            "this model will ignore them in training.")
 
-        X_train.insert(len(X_train.columns), self._label_column_name, y)
+        # Need to deep copy to avoid altering outer context
+        X = X.copy()
+        X.insert(len(X.columns), self._label_column_name, y)
         if X_val is not None:
+            X_val = X_val.copy()
             X_val.insert(len(X_val.columns), self._label_column_name, y_val)
 
         verbosity_text = max(0, verbosity - 1)
         root_logger = logging.getLogger('autogluon')
         root_log_level = root_logger.level
-        self.model = MultiModalPredictor(label=self._label_column_name,
-                                     problem_type=self.problem_type,
-                                     path=self.path,
-                                     eval_metric=self.eval_metric,
-                                     verbosity=verbosity_text)
-        params = self._get_model_params()
+        # in self.save(), the model is saved to automm_nn_path
+        automm_nn_path = os.path.join(self.path, self._NN_MODEL_NAME)
+        self.model = MultiModalPredictor(
+            label=self._label_column_name,
+            problem_type=self.problem_type,
+            path=automm_nn_path,
+            eval_metric=self.eval_metric,
+            verbosity=verbosity_text,
+            enable_progress_bar=enable_progress_bar,
+        )
 
         if num_gpus is not None:
             params['env.num_gpus'] = num_gpus
         presets = params.pop('presets', None)
         seed = params.pop('seed', 0)
 
-        self.model.fit(train_data=X_train,
-                       tuning_data=X_val,
-                       time_limit=time_limit,
-                       presets=presets,
-                       hyperparameters=params,
-                       seed=seed)
+        self.model.fit(
+            train_data=X,
+            tuning_data=X_val,
+            time_limit=time_limit,
+            presets=presets,
+            hyperparameters=params,
+            seed=seed,
+        )
+
         self.model.set_verbosity(verbosity)
         root_logger.setLevel(root_log_level)  # Reset log level
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
 
+        self.model._enable_progress_bar = False
         if self.problem_type == REGRESSION:
             return self.model.predict(X, as_pandas=False)
 
@@ -202,11 +237,11 @@ class MultiModalPredictorModel(AbstractModel):
         return total_size
 
     def _get_default_resources(self):
-        num_cpus = get_cpu_count()
-        num_gpus = min(get_gpu_count_torch(), 1)  # Use single gpu training by default. Consider to revise it later.
+        num_cpus = ResourceManager.get_cpu_count()
+        num_gpus = min(ResourceManager.get_gpu_count_torch(), 1)  # Use single gpu training by default. Consider to revise it later.
         return num_cpus, num_gpus
 
-    def get_minimum_resources(self) -> Dict[str, int]:
+    def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:
         return {
             'num_cpus': 1,
             'num_gpus': 1,

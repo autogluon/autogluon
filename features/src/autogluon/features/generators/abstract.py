@@ -39,11 +39,14 @@ class AbstractFeatureGenerator:
         If None, infer during fit from the _infer_feature_metadata_in method.
         Any features not present in features_in (if provided) will be removed from feature_metadata_in.
     post_generators : list of FeatureGenerators, default None
-        FeatureGenerators which will fit and transform sequentially after this object's transformation logic, feeding their output into the next generator's input.
+        FeatureGenerators which will fit and transform sequentially after this object's transformation logic,
+        feeding their output into the next generator's input.
         The output of the final FeatureGenerator will be the used as the transformed output.
     pre_enforce_types : bool, default False
-        If True, the exact raw types (int64, float32, etc.) of the training data will be enforced on future data, either converting the types to the training types or raising an exception if unable.
-        This is important to set to True on the outer feature generator in a feature generation pipeline to ensure incorrect dtypes are not passed downstream, but is often redundant when used on inner feature generators inside a pipeline.
+        If True, the exact raw types (int64, float32, etc.) of the training data will be enforced on future data,
+        either converting the types to the training types or raising an exception if unable.
+        This is important to set to True on the outer feature generator in a feature generation pipeline to ensure
+        incorrect dtypes are not passed downstream, but is often redundant when used on inner feature generators inside a pipeline.
     pre_drop_useless : bool, default False
         If True, features_in will be pruned at fit time of features containing only a single unique value across all rows.
     post_drop_duplicates : bool, default False
@@ -53,12 +56,15 @@ class AbstractFeatureGenerator:
     reset_index : bool, default False
         If True, for the duration of fit and transform, the input data's index is reset to be monotonically increasing from 0 to N-1 for a dataset of N rows.
         At the end of fit and transform, the original index is re-applied to the output data.
-        This is important to set to True on the outer feature generator in a feature generation pipeline to ensure that a non-default index does not cause corruption of the inner feature generation if any inner feature generator does not properly handle non-default indices.
+        This is important to set to True on the outer feature generator in a feature generation pipeline to ensure that a non-default
+        index does not cause corruption of the inner feature generation if any inner feature generator does not properly handle non-default indices.
         This index reset is also applied to the y label data if provided during fit.
     column_names_as_str : bool, default True
         If True, the column names of the input data are converted to string if they were not already.
-        This solves any issues related to downstream FeatureGenerators and models which cannot handle integer column names, and allows column name prefix and suffix operations to avoid errors.
-        Note that for performance purposes, column names are only converted at transform time if they were not strings at fit time. Ensure consistent column names as input to avoid errors.
+        This solves any issues related to downstream FeatureGenerators and models which cannot handle integer column names, and allows
+        column name prefix and suffix operations to avoid errors.
+        Note that for performance purposes, column names are only converted at transform time if they were not strings at fit time.
+        Ensure consistent column names as input to avoid errors.
     name_prefix : str, default None
         Name prefix to add to all output feature names.
     name_suffix : str, default None
@@ -71,7 +77,8 @@ class AbstractFeatureGenerator:
         Refer to FeatureMetadata.get_features documentation for a full description of valid keys.
         Note: This is advanced functionality that is not necessary for most situations.
     infer_features_in_args_strategy : str, default 'overwrite'
-        Determines how infer_features_in_args and self.get_default_infer_features_in_args() are combined to result in self._infer_features_in_args which dictates the features_in inference logic.
+        Determines how infer_features_in_args and self.get_default_infer_features_in_args() are combined to result in self._infer_features_in_args
+        which dictates the features_in inference logic.
         If 'overwrite': infer_features_in_args is used exclusively and self.get_default_infer_features_in_args() is ignored.
         If 'update': self.get_default_infer_features_in_args() is dictionary updated by infer_features_in_args.
         If infer_features_in_args is None, this is ignored.
@@ -81,7 +88,8 @@ class AbstractFeatureGenerator:
         Prefix string added to all logging statements made by the generator.
     verbosity : int, default 2
         Controls the verbosity of logging.
-        0 will silence logs, 1 will only log warnings, 2 will log info level information, and 3 will log info level information and provide detailed feature type input and output information.
+        0 will silence logs, 1 will only log warnings, 2 will log info level information, and 3 will log info level information and provide detailed
+        feature type input and output information.
         Logging is still controlled by the global logger configuration, and therefore a verbosity of 3 does not guarantee that logs will be output.
 
     Attributes
@@ -97,8 +105,10 @@ class AbstractFeatureGenerator:
     feature_metadata : FeatureMetadata
         The FeatureMetadata of data post-transformation (data outputted by fit_transform and transform methods).
     feature_metadata_real : FeatureMetadata
-        The FeatureMetadata of data post-transformation consisting of the exact dtypes as opposed to the grouped raw dtypes found in feature_metadata_in, with grouped raw dtypes substituting for the special dtypes.
-        This is only used in the print_feature_metadata_info method and is intended for introspection. It can be safely set to None to reduce memory and disk usage post-fit.
+        The FeatureMetadata of data post-transformation consisting of the exact dtypes as opposed to the grouped raw dtypes found in feature_metadata_in,
+        with grouped raw dtypes substituting for the special dtypes.
+        This is only used in the print_feature_metadata_info method and is intended for introspection. It can be safely set to None to reduce memory and
+        disk usage post-fit.
     """
     def __init__(
         self,
@@ -122,9 +132,15 @@ class AbstractFeatureGenerator:
         self.features_in = features_in  # Original features to use as input to feature generation
         self.features_out = None  # Final list of features after transformation
         self.feature_metadata_in: FeatureMetadata = feature_metadata_in  # FeatureMetadata object based on the original input features.
-        self.feature_metadata: FeatureMetadata = None  # FeatureMetadata object based on the processed features. Pass to models to enable advanced functionality.
-        # TODO: Consider merging feature_metadata and feature_metadata_real, have FeatureMetadata contain exact dtypes, grouped raw dtypes, and special dtypes all at once.
-        self.feature_metadata_real: FeatureMetadata = None  # FeatureMetadata object based on the processed features, containing the true raw dtype information (such as int32, float64, etc.). Pass to models to enable advanced functionality.
+
+        # FeatureMetadata object based on the processed features. Pass to models to enable advanced functionality.
+        self.feature_metadata: FeatureMetadata = None
+
+        # TODO: Consider merging feature_metadata and feature_metadata_real, have FeatureMetadata contain exact dtypes, grouped raw dtypes,
+        #  and special dtypes all at once.
+        # FeatureMetadata object based on the processed features, containing the true raw dtype information (such as int32, float64, etc.).
+        # Pass to models to enable advanced functionality.
+        self.feature_metadata_real: FeatureMetadata = None
         self._feature_metadata_before_post = None  # FeatureMetadata directly prior to applying self._post_generators.
         self._infer_features_in_args = self.get_default_infer_features_in_args()
         if infer_features_in_args is not None:
@@ -156,7 +172,8 @@ class AbstractFeatureGenerator:
 
         if self._post_generators:
             if not self.get_tags().get('allow_post_generators', True):
-                raise AssertionError(f'{self.__class__.__name__} is not allowed to have post_generators, but found: {[generator.__class__.__name__ for generator in self._post_generators]}')
+                raise AssertionError(f'{self.__class__.__name__} is not allowed to have post_generators, '
+                                     f'but found: {[generator.__class__.__name__ for generator in self._post_generators]}')
 
         self.pre_enforce_types = pre_enforce_types
         self._pre_astype_generator = None
@@ -175,7 +192,8 @@ class AbstractFeatureGenerator:
     def fit(self, X: DataFrame, **kwargs):
         """
         Fit generator to the provided data.
-        Because of how the generators track output features and types, it is generally required that the data be transformed during fit, so the fit function is rarely useful to implement beyond a simple call to fit_transform.
+        Because of how the generators track output features and types, it is generally required that the data be transformed during fit, so the fit
+        function is rarely useful to implement beyond a simple call to fit_transform.
 
         Parameters
         ----------
@@ -190,7 +208,8 @@ class AbstractFeatureGenerator:
     def fit_transform(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None, **kwargs) -> DataFrame:
         """
         Fit generator to the provided data and return the transformed version of the data as if fit and transform were called sequentially with the same data.
-        This is generally more efficient than calling fit and transform separately and can be up to twice as fast if the fit process requires transformation of the data.
+        This is generally more efficient than calling fit and transform separately and can be up to twice as fast if the fit process requires transformation
+        of the data.
         This cannot be called after the generator has been fit, and will result in an AssertionError.
 
         Parameters
@@ -219,7 +238,8 @@ class AbstractFeatureGenerator:
 
         if self.reset_index:
             X_index = copy.deepcopy(X.index)
-            X = X.reset_index(drop=True)  # TODO: Theoretically inplace=True avoids data copy, but can lead to altering of original DataFrame outside of method context.
+            # TODO: Theoretically inplace=True avoids data copy, but can lead to altering of original DataFrame outside of method context.
+            X = X.reset_index(drop=True)
             if y is not None and isinstance(y, Series):
                 y = y.reset_index(drop=True)  # TODO: this assumes y and X had matching indices prior
         else:
@@ -243,7 +263,8 @@ class AbstractFeatureGenerator:
                 self._remove_features_in(self._useless_features_in)
         if self.pre_enforce_types:
             from .astype import AsTypeFeatureGenerator
-            self._pre_astype_generator = AsTypeFeatureGenerator(features_in=self.features_in, feature_metadata_in=self.feature_metadata_in, log_prefix=self.log_prefix + '\t')
+            self._pre_astype_generator = AsTypeFeatureGenerator(
+                features_in=self.features_in, feature_metadata_in=self.feature_metadata_in, log_prefix=self.log_prefix + '\t')
             self._pre_astype_generator.fit(X)
 
         # TODO: Add option to return feature_metadata instead to avoid data copy
@@ -253,7 +274,8 @@ class AbstractFeatureGenerator:
         type_map_raw = get_type_map_raw(X_out)
         self._feature_metadata_before_post = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
         if self._post_generators:
-            X_out, self.feature_metadata, self._post_generators = self._fit_generators(X=X_out, y=y, feature_metadata=self._feature_metadata_before_post, generators=self._post_generators, **kwargs)
+            X_out, self.feature_metadata, self._post_generators = self._fit_generators(
+                X=X_out, y=y, feature_metadata=self._feature_metadata_before_post, generators=self._post_generators, **kwargs)
         else:
             self.feature_metadata = self._feature_metadata_before_post
         type_map_real = get_type_map_real(X_out)
@@ -294,19 +316,24 @@ class AbstractFeatureGenerator:
             raise AssertionError(f'{self.__class__.__name__} is not fit.')
         if self.reset_index:
             X_index = copy.deepcopy(X.index)
-            X = X.reset_index(drop=True)  # TODO: Theoretically inplace=True avoids data copy, but can lead to altering of original DataFrame outside of method context.
+            # TODO: Theoretically inplace=True avoids data copy, but can lead to altering of original DataFrame outside of method context.
+            X = X.reset_index(drop=True)
         else:
             X_index = None
         if self.column_names_as_str:
             X.columns = X.columns.astype(str)  # Ensure all column names are strings
         try:
-            X = X[self.features_in]
+            if list(X.columns) != self.features_in:
+                # It comes at a cost when making a copy of the DataFrame,
+                # therefore, try avoid copying by checking the expected features first.
+                X = X[self.features_in]
         except KeyError:
             missing_cols = []
             for col in self.features_in:
                 if col not in X.columns:
                     missing_cols.append(col)
-            raise KeyError(f'{len(missing_cols)} required columns are missing from the provided dataset to transform using {self.__class__.__name__}. Missing columns: {missing_cols}')
+            raise KeyError(f'{len(missing_cols)} required columns are missing from the provided dataset to transform using {self.__class__.__name__}. '
+                           f'Missing columns: {missing_cols}')
         if self._pre_astype_generator:
             X = self._pre_astype_generator.transform(X)
         X_out = self._transform(X)
@@ -327,7 +354,8 @@ class AbstractFeatureGenerator:
         X : DataFrame
             Input data used to fit the generator.
             This data will have already been limited to only the columns present in self.features_in.
-            This data may have been altered by the fit_transform method prior to entering _fit_transform in a variety of ways, but self.features_in and self.features_metadata_in will correctly correspond to X at this point in the generator's fit process.
+            This data may have been altered by the fit_transform method prior to entering _fit_transform in a variety of ways, but self.features_in and
+            self.features_metadata_in will correctly correspond to X at this point in the generator's fit process.
         y : Series, optional
             Input data's labels used to fit the generator. Most generators do not utilize labels.
             y.index is always equal to X.index.
@@ -340,7 +368,8 @@ class AbstractFeatureGenerator:
             X_out is the transformed version of the input data X
             type_group_map_special is the type_group_map_special value of X_out's intended FeatureMetadata object.
                 If special types are not relevant to the generator, this can simply be dict()
-                If the input and output features are identical in name and type, it may be valid to return self.feature_metadata_in.type_group_map_special to maintain any pre-existing special type information.
+                If the input and output features are identical in name and type, it may be valid to return self.feature_metadata_in.type_group_map_special
+                to maintain any pre-existing special type information.
                 Refer to existing generator implementations for guidance on setting the dict output of _fit_transform.
 
         """
@@ -357,7 +386,8 @@ class AbstractFeatureGenerator:
         X : DataFrame
             Input data to be transformed by the generator.
             This data will have already been limited to only the columns present in self.features_in.
-            This data may have been altered by the transform method prior to entering _transform in a variety of ways, but self.features_in and self.features_metadata_in will correctly correspond to X at this point in the generator's transform process.
+            This data may have been altered by the transform method prior to entering _transform in a variety of ways, but self.features_in and
+            self.features_metadata_in will correctly correspond to X at this point in the generator's transform process.
 
         Returns
         -------
@@ -384,9 +414,11 @@ class AbstractFeatureGenerator:
         if self.feature_metadata_in is None:
             self.feature_metadata_in = feature_metadata_in
         elif feature_metadata_in is not None:
-            self._log(30, '\tWarning: feature_metadata_in passed as input to fit_transform, but self.feature_metadata_in was already set. Ignoring feature_metadata_in.')
+            self._log(30, '\tWarning: feature_metadata_in passed as input to fit_transform, but self.feature_metadata_in was already set. '
+                          'Ignoring feature_metadata_in.')
         if self.feature_metadata_in is None:
-            self._log(20, f'\tInferring data type of each feature based on column values. Set feature_metadata_in to manually specify special dtypes of the features.')
+            self._log(20, '\tInferring data type of each feature based on column values. Set feature_metadata_in to manually specify special '
+                          'dtypes of the features.')
             self.feature_metadata_in = self._infer_feature_metadata_in(X=X)
         if self.features_in is None:
             self.features_in = self._infer_features_in(X=X)
@@ -465,7 +497,8 @@ class AbstractFeatureGenerator:
         """
         Removes features from all relevant objects which represent the content of the input data or how the input features are used.
         For example, DropDuplicatesFeatureGenerator calls this method during _fit_transform with the list of duplicate features.
-            This allows DropDuplicatesFeatureGenerator's _transform method to simply return X, as the duplicate features are already dropped in the transform method due to not being in self.features_in.
+            This allows DropDuplicatesFeatureGenerator's _transform method to simply return X, as the duplicate features are already dropped in the transform
+            method due to not being in self.features_in.
 
         Parameters
         ----------
@@ -504,7 +537,8 @@ class AbstractFeatureGenerator:
             self.feature_metadata = self.feature_metadata.remove_features(features=features)
             self.feature_metadata_real = self.feature_metadata_real.remove_features(features=features)
             self.features_out = self.feature_metadata.get_features()
-            feature_links_chain[-1] = {feature_in: [feature_out for feature_out in features_out if feature_out not in features] for feature_in, features_out in feature_links_chain[-1].items()}
+            feature_links_chain[-1] = {feature_in: [feature_out for feature_out in features_out if feature_out not in features] for feature_in, features_out in
+                                       feature_links_chain[-1].items()}
         self._remove_unused_features(feature_links_chain=feature_links_chain)
 
     def _remove_unused_features(self, feature_links_chain):
@@ -591,7 +625,8 @@ class AbstractFeatureGenerator:
             This is dictated by `feature_metadata_in.get_features(**self._infer_features_in_args)` not being empty.
         False if the features represented in feature_metadata_in do not contain any usable types for the generator.
             For example, if only numeric features are passed as input to TextSpecialFeatureGenerator which requires text input features, this will return False.
-            However, if both numeric and text features are passed, this will return True since the text features would be valid input (the numeric features would simply be dropped).
+            However, if both numeric and text features are passed, this will return True since the text features would be valid input (the numeric features
+            would simply be dropped).
         """
         features_in = feature_metadata_in.get_features(**self._infer_features_in_args)
         if features_in:
@@ -724,7 +759,8 @@ class AbstractFeatureGenerator:
         feature_interactions : bool, default True
             If True, then treat all features_out as if they depend on all features_in.
             If False, then treat each features_out as if it was generated by a 1:1 mapping (no feature interactions).
-                This enables advanced functionality regarding automated feature pruning, but is only valid for generators which only transform each feature and do not perform interactions.
+                This enables advanced functionality regarding automated feature pruning, but is only valid for generators which only transform each feature
+                and do not perform interactions.
         allow_post_generators : bool, default True
             If False, will raise an AssertionError if post_generators is specified during init.
                 This is reserved for very simple generators where including post_generators would not be sensible, such as in RenameFeatureGenerator.

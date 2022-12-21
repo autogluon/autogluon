@@ -16,15 +16,15 @@ PYTHON_REQUIRES = '>=3.7, <3.10'
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
     # note: if python 3.7 is used, the open CVEs are present: CVE-2021-41496 | CVE-2021-34141; fixes are available in 1.22.x, but python 3.8 only
-    'numpy': '>=1.21,<1.23',
-    'pandas': '>=1.2.5,!=1.4.0,<1.5',
-    'scikit-learn': '>=1.0.0,<1.1',
-    'scipy': '>=1.5.4,<1.8.0',
+    'numpy': '>=1.21,<1.24',
+    'pandas': '>=1.2.5,!=1.4.0,<1.6',
+    'scikit-learn': '>=1.0.0,<1.2',
+    'scipy': '>=1.5.4,<1.10.0',
     'psutil': '>=5.7.3,<6',
     'gluoncv': '>=0.10.5,<0.10.6',
     'tqdm': '>=4.38.0',
-    'Pillow': '>=9.0.1,<9.1.0',
-    'timm': '>=0.5.4,<0.6.0',
+    'Pillow': '>=9.3.0,<=9.4.0',
+    'timm': '>=0.5.4,<0.7.0',
 }
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
 # TODO: Use DOCS_PACKAGES and TEST_PACKAGES
@@ -92,7 +92,7 @@ def default_setup_args(*, version, submodule):
         name=name,
         version=version,
         author='AutoGluon Community',
-        url='https://github.com/awslabs/autogluon',
+        url='https://github.com/autogluon/autogluon',
         description='AutoML for Image, Text, and Tabular Data',
         long_description=long_description,
         long_description_content_type='text/markdown',
@@ -134,9 +134,9 @@ def default_setup_args(*, version, submodule):
         ],
         project_urls={
             'Documentation': 'https://auto.gluon.ai',
-            'Bug Reports': 'https://github.com/awslabs/autogluon/issues',
-            'Source': 'https://github.com/awslabs/autogluon/',
-            'Contribute!': 'https://github.com/awslabs/autogluon/blob/master/CONTRIBUTING.md',
+            'Bug Reports': 'https://github.com/autogluon/autogluon/issues',
+            'Source': 'https://github.com/autogluon/autogluon/',
+            'Contribute!': 'https://github.com/autogluon/autogluon/blob/master/CONTRIBUTING.md',
         },
     )
     return setup_args

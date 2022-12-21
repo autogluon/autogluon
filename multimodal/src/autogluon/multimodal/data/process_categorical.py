@@ -1,11 +1,10 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
-from nptyping import NDArray
 from torch import nn
 
 from ..constants import CATEGORICAL, COLUMN
-from .collator import Stack, Tuple
+from .collator import StackCollator, TupleCollator
 
 
 class CategoricalProcessor:
@@ -52,9 +51,9 @@ class CategoricalProcessor:
         if self.requires_column_info:
             assert categorical_column_names, "Empty categorical column names."
             for col_name in categorical_column_names:
-                fn[f"{self.categorical_column_prefix}_{col_name}"] = Stack()
+                fn[f"{self.categorical_column_prefix}_{col_name}"] = StackCollator()
 
-        fn[self.categorical_key] = Tuple([Stack() for _ in range(len(categorical_column_names))])
+        fn[self.categorical_key] = TupleCollator([StackCollator() for _ in range(len(categorical_column_names))])
 
         return fn
 
@@ -87,8 +86,8 @@ class CategoricalProcessor:
 
     def __call__(
         self,
-        all_categorical_features: Dict[str, NDArray[(Any,), np.int32]],
-        idx: int,
+        categorical_features: Dict[str, int],
+        feature_modalities: Dict[str, Union[int, float, list]],
         is_training: bool,
     ) -> Dict:
         """
@@ -96,10 +95,10 @@ class CategoricalProcessor:
 
         Parameters
         ----------
-        all_categorical_features
-            All the categorical features in a dataset.
-        idx
-            The sample index in a dataset.
+        categorical_features
+            Categorical features of one sample.
+        feature_modalities
+            The modality of the feature columns.
         is_training
             Whether to do processing in the training mode. This unused flag is for the API compatibility.
 
@@ -107,8 +106,4 @@ class CategoricalProcessor:
         -------
         A dictionary containing one sample's processed categorical features.
         """
-        per_sample_features = {
-            per_column_name: per_column_features[idx]
-            for per_column_name, per_column_features in all_categorical_features.items()
-        }
-        return self.process_one_sample(per_sample_features)
+        return self.process_one_sample(categorical_features)

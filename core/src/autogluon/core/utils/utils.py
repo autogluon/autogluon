@@ -18,72 +18,101 @@ from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold, Leav
 from sklearn.model_selection import train_test_split
 
 from .miscs import warning_filter
-from ..constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS, QUANTILE
+from ..constants import (
+    BINARY, LARGE_DATA_THRESHOLD, MULTICLASS, MULTICLASS_UPPER_LIMIT, QUANTILE,
+    REGRESS_THRESHOLD_LARGE_DATA, REGRESS_THRESHOLD_SMALL_DATA, REGRESSION, SOFTCLASS
+)
 from ..metrics import accuracy, root_mean_squared_error, pinball_loss, Scorer
+
 
 logger = logging.getLogger(__name__)
 
 
-def get_cpu_count():
-    return multiprocessing.cpu_count()
-
-
-def get_memory_size():
-    return bytes_to_mega_bytes(psutil.virtual_memory().total)
-
-
-def get_available_disk_size():
-    # FIXME: os.statvfs doesn't work on Windows... 
-    # Need to find another way to calculate disk on Windows.
-    # Return None for now
-    try:
-        statvfs = os.statvfs(".")
-        available_blocks = statvfs.f_frsize * statvfs.f_bavail
-        return bytes_to_mega_bytes(available_blocks)
-    except Exception:
-        return None
-
-
-def get_gpu_count_all():
-    """
-    Attempts to get number of GPUs available for use via multiple means.
-    """
-    # FIXME: update to use only torch for TIMM or find a better GPU detection strategy
-    # FIXME: get_gpu_count by itself doesn't always work for Windows
-    num_gpus = _get_gpu_count_cuda()
-    if num_gpus == 0:
-        num_gpus = get_gpu_count_mxnet()
+class ResourceManager():
+    """Manager that fetches system related info"""
+    
+    @staticmethod
+    def get_cpu_count():
+        return multiprocessing.cpu_count()
+    
+    @staticmethod
+    def get_cpu_count_psutil(logical=True):
+        return psutil.cpu_count(logical=logical)
+    
+    @staticmethod
+    def get_gpu_count_all():
+        num_gpus = ResourceManager._get_gpu_count_cuda()
         if num_gpus == 0:
-            num_gpus = get_gpu_count_torch()
-    return num_gpus
+            # Get num gpus from mxnet first because of https://github.com/autogluon/autogluon/issues/2042
+            # TODO: stop using mxnet to determine num gpus once mxnet is removed from AG
+            num_gpus = ResourceManager.get_gpu_count_mxnet()
+            if num_gpus == 0:
+                num_gpus = ResourceManager.get_gpu_count_torch()
+        return num_gpus
 
+    @staticmethod
+    def get_gpu_count_mxnet():
+        # TODO: Remove this once AG get rid off mxnet
+        try:
+            import mxnet
+            num_gpus = mxnet.context.num_gpus()
+        except Exception:
+            num_gpus = 0
+        return num_gpus
+    
+    @staticmethod
+    def get_gpu_count_torch():
+        try:
+            import torch
+            num_gpus = torch.cuda.device_count()
+        except Exception:
+            num_gpus = 0
+        return num_gpus
+    
+    @staticmethod
+    def get_gpu_free_memory():
+        """Grep gpu free memory from nvidia-smi tool.
+        This function can fail due to many reasons(driver, nvidia-smi tool, envs, etc) so please simply use
+        it as a suggestion, stay away with any rules bound to it.
+        E.g. for a 4-gpu machine, the result can be list of int
+        >>> print(get_gpu_free_memory)
+        >>> [13861, 13859, 13859, 13863]
+        """
+        _output_to_list = lambda x: x.decode('ascii').split('\n')[:-1]
 
-def _get_gpu_count_cuda():
-    # FIXME: Sometimes doesn't detect GPU on Windows
-    # FIXME: Doesn't ensure the GPUs are actually usable by the model (MXNet, PyTorch, etc.)
-    from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
-    if not cudaInit(): return 0
-    gpu_count = cudaDeviceGetCount()
-    cudaShutdown()
-    return gpu_count
-
-
-def get_gpu_count_mxnet():
-    try:
-        import mxnet
-        num_gpus = mxnet.context.num_gpus()
-    except Exception:
-        num_gpus = 0
-    return num_gpus
-
-
-def get_gpu_count_torch():
-    try:
-        import torch
-        num_gpus = torch.cuda.device_count()
-    except Exception:
-        num_gpus = 0
-    return num_gpus
+        try:
+            COMMAND = "nvidia-smi --query-gpu=memory.free --format=csv"
+            memory_free_info = _output_to_list(subprocess.check_output(COMMAND.split()))[1:]
+            memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
+        except:
+            memory_free_values = []
+        return memory_free_values
+    
+    @staticmethod
+    def get_memory_size():
+        return bytes_to_mega_bytes(psutil.virtual_memory().total)
+    
+    @staticmethod
+    def get_available_disk_size():
+        # FIXME: os.statvfs doesn't work on Windows... 
+        # Need to find another way to calculate disk on Windows.
+        # Return None for now
+        try:
+            statvfs = os.statvfs(".")
+            available_blocks = statvfs.f_frsize * statvfs.f_bavail
+            return bytes_to_mega_bytes(available_blocks)
+        except Exception:
+            return None
+    
+    @staticmethod
+    def _get_gpu_count_cuda():
+        # FIXME: Sometimes doesn't detect GPU on Windows
+        # FIXME: Doesn't ensure the GPUs are actually usable by the model (MXNet, PyTorch, etc.)
+        from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
+        if not cudaInit(): return 0
+        gpu_count = cudaDeviceGetCount()
+        cudaShutdown()
+        return gpu_count
 
 
 class CVSplitter:
@@ -150,11 +179,11 @@ class CVSplitter:
 
 def setup_compute(nthreads_per_trial, ngpus_per_trial):
     if nthreads_per_trial is None or nthreads_per_trial == 'all':
-        nthreads_per_trial = get_cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
+        nthreads_per_trial = ResourceManager.get_cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
     if ngpus_per_trial is None:
         ngpus_per_trial = 0  # do not use GPU by default
     elif ngpus_per_trial == 'all':
-        ngpus_per_trial = get_gpu_count_all()
+        ngpus_per_trial = ResourceManager.get_gpu_count_all()
     if not isinstance(nthreads_per_trial, int) and nthreads_per_trial != 'auto':
         raise ValueError(f'nthreads_per_trial must be an integer or "auto": nthreads_per_trial = {nthreads_per_trial}')
     if not isinstance(ngpus_per_trial, int) and ngpus_per_trial != 'auto':
@@ -334,14 +363,119 @@ def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
     return y_pred
 
 
+def extract_label(data: DataFrame, label: str) -> (DataFrame, Series):
+    """
+    Extract the label column from a dataset and return X, y.
+
+    Parameters
+    ----------
+    data : DataFrame
+        The data containing features and the label column.
+    label : str
+        The label column name.
+
+    Returns
+    -------
+    X, y : (DataFrame, Series)
+        X is the data with the label column dropped.
+        y is the label column as a pd.Series.
+    """
+    if label not in list(data.columns):
+        raise ValueError(f"Provided DataFrame does not contain label column: {label}")
+    y = data[label].copy()
+    X = data.drop(label, axis=1)
+    return X, y
+
+
+def generate_train_test_split_combined(data: DataFrame,
+                                       label: str,
+                                       problem_type: str,
+                                       test_size: float = 0.1,
+                                       random_state: int = 0,
+                                       min_cls_count_train: int = 1) -> (DataFrame, DataFrame):
+    """
+    Generate a train test split from a DataFrame that contains the label column.
+
+    Parameters
+    ----------
+    data : DataFrame
+        DataFrame containing the features plus the label column to split into train and test sets.
+    label : str
+        The label column name.
+        Used for stratification and to ensure all classes in multiclass classification are preserved in train data.
+    problem_type : str
+        The problem_type the label is used for. Determines if stratification is used.
+        Options: ["binary", "multiclass", "regression", "softclass", "quantile"]
+    test_size : float, default = 0.1
+        The proportion of data to use for the test set.
+        The remaining (1 - test_size) of data will be used for the training set.
+    random_state : int, default = 0
+        Random seed to use during the split.
+    min_cls_count_train : int, default = 1
+        The minimum number of instances of each class that must occur in the training set (for classification).
+        If not satisfied by the original split, instances of unsatisfied classes are
+        taken from test and put into train until satisfied.
+        Raises an exception if impossible to satisfy.
+
+    Returns
+    -------
+    train_data, test_data : (DataFrame, DataFrame)
+        The train_data and test_data after performing the split. Includes the label column.
+    """
+    X, y = extract_label(data=data, label=label)
+    train_data, test_data, y_train, y_test = generate_train_test_split(
+        X=X,
+        y=y,
+        problem_type=problem_type,
+        test_size=test_size,
+        random_state=random_state,
+        min_cls_count_train=min_cls_count_train)
+    train_data[label] = y_train
+    test_data[label] = y_test
+    return train_data, test_data
+
+
 def generate_train_test_split(X: DataFrame,
                               y: Series,
                               problem_type: str,
                               test_size: float = 0.1,
-                              random_state=0,
-                              min_cls_count_train=1) -> (DataFrame, DataFrame, Series, Series):
+                              random_state: int = 0,
+                              min_cls_count_train: int = 1) -> (DataFrame, DataFrame, Series, Series):
+    """
+    Generate a train test split from input X, y.
+    If you have a combined X, y DataFrame, refer to `generate_train_test_split_combined` instead.
+
+    Parameters
+    ----------
+    X : DataFrame
+        pd.DataFrame containing the features minus the label column to split into train and test sets.
+    y : Series
+        pd.Series containing the label with matching indices to X.
+        Used for stratification and to ensure all classes in multiclass classification are preserved in train data.
+    problem_type : str
+        The problem_type the label is used for. Determines if stratification is used.
+        Options: ["binary", "multiclass", "regression", "softclass", "quantile"]
+    test_size : float, default = 0.1
+        The proportion of data to use for the test set.
+        The remaining (1 - test_size) of data will be used for the training set.
+    random_state : int, default = 0
+        Random seed to use during the split.
+    min_cls_count_train : int, default = 1
+        The minimum number of instances of each class that must occur in the training set (for classification).
+        If not satisfied by the original split, instances of unsatisfied classes are
+        taken from test and put into train until satisfied.
+        Raises an exception if impossible to satisfy.
+
+    Returns
+    -------
+    X_train, X_test, y_train, y_test : (DataFrame, DataFrame, Series, Series)
+        The train_data and test_data after performing the split, separated into X and y.
+
+    """
     if (test_size <= 0.0) or (test_size >= 1.0):
         raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
+    valid_problem_types = [BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE]
+    assert problem_type in valid_problem_types, f'Unknown problem type "{problem_type}" | Valid problem types: {valid_problem_types}'
 
     X_split = X
     y_split = y
@@ -380,8 +514,8 @@ def generate_train_test_split(X: DataFrame,
         y_test = pd.DataFrame(y_test, index=X_test.index)
 
     if rare_indices:
-        X_train = X_train.append(X.loc[rare_indices])
-        y_train = y_train.append(y.loc[rare_indices])
+        X_train = pd.concat([X_train, X.loc[rare_indices]])
+        y_train = pd.concat([y_train, y.loc[rare_indices]])
 
     if problem_type in [BINARY, MULTICLASS]:
         class_counts_dict_orig = y.value_counts().to_dict()
@@ -443,18 +577,19 @@ def infer_problem_type(y: Series, silent=False) -> str:
     """ Identifies which type of prediction problem we are interested in (if user has not specified).
         Ie. binary classification, multi-class classification, or regression.
     """
-    if len(y) == 0:
-        raise ValueError("provided labels cannot have length = 0")
-    y = y.dropna()  # Remove missing values from y (there should not be any though as they were removed in Learner.general_data_processing())
+    with pd.option_context('mode.use_inf_as_na', True): # treat None, NaN, INF, NINF as NA
+        y = y.dropna()
     num_rows = len(y)
+
+    if num_rows == 0:
+        raise ValueError("Label column cannot have 0 valid values")
 
     unique_values = y.unique()
 
-    MULTICLASS_LIMIT = 1000  # if numeric and class count would be above this amount, assume it is regression
-    if num_rows > 1000:
-        REGRESS_THRESHOLD = 0.05  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
+    if num_rows > LARGE_DATA_THRESHOLD:
+        regression_threshold = REGRESS_THRESHOLD_LARGE_DATA  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
     else:
-        REGRESS_THRESHOLD = 0.1
+        regression_threshold = REGRESS_THRESHOLD_SMALL_DATA
 
     unique_count = len(unique_values)
     if unique_count == 2:
@@ -465,7 +600,7 @@ def infer_problem_type(y: Series, silent=False) -> str:
         reason = f"dtype of label-column == {y.dtype.name}"
     elif np.issubdtype(y.dtype, np.floating):
         unique_ratio = unique_count / float(num_rows)
-        if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
+        if (unique_ratio <= regression_threshold) and (unique_count <= MULTICLASS_UPPER_LIMIT):
             try:
                 can_convert_to_int = np.array_equal(y, y.astype(int))
                 if can_convert_to_int:
@@ -482,7 +617,7 @@ def infer_problem_type(y: Series, silent=False) -> str:
             reason = "dtype of label-column == float and many unique label-values observed"
     elif np.issubdtype(y.dtype, np.integer):
         unique_ratio = unique_count / float(num_rows)
-        if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
+        if (unique_ratio <= regression_threshold) and (unique_count <= MULTICLASS_UPPER_LIMIT):
             problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression
             reason = "dtype of label-column == int, but few unique label-values observed"
         else:
@@ -877,25 +1012,6 @@ def _get_safe_fi_batch_count(X, num_features, X_transformed=None, max_memory_rat
     feature_batch_count = max(1, min(max_feature_batch_count, feature_batch_count_safe))
     feature_batch_count = min(feature_batch_count, num_features)
     return feature_batch_count
-
-
-def get_gpu_free_memory():
-    """Grep gpu free memory from nvidia-smi tool.
-    This function can fail due to many reasons(driver, nvidia-smi tool, envs, etc) so please simply use
-    it as a suggestion, stay away with any rules bound to it.
-    E.g. for a 4-gpu machine, the result can be list of int
-    >>> print(get_gpu_free_memory)
-    >>> [13861, 13859, 13859, 13863]
-    """
-    _output_to_list = lambda x: x.decode('ascii').split('\n')[:-1]
-
-    try:
-        COMMAND = "nvidia-smi --query-gpu=memory.free --format=csv"
-        memory_free_info = _output_to_list(subprocess.check_output(COMMAND.split()))[1:]
-        memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
-    except:
-        memory_free_values = []
-    return memory_free_values
 
 
 def unevaluated_fi_df_template(features: List[str]) -> pd.DataFrame:

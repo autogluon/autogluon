@@ -9,10 +9,10 @@ from autogluon.common.savers import save_pkl
 from autogluon.core.hpo.exceptions import EmptySearchSpace
 from autogluon.core.hpo.executors import HpoExecutor
 from autogluon.core.models import AbstractModel
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
+from autogluon.timeseries.evaluator import TimeSeriesEvaluator
+from autogluon.timeseries.utils.metadata import get_prototype_metadata_dict
 
-from ... import TimeSeriesEvaluator
-from ...dataset import TimeSeriesDataFrame
-from ...utils.metadata import get_prototype_metadata_dict
 from .model_trial import model_trial, skip_hpo
 
 logger = logging.getLogger(__name__)
@@ -133,16 +133,23 @@ class AbstractTimeSeriesModel(AbstractModel):
         return params
 
     def get_info(self) -> dict:
-        info_dict = super().get_info()
-        info_dict.update(
-            {
-                "freq": self.freq,
-                "prediction_length": self.prediction_length,
-                "quantile_levels": self.quantile_levels,
-                "metadata": self.metadata,
-            }
-        )
-        return info_dict
+        """
+        Returns a dictionary of numerous fields describing the model.
+        """
+        # TODO: Include self.metadata
+        info = {
+            "name": self.name,
+            "model_type": type(self).__name__,
+            "eval_metric": self.eval_metric,
+            "fit_time": self.fit_time,
+            "predict_time": self.predict_time,
+            "freq": self.freq,
+            "prediction_length": self.prediction_length,
+            "quantile_levels": self.quantile_levels,
+            "val_score": self.val_score,
+            "hyperparameters": self.params,
+        }
+        return info
 
     def fit(self, **kwargs) -> "AbstractTimeSeriesModel":
         """Fit timeseries model.
@@ -218,7 +225,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         logger.debug(f"Predicting with time series model {self.name}")
         logger.debug(
             f"\tProvided data for prediction with {len(data)} rows, {data.num_items} items. "
-            f"Average time series length is {len(data) / data.num_items}."
+            f"Average time series length is {len(data) / data.num_items:.1f}."
         )
 
         quantiles = quantile_levels or self.quantile_levels
@@ -226,7 +233,10 @@ class AbstractTimeSeriesModel(AbstractModel):
             raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
 
     def predict(
-        self, data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]], **kwargs
+        self,
+        data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]],
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        **kwargs,
     ) -> TimeSeriesDataFrame:
         """Given a dataset, predict the next `self.prediction_length` time steps.
         This method produces predictions for the forecast horizon *after* the individual time series.
@@ -240,6 +250,8 @@ class AbstractTimeSeriesModel(AbstractModel):
         data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]]
             The dataset where each time series is the "context" for predictions. For ensemble models that depend on
             the predictions of other models, this method may accept a dictionary of previous models' predictions.
+        known_covariates : Optional[TimeSeriesDataFrame]
+            A TimeSeriesDataFrame containing the values of the known covariates during the forecast horizon.
 
         Other Parameters
         ----------------
@@ -281,7 +293,12 @@ class AbstractTimeSeriesModel(AbstractModel):
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
-        return self.predict(data.slice_by_timestep(None, -self.prediction_length), **kwargs)
+        past_data = data.slice_by_timestep(None, -self.prediction_length)
+        if len(data.columns) > 1:
+            known_covariates = data.slice_by_timestep(-self.prediction_length, None).drop(self.target, axis=1)
+        else:
+            known_covariates = None
+        return self.predict(past_data, known_covariates=known_covariates, **kwargs)
 
     def score(self, data: TimeSeriesDataFrame, metric: str = None, **kwargs) -> float:
         """Return the evaluation scores for given metric and dataset. The last
@@ -394,6 +411,13 @@ class AbstractTimeSeriesModel(AbstractModel):
         template = self.__class__(**params)
 
         return template
+
+    def get_user_params(self) -> dict:
+        """Used to access user-specified parameters for the model before initialization."""
+        if self._user_params is None:
+            return {}
+        else:
+            return self._user_params.copy()
 
 
 class AbstractTimeSeriesModelFactory:

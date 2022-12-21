@@ -8,13 +8,7 @@ import sys
 from datetime import datetime
 
 from .nvutil import cudaInit, cudaSystemGetNVMLVersion
-from .utils import (
-    get_available_disk_size,
-    get_cpu_count,
-    get_gpu_count_all,
-    get_gpu_free_memory,
-    get_memory_size
-)
+from .utils import ResourceManager
 
 
 # We don't include test dependency here
@@ -97,12 +91,12 @@ def _get_sys_info():
         'Version': uname.version,
         'machine': uname.machine,
         'processor': uname.processor,
-        'num_cores': get_cpu_count(),
-        'cpu_ram_mb': get_memory_size(),
+        'num_cores': ResourceManager.get_cpu_count(),
+        'cpu_ram_mb': ResourceManager.get_memory_size(),
         'cuda version': cuda_version,
-        'num_gpus': get_gpu_count_all(),
-        'gpu_ram_mb': get_gpu_free_memory(),
-        'avail_disk_size_mb': get_available_disk_size(),
+        'num_gpus': ResourceManager.get_gpu_count_all(),
+        'gpu_ram_mb': ResourceManager.get_gpu_free_memory(),
+        'avail_disk_size_mb': ResourceManager.get_available_disk_size(),
     }
 
 

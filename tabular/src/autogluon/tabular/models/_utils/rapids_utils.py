@@ -1,6 +1,6 @@
 from typing import Dict
 
-from autogluon.core.utils import get_gpu_count_torch
+from autogluon.core.utils import ResourceManager
 
 
 class RapidsModelMixin:
@@ -15,10 +15,10 @@ class RapidsModelMixin:
 
     def _get_default_resources(self):
         num_cpus, _ = super()._get_default_resources()
-        num_gpus = min(get_gpu_count_torch(), 1)  # Use single gpu training by default. Consider revising it later.
+        num_gpus = min(ResourceManager.get_gpu_count_torch(), 1)  # Use single gpu training by default. Consider revising it later.
         return num_cpus, num_gpus
 
-    def get_minimum_resources(self) -> Dict[str, int]:
+    def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:
         return {
             'num_cpus': 1,
             'num_gpus': 1,

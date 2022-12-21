@@ -27,7 +27,9 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
     """
     def __init__(self, convert_bool=True, **kwargs):
         super().__init__(**kwargs)
-        self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
+        # FeatureMetadata object based on the original input features real dtypes
+        # (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
+        self._feature_metadata_in_real: FeatureMetadata = None
         self._type_map_real_opt: dict = None  # Optimized representation of data types, saves a few milliseconds during comparisons in online inference
         # self.inplace = inplace  # TODO, also add check if dtypes are same as expected and skip .astype
         self._int_features = None
@@ -43,10 +45,12 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
             feature_type_raw = self.feature_metadata_in.get_feature_type_raw(feature)
             feature_type_raw_cur = feature_type_raw_cur_dict[feature]
             if feature_type_raw != feature_type_raw_cur:
-                self._log(30, f'\tWARNING: Actual dtype differs from dtype in FeatureMetadata for feature "{feature}". Actual dtype: {feature_type_raw_cur} | Expected dtype: {feature_type_raw}')
+                self._log(30, f'\tWARNING: Actual dtype differs from dtype in FeatureMetadata for feature "{feature}". '
+                              f'Actual dtype: {feature_type_raw_cur} | Expected dtype: {feature_type_raw}')
                 feature_map_to_update[feature] = feature_type_raw
         if feature_map_to_update:
-            self._log(30, f'\tWARNING: Forcefully converting features to expected dtypes. Please manually align the input data with the expected dtypes if issues occur.')
+            self._log(30, '\tWARNING: Forcefully converting features to expected dtypes. '
+                          'Please manually align the input data with the expected dtypes if issues occur.')
             X = X.astype(feature_map_to_update)
 
         self._bool_features = dict()
@@ -83,7 +87,8 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
                     # TODO: Add unit test for this situation, to confirm it is handled properly.
                     with_null = null_count[null_count]
                     with_null_features = list(with_null.index)
-                    logger.warning(f'WARNING: Int features without null values at train time contain null values at inference time! Imputing nulls to 0. To avoid this, pass the features as floats during fit!')
+                    logger.warning('WARNING: Int features without null values at train time contain null values at inference time! '
+                                   'Imputing nulls to 0. To avoid this, pass the features as floats during fit!')
                     logger.warning(f'WARNING: Int features with nulls: {with_null_features}')
                     X[with_null_features] = X[with_null_features].fillna(0)
 

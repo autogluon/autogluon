@@ -18,19 +18,15 @@ from autogluon.common.utils.file_utils import get_directory_size, get_directory_
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir, get_autogluon_metadata, compare_autogluon_metadata
-from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
-from autogluon.core.calibrate.conformity_score import compute_conformity_score
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.trainer import AbstractTrainer
-from autogluon.core.utils import get_pred_from_proba_df, try_import_torch
+from autogluon.core.utils import get_pred_from_proba_df
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
-from autogluon.tabular.models import _IModelsModel
-
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import default_holdout_frac
@@ -305,6 +301,8 @@ class TabularPredictor:
             infer_limit=None,
             infer_limit_batch_size=None,
             fit_weighted_ensemble=True,
+            num_cpus='auto',
+            num_gpus='auto',
             **kwargs):
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
@@ -405,8 +403,8 @@ class TabularPredictor:
                 For example, set `hyperparameters = { 'NN_TORCH':{...} }` if say you only want to train (PyTorch) neural networks and no other types of models.
             Values = dict of hyperparameter settings for each model type, or list of dicts.
                 Each hyperparameter can either be a single fixed value or a search space containing many possible values.
-                Unspecified hyperparameters will be set to default values (or default search spaces if `hyperparameter_tune = True`).
-                Caution: Any provided search spaces will error if `hyperparameter_tune = False`.
+                Unspecified hyperparameters will be set to default values (or default search spaces if `hyperparameter_tune_kwargs='auto'`).
+                Caution: Any provided search spaces will error if `hyperparameter_tune_kwargs=None` (Default).
                 To train multiple models of a given type, set the value to a list of hyperparameter dictionaries.
                     For example, `hyperparameters = {'RF': [{'criterion': 'gini'}, {'criterion': 'entropy'}]}` will result in 2 random forest models being trained with separate hyperparameters.
                 Some model types have preset hyperparameter configs keyed under strings as shorthand for a complex model hyperparameter configuration known to work well:
@@ -542,6 +540,14 @@ class TabularPredictor:
             If True, a WeightedEnsembleModel will be fit in each stack layer.
             A weighted ensemble will often be stronger than an individual model while being very fast to train.
             It is recommended to keep this value set to True to maximize predictive quality.
+        num_cpus: int, default = "auto"
+            The total amount of cpus you want AutoGluon predictor to use.
+            Auto means AutoGluon will make the decision based on the total number of cpus available and the model requirement for best performance.
+            Users generally don't need to set this value
+        num_gpus: int, default = "auto"
+            The total amount of gpus you want AutoGluon predictor to use.
+            Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
+            Users generally don't need to set this value
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -837,6 +843,10 @@ class TabularPredictor:
                            f'\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `presets` and `hyperparameters` configuration.')
 
         core_kwargs = {
+            'total_resources': {
+                'num_cpus': num_cpus,
+                'num_gpus': num_gpus,
+            },
             'ag_args': ag_args,
             'ag_args_ensemble': ag_args_ensemble,
             'ag_args_fit': ag_args_fit,
@@ -908,9 +918,9 @@ class TabularPredictor:
 
         if calibrate:
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-                self._calibrate_model()
+                self._trainer.calibrate_model()
             elif self.problem_type == QUANTILE:
-                self._calibrate_model()
+                self._trainer.calibrate_model()
             else:
                 logger.log(30, 'WARNING: `calibrate=True` is only applicable to classification or quantile regression problems. Skipping calibration...')
 
@@ -920,80 +930,14 @@ class TabularPredictor:
         if save_space:
             self.save_space()
 
-    def _calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000, init_val: float = 1.0):
-        """
-        Applies temperature scaling to the AutoGluon model. Applies
-        inverse softmax to predicted probs then trains temperature scalar
-        on validation data to maximize negative log likelihood. Inversed
-        softmaxes are divided by temperature scalar then softmaxed to return
-        predicted probs.
-
-        Parameters:
-        -----------
-        model_name: str: default=None
-            model name to tune temperature scaling on. If set to None
-            then will tune best model only. Best model chosen by validation score
-        lr: float: default=0.01
-            The learning rate for temperature scaling algorithm
-        max_iter: int: default=1000
-            Number of iterations optimizer should take for
-            tuning temperature scaler
-        init_val: float: default=1.0
-            The initial value for temperature scalar term
-        """
-        # TODO: Note that temperature scaling is known to worsen calibration in the face of shifted test data.
-        try:
-            # FIXME: Avoid depending on torch for temp scaling
-            try_import_torch
-        except ImportError:
-            logger.log(30, 'Warning: Torch is not installed, skipping calibration step...')
-            return
-
-        if model_name is None:
-            model_name = self.get_model_best()
-
-        model_full_dict = self._trainer.get_model_full_dict()
-        model_name_og = model_name
-        for m, m_full in model_full_dict.items():
-            if m_full == model_name:
-                model_name_og = m
-                break
-        if self._trainer.bagged_mode:
-            y_val_probs = self.get_oof_pred_proba(model_name_og, transformed=True, internal_oof=True).to_numpy()
-            y_val = self._trainer.load_y().to_numpy()
-        else:
-            X_val = self._trainer.load_X_val()
-            y_val_probs = self._trainer.predict_proba(X_val, model_name_og)
-            y_val = self._trainer.load_y_val().to_numpy()
-
-            if self.problem_type == BINARY:
-                y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
-
-        model = self._trainer.load_model(model_name=model_name)
-        if self.problem_type == QUANTILE:
-            logger.log(15, f'Conformity scores being computed to calibrate model: {model_name}')
-            conformalize = compute_conformity_score(y_val_pred=y_val_probs, y_val=y_val,
-                                                    quantile_levels=self.quantile_levels)
-            model.conformalize = conformalize
-            model.save()
-        else:
-            logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
-            temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
-                                                   init_val=init_val, max_iter=max_iter, lr=lr)
-            if temp_scalar is None:
-                logger.log(15, f'Warning: Infinity found during calibration, skipping calibration on {model.name}! '
-                               f'This can occur when the model is absolutely certain of a validation prediction (1.0 pred_proba).')
-            else:
-                logger.log(15, f'Temperature term found is: {temp_scalar}')
-                model.temperature_scalar = temp_scalar
-                model.save()
-
     # TODO: Consider adding infer_limit to fit_extra
     def fit_extra(self,
                   hyperparameters,
                   time_limit=None,
                   base_model_names=None,
                   fit_weighted_ensemble=True,
+                  num_cpus='auto',
+                  num_gpus='auto',
                   **kwargs):
         """
         Fits additional models after the original :meth:`TabularPredictor.fit` call.
@@ -1018,6 +962,14 @@ class TabularPredictor:
             If True, a WeightedEnsembleModel will be fit in each stack layer.
             A weighted ensemble will often be stronger than an individual model while being very fast to train.
             It is recommended to keep this value set to True to maximize predictive quality.
+        num_cpus: int, default = "auto"
+            The total amount of cpus you want AutoGluon predictor to use.
+            Auto means AutoGluon will make the decision based on the total number of cpus available and the model requirement for best performance.
+            Users generally don't need to set this value
+        num_gpus: int, default = "auto"
+            The total amount of gpus you want AutoGluon predictor to use.
+            Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
+            Users generally don't need to set this value
         **kwargs :
             Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
             Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:
@@ -1098,8 +1050,16 @@ class TabularPredictor:
             num_stack_levels = highest_level
 
         # TODO: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
-        core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit,
-                       'excluded_model_types': excluded_model_types}
+        core_kwargs = {
+            'total_resources': {
+                'num_cpus': num_cpus,
+                'num_gpus': num_gpus,
+            },
+            'ag_args': ag_args,
+            'ag_args_ensemble': ag_args_ensemble,
+            'ag_args_fit': ag_args_fit,
+            'excluded_model_types': excluded_model_types
+        }
 
         if X_pseudo is not None and y_pseudo is not None:
             core_kwargs['X_pseudo'] = X_pseudo
@@ -1518,7 +1478,7 @@ class TabularPredictor:
         return self._learner.evaluate_predictions(y_true=y_true, y_pred=y_pred, sample_weight=sample_weight, silent=silent,
                                                   auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
-    def leaderboard(self, data=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, silent=False):
+    def leaderboard(self, data=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, skip_score=False, silent=False):
         """
         Output summary of information about models produced during `fit()` as a :class:`pd.DataFrame`.
         Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
@@ -1630,6 +1590,10 @@ class TabularPredictor:
             At minimum this will include the model with the highest score and the model with the lowest inference time.
             This is useful when deciding which model to use during inference if inference time is a consideration.
             Models filtered out by this process would never be optimal choices for a user that only cares about model inference time and score.
+        skip_score : bool, default = False
+            [Advanced, primarily for developers]
+            If `True`, will skip computing `score_test` if `data` is specified. `score_test` will be set to NaN for all models.
+            `pred_time_test` and related columns will still be computed.
         silent : bool, default = False
             Should leaderboard DataFrame be printed?
 
@@ -1640,7 +1604,7 @@ class TabularPredictor:
         self._assert_is_fit('leaderboard')
         data = self.__get_dataset(data) if data is not None else data
         return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
-                                         only_pareto_frontier=only_pareto_frontier, silent=silent)
+                                         only_pareto_frontier=only_pareto_frontier, skip_score=skip_score, silent=silent)
 
     def fit_summary(self, verbosity=3, show_plot=False):
         """
@@ -2022,6 +1986,59 @@ class TabularPredictor:
             fi_df[low_str] = pd.Series(ci_low_dict)
         return fi_df
 
+    def compile_models(self, models='best', with_ancestors=True, compiler_configs="auto"):
+        """
+        Compile models for accelerated prediction.
+        This can be helpful to reduce prediction latency and improve throughput.
+
+        Note that this is currently an experimental feature, the supported compilers can be ['native', 'onnx'].
+
+        In order to compile with a specific compiler, that compiler must be installed in the Python environment.
+
+        Parameters
+        ----------
+        models : list of str or str, default = 'best'
+            Model names of models to compile.
+            If 'best' then the model with the highest validation score is compiled (this is the model used for prediction by default).
+            If 'all' then all models are compiled.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+        with_ancestors : bool, default = True
+            If True, all ancestor models of the provided models will also be compiled.
+        compiler_configs : dict or str, default = "auto"
+            If "auto", defaults to the following:
+                compiler_configs = {
+                    "RF": {"compiler": "onnx"},
+                    "XT": {"compiler": "onnx"},
+                    "NN_TORCH": {"compiler": "onnx"},
+                }
+            Otherwise, specify a compiler_configs dictionary manually. Keys can be exact model names or model types.
+            Exact model names take priority over types if both are valid for a model.
+            Types can be either the true type such as RandomForestModel or the shorthand "RF".
+            The dictionary key logic for types is identical to the logic in the hyperparameters argument of `predictor.fit`
+
+            Example values within the configs:
+                compiler : str, default = None
+                    The compiler that is used for model compilation.
+                batch_size : int, default = None
+                    The batch size that is optimized for model prediction.
+                    By default, the batch size is None. This means the compiler would try to leverage dynamic shape for prediction.
+                    Using batch_size=1 would be more suitable for online prediction, which expects a result from one data point.
+                    However, it can be slow for batch processing, because of the overhead of multiple kernel execution.
+                    Increasing batch size to a number that is larger than 1 would help increase the prediction throughput.
+                    This comes with an expense of utilizing larger memory for prediction.
+        """
+        self._assert_is_fit('compile_models')
+        if isinstance(compiler_configs, str):
+            if compiler_configs == 'auto':
+                compiler_configs = {
+                    "RF": {"compiler": "onnx"},
+                    "XT": {"compiler": "onnx"},
+                    "NN_TORCH": {"compiler": "onnx"},
+                }
+            else:
+                raise ValueError(f'Unknown compiler_configs preset: "{compiler_configs}"')
+        self._trainer.compile_models(model_names=models, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
+
     def persist_models(self, models='best', with_ancestors=True, max_memory=0.1) -> list:
         """
         Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online-inference where low latency is critical.
@@ -2221,7 +2238,7 @@ class TabularPredictor:
     # TODO: Add fit() arg to perform this automatically at end of training
     # TODO: Consider adding cutoff arguments such as top-k models
     def fit_weighted_ensemble(self, base_models: list = None, name_suffix='Best', expand_pareto_frontier=False,
-                              time_limit=None):
+                              time_limit=None, refit_full=False):
         """
         Fits new weighted ensemble models to combine predictions of previously-trained models.
         `cache_data` must have been set to `True` during the original training to enable this functionality.
@@ -2243,6 +2260,9 @@ class TabularPredictor:
         time_limit : int, default = None
             Time in seconds each weighted ensemble model is allowed to train for. If `expand_pareto_frontier=True`, the `time_limit` value is applied to each model.
             If None, the ensemble models train without time restriction.
+        refit_full : bool, default = False
+            If True, will apply refit_full to all weighted ensembles created during this call.
+            Identical to calling `predictor.refit_full(model=predictor.fit_weighted_ensemble(...))`
 
         Returns
         -------
@@ -2265,7 +2285,12 @@ class TabularPredictor:
         if base_models is None:
             base_models = trainer.get_model_names(stack_name='core')
 
-        X_stack_preds = trainer.get_inputs_to_stacker(X=X, base_models=base_models, fit=fit, use_orig_features=False)
+        X_stack_preds = trainer.get_inputs_to_stacker(X=X,
+                                                      base_models=base_models,
+                                                      fit=fit,
+                                                      use_orig_features=False,
+                                                      use_val_cache=True
+                                                      )
 
         models = []
 
@@ -2289,6 +2314,9 @@ class TabularPredictor:
         models += trainer.generate_weighted_ensemble(X=X_stack_preds, y=y, level=weighted_ensemble_level,
                                                      stack_name=stack_name, base_model_names=base_models,
                                                      name_suffix=name_suffix, time_limit=time_limit)
+
+        if refit_full:
+            models += self.refit_full(model=models)
 
         return models
 
@@ -3104,9 +3132,6 @@ class TabularPredictor:
             # private
             _save_bag_folds=None,
 
-            # quantile levels
-            quantile_levels=None,
-
             calibrate='auto',
 
             # pseudo label
@@ -3126,7 +3151,7 @@ class TabularPredictor:
                 public_kwarg_options = [kwarg for kwarg in allowed_kwarg_names if kwarg[0] != '_']
                 public_kwarg_options.sort()
                 raise ValueError(
-                    f"Unknown keyword argument specified: {kwarg_name}\nValid kwargs: {public_kwarg_options}")
+                    f"Unknown `.fit` keyword argument specified: '{kwarg_name}'\nValid kwargs: {public_kwarg_options}")
 
         kwargs_sanitized = fit_extra_kwargs_default.copy()
         kwargs_sanitized.update(kwargs)
@@ -3204,6 +3229,17 @@ class TabularPredictor:
             tuning_features = np.array(tuning_features)
             if np.any(train_features != tuning_features):
                 raise ValueError("Column names must match between training and tuning data")
+
+            if self.label in tuning_data:
+                train_label_type = train_data[self.label].dtype
+                tuning_label_type = tuning_data[self.label].dtype
+
+                if train_label_type != tuning_label_type:
+                    logger.warning(f'WARNING: train_data and tuning_data have mismatched label column dtypes! '
+                                   f'train_label_type={train_label_type}, tuning_data_type={tuning_label_type}.\n'
+                                   f'\tYou should ensure the dtypes match to avoid bugs or instability.\n'
+                                   f'\tAutoGluon will attempt to convert the dtypes to align.')
+
         if unlabeled_data is not None:
             if not isinstance(unlabeled_data, pd.DataFrame):
                 raise AssertionError(

@@ -1,11 +1,13 @@
 import ast
 import logging
 import warnings
-from typing import Dict, List, Optional
+from io import BytesIO
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 import PIL
 import torch
+from PIL import ImageFile
 from timm.data.constants import (
     IMAGENET_DEFAULT_MEAN,
     IMAGENET_DEFAULT_STD,
@@ -16,24 +18,6 @@ from torch import nn
 from torchvision import transforms
 
 from .randaug import RandAugment
-
-try:
-    import mmcv
-    from mmcv.parallel import collate
-except ImportError:
-    mmcv = None
-
-try:
-    import mmdet
-    from mmdet.datasets import replace_ImageToTensor
-    from mmdet.datasets.pipelines import Compose
-except ImportError:
-    mmdet = None
-
-try:
-    import mmocr
-except ImportError:
-    mmocr = None
 
 try:
     from torchvision.transforms import InterpolationMode
@@ -49,16 +33,17 @@ from ..constants import (
     CLIP_IMAGE_STD,
     COLUMN,
     IMAGE,
+    IMAGE_BYTEARRAY,
+    IMAGE_PATH,
     IMAGE_VALID_NUM,
-    MMDET_IMAGE,
-    MMOCR_TEXT_DET,
     TIMM_IMAGE,
 )
-from .collator import Pad, Stack
+from .collator import PadCollator, StackCollator
 from .trivial_augmenter import TrivialAugment
-from .utils import extract_value_from_config
+from .utils import extract_value_from_config, is_rois_input
 
 logger = logging.getLogger(AUTOMM)
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class ImageProcessor:
@@ -72,7 +57,6 @@ class ImageProcessor:
         model: nn.Module,
         train_transform_types: List[str],
         val_transform_types: List[str],
-        samples_per_gpu: Optional[int] = None,
         norm_type: Optional[str] = None,
         size: Optional[int] = None,
         max_img_num_per_col: Optional[int] = 1,
@@ -88,8 +72,6 @@ class ImageProcessor:
             A list of image transforms used in training. Note that the transform order matters.
         val_transform_types
             A list of image transforms used in validation/test/prediction. Note that the transform order matters.
-        samples_per_gpu
-            Number of samples per gpu, used in MMDET to group data in each batch.
         norm_type
             How to normalize an image. We now support:
             - inception
@@ -156,22 +138,8 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
-            if self.prefix == MMDET_IMAGE:
-                assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
-            else:
-                assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
-            cfg = model.model.cfg
-            cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
-            self.val_processor = Compose(cfg.data.test.pipeline)
-            self.train_processor = Compose(cfg.data.test.pipeline)
-            if isinstance(samples_per_gpu, int) and samples_per_gpu > 0:
-                self.samples_per_gpu = samples_per_gpu
-            else:
-                raise ValueError(f"invalid samples_per_gpu value: {samples_per_gpu}")
-        else:
-            self.train_processor = self.construct_processor(self.train_transform_types)
-            self.val_processor = self.construct_processor(self.val_transform_types)
+        self.train_processor = self.construct_processor(self.train_transform_types)
+        self.val_processor = self.construct_processor(self.val_transform_types)
 
     @property
     def image_key(self):
@@ -185,7 +153,7 @@ class ImageProcessor:
     def image_column_prefix(self):
         return f"{self.image_key}_{COLUMN}"
 
-    def collate_fn(self, image_column_names: Optional[List] = None) -> Dict:
+    def collate_fn(self, image_column_names: Optional[List] = None, per_gpu_batch_size: Optional[int] = None) -> Dict:
         """
         Collate images into a batch. Here it pads images since the image number may
         vary from sample to sample. Samples with less images will be padded zeros.
@@ -200,22 +168,14 @@ class ImageProcessor:
         if self.requires_column_info:
             assert image_column_names, "Empty image column names."
             for col_name in image_column_names:
-                fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
+                fn[f"{self.image_column_prefix}_{col_name}"] = StackCollator()
 
-        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
-            assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-            fn.update(
-                {
-                    self.image_key: lambda x: collate(x, samples_per_gpu=self.samples_per_gpu),
-                }
-            )
-        else:
-            fn.update(
-                {
-                    self.image_key: Pad(pad_val=0),
-                    self.image_valid_num_key: Stack(),
-                }
-            )
+        fn.update(
+            {
+                self.image_key: PadCollator(pad_val=0),
+                self.image_valid_num_key: StackCollator(),
+            }
+        )
 
         return fn
 
@@ -261,15 +221,7 @@ class ImageProcessor:
         std
             Image normalizaiton std.
         """
-        if self.prefix.lower().startswith(MMDET_IMAGE):
-            image_size = config.test_pipeline[1]["img_scale"][0]
-            mean = config.test_pipeline[1]["transforms"][2]["mean"]
-            std = config.test_pipeline[1]["transforms"][2]["std"]
-        elif self.prefix.lower().startswith(MMOCR_TEXT_DET):
-            image_size = config.data.test.pipeline[1]["img_scale"][0]
-            mean = config.data.test.pipeline[1]["transforms"][1]["mean"]
-            std = config.data.test.pipeline[1]["transforms"][1]["std"]
-        elif self.prefix.lower().startswith(TIMM_IMAGE):
+        if self.prefix.lower().startswith(TIMM_IMAGE):
             image_size = config["input_size"][-1]
             mean = config["mean"]
             std = config["std"]
@@ -363,8 +315,10 @@ class ImageProcessor:
 
     def process_one_sample(
         self,
-        image_paths: Dict[str, List[str]],
+        image_features: Dict[str, Union[List[str], List[bytearray]]],
+        feature_modalities: Dict[str, List[str]],
         is_training: bool,
+        image_mode: Optional[str] = "RGB",
     ) -> Dict:
         """
         Read images, process them, and stack them. One sample can have multiple images,
@@ -372,11 +326,16 @@ class ImageProcessor:
 
         Parameters
         ----------
-        image_paths
+        image_features
             One sample may have multiple image columns in a pd.DataFrame and multiple images
             inside each image column.
+        feature_modalities
+            What modality each column belongs to.
         is_training
             Whether to process images in the training mode.
+        image_mode
+            A string which defines the type and depth of a pixel in the image.
+            For example, RGB, RGBA, CMYK, and etc.
 
         Returns
         -------
@@ -386,39 +345,41 @@ class ImageProcessor:
         zero_images = []
         ret = {}
         column_start = 0
-        for per_col_name, per_col_image_paths in image_paths.items():
-            for img_path in per_col_image_paths[: self.max_img_num_per_col]:
-                if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
-                    data = dict(img_info=dict(filename=img_path), img_prefix=None)
-                    images.append(self.val_processor(data))
+
+        for per_col_name, per_col_image_features in image_features.items():
+            for img_feature in per_col_image_features[: self.max_img_num_per_col]:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings(
+                        "ignore",
+                        message=(
+                            "Palette images with Transparency expressed in bytes should be converted to RGBA images"
+                        ),
+                    )
+                    is_zero_img = False
+                    try:
+                        if feature_modalities.get(per_col_name) == IMAGE_BYTEARRAY:
+                            image_feature = BytesIO(img_feature)
+                        else:
+                            image_feature = img_feature
+                        with PIL.Image.open(image_feature) as img:
+                            img = img.convert(image_mode)
+                    except Exception as e:
+                        if self.missing_value_strategy.lower() == "zero":
+                            logger.debug(f"Using a zero image due to '{e}'")
+                            img = PIL.Image.new(image_mode, (self.size, self.size), color=0)
+                            is_zero_img = True
+                        else:
+                            raise e
+
+                if is_training:
+                    img = self.train_processor(img)
                 else:
-                    with warnings.catch_warnings():
-                        warnings.filterwarnings(
-                            "ignore",
-                            message=(
-                                "Palette images with Transparency expressed in bytes should be converted to RGBA images"
-                            ),
-                        )
-                        is_zero_img = False
-                        try:
-                            img = PIL.Image.open(img_path).convert("RGB")
-                        except Exception as e:
-                            if self.missing_value_strategy.lower() == "zero":
-                                logger.debug(f"Using a zero image due to '{e}'")
-                                img = PIL.Image.new("RGB", (self.size, self.size), color=0)
-                                is_zero_img = True
-                            else:
-                                raise e
+                    img = self.val_processor(img)
 
-                    if is_training:
-                        img = self.train_processor(img)
-                    else:
-                        img = self.val_processor(img)
-
-                    if is_zero_img:
-                        zero_images.append(img)
-                    else:
-                        images.append(img)
+                if is_zero_img:
+                    zero_images.append(img)
+                else:
+                    images.append(img)
 
             if self.requires_column_info:
                 # only count the valid images since they are put ahead of the zero images in the below returning
@@ -426,23 +387,21 @@ class ImageProcessor:
                     [column_start, len(images)], dtype=np.int64
                 )
                 column_start = len(images)
-        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
-            ret.update({self.image_key: images[0]})
-        else:
-            ret.update(
-                {
-                    self.image_key: torch.tensor([])
-                    if len(images + zero_images) == 0
-                    else torch.stack(images + zero_images, dim=0),
-                    self.image_valid_num_key: len(images),
-                }
-            )
+
+        ret.update(
+            {
+                self.image_key: torch.tensor([])
+                if len(images + zero_images) == 0
+                else torch.stack(images + zero_images, dim=0),
+                self.image_valid_num_key: len(images),
+            }
+        )
         return ret
 
     def __call__(
         self,
-        all_image_paths: Dict[str, List[List[str]]],
-        idx: int,
+        images: Dict[str, List[str]],
+        feature_modalities: Dict[str, Union[int, float, list]],
         is_training: bool,
     ) -> Dict:
         """
@@ -450,10 +409,10 @@ class ImageProcessor:
 
         Parameters
         ----------
-        all_image_paths
-            Paths of all the images in a dataset.
-        idx
-            The sample index in a dataset.
+        images
+            Images of one sample.
+        feature_modalities
+            The modality of the feature columns.
         is_training
             Whether to process images in the training mode.
 
@@ -461,10 +420,9 @@ class ImageProcessor:
         -------
         A dictionary containing one sample's processed images and their number.
         """
-        per_sample_paths = {
-            per_column_name: per_column_paths[idx] for per_column_name, per_column_paths in all_image_paths.items()
-        }
-        return self.process_one_sample(per_sample_paths, is_training)
+        images = {k: [v] if isinstance(v, str) else v for k, v in images.items()}
+
+        return self.process_one_sample(images, feature_modalities, is_training)
 
     def __getstate__(self):
         odict = self.__dict__.copy()  # get attribute dictionary

@@ -974,3 +974,34 @@ def test_tabular_bagstack_use_bag_holdout():
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val=seed_val, fit_args=fit_args, run_distill=True, crash_in_oof=True)
+
+
+def test_tabular_raise_on_nonfinite_float_labels():
+    predictor = TabularPredictor(label='y')
+    nonfinite_values = [np.nan, np.inf, np.NINF]
+
+    for idx, nonfinite_value in enumerate(nonfinite_values):
+        train_data = TabularDataset({
+            'x': [0.0, 1.0, 2.0, 3.0, 4.0],
+            'y': [0.0, 1.0, 2.0, 3.0, 4.0]
+            })
+        train_data.loc[idx, 'y'] = nonfinite_value
+
+        with pytest.raises(ValueError) as ex_info:
+            predictor.fit(train_data)
+        assert str(ex_info.value).split()[-1] == str(idx)
+
+def test_tabular_raise_on_nonfinite_class_labels():
+    predictor = TabularPredictor(label='y')
+    nonfinite_values = [np.nan, np.inf, np.NINF]
+
+    for idx, nonfinite_value in enumerate(nonfinite_values):
+        train_data = TabularDataset({
+            'x': [0.0, 1.0, 2.0, 3.0, 4.0],
+            'y': ["a", "b", "c", "d", "e"]
+            })
+        train_data.loc[idx, 'y'] = nonfinite_value
+
+        with pytest.raises(ValueError) as ex_info:
+            predictor.fit(train_data)
+        assert str(ex_info.value).split()[-1] == str(idx)

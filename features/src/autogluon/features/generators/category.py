@@ -5,7 +5,7 @@ import pandas as pd
 from pandas import DataFrame
 from pandas.api.types import CategoricalDtype
 
-from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_OBJECT, S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_TEXT, S_TEXT_AS_CATEGORY
+from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_OBJECT, S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY, S_TEXT, S_TEXT_AS_CATEGORY
 
 from .abstract import AbstractFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator
@@ -27,7 +27,8 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         It is recommended to keep this value as True to avoid strange downstream behaviour.
     minimize_memory : bool, default True
         If True, minimizes category memory usage by converting all category values to sequential integers.
-        This replaces any string data present in the categories but does not alter the behavior of models when using the category as a feature so long as the original string values are not required downstream.
+        This replaces any string data present in the categories but does not alter the behavior of models when using the category as a feature so long
+        as the original string values are not required downstream.
         It is recommended to keep this value as True to dramatically reduce memory usage with no cost to accuracy.
     cat_order : str, default 'original'
         Determines the order in which categories are stored.
@@ -39,7 +40,8 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
     minimum_cat_count : int, default None
         The minimum number of occurrences a category must have in the training data to avoid being considered a rare category.
         Rare categories are removed and treated as missing values.
-        If None, no minimum count is required. This includes categories that never occur in the data but are present in the category object as possible categories.
+        If None, no minimum count is required. This includes categories that never occur in the data but are present in the category object
+        as possible categories.
     maximum_num_cat : int, default None
         The maximum amount of categories that can be considered non-rare.
         Sorted by occurrence count, up to the N highest count categories will be kept if maximum_num_cat=N. All others will be considered rare categories.
@@ -52,7 +54,9 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
-    def __init__(self, stateful_categories=True, minimize_memory=True, cat_order='original', minimum_cat_count: int = 2, maximum_num_cat: int = None, fillna: str = None, **kwargs):
+
+    def __init__(self, stateful_categories=True, minimize_memory=True, cat_order='original', minimum_cat_count: int = 2, maximum_num_cat: int = None,
+                 fillna: str = None, **kwargs):
         super().__init__(**kwargs)
         self._stateful_categories = stateful_categories
         if minimum_cat_count is not None and minimum_cat_count < 1:
@@ -84,7 +88,8 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         feature_metadata_out_type_group_map_special = copy.deepcopy(self.feature_metadata_in.type_group_map_special)
         if S_TEXT in feature_metadata_out_type_group_map_special:
             text_features = feature_metadata_out_type_group_map_special.pop(S_TEXT)
-            feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY] += [feature for feature in text_features if feature not in feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY]]
+            feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY] += [feature for feature in text_features if
+                                                                                feature not in feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY]]
         return X_out, feature_metadata_out_type_group_map_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
@@ -94,7 +99,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
     def get_default_infer_features_in_args() -> dict:
         return dict(
             valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL],
-            invalid_special_types=[S_DATETIME_AS_OBJECT, S_IMAGE_PATH]
+            invalid_special_types=[S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY]
         )
 
     def _generate_features_category(self, X: DataFrame) -> DataFrame:

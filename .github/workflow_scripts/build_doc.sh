@@ -4,13 +4,17 @@ function build_doc {
     GIT_REPO="$3"
     COMMIT_SHA="$4"
     PR_NUMBER="$5"  # For push events, PR_NUMBER will be empty
+    SUB_DOC=$6  # Can be empty
 
     source $(dirname "$0")/write_to_s3.sh
+    source $(dirname "$0")/setup_mmcv.sh
 
     setup_build_contrib_env
     bash docs/build_pip_install.sh
+    setup_mmcv
     # only build for docs/$DOC
     rm -rf ./docs/tutorials/!($DOC)
+    if [[ -n $SUB_DOC ]]; then rm -rf ./docs/tutorials/"$DOC"/!(index.rst|$SUB_DOC); fi
     cd docs && rm -rf _build && d2lbook build rst
 
     COMMAND_EXIT_CODE=$?

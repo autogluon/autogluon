@@ -9,7 +9,7 @@ import os
 import pandas as pd
 import numpy as np
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.core.utils import get_gpu_count_all
+from autogluon.core.utils import ResourceManager
 from .._gluoncv import ObjectDetection
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 
@@ -36,6 +36,12 @@ class ObjectDetector(object):
     Dataset = ObjectDetection.Dataset
 
     def __init__(self, path=None, verbosity=2):
+        warnings.warn(
+            f"AutoGluon ObjectDetector will be deprecated in v0.7. "
+            f"Please use AutoGluon MultiModalPredictor instead for more functionalities and better support. "
+            f"Visit https://auto.gluon.ai/stable/tutorials/multimodal/index.html for more details!",
+            DeprecationWarning,
+        )
         if path is None:
             path = os.getcwd()
         self._log_dir = path
@@ -237,7 +243,7 @@ class ObjectDetector(object):
                        'In a future release ObjectDetector may be entirely reworked to use Torch as a backend.\n'
                        'This future change will likely be API breaking.'
                        'Users should ensure they update their code that depends on ObjectDetector when upgrading to future AutoGluon releases.\n'
-                       'For more information, refer to ObjectDetector refactor GitHub issue: https://github.com/awslabs/autogluon/issues/1559\n'
+                       'For more information, refer to ObjectDetector refactor GitHub issue: https://github.com/autogluon/autogluon/issues/1559\n'
                        '=============================================================================\n')
         if presets:
             if not isinstance(presets, list):
@@ -490,4 +496,4 @@ class ObjectDetector(object):
 
     @staticmethod
     def _get_num_gpus_available():
-        return get_gpu_count_all()
+        return ResourceManager.get_gpu_count_all()

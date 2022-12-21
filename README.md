@@ -6,9 +6,9 @@
 
 ## AutoML for Image, Text, Time Series, and Tabular Data
 
-[![Latest Release](https://img.shields.io/github/v/release/awslabs/autogluon)](https://github.com/awslabs/autogluon/releases)
-[![Continuous Integration](https://github.com/awslabs/autogluon/actions/workflows/continuous_integration.yml/badge.svg)](https://github.com/awslabs/autogluon/actions/workflows/continuous_integration.yml)
-[![Platform Tests](https://github.com/awslabs/autogluon/actions/workflows/platform_tests-command.yml/badge.svg?event=schedule)](https://github.com/awslabs/autogluon/actions/workflows/platform_tests-command.yml)
+[![Latest Release](https://img.shields.io/github/v/release/autogluon/autogluon)](https://github.com/autogluon/autogluon/releases)
+[![Continuous Integration](https://github.com/autogluon/autogluon/actions/workflows/continuous_integration.yml/badge.svg)](https://github.com/autogluon/autogluon/actions/workflows/continuous_integration.yml)
+[![Platform Tests](https://github.com/autogluon/autogluon/actions/workflows/platform_tests-command.yml/badge.svg?event=schedule)](https://github.com/autogluon/autogluon/actions/workflows/platform_tests-command.yml)
 [![Python Versions](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue)](https://pypi.org/project/autogluon/)
 [![GitHub license](docs/static/apache2.svg)](./LICENSE)
 [![Downloads](https://pepy.tech/badge/autogluon/month)](https://pepy.tech/project/autogluon)
@@ -24,7 +24,7 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 # First install package from terminal:
 # pip install -U pip
 # pip install -U setuptools wheel
-# pip install autogluon  # autogluon==0.5.2
+# pip install autogluon  # autogluon==0.6.1
 
 from autogluon.tabular import TabularDataset, TabularPredictor
 train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
@@ -53,7 +53,7 @@ See the [AutoGluon Website](https://auto.gluon.ai/stable/index.html) for [docume
 - [Learning with image data](https://auto.gluon.ai/stable/tutorials/image_prediction/beginner.html)
 - [Learning with time series data](https://auto.gluon.ai/stable/tutorials/timeseries/forecasting-quickstart.html)
 
-Refer to the [AutoGluon Roadmap](https://github.com/awslabs/autogluon/blob/master/ROADMAP.md) for details on upcoming features and releases.
+Refer to the [AutoGluon Roadmap](https://github.com/autogluon/autogluon/blob/master/ROADMAP.md) for details on upcoming features and releases.
 
 ### Scientific Publications
 - [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/pdf/2003.06505.pdf) (*Arxiv*, 2020)
@@ -75,7 +75,7 @@ Refer to the [AutoGluon Roadmap](https://github.com/awslabs/autogluon/blob/maste
 
 ## Contributing to AutoGluon
 
-We are actively accepting code contributions to the AutoGluon project. If you are interested in contributing to AutoGluon, please read the [Contributing Guide](https://github.com/awslabs/autogluon/blob/master/CONTRIBUTING.md) to get started.
+We are actively accepting code contributions to the AutoGluon project. If you are interested in contributing to AutoGluon, please read the [Contributing Guide](https://github.com/autogluon/autogluon/blob/master/CONTRIBUTING.md) to get started.
 
 ## Citing AutoGluon
 

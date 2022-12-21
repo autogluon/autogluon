@@ -38,6 +38,7 @@ class HFAutoModelForTextPrediction(nn.Module):
         num_classes: Optional[int] = 0,
         pooling_mode: Optional[str] = "cls",
         gradient_checkpointing: Optional[bool] = False,
+        low_cpu_mem_usage: Optional[bool] = False,
         pretrained: Optional[bool] = True,
     ):
         """
@@ -65,6 +66,8 @@ class HFAutoModelForTextPrediction(nn.Module):
             The pooling mode for the Transformer. Can be "cls", or "mean"
         gradient_checkpointing
             Whether to enable gradient checkpointing
+        low_cpu_mem_usage
+            Whether to turn on the optimization of reducing the peak CPU memory usage when loading the pretrained model.
         pretrained
             Whether using the pretrained weights. If pretrained=True, download the pretrained model.
         """
@@ -73,7 +76,9 @@ class HFAutoModelForTextPrediction(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.num_classes = num_classes
 
-        self.config, self.model = get_hf_config_and_model(checkpoint_name=checkpoint_name, pretrained=pretrained)
+        self.config, self.model = get_hf_config_and_model(
+            checkpoint_name=checkpoint_name, pretrained=pretrained, low_cpu_mem_usage=low_cpu_mem_usage
+        )
 
         if isinstance(self.model, T5PreTrainedModel):
             self.is_t5 = True

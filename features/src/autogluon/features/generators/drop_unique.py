@@ -2,7 +2,7 @@ import logging
 
 from pandas import DataFrame
 
-from autogluon.common.features.types import R_CATEGORY, R_OBJECT, S_TEXT, S_IMAGE_PATH
+from autogluon.common.features.types import R_CATEGORY, R_OBJECT, S_TEXT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY
 from autogluon.common.features.feature_metadata import FeatureMetadata
 
 from .abstract import AbstractFeatureGenerator
@@ -49,6 +49,9 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
                     continue
                 elif S_IMAGE_PATH in special_types:
                     # We should not drop an image path column
+                    continue
+                elif S_IMAGE_BYTEARRAY in special_types:
+                    # We should not drop an image bytearray column
                     continue
                 else:
                     features_to_drop.append(column)

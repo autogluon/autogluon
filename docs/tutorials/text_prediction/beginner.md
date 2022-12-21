@@ -1,6 +1,8 @@
 # Text Prediction - Quick Start
 :label:`sec_textprediction_beginner`
 
+*Starting from AutoGluon 0.6, we recommend to adopt `MultiModalPredictor` if you are looking for automatically finetuning foundational models for text problems. See more in :ref:`sec_automm_textprediction_beginner_`* 
+
 Here we briefly demonstrate the `TextPredictor`, which helps you automatically train and deploy models for various Natural Language Processing (NLP) tasks.
 This tutorial presents two examples of NLP tasks:
 
@@ -106,6 +108,12 @@ test_predictions.head()
 ### Save and Load
 
 The trained predictor is automatically saved at the end of `fit()`, and you can easily reload it.
+
+:::warning
+
+`TextPredictor.load()` used `pickle` module implicitly, which is known to be insecure. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling. Never load data that could have come from an untrusted source, or that could have been tampered with. **Only load data you trust.**
+
+:::
 
 
 ```{.python .input}

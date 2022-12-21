@@ -44,6 +44,7 @@ def get_args() -> argparse.ArgumentParser:
 def get_hparams(args: argparse.ArgumentParser) -> dict:
     hparams = {
         "model.hf_text.checkpoint_name": args.text_backbone,
+        "data.text.normalize_text": True,
         "optimization.learning_rate": args.learning_rate,
         "optimization.max_epochs": args.max_epochs,
     }

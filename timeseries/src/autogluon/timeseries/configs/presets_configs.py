@@ -5,29 +5,24 @@
 
 TIMESERIES_PRESETS_CONFIGS = dict(
     best_quality={
-        "hyperparameters": "default_hpo",
+        "hyperparameters": "best_quality",
         "hyperparameter_tune_kwargs": {
             "scheduler": "local",
-            "searcher": "random",
-            "num_trials": 20,
-        },
-    },
-    high_quality={
-        "hyperparameters": "default_hpo",
-        "hyperparameter_tune_kwargs": {
-            "scheduler": "local",
-            "searcher": "random",
+            "searcher": "auto",
             "num_trials": 10,
         },
     },
-    good_quality={
-        "hyperparameters": "default_hpo",
+    high_quality={
+        "hyperparameters": "high_quality",
         "hyperparameter_tune_kwargs": {
             "scheduler": "local",
-            "searcher": "random",
-            "num_trials": 2,
+            "searcher": "auto",
+            "num_trials": 5,
         },
     },
-    medium_quality={"hyperparameters": "default"},
-    low_quality={"hyperparameters": "toy"},
+    medium_quality={"hyperparameters": "medium_quality"},
+    fast_training={"hyperparameters": "local_only"},
+    # TODO: Remove deprecated presets below
+    good_quality={"hyperparameters": "medium_quality"},
+    low_quality={"hyperparameters": "local_only"},
 )

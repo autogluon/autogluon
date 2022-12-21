@@ -1,11 +1,10 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
-from nptyping import NDArray
 from torch import nn
 
 from ..constants import COLUMN, NUMERICAL
-from .collator import Stack
+from .collator import StackCollator
 
 
 class NumericalProcessor:
@@ -59,9 +58,9 @@ class NumericalProcessor:
         if self.requires_column_info:
             assert numerical_column_names, "Empty numerical column names."
             for col_name in numerical_column_names:
-                fn[f"{self.numerical_column_prefix}_{col_name}"] = Stack()
+                fn[f"{self.numerical_column_prefix}_{col_name}"] = StackCollator()
 
-        fn[self.numerical_key] = Stack()
+        fn[self.numerical_key] = StackCollator()
 
         return fn
 
@@ -97,8 +96,8 @@ class NumericalProcessor:
 
     def __call__(
         self,
-        all_numerical_features: Dict[str, NDArray[(Any,), np.float32]],
-        idx: int,
+        numerical_features: Dict[str, float],
+        feature_modalities: Dict[str, Union[int, float, list]],
         is_training: bool,
     ) -> Dict:
         """
@@ -106,10 +105,10 @@ class NumericalProcessor:
 
         Parameters
         ----------
-        all_numerical_features
-            All the numerical features in a dataset.
-        idx
-            The sample index in a dataset.
+        numerical_features
+            Numerical features of one sample.
+        feature_modalities
+            The modality of the feature columns.
         is_training
             Whether to do processing in the training mode. This unused flag is for the API compatibility.
 
@@ -117,8 +116,4 @@ class NumericalProcessor:
         -------
         A dictionary containing one sample's processed numerical features.
         """
-        per_sample_features = {
-            per_column_name: per_column_features[idx]
-            for per_column_name, per_column_features in all_numerical_features.items()
-        }
-        return self.process_one_sample(per_sample_features)
+        return self.process_one_sample(numerical_features)

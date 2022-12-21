@@ -1,12 +1,11 @@
 import logging
-import re
 from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
-from autogluon.common.features.types import S_IMAGE_PATH, S_TEXT, S_TEXT_SPECIAL
+from autogluon.common.features.types import S_IMAGE_PATH, S_IMAGE_BYTEARRAY, S_TEXT, S_TEXT_SPECIAL
 
 from .abstract import AbstractFeatureGenerator
 from .binned import BinnedFeatureGenerator
@@ -39,7 +38,9 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
     **kwargs :
         Refer to AbstractFeatureGenerator documentation for details on valid keyword arguments.
     """
-    def __init__(self, symbols: List[str] = None, min_occur_ratio=0.01, min_occur_offset=10, bin_features: bool = True, post_drop_duplicates: bool = True, **kwargs):
+
+    def __init__(self, symbols: List[str] = None, min_occur_ratio=0.01, min_occur_offset=10, bin_features: bool = True, post_drop_duplicates: bool = True,
+                 **kwargs):
         super().__init__(post_drop_duplicates=post_drop_duplicates, **kwargs)
         if symbols is None:
             symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
@@ -79,7 +80,7 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict(required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH])
+        return dict(required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY])
 
     def _filter_symbols(self, X: DataFrame, symbols: list) -> dict:
         symbols_per_feature = {}
@@ -100,7 +101,8 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
         if self.features_in:
             X_text_special_combined = {}
             for text_feature in self.features_in:
-                X_text_special_combined = self._generate_text_special(X[text_feature], text_feature, symbols=self._symbols_per_feature[text_feature], X_dict=X_text_special_combined)
+                X_text_special_combined = self._generate_text_special(X[text_feature], text_feature, symbols=self._symbols_per_feature[text_feature],
+                                                                      X_dict=X_text_special_combined)
             X_text_special_combined = pd.DataFrame(X_text_special_combined, index=X.index)
         else:
             X_text_special_combined = pd.DataFrame(index=X.index)
@@ -110,7 +112,7 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
         fn = self._feature_names_dict[feature]
         X_str = X.astype(str)
 
-        X_no_ws = X_str.str.replace(' ','')
+        X_no_ws = X_str.str.replace(' ', '')
         X_no_ws_text_len = X_no_ws.str.len()
 
         char_count = X_str.str.len()
@@ -119,8 +121,8 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
         X_dict[fn['word_count']] = X_str.str.split().str.len().to_numpy(dtype=np.uint32)
         X_dict[fn['capital_ratio']] = X_no_ws.str.count('[A-Z]').divide(X_no_ws_text_len, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32)
         X_dict[fn['lower_ratio']] = X_no_ws.str.count('[a-z]').divide(X_no_ws_text_len, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32)
-        X_dict[fn['digit_ratio']] = X_no_ws.str.count('[0-9]').divide(X_no_ws_text_len, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32) 
-        X_dict[fn['special_ratio']] = X_no_ws.str.count('[^\w]').divide(X_no_ws_text_len, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32) 
+        X_dict[fn['digit_ratio']] = X_no_ws.str.count('[0-9]').divide(X_no_ws_text_len, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32)
+        X_dict[fn['special_ratio']] = X_no_ws.str.count(r'[^\w]').divide(X_no_ws_text_len, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32)
 
         for symbol in symbols:
             symbol_count = X_str.str.count("\\" + symbol)

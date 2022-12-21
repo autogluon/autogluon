@@ -21,12 +21,14 @@ Select your preferences below and run the corresponding install commands:
      :title:`OS:`
      :act:`Linux`
      :opt:`Mac`
+     :opt:`Mac - Apple Silicon`
      :opt:`Windows`
 
      .. raw:: html
 
         <div class="mdl-tooltip" data-mdl-for="linux">Linux.</div>
         <div class="mdl-tooltip" data-mdl-for="mac">Mac OSX.</div>
+        <div class="mdl-tooltip" data-mdl-for="mac-apple-silicon">Mac OSX - Apple Silicon.</div>
         <div class="mdl-tooltip" data-mdl-for="windows">Windows.</div>
 
   .. container:: opt-group
@@ -88,9 +90,7 @@ Select your preferences below and run the corresponding install commands:
 
            .. container:: gpu
 
-              .. note::
-
-                 GPU usage is not yet supported on Mac OSX, please use Linux or Windows to utilize GPUs in AutoGluon.
+              .. include:: install-macos-no-gpu.rst
 
         .. container:: source
 
@@ -102,9 +102,29 @@ Select your preferences below and run the corresponding install commands:
 
            .. container:: gpu
 
-              .. note::
+              .. include:: install-macos-no-gpu.rst
 
-                 GPU usage is not yet supported on Mac OSX , please use Linux or Windows to utilize GPUs in AutoGluon.
+     .. container:: mac-apple-silicon
+
+        .. container:: pip
+
+           .. container:: cpu
+
+              .. include:: install-macos-apple-silicon.rst
+
+           .. container:: gpu
+
+              .. include:: install-macos-no-gpu.rst
+
+        .. container:: source
+
+           .. container:: cpu
+
+              .. include:: install-macos-apple-silicon.rst
+
+           .. container:: gpu
+
+              .. include:: install-macos-no-gpu.rst
 
      .. container:: windows
 
@@ -137,22 +157,31 @@ Select your preferences below and run the corresponding install commands:
               .. include:: install-gpu-source-windows.rst
 
 
-AutoGluon is modularized into `sub-modules <https://packaging.python.org/guides/packaging-namespace-packages/>`_ specialized for tabular, text, or image data. You can reduce the number of dependencies required by solely installing a specific sub-module via:  `python3 -m pip install <submodule>`, where `<submodule>` may be one of the following options:
+AutoGluon is modularized into `sub-modules <https://packaging.python.org/guides/packaging-namespace-packages/>`_ specialized for tabular, text, image, or time series data. You can reduce the number of dependencies required by solely installing a specific sub-module via:  `python3 -m pip install <submodule>`, where `<submodule>` may be one of the following options:
 
 - `autogluon.tabular` - functionality for tabular data (TabularPredictor)
     - The default installation of `autogluon.tabular` standalone is a skeleton installation.
     - Install via `pip install autogluon.tabular[all]` to get the same installation of tabular as via `pip install autogluon`
     - Available optional dependencies: `lightgbm,catboost,xgboost,fastai`. These are included in `all`.
-    - Optional dependencies not included in `all`: `vowpalwabbit`.
+    - Optional dependencies not included in `all`: `vowpalwabbit,imodels,skex`.
     - To run `autogluon.tabular` with only the optional LightGBM and CatBoost models for example, you can do: `pip install autogluon.tabular[lightgbm,catboost]`
 
     - Experimental optional dependency: `skex`. This will speedup KNN models by 25x in training and inference on CPU. Use `pip install autogluon.tabular[all,skex]` to enable, or `pip install "scikit-learn-intelex<2021.5"` after a standard installation of AutoGluon.
+    - Optional Dependency: `vowpalwabbit`. This will install the VowpalWabbit package and allow you to fit VowpalWabbit in TabularPredictor.
+    - Optional Dependency: `imodels`. This will install the imodels package and allow you to fit interpretable models in TabularPredictor.
 - `autogluon.multimodal` - functionality for image, text, and multimodal problems. Focus on deep learning models.
+    - To try object detection functionality using `MultiModalPredictor`, please install additional dependencies via `mim install mmcv-full`, `pip install mmdet` and `pip install pycocotools`. Note that Windows users should also install `pycocotools`` by: `pip install pycocotools-windows`, but it only supports python 3.6/3.7/3.8.
 - `autogluon.vision` - only functionality for computer vision (ImagePredictor, ObjectDetector)
 - `autogluon.text` - only functionality for natural language processing (TextPredictor)
+- `autogluon.timeseries` - only functionality for time series data (TimeSeriesPredictor)
+- `autogluon.common` - helper functionality. Not useful standalone.
 - `autogluon.core` - only core functionality (Searcher/Scheduler) useful for hyperparameter tuning of arbitrary code/models.
 - `autogluon.features` - only functionality for feature generation / feature preprocessing pipelines (primarily related to Tabular data).
 
 To install a submodule from source, follow the instructions for installing the entire package from source but replace the line `cd autogluon && ./full_install.sh` with `cd autogluon && python3 -m pip install -e {SUBMODULE_NAME}/{OPTIONAL_DEPENDENCIES}`
 
 - For example, to install `autogluon.tabular[lightgbm,catboost]` from source, the command would be: `cd autogluon && python3 -m pip install -e tabular/[lightgbm,catboost]`
+
+To install all AutoGluon optional dependencies:
+
+`pip install autogluon && pip install autogluon.tabular[vowpalwabbit,imodels,skex]`

@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+import traceback
 
 from autogluon.core.models.abstract.model_trial import init_model
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -20,7 +21,6 @@ def model_trial(
     reporter=None,  # reporter only used by custom strategy, hence optional
     time_limit=None,
     fit_kwargs=None,
-    checkpoint_dir=None,  # Timeseries doesn't support checkpoint in the middle yet. This is here to disable warning from ray tune
 ):
     """Runs a single trial of a hyperparameter tuning. Replaces
     `core.models.abstract.model_trial.model_trial` for timeseries models.
@@ -44,9 +44,11 @@ def model_trial(
             time_limit=time_limit,
         )
 
-    except Exception as e:
-        if not isinstance(e, TimeLimitExceeded):
-            logger.exception(e, exc_info=True)
+    except Exception as err:
+        if not isinstance(err, TimeLimitExceeded):
+            logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
+            logger.error(f"\t{err}")
+            logger.debug(traceback.format_exc())
         # In case of TimeLimitExceed, val_score could be None
         hpo_executor.report(
             reporter=reporter,

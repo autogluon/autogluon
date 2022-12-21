@@ -25,7 +25,7 @@ If this is not done, AutoGluon will crash during fit when trying to parallelize 
 In the below example, you would want to create a new python file such as `my_metrics.py` with `ag_accuracy_scorer` defined in it,
 and then use it via `from my_metrics import ag_accuracy_scorer`.
 
-If your metric is not serializable, you will get many errors similar to: `_pickle.PicklingError: Can't pickle`. Refer to https://github.com/awslabs/autogluon/issues/1637 for an example.
+If your metric is not serializable, you will get many errors similar to: `_pickle.PicklingError: Can't pickle`. Refer to https://github.com/autogluon/autogluon/issues/1637 for an example.
 
 The custom metrics in this tutorial are **not** serializable for ease of demonstration. If `best_quality` preset was used, it would crash.
 
@@ -38,7 +38,13 @@ import sklearn.metrics
 sklearn.metrics.accuracy_score(y_true, y_pred)
 ```
 
-Now, let's convert this evaluation metric to an AutoGluon Scorer.
+There are a variety of limitations with the above logic.
+For example, without outside knowledge of the metric it is unknown:
+1. What the optimal value is (1)
+2. If higher values are better (True)
+3. If the metric requires prediction labels or probabilities (labels)
+
+Now, let's convert this evaluation metric to an AutoGluon Scorer to address these limitations.
 
 We do this by calling `autogluon.core.metrics.make_scorer`.
 
@@ -55,16 +61,51 @@ When creating the Scorer, we need to specify a name for the Scorer. This does no
 
 Next, we specify the `score_func`. This is the function we want to wrap, in this case, sklearn's `accuracy_score` function.
 
-We then need to specify the optimum value. This is necessary when calculating error as opposed to score. Error is calculated as `optimum - score`. It is also useful to identify when a score is optimal and cannot be improved.
+We then need to specify the `optimum` value.
+This is necessary when calculating `error` (also known as `regret`) as opposed to `score`.
+`error` is defined as `sign * optimum - score`, where `sign=1` if `greater_is_better=True`, else `sign=-1`.
+It is also useful to identify when a score is optimal and cannot be improved.
+Because the best possible value from `sklearn.metrics.accuracy_score` is `1`, we specify `optimum=1`.
 
-Finally, we need to specify `greater_is_better`. In this case, `greater_is_better=True` because the best value returned is 1, and the worst value returned is less than 1 (0). It is very important to set this value correctly, otherwise AutoGluon will try to optimize for the **worst** model instead of the best.
+Finally, we need to specify `greater_is_better`. In this case, `greater_is_better=True`
+because the best value returned is 1, and the worst value returned is less than 1 (0).
+It is very important to set this value correctly,
+otherwise AutoGluon will try to optimize for the **worst** model instead of the best.
 
-Once created, the AutoGluon Scorer can be called in the same fashion as the original metric.
+**Advanced Note**: `optimum` must correspond to the optimal value
+from the original metric callable (in this case `sklearn.metrics.accuracy_score`).
+Hypothetically, if a metric callable was `greater_is_better=False` with an optimal value of `-2`,
+you should specify `optimum=-2, greater_is_better=False`.
+In this case, if `raw_metric_value=-0.5`
+then Scorer would return `score=0.5` to enforce higher_is_better (`score = sign * raw_metric_value`).
+Scorer's error would be `error=1.5` because `sign (-1) * optimum (-2) - score (0.5) = 1.5`
 
+Once created, the AutoGluon Scorer can be called in the same fashion as the original metric to compute `score`.
 
 ```{.python .input}
+# score
 ag_accuracy_scorer(y_true, y_pred)
 ```
+
+Alternatively, `.score` is an alias to the above callable for convenience:
+
+```{.python .input}
+ag_accuracy_scorer.score(y_true, y_pred)
+```
+
+To get the error instead of score:
+
+```{.python .input}
+# error, error=sign*optimum-score -> error=1*1-score -> error=1-score
+ag_accuracy_scorer.error(y_true, y_pred)
+
+# Can also convert score to error:
+# score = ag_accuracy_scorer(y_true, y_pred)
+# error = ag_accuracy_scorer.convert_score_to_error(score)
+```
+
+Note that `score` is in `higher_is_better` format, while error is in `lower_is_better` format.
+An error of 0 corresponds to a perfect prediction.
 
 ## Custom Mean Squared Error Metric
 
@@ -96,17 +137,26 @@ ag_mean_squared_error_scorer = make_scorer(name='mean_squared_error',
                                            greater_is_better=False)
 ```
 
-In this case, optimum is 0 because this is an error metric.
+In this case, `optimum=0` because this is an error metric.
 
 Additionally, `greater_is_better=False` because sklearn reports error as positive values, and the lower the value is, the better.
 
-A very important point about AutoGluon Scorers is that internally, they will always report scores in `greater_is_better=True` form. This means if the original metric was `greater_is_better=False`, AutoGluon's Scorer will flip the value. Therefore, error will be represented as negative values.
+A very important point about AutoGluon Scorers is that internally,
+they will always report scores in `greater_is_better=True` form.
+This means if the original metric was `greater_is_better=False`, AutoGluon's Scorer will flip the value.
+Therefore, `score` will be represented as a negative value.
 
 This is done to ensure consistency between different metrics.
 
 
 ```{.python .input}
+# score
 ag_mean_squared_error_scorer(y_true, y_pred)
+```
+
+```{.python .input}
+# error, error=sign*optimum-score -> error=-1*0-score -> error=-score
+ag_mean_squared_error_scorer.error(y_true, y_pred)
 ```
 
 We can also specify metrics outside of sklearn. For example, below is a minimal implementation of mean squared error:
@@ -208,7 +258,7 @@ predictor_custom.leaderboard(test_data, silent=True)
 
 That's all it takes to create and use custom metrics in AutoGluon!
 
-If you create a custom metric, consider [submitting a PR](https://github.com/awslabs/autogluon/pulls) so that we can add it officially to AutoGluon!
+If you create a custom metric, consider [submitting a PR](https://github.com/autogluon/autogluon/pulls) so that we can add it officially to AutoGluon!
 
 For a tutorial on implementing custom models in AutoGluon, refer to :ref:`sec_tabularcustommodel`.
 

@@ -11,7 +11,8 @@ from autogluon.features.generators import AbstractFeatureGenerator
 
 class GeneratorHelper:
     @staticmethod
-    def fit_transform_assert(input_data: DataFrame, generator: AbstractFeatureGenerator, feature_metadata_in: FeatureMetadata = None, expected_feature_metadata_in_full: dict = None, expected_feature_metadata_full: dict = None):
+    def fit_transform_assert(input_data: DataFrame, generator: AbstractFeatureGenerator, feature_metadata_in: FeatureMetadata = None,
+                             expected_feature_metadata_in_full: dict = None, expected_feature_metadata_full: dict = None):
         # Given
         original_input_data = copy.deepcopy(input_data)
 
@@ -34,7 +35,7 @@ class GeneratorHelper:
             # Can't call fit_transform after fit
             generator.fit_transform(input_data, feature_metadata_in=feature_metadata_in)
 
-        # Ensure input_data is not altered inplace
+        # Ensure input_data is not altered inplace by fit_transform
         assert input_data.equals(original_input_data)
 
         # Ensure unchanged row count
@@ -44,15 +45,28 @@ class GeneratorHelper:
         output_data_transform = generator.transform(input_data)
         assert output_data.equals(output_data_transform)
 
+        # Ensure input_data is not altered inplace by transform
+        assert input_data.equals(original_input_data)
+
         # Ensure transform will be the same if unnecessary columns are removed from input
-        output_data_transform = generator.transform(input_data[generator.features_in])
+        input_data_features_in = input_data[generator.features_in]
+        original_input_data_features_in = copy.deepcopy(input_data_features_in)
+        output_data_transform = generator.transform(input_data_features_in)
         assert output_data.equals(output_data_transform)
+
+        # Ensure input_data is not altered inplace by transform when features_in match exactly
+        assert input_data_features_in.equals(original_input_data_features_in)
 
         # Ensure transform will be the same if input feature order is not the same as generator.features_in
         reversed_column_names = list(input_data.columns)
         reversed_column_names.reverse()
-        output_data_transform = generator.transform(input_data[reversed_column_names])
+        input_data_reversed = input_data[reversed_column_names]
+        original_input_data_reversed = copy.deepcopy(input_data_reversed)
+        output_data_transform = generator.transform(input_data_reversed)
         assert output_data.equals(output_data_transform)
+
+        # Ensure input_data is not altered inplace by transform when column order is reversed
+        assert input_data_reversed.equals(original_input_data_reversed)
 
         # Ensure output feature order is correct
         assert generator.features_out == list(output_data.columns)
@@ -68,8 +82,12 @@ class GeneratorHelper:
         # Ensure unknown input columns don't affect output
         input_data_with_extra = copy.deepcopy(input_data)
         input_data_with_extra['__UNKNOWN_COLUMN__'] = 0
+        original_input_data_with_extra = copy.deepcopy(input_data_with_extra)
         output_data_transform = generator.transform(input_data_with_extra)
         assert output_data.equals(output_data_transform)
+
+        # Ensure input_data is not altered inplace by transform when extra columns are present
+        assert input_data_with_extra.equals(original_input_data_with_extra)
 
         # Ensure feature_metadata_in is as expected
         if expected_feature_metadata_in_full is not None:
@@ -131,6 +149,20 @@ class DataHelper:
                 '12/31/2200 23:59',
                 '8/15/2700 7:12',  # nan
                 '12/18/1000 2:12',  # nan
+            ]
+        )
+
+    @staticmethod
+    def generate_datetime_as_object_feature_advanced() -> Series:
+        """Nightmare input for datetime"""
+        return Series(
+            [
+                '8/1/2018 16:27',
+                '',  # nan
+                np.nan,  # nan
+                '2021-08-09T17:07:08.659-0400',  # With timezone 4
+                '2021-08-09T17:08:15.541-0400',  # With timezone 4
+                '2021-01-07T12:33:23.938-0500',  # With timezone 5
             ]
         )
 

@@ -130,33 +130,39 @@ Object Detection
 
       5 min tutorial on detecting objects in images.
 
-Text Prediction
----------------
+
+Time Series Forecasting
+-----------------------
 .. container:: cards
 
    .. card::
-      :title: Quick Start Tutorial
-      :link: text_prediction/beginner.html
+      :title: Quick Start
+      :link: forecasting-quickstart.html
 
-      5 min tutorial on fitting prediction models with text in the dataset.
-
-   .. card::
-      :title: Text Prediction for Multimodal Tables with Text
-      :link: text_prediction/multimodal_text.html
-
-      Learning how AutoGluon Text can be used to train model for multimodal data table with text.
-
+      Quick start tutorial on fitting models with time series datasets.
 
    .. card::
-      :title: Customize Search Space and HPO
-      :link: text_prediction/customization.html
+      :title: In-depth Tutorial
+      :link: forecasting-indepth.html
 
-      In-depth tutorial on learning how to customize the search space and try different
-      HPO algorithms.
+      Detailed discussion of the time series forecasting capabilities in AutoGluon.
+
+   .. card::
+      :title: FAQ
+      :link: forecasting-faq.html
+
+      Frequently asked questions about AutoGluon-TimeSeries.
+
 
 Cloud Training and Deployment
 -----------------------------
 .. container:: cards
+
+   .. card::
+      :title: AutoGluon-Tabular on Amazon SageMaker Autopilot
+      :link:  https://aws.amazon.com/blogs/machine-learning/amazon-sagemaker-autopilot-is-up-to-eight-times-faster-with-new-ensemble-training-mode-powered-by-autogluon/
+
+      Checkout managed AutoGluon experience on Amazon SageMaker Autopilot
 
    .. card::
       :title: Cloud Training with AWS SageMaker
@@ -180,12 +186,11 @@ Cloud Training and Deployment
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :hidden:
 
    image_prediction/index
    object_detection/index
-   text_prediction/index
    tabular_prediction/index
    multimodal/index
    cloud_fit_deploy/index

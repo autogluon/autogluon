@@ -54,14 +54,15 @@ def try_import_mxnet():
 
 
 def try_import_ray() -> ModuleType:
+    RAY_MAX_VERSION = '2.1.0'
     ray_max_version_os_map = dict(
-        Darwin='1.14.0',
-        Windows='1.14.0',
-        Linux='1.14.0',
+        Darwin=RAY_MAX_VERSION,
+        Windows=RAY_MAX_VERSION,
+        Linux=RAY_MAX_VERSION,
     )
-    ray_min_version = '1.13.0'
+    ray_min_version = '2.0.0'
     current_os = platform.system()
-    ray_max_version = ray_max_version_os_map.get(current_os, '1.14.0')
+    ray_max_version = ray_max_version_os_map.get(current_os, RAY_MAX_VERSION)
     try:
         import ray
         from distutils.version import LooseVersion
@@ -165,6 +166,11 @@ def try_import_lightgbm():
 def try_import_xgboost():
     try:
         import xgboost
+        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+        xgboost_version = parse_version(xgboost.__version__)
+        min_version = "1.6"
+        assert xgboost_version >= parse_version(min_version),\
+            f'Currently, we only support "xgboost>={min_version}". Installed version: "xgboost=={xgboost.__version__}".'
     except ImportError:
         raise ImportError("`import xgboost` failed. "
                           f"A quick tip is to install via `pip install autogluon.tabular[xgboost]=={__version__}`.")

@@ -60,7 +60,7 @@ def _stack_arrs(arrs):
         return _stack_arrs([torch.as_tensor(x) for x in arrs])
 
 
-class Stack:
+class StackCollator:
     """
     Stack the input data samples to construct the batch.
     The N input samples must have the same shape/length and will be stacked to construct a batch.
@@ -81,7 +81,7 @@ class Stack:
         return _stack_arrs(data)
 
 
-class Pad:
+class PadCollator:
     """
     Returns a callable that pads and stacks data.
 
@@ -163,7 +163,7 @@ class Pad:
             raise NotImplementedError
 
 
-class Tuple:
+class TupleCollator:
     """
     Wrap multiple data collator functions together. The input functions will be applied
     to the corresponding input fields.
@@ -217,7 +217,7 @@ class Tuple:
         return tuple(ret)
 
 
-class List:
+class ListCollator:
     """
     Simply forward the list of input data.
 
@@ -239,7 +239,7 @@ class List:
         return list(data)
 
 
-class Dict:
+class DictCollator:
     """
     Wrap multiple collate functions together and apply it to merge inputs from a dict.
 

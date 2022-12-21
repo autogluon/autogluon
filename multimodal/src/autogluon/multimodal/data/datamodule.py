@@ -1,13 +1,13 @@
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
-from ..constants import PREDICT, TEST, TRAIN, VAL
-from .collator import Dict
+from ..constants import PREDICT, TEST, TRAIN, VALIDATE
 from .dataset import BaseDataset
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
+from .utils import get_collate_fn
 
 
 class BaseDataModule(LightningDataModule):
@@ -26,9 +26,11 @@ class BaseDataModule(LightningDataModule):
         per_gpu_batch_size: int,
         num_workers: int,
         train_data: Optional[pd.DataFrame] = None,
-        val_data: Optional[pd.DataFrame] = None,
+        validate_data: Optional[pd.DataFrame] = None,
         test_data: Optional[pd.DataFrame] = None,
         predict_data: Optional[pd.DataFrame] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
+        val_use_training_mode: bool = False,
     ):
         """
         Parameters
@@ -48,12 +50,19 @@ class BaseDataModule(LightningDataModule):
             Number of workers for Pytorch DataLoader.
         train_data
             Training data.
-        val_data
+        validate_data
             Validation data.
         test_data
             Test data.
         predict_data
             Prediction data. No labels required in it.
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when the dataframe contains the query/response indexes instead of their contents.
+        val_use_training_mode
+             whether we are triggering is_training when creating the dataset for validation.
+             This is used when we want to use val_loss as val metric, and thus we'll use data pipeline
+             for training instead of for inference during validation.
         """
         super().__init__()
         self.prepare_data_per_node = True
@@ -68,17 +77,24 @@ class BaseDataModule(LightningDataModule):
         self.per_gpu_batch_size = per_gpu_batch_size
         self.num_workers = num_workers
         self.train_data = train_data
-        self.val_data = val_data
+        self.validate_data = validate_data
         self.test_data = test_data
         self.predict_data = predict_data
+        self.id_mappings = id_mappings
+        self.val_use_training_mode = val_use_training_mode
 
     def set_dataset(self, split):
         data_split = getattr(self, f"{split}_data")
+        if self.val_use_training_mode:
+            is_training = split in [TRAIN, VALIDATE]
+        else:
+            is_training = split == TRAIN
         dataset = BaseDataset(
             data=data_split,
             preprocessor=self.df_preprocessor,
             processors=self.data_processors,
-            is_training=split == TRAIN,
+            id_mappings=self.id_mappings,
+            is_training=is_training,
         )
 
         setattr(self, f"{split}_dataset", dataset)
@@ -99,7 +115,9 @@ class BaseDataModule(LightningDataModule):
         """
         if stage == "fit":
             self.set_dataset(TRAIN)
-            self.set_dataset(VAL)
+            self.set_dataset(VALIDATE)
+        elif stage == "validate":
+            self.set_dataset(VALIDATE)
         elif stage == "test":
             self.set_dataset(TEST)
         elif stage == "predict":
@@ -123,7 +141,11 @@ class BaseDataModule(LightningDataModule):
             num_workers=self.num_workers,
             shuffle=True,
             pin_memory=False,
-            collate_fn=self.get_collate_fn(),
+            collate_fn=get_collate_fn(
+                df_preprocessor=self.df_preprocessor,
+                data_processors=self.data_processors,
+                per_gpu_batch_size=self.per_gpu_batch_size,
+            ),
         )
         return loader
 
@@ -138,11 +160,15 @@ class BaseDataModule(LightningDataModule):
         A Pytorch DataLoader object.
         """
         loader = DataLoader(
-            self.val_dataset,
+            self.validate_dataset,
             batch_size=self.per_gpu_batch_size,
             num_workers=self.num_workers,
             pin_memory=False,
-            collate_fn=self.get_collate_fn(),
+            collate_fn=get_collate_fn(
+                df_preprocessor=self.df_preprocessor,
+                data_processors=self.data_processors,
+                per_gpu_batch_size=self.per_gpu_batch_size,
+            ),
         )
         return loader
 
@@ -161,7 +187,11 @@ class BaseDataModule(LightningDataModule):
             batch_size=self.per_gpu_batch_size,
             num_workers=self.num_workers,
             pin_memory=False,
-            collate_fn=self.get_collate_fn(),
+            collate_fn=get_collate_fn(
+                df_preprocessor=self.df_preprocessor,
+                data_processors=self.data_processors,
+                per_gpu_batch_size=self.per_gpu_batch_size,
+            ),
         )
         return loader
 
@@ -180,25 +210,10 @@ class BaseDataModule(LightningDataModule):
             batch_size=self.per_gpu_batch_size,
             num_workers=self.num_workers,
             pin_memory=False,
-            collate_fn=self.get_collate_fn(),
+            collate_fn=get_collate_fn(
+                df_preprocessor=self.df_preprocessor,
+                data_processors=self.data_processors,
+                per_gpu_batch_size=self.per_gpu_batch_size,
+            ),
         )
         return loader
-
-    def get_collate_fn(self):
-        """
-        Collect collator functions for each modality input of every model.
-        These collator functions are wrapped by the "Dict" collator function,
-        which can then be used by the Pytorch DataLoader.
-
-        Returns
-        -------
-        A "Dict" collator wrapping other collators.
-        """
-        collate_fn = {}
-        for per_preprocessor, per_data_processors_group in zip(self.df_preprocessor, self.data_processors):
-            for per_modality in per_data_processors_group:
-                per_modality_column_names = per_preprocessor.get_column_names(modality=per_modality)
-                if per_modality_column_names:
-                    for per_model_processor in per_data_processors_group[per_modality]:
-                        collate_fn.update(per_model_processor.collate_fn(per_modality_column_names))
-        return Dict(collate_fn)

@@ -1,20 +1,22 @@
 import copy
 import logging
+import math
 import os
 import time
 import pandas as pd
 import pickle
 import psutil
+
 from abc import abstractmethod
 
 from numpy import ndarray
 from pandas import DataFrame, Series
+from typing import Union
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 
-from ...ray.resources_calculator import ResourceCalculatorFactory, ResourceCalculator
+from ...ray.resources_calculator import ResourceCalculatorFactory
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NotEnoughCudaMemoryError
-from ...utils import get_cpu_count, get_gpu_count_all
 from ...utils.try_import import try_import_ray
 
 logger = logging.getLogger(__name__)
@@ -116,7 +118,7 @@ class LocalFoldFittingStrategy(AbstractFoldFittingStrategy):
                  X: DataFrame, y: Series, X_pseudo: DataFrame, y_pseudo: Series,
                  sample_weight, time_limit: float, time_start: float,
                  models: list, oof_pred_proba: ndarray, oof_pred_model_repeats: ndarray,
-                 save_folds: bool, time_limit_fold_ratio=0.8, num_cpus=None, num_gpus=None, **kwargs):
+                 save_folds: bool, num_cpus: int, num_gpus: Union[int, float], time_limit_fold_ratio=0.8, **kwargs):
         self.model_base = model_base
         self.model_base_kwargs = model_base_kwargs
         self.X = X
@@ -133,12 +135,68 @@ class LocalFoldFittingStrategy(AbstractFoldFittingStrategy):
         self.jobs = []
         self.save_folds = save_folds
         self.time_limit_fold_ratio = time_limit_fold_ratio
+        self.num_cpus = num_cpus
+        self.num_gpus = num_gpus
+        logger.debug(f'Upper level total_num_cpus, num_gpus {self.num_cpus} | {self.num_gpus}')
+        self._validate_user_specified_resources()
 
     def schedule_fold_model_fit(self, fold_ctx):
         raise NotImplementedError
 
     def after_all_folds_scheduled(self):
         raise NotImplementedError
+    
+    def _validate_user_specified_resources(self):
+        # User specified value through ag_args_fit means they want this individual model to use this amount of resources
+        user_ensemble_resources = None
+        user_resources_per_job = None
+        # initialize the model base to get necessary info for estimating memory usage and getting resources
+        self._initialized_model_base = copy.deepcopy(self.model_base)
+        self._initialized_model_base.initialize(X=self.X, y=self.y, **self.model_base_kwargs)
+        user_cpu_per_job = self._initialized_model_base._get_child_aux_val(key='num_cpus', default=None)
+        user_gpu_per_job = self._initialized_model_base._get_child_aux_val(key='num_gpus', default=None)
+        minimum_model_resources = self._initialized_model_base.get_minimum_resources(
+            is_gpu_available=(self.num_gpus > 0),
+        )
+        minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
+        minimum_model_num_gpus = minimum_model_resources.get('num_gpus', 0)
+        logger.debug(f'minimum_model_resources: {minimum_model_resources}')
+        logger.debug(f'user_cpu_per_job, user_gpu_per_job {user_cpu_per_job} | {user_gpu_per_job}')
+        user_ensemble_cpu = self.bagged_ensemble_model._user_params_aux.get('num_cpus', None)
+        user_ensemble_gpu = self.bagged_ensemble_model._user_params_aux.get('num_gpus', None)
+        logger.debug(f'user_ensemble_cpu, user_ensemble_gpu {user_ensemble_cpu} | {user_ensemble_gpu}')
+        if user_ensemble_cpu is not None or user_ensemble_gpu is not None:
+            user_ensemble_resources = dict()
+        if user_ensemble_cpu is not None:
+            assert user_ensemble_cpu <= self.num_cpus, \
+                f"Detected ensemble cpu requirement = {user_ensemble_cpu} > total cpu granted = {self.num_cpus}"
+            assert user_ensemble_cpu >= minimum_model_num_cpus, \
+                f"Detected ensenble cpu requirement = {user_ensemble_cpu} < minimum cpu required by the model = {minimum_model_num_cpus}"
+            user_ensemble_resources['num_cpus'] = user_ensemble_cpu
+            self.num_cpus = user_ensemble_cpu
+        if user_ensemble_gpu is not None:
+            assert user_ensemble_gpu <= self.num_gpus, \
+                f"Detected ensemble gpu requirement = {user_ensemble_gpu} > total gpu granted = {self.num_gpus}"
+            assert user_ensemble_gpu >= minimum_model_num_gpus, \
+                f"Detected ensenble gpu requirement = {user_ensemble_cpu} < minimum gpu required by the model = {minimum_model_num_gpus}"
+            user_ensemble_resources['num_gpus'] = user_ensemble_gpu
+            self.num_gpus = user_ensemble_gpu
+        if user_cpu_per_job is not None or user_gpu_per_job is not None:
+            user_resources_per_job = dict()
+        if user_cpu_per_job is not None:
+            assert user_cpu_per_job <= self.num_cpus, \
+                f"Detected model level cpu requirement = {user_cpu_per_job} > total cpu granted to the bagged model = {self.num_cpus}"
+            assert user_cpu_per_job >= minimum_model_num_cpus, \
+                f"Detected model level cpu requirement = {user_cpu_per_job} < minimum cpu required by the model = {minimum_model_num_cpus}"
+            user_resources_per_job['num_cpus'] = user_cpu_per_job
+        if user_gpu_per_job is not None: 
+            assert user_gpu_per_job <= self.num_gpus, \
+                f"Detected model level gpu requirement = {user_gpu_per_job} > total gpu granted to the bagged model = {self.num_gpus}"
+            assert user_gpu_per_job >= minimum_model_num_gpus, \
+                f"Detected model level gpu requirement = {user_gpu_per_job} < minimum gpu required by the model = {minimum_model_num_gpus}"
+            user_resources_per_job['num_gpus'] = user_gpu_per_job
+        self.user_ensemble_resources = user_ensemble_resources
+        self.user_resources_per_job = user_resources_per_job
 
     def _get_fold_time_limit(self, fold_ctx):
         _, folds_finished, folds_left, folds_to_fit, _, _ = self._get_fold_properties(fold_ctx)
@@ -209,6 +267,20 @@ class SequentialLocalFoldFittingStrategy(LocalFoldFittingStrategy):
     """
     This strategy fits the folds locally in a sequence.
     """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.user_ensemble_resources is None:
+            if self.user_resources_per_job is None:
+                self.num_cpus, self.num_gpus = self.model_base._get_default_resources()
+            else:
+                self.num_cpus = self.user_resources_per_job.get('num_cpus', self.num_cpus)
+                self.num_gpus = self.user_resources_per_job.get('num_gpus', self.num_gpus)
+        else:
+            if self.user_resources_per_job is not None:
+                self.num_cpus = self.user_resources_per_job.get('num_cpus', self.num_cpus)
+                self.num_gpus = self.user_resources_per_job.get('num_gpus', self.num_gpus)
+        self.resources = {'num_cpus': self.num_cpus, 'num_gpus': self.num_gpus}
+        
     def schedule_fold_model_fit(self, fold_ctx):
         self.jobs.append(fold_ctx)
 
@@ -249,7 +321,21 @@ class SequentialLocalFoldFittingStrategy(LocalFoldFittingStrategy):
             X_fold = pd.concat([X_fold, self.X_pseudo], axis=0, ignore_index=True)
             y_fold = pd.concat([y_fold, self.y_pseudo], axis=0, ignore_index=True)
 
-        fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **kwargs_fold)
+        num_cpus = self.num_cpus
+        num_gpus = self.num_gpus
+        if self.user_resources_per_job is not None:
+            num_cpus = min(self.num_cpus, self.user_resources_per_job.get('num_cpus', math.inf))
+            num_gpus = min(self.num_gpus, self.user_resources_per_job.get('num_gpus', math.inf))
+        fold_model.fit(
+            X=X_fold,
+            y=y_fold,
+            X_val=X_val_fold,
+            y_val=y_val_fold,
+            time_limit=time_limit_fold,
+            num_cpus=num_cpus,
+            num_gpus=num_gpus,
+            **kwargs_fold
+        )
         fold_model.fit_time = time.time() - time_start_fold
         return fold_model
 
@@ -343,7 +429,14 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         predict_time: float
             The amount of time used to do out of folds predictions for all folds.
     """
-    def __init__(self, num_jobs: int, num_folds_parallel: int, max_memory_usage_ratio=0.8, num_cpus=None, num_gpus=None, **kwargs):
+    def __init__(
+        self,
+        *,
+        num_jobs: int,
+        num_folds_parallel: int,
+        max_memory_usage_ratio: float = 0.8,
+        **kwargs
+    ):
         super().__init__(**kwargs)
         self.ray = try_import_ray()
         self.max_memory_usage_ratio = min(max_memory_usage_ratio, 1.0)
@@ -354,12 +447,11 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         self.predict_1_time = None
         # max_calls to guarantee release of gpu resource
         self._ray_fit = self.ray.remote(max_calls=1)(_ray_fit)
-        # initialize the model base to get necessary info for estimating memory usage
-        self._initialized_model_base = copy.deepcopy(self.model_base)
-        self._initialized_model_base.initialize(X=self.X, y=self.y, **self.model_base_kwargs)
-        self.num_cpus = self._get_cpu_count(num_cpus)
-        self.num_gpus = self._get_gpu_count(num_gpus)
-        self.resources, self.batches, self.num_parallel_jobs = self._get_resource_suggestions(num_jobs, num_folds_parallel)
+        self.resources, self.batches, self.num_parallel_jobs = self._get_resource_suggestions(
+            num_jobs=num_jobs,
+            user_specified_num_folds_parallel=num_folds_parallel,
+            user_resources_per_job=self.user_resources_per_job
+        )
 
     def is_mem_sufficient(self):
         '''Check if the memory is sufficient to do parallel training'''
@@ -375,32 +467,17 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         y_mem = get_approximate_df_mem_usage(self.y.to_frame()).sum()
         return X_mem + y_mem
 
-    def _get_gpu_count(self, num_gpus_available):
-        _user_gpu_count = self._initialized_model_base._get_child_aux_val(key='num_gpus', default=None)
-        resource_kwargs = self._initialized_model_base._preprocess_fit_resources()
-
-        return ResourceCalculator.get_total_gpu_count(
-            user_specified_num_gpus=_user_gpu_count,
-            model_default_num_gpus=resource_kwargs['num_gpus'],
-            num_gpus_available=num_gpus_available
-        )
-
-    def _get_cpu_count(self, num_cpus_available):
-        _user_cpu_count = self._initialized_model_base._get_child_aux_val(key='num_cpus', default=None)
-        resource_kwargs = self._initialized_model_base._preprocess_fit_resources()
-
-        return ResourceCalculator.get_total_cpu_count(
-            user_specified_num_cpus=_user_cpu_count,
-            model_default_num_cpus=resource_kwargs['num_cpus'],
-            num_cpus_available=num_cpus_available
-        )
-
     def schedule_fold_model_fit(self, fold_ctx):
         self.jobs.append(fold_ctx)
 
     def after_all_folds_scheduled(self):
         if not self.ray.is_initialized():
-            ray_init_args = dict(num_cpus=self.num_cpus, log_to_driver=False)
+            ray_init_args = dict(
+                log_to_driver=False,
+                runtime_env={"env_vars": {"PL_DISABLE_FORK": "1"}},  # https://github.com/ray-project/ray/issues/28197
+                logging_level=logging.ERROR,  # https://github.com/ray-project/ray/issues/29216
+                num_cpus=self.num_cpus,
+            )
             if self.num_gpus > 0:
                 ray_init_args['num_gpus'] = self.num_gpus
             self.ray.init(**ray_init_args)
@@ -470,6 +547,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         fold, folds_finished, folds_left, \
             folds_to_fit, is_last_fold, \
             model_name_suffix = self._get_fold_properties(fold_ctx)
+        logger.debug(f'Folding resources per job {resources}')
         train_index, val_index = fold
         fold_ctx_ref = self.ray.put(fold_ctx)
         save_bag_folds = self.bagged_ensemble_model.params.get('save_bag_folds', True)
@@ -519,24 +597,47 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
             time_limit_fold = None
         return time_limit_fold
 
-    def _get_resource_suggestions(self, num_jobs, user_specified_num_folds_parallel):
+    def _get_resource_suggestions(
+        self,
+        num_jobs,
+        user_specified_num_folds_parallel,
+        user_resources_per_job
+    ):  
+        """
+        Get resources per job, number of total batches, and number of jobs running in parallel for a single batch
+        based on total number of jobs, user specified number of jobs to be run in parallel, and user specified resourecs per job.
+        When user specified resources per job, will validate and force this value if legit.
+        Otherwise, will try to run as many jobs in parallel as possible respecting the minimum resources required per job.
+        """
         user_specified_num_folds_parallel = min(num_jobs, user_specified_num_folds_parallel)
-        model_min_resources = self._initialized_model_base.get_minimum_resources()
+        model_min_resources = self._initialized_model_base.get_minimum_resources(
+            is_gpu_available=(self.num_gpus > 0)
+        )
         resources_calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type='cpu' if self.num_gpus == 0 else 'gpu')
         # use minimum resource to control number of jobs running in parallel
         min_cpu_per_job_based_on_num_folds_parallel = self.num_cpus // user_specified_num_folds_parallel
         min_gpu_per_job_based_on_num_folds_parallel = self.num_gpus / user_specified_num_folds_parallel
         min_cpu_based_on_model = model_min_resources.get('num_cpus', 1)
         min_gpu_based_on_model = model_min_resources.get('num_gpus', 0)
-
-        resources_info = resources_calculator.get_resources_per_job(
+        
+        get_resources_per_job_args = dict(
             total_num_cpus=self.num_cpus,
             total_num_gpus=self.num_gpus,
             num_jobs=num_jobs,
             minimum_cpu_per_job=max(min_cpu_per_job_based_on_num_folds_parallel, min_cpu_based_on_model),
             minimum_gpu_per_job=max(min_gpu_per_job_based_on_num_folds_parallel, min_gpu_based_on_model),
+            user_resources_per_job=user_resources_per_job
+        )
+        if user_resources_per_job is not None:
+            get_resources_per_job_args['minimum_cpu_per_job'] = min_cpu_based_on_model
+            get_resources_per_job_args['minimum_gpu_per_job'] = min_gpu_based_on_model
+
+        resources_info = resources_calculator.get_resources_per_job(
+            **get_resources_per_job_args
         )
         resources = resources_info.get('resources_per_job')
+        if 'num_gpus' not in resources:
+            resources['num_gpus'] = 0
         num_parallel_jobs = resources_info.get('num_parallel_jobs')
         batches = resources_info.get('batches')
 

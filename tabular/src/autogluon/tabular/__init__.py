@@ -1,6 +1,5 @@
-import logging
-
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.utils.log_utils import _add_stream_handler 
 from autogluon.core.dataset import TabularDataset
 
 try:
@@ -10,4 +9,4 @@ except ImportError:
 
 from .predictor import TabularPredictor
 
-logging.basicConfig(format='%(message)s')  # just print message in logs
+_add_stream_handler()
