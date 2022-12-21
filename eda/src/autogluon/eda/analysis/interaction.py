@@ -2,7 +2,9 @@ import warnings
 from typing import List, Optional, Dict, Any, Union
 
 import pandas as pd
+import numpy as np
 import phik  # noqa - required for significance_matrix instrumentation on pandas dataframes
+from pandas.core.dtypes.common import is_numeric_dtype
 from scipy import stats
 
 from .base import AbstractAnalysis
@@ -347,10 +349,15 @@ class DistributionFit(AbstractAnalysis):
                 if c in df.columns:
                     col = df[c]
                     col = col[col.notna()]  # skip NaNs
-                    state.distributions_fit[ds][c] = self._fit_dist(col, self.pvalue_min)
+                    dist = self._fit_dist(col, self.pvalue_min)
+                    if dist is not None:
+                        state.distributions_fit[ds][c] = dist
 
     def _fit_dist(self, series, pvalue_min=0.01):
         results = {}
+        if not is_numeric_dtype(series):
+            self.logger.warning(f'{series.name}: distribution cannot be fit; only numeric columns are supported')
+            return None
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             for i in self.distributions_to_fit:
@@ -363,6 +370,9 @@ class DistributionFit(AbstractAnalysis):
                         "statistic": statistic,
                         "pvalue": pvalue,
                     }
+            if len(results) == 0:
+                self.logger.warning(f'{series.name}: none of the distributions were able to fit to satisfy specified pvalue_min: {self.pvalue_min}')
+                return None
             results = pd.DataFrame(results).T.sort_values("pvalue", ascending=False)
             if self.keep_top_n is not None:
                 results = results[: self.keep_top_n]
