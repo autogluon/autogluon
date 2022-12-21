@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import pandas as pd
 import pytest
 
@@ -282,19 +284,23 @@ def test_DistributionFit__happy_path():
         },
     }
 
+    a = DistributionFit(
+        columns=["e"],
+        keep_top_n=3,
+        pvalue_min=0.9,
+        distributions_to_fit=["dweibull", "dgamma", "logistic", "lognorm"],
+    )
+    a.logger.warning = MagicMock()
+
     state = auto.analyze(
         train_data=df,
         return_state=True,
-        anlz_facets=[
-            DistributionFit(
-                columns=["e"],
-                keep_top_n=3,
-                pvalue_min=0.9,
-                distributions_to_fit=["dweibull", "dgamma", "logistic", "lognorm"],
-            )
-        ],
+        anlz_facets=[a],
     )
     assert state.distributions_fit.train_data.e is None
+    a.logger.warning.assert_called_with(
+        "e: none of the distributions were able to fit to satisfy specified pvalue_min: 0.9"
+    )
 
 
 def test_DistributionFit__constructor_defaults():
@@ -322,15 +328,16 @@ def test_DistributionFit__constructor_unsupported_dist():
 
 def test_DistributionFit__non_numeric_col():
     df = __create_test_df()
+    a = DistributionFit(
+        columns=["a", "f"],
+        distributions_to_fit=["dweibull", "dgamma", "logistic", "lognorm"],
+    )
+    a.logger.warning = MagicMock()
     state = auto.analyze(
         train_data=df,
         return_state=True,
-        anlz_facets=[
-            DistributionFit(
-                columns=["a", "f"],
-                distributions_to_fit=["dweibull", "dgamma", "logistic", "lognorm"],
-            )
-        ],
+        anlz_facets=[a],
     )
     assert len(state.distributions_fit.train_data.a) == 4
     assert state.distributions_fit.train_data.f is None
+    a.logger.warning.assert_called_with("f: distribution cannot be fit; only numeric columns are supported")
