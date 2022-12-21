@@ -76,7 +76,7 @@ def get_config(
         Name of the presets.
     config
         A dictionary including four keys: "model", "data", "optimization", and "environment".
-        If any key is not not given, we will fill in with the default value.
+        If any key is not given, we will fill in with the default value.
 
         The value of each key can be a string, yaml path, or DictConfig object. For example:
         config = {

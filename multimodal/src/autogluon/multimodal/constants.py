@@ -1,3 +1,5 @@
+"""Storing the constants"""
+
 # Column/Label Types
 NULL = "null"
 CATEGORICAL = "categorical"

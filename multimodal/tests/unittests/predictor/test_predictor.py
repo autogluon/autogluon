@@ -48,7 +48,13 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
     os.makedirs(root, exist_ok=True)
     predictor.save(root)
     predictions = predictor.predict(df, as_pandas=False)
+    # Test fit_summary()
+    predictor.fit_summary()
+
     loaded_predictor = cls.load(root)
+    # Test fit_summary()
+    loaded_predictor.fit_summary()
+
     predictions2 = loaded_predictor.predict(df, as_pandas=False)
     predictions2_df = loaded_predictor.predict(df, as_pandas=True)
     npt.assert_equal(predictions, predictions2)
