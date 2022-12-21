@@ -130,6 +130,11 @@ class CorrelationSignificanceVisualization(_AbstractCorrelationChart):
 
 class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
     """
+    Feature interaction visualization.
+
+    This report renders feature interaction analysis results.
+    The details of the report to be rendered depend on the variable types combination in `x`/`y`/`hue`.
+    `key` is used to link analysis and visualization - this allows to have multiple analyses/visualizations in one composite analysis.
 
     Parameters
     ----------
@@ -147,6 +152,9 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
     kwargs
         parameters to pass as a chart args
 
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.interaction.FeatureInteraction`
     """
 
     def __init__(

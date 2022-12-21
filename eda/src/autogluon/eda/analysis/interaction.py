@@ -125,7 +125,7 @@ class FeatureInteraction(AbstractAnalysis):
     key: Optional[str], default = None
         key to use to store the analysis in the state; the value is later to be used by FeatureInteractionVisualization.
         If the key is not provided, then use one of theform: 'x:A|y:B|hue:C' (omit corresponding x/y/hue if the value not provided)
-        See also :class:`autogluon.eda.visualization.interaction.FeatureInteractionVisualization`
+        See also :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`
     parent: Optional[AbstractAnalysis], default = None
         parent Analysis
     children: Optional[List[AbstractAnalysis]], default None

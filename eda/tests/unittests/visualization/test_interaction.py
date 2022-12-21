@@ -251,10 +251,6 @@ def test_FeatureInteractionVisualization__no_renderer(monkeypatch):
     call_subplots.assert_not_called()
 
 
-def test_FeatureInteractionVisualization__fig_args():
-    assert FeatureInteractionVisualization(key="abc").fig_args == {}
-
-
 def test_FeatureInteractionVisualization__convert_categoricals_to_objects():
     df = pd.DataFrame(
         {

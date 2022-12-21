@@ -126,12 +126,23 @@ def analyze_interaction(
     y: Optional[str], default = None
     hue: Optional[str], default = None
     viz_args: Optional[dict], default = None
+        kwargs to pass into visualization component
     fig_args: Optional[Dict[str, Any]], default = None,
         kwargs to pass into chart figure
-    analysis_args
 
-    Returns
-    -------
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import autogluon.eda.auto as auto
+    >>>
+    >>> df_train = pd.DataFrame(...)
+    >>>
+    >>> auto.analyze_interaction(x='Age', hue='Survived', train_data=df_train, viz_args=dict(headers=True, alpha=0.2))
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.interaction.FeatureInteraction`
+    :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`
 
     """
     if viz_args is None:
