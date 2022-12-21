@@ -406,7 +406,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         item_id_to_forecast = {f.item_id: f for f in forecasts}
         result_dfs = []
         for item_id in forecast_index.unique(level=ITEMID):
-            forecast = item_id_to_forecast[item_id]
+            # GluonTS always saves item_id as a string
+            forecast = item_id_to_forecast[str(item_id)]
             item_forecast_dict = {"mean": forecast.mean}
             for quantile in quantile_levels:
                 item_forecast_dict[str(quantile)] = forecast.quantile(str(quantile))
