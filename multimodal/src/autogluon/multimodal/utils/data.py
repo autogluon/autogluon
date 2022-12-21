@@ -11,6 +11,7 @@ from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
 from autogluon.core.utils.loaders import load_pd
+from ..data.infer_types import is_imagepath_column
 
 from ..constants import (
     AUTOMM,
@@ -432,11 +433,12 @@ def data_to_df(
         assert len(data) > 0, f"Expected data to have length > 0, but got {data} of len {len(data)}"
         if header is None:
             data = pd.DataFrame(data)
+            data = check_if_imagepath_and_add_column_title(data)
         else:
             data = pd.DataFrame({header: data})
     elif isinstance(data, str):
         if is_valid_imagepath(data):
-            data = pd.DataFrame({"image": data})
+            data = pd.DataFrame({"image": [data]})
         else:
             data = load_pd.load(data)
     else:
@@ -543,3 +545,36 @@ def is_valid_imagepath(data: str, sample_n: Optional[int] = 50) -> bool:
             return False
     else:
         raise Exception(f"Expected data to be a list or a str, but got {type(data)}")
+
+
+def check_if_imagepath_and_add_column_title(data: pd.DataFrame) -> pd.DataFrame:
+    """
+    Check to see if the data frame is a single column data frame which contains image paths.
+    If so add the column name "image" if applicable. i.e.
+        IF the columns of data is not labeled, for example:
+          image
+        0   123
+        1   234
+        2   345
+        but is labeled by pd.RangeIndex, for example:
+             0
+        0  123
+        1  234
+        2  345
+        AND IF the column is an imagepath column
+        THEN we add the column title "image"
+        OTHERWISE do nothing
+    Parameters
+    ----------
+    data
+        pd.DataFrame containing some strings
+    Returns
+    -------
+    A pd.DataFrame containing the column name modifications
+    """
+    if 0 in data.columns:
+        # MARK: col_name seems to take no effect in determining if the column is an imagepath column
+        is_image_column = is_imagepath_column(data.iloc[:, 0], col_name="")
+        if is_image_column:
+            data.columns = ["image"]
+    return data
