@@ -55,11 +55,11 @@ def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_glu
     )
     fcast_list, ts_list = list(forecast_iter), list(ts_iter)
     prediction_length = 2
-    past_data = DUMMY_TS_DATAFRAME.slice_by_timestep(None, -prediction_length)
+    forecast_index = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None).index
     forecast_df = model._gluonts_forecasts_to_data_frame(
         fcast_list,
         quantile_levels=model.quantile_levels,
-        data=past_data,
+        forecast_index=forecast_index,
     )
 
     ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=prediction_length)
@@ -88,11 +88,11 @@ def test_when_given_all_zero_data_when_evaluator_called_then_output_equal_to_glu
     )
     fcast_list, ts_list = list(forecast_iter), list(ts_iter)
     prediction_length = 2
-    past_data = DUMMY_TS_DATAFRAME.slice_by_timestep(None, -prediction_length)
+    forecast_index = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None).index
     forecast_df = model._gluonts_forecasts_to_data_frame(
         fcast_list,
         quantile_levels=model.quantile_levels,
-        data=past_data,
+        forecast_index=forecast_index,
     )
 
     ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=prediction_length)
@@ -124,11 +124,11 @@ def test_when_given_zero_forecasts_when_evaluator_called_then_output_equal_to_gl
             )
         )
     prediction_length = 2
-    past_data = DUMMY_TS_DATAFRAME.slice_by_timestep(None, -prediction_length)
+    forecast_index = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None).index
     forecast_df = model._gluonts_forecasts_to_data_frame(
         zero_forecast_list,
         quantile_levels=model.quantile_levels,
-        data=past_data,
+        forecast_index=forecast_index,
     )
 
     ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=prediction_length)

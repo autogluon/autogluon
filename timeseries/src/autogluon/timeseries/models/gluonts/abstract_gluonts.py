@@ -11,6 +11,7 @@ from gluonts.dataset.common import Dataset as GluonTSDataset
 from gluonts.dataset.field_names import FieldName
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
+from gluonts.torch.model.forecast import DistributionForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 from pandas.tseries.frequencies import to_offset
 
@@ -39,6 +40,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
     def __init__(
         self,
         target_df: TimeSeriesDataFrame,
+        target_column: str = "target",
         feat_static_cat: Optional[pd.DataFrame] = None,
         feat_static_real: Optional[pd.DataFrame] = None,
         feat_dynamic_real: Optional[TimeSeriesDataFrame] = None,
@@ -47,9 +49,8 @@ class SimpleGluonTSDataset(GluonTSDataset):
     ):
         assert target_df is not None
         assert target_df.freq, "Initializing GluonTS data sets without freq is not allowed"
-        assert len(target_df.columns) == 1
         # Convert TimeSeriesDataFrame to pd.Series for faster processing
-        self.target_series = target_df.squeeze()
+        self.target_series = target_df[target_column]
         self.item_ids = target_df.item_ids
         self.freq_ = target_df.freq
         self.feat_static_cat = feat_static_cat
@@ -280,7 +281,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 feat_dynamic_real = None
 
             return SimpleGluonTSDataset(
-                target_df=time_series_df[[self.target]],
+                target_df=time_series_df,
+                target_column=self.target,
                 feat_static_cat=feat_static_cat,
                 feat_static_real=feat_static_real,
                 feat_dynamic_real=feat_dynamic_real,
@@ -351,7 +353,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
                 quantile_levels=quantile_levels or self.quantile_levels,
-                data=data,
+                forecast_index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length),
             )
 
         return df
@@ -384,25 +386,29 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             forecast_init_args.update({"freq": forecast.freq})
         return QuantileForecast(**forecast_init_args)
 
+    @staticmethod
+    def _distribution_to_quantile_forecast(forecast: SampleForecast, quantile_levels: List[float]) -> QuantileForecast:
+        raise NotImplementedError
+
     def _gluonts_forecasts_to_data_frame(
         self,
         forecasts: List[Forecast],
         quantile_levels: List[float],
-        data: TimeSeriesDataFrame,
+        forecast_index: pd.MultiIndex,
     ) -> TimeSeriesDataFrame:
-        if not isinstance(forecasts[0], (QuantileForecast, SampleForecast)):
-            raise TypeError("DistributionForecast is not supported.")
-
         # if predictions are gluonts SampleForecasts, convert to quantile forecasts
         if isinstance(forecasts[0], SampleForecast):
             forecasts = [self._sample_to_quantile_forecast(f, quantile_levels) for f in forecasts]
+        elif isinstance(forecasts[0], DistributionForecast):
+            forecasts = [self._distribution_to_quantile_forecast(f, quantile_levels) for f in forecasts]
+        else:
+            assert isinstance(forecasts[0], QuantileForecast), f"Unrecognized forecast type {type(forecasts[0])}"
 
         # sanity check to ensure all quantiles are accounted for
         assert all(str(q) in forecasts[0].forecast_keys for q in quantile_levels), (
             "Some forecast quantiles are missing from GluonTS forecast outputs. Was"
             " the model trained to forecast all quantiles?"
         )
-        forecast_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
         item_id_to_forecast = {f.item_id: f for f in forecasts}
         result_dfs = []
         for item_id in forecast_index.unique(level=ITEMID):

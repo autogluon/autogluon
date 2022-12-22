@@ -17,6 +17,7 @@ from gluonts.torch.distributions import AffineTransformed, NormalOutput
 from gluonts.torch.model.deepar import DeepAREstimator
 from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
 from gluonts.torch.model.forecast import DistributionForecast, Forecast
+from gluonts.model.forecast import QuantileForecast
 from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPredictor
 from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
 from pytorch_lightning.callbacks import Timer
@@ -123,6 +124,31 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
                 model.set_contexts(path)
             model.gts_predictor = GluonTSPyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
         return model
+
+    @staticmethod
+    def _distribution_to_quantile_forecast(
+        forecast: DistributionForecast, quantile_levels: List[float]
+    ) -> QuantileForecast:
+        forecast_arrays = [forecast.mean]
+
+        quantile_keys = [str(q) for q in quantile_levels]
+        if isinstance(forecast.distribution, AffineTransformed):
+            fdist = forecast.distribution
+            quantiles_tensor = torch.tensor(quantile_levels, device=fdist.scale.device).unsqueeze(1)
+            q_transformed = (fdist.scale * fdist.base_dist.icdf(quantiles_tensor) + fdist.loc).cpu().numpy().tolist()
+        else:
+            q_transformed = [forecast.quantile(q) for q in quantile_keys]
+
+        forecast_arrays.extend(q_transformed)
+        forecast_init_args = dict(
+            forecast_arrays=np.array(forecast_arrays),
+            start_date=forecast.start_date,
+            forecast_keys=["mean"] + quantile_keys,
+            item_id=forecast.item_id,
+        )
+        if isinstance(forecast.start_date, pd.Timestamp):  # GluonTS version is <0.10
+            forecast_init_args.update({"freq": forecast.freq})
+        return QuantileForecast(**forecast_init_args)
 
 
 class DeepARModel(AbstractGluonTSPyTorchModel):
@@ -233,37 +259,3 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
             )
         init_kwargs["distr_output"] = NormalOutput()
         return init_kwargs
-
-    def _gluonts_forecasts_to_data_frame(
-        self,
-        forecasts: List[Forecast],
-        quantile_levels: List[float],
-        data: TimeSeriesDataFrame,
-    ) -> TimeSeriesDataFrame:
-        assert isinstance(forecasts[0], DistributionForecast)
-
-        forecast_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
-        item_id_to_forecast = {f.item_id: f for f in forecasts}
-        result_dfs = []
-        for item_id in forecast_index.unique(level=ITEMID):
-            forecast = item_id_to_forecast[item_id]
-            item_forecast_dict = {"mean": forecast.mean}
-            if isinstance(forecast.distribution, AffineTransformed):
-                # FIXME: this is a hack to get around GluonTS not implementing quantiles for
-                # torch AffineTransformed. We hence force PyTorch SFF to always use Gaussian error.
-                # However, this leads to a ~2x regression in error compared to MXNet SFF.
-                fdist = forecast.distribution
-                quantiles_tensor = torch.tensor(quantile_levels, device=fdist.scale.device).unsqueeze(1)
-                q_transformed = (
-                    (fdist.scale * fdist.base_dist.icdf(quantiles_tensor) + fdist.loc).cpu().numpy().tolist()
-                )
-                for ix, quantile in enumerate(quantile_levels):
-                    item_forecast_dict[str(quantile)] = q_transformed[ix]
-            else:
-                for quantile in quantile_levels:
-                    item_forecast_dict[str(quantile)] = forecast.quantile(str(quantile))
-            result_dfs.append(pd.DataFrame(item_forecast_dict))
-
-        result = pd.concat(result_dfs)
-        result.index = forecast_index
-        return TimeSeriesDataFrame(result)
