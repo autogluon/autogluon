@@ -222,7 +222,8 @@ class FeatureInteraction(AbstractAnalysis):
 
 class DistributionFit(AbstractAnalysis):
     """
-    Attempt to fit various distributions for further plotting via :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`.
+    This component attempts to fit various distributions for further plotting via
+    :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`.
 
     The data specified in `columns` must be numeric to be considered for fitting (categorical variables are not supported).
 
