@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, ANY
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -404,3 +404,55 @@ def __get_feature_interaction_state():
         }
     )
     return state
+
+
+@pytest.mark.parametrize("has_dist_fit", [True, False])
+def test_FeatureInteractionVisualization__HistPlotRenderer(monkeypatch, has_dist_fit):
+    r = FeatureInteractionVisualization._HistPlotRenderer()
+
+    state = AnalysisState(
+        {
+            "distributions_fit": {
+                "train_data": {
+                    "aaa": {
+                        "fisk": {"param": (11, -65, 94), "statistic": 0.04, "pvalue": 0.17},
+                        "lognorm": {"param": (0.12, -82, 111), "statistic": 0.05, "pvalue": 0.021},
+                    }
+                }
+            }
+        }
+    )
+    if not has_dist_fit:
+        state.distributions_fit.train_data.aaa = None
+
+    params = ("aaa", None, None)
+    param_types = ("numeric", None, None)
+    chart_args = dict(some_chart_arg=123)
+
+    ax = MagicMock()
+    ax.get_xlim = MagicMock(return_value=(0, 1))
+    call_sns_histplot = MagicMock()
+    call_plt_legend = MagicMock()
+
+    with monkeypatch.context() as m:
+        m.setattr(sns, "histplot", call_sns_histplot)
+        m.setattr(plt, "legend", call_plt_legend)
+        r._render(state, "train_data", params, param_types, ax, "data", chart_args, num_point_to_fit=3)
+
+    if has_dist_fit:
+        call_sns_histplot.assert_called_with(ax=ax, data="data", some_chart_arg=123, stat="density")
+        ax.get_xlim.assert_called()
+        ax.plot.assert_called_with(
+            ANY,
+            ANY,
+            ls="--",
+            label="lognorm: pvalue 0.02",
+        )
+        ax.set_xlim.assert_called()
+        call_plt_legend.assert_called()
+    else:
+        call_sns_histplot.assert_called_with(ax=ax, data="data", some_chart_arg=123)
+        ax.get_xlim.assert_not_called()
+        ax.plot.assert_not_called()
+        ax.set_xlim.assert_not_called()
+        call_plt_legend.assert_not_called()

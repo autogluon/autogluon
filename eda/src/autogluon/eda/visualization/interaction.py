@@ -90,7 +90,7 @@ class CorrelationVisualization(_AbstractCorrelationChart):
 class _AbstractFeatureInteractionPlotRenderer(ABC):
     @abstractmethod
     def _render(self, state, ds, params, param_types, ax, data, chart_args):
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def render(self, state, ds, params, param_types, data, fig_args, chart_args):
         fig, ax = plt.subplots(**fig_args)
@@ -294,12 +294,12 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             return None
 
     class _HistPlotRenderer(_AbstractFeatureInteractionPlotRenderer):
-        def _render(self, state, ds, params, param_types, ax, data, chart_args):
+        def _render(self, state, ds, params, param_types, ax, data, chart_args, num_point_to_fit=200):
             x = params[0]
             fitted_distributions_present = (
                 ("distributions_fit" in state)
                 and (param_types == ("numeric", None, None))  # (x, y, hue)
-                and (x in state.distributions_fit[ds])
+                and (state.distributions_fit[ds].get(x, None) is not None)
             )
 
             if fitted_distributions_present:
@@ -307,21 +307,19 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             sns.histplot(ax=ax, data=data, **chart_args)
 
             if fitted_distributions_present:  # types for  x, y, hue
-                chart_args["stat"] = "density"
                 dists = state.distributions_fit[ds][x]
-                if dists is not None:
-                    x_min, x_max = ax.get_xlim()
-                    xs = np.linspace(x_min, x_max, 200)
-                    for dist, v in dists.items():
-                        _dist = getattr(stats, dist)
-                        ax.plot(
-                            xs,
-                            _dist.pdf(xs, *v["param"]),
-                            ls="--",
-                            label=f'{dist}: pvalue {v["pvalue"]:.2f}',
-                        )
-                    ax.set_xlim(x_min, x_max)  # set the limits back to the ones of the distplot
-                    plt.legend()
+                x_min, x_max = ax.get_xlim()
+                xs = np.linspace(x_min, x_max, num_point_to_fit)
+                for dist, v in dists.items():
+                    _dist = getattr(stats, dist)
+                    ax.plot(
+                        xs,
+                        _dist.pdf(xs, *v["param"]),
+                        ls="--",
+                        label=f'{dist}: pvalue {v["pvalue"]:.2f}',
+                    )
+                ax.set_xlim(x_min, x_max)  # set the limits back to the ones of the distplot
+                plt.legend()
 
     class _KdePlotRenderer(_AbstractFeatureInteractionPlotRenderer):
         def _render(self, state, ds, params, param_types, ax, data, chart_args):
