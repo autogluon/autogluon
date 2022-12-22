@@ -380,7 +380,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             forecast_arrays=np.array(forecast_arrays),
             start_date=forecast.start_date,
             forecast_keys=["mean"] + quantile_keys,
-            item_id=forecast.item_id,
+            item_id=str(forecast.item_id),
         )
         if isinstance(forecast.start_date, pd.Timestamp):  # GluonTS version is <0.10
             forecast_init_args.update({"freq": forecast.freq})
