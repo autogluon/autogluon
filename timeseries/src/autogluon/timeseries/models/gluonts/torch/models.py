@@ -133,6 +133,9 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
 
         quantile_keys = [str(q) for q in quantile_levels]
         if isinstance(forecast.distribution, AffineTransformed):
+            # FIXME: this is a hack to get around GluonTS not implementing quantiles for
+            # torch AffineTransformed. We hence force PyTorch SFF to always use Gaussian error.
+            # However, this leads to a ~2x regression in error compared to MXNet SFF.
             fdist = forecast.distribution
             quantiles_tensor = torch.tensor(quantile_levels, device=fdist.scale.device).unsqueeze(1)
             q_transformed = (fdist.scale * fdist.base_dist.icdf(quantiles_tensor) + fdist.loc).cpu().numpy().tolist()
