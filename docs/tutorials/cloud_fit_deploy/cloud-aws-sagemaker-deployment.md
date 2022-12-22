@@ -62,7 +62,7 @@ Mostly, you just need to replace `TabularPredictor` to be `TextPredictor` for ex
 
 ### Note on image modality
 To do inference on image modality, you would need to embed the image info, as bytes for example, into a column of the test data.
-Then in the inference container, you would need to store the image into the disk and update the test data with the image paths accordingly.
+Then in the inference container, if you are using the `MultiModalPredictor`, you just need to decode the aforementioned image column and feed the test data to it.
 
 For example, to encode the image:
 ```{.python}
@@ -84,6 +84,13 @@ def convert_image_path_to_encoded_bytes_in_dataframe(dataframe, image_column):
 test_data_image_column = "YOUR_COLUMN_CONTAINING_IMAGE_PATH"
 test_data = convert_image_path_to_encoded_bytes_in_dataframe(test_data, test_data_image_column)
 ```
+
+For example, to decode the image the inference container:
+```{.python}
+test_data[image_column] = [base64.b85decode(bytes) for bytes in test_data[image_column]]
+```
+
+Note that if you are using the `TabularPredictor`, you would need to store the image into the disk and update the test data with the image paths accordingly.
 
 For example, to decode the image and save to disk in the inference container:
 ```{.python}
