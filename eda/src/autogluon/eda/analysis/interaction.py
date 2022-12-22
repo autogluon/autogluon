@@ -221,6 +221,65 @@ class FeatureInteraction(AbstractAnalysis):
 
 
 class DistributionFit(AbstractAnalysis):
+    """
+    Attempt to fit various distributions for further plotting via :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`.
+
+    The data specified in `columns` must be numeric to be considered for fitting (categorical variables are not supported).
+
+    Only the distributions with statistical significance above `pvalue_min` threshold will be included in the results.
+
+    Note: this analysis is an augmentation for :py:class:`~autogluon.eda.analysis.interaction.FeatureInteraction` and should be used in pair
+    to be visualized via :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`.
+
+    Parameters
+    ----------
+    columns: Union[str, List[str]]
+        colums to be included into analysis. Can be passed as a string or a list of strings.
+    pvalue_min: float = 0.01,
+        min pvalue to consider including distribution fit in the results.
+    keep_top_n: Optional[int] = None,
+        how many distributions exceeding `pvalue_min` to include in the results. I.e. if `keep_top_n=3`,
+        but 10 distributions satisfied `pvalue_min`, only top 3 will be included.
+        If not specified and `distributions_to_fit` is not provided, then only top 3 will be included in the results.
+    distributions_to_fit: Optional[Union[str, List[str]]] = None,
+        list of distributions to fit. See `DistributionFit.AVAILABLE_DISTRIBUTIONS` for the list of supported values.
+        If not specified, then all supported distributions will be attempted to fit.
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: Optional[List[AbstractAnalysis]], default None
+        wrapped analyses; these will receive sampled `args` during `fit` call
+    kwargs
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.visualization as viz
+    >>> import autogluon.eda.auto as auto
+    >>> import pandas as pd
+    >>> import numpy as np
+    >>>
+    >>> df_train = pd.DataFrame(...)
+    >>>
+    >>> auto.analyze(
+    >>>     train_data=df_train, label=target_col,
+    >>>     anlz_facets=[
+    >>>         eda.dataset.RawTypesAnalysis(),
+    >>>         eda.interaction.DistributionFit(columns=['Fare', 'Age'], distributions_to_fit=['lognorm', 'beta', 'gamma', 'fisk']),
+    >>>         eda.interaction.FeatureInteraction(key='age-chart', x='Age'),
+    >>>
+    >>>     ],
+    >>>     viz_facets=[
+    >>>         viz.interaction.FeatureInteractionVisualization(key='age-chart', headers=True),
+    >>>     ]
+    >>> )
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.interaction.FeatureInteraction`
+    :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`
+
+    """
+
     AVAILABLE_DISTRIBUTIONS = [
         "alpha",
         "anglit",
