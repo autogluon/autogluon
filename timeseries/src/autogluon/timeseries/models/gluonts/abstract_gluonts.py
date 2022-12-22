@@ -12,6 +12,7 @@ from gluonts.dataset.field_names import FieldName
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
+from gluonts.torch.model.forecast import DistributionForecast
 from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
@@ -39,6 +40,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
     def __init__(
         self,
         target_df: TimeSeriesDataFrame,
+        target_column: str = "target",
         feat_static_cat: Optional[pd.DataFrame] = None,
         feat_static_real: Optional[pd.DataFrame] = None,
         feat_dynamic_real: Optional[TimeSeriesDataFrame] = None,
@@ -47,7 +49,10 @@ class SimpleGluonTSDataset(GluonTSDataset):
     ):
         assert target_df is not None
         assert target_df.freq, "Initializing GluonTS data sets without freq is not allowed"
-        self.target_df = target_df
+        # Convert TimeSeriesDataFrame to pd.Series for faster processing
+        self.target_series = target_df[target_column]
+        self.item_ids = target_df.item_ids
+        self.freq_ = target_df.freq
         self.feat_static_cat = feat_static_cat
         self.feat_static_real = feat_static_real
         self.feat_dynamic_real = feat_dynamic_real
@@ -61,24 +66,23 @@ class SimpleGluonTSDataset(GluonTSDataset):
         # for feature generation. If the frequency string doesn't match or is not provided, it raises an exception.
         # Here we bypass this by issuing a default "yearly" frequency, tricking it into not producing
         # any lags or features.
-        freq_ = self.target_df.freq
-        pd_offset = to_offset(freq_)
+        pd_offset = to_offset(self.freq_)
 
         # normalize freq str to handle peculiarities such as W-SUN
         offset_base_alias = pd_offset.name.split("-")[0]
 
-        return "A" if offset_base_alias is None or offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS else freq_
+        return "A" if offset_base_alias is None or offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS else self.freq_
 
     def __len__(self):
-        return len(self.target_df.item_ids)  # noqa
+        return len(self.item_ids)  # noqa
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
-        for item_id in self.target_df.item_ids:  # noqa
-            df = self.target_df.loc[item_id]
+        for item_id in self.item_ids:  # noqa
+            ts = self.target_series.loc[item_id]
             time_series = {
                 FieldName.ITEM_ID: item_id,
-                FieldName.TARGET: df.to_numpy(dtype=self.float_dtype).ravel(),
-                FieldName.START: pd.Period(df.index[0], freq=self.freq),
+                FieldName.TARGET: ts.to_numpy(dtype=self.float_dtype).ravel(),
+                FieldName.START: pd.Period(ts.index[0], freq=self.freq),
             }
             if self.feat_static_cat is not None:
                 time_series[FieldName.FEAT_STATIC_CAT] = self.feat_static_cat.loc[item_id].to_numpy(
@@ -277,7 +281,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 feat_dynamic_real = None
 
             return SimpleGluonTSDataset(
-                target_df=time_series_df[[self.target]],
+                target_df=time_series_df,
+                target_column=self.target,
                 feat_static_cat=feat_static_cat,
                 feat_static_real=feat_static_real,
                 feat_dynamic_real=feat_dynamic_real,
@@ -338,8 +343,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             f"\tProvided data for prediction with {len(data)} rows, {data.num_items} items. "
             f"Average time series length is {len(data) / data.num_items}."
         )
-        input_index_type = type(data.index.levels[0][0])
-
         with warning_filter(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
             quantiles = quantile_levels or self.quantile_levels
             if not all(0 < q < 1 for q in quantiles):
@@ -350,22 +353,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
                 quantile_levels=quantile_levels or self.quantile_levels,
+                forecast_index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length),
             )
 
-            # if index type is different than the input data, cast it back
-            if len(df.index.levels[0]) > 0:
-                prediction_index_type = type(df.index.levels[0][0])
-                if prediction_index_type is not input_index_type:
-                    df.set_index(
-                        df.index.set_levels([input_index_type(i) for i in df.index.levels[0]], level=0),
-                        inplace=True,
-                    )
-
-        # Make sure the item_ids are sorted in the same order as in data
-        df = df.loc[data.item_ids]
-        # GluonTS uses pd.Period internally, which may lead to loss of precision (e.g., "2020-01-01 12:00" becomes
-        # "2020-01-01 00:00"). We manually set the index to avoid such problems.
-        df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
         return df
 
     def _predict_gluonts_forecasts(
@@ -380,7 +370,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     @staticmethod
     def _sample_to_quantile_forecast(forecast: SampleForecast, quantile_levels: List[float]) -> QuantileForecast:
-        forecast_arrays = []
+        forecast_arrays = [forecast.mean]
 
         quantile_keys = [str(q) for q in quantile_levels]
         for q in quantile_keys:
@@ -389,47 +379,49 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         forecast_init_args = dict(
             forecast_arrays=np.array(forecast_arrays),
             start_date=forecast.start_date,
-            forecast_keys=quantile_keys,
-            item_id=forecast.item_id,
+            forecast_keys=["mean"] + quantile_keys,
+            item_id=str(forecast.item_id),
         )
         if isinstance(forecast.start_date, pd.Timestamp):  # GluonTS version is <0.10
             forecast_init_args.update({"freq": forecast.freq})
         return QuantileForecast(**forecast_init_args)
 
+    @staticmethod
+    def _distribution_to_quantile_forecast(forecast: SampleForecast, quantile_levels: List[float]) -> QuantileForecast:
+        raise NotImplementedError
+
     def _gluonts_forecasts_to_data_frame(
-        self, forecasts: List[Forecast], quantile_levels: List[float]
+        self,
+        forecasts: List[Forecast],
+        quantile_levels: List[float],
+        forecast_index: pd.MultiIndex,
     ) -> TimeSeriesDataFrame:
-        if not isinstance(forecasts[0], (QuantileForecast, SampleForecast)):
-            raise TypeError("DistributionForecast is not supported.")
-
-        forecast_means = [f.mean for f in forecasts]
-
         # if predictions are gluonts SampleForecasts, convert to quantile forecasts
         if isinstance(forecasts[0], SampleForecast):
             forecasts = [self._sample_to_quantile_forecast(f, quantile_levels) for f in forecasts]
+        elif isinstance(forecasts[0], DistributionForecast):
+            forecasts = [self._distribution_to_quantile_forecast(f, quantile_levels) for f in forecasts]
+        else:
+            assert isinstance(forecasts[0], QuantileForecast), f"Unrecognized forecast type {type(forecasts[0])}"
 
         # sanity check to ensure all quantiles are accounted for
         assert all(str(q) in forecasts[0].forecast_keys for q in quantile_levels), (
             "Some forecast quantiles are missing from GluonTS forecast outputs. Was"
             " the model trained to forecast all quantiles?"
         )
-
+        item_id_to_forecast = {f.item_id: f for f in forecasts}
         result_dfs = []
-        for i, forecast in enumerate(forecasts):
-            item_forecast_dict = dict(mean=forecast_means[i])
+        for item_id in forecast_index.unique(level=ITEMID):
+            # GluonTS always saves item_id as a string
+            forecast = item_id_to_forecast[str(item_id)]
+            item_forecast_dict = {"mean": forecast.mean}
             for quantile in quantile_levels:
                 item_forecast_dict[str(quantile)] = forecast.quantile(str(quantile))
+            result_dfs.append(pd.DataFrame(item_forecast_dict))
 
-            df = pd.DataFrame(item_forecast_dict)
-            df[ITEMID] = forecast.item_id
-            df[TIMESTAMP] = pd.date_range(
-                start=forecasts[i].start_date.to_timestamp(how="S"),
-                periods=self.prediction_length,
-                freq=self.freq,
-            )
-            result_dfs.append(df)
-
-        return TimeSeriesDataFrame.from_data_frame(pd.concat(result_dfs))
+        result = pd.concat(result_dfs)
+        result.index = forecast_index
+        return TimeSeriesDataFrame(result)
 
     def _get_hpo_backend(self):
         return RAY_BACKEND

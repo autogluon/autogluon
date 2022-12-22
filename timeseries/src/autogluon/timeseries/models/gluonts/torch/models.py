@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import torch
 from gluonts.core.component import from_hyperparameters
+from gluonts.model.forecast import QuantileForecast
 from gluonts.torch.distributions import AffineTransformed, NormalOutput
 from gluonts.torch.model.deepar import DeepAREstimator
 from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
@@ -25,6 +26,7 @@ from autogluon.core.hpo.constants import CUSTOM_BACKEND
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import torch_warning_filter
 
 # FIXME: introduces cpflows dependency. We exclude this model until a future release.
@@ -122,6 +124,34 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
                 model.set_contexts(path)
             model.gts_predictor = GluonTSPyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
         return model
+
+    @staticmethod
+    def _distribution_to_quantile_forecast(
+        forecast: DistributionForecast, quantile_levels: List[float]
+    ) -> QuantileForecast:
+        forecast_arrays = [forecast.mean]
+
+        quantile_keys = [str(q) for q in quantile_levels]
+        if isinstance(forecast.distribution, AffineTransformed):
+            # FIXME: this is a hack to get around GluonTS not implementing quantiles for
+            # torch AffineTransformed. We hence force PyTorch SFF to always use Gaussian error.
+            # However, this leads to a ~2x regression in error compared to MXNet SFF.
+            fdist = forecast.distribution
+            quantiles_tensor = torch.tensor(quantile_levels, device=fdist.scale.device).unsqueeze(1)
+            q_transformed = (fdist.scale * fdist.base_dist.icdf(quantiles_tensor) + fdist.loc).cpu().numpy().tolist()
+        else:
+            q_transformed = [forecast.quantile(q) for q in quantile_keys]
+
+        forecast_arrays.extend(q_transformed)
+        forecast_init_args = dict(
+            forecast_arrays=np.array(forecast_arrays),
+            start_date=forecast.start_date,
+            forecast_keys=["mean"] + quantile_keys,
+            item_id=str(forecast.item_id),
+        )
+        if isinstance(forecast.start_date, pd.Timestamp):  # GluonTS version is <0.10
+            forecast_init_args.update({"freq": forecast.freq})
+        return QuantileForecast(**forecast_init_args)
 
 
 class DeepARModel(AbstractGluonTSPyTorchModel):
@@ -232,38 +262,3 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
             )
         init_kwargs["distr_output"] = NormalOutput()
         return init_kwargs
-
-    def _gluonts_forecasts_to_data_frame(
-        self, forecasts: List[Forecast], quantile_levels: List[float]
-    ) -> TimeSeriesDataFrame:
-        assert isinstance(forecasts[0], DistributionForecast)
-
-        result_dfs = []
-        for i, forecast in enumerate(forecasts):
-            item_forecast_dict = dict(mean=forecast.mean)
-            if isinstance(forecast.distribution, AffineTransformed):
-                # FIXME: this is a hack to get around GluonTS not implementing quantiles for
-                # torch AffineTransformed. We hence force PyTorch SFF to always use Gaussian error.
-                # However, this leads to a ~2x regression in error compared to MXNet SFF.
-                fdist = forecast.distribution
-                quantiles_tensor = torch.tensor(quantile_levels, device=fdist.scale.device).unsqueeze(1)
-                q_transformed = (
-                    (fdist.scale * fdist.base_dist.icdf(quantiles_tensor) + fdist.loc).cpu().numpy().tolist()
-                )
-                for ix, quantile in enumerate(quantile_levels):
-                    item_forecast_dict[str(quantile)] = q_transformed[ix]
-            else:
-                for quantile in quantile_levels:
-                    item_forecast_dict[str(quantile)] = forecast.quantile(str(quantile))
-
-            df = pd.DataFrame(item_forecast_dict)
-            df[ITEMID] = forecast.item_id
-            # TODO: replace with get_forecast_horizon_index_single_time_series
-            df[TIMESTAMP] = pd.date_range(
-                start=forecasts[i].start_date.to_timestamp(how="S"),
-                periods=self.prediction_length,
-                freq=self.freq,
-            )
-            result_dfs.append(df)
-
-        return TimeSeriesDataFrame.from_data_frame(pd.concat(result_dfs))

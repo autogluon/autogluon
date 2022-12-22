@@ -21,10 +21,19 @@ def get_forecast_horizon_index_ts_dataframe(
     - level 1 ("timestamp") contains the next prediction_length time steps starting from the end of each time series.
     """
 
-    def get_series_with_timestamps_per_item(group: pd.DataFrame) -> pd.DataFrame:
-        timestamps = group.index.get_level_values(TIMESTAMP)
-        return get_forecast_horizon_index_single_time_series(
-            past_timestamps=timestamps, freq=ts_dataframe.freq, prediction_length=prediction_length
-        ).to_frame()
+    timestamps = ts_dataframe.reset_index(level=TIMESTAMP)[TIMESTAMP]
+    last_ts = timestamps.groupby(level=ITEMID, sort=False).tail(1)
+    offset = pd.tseries.frequencies.to_offset(ts_dataframe.freq)
 
-    return ts_dataframe.groupby(level=ITEMID, sort=False).apply(get_series_with_timestamps_per_item).index
+    def get_index_single_item(item_id, cutoff):
+        return pd.DataFrame(
+            {
+                ITEMID: [item_id] * prediction_length,
+                TIMESTAMP: pd.date_range(start=cutoff + offset, freq=offset, periods=prediction_length),
+            }
+        )
+
+    index_per_item = []
+    for item_id, cutoff in last_ts.items():
+        index_per_item.append(get_index_single_item(item_id, cutoff))
+    return pd.MultiIndex.from_frame(pd.concat(index_per_item))

@@ -54,9 +54,15 @@ def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_glu
         num_samples=100,
     )
     fcast_list, ts_list = list(forecast_iter), list(ts_iter)
-    forecast_df = model._gluonts_forecasts_to_data_frame(fcast_list, quantile_levels=model.quantile_levels)
+    prediction_length = 2
+    forecast_index = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None).index
+    forecast_df = model._gluonts_forecasts_to_data_frame(
+        fcast_list,
+        quantile_levels=model.quantile_levels,
+        forecast_index=forecast_index,
+    )
 
-    ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=2)
+    ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=prediction_length)
     ag_value = ag_evaluator(DUMMY_TS_DATAFRAME, forecast_df)
 
     gts_evaluator = GluonTSEvaluator()
@@ -81,9 +87,15 @@ def test_when_given_all_zero_data_when_evaluator_called_then_output_equal_to_glu
         num_samples=100,
     )
     fcast_list, ts_list = list(forecast_iter), list(ts_iter)
-    forecast_df = model._gluonts_forecasts_to_data_frame(fcast_list, quantile_levels=model.quantile_levels)
+    prediction_length = 2
+    forecast_index = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None).index
+    forecast_df = model._gluonts_forecasts_to_data_frame(
+        fcast_list,
+        quantile_levels=model.quantile_levels,
+        forecast_index=forecast_index,
+    )
 
-    ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=2)
+    ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=prediction_length)
     ag_value = ag_evaluator(data, forecast_df)
 
     gts_evaluator = GluonTSEvaluator()
@@ -111,9 +123,15 @@ def test_when_given_zero_forecasts_when_evaluator_called_then_output_equal_to_gl
                 item_id=s.item_id,
             )
         )
-    forecast_df = model._gluonts_forecasts_to_data_frame(zero_forecast_list, quantile_levels=model.quantile_levels)
+    prediction_length = 2
+    forecast_index = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None).index
+    forecast_df = model._gluonts_forecasts_to_data_frame(
+        zero_forecast_list,
+        quantile_levels=model.quantile_levels,
+        forecast_index=forecast_index,
+    )
 
-    ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=2)
+    ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=prediction_length)
     ag_value = ag_evaluator(DUMMY_TS_DATAFRAME, forecast_df)
 
     gts_evaluator = GluonTSEvaluator()
