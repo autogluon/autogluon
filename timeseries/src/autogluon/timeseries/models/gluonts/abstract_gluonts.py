@@ -11,8 +11,8 @@ from gluonts.dataset.common import Dataset as GluonTSDataset
 from gluonts.dataset.field_names import FieldName
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
-from gluonts.torch.model.forecast import DistributionForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
+from gluonts.torch.model.forecast import DistributionForecast
 from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.utils.log_utils import set_logger_verbosity

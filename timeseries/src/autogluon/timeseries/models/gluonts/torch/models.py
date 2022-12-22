@@ -13,11 +13,11 @@ import numpy as np
 import pandas as pd
 import torch
 from gluonts.core.component import from_hyperparameters
+from gluonts.model.forecast import QuantileForecast
 from gluonts.torch.distributions import AffineTransformed, NormalOutput
 from gluonts.torch.model.deepar import DeepAREstimator
 from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
 from gluonts.torch.model.forecast import DistributionForecast, Forecast
-from gluonts.model.forecast import QuantileForecast
 from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPredictor
 from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
 from pytorch_lightning.callbacks import Timer
