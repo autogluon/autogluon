@@ -126,6 +126,7 @@ def test_matcher(
 
     hyperparameters = {
         "optimization.max_epochs": 1,
+        "env.auto_select_gpus": False,  # Turn off due to pl.Trainer using multiprocessing fork context pool
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
         "optimization.top_k_average_method": "greedy_soup",
