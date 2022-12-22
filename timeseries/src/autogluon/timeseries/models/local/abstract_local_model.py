@@ -66,7 +66,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         if len(unused_local_model_args):
             logger.warning(
-                f" {self.name} ignores following hyperparameters: {unused_local_model_args}. "
+                f"{self.name} ignores following hyperparameters: {unused_local_model_args}. "
                 f"See the docstring of {self.name} for the list of supported hyperparameters."
             )
 
