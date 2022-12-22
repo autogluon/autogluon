@@ -244,6 +244,7 @@ class DistributionFit(AbstractAnalysis):
         If not specified and `distributions_to_fit` is not provided, then only top 3 will be included in the results.
     distributions_to_fit: Optional[Union[str, List[str]]] = None,
         list of distributions to fit. See `DistributionFit.AVAILABLE_DISTRIBUTIONS` for the list of supported values.
+        See `scipy <https://docs.scipy.org/doc/scipy/reference/stats.html>`_ documentation for each distribution details.
         If not specified, then all supported distributions will be attempted to fit.
     parent: Optional[AbstractAnalysis], default = None
         parent Analysis
@@ -278,6 +279,7 @@ class DistributionFit(AbstractAnalysis):
     --------
     :py:class:`~autogluon.eda.analysis.interaction.FeatureInteraction`
     :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`
+    `scipy <https://docs.scipy.org/doc/scipy/reference/stats.html>`_ documentation for each distribution details
 
     """
 
