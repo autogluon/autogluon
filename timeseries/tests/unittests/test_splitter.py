@@ -2,7 +2,7 @@ from ast import literal_eval
 
 import pytest
 
-from autogluon.timeseries.splitter import MultiWindowSplitter, append_suffix_to_item_id
+from autogluon.timeseries.splitter import MultiWindowSplitter
 
 from .common import (
     DATAFRAME_WITH_COVARIATES,
@@ -69,7 +69,8 @@ def test_when_all_series_too_short_then_multi_window_splitter_raises_value_error
 
 def test_when_splitter_adds_suffix_to_index_then_data_is_not_copied():
     ts_df = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy()
-    ts_df_with_suffix = append_suffix_to_item_id(ts_dataframe=ts_df, suffix="_[None:None]")
+    splitter = MultiWindowSplitter()
+    ts_df_with_suffix = splitter._append_suffix_to_item_id(ts_dataframe=ts_df, suffix="_[None:None]")
     assert ts_df.values.base is ts_df_with_suffix.values.base
 
 

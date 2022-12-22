@@ -54,18 +54,18 @@ class AbstractTimeSeriesSplitter:
     def __repr__(self):
         return f"{self.name}()"
 
-
-def append_suffix_to_item_id(
-    ts_dataframe: Union[TimeSeriesDataFrame, pd.DataFrame], suffix: str
-) -> TimeSeriesDataFrame:
-    """Append a suffix to each item_id in a TimeSeriesDataFrame."""
-    result = ts_dataframe.copy(deep=False)
-    if result.index.nlevels == 1:
-        result.index = result.index.astype(str) + suffix
-    elif result.index.nlevels == 2:
-        new_item_id = result.index.levels[0].astype(str) + suffix
-        result.index = result.index.set_levels(levels=new_item_id, level=0)
-    return result
+    @staticmethod
+    def _append_suffix_to_item_id(
+        ts_dataframe: Union[TimeSeriesDataFrame, pd.DataFrame], suffix: str
+    ) -> TimeSeriesDataFrame:
+        """Append a suffix to each item_id in a TimeSeriesDataFrame."""
+        result = ts_dataframe.copy(deep=False)
+        if result.index.nlevels == 1:
+            result.index = result.index.astype(str) + suffix
+        elif result.index.nlevels == 2:
+            new_item_id = result.index.levels[0].astype(str) + suffix
+            result.index = result.index.set_levels(levels=new_item_id, level=0)
+        return result
 
 
 class MultiWindowSplitter(AbstractTimeSeriesSplitter):
@@ -193,9 +193,9 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
                 if len(can_be_split) == 0:
                     break
 
-            validation_dataframes.append(append_suffix_to_item_id(ts_dataframe, suffix))
+            validation_dataframes.append(self._append_suffix_to_item_id(ts_dataframe, suffix))
             if static_features_available:
-                validation_static_features.append(append_suffix_to_item_id(ts_dataframe.static_features, suffix))
+                validation_static_features.append(self._append_suffix_to_item_id(ts_dataframe.static_features, suffix))
 
             ts_dataframe = ts_dataframe.slice_by_timestep(None, -prediction_length)
 
