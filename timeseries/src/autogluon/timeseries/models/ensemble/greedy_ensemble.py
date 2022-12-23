@@ -1,6 +1,6 @@
 import copy
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -36,22 +36,31 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
             **kwargs,
         )
 
-    def _fit(self, predictions, labels, time_limit=None, sample_weight=None):
+    def _fit(
+        self,
+        predictions: TimeSeriesDataFrame,
+        labels: TimeSeriesDataFrame,
+        time_limit: Optional[int] = None,
+        sample_weight=None,
+    ):
         self.dummy_pred = copy.deepcopy(predictions[0])
         # This should never happen; sanity check to make sure that all predictions have the same index
         assert all(self.dummy_pred.index.equals(pred.index) for pred in predictions)
+        # Split the observed time series once to avoid repeated computations inside the evaluator
+        data_past = labels.slice_by_timestep(None, -self.metric.prediction_length)
+        data_future = labels.slice_by_timestep(-self.metric.prediction_length, None)
+        self.metric.cache_historic_metrics(data_past)
         super()._fit(
             predictions=[d.values for d in predictions],
-            labels=labels,
+            labels=data_future,
             time_limit=time_limit,
-            sample_weight=sample_weight,
         )
         self.dummy_pred = None
 
     def _calculate_regret(self, y_true, y_pred_proba, metric, dummy_pred=None, sample_weight=None):  # noqa
         dummy_pred = copy.deepcopy(self.dummy_pred if dummy_pred is None else dummy_pred)
         dummy_pred[list(dummy_pred.columns)] = y_pred_proba
-        score = metric(y_true, dummy_pred) * metric.coefficient
+        score = metric.score_with_cached_history(y_true, dummy_pred) * metric.coefficient
         # score: higher is better, regret: lower is better, so we flip the sign
         return -score
 
