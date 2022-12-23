@@ -985,7 +985,7 @@ class MultiModalPredictor:
                 val_df = val_df.sample(n=val_n)
             elif isinstance(n, float):
                 train_df = train_df.sample(frac=n)
-                val_df = val_df.sample(frac=n)
+                # val_df = val_df.sample(frac=n)
 
         norm_param_names = get_norm_layer_param_names(model)
 
