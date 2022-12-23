@@ -681,10 +681,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def fit_ensemble(
         self, val_data: TimeSeriesDataFrame, model_names: List[str], time_limit: Optional[float] = None
     ) -> str:
+        val_data_past = val_data.slice_by_timestep(None, -self.prediction_length)
+        val_data_future = val_data.slice_by_timestep(-self.prediction_length, None)
         evaluator = TimeSeriesEvaluator(
             eval_metric=self.eval_metric,
             prediction_length=self.prediction_length,
             target_column=self.target,
+            data_past=val_data_past,
         )
 
         logger.info("Fitting simple weighted ensemble.")
@@ -707,7 +710,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         ensemble.fit(
             predictions=predictions,
-            labels=val_data,
+            labels=val_data_future,
             time_limit=time_limit,
         )
 
@@ -726,8 +729,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         time_end = time.time()
         simple_ensemble.fit_time = time_end - time_start
 
-        forecasts = simple_ensemble.predict({n: model_preds[n] for n in simple_ensemble.model_names})
-        simple_ensemble.val_score = evaluator(val_data, forecasts) * evaluator.coefficient
+        predictions = simple_ensemble.predict({n: model_preds[n] for n in simple_ensemble.model_names})
+        simple_ensemble.val_score = (
+            evaluator(data_future=val_data_future, predictions=predictions) * evaluator.coefficient
+        )
 
         predict_time = 0
         # FIXME: This is a hack, should instead leverage `predict_time_marginal` as in Tabular.
@@ -845,29 +850,18 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     ) -> float:
         model = self._get_model_for_prediction(model)
         eval_metric = self.eval_metric if metric is None else metric
+        data_past = data.slice_by_timestep(None, -self.prediction_length)
+        data_future = data.slice_by_timestep(None, -self.prediction_length)
+        known_covariates = data_future.drop(self.target, axis=1) if len(data.columns) > 1 else None
+        predictions = self.predict(data=data_past, known_covariates=known_covariates, model=model)
 
-        if isinstance(model, TimeSeriesEnsembleWrapper):
-            evaluator = TimeSeriesEvaluator(
-                eval_metric=eval_metric,
-                prediction_length=self.prediction_length,
-                target_column=self.target,
-            )
-            model_preds = {}
-            base_models = self.get_minimum_model_set(model, include_self=False)
-            for base_model in base_models:
-                try:
-                    base_model_loaded = self._get_model_for_prediction(base_model)
-                    model_preds[base_model] = base_model_loaded.predict_for_scoring(
-                        data, quantile_levels=self.quantile_levels
-                    )
-                except Exception:
-                    model_preds[base_model] = None
-            forecasts = model.predict(model_preds)
-
-            model_score = evaluator(data, forecasts) * evaluator.coefficient
-            return model_score
-
-        return model.score(data, metric=eval_metric)
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=eval_metric,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
+            data_past=data_past,
+        )
+        return evaluator(data_future=data_future, predictions=predictions) * evaluator.coefficient
 
     def _predict_model(
         self,

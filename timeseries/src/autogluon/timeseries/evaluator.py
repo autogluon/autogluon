@@ -104,7 +104,9 @@ class TimeSeriesEvaluator:
     METRIC_COEFFICIENTS = {"MASE": -1, "MAPE": -1, "sMAPE": -1, "mean_wQuantileLoss": -1, "MSE": -1, "RMSE": -1}
     DEFAULT_METRIC = "mean_wQuantileLoss"
 
-    def __init__(self, eval_metric: str, prediction_length: int, target_column: str = "target"):
+    def __init__(
+        self, eval_metric: str, prediction_length: int, data_past: TimeSeriesDataFrame, target_column: str = "target"
+    ):
         assert eval_metric in self.AVAILABLE_METRICS, f"Metric {eval_metric} not available"
 
         self.prediction_length = prediction_length
@@ -112,6 +114,10 @@ class TimeSeriesEvaluator:
         self.target_column = target_column
 
         self.metric_method = self.__getattribute__("_" + self.eval_metric.lower())
+        if self.eval_metric.lower() == "mase":
+            self.historic_naive_1_error = in_sample_naive_1_error(data_past[self.target])
+        else:
+            self.historic_naive_1_error = None
 
     @property
     def coefficient(self) -> int:
@@ -134,8 +140,7 @@ class TimeSeriesEvaluator:
     def _mase(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, y_history: pd.Series) -> float:
         y_pred = self._get_median_forecast(predictions)
         mae = mae_per_item(y_true=y_true, y_pred=y_pred)
-        naive_1_error = in_sample_naive_1_error(y_history=y_history)
-        return self._safemean(mae / naive_1_error)
+        return self._safemean(mae / self.historic_naive_1_error)
 
     def _mape(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, **kwargs) -> float:
         y_pred = self._get_median_forecast(predictions)
@@ -195,11 +200,8 @@ class TimeSeriesEvaluator:
             return TimeSeriesEvaluator.DEFAULT_METRIC
         return metric
 
-    def __call__(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
+    def __call__(self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
         assert (predictions.num_timesteps_per_item() == self.prediction_length).all()
-        # Select entries in `data` that correspond to the forecast horizon
-        data_history = data.slice_by_timestep(None, -self.prediction_length)
-        data_future = data.slice_by_timestep(-self.prediction_length, None)
         assert data_future.index.equals(predictions.index), "Prediction and data indices do not match."
 
         with evaluator_warning_filter(), warnings.catch_warnings():
@@ -209,5 +211,4 @@ class TimeSeriesEvaluator:
             return self.metric_method(
                 y_true=data_future[self.target_column],
                 predictions=predictions,
-                y_history=data_history[self.target_column],
             )

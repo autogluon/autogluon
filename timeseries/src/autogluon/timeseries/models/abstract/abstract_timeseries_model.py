@@ -327,13 +327,16 @@ class AbstractTimeSeriesModel(AbstractModel):
             time steps of each time series.
         """
         metric = self.eval_metric if metric is None else metric
+        data_past = data.slice_by_timestep(None, -self.prediction_length)
+        data_future = data.slice_by_timestep(-self.prediction_length, None)
         evaluator = TimeSeriesEvaluator(
             eval_metric=metric,
             prediction_length=self.prediction_length,
             target_column=self.target,
+            data_past=data_past,
         )
         predictions = self.predict_for_scoring(data)
-        metric_value = evaluator(data, predictions)
+        metric_value = evaluator(data_future=data_future, predictions=predictions)
 
         return metric_value * evaluator.coefficient
 
