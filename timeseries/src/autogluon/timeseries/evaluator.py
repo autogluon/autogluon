@@ -198,14 +198,16 @@ class TimeSeriesEvaluator:
     def save_past_metrics(self, data_past: TimeSeriesDataFrame):
         self._past_naive_1_error = in_sample_naive_1_error(y_past=data_past[self.target_column])
 
-    def score_with_saved_past_data(self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
+    def score_with_saved_past_metrics(
+        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
+    ) -> float:
         """Compute the metric assuming that the historic metrics have already been computed.
 
         This method should be preferred to TimeSeriesEvaluator.__call__ if the metrics are computed multiple times, as
         it doesn't require splitting the test data into past/future portions each time (e.g., when fitting ensembles).
         """
         assert (predictions.num_timesteps_per_item() == self.prediction_length).all()
-        assert self._past_naive_1_error is not None, "Call save_past_metrics before score_with_saved_past_data"
+        assert self._past_naive_1_error is not None, "Call save_past_metrics before score_with_saved_past_metrics"
         assert data_future.index.equals(predictions.index), "Prediction and data indices do not match."
 
         with evaluator_warning_filter(), warnings.catch_warnings():
@@ -222,4 +224,4 @@ class TimeSeriesEvaluator:
         data_past = data.slice_by_timestep(None, -self.prediction_length)
         data_future = data.slice_by_timestep(-self.prediction_length, None)
         self.save_past_metrics(data_past=data_past)
-        return self.score_with_saved_past_data(data_future=data_future, predictions=predictions)
+        return self.score_with_saved_past_metrics(data_future=data_future, predictions=predictions)

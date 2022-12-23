@@ -183,5 +183,5 @@ def test_given_historic_data_not_cached_when_scoring_then_exception_is_raised(ev
     evaluator = TimeSeriesEvaluator(eval_metric=eval_metric, prediction_length=prediction_length)
     data_future = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None)
     predictions = data_future.rename({"target": "mean"}, axis=1)
-    with pytest.raises(AssertionError, match="Call save_past_metrics before score_with_saved_past_data"):
+    with pytest.raises(AssertionError, match="Call save_past_metrics before"):
         evaluator.score_with_saved_past_data(data_future=data_future, predictions=predictions)

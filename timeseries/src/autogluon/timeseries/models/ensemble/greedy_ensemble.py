@@ -49,7 +49,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         # Split the observed time series once to avoid repeated computations inside the evaluator
         data_past = labels.slice_by_timestep(None, -self.metric.prediction_length)
         data_future = labels.slice_by_timestep(-self.metric.prediction_length, None)
-        self.metric.cache_historic_metrics(data_past)
+        self.metric.save_past_metrics(data_past)
         super()._fit(
             predictions=[d.values for d in predictions],
             labels=data_future,
@@ -60,7 +60,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
     def _calculate_regret(self, y_true, y_pred_proba, metric, dummy_pred=None, sample_weight=None):  # noqa
         dummy_pred = copy.deepcopy(self.dummy_pred if dummy_pred is None else dummy_pred)
         dummy_pred[list(dummy_pred.columns)] = y_pred_proba
-        score = metric.score_with_cached_history(y_true, dummy_pred) * metric.coefficient
+        score = metric.score_with_saved_past_metrics(y_true, dummy_pred) * metric.coefficient
         # score: higher is better, regret: lower is better, so we flip the sign
         return -score
 
