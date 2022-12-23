@@ -175,3 +175,13 @@ def test_given_unavailable_input_and_no_raise_check_get_eval_metric_output_defau
     assert TimeSeriesEvaluator.DEFAULT_METRIC == TimeSeriesEvaluator.check_get_evaluation_metric(
         "some_nonsense_eval_metric", raise_if_not_available=False
     )
+
+
+@pytest.mark.parametrize("eval_metric", ["MASE", "sMAPE"])
+def test_given_historic_data_not_cached_when_scoring_then_exception_is_raised(eval_metric):
+    prediction_length = 3
+    evaluator = TimeSeriesEvaluator(eval_metric=eval_metric, prediction_length=prediction_length)
+    data_future = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None)
+    predictions = data_future.rename({"target": "mean"}, axis=1)
+    with pytest.raises(AssertionError, match="Call cache_historic_metrics"):
+        evaluator.score_with_cached_history(data_future=data_future, predictions=predictions)
