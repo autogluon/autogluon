@@ -980,12 +980,12 @@ class MultiModalPredictor:
             n = is_pretrain_["few_shot"]
             if isinstance(n, int):
                 train_n = min(n, len(train_df.index))
-                train_df = train_df.sample(n=train_n)
+                train_df = train_df.sample(n=train_n, random_state=1)
                 val_n = min(n, len(val_df.index))
-                val_df = val_df.sample(n=val_n)
+                val_df = val_df.sample(n=val_n, random_state=1)
             elif isinstance(n, float):
-                train_df = train_df.sample(frac=n)
-                # val_df = val_df.sample(frac=n)
+                train_df = train_df.sample(frac=n, random_state=1)
+                # val_df = val_df.sample(frac=n, random_state=1)
 
         norm_param_names = get_norm_layer_param_names(model)
 
