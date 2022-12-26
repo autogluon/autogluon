@@ -552,7 +552,10 @@ class FT_Transformer(nn.Module):
             if self.category_sizes:
                 x_num = x[:, len(self.category_sizes) :, :]
             num_out = [f(x_num[:, i]) for i, f in enumerate(self.num_out)]
-            num_out = torch.concat(num_out, dim=1)
+            if len(num_out)>0:
+                num_out = torch.concat(num_out, dim=1)
+            else:
+                num_out = None
             return {"num_out": num_out, "cat_out": cat_out}
 
     def __init__(

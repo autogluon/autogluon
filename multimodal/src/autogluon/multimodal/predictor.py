@@ -1366,22 +1366,22 @@ class MultiModalPredictor:
                         ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
                     )
                 except:
-                    while True:
-                        if not is_pretrain_["is_pretrain"]:
-                            break
-                        try:
-                            target = 'ec2/2022_09_14/cross_table_pretrain/' + is_pretrain_["folder_name"] + '/iter_' + str(-1) + '/' + is_pretrain_[
-                                'name'] + '.ckpt'
-                            checkpoint = {
-                                "state_dict": {name: param for name, param in
-                                            self._model.fusion_transformer.state_dict().items()}
-                            }
-                            torch.save(checkpoint, os.path.join("./", "pretrained.ckpt"))
-                            s3 = boto3.resource('s3')
-                            s3.Bucket('automl-benchmark-bingzzhu').upload_file('./pretrained.ckpt', target)
-                            break
-                        except:
-                            pass
+                    pass
+
+                while True:
+                    try:
+                        target = 'ec2/2022_09_14/cross_table_pretrain/' + is_pretrain_["folder_name"] + '/iter_' + str(-1) + '/' + is_pretrain_[
+                            'name'] + '.ckpt'
+                        checkpoint = {
+                            "state_dict": {name: param for name, param in
+                                        self._model.fusion_transformer.state_dict().items()}
+                        }
+                        torch.save(checkpoint, os.path.join("./", "pretrained.ckpt"))
+                        s3 = boto3.resource('s3')
+                        s3.Bucket('automl-benchmark-bingzzhu').upload_file('./pretrained.ckpt', target)
+                        break
+                    except:
+                        pass
 
             self._fit_called = True
 
