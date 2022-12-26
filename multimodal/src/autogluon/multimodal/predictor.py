@@ -960,18 +960,17 @@ class MultiModalPredictor:
             model = self._model
 
         while True:
-            if finetune_on is None:
-                break
             try:
-                foundation_model = finetune_on
-                s3 = boto3.resource('s3')
-                s3.Bucket('automl-benchmark-bingzzhu').download_file(
-                    'ec2/2022_09_14/cross_table_pretrain/' + foundation_model,
-                    './pretrained.ckpt'
-                )
-                pretrain_path = os.path.join("./", 'pretrained.ckpt')
-                state_dict = torch.load(pretrain_path, map_location=torch.device("cuda"))["state_dict"]
-                model.fusion_transformer.load_state_dict(state_dict)
+                if finetune_on is not None:
+                    foundation_model = finetune_on
+                    s3 = boto3.resource('s3')
+                    s3.Bucket('automl-benchmark-bingzzhu').download_file(
+                        'ec2/2022_09_14/cross_table_pretrain/' + foundation_model,
+                        './pretrained.ckpt'
+                    )
+                    pretrain_path = os.path.join("./", 'pretrained.ckpt')
+                    state_dict = torch.load(pretrain_path, map_location=torch.device("cuda"))["state_dict"]
+                    model.fusion_transformer.load_state_dict(state_dict)
                 break
             except:
                 pass

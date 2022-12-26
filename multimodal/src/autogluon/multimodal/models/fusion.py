@@ -322,6 +322,11 @@ class MultimodalFusionTransformer(nn.Module):
         self.loss_weight = loss_weight
         self.model = nn.ModuleList(models)
         self.row_attention = row_attention
+        if share_qv_weights:
+            self.pretrain_cls = True
+            share_qv_weights = False
+        else:
+            self.pretrain_cls = False
 
         raw_in_features = [per_model.out_features for per_model in models]
 
@@ -431,6 +436,14 @@ class MultimodalFusionTransformer(nn.Module):
             d_token=in_features,
             initialization="uniform",
         )
+        
+        if self.pretrain_cls:
+            self.fusion_transformer = nn.ModuleDict(
+                {
+                    "fusion_transformer": self.fusion_transformer,
+                    "cls_token": self.cls_token,
+                }
+            )
 
         self.out_features = in_features
 
@@ -466,8 +479,8 @@ class MultimodalFusionTransformer(nn.Module):
                 output.update(per_output)
 
         multimodal_features = torch.cat(multimodal_features, dim=1)
-        multimodal_features = self.cls_token(multimodal_features)
-        features = self.fusion_transformer(multimodal_features)
+        multimodal_features = self.fusion_transformer["cls_token"](multimodal_features) if self.pretrain_cls else self.cls_token(multimodal_features)
+        features = self.fusion_transformer["fusion_transformer"](multimodal_features) if self.pretrain_cls else self.fusion_transformer(multimodal_features)
         features = self.remainder_transformer(features)
 
         logits = self.heads[head](features)
