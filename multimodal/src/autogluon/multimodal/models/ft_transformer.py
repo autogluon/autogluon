@@ -692,7 +692,7 @@ class FT_Transformer(nn.Module):
 
         self.blocks = nn.ModuleList([])
         if self.row_attention:
-            row_attention_layers = nn.ModuleDict(
+            self.row_attention_layers = nn.ModuleDict(
                 {
                     "row_attention": MultiheadAttention(
                         d_token=d_token,
@@ -714,7 +714,7 @@ class FT_Transformer(nn.Module):
                     "row_output": nn.Identity(),  # for hooks-based introspection
                 }
             )
-            for p in row_attention_layers.parameters():
+            for p in self.row_attention_layers.parameters():
                 nn.init.zeros_(p)
 
         for layer_idx in range(n_blocks):
@@ -759,7 +759,7 @@ class FT_Transformer(nn.Module):
                 else:
                     assert kv_compression_sharing == "key-value", _INTERNAL_ERROR_MESSAGE
             if row_attention:
-                layer.update(row_attention_layers)
+                layer.update(self.row_attention_layers)
             self.blocks.append(layer)
 
         self.head = (
