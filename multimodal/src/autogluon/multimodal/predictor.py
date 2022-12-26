@@ -160,6 +160,7 @@ from .utils import (
     update_tabular_config_by_resources,
     use_realtime,
     setup_problem_type_and_presets,
+    predict,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -1961,63 +1962,6 @@ class MultiModalPredictor:
             return eval_results, outputs
         else:
             return eval_results
-
-    def _process_batch(
-        self,
-        data: Union[pd.DataFrame, dict, list],
-        df_preprocessor: MultiModalFeaturePreprocessor,
-        data_processors: Dict,
-    ):
-
-        modality_features, modality_types, sample_num = apply_df_preprocessor(
-            data=data,
-            df_preprocessor=df_preprocessor,
-            modalities=data_processors.keys(),
-        )
-
-        processed_features = []
-        for i in range(sample_num):
-            per_sample_features = get_per_sample_features(
-                modality_features=modality_features,
-                modality_types=modality_types,
-                idx=i,
-            )
-            per_sample_features = apply_data_processor(
-                per_sample_features=per_sample_features,
-                data_processors=data_processors,
-                feature_modalities=modality_types,
-                is_training=False,
-            )
-            processed_features.append(per_sample_features)
-
-        collate_fn = get_collate_fn(
-            df_preprocessor=df_preprocessor, data_processors=data_processors, per_gpu_batch_size=sample_num
-        )
-        batch = collate_fn(processed_features)
-
-        return batch
-
-    def _realtime_predict(
-        self,
-        data: pd.DataFrame,
-        df_preprocessor: MultiModalFeaturePreprocessor,
-        data_processors: Dict,
-        num_gpus: int,
-        precision: Union[int, str],
-    ) -> List[Dict]:
-        batch = self._process_batch(
-            data=data,
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-        )
-        output = infer_batch(
-            batch=batch,
-            model=self._model,
-            precision=precision,
-            num_gpus=num_gpus,
-            model_postprocess_fn=self._model_postprocess_fn,
-        )
-        return [output]
 
     def _predict(
         self,

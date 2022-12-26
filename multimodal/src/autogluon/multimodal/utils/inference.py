@@ -23,8 +23,11 @@ from ..constants import (
     TEXT,
     TOKEN_WORD_MAPPING,
     WORD_OFFSETS,
+    OBJECT_DETECTION,
 )
-from .environment import get_precision_context, move_to_device
+from ..data.preprocess_dataframe import MultiModalFeaturePreprocessor
+from ..data.utils import get_per_sample_features, get_collate_fn, apply_df_preprocessor, apply_data_processor
+from .environment import get_precision_context, move_to_device, compute_num_gpus, infer_precision, compute_inference_batch_size
 from .misc import tensor_to_ndarray
 from .log import apply_log_filter, LogFilter
 
@@ -186,22 +189,93 @@ def use_realtime(data: pd.DataFrame, data_processors: Dict, batch_size: int):
     return realtime
 
 
+def process_batch(
+    data: Union[pd.DataFrame, dict, list],
+    df_preprocessor: MultiModalFeaturePreprocessor,
+    data_processors: Dict,
+):
+
+    modality_features, modality_types, sample_num = apply_df_preprocessor(
+        data=data,
+        df_preprocessor=df_preprocessor,
+        modalities=data_processors.keys(),
+    )
+
+    processed_features = []
+    for i in range(sample_num):
+        per_sample_features = get_per_sample_features(
+            modality_features=modality_features,
+            modality_types=modality_types,
+            idx=i,
+        )
+        per_sample_features = apply_data_processor(
+            per_sample_features=per_sample_features,
+            data_processors=data_processors,
+            feature_modalities=modality_types,
+            is_training=False,
+        )
+        processed_features.append(per_sample_features)
+
+    collate_fn = get_collate_fn(
+        df_preprocessor=df_preprocessor, data_processors=data_processors, per_gpu_batch_size=sample_num
+    )
+    batch = collate_fn(processed_features)
+
+    return batch
+
+
+def realtime_predict(
+    model: nn.Module,
+    data: pd.DataFrame,
+    df_preprocessor: MultiModalFeaturePreprocessor,
+    data_processors: Dict,
+    num_gpus: int,
+    precision: Union[int, str],
+    model_postprocess_fn: Callable,
+) -> List[Dict]:
+    batch = process_batch(
+        data=data,
+        df_preprocessor=df_preprocessor,
+        data_processors=data_processors,
+    )
+    output = infer_batch(
+        batch=batch,
+        model=model,
+        precision=precision,
+        num_gpus=num_gpus,
+        model_postprocess_fn=model_postprocess_fn,
+    )
+    return [output]
+
+
 def predict(
     predictor,
     data: Union[pd.DataFrame, dict, list],
     requires_label: bool,
+    id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]] = None,
+    signature: Optional[str] = None,
     realtime: Optional[bool] = None,
+    is_matching: Optional[bool] = False,
     seed: Optional[int] = 123,
 ) -> List[Dict]:
 
     with apply_log_filter(LogFilter("Global seed set to")):  # Ignore the log "Global seed set to"
         pl.seed_everything(seed, workers=True)
 
-    data, df_preprocessor, data_processors = predictor._on_predict_start(
-        config=predictor._config,
-        data=data,
-        requires_label=requires_label,
-    )
+    if is_matching:
+        data, df_preprocessor, data_processors, match_label = predictor._on_predict_start(
+            config=predictor._config,
+            data=data,
+            id_mappings=id_mappings,
+            requires_label=requires_label,
+            signature=signature,
+        )
+    else:
+        data, df_preprocessor, data_processors = predictor._on_predict_start(
+            config=predictor._config,
+            data=data,
+            requires_label=requires_label,
+        )
 
     strategy = "dp"  # default used in inference.
 
@@ -231,26 +305,40 @@ def predict(
     if realtime is None:
         realtime = use_realtime(data=data, data_processors=data_processors, batch_size=batch_size)
 
-    if predictor._problem_type and predictor._problem_type == OBJECT_DETECTION:
+    if predictor._problem_type == OBJECT_DETECTION:
         realtime = False
 
     if realtime:
-        outputs = predictor._realtime_predict(
+        outputs = realtime_predict(
+            model=predictor._model,
             data=data,
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             num_gpus=num_gpus,
             precision=precision,
+            model_postprocess_fn=predictor._model_postprocess_fn,
         )
     else:
-        outputs = predictor._default_predict(
-            data=data,
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-            num_gpus=num_gpus,
-            precision=precision,
-            batch_size=batch_size,
-            strategy=strategy,
-        )
+        if is_matching:
+            outputs = predictor._default_predict(
+                data=data,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                num_gpus=num_gpus,
+                precision=precision,
+                batch_size=batch_size,
+                strategy=strategy,
+                match_label=match_label,
+            )
+        else:
+            outputs = predictor._default_predict(
+                data=data,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                num_gpus=num_gpus,
+                precision=precision,
+                batch_size=batch_size,
+                strategy=strategy,
+            )
 
     return outputs
