@@ -1,7 +1,6 @@
 import copy
 import logging
 from typing import Dict, List, Optional, Tuple, Union
-import warnings
 
 from ..constants import AUTOMM, QUERY, RESPONSE
 from .config import customize_model_names, get_config
@@ -131,31 +130,3 @@ def init_pretrained_matcher(
 
     return config, query_config, response_config, query_model, response_model, query_processors, response_processors
 
-
-def setup_problem_type_and_presets(
-        problem_type: str,
-        presets: str,
-        pipeline: Optional[str] = None,
-):
-    assert pipeline is None or presets is None
-
-    if pipeline:
-        pipeline = pipeline.lower()
-        warnings.warn(
-            f"pipeline argument has been deprecated and moved to problem_type. "
-            f"Use problem_type='{pipeline}' instead.",
-            DeprecationWarning,
-        )
-        if problem_type is not None:
-            assert pipeline == problem_type, (
-                f"Mismatched pipeline and problem_type. "
-                f"Received pipeline={pipeline}, problem_type={problem_type}. "
-                f"Consider to revise the arguments."
-            )
-        problem_type = pipeline
-
-    if problem_type and problem_type not in BASIC_PROBLEM_TYPES:
-        assert presets is None
-        presets = problem_type
-
-    return problem_type, presets

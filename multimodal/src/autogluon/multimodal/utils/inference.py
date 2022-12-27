@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 from torch import nn
 import pytorch_lightning as pl
-import OmegaConf
+from omegaconf import OmegaConf
 
 from ..constants import (
     AUTOMM,
@@ -264,7 +264,6 @@ def predict(
 
     if is_matching:
         data, df_preprocessor, data_processors, match_label = predictor._on_predict_start(
-            config=predictor._config,
             data=data,
             id_mappings=id_mappings,
             requires_label=requires_label,
@@ -272,7 +271,6 @@ def predict(
         )
     else:
         data, df_preprocessor, data_processors = predictor._on_predict_start(
-            config=predictor._config,
             data=data,
             requires_label=requires_label,
         )
@@ -305,7 +303,7 @@ def predict(
     if realtime is None:
         realtime = use_realtime(data=data, data_processors=data_processors, batch_size=batch_size)
 
-    if predictor._problem_type == OBJECT_DETECTION:
+    if predictor._problem_type == OBJECT_DETECTION or is_matching:
         realtime = False
 
     if realtime:
@@ -322,6 +320,7 @@ def predict(
         if is_matching:
             outputs = predictor._default_predict(
                 data=data,
+                id_mappings=id_mappings,
                 df_preprocessor=df_preprocessor,
                 data_processors=data_processors,
                 num_gpus=num_gpus,
@@ -329,6 +328,7 @@ def predict(
                 batch_size=batch_size,
                 strategy=strategy,
                 match_label=match_label,
+                signature=signature,
             )
         else:
             outputs = predictor._default_predict(

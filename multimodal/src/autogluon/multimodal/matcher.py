@@ -1301,10 +1301,12 @@ class MultiModalMatcher:
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
     ):
-        outputs = self._predict(
+        outputs = predict(
+            predictor=self,
             data=data,
             id_mappings=id_mappings,
             requires_label=True,
+            is_matching=True,
         )
         prob = extract_from_output(ret_type=PROBABILITY, outputs=outputs)
 
@@ -1467,10 +1469,12 @@ class MultiModalMatcher:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        outputs = self._predict(
+        outputs = predict(
+            predictor=self,
             data=data,
             id_mappings=id_mappings,
             requires_label=False,
+            is_matching=True,
         )
         prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
 
@@ -1520,10 +1524,12 @@ class MultiModalMatcher:
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-        outputs = self._predict(
+        outputs = predict(
+            predictor=self,
             data=data,
             id_mappings=id_mappings,
             requires_label=False,
+            is_matching=True,
         )
         prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
 
@@ -1590,11 +1596,13 @@ class MultiModalMatcher:
             else:
                 signature = QUERY
 
-        outputs = self._predict(
+        outputs = predict(
+            predictor=self,
             data=data,
             id_mappings=id_mappings,
             signature=signature,
             requires_label=False,
+            is_matching=True,
         )
         features = extract_from_output(outputs=outputs, ret_type=FEATURES, as_ndarray=as_tensor is False)
 

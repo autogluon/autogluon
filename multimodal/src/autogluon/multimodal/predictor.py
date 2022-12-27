@@ -159,7 +159,6 @@ from .utils import (
     update_config_by_rules,
     update_tabular_config_by_resources,
     use_realtime,
-    setup_problem_type_and_presets,
     predict,
 )
 
@@ -342,11 +341,20 @@ class MultiModalPredictor:
             This is used for automatically inference num_classes, classes, or label.
 
         """
-        problem_type, presets = setup_problem_type_and_presets(
-            problem_type=problem_type,
-            presets=presets,
-            pipeline=pipeline,
-        )
+        if pipeline is not None:
+            pipeline = pipeline.lower()
+            warnings.warn(
+                f"pipeline argument has been deprecated and moved to problem_type. "
+                f"Use problem_type='{pipeline}' instead.",
+                DeprecationWarning,
+            )
+            if problem_type is not None:
+                assert pipeline == problem_type, (
+                    f"Mismatched pipeline and problem_type. "
+                    f"Received pipeline={pipeline}, problem_type={problem_type}. "
+                    f"Consider to revise the arguments."
+                )
+            problem_type = pipeline
         # Sanity check of problem_type
         if problem_type is not None:
             problem_type = problem_type.lower()
@@ -1840,7 +1848,6 @@ class MultiModalPredictor:
 
     def _on_predict_start(
         self,
-        config: DictConfig,
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
     ):
@@ -1880,7 +1887,7 @@ class MultiModalPredictor:
 
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
-                config=config,
+                config=self._config,
                 column_types=column_types,
                 label_column=self._label_column,
                 train_df_x=data,  # TODO: drop label like in line 884?
@@ -1935,7 +1942,8 @@ class MultiModalPredictor:
             anno_file = self.detection_anno_train
             data = anno_file_or_df
 
-        outputs = self._predict(
+        outputs = predict(
+            predictor=self,
             data=data,
             requires_label=True,
             seed=seed,
@@ -1962,75 +1970,6 @@ class MultiModalPredictor:
             return eval_results, outputs
         else:
             return eval_results
-
-    def _predict(
-        self,
-        data: Union[pd.DataFrame, dict, list],
-        requires_label: bool,
-        realtime: Optional[bool] = None,
-        seed: Optional[int] = 123,
-    ) -> List[Dict]:
-
-        with apply_log_filter(LogFilter("Global seed set to")):  # Ignore the log "Global seed set to"
-            pl.seed_everything(seed, workers=True)
-
-        data, df_preprocessor, data_processors = self._on_predict_start(
-            config=self._config,
-            data=data,
-            requires_label=requires_label,
-        )
-
-        strategy = "dp"  # default used in inference.
-
-        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
-
-        if self._problem_type == OBJECT_DETECTION:
-            strategy = "ddp"
-
-        if strategy == "ddp" and self._fit_called:
-            num_gpus = 1  # While using DDP, we can only use single gpu after fit is called
-
-        if num_gpus <= 1:
-            # Force set strategy to be None if it's cpu-only or we have only one GPU.
-            strategy = None
-
-        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False)
-
-        if not realtime:
-            batch_size = compute_inference_batch_size(
-                per_gpu_batch_size=self._config.env.per_gpu_batch_size,
-                eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
-                per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,  # backward compatibility.
-                num_gpus=num_gpus,
-                strategy=strategy,
-            )
-
-        if realtime is None:
-            realtime = use_realtime(data=data, data_processors=data_processors, batch_size=batch_size)
-
-        if self._problem_type and self._problem_type == OBJECT_DETECTION:
-            realtime = False
-
-        if realtime:
-            outputs = self._realtime_predict(
-                data=data,
-                df_preprocessor=df_preprocessor,
-                data_processors=data_processors,
-                num_gpus=num_gpus,
-                precision=precision,
-            )
-        else:
-            outputs = self._default_predict(
-                data=data,
-                df_preprocessor=df_preprocessor,
-                data_processors=data_processors,
-                num_gpus=num_gpus,
-                precision=precision,
-                batch_size=batch_size,
-                strategy=strategy,
-            )
-
-        return outputs
 
     def set_num_gpus(self, num_gpus):
         assert isinstance(num_gpus, int)
@@ -2129,7 +2068,8 @@ class MultiModalPredictor:
         else:
             ret_type = LOGITS
 
-        outputs = self._predict(
+        outputs = predict(
+            predictor=self,
             data=data,
             requires_label=True,
             realtime=realtime,
@@ -2319,7 +2259,8 @@ class MultiModalPredictor:
                 return_prob=False,
             )
         else:
-            outputs = self._predict(
+            outputs = predict(
+                predictor=self,
                 data=data,
                 requires_label=False,
                 realtime=realtime,
@@ -2443,7 +2384,8 @@ class MultiModalPredictor:
                 return_prob=True,
             )
         else:
-            outputs = self._predict(
+            outputs = predict(
+                predictor=self,
                 data=data,
                 requires_label=False,
                 realtime=realtime,
@@ -2522,7 +2464,8 @@ class MultiModalPredictor:
             data_processors=self._data_processors,
             flag=True,
         )
-        outputs = self._predict(
+        outputs = predict(
+            predictor=self,
             data=data,
             requires_label=False,
             realtime=realtime,
@@ -2758,7 +2701,6 @@ class MultiModalPredictor:
                 data = data[:2]
 
         data, df_preprocessor, data_processors = self._on_predict_start(
-            config=self._config,
             data=data,
             requires_label=requires_label,
         )
