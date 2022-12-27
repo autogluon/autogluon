@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from pandas.core.internals import ArrayManager, BlockManager
 
+from autogluon.common.loaders import load_pd
 from autogluon.common.utils.deprecated import deprecated
 
 ITEMID = "item_id"
@@ -29,8 +30,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
     Parameters
     ----------
     data : Any
-        Time-series data to construct a ``TimeSeriesDataFrame``. The class currently supports three
-        input formats.
+        Time-series data to construct a ``TimeSeriesDataFrame``. The class currently supports four input formats.
 
         1. Time-series data in Iterable format. For example::
 
@@ -66,6 +66,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 2       2019-01-01       6
                         2019-01-02       7
                         2019-01-03       8
+
+        4. Path to a data file in CSV or Parquet format. The file must contain columns ``item_id`` and ``timestamp``, as well as columns with time series values. This is similar to Option 2 above (pandas DataFrame format without multi-index). Both remote (e.g., S3) and local paths are accepted.
 
     static_features : Optional[pd.DataFrame]
         An optional data frame describing the metadata attributes of individual items in the item index. These
@@ -104,10 +106,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 self._validate_multi_index_data_frame(data)
             else:
                 data = self._construct_pandas_frame_from_data_frame(data)
+        elif isinstance(data, str):
+            data = self._load_data_frame_from_file(data)
         elif isinstance(data, Iterable):
             data = self._construct_pandas_frame_from_iterable_dataset(data)
         else:
-            raise ValueError("Data input type not recognized, must be DataFrame or iterable.")
+            raise ValueError("Data input type not recognized, must be DataFrame, iterable or string.")
         super().__init__(data=data, *args, **kwargs)
         self._static_features: Optional[pd.DataFrame] = None
         if static_features is not None:
@@ -307,6 +311,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
             A data frame in TimeSeriesDataFrame format.
         """
         return cls(cls._construct_pandas_frame_from_iterable_dataset(iterable_dataset))
+
+    @classmethod
+    def _load_data_frame_from_file(cls, path: str) -> pd.DataFrame:
+        df = load_pd.load(path)
+        return cls._construct_pandas_frame_from_data_frame(df)
 
     @classmethod
     def _construct_pandas_frame_from_data_frame(

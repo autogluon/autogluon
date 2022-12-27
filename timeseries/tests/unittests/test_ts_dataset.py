@@ -734,3 +734,10 @@ def test_when_dataset_constructed_from_dataframe_then_timestamp_column_is_conver
     )
     ts_df = TimeSeriesDataFrame.from_data_frame(df, timestamp_column=timestamp_column)
     assert ts_df.index.get_level_values(level=TIMESTAMP).dtype == "datetime64[ns]"
+
+
+def test_when_path_is_given_to_constructor_then_tsdf_is_constructed_correctly():
+    df = TimeSeriesDataFrame("https://autogluon.s3.amazonaws.com/datasets/timeseries/dummy/dummy.csv")
+    assert isinstance(df.index, pd.MultiIndex)
+    assert df.index.names == [ITEMID, TIMESTAMP]
+    assert len(df) > 0
