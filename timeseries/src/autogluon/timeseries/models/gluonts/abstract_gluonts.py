@@ -409,7 +409,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             "Some forecast quantiles are missing from GluonTS forecast outputs. Was"
             " the model trained to forecast all quantiles?"
         )
-        item_id_to_forecast = {f.item_id: f for f in forecasts}
+        item_id_to_forecast = {str(f.item_id): f for f in forecasts}
         result_dfs = []
         for item_id in forecast_index.unique(level=ITEMID):
             # GluonTS always saves item_id as a string
