@@ -32,15 +32,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
     data : Any
         Time-series data to construct a ``TimeSeriesDataFrame``. The class currently supports four input formats.
 
-        1. Time-series data in Iterable format. For example::
-
-                iterable_dataset = [
-                    {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq='D')},
-                    {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq='D')},
-                    {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq='D')}
-                ]
-
-        2. Time-series data in a pandas DataFrame format without multi-index. For example::
+        1. Time-series data in a pandas DataFrame format without multi-index. For example::
 
                    item_id  timestamp  target
                 0        0 2019-01-01       0
@@ -53,7 +45,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 7        2 2019-01-02       7
                 8        2 2019-01-03       8
 
-        3. Time-series data in pandas DataFrame format with multi-index on item_id and timestamp. For example::
+        2. Time-series data in pandas DataFrame format with multi-index on item_id and timestamp. For example::
 
                                         target
                 item_id timestamp
@@ -67,7 +59,15 @@ class TimeSeriesDataFrame(pd.DataFrame):
                         2019-01-02       7
                         2019-01-03       8
 
-        4. Path to a data file in CSV or Parquet format. The file must contain columns ``item_id`` and ``timestamp``, as well as columns with time series values. This is similar to Option 2 above (pandas DataFrame format without multi-index). Both remote (e.g., S3) and local paths are accepted.
+        3. Path to a data file in CSV or Parquet format. The file must contain columns ``item_id`` and ``timestamp``, as well as columns with time series values. This is similar to Option 2 above (pandas DataFrame format without multi-index). Both remote (e.g., S3) and local paths are accepted.
+
+        4. Time-series data in Iterable format. For example::
+
+                iterable_dataset = [
+                    {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq='D')},
+                    {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq='D')},
+                    {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq='D')}
+                ]
 
     static_features : Optional[pd.DataFrame]
         An optional data frame describing the metadata attributes of individual items in the item index. These
