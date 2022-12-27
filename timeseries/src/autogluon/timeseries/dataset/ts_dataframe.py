@@ -341,6 +341,47 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return df.set_index([ITEMID, TIMESTAMP])
 
     @classmethod
+    def from_path(
+        cls,
+        path: str,
+        id_column: Optional[str] = None,
+        timestamp_column: Optional[str] = None,
+    ) -> TimeSeriesDataFrame:
+        """Construct a ``TimeSeriesDataFrame`` from a CSV or Parquet file.
+
+        Parameters
+        ----------
+        path : str
+            Path to a local or remote (e.g., S3) file containing the time series data in CSV or Parquet format.
+            Example file contents::
+
+            .. code-block::
+
+                item_id,timestamp,target
+                0,2019-01-01,0
+                0,2019-01-02,1
+                0,2019-01-03,2
+                1,2019-01-01,3
+                1,2019-01-02,4
+                1,2019-01-03,5
+                2,2019-01-01,6
+                2,2019-01-02,7
+                2,2019-01-03,8
+
+        id_column: str
+            Name of the 'item_id' column if column name is different
+        timestamp_column: str
+            Name of the 'timestamp' column if column name is different
+
+        Returns
+        -------
+        ts_df: TimeSeriesDataFrame
+            A data frame in TimeSeriesDataFrame format.
+        """
+        df = load_pd.load(path)
+        return cls.from_data_frame(df, id_column=id_column, timestamp_column=timestamp_column)
+
+    @classmethod
     def from_data_frame(
         cls,
         df: pd.DataFrame,
