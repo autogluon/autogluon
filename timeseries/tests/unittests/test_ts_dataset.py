@@ -720,3 +720,17 @@ def test_when_static_features_are_modified_on_shallow_copy_then_original_df_does
     new_df = old_df.copy(deep=False)
     new_df.static_features = None
     assert old_df.static_features is not None
+
+
+@pytest.mark.parametrize("timestamp_column", ["timestamp", None, "custom_ts_column"])
+def test_when_dataset_constructed_from_dataframe_then_timestamp_column_is_converted_to_datetime(timestamp_column):
+    timestamps = ["2020-01-01", "2020-01-02", "2020-01-03"]
+    df = pd.DataFrame(
+        {
+            "item_id": np.ones(len(timestamps), dtype=np.int64),
+            timestamp_column or "timestamp": timestamps,
+            "target": np.ones(len(timestamps)),
+        }
+    )
+    ts_df = TimeSeriesDataFrame.from_data_frame(df, timestamp_column=timestamp_column)
+    assert ts_df.index.get_level_values(level=TIMESTAMP).dtype == "datetime64[ns]"

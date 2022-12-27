@@ -577,3 +577,22 @@ def test_when_prediction_data_contains_nans_then_exception_is_raised(temp_model_
     df.iloc[5] = np.nan
     with pytest.raises(ValueError, match="missing values"):
         predictor.predict(df)
+
+
+def test_given_data_is_in_dataframe_format_then_predictor_works(temp_model_path):
+    df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
+    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    predictor.fit(df, hyperparameters={"Naive": {}})
+    predictor.leaderboard(df)
+    predictor.score(df)
+    predictions = predictor.predict(df)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+
+
+@pytest.mark.parametrize("rename_columns", [{TIMESTAMP: "custom_timestamp"}, {ITEMID: "custom_item_id"}])
+def test_given_data_cannot_be_interpreted_as_tsdf_then_exception_raised(temp_model_path, rename_columns):
+    df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
+    df = df.rename(columns=rename_columns)
+    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    with pytest.raises(ValueError, match="cannot be interpreted as a TimeSeriesDataFrame"):
+        predictor.fit(df, hyperparameters={"Naive": {}})

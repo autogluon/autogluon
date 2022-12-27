@@ -205,6 +205,11 @@ class TimeSeriesPredictor:
         """
         if df is None:
             return df
+        if not isinstance(df, TimeSeriesDataFrame):
+            try:
+                df = TimeSeriesDataFrame(df)
+            except:
+                raise ValueError(f"Provided data of type {type(df)} cannot be interpreted as a TimeSeriesDataFrame.")
         if self.ignore_time_index:
             df = df.get_reindexed_view(freq="S")
         timestamps = df.reset_index(level=TIMESTAMP)[TIMESTAMP]
