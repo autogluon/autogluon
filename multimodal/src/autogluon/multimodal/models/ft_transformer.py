@@ -762,6 +762,30 @@ class FT_Transformer(nn.Module):
                 else:
                     assert kv_compression_sharing == "key-value", _INTERNAL_ERROR_MESSAGE
             if row_attention:
+                self.row_attention_layers = nn.ModuleDict(
+                    {
+                        "row_attention": MultiheadAttention(
+                            d_token=d_token,
+                            n_heads=attention_n_heads,
+                            dropout=attention_dropout,
+                            bias=True,
+                            initialization=attention_initialization,
+                        ),
+                        "row_ffn": FT_Transformer.FFN(
+                            d_token=d_token,
+                            d_hidden=ffn_d_hidden,
+                            bias_first=True,
+                            bias_second=True,
+                            dropout=ffn_dropout,
+                            activation=ffn_activation,
+                        ),
+                        "row_attention_residual_dropout": nn.Dropout(residual_dropout),
+                        "row_ffn_residual_dropout": nn.Dropout(residual_dropout),
+                        "row_output": nn.Identity(),  # for hooks-based introspection
+                    }
+                )
+                for p in self.row_attention_layers.parameters():
+                    nn.init.zeros_(p)
                 layer.update(self.row_attention_layers)
             self.blocks.append(layer)
 
