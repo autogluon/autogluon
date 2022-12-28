@@ -247,7 +247,7 @@ class PretrainLitModule(LitModule):
             state_dict = torch.load(ckpt_path, map_location=torch.device("cuda"))["state_dict"]
             with torch.no_grad():
                 for name in new_pretrained:
-                    new_pretrained[name] = new_pretrained[name] + torch.nan_to_num(state_dict[name]) / num_files
+                    new_pretrained[name] = new_pretrained[name] + torch.nan_to_num(state_dict[name], posinf=0, neginf=0) / num_files
         self.model.fusion_transformer.load_state_dict(new_pretrained)
         self._save_s3('ec2/2022_09_14/cross_table_pretrain/' + self.is_pretrain["folder_name"] + '/iter_' + str(self.current_iter) + '/pretrained.ckpt')
         self.prev_state_dic = copy.deepcopy(new_pretrained)
