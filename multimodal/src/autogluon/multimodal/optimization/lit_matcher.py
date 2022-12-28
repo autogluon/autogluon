@@ -16,11 +16,11 @@ from .utils import (
     apply_layerwise_lr_decay,
     apply_single_lr,
     apply_two_stages_lr,
-    compute_probability,
     generate_metric_learning_labels,
     get_lr_scheduler,
     get_optimizer,
 )
+from ..utils.matcher import compute_matching_probability
 
 logger = logging.getLogger(AUTOMM)
 
@@ -212,7 +212,7 @@ class MatcherLitModule(pl.LightningModule):
             )
         else:
             metric.update(
-                compute_probability(
+                compute_matching_probability(
                     embeddings1=query_embeddings,
                     embeddings2=response_embeddings,
                     reverse_prob=reverse_prob,
@@ -339,7 +339,7 @@ class MatcherLitModule(pl.LightningModule):
             query_embeddings = self.query_model(batch)[self.query_model.prefix][FEATURES]
             response_embeddings = self.response_model(batch)[self.response_model.prefix][FEATURES]
 
-        match_prob = compute_probability(
+        match_prob = compute_matching_probability(
             embeddings1=query_embeddings,
             embeddings2=response_embeddings,
         )

@@ -58,7 +58,7 @@ from ..constants import (
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
 )
-from ..utils import MeanAveragePrecision
+from ..utils.map import MeanAveragePrecision
 from .losses import MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
@@ -966,39 +966,3 @@ def generate_metric_learning_labels(
     metric_learning_labels = torch.cat([labels_1, labels_2], dim=0)
 
     return metric_learning_labels
-
-
-def compute_probability(
-    logits: Optional[torch.Tensor] = None,
-    embeddings1: Optional[torch.Tensor] = None,
-    embeddings2: Optional[torch.Tensor] = None,
-    reverse_prob: Optional[bool] = False,
-):
-    """
-    Compute probabilities from logits or embedding pairs.
-
-    Parameters
-    ----------
-    logits
-        The output of a model's head layer.
-    embeddings1
-        Feature embeddings of one side in matching.
-    embeddings2
-        Feature embeddings 2 of the other side in matching.
-    reverse_prob
-        Whether to reverse the probability.
-
-    Returns
-    -------
-    Probabilities.
-    """
-    if logits is not None:
-        prob = F.softmax(logits.float(), dim=1)[:, 1]
-    else:
-        cosine_similarity = F.cosine_similarity(embeddings1, embeddings2)
-        prob = 0.5 * (cosine_similarity + 1)
-
-    if reverse_prob:
-        prob = 1 - prob
-
-    return prob

@@ -24,9 +24,12 @@ from ..constants import (
     TOKEN_WORD_MAPPING,
     WORD_OFFSETS,
     OBJECT_DETECTION,
+    QUERY,
+    RESPONSE,
 )
 from ..data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from ..data.utils import get_per_sample_features, get_collate_fn, apply_df_preprocessor, apply_data_processor
+from .matcher import compute_matching_probability
 from .environment import get_precision_context, move_to_device, compute_num_gpus, infer_precision, compute_inference_batch_size
 from .misc import tensor_to_ndarray
 from .log import apply_log_filter, LogFilter
@@ -111,7 +114,7 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
 
 
 def infer_batch(
-    batch: Dict, model: nn.Module, precision: Union[str, int], num_gpus: int, model_postprocess_fn: Callable
+    batch: Dict, model: nn.Module, precision: Union[str, int], num_gpus: int, model_postprocess_fn: Callable = None,
 ):
     """
     Perform inference for a batch.
@@ -151,6 +154,68 @@ def infer_batch(
     else:
         model = model
     return output[model.prefix]
+
+
+def infer_matcher_batch(
+    batch: Dict, query_model: nn.Module, response_model: nn.Module, signature: str, match_label: int, precision: Union[str, int], num_gpus: int,
+):
+    """
+    Perform matcher inference for a batch.
+
+    Parameters
+    ----------
+    batch
+        The batch data.
+    query_model
+        Query model.
+    response_model
+        Response model.
+    signature
+        query, response, or None.
+    match_label
+        0 or 1.
+    precision
+        The desired precision used in inference.
+    num_gpus
+        Number of GPUs.
+
+    Returns
+    -------
+    Model output.
+    """
+    if signature is None or signature == QUERY:
+        output = infer_batch(
+            batch=batch,
+            model=query_model,
+            precision=precision,
+            num_gpus=num_gpus,
+        )
+        query_embeddings = output[FEATURES]
+
+    if signature is None or signature == RESPONSE:
+        output = infer_batch(
+            batch=batch,
+            model=response_model,
+            precision=precision,
+            num_gpus=num_gpus,
+        )
+        response_embeddings = output[FEATURES]
+
+    if signature == QUERY:
+        return {FEATURES: query_embeddings}
+    elif signature == RESPONSE:
+        return {FEATURES: response_embeddings}
+    else:
+        match_prob = compute_matching_probability(
+            embeddings1=query_embeddings,
+            embeddings2=response_embeddings,
+        )
+        if match_label == 0:
+            probability = torch.stack([match_prob, 1 - match_prob]).t()
+        else:
+            probability = torch.stack([1 - match_prob, match_prob]).t()
+
+        return {PROBABILITY: probability}
 
 
 def use_realtime(data: pd.DataFrame, data_processors: Dict, batch_size: int):
@@ -225,26 +290,43 @@ def process_batch(
 
 
 def realtime_predict(
-    model: nn.Module,
     data: pd.DataFrame,
     df_preprocessor: MultiModalFeaturePreprocessor,
     data_processors: Dict,
     num_gpus: int,
     precision: Union[int, str],
-    model_postprocess_fn: Callable,
+    model: Optional[nn.Module] = None,
+    query_model: Optional[nn.Module] = None,
+    response_model: Optional[nn.Module] = None,
+    model_postprocess_fn: Optional[Callable] = None,
+    is_matching: Optional[bool] = False,
+    signature: Optional[str] = None,
+    match_label: Optional[int] = None,
 ) -> List[Dict]:
+
     batch = process_batch(
         data=data,
         df_preprocessor=df_preprocessor,
         data_processors=data_processors,
     )
-    output = infer_batch(
-        batch=batch,
-        model=model,
-        precision=precision,
-        num_gpus=num_gpus,
-        model_postprocess_fn=model_postprocess_fn,
-    )
+    if is_matching:
+        output = infer_matcher_batch(
+            batch=batch,
+            query_model=query_model,
+            response_model=response_model,
+            signature=signature,
+            match_label=match_label,
+            precision=precision,
+            num_gpus=num_gpus,
+        )
+    else:
+        output = infer_batch(
+            batch=batch,
+            model=model,
+            precision=precision,
+            num_gpus=num_gpus,
+            model_postprocess_fn=model_postprocess_fn,
+        )
     return [output]
 
 
@@ -303,19 +385,35 @@ def predict(
     if realtime is None:
         realtime = use_realtime(data=data, data_processors=data_processors, batch_size=batch_size)
 
-    if predictor._problem_type == OBJECT_DETECTION or is_matching:
+    if predictor._problem_type == OBJECT_DETECTION:
         realtime = False
 
+    print(f"\nrealtime: {realtime}\n")
+
     if realtime:
-        outputs = realtime_predict(
-            model=predictor._model,
-            data=data,
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-            num_gpus=num_gpus,
-            precision=precision,
-            model_postprocess_fn=predictor._model_postprocess_fn,
-        )
+        if is_matching:
+            outputs = realtime_predict(
+                query_model=predictor._query_model,
+                response_model=predictor._response_model,
+                data=data,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                num_gpus=num_gpus,
+                precision=precision,
+                is_matching=True,
+                signature=signature,
+                match_label=match_label,
+            )
+        else:
+            outputs = realtime_predict(
+                model=predictor._model,
+                data=data,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                num_gpus=num_gpus,
+                precision=precision,
+                model_postprocess_fn=predictor._model_postprocess_fn,
+            )
     else:
         if is_matching:
             outputs = predictor._default_predict(
