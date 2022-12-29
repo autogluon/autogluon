@@ -60,7 +60,7 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
         super().__init__(parent, children, state, **kwargs)
         self.category_to_numbers = category_to_numbers
         if feature_generator is None:
-            feature_generator = AutoMLPipelineFeatureGenerator(
+            args = dict(
                 enable_numeric_features=True,
                 enable_categorical_features=True,
                 enable_datetime_features=False,
@@ -68,7 +68,10 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
                 enable_text_ngram_features=False,
                 enable_raw_text_features=False,
                 enable_vision_features=False,
+                verbosity=0,
             )
+            args = {**args, **kwargs}
+            feature_generator = AutoMLPipelineFeatureGenerator(**args)
         self.feature_generator = feature_generator
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
