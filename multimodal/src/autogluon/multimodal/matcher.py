@@ -61,6 +61,7 @@ from .data.infer_types import (
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from .optimization.lit_matcher import MatcherLitModule
 from .optimization.utils import get_matcher_loss_func, get_matcher_miner_func, get_metric
+from .presets import matcher_presets
 from .utils import (
     AutoMMModelCheckpoint,
     CustomUnpickler,
@@ -113,7 +114,6 @@ class MultiModalMatcher:
         label: Optional[str] = None,
         match_label: Optional[Union[int, str]] = None,
         problem_type: Optional[str] = None,
-        pipeline: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -193,8 +193,8 @@ class MultiModalMatcher:
         self._data_format = PAIR  # TODO: Support Triplet
         self._match_label = match_label
         self._label_column = label
-        self._problem_type = problem_type.lower() if problem_type is not None else None
-        self._pipeline = pipeline.lower() if pipeline is not None else None
+        self._problem_type = None  # always infer problem type for matching.
+        self._pipeline = problem_type.lower() if problem_type is not None else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = None
@@ -252,7 +252,12 @@ class MultiModalMatcher:
 
     @property
     def problem_type(self):
-        return self._problem_type
+        if self._pipeline and self._problem_type:
+            return f"{self._pipeline}_{self._problem_type}"
+        elif self._pipeline:
+            return self._pipeline
+        else:
+            return self._problem_type
 
     @property
     def column_types(self):
@@ -435,7 +440,7 @@ class MultiModalMatcher:
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
                 problem_type=problem_type,
-                pipeline=self._pipeline,
+                is_matching=self._pipeline in matcher_presets.list_keys(),
                 eval_metric_name=self._eval_metric_name,
             )
         else:
@@ -672,6 +677,7 @@ class MultiModalMatcher:
             metric_name=validation_metric_name,
             num_classes=self._output_shape,
             pos_label=pos_label,
+            is_matching=self._pipeline in matcher_presets.list_keys(),
         )
         logger.debug(f"validation_metric_name: {validation_metric_name}")
         logger.debug(f"validation_metric: {validation_metric}")
@@ -686,9 +692,8 @@ class MultiModalMatcher:
             distance_type=config.matcher.distance.type,
         )
 
-        if self._pipeline == IMAGE_TEXT_SIMILARITY:
-            miner_func = None
-        else:
+        miner_func = None
+        if self._problem_type == BINARY:
             miner_func = get_matcher_miner_func(
                 miner_type=config.matcher.miner.type,
                 pos_margin=config.matcher.miner.pos_margin,

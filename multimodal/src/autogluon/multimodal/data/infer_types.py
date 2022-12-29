@@ -612,7 +612,7 @@ def infer_problem_type_output_shape(
         Shape of output.
     """
     if label_column is None:
-        return None, None
+        return provided_problem_type, None
 
     if provided_problem_type is not None:
         if provided_problem_type == MULTICLASS or provided_problem_type == BINARY:
@@ -647,7 +647,7 @@ def infer_problem_type_output_shape(
             ]
             return provided_problem_type, len(set(unique_entity_groups)) + 2
         elif provided_problem_type == OBJECT_DETECTION:
-            return None, None
+            return provided_problem_type, None
         else:
             raise ValueError(
                 f"Problem type '{provided_problem_type}' doesn't have a valid output shape "

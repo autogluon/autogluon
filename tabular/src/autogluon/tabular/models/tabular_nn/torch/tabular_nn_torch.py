@@ -16,6 +16,8 @@ from autogluon.core.utils import try_import_torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 
+from ..compilers.native import TabularNeuralNetTorchNativeCompiler
+from ..compilers.onnx import TabularNeuralNetTorchOnnxCompiler
 from ..hyperparameters.parameters import get_default_param
 from ..hyperparameters.searchspaces import get_default_searchspace
 from ..utils.data_preprocessor import create_preprocessor, get_feature_arraycol_map, get_feature_type_map
@@ -253,7 +255,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         logger.log(15, "Neural network architecture:")
         logger.log(15, str(self.model))
 
-        net_filename = self.path + self.temp_file_name
+        net_filename = os.path.join(self.path, self.temp_file_name)
         if num_epochs == 0:
             # use dummy training loop that stops immediately
             # useful for using NN just for data preprocessing / debugging
@@ -430,7 +432,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             raise ValueError("new_data must of of type TabularTorchDataset if process=False")
         val_dataloader = new_data.build_loader(self.max_batch_size, self.num_dataloading_workers, is_test=True)
         preds_dataset = []
-        for batch_idx, data_batch in enumerate(val_dataloader):
+        for data_batch in val_dataloader:
             preds_batch = self.model.predict(data_batch)
             preds_dataset.append(preds_batch)
         preds_dataset = np.concatenate(preds_dataset, 0)
@@ -567,13 +569,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         return num_cpus, num_gpus
 
     def save(self, path: str = None, verbose=True) -> str:
-        if self.model is not None:
-            self._architecture_desc = self.model.architecture_desc
         temp_model = self.model
         self.model = None
         path_final = super().save(path=path, verbose=verbose)
         self.model = temp_model
-        self._architecture_desc = None
 
         # Export model
         if self.model is not None:
@@ -588,18 +587,11 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
         model: TabularNeuralNetTorchModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-        if model._architecture_desc is not None:
-            import torch
-            from .torch_network_modules import EmbedNet
-
-            # recreate network from architecture description
-            model.model = EmbedNet(problem_type=model.problem_type,
-                                   num_net_outputs=model._get_num_net_outputs(),
-                                   quantile_levels=model.quantile_levels,
-                                   architecture_desc=model._architecture_desc,
-                                   device=model.device)
-            model._architecture_desc = None
-            model.model = torch.load(model.path + model.params_file_name)
+        import torch
+        model.model = torch.load(os.path.join(model.path, model.params_file_name))
+        if hasattr(model, '_compiler') and model._compiler:
+            model.model.eval()
+            model.processor = model._compiler.load(path=model.path)
         return model
     
     def _get_hpo_backend(self):
@@ -620,3 +612,47 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         #  self.params_trained['batch_size'] = batch_size
         #  self.params_trained['num_epochs'] = best_epoch
         return {'can_refit_full': True}
+
+    def _valid_compilers(self):
+        return [TabularNeuralNetTorchNativeCompiler,
+                TabularNeuralNetTorchOnnxCompiler]
+
+    def _default_compiler(self):
+        return TabularNeuralNetTorchNativeCompiler
+
+    def _get_input_types(self, batch_size=None):
+        input_types = []
+        for f in self._features:
+            input_types.append((f, [batch_size, 1]))
+        return input_types
+
+    def compile(self, compiler_configs=None):
+        """
+        Compile the trained model for faster inference.
+
+        This completely overrides the compile() in AbstractModel, since we won't
+        overwrite self.model in the compilation process.
+        Instead, self.processor would be converted from sklearn ColumnTransformer
+        to its alternative counterpart.
+        """
+        assert self.is_fit(), "The model must be fit before calling the compile method."
+        if compiler_configs is None:
+            compiler_configs = {}
+        # Take self.max_batch_size as default batch size, instead of None in AbstractModel
+        batch_size = compiler_configs.get("batch_size", self.max_batch_size)
+        compiler_configs.update(batch_size=batch_size)
+        super().compile(compiler_configs)
+
+    def _compile(self, **kwargs):
+        """
+        Take the compiler to perform actual compilation.
+
+        This overrides the _compile() in AbstractModel, since we won't
+        overwrite self.model in the compilation process.
+        Instead, self.processor would be converted from sklearn ColumnTransformer
+        to TabularNeuralNetTorchOnnxTransformer.
+        """
+        input_types = kwargs.get('input_types', self._get_input_types(batch_size=self.max_batch_size))
+        self.processor = self._compiler.compile(model=(self.processor, self.model),
+                                                path=self.path,
+                                                input_types=input_types)

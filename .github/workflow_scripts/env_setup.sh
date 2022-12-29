@@ -16,12 +16,24 @@ function setup_build_contrib_env {
 }
 
 function setup_mxnet_gpu {
-    python3 -m pip install mxnet-cu112==1.9.*
+    python3 -m pip install mxnet-cu113==1.9.*
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 }
 
 function setup_torch_gpu {
-    python3 -m pip install torch==1.12.0+cu113 torchvision==0.13.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
+    # Security-patched torch
+    TORCH_URL=https://aws-pytorch-unified-cicd-binaries.s3.us-west-2.amazonaws.com/r1.12.1_sm/20221201-232940/bbd58c88fe74811ebc2c7225a308eeadfa42a7b9/torch-1.12.1%2Bcu113-cp38-cp38-linux_x86_64.whl
+    TORCHVISION_URL=https://download.pytorch.org/whl/cu113/torchvision-0.13.1%2Bcu113-cp38-cp38-linux_x86_64.whl
+    python3 -m pip uninstall -y torch torchvision torchaudio torchdata
+    python3 -m pip install --no-cache-dir -U ${TORCH_URL} ${TORCHVISION_URL}
+}
+
+function setup_torch_cpu {
+    # Security-patched torch
+    TORCH_URL=https://aws-pytorch-unified-cicd-binaries.s3.us-west-2.amazonaws.com/r1.12.1_sm/20221130-175350/98e79c6834c193ed3751a155c5309d441bf904e3/torch-1.12.1%2Bcpu-cp38-cp38-linux_x86_64.whl
+    TORCHVISION_URL=https://download.pytorch.org/whl/cpu/torchvision-0.13.1%2Bcpu-cp38-cp38-linux_x86_64.whl
+    python3 -m pip uninstall -y torch torchvision torchaudio torchdata
+    python3 -m pip install --no-cache-dir -U ${TORCH_URL} ${TORCHVISION_URL}
 }
 
 function install_local_packages {
@@ -43,11 +55,6 @@ function install_multimodal {
 function install_vision {
     python3 -m pip install --upgrade pytest-xdist  # launch different process for each test to avoid resource not being released by either mxnet or torch
     install_local_packages "vision/"
-}
-
-function install_cloud {
-    python3 -m pip install --upgrade pytest-xdist # Enable running tests in parallel for speedup
-    install_local_packages "cloud/[tests]"
 }
 
 function install_all {

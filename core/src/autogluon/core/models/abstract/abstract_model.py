@@ -485,9 +485,9 @@ class AbstractModel:
             user_specified_total_resource = math.inf
         
         # retrieve model level requirement when self is bagged model
-        user_specified_model_level_resource = self.model_base._user_params_aux.get(resource_type, None)
+        user_specified_model_level_resource = self._get_child_aux_val(key=resource_type, default=None)
         if user_specified_model_level_resource is not None:
-            assert user_specified_model_level_resource <= system_resource, f'Specified {resource_type} per {self.model_base.__class__.__name__} is more than the total: {system_resource}'
+            assert user_specified_model_level_resource <= system_resource, f'Specified {resource_type} per model base is more than the total: {system_resource}'
         user_specified_lower_level_resource = user_specified_ensemble_resource
         if user_specified_ensemble_resource is not None:
             if user_specified_model_level_resource is not None:
@@ -1040,7 +1040,12 @@ class AbstractModel:
                                             compiler_fallback_to_native=compiler_fallback_to_native)
         if self._compiler is not None:
             input_types = self._get_input_types(batch_size=batch_size)
-            self.model = self._compiler.compile(model=self.model, path=self.path, input_types=input_types)
+            self._compile(input_types=input_types)
+
+    def _compile(self, **kwargs):
+        """Take the compiler to perform actual compilation."""
+        input_types = kwargs.get('input_types', self._get_input_types(batch_size=None))
+        self.model = self._compiler.compile(model=self.model, path=self.path, input_types=input_types)
 
     # FIXME: This won't work for all models, and self._features is not
     # a trustworthy variable for final input shape

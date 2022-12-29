@@ -14,7 +14,7 @@ from .download import download, is_url
 logger = logging.getLogger(AUTOMM)
 
 
-def from_dict(data):
+def from_dict(data: dict):
     """
     Construct a dataframe (dummy) from a data dictionary, with the form {"image": ["img1.jpg", "img2.jpg", ...]}
     Parameters
@@ -373,7 +373,6 @@ def _check_load_coco_bbox(
         xmin, ymin, xmax, ymax = bbox_clip_xyxy(bbox_xywh_to_xyxy(obj["bbox"]), width, height)
         # require non-zero box area
         if obj["area"] > 0 and xmax > xmin and ymax > ymin:
-            # TODO: remove hardcoding here
             cat_ids = coco.getCatIds()
             id_to_idx = dict(zip(cat_ids, range(len(cat_ids))))
             class_label = id_to_idx[coco.loadCats(obj["category_id"])[0]["id"]]
@@ -470,50 +469,6 @@ def from_coco(
     return df.sort_values("image").reset_index(drop=True)
 
 
-def getCOCOCatIDs(is_voc=False):
-    if is_voc:
-        return range(20)
-    else:
-        return [e for e in range(1, 91) if e not in {12, 26, 29, 30, 45, 66, 68, 69, 71, 83}]
-
-
-COCO_ID_TO_IDX = dict(zip(getCOCOCatIDs(), range(80)))
-
-
-def COCOId2Idx(id):
-    return COCO_ID_TO_IDX[id]
-
-
-VOC_CLASSES = [
-    "aeroplane",
-    "bicycle",
-    "bird",
-    "boat",
-    "bottle",
-    "bus",
-    "car",
-    "cat",
-    "chair",
-    "cow",
-    "diningtable",
-    "dog",
-    "horse",
-    "motorbike",
-    "person",
-    "pottedplant",
-    "sheep",
-    "sofa",
-    "train",
-    "tvmonitor",
-]
-
-VOC_NAME_TO_IDX = dict(zip(VOC_CLASSES, range(20)))
-
-
-def VOCName2Idx(name):
-    return VOC_NAME_TO_IDX[name]
-
-
 def get_image_filename(path: str):
     """
     Get the filename (without extension) from its path.
@@ -533,7 +488,13 @@ def get_image_filename(path: str):
 class COCODataset:
     # The class that load/save COCO data format.
     # TODO: refactor data loading into here
-    def __init__(self, anno_file):
+    def __init__(self, anno_file: str):
+        """
+        Parameters
+        ----------
+        anno_file
+            The path to COCO format json annotation file.
+        """
         self.anno_file = anno_file
 
         with open(anno_file, "r") as f:
@@ -597,7 +558,20 @@ class COCODataset:
             json.dump(coco_format_result, f)
 
 
-def cocoeval_torchmetrics(outputs):
+def cocoeval_torchmetrics(outputs: List):
+    """
+    Evaluate predictor's output using torchmetrics' mAP implementation: https://github.com/Lightning-AI/metrics
+
+    Parameters
+    ----------
+    outputs
+        The predictor's output. It is a list with length equals number of images.
+
+    Returns
+    -------
+    The mAP result.
+    """
+
     import torch
 
     from . import MeanAveragePrecision
@@ -639,7 +613,31 @@ def cocoeval_torchmetrics(outputs):
     return map_metric.compute()
 
 
-def cocoeval_pycocotools(outputs, data, anno_file, cache_path, metrics):
+def cocoeval_pycocotools(
+    outputs: List, data: pd.DataFrame, anno_file: str, cache_path: str, metrics: Optional[Union[str, List]]
+):
+    """
+    Evaluate predictor's output using pycocotool's mAP implementation: https://github.com/cocodataset/cocoapi
+    Pycocotool's implementation takes COCO format prediction result file as input.
+    So here requires a cache_path to store the prediction result file.
+
+    Parameters
+    ----------
+    outputs
+        The predictor's output. It is a list with length equals number of images.
+    data
+        The input data.
+    anno_file
+        The path to COCO format json annotation file.
+    cache_path
+        The cache path to store prediction result in COCO format.
+    metrics
+        The name of metrics to be reported.
+
+    Returns
+    -------
+    The mAP result.
+    """
     try_import_pycocotools()
     from pycocotools.coco import COCO
     from pycocotools.cocoeval import COCOeval
@@ -671,7 +669,36 @@ def cocoeval_pycocotools(outputs, data, anno_file, cache_path, metrics):
     return {metrics: cocoEval.stats[0]}
 
 
-def cocoeval(outputs, data, anno_file, cache_path, metrics, tool="pycocotools"):
+def cocoeval(
+    outputs: List,
+    data: pd.DataFrame,
+    anno_file: str,
+    cache_path: str,
+    metrics: Optional[Union[str, List]],
+    tool="pycocotools",
+):
+    """
+    Evaluate predictor's output using mAP metrics per COCO's standard.
+
+    Parameters
+    ----------
+    outputs
+        The predictor's output. It is a list with length equals number of images.
+    data
+        The input data.
+    anno_file
+        The path to COCO format json annotation file.
+    cache_path
+        The cache path to store prediction result in COCO format.
+    metrics
+        The name of metrics to be reported.
+    tool
+        Use the mAP implementation of "pycocotools" or "torchmetrics".
+
+    Returns
+    -------
+    The mAP result.
+    """
     if (not tool) or tool == "pycocotools":
         return cocoeval_pycocotools(outputs, data, anno_file, cache_path, metrics)
     elif tool == "torchmetrics":
@@ -783,7 +810,23 @@ def process_voc_annotations(
         f.writelines("\n".join(xml_file_names))
 
 
-def from_coco_or_voc(file_path, splits: Optional[str] = None):
+def from_coco_or_voc(file_path: str, splits: Optional[Union[str]] = None):
+    """
+    Convert the data from coco or voc format to pandas Dataframe.
+
+    Parameters
+    ----------
+    file_path
+        The path to data.
+        If it is a file, it should be the COCO format json annotation file.
+        If it is a directory, it should be the root folder of VOC format data.
+    splits
+        The splits to use for VOC format data.
+
+    Returns
+    -------
+        The data in our pandas Dataframe format.
+    """
     if os.path.isdir(file_path):
         # VOC use dir as input
         return from_voc(root=file_path, splits=splits)
@@ -791,7 +834,19 @@ def from_coco_or_voc(file_path, splits: Optional[str] = None):
         return from_coco(file_path)
 
 
-def get_coco_format_classes(sample_data_path):
+def get_coco_format_classes(sample_data_path: str):
+    """
+    The all class names for COCO format data.
+
+    Parameters
+    ----------
+    sample_data_path
+        The path to COCO format json annotation file. Could be any split, e.g. train/val/test/....
+
+    Returns
+    -------
+        All the class names.
+    """
     try:
         with open(sample_data_path, "r") as f:
             annotation = json.load(f)
@@ -800,7 +855,19 @@ def get_coco_format_classes(sample_data_path):
     return [cat["name"] for cat in annotation["categories"]]
 
 
-def get_voc_format_classes(root):
+def get_voc_format_classes(root: str):
+    """
+    The all class names for VOC format data.
+
+    Parameters
+    ----------
+    root
+        The path to the root directory of VOC data.
+
+    Returns
+    -------
+        All the class names.
+    """
     if is_url(root):
         root = download(root)
     rpath = Path(root).expanduser()
@@ -824,6 +891,19 @@ def get_voc_format_classes(root):
 
 
 def get_detection_classes(sample_data_path):
+    """
+    The all class names for given data.
+
+    Parameters
+    ----------
+    sample_data_path
+        If it is a file, it is the path to COCO format json annotation file. Could be any split, e.g. train/val/test/....
+        If it is a directory, it is path to the root directory of VOC data.
+
+    Returns
+    -------
+        All the class names.
+    """
     if os.path.isdir(sample_data_path):
         return get_voc_format_classes(sample_data_path)
     else:
