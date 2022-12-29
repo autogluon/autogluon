@@ -10,6 +10,7 @@ from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
 from ..constants import AUTOMM, FEATURES, LOGIT_SCALE, PROBABILITY, QUERY, RESPONSE
+from ..utils.matcher import compute_matching_probability
 from .losses import MultiNegativesSoftmaxLoss
 from .utils import (
     CustomHitRate,
@@ -20,7 +21,6 @@ from .utils import (
     get_lr_scheduler,
     get_optimizer,
 )
-from ..utils.matcher import compute_matching_probability
 
 logger = logging.getLogger(AUTOMM)
 

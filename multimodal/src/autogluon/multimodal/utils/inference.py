@@ -2,10 +2,10 @@ import logging
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
-import torch
-from torch import nn
 import pytorch_lightning as pl
+import torch
 from omegaconf import OmegaConf
+from torch import nn
 
 from ..constants import (
     AUTOMM,
@@ -18,22 +18,27 @@ from ..constants import (
     NER,
     NER_ANNOTATION,
     NER_RET,
+    OBJECT_DETECTION,
     PROBABILITY,
+    QUERY,
+    RESPONSE,
     SCORE,
     TEXT,
     TOKEN_WORD_MAPPING,
     WORD_OFFSETS,
-    OBJECT_DETECTION,
-    QUERY,
-    RESPONSE,
 )
 from ..data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from ..data.utils import get_per_sample_features, get_collate_fn, apply_df_preprocessor, apply_data_processor
+from ..data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
+from .environment import (
+    compute_inference_batch_size,
+    compute_num_gpus,
+    get_precision_context,
+    infer_precision,
+    move_to_device,
+)
+from .log import LogFilter, apply_log_filter
 from .matcher import compute_matching_probability
-from .environment import get_precision_context, move_to_device, compute_num_gpus, infer_precision, compute_inference_batch_size
 from .misc import tensor_to_ndarray
-from .log import apply_log_filter, LogFilter
-
 
 logger = logging.getLogger(AUTOMM)
 
@@ -114,7 +119,11 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
 
 
 def infer_batch(
-    batch: Dict, model: nn.Module, precision: Union[str, int], num_gpus: int, model_postprocess_fn: Callable = None,
+    batch: Dict,
+    model: nn.Module,
+    precision: Union[str, int],
+    num_gpus: int,
+    model_postprocess_fn: Callable = None,
 ):
     """
     Perform inference for a batch.
@@ -157,7 +166,13 @@ def infer_batch(
 
 
 def infer_matcher_batch(
-    batch: Dict, query_model: nn.Module, response_model: nn.Module, signature: str, match_label: int, precision: Union[str, int], num_gpus: int,
+    batch: Dict,
+    query_model: nn.Module,
+    response_model: nn.Module,
+    signature: str,
+    match_label: int,
+    precision: Union[str, int],
+    num_gpus: int,
 ):
     """
     Perform matcher inference for a batch.
@@ -255,11 +270,30 @@ def use_realtime(data: pd.DataFrame, data_processors: Dict, batch_size: int):
 
 
 def process_batch(
-    data: Union[pd.DataFrame, Dict, List],
+    data: pd.DataFrame,
     df_preprocessor: Union[MultiModalFeaturePreprocessor, List[MultiModalFeaturePreprocessor]],
     data_processors: Union[Dict, List[Dict]],
     id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]] = None,
 ):
+    """
+    process data to get a batch.
+
+    Parameters
+    ----------
+    data
+        A dataframe.
+    df_preprocessor
+        Dataframe preprocessors.
+    data_processors
+        Data processors.
+    id_mappings
+        Id-to-content mappings. The contents can be text, image, etc.
+        This is used when the dataframe contains the query/response indexes instead of their contents.
+
+    Returns
+    -------
+    A dict of tensors.
+    """
     if isinstance(df_preprocessor, MultiModalFeaturePreprocessor):
         df_preprocessor = [df_preprocessor]
     if isinstance(data_processors, dict):
@@ -309,8 +343,8 @@ def process_batch(
 
 def realtime_predict(
     data: pd.DataFrame,
-    df_preprocessor: MultiModalFeaturePreprocessor,
-    data_processors: Dict,
+    df_preprocessor: Union[MultiModalFeaturePreprocessor, List[MultiModalFeaturePreprocessor]],
+    data_processors: Union[Dict, List[Dict]],
     num_gpus: int,
     precision: Union[int, str],
     model: Optional[nn.Module] = None,
@@ -322,6 +356,43 @@ def realtime_predict(
     signature: Optional[str] = None,
     match_label: Optional[int] = None,
 ) -> List[Dict]:
+    """
+    Perform realtime inference.
+
+    Parameters
+    ----------
+    data
+        A dataframe.
+    df_preprocessor
+        Dataframe preprocessors.
+    data_processors
+        Data processors.
+    num_gpus
+        Number of GPUs.
+    precision
+        The precision used in inference.
+    model
+        Predictor's model.
+    query_model
+        Matcher's query model.
+    response_model
+        Matcher's response model.
+    model_postprocess_fn
+        Model postprocessing function.
+    is_matching
+        Whether is matching.
+    id_mappings
+        Id-to-content mappings. The contents can be text, image, etc.
+        This is used when the dataframe contains the query/response indexes instead of their contents.
+    signature
+        query or response.
+    match_label
+        0 or 1.
+
+    Returns
+    -------
+    A list of output dicts.
+    """
 
     batch = process_batch(
         data=data,
@@ -360,7 +431,33 @@ def predict(
     is_matching: Optional[bool] = False,
     seed: Optional[int] = 123,
 ) -> List[Dict]:
+    """
+    Perform inference for predictor or matcher.
 
+    Parameters
+    ----------
+    predictor
+        A predictor or matcher object.
+    data
+        The data for inference.
+    requires_label
+        Whether uses label during inference.
+    id_mappings
+        Id-to-content mappings. The contents can be text, image, etc.
+        This is used when the dataframe contains the query/response indexes instead of their contents.
+    signature
+        query or response.
+    realtime
+        Whether use realtime infernece.
+    is_matching
+        Whether is matching.
+    seed
+        random seed.
+
+    Returns
+    -------
+    A list of output dicts.
+    """
     with apply_log_filter(LogFilter("Global seed set to")):  # Ignore the log "Global seed set to"
         pl.seed_everything(seed, workers=True)
 

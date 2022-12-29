@@ -153,6 +153,8 @@ from .utils import (
     load_text_tokenizers,
     logits_to_prob,
     modify_duplicate_model_names,
+    predict,
+    process_batch,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
@@ -162,8 +164,6 @@ from .utils import (
     turn_on_off_feature_column_info,
     update_config_by_rules,
     update_tabular_config_by_resources,
-    use_realtime,
-    predict,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -2020,6 +2020,7 @@ class MultiModalPredictor:
                 label=label,
                 metrics=metrics,
                 return_pred=return_pred,
+                realtime=realtime,
             )
         if self._problem_type == OBJECT_DETECTION:
             if realtime:
@@ -2196,6 +2197,7 @@ class MultiModalPredictor:
                 data=data,
                 id_mappings=id_mappings,
                 as_pandas=as_pandas,
+                realtime=realtime,
             )
         if self._problem_type == OBJECT_DETECTION:
             if isinstance(data, str):
@@ -2337,6 +2339,7 @@ class MultiModalPredictor:
                 id_mappings=id_mappings,
                 as_pandas=as_pandas,
                 as_multiclass=as_multiclass,
+                realtime=realtime,
             )
 
         assert self._problem_type not in [
@@ -2425,6 +2428,7 @@ class MultiModalPredictor:
                 id_mappings=id_mappings,
                 as_tensor=as_tensor,
                 as_pandas=as_pandas,
+                realtime=realtime,
             )
 
         turn_on_off_feature_column_info(
@@ -2674,7 +2678,7 @@ class MultiModalPredictor:
             requires_label=requires_label,
         )
 
-        batch = self._process_batch(
+        batch = process_batch(
             data=data,
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,

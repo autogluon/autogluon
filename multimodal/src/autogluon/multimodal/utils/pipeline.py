@@ -125,4 +125,3 @@ def init_pretrained_matcher(
     )
 
     return config, query_config, response_config, query_model, response_model, query_processors, response_processors
-
