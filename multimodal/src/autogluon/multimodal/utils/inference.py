@@ -255,30 +255,48 @@ def use_realtime(data: pd.DataFrame, data_processors: Dict, batch_size: int):
 
 
 def process_batch(
-    data: Union[pd.DataFrame, dict, list],
-    df_preprocessor: MultiModalFeaturePreprocessor,
-    data_processors: Dict,
+    data: Union[pd.DataFrame, Dict, List],
+    df_preprocessor: Union[MultiModalFeaturePreprocessor, List[MultiModalFeaturePreprocessor]],
+    data_processors: Union[Dict, List[Dict]],
+    id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]] = None,
 ):
+    if isinstance(df_preprocessor, MultiModalFeaturePreprocessor):
+        df_preprocessor = [df_preprocessor]
+    if isinstance(data_processors, dict):
+        data_processors = [data_processors]
 
-    modality_features, modality_types, sample_num = apply_df_preprocessor(
-        data=data,
-        df_preprocessor=df_preprocessor,
-        modalities=data_processors.keys(),
-    )
+    modality_features = dict()
+    modality_types = dict()
+    sample_num = dict()
+
+    for i, (per_preprocessor, per_processors_group) in enumerate(zip(df_preprocessor, data_processors)):
+        modality_features[i], modality_types[i], sample_num[i] = apply_df_preprocessor(
+            data=data,
+            df_preprocessor=per_preprocessor,
+            modalities=per_processors_group.keys(),
+        )
+    sample_num = list(sample_num.values())
+    assert len(set(sample_num)) == 1
+    sample_num = sample_num[0]
 
     processed_features = []
     for i in range(sample_num):
-        per_sample_features = get_per_sample_features(
-            modality_features=modality_features,
-            modality_types=modality_types,
-            idx=i,
-        )
-        per_sample_features = apply_data_processor(
-            per_sample_features=per_sample_features,
-            data_processors=data_processors,
-            feature_modalities=modality_types,
-            is_training=False,
-        )
+        per_sample_features = dict()
+        for group_id, per_processors_group in enumerate(data_processors):
+            per_sample_features_group = get_per_sample_features(
+                modality_features=modality_features[group_id],
+                modality_types=modality_types[group_id],
+                idx=i,
+                id_mappings=id_mappings,
+            )
+            per_sample_features_group = apply_data_processor(
+                per_sample_features=per_sample_features_group,
+                data_processors=per_processors_group,
+                feature_modalities=modality_types[group_id],
+                is_training=False,
+            )
+            per_sample_features.update(per_sample_features_group)
+
         processed_features.append(per_sample_features)
 
     collate_fn = get_collate_fn(
@@ -300,6 +318,7 @@ def realtime_predict(
     response_model: Optional[nn.Module] = None,
     model_postprocess_fn: Optional[Callable] = None,
     is_matching: Optional[bool] = False,
+    id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]] = None,
     signature: Optional[str] = None,
     match_label: Optional[int] = None,
 ) -> List[Dict]:
@@ -308,6 +327,7 @@ def realtime_predict(
         data=data,
         df_preprocessor=df_preprocessor,
         data_processors=data_processors,
+        id_mappings=id_mappings,
     )
     if is_matching:
         output = infer_matcher_batch(
@@ -388,8 +408,6 @@ def predict(
     if predictor._problem_type == OBJECT_DETECTION:
         realtime = False
 
-    print(f"\nrealtime: {realtime}\n")
-
     if realtime:
         if is_matching:
             outputs = realtime_predict(
@@ -401,6 +419,7 @@ def predict(
                 num_gpus=num_gpus,
                 precision=precision,
                 is_matching=True,
+                id_mappings=id_mappings,
                 signature=signature,
                 match_label=match_label,
             )
