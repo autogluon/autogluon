@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy import stats
+from scipy.cluster import hierarchy as hc
 
 from autogluon.common.features.types import R_OBJECT, R_CATEGORY, R_BOOL, R_INT, R_FLOAT
 from .base import AbstractVisualization
@@ -128,6 +129,58 @@ class CorrelationSignificanceVisualization(_AbstractCorrelationChart):
     def _render(self, state: AnalysisState) -> None:
         args = {"center": 3, "vmax": 5, "cmap": "Spectral", "robust": True}
         self._render_internal(state, "significance_matrix", "correlation significance matrix", args)
+
+
+class FeatureDistanceAnalysisVisualization(AbstractVisualization, JupyterMixin):
+    """
+
+    Parameters
+    ----------
+    headers: bool, default = False
+        if `True` then render headers
+    namespace: Optional[str], default = None
+        namespace to use; can be nested like `ns_a.ns_b.ns_c`
+    fig_args: Optional[Dict[str, Any]] = None,
+        kwargs to pass into chart figure
+    kwargs
+    """
+
+    def __init__(
+        self,
+        headers: bool = False,
+        namespace: Optional[str] = None,
+        fig_args: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(namespace, **kwargs)
+        self.headers = headers
+        if fig_args is None:
+            fig_args = {}
+        self.fig_args = fig_args
+
+    def can_handle(self, state: AnalysisState) -> bool:
+        return self.all_keys_must_be_present(state, "feature_distance")
+
+    def _render(self, state: AnalysisState) -> None:
+        fig, ax = plt.subplots(**self.fig_args)
+        default_args = dict(orientation="left")
+        ax.grid(False)
+        hc.dendrogram(
+            ax=ax,
+            Z=state.feature_distance.linkage,
+            labels=state.feature_distance.columns,
+            **{**default_args, **self._kwargs},
+        )
+        plt.show(fig)
+        if len(state.feature_distance.near_duplicates) > 0:
+            message = (
+                f"**The following feature groups are considered as near-duplicates**:\n\n"
+                f"Distance threshold: <= `{state.feature_distance.near_duplicates_threshold}`. "
+                f"Consider keeping only some of the columns within each group:\n"
+            )
+            for group in state.feature_distance.near_duplicates:
+                message += f'\n - `{"`, `".join(sorted(group["nodes"]))}` - distance `{group["distance"]:.2f}`'
+            self.render_markdown(message)
 
 
 class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):

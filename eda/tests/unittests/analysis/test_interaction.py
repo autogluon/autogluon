@@ -1,12 +1,34 @@
 from unittest.mock import MagicMock
 
 import pandas as pd
+import numpy as np
 import pytest
+import os
 
 import autogluon.eda.auto as auto
 from autogluon.eda import AnalysisState
-from autogluon.eda.analysis import Correlation, CorrelationSignificance, FeatureInteraction, DistributionFit
+from autogluon.eda.analysis import (
+    Correlation,
+    CorrelationSignificance,
+    FeatureInteraction,
+    DistributionFit,
+    ApplyFeatureGenerator,
+)
 from autogluon.eda.analysis.dataset import RawTypesAnalysis
+from autogluon.eda.analysis.interaction import FeatureDistanceAnalysis
+
+RESOURCE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources"))
+
+SAMPLE_SIZE = 200
+
+
+def load_adult_data():
+    train_data = os.path.join(RESOURCE_PATH, "adult", "train_data.csv")
+    test_data = os.path.join(RESOURCE_PATH, "adult", "test_data.csv")
+    train = pd.read_csv(train_data).sample(SAMPLE_SIZE, random_state=0)
+    test = pd.read_csv(test_data).sample(SAMPLE_SIZE, random_state=0)
+    data = (train, test)
+    return data
 
 
 def test_Correlation_spearman():
@@ -341,3 +363,70 @@ def test_DistributionFit__non_numeric_col():
     assert len(state.distributions_fit.train_data.a) == 4
     assert state.distributions_fit.train_data.f is None
     a.logger.warning.assert_called_with("f: distribution cannot be fit; only numeric columns are supported")
+
+
+def test_FeatureDistanceAnalysis__happy_path():
+    df, _ = load_adult_data()
+    label = "class"
+
+    state = auto.analyze(
+        train_data=df,
+        label=label,
+        return_state=True,
+        anlz_facets=[
+            ApplyFeatureGenerator(
+                category_to_numbers=True, children=[FeatureDistanceAnalysis(near_duplicates_threshold=0.85)]
+            ),
+        ],
+    )
+
+    assert np.allclose(
+        state.feature_distance.linkage,
+        np.array(
+            [
+                [9.0, 11.0, 0.6113, 2.0],
+                [3.0, 10.0, 0.7652, 2.0],
+                [7.0, 15.0, 0.7905, 3.0],
+                [2.0, 6.0, 0.8097, 2.0],
+                [0.0, 4.0, 0.8306, 2.0],
+                [17.0, 18.0, 0.86785, 4.0],
+                [12.0, 13.0, 0.8872, 2.0],
+                [8.0, 20.0, 0.9333, 3.0],
+                [1.0, 5.0, 0.946, 2.0],
+                [16.0, 19.0, 0.94793333, 7.0],
+                [21.0, 23.0, 0.9676619, 10.0],
+                [22.0, 24.0, 0.981165, 12.0],
+                [14.0, 25.0, 1.13729167, 14.0],
+            ]
+        ),
+    )
+
+    state.feature_distance.pop("linkage")
+
+    assert state == {
+        "feature_distance": {
+            "columns": [
+                "age",
+                "fnlwgt",
+                "education-num",
+                "sex",
+                "capital-gain",
+                "capital-loss",
+                "hours-per-week",
+                "workclass",
+                "education",
+                "marital-status",
+                "occupation",
+                "relationship",
+                "race",
+                "native-country",
+            ],
+            "near_duplicates": [
+                {"distance": 0.6113, "nodes": ["marital-status", "relationship"]},
+                {"distance": 0.7905, "nodes": ["occupation", "sex", "workclass"]},
+                {"distance": 0.8097, "nodes": ["education-num", "hours-per-week"]},
+                {"distance": 0.8306, "nodes": ["age", "capital-gain"]},
+            ],
+            "near_duplicates_threshold": 0.85,
+        }
+    }
