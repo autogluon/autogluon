@@ -717,8 +717,8 @@ class FT_Transformer(nn.Module):
                     "row_output": nn.Identity(),  # for hooks-based introspection
                 }
             )
-            for p in self.row_attention_layers.parameters():
-                nn.init.zeros_(p)
+            # for p in self.row_attention_layers.parameters():
+            #     nn.init.zeros_(p)
 
         for layer_idx in range(n_blocks):
             layer = nn.ModuleDict(
