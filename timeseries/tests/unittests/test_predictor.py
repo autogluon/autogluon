@@ -594,5 +594,5 @@ def test_given_data_cannot_be_interpreted_as_tsdf_then_exception_raised(temp_mod
     df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
     df = df.rename(columns=rename_columns)
     predictor = TimeSeriesPredictor(path_context=temp_model_path)
-    with pytest.raises(ValueError, match="cannot be interpreted as a TimeSeriesDataFrame"):
+    with pytest.raises(ValueError, match="cannot be automatically converted to a TimeSeriesDataFrame"):
         predictor.fit(df, hyperparameters={"Naive": {}})
