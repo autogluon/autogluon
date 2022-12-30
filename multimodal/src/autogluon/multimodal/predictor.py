@@ -29,7 +29,6 @@ from sklearn.model_selection import train_test_split
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.core.utils.try_import import try_import_ray_lightning
 from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.multimodal.utils import save_result_df
 
@@ -831,7 +830,6 @@ class MultiModalPredictor:
                 _fit_args["max_time"] *= 0.95  # give some buffer time to ray lightning trainer
             _fit_args["predictor"] = self
             predictor = hyperparameter_tune(
-                predictor=self,
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 resources=resources,
                 **_fit_args,

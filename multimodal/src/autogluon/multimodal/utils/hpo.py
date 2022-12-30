@@ -1,7 +1,11 @@
 import logging
 import os
+import shutil
+import yaml
 
-from ..constants import AUTOMM, RAY_TUNE_CHECKPOINT
+from ..constants import AUTOMM, RAY_TUNE_CHECKPOINT, BEST_K_MODELS_FILE
+
+from .model import create_fusion_model
 
 logger = logging.getLogger(AUTOMM)
 
@@ -20,8 +24,9 @@ def hpo_trial(sampled_hyperparameters, predictor, checkpoint_dir=None, **_fit_ar
     predictor._fit(**_fit_args)
 
 
-def hyperparameter_tune(predictor, hyperparameter_tune_kwargs, resources, **_fit_args):
+def hyperparameter_tune(hyperparameter_tune_kwargs, resources, **_fit_args):
     from ray.air.config import CheckpointConfig
+    from ..predictor import MultiModalPredictor
 
     from autogluon.core.hpo.ray_hpo import (
         AutommRayTuneAdapter,
@@ -31,6 +36,7 @@ def hyperparameter_tune(predictor, hyperparameter_tune_kwargs, resources, **_fit
         cleanup_trials,
         run,
     )
+    from autogluon.core.utils.try_import import try_import_ray_lightning
 
     ray_tune_adapter = AutommRayTuneAdapter()
     if try_import_ray_lightning():
@@ -88,7 +94,7 @@ def hyperparameter_tune(predictor, hyperparameter_tune_kwargs, resources, **_fit
         cleanup_trials(save_path, best_trial.trial_id)
         best_trial_path = os.path.join(save_path, best_trial.trial_id)
         # reload the predictor metadata
-        predictor = MultiModalPredictor._load_metadata(predictor=self, path=best_trial_path)
+        predictor = MultiModalPredictor._load_metadata(predictor=_fit_args.get("predictor"), path=best_trial_path)
         # construct the model
         model = create_fusion_model(
             config=predictor._config,
