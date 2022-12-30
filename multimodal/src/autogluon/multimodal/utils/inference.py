@@ -162,6 +162,7 @@ def infer_batch(
         model = model.module
     else:
         model = model
+    output = move_to_device(output, device=torch.device("cpu"))
     return output[model.prefix]
 
 
