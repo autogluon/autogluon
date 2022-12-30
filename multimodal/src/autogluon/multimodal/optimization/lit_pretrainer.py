@@ -399,6 +399,14 @@ class PretrainLitModule(LitModule):
         -------
         Average loss of the mini-batch data.
         """
+        # tmp = 0
+        # for name, param in self.model.state_dict().items():
+        #     if "bias" in name or "norm" in name:
+        #         continue
+        #     if "row" in name:
+        #         tmp += torch.norm(param)
+        # print(tmp)
+
         if self.is_pretrain["is_pretrain"]:
             if self.current_iter % self.is_pretrain["upload_per_n_iter"] == 0:
                 while True:
