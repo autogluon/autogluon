@@ -3,6 +3,7 @@ import datetime
 import tempfile
 import traceback
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Iterable
 
 import numpy as np
@@ -736,8 +737,18 @@ def test_when_dataset_constructed_from_dataframe_then_timestamp_column_is_conver
     assert ts_df.index.get_level_values(level=TIMESTAMP).dtype == "datetime64[ns]"
 
 
-def test_when_path_is_given_to_constructor_then_tsdf_is_constructed_correctly():
-    df = TimeSeriesDataFrame("https://autogluon.s3.amazonaws.com/datasets/timeseries/dummy/dummy.csv")
-    assert isinstance(df.index, pd.MultiIndex)
-    assert df.index.names == [ITEMID, TIMESTAMP]
-    assert len(df) > 0
+@pytest.mark.parametrize("use_parquet", [True, False])
+def test_when_path_is_given_to_constructor_then_tsdf_is_constructed_correctly(use_parquet):
+    df = SAMPLE_TS_DATAFRAME.reset_index()
+    with TemporaryDirectory() as temp_dir:
+        if use_parquet:
+            temp_file = str(Path(temp_dir) / f"temp.parquet")
+            df.to_parquet(temp_file)
+        else:
+            temp_file = str(Path(temp_dir) / f"temp.csv")
+            df.to_csv(temp_file)
+
+        ts_df = TimeSeriesDataFrame(temp_file)
+        assert isinstance(ts_df.index, pd.MultiIndex)
+        assert ts_df.index.names == [ITEMID, TIMESTAMP]
+        assert len(ts_df) == len(SAMPLE_TS_DATAFRAME)
