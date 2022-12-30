@@ -1,13 +1,13 @@
 import logging
 import pprint
 import time
+import traceback
 import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, Union
 
 import pandas as pd
 
-from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
@@ -209,7 +209,9 @@ class TimeSeriesPredictor:
             try:
                 df = TimeSeriesDataFrame(df)
             except:
-                raise ValueError(f"Provided data of type {type(df)} cannot be interpreted as a TimeSeriesDataFrame.")
+                raise ValueError(
+                    f"Provided data of type {type(df)} cannot be automatically converted to a TimeSeriesDataFrame."
+                )
         if self.ignore_time_index:
             df = df.get_reindexed_view(freq="S")
         timestamps = df.reset_index(level=TIMESTAMP)[TIMESTAMP]
