@@ -93,6 +93,7 @@ from .utils import (
     save_text_tokenizers,
     select_model,
     try_to_infer_pos_label,
+    hyperparameter_tune,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -286,6 +287,7 @@ class MultiModalMatcher:
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         column_types: Optional[dict] = None,
         holdout_frac: Optional[float] = None,
+        hyperparameter_tune_kwargs: Optional[dict] = None,
         seed: Optional[int] = 123,
     ):
         """
@@ -465,12 +467,27 @@ class MultiModalMatcher:
             minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=save_path,
-            ckpt_path=self._ckpt_path,
-            resume=self._resume,
-            enable_progress_bar=self._enable_progress_bar,
+            ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
+            resume=False if hyperparameter_tune_kwargs is not None else self._resume,
+            enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
             presets=presets,
             hyperparameters=hyperparameters,
+            hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
         )
+
+        if hyperparameter_tune_kwargs is not None:
+            # TODO: allow custom gpu
+            assert self._resume is False, "You can not resume training with HPO"
+            resources = dict(num_gpus=torch.cuda.device_count())
+            if _fit_args["max_time"] is not None:
+                _fit_args["max_time"] *= 0.95  # give some buffer time to ray lightning trainer
+            _fit_args["predictor"] = self
+            predictor = hyperparameter_tune(
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                resources=resources,
+                **_fit_args,
+            )
+            return predictor
 
         self._fit(**_fit_args)
         logger.info(f"Models and intermediate outputs are saved to {save_path} ")
@@ -796,6 +813,23 @@ class MultiModalMatcher:
             model_summary,
         ]
 
+        use_ray_lightning = "_ray_lightning_plugin" in hpo_kwargs
+        if hpo_mode:
+            if use_ray_lightning:
+                from ray_lightning.tune import TuneReportCheckpointCallback
+            else:
+                from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
+            tune_report_callback = TuneReportCheckpointCallback(
+                {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
+                filename=RAY_TUNE_CHECKPOINT,
+            )
+            callbacks = [
+                tune_report_callback,
+                early_stopping_callback,
+                lr_callback,
+                model_summary,
+            ]
+
         tb_logger = pl.loggers.TensorBoardLogger(
             save_dir=save_path,
             name="",
@@ -823,8 +857,12 @@ class MultiModalMatcher:
             else:
                 strategy = config.env.strategy
         else:
-            strategy = None
-            num_gpus = min(num_gpus, 1)
+            # we don't support running each trial in parallel without ray lightning
+            if use_ray_lightning:
+                strategy = hpo_kwargs.get("_ray_lightning_plugin")
+            else:
+                strategy = None
+                num_gpus = min(num_gpus, 1)
 
         config.env.num_gpus = num_gpus
         config.env.precision = precision
