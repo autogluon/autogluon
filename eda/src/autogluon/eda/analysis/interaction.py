@@ -414,7 +414,8 @@ class FeatureDistanceAnalysis(AbstractAnalysis):
     --------
     :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
     :py:class:`~autogluon.eda.visualization.interaction.FeatureDistanceAnalysisVisualization`
-    `Removing redundant features <https://github.com/fastai/book_nbs/blob/master/10_tabular.ipynb>`_ section
+    `Removing redundant features <https://github.com/fastai/book_nbs/blob/master/10_tabular.ipynb>`_ section of
+        Jeremy Howard's "Deep Learning for Coders with Fastai and PyTorch" book.
 
     """
 
