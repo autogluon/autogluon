@@ -44,6 +44,7 @@ from .constants import (
     PAIR,
     PROBABILITY,
     QUERY,
+    RAY_TUNE_CHECKPOINT,
     RESPONSE,
     TEXT,
     TRIPLET,
@@ -82,6 +83,7 @@ from .utils import (
     get_config,
     get_local_pretrained_config_paths,
     get_minmax_mode,
+    hyperparameter_tune,
     infer_dtypes_by_model_names,
     infer_metrics,
     infer_precision,
@@ -93,7 +95,6 @@ from .utils import (
     save_text_tokenizers,
     select_model,
     try_to_infer_pos_label,
-    hyperparameter_tune,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -485,6 +486,7 @@ class MultiModalMatcher:
             predictor = hyperparameter_tune(
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 resources=resources,
+                is_matching=True,
                 **_fit_args,
             )
             return predictor

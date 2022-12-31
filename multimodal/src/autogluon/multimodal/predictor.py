@@ -140,6 +140,7 @@ from .utils import (
     get_minmax_mode,
     get_mixup,
     get_onnx_input,
+    hyperparameter_tune,
     infer_batch,
     infer_dtypes_by_model_names,
     infer_metrics,
@@ -161,7 +162,6 @@ from .utils import (
     update_config_by_rules,
     update_tabular_config_by_resources,
     use_realtime,
-    hyperparameter_tune,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -672,6 +672,7 @@ class MultiModalPredictor:
                 column_types=column_types,
                 holdout_frac=holdout_frac,
                 save_path=save_path,
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 seed=seed,
             )
             return self

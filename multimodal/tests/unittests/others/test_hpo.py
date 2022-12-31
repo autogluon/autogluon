@@ -8,13 +8,14 @@ from autogluon.core.hpo.ray_tune_constants import SCHEDULER_PRESETS, SEARCHER_PR
 from autogluon.multimodal import MultiModalPredictor
 
 from ..predictor.test_predictor import verify_predictor_save_load
-from .unittest_datasets import PetFinderDataset
+from .test_matcher import verify_matcher_save_load
+from .unittest_datasets import IDChangeDetectionDataset, PetFinderDataset
 from .utils import get_home_dir
 
 
 @pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))
 @pytest.mark.parametrize("scheduler", list(SCHEDULER_PRESETS.keys()))
-def test_hpo(searcher, scheduler):
+def test_predictor_hpo(searcher, scheduler):
     dataset = PetFinderDataset()
 
     hyperparameters = {
@@ -59,6 +60,58 @@ def test_hpo(searcher, scheduler):
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
         time_limit=30,
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+    )
+
+
+@pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))
+@pytest.mark.parametrize("scheduler", list(SCHEDULER_PRESETS.keys()))
+def test_matcher_hpo(searcher, scheduler):
+    dataset = IDChangeDetectionDataset()
+
+    hyperparameters = {
+        "optimization.learning_rate": tune.uniform(0.0001, 0.001),
+        "optimization.max_epochs": 1,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "optimization.top_k_average_method": "greedy_soup",
+    }
+
+    hyperparameter_tune_kwargs = {
+        "searcher": searcher,
+        "scheduler": scheduler,
+        "num_trials": 2,
+    }
+
+    matcher = MultiModalPredictor(
+        query="Previous Image",
+        response="Current Image",
+        problem_type="image_similarity",
+        label=dataset.label_columns[0] if dataset.label_columns else None,
+        match_label=dataset.match_label,
+        eval_metric=dataset.metric,
+    )
+
+    save_path = os.path.join(get_home_dir(), "hpo", f"_{searcher}", f"_{scheduler}")
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
+
+    matcher = matcher.fit(
+        train_data=dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=60,
+        save_path=save_path,
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+    )
+
+    score = matcher.evaluate(dataset.test_df)
+    verify_matcher_save_load(matcher, dataset.test_df)
+
+    # test for continuous training
+    predictor = matcher.fit(
+        train_data=dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=60,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
 
