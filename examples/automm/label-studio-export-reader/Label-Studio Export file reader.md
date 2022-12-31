@@ -89,12 +89,12 @@ Normally,  data with files like images should be provided with their URL as we m
 
 
 
-|            Data            | addressable if ls_host_on=True | addressable if ls_host_on=False | Description                                                  | Preprocess                                                   |
-| :------------------------: | :----------------------------: | :-----------------------------: | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| file url, text content,... |               √                |                √                |                                                              | Not doing anything                                           |
-|     "/data/upload/..."     |               √                |                X                | use didn't provide url of the image, just import the image directly in LS | [ls_host_on=True]:   join with the label-studio host(e.g: http://locahost:8080/data/upload/...), when the LS host is on, the file is accessable<br />[ls_host_on=False]: cannot access |
-|  "/data/local-files/..."   |               √                |         √(conditional)          | use didn't provide url of the image, instead they set up a localstorage in LS. | [ls_host_on=True]:   join with the label-studio host(e.g: http://locahost:8080/data/upload/...)<br />[ls_host_on=False]: reserve the local path of the data files(if the root of the dataset is not moved) |
-|            ...             |                                |                                 |                                                              |                                                              |
+|            Data            | accessible if ls_host_on=True | accessible if ls_host_on=False | Description                                                  | Preprocess                                                   |
+| :------------------------: | :---------------------------: | :----------------------------: | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| file url, text content,... |               √               |               √                |                                                              | Not doing anything                                           |
+|     "/data/upload/..."     |               √               |               X                | use didn't provide url of the image, just import the image directly in LS | [ls_host_on=True]:   join with the label-studio host(e.g: http://locahost:8080/data/upload/...), when the LS host is on, the file is accessible<br />[ls_host_on=False]: cannot access |
+|  "/data/local-files/..."   |               √               |         √(conditional)         | use didn't provide url of the image, instead they set up a localstorage in LS. | [ls_host_on=True]:   join with the label-studio host(e.g: http://locahost:8080/data/upload/...)<br />[ls_host_on=False]: reserve the local path of the data files(if the root of the dataset is not moved) |
+|            ...             |                               |                                |                                                              |                                                              |
 
 
 
