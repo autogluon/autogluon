@@ -8,6 +8,7 @@ class TaskType(Enum):
     """
     Currently supported task type
     """
+
     IMAGE_CLASSIFICATION = "image_classification"
     OBJECT_DETECTION = "object_detection"
     CUSTOMIZE = "customize"
@@ -47,7 +48,7 @@ columns_template = {
             "label_columns": ["value.start", "value.end", "value.text", "value.labels"],
         },
         "json_min": {"data_columns": ["text"], "label_columns": ["label"]},
-    }
+    },
 }
 
 
@@ -99,7 +100,7 @@ def read_from_labelstudio_json(path, data_columns, label_columns):
 
         if "annotations" in label_studio_json[0]:
             # the file is export through JSON
-            # since JSON file provides unified naming, it's available to specify nested data 
+            # JSON file parsing is available to specify nested data
             annotation = pd.json_normalize(
                 data=label_studio_json, record_path=["annotations", "result"], meta=["data"]
             )
@@ -179,7 +180,8 @@ class LabelStudioReader:
         self.default_host = "http://localhost:8080" if not host else host
         print(
             "NOTE: the default label-studio host is {},if you want to get data from an running label-studio url, "
-            "please set 'ls_host_on' to True".format(self.default_host))
+            "please set 'ls_host_on' to True".format(self.default_host)
+        )
         self.templates = columns_template
 
     def set_labelstudio_host(self, host):
