@@ -4,6 +4,7 @@ from enum import Enum
 
 import pandas as pd
 
+
 class TaskType(Enum):
     """
     Currently supported task type
