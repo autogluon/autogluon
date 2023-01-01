@@ -12,6 +12,20 @@ logger = logging.getLogger(AUTOMM)
 
 
 def hpo_trial(sampled_hyperparameters, predictor, checkpoint_dir=None, **_fit_args):
+    """
+    Run one HPO trial.
+
+    Parameters
+    ----------
+    sampled_hyperparameters
+        The sampled hyperparameters for this trial.
+    predictor
+        A predictor object.
+    checkpoint_dir
+        The checkpoint directory.
+    _fit_args
+        The keyword arguments for predictor._fit().
+    """
     from ray import tune
 
     _fit_args[
@@ -28,7 +42,32 @@ def hpo_trial(sampled_hyperparameters, predictor, checkpoint_dir=None, **_fit_ar
 def build_final_predictor(
     predictor, best_trial_path, minmax_mode, is_distill, val_df, save_path, last_ckpt_path, is_matching
 ):
+    """
+    Build the final predictor after HPO is finished.
 
+    Parameters
+    ----------
+    predictor
+        A predictor object.
+    best_trial_path
+        The best trial's saving path.
+    minmax_mode
+        min or max.
+    is_distill
+        Whether is distillation.
+    val_df
+        Validation dataframe.
+    save_path
+        The saving path.
+    last_ckpt_path
+        The last checkpoint's path.
+    is_matching
+        Whether is matching.
+
+    Returns
+    -------
+    The constructed predictor.
+    """
     if is_matching:
         from ..matcher import MultiModalMatcher
 
@@ -88,6 +127,24 @@ def build_final_predictor(
 
 
 def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False, **_fit_args):
+    """
+    Tune hyperparameters of predictor.
+
+    Parameters
+    ----------
+    hyperparameter_tune_kwargs
+        The hyperparameters for HPO, such as, searcher, scheduler, and num_trials.
+    resources
+        The resources for HPO.
+    is_matching
+        Whether is matching.
+    _fit_args
+        The keyword arguments for predictor._fit().
+
+    Returns
+    -------
+    The predictor after tuning hyperparameters.
+    """
     from ray.air.config import CheckpointConfig
 
     from autogluon.core.hpo.ray_hpo import (
