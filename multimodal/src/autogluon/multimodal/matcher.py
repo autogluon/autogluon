@@ -112,6 +112,7 @@ class MultiModalMatcher:
         label: Optional[str] = None,
         match_label: Optional[Union[int, str]] = None,
         problem_type: Optional[str] = None,
+        presets: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -193,6 +194,7 @@ class MultiModalMatcher:
         self._label_column = label
         self._problem_type = None  # always infer problem type for matching.
         self._pipeline = problem_type.lower() if problem_type is not None else None
+        self._presets = presets.lower() if presets else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = None
@@ -226,7 +228,7 @@ class MultiModalMatcher:
                 self._response_model,
                 self._query_processors,
                 self._response_processors,
-            ) = init_pretrained_matcher(presets=self._pipeline, hyperparameters=hyperparameters)
+            ) = init_pretrained_matcher(pipeline=self._pipeline, presets=self._presets, hyperparameters=hyperparameters)
 
     @property
     def query(self):

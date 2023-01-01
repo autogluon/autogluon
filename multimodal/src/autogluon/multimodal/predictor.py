@@ -187,6 +187,7 @@ class MultiModalPredictor:
         response: Optional[Union[str, List[str]]] = None,
         match_label: Optional[Union[int, str]] = None,
         pipeline: Optional[str] = None,
+        presets: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -376,6 +377,7 @@ class MultiModalPredictor:
 
         self._label_column = label
         self._problem_type = problem_type
+        self._presets = presets.lower() if presets else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = num_classes
@@ -421,6 +423,7 @@ class MultiModalPredictor:
                 label=label,
                 match_label=match_label,
                 problem_type=self._problem_type,  # Ensure that matcher will always infer problem type.
+                presets=presets,
                 hyperparameters=hyperparameters,
                 eval_metric=eval_metric,
                 path=path,

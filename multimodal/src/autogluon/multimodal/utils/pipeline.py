@@ -11,8 +11,18 @@ from .model import create_fusion_model
 logger = logging.getLogger(AUTOMM)
 
 
+def get_registered_presets(problem_type: str, presets: str):
+    if problem_type and presets:
+        return f"{problem_type}_{presets}"
+    elif problem_type:
+        return problem_type
+    else:
+        return presets
+
+
 def init_pretrained(
-    presets: Optional[str],
+    problem_type: Optional[str] = None,
+    presets: Optional[str] = None,
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
     num_classes: Optional[int] = None,
     classes: Optional[list] = None,
@@ -37,7 +47,7 @@ def init_pretrained(
     data_processors
         The data processors associated with the pre-trained model.
     """
-    # TODO: Fix the logic and add presets
+    presets = get_registered_presets(problem_type=problem_type, presets=presets)
     config = get_config(presets=presets, overrides=hyperparameters)
     assert (
         len(config.model.names) == 1
@@ -53,7 +63,8 @@ def init_pretrained(
 
 
 def init_pretrained_matcher(
-    presets: Optional[str],
+    pipeline: Optional[str] = None,
+    presets: Optional[str] = None,
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
 ):
     """
@@ -83,6 +94,7 @@ def init_pretrained_matcher(
     response_processors
         The data processors associated with the response model.
     """
+    presets = get_registered_presets(problem_type=pipeline, presets=presets)
     config = get_config(
         presets=presets,
         overrides=hyperparameters,
