@@ -2676,6 +2676,7 @@ class MultiModalPredictor:
                     "column_types": self._column_types,
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
+                    "presets": self._presets,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
@@ -2884,6 +2885,8 @@ class MultiModalPredictor:
         predictor._problem_type = assets["problem_type"]
         if "pipeline" in assets:  # backward compatibility
             predictor._problem_type = assets["pipeline"]
+        if "presets" in assets:
+            predictor._presets = assets["presets"]
         if "best_score" in assets:  # backward compatibility
             predictor._best_score = assets["best_score"]
         if "total_train_time" in assets:  # backward compatibility

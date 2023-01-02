@@ -1734,6 +1734,7 @@ class MultiModalMatcher:
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
                     "pipeline": self._pipeline,
+                    "presets": self._presets,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
@@ -1831,6 +1832,8 @@ class MultiModalMatcher:
         matcher._label_column = assets["label_column"]
         matcher._problem_type = assets["problem_type"]
         matcher._pipeline = assets["pipeline"]
+        if "presets" in assets:
+            matcher._presets = assets["presets"]
         matcher._eval_metric_name = assets["eval_metric_name"]
         matcher._verbosity = verbosity
         matcher._resume = resume
