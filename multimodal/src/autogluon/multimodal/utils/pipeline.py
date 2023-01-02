@@ -13,7 +13,7 @@ logger = logging.getLogger(AUTOMM)
 
 def get_registered_presets(problem_type: str, presets: str):
     if problem_type and presets:
-        return f"{problem_type}_{presets}"
+        return f"{presets}_{problem_type}"
     elif problem_type:
         return problem_type
     else:

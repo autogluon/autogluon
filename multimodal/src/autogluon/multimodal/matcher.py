@@ -228,7 +228,9 @@ class MultiModalMatcher:
                 self._response_model,
                 self._query_processors,
                 self._response_processors,
-            ) = init_pretrained_matcher(pipeline=self._pipeline, presets=self._presets, hyperparameters=hyperparameters)
+            ) = init_pretrained_matcher(
+                pipeline=self._pipeline, presets=self._presets, hyperparameters=hyperparameters
+            )
 
     @property
     def query(self):

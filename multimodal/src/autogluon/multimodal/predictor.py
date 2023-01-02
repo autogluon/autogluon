@@ -422,7 +422,7 @@ class MultiModalPredictor:
                 response=response,
                 label=label,
                 match_label=match_label,
-                problem_type=self._problem_type,  # Ensure that matcher will always infer problem type.
+                problem_type=problem_type,
                 presets=presets,
                 hyperparameters=hyperparameters,
                 eval_metric=eval_metric,
@@ -442,9 +442,9 @@ class MultiModalPredictor:
         if self._problem_type is not None:
             if self.problem_property.support_zero_shot:
                 # Load pretrained model via the provided hyperparameters and presets
-                # FIXME!, Revise the logic to use presets and add problem_type in init_pretrained
                 self._config, self._model, self._data_processors = init_pretrained(
-                    presets=self._problem_type,
+                    problem_type=self._problem_type,
+                    presets=self._presets,
                     hyperparameters=hyperparameters,
                     num_classes=self._output_shape,
                     classes=self._classes,
@@ -748,6 +748,10 @@ class MultiModalPredictor:
             data=train_data,
             valid_data=tuning_data,
         )
+        if self._presets is not None:
+            presets = self._presets
+        else:
+            self._presets = presets
 
         if self._config is not None:  # continuous training
             config = self._config
@@ -1112,8 +1116,6 @@ class MultiModalPredictor:
         standalone: bool = True,
         **hpo_kwargs,
     ):
-        if self._config is not None:  # continuous training
-            config = self._config
 
         config = get_config(
             presets=presets,
