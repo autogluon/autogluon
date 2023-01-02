@@ -85,7 +85,8 @@ def build_final_predictor(
         matcher._top_k_average(
             query_model=query_model,
             response_model=response_model,
-            save_path=save_path,
+            save_path=best_trial_path,
+            last_ckpt_path=last_ckpt_path,
             minmax_mode=minmax_mode,
             top_k_average_method=matcher._config.optimization.top_k_average_method,
             val_df=val_df,
