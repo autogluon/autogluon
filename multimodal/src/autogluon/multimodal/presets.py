@@ -543,3 +543,26 @@ def get_automm_presets(presets: str):
         )
 
     return overrides
+
+
+def get_preset_str(problem_type: str, presets: str):
+    """
+    Concatenate problem type and presets to get a registered preset string.
+
+    Parameters
+    ----------
+    problem_type
+        Problem type.
+    presets
+        Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+
+    Returns
+    -------
+    A registered preset string.
+    """
+    if problem_type and presets:
+        return f"{presets}_{problem_type}"
+    elif problem_type:
+        return problem_type
+    else:
+        return presets

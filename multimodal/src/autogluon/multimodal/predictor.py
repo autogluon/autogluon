@@ -253,7 +253,7 @@ class MultiModalPredictor:
         pipeline
             Pipeline has been deprecated and merged in problem_type.
         presets
-            The presets for loading model parameters / training the model
+            Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
@@ -556,7 +556,7 @@ class MultiModalPredictor:
         train_data
             A dataframe containing training data.
         presets
-            Name of the presets. See the available presets in `presets.py`.
+            Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
         config
             A dictionary with four keys "model", "data", "optimization", and "environment".
             Each key's value can be a string, yaml file path, or OmegaConf's DictConfig.
@@ -1118,6 +1118,7 @@ class MultiModalPredictor:
     ):
 
         config = get_config(
+            problem_type=self._problem_type,
             presets=presets,
             config=config,
             overrides=hyperparameters,
