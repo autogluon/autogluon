@@ -41,7 +41,7 @@ function setup_torch_gpu_non_linux {
 }
 
 function setup_torch_cpu_non_linux {
-    pip3 install torch==1.12.1+cpu torchvision==0.13.1+cpu torchtext==0.13.1 -f https://download.pytorch.org/whl/cpu/torch_stable.html
+    pip3 install torch==1.12.1 torchvision==0.13.1 torchtext==0.13.1
 }
 
 function install_local_packages {
