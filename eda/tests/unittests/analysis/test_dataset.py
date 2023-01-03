@@ -3,11 +3,12 @@ import pandas as pd
 import pytest
 
 import autogluon.eda.auto as auto
-from autogluon.common.features.types import R_INT, R_FLOAT, R_OBJECT, R_CATEGORY, R_BOOL
+from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, R_OBJECT
+from autogluon.core.constants import MULTICLASS, REGRESSION
 from autogluon.eda import AnalysisState
-from autogluon.eda.analysis import Sampler, Namespace
+from autogluon.eda.analysis import Namespace, Sampler, TrainValidationSplit
 from autogluon.eda.analysis.base import BaseAnalysis
-from autogluon.eda.analysis.dataset import RawTypesAnalysis, VariableTypeAnalysis, SpecialTypesAnalysis, DatasetSummary
+from autogluon.eda.analysis.dataset import DatasetSummary, RawTypesAnalysis, SpecialTypesAnalysis, VariableTypeAnalysis
 
 
 class SomeAnalysis(BaseAnalysis):
@@ -59,6 +60,38 @@ def test_Sampler_frac():
     assert state.sample_size == 0.5
     assert state.args.train_data.shape == (5, 4)
     assert state.args.test_data.shape == (10, 4)
+
+
+def test_TrainValidationSplit():
+    df_train, _ = __get_dataset_summary_test_datasets()
+    analysis = BaseAnalysis(
+        train_data=df_train,
+        label="D",
+        children=[
+            Namespace(
+                namespace="ns_val_split_specified",
+                children=[TrainValidationSplit(val_size=0.4, children=[SomeAnalysis()])],
+            ),
+            Namespace(
+                namespace="ns_val_split_default",
+                children=[TrainValidationSplit(problem_type=REGRESSION, children=[SomeAnalysis()])],
+            ),
+            Namespace(namespace="ns_no_split", children=[SomeAnalysis()]),
+        ],
+    )
+
+    state = analysis.fit()
+    assert state.ns_val_split_specified.args.train_data.shape == (60, 7)
+    assert state.ns_val_split_specified.args.val_data.shape == (40, 7)
+    assert state.ns_val_split_specified.problem_type == MULTICLASS
+
+    assert state.ns_val_split_default.args.train_data.shape == (70, 7)
+    assert state.ns_val_split_default.args.val_data.shape == (30, 7)
+    assert state.ns_val_split_default.problem_type == REGRESSION
+
+    assert state.ns_no_split.args.train_data.shape == (100, 7)
+    assert state.ns_no_split.args.val_data is None
+    assert state.ns_no_split.problem_type is None
 
 
 def __get_dataset_summary_test_datasets():
