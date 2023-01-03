@@ -122,7 +122,7 @@ def main():
         'WORK_DIR': args.work_dir,
         'SAVED_OUTPUT': args.saved_output,
         'SAVE_PATH': args.save_path,
-        'COMMAND': args.command,
+        'COMMAND': f"\"{args.command}\"",  # wrap command with double quotation mark, so that batch can treat it as a single command
         'REMOTE': args.remote,
         'SAFE_TO_USE_SCRIPT': safe_to_use_script,
     }
