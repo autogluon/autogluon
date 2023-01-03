@@ -210,3 +210,7 @@ class TextPredictorModel(AbstractModel):
     def _more_tags(self):
         # `can_refit_full=False` because TextPredictor does not communicate how to train until the best epoch in refit_full.
         return {'can_refit_full': False}
+
+    @classmethod
+    def _class_tags(cls):
+        return {'handles_text': True}
