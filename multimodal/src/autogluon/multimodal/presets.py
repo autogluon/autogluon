@@ -588,7 +588,8 @@ def get_preset_str(problem_type: str, presets: str):
         MULTICLASS,
         REGRESSION,
     ]:
-        problem_type = None
+        return presets
+
     if problem_type and presets:
         return f"{presets}_{problem_type}"
     elif problem_type:
