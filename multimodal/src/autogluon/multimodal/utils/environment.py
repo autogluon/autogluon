@@ -155,7 +155,7 @@ def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List, Tuple], devic
         for v in obj:
             res.append(move_to_device(v, device))
         return res
-    elif isinstance(obj, DataContainer):
+    elif isinstance(obj, (int, float, str, DataContainer)):
         return obj
     else:
         raise TypeError(

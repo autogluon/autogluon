@@ -153,6 +153,8 @@ from .utils import (
     load_text_tokenizers,
     logits_to_prob,
     modify_duplicate_model_names,
+    predict,
+    process_batch,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
@@ -162,7 +164,6 @@ from .utils import (
     turn_on_off_feature_column_info,
     update_config_by_rules,
     update_tabular_config_by_resources,
-    use_realtime,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -187,6 +188,7 @@ class MultiModalPredictor:
         response: Optional[Union[str, List[str]]] = None,
         match_label: Optional[Union[int, str]] = None,
         pipeline: Optional[str] = None,
+        presets: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -1813,7 +1815,6 @@ class MultiModalPredictor:
 
     def _on_predict_start(
         self,
-        config: DictConfig,
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
     ):
@@ -1853,7 +1854,7 @@ class MultiModalPredictor:
 
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
-                config=config,
+                config=self._config,
                 column_types=column_types,
                 label_column=self._label_column,
                 train_df_x=data,  # TODO: drop label like in line 884?
@@ -1908,7 +1909,8 @@ class MultiModalPredictor:
             anno_file = self._detection_anno_train
             data = anno_file_or_df
 
-        outputs = self._predict(
+        outputs = predict(
+            predictor=self,
             data=data,
             requires_label=True,
             seed=seed,
@@ -1935,132 +1937,6 @@ class MultiModalPredictor:
             return eval_results, outputs
         else:
             return eval_results
-
-    def _process_batch(
-        self,
-        data: Union[pd.DataFrame, dict, list],
-        df_preprocessor: MultiModalFeaturePreprocessor,
-        data_processors: Dict,
-    ):
-
-        modality_features, modality_types, sample_num = apply_df_preprocessor(
-            data=data,
-            df_preprocessor=df_preprocessor,
-            modalities=data_processors.keys(),
-        )
-
-        processed_features = []
-        for i in range(sample_num):
-            per_sample_features = get_per_sample_features(
-                modality_features=modality_features,
-                modality_types=modality_types,
-                idx=i,
-            )
-            per_sample_features = apply_data_processor(
-                per_sample_features=per_sample_features,
-                data_processors=data_processors,
-                feature_modalities=modality_types,
-                is_training=False,
-            )
-            processed_features.append(per_sample_features)
-
-        collate_fn = get_collate_fn(
-            df_preprocessor=df_preprocessor, data_processors=data_processors, per_gpu_batch_size=sample_num
-        )
-        batch = collate_fn(processed_features)
-
-        return batch
-
-    def _realtime_predict(
-        self,
-        data: pd.DataFrame,
-        df_preprocessor: MultiModalFeaturePreprocessor,
-        data_processors: Dict,
-        num_gpus: int,
-        precision: Union[int, str],
-    ) -> List[Dict]:
-        batch = self._process_batch(
-            data=data,
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-        )
-        output = infer_batch(
-            batch=batch,
-            model=self._model,
-            precision=precision,
-            num_gpus=num_gpus,
-            model_postprocess_fn=self._model_postprocess_fn,
-        )
-        return [output]
-
-    def _predict(
-        self,
-        data: Union[pd.DataFrame, dict, list],
-        requires_label: bool,
-        realtime: Optional[bool] = None,
-        seed: Optional[int] = 123,
-    ) -> List[Dict]:
-
-        with apply_log_filter(LogFilter("Global seed set to")):  # Ignore the log "Global seed set to"
-            pl.seed_everything(seed, workers=True)
-
-        data, df_preprocessor, data_processors = self._on_predict_start(
-            config=self._config,
-            data=data,
-            requires_label=requires_label,
-        )
-
-        strategy = "dp"  # default used in inference.
-
-        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
-
-        if self._problem_type == OBJECT_DETECTION:
-            strategy = "ddp"
-
-        if strategy == "ddp" and self._fit_called:
-            num_gpus = 1  # While using DDP, we can only use single gpu after fit is called
-
-        if num_gpus <= 1:
-            # Force set strategy to be None if it's cpu-only or we have only one GPU.
-            strategy = None
-
-        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False)
-
-        if not realtime:
-            batch_size = compute_inference_batch_size(
-                per_gpu_batch_size=self._config.env.per_gpu_batch_size,
-                eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
-                per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,  # backward compatibility.
-                num_gpus=num_gpus,
-                strategy=strategy,
-            )
-
-        if realtime is None:
-            realtime = use_realtime(data=data, data_processors=data_processors, batch_size=batch_size)
-
-        if self._problem_type == OBJECT_DETECTION:
-            realtime = False
-
-        if realtime:
-            outputs = self._realtime_predict(
-                data=data,
-                df_preprocessor=df_preprocessor,
-                data_processors=data_processors,
-                num_gpus=num_gpus,
-                precision=precision,
-            )
-        else:
-            outputs = self._default_predict(
-                data=data,
-                df_preprocessor=df_preprocessor,
-                data_processors=data_processors,
-                num_gpus=num_gpus,
-                precision=precision,
-                batch_size=batch_size,
-                strategy=strategy,
-            )
-
-        return outputs
 
     def set_num_gpus(self, num_gpus):
         assert isinstance(num_gpus, int)
@@ -2144,6 +2020,7 @@ class MultiModalPredictor:
                 label=label,
                 metrics=metrics,
                 return_pred=return_pred,
+                realtime=realtime,
             )
         if self._problem_type == OBJECT_DETECTION:
             if realtime:
@@ -2159,7 +2036,8 @@ class MultiModalPredictor:
         else:
             ret_type = LOGITS
 
-        outputs = self._predict(
+        outputs = predict(
+            predictor=self,
             data=data,
             requires_label=True,
             realtime=realtime,
@@ -2319,6 +2197,7 @@ class MultiModalPredictor:
                 data=data,
                 id_mappings=id_mappings,
                 as_pandas=as_pandas,
+                realtime=realtime,
             )
         if self._problem_type == OBJECT_DETECTION:
             if isinstance(data, str):
@@ -2349,7 +2228,8 @@ class MultiModalPredictor:
                 return_prob=False,
             )
         else:
-            outputs = self._predict(
+            outputs = predict(
+                predictor=self,
                 data=data,
                 requires_label=False,
                 realtime=realtime,
@@ -2459,6 +2339,7 @@ class MultiModalPredictor:
                 id_mappings=id_mappings,
                 as_pandas=as_pandas,
                 as_multiclass=as_multiclass,
+                realtime=realtime,
             )
 
         assert self._problem_type not in [
@@ -2473,7 +2354,8 @@ class MultiModalPredictor:
                 return_prob=True,
             )
         else:
-            outputs = self._predict(
+            outputs = predict(
+                predictor=self,
                 data=data,
                 requires_label=False,
                 realtime=realtime,
@@ -2546,13 +2428,15 @@ class MultiModalPredictor:
                 id_mappings=id_mappings,
                 as_tensor=as_tensor,
                 as_pandas=as_pandas,
+                realtime=realtime,
             )
 
         turn_on_off_feature_column_info(
             data_processors=self._data_processors,
             flag=True,
         )
-        outputs = self._predict(
+        outputs = predict(
+            predictor=self,
             data=data,
             requires_label=False,
             realtime=realtime,
@@ -2790,12 +2674,11 @@ class MultiModalPredictor:
                 data = data[:2]
 
         data, df_preprocessor, data_processors = self._on_predict_start(
-            config=self._config,
             data=data,
             requires_label=requires_label,
         )
 
-        batch = self._process_batch(
+        batch = process_batch(
             data=data,
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,

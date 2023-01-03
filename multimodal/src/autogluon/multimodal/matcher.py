@@ -58,6 +58,7 @@ from .data.infer_types import (
     infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
 )
+from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from .optimization.lit_matcher import MatcherLitModule
 from .optimization.utils import get_matcher_loss_func, get_matcher_miner_func, get_metric
 from .presets import matcher_presets
@@ -88,6 +89,7 @@ from .utils import (
     init_df_preprocessor,
     init_pretrained_matcher,
     load_text_tokenizers,
+    predict,
     process_save_path,
     save_pretrained_model_configs,
     save_text_tokenizers,
@@ -1023,18 +1025,13 @@ class MultiModalMatcher:
         if os.path.isfile(last_ckpt_path):
             os.remove(last_ckpt_path)
 
-    def _predict(
+    def _on_predict_start(
         self,
         data: Union[pd.DataFrame, dict, list],
         id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]],
         requires_label: bool,
         signature: Optional[str] = None,
-        seed: Optional[int] = 123,
-    ) -> List[Dict]:
-
-        with apply_log_filter(LogFilter("Global seed set to")):  # Ignore the log "Global seed set to"
-            pl.seed_everything(seed, workers=True)
-
+    ):
         assert signature in [QUERY, RESPONSE, None]
 
         data = data_to_df(data=data, header=signature)
@@ -1138,38 +1135,40 @@ class MultiModalMatcher:
 
         df_preprocessors = [item for item in df_preprocessors if item is not None]
         data_processors = [item for item in data_processors if item is not None]
-        strategy = "dp"  # default used in inference.
 
-        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
-        if num_gpus <= 1:
-            strategy = None
+        if self._match_label is not None:
+            match_label = label_df_preprocessor.label_generator.transform([self._match_label]).item()
+        else:
+            match_label = None
 
-        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision)
+        return data, df_preprocessors, data_processors, match_label
 
-        batch_size = compute_inference_batch_size(
-            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
-            eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
-            per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,  # backward compatibility.
-            num_gpus=num_gpus,
-            strategy=strategy,
-        )
+    def _default_predict(
+        self,
+        data: Union[pd.DataFrame, Dict, List],
+        id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]],
+        df_preprocessor: List[MultiModalFeaturePreprocessor],
+        data_processors: List[Dict],
+        num_gpus: int,
+        precision: Union[int, str],
+        batch_size: int,
+        strategy: str,
+        match_label: int,
+        signature: Optional[str] = None,
+    ) -> List[Dict]:
 
         predict_dm = BaseDataModule(
-            df_preprocessor=df_preprocessors,
+            df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             per_gpu_batch_size=batch_size,
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
             id_mappings=id_mappings,
         )
-        if self._match_label is not None:
-            match_label = label_df_preprocessor.label_generator.transform([self._match_label]).item()
-        else:
-            match_label = None
 
         task = MatcherLitModule(
-            query_model=query_model,
-            response_model=response_model,
+            query_model=self._query_model,
+            response_model=self._response_model,
             signature=signature,
             match_label=match_label,
         )
@@ -1254,6 +1253,7 @@ class MultiModalMatcher:
         chunk_size: Optional[int] = 1024,
         similarity_type: Optional[str] = "cosine",
         cutoffs: Optional[List[int]] = [1, 5, 10],
+        realtime: Optional[bool] = None,
     ):
         query_column = query_data.columns[0]
         response_column = response_data.columns[0]
@@ -1272,11 +1272,15 @@ class MultiModalMatcher:
             rank_labels.setdefault(per_row[query_column], {})[per_row[response_column]] = int(per_row[label_column])
 
         rank_results = dict()
-        query_embeddings = self.extract_embedding(query_data, id_mappings=id_mappings, as_tensor=True)
+        query_embeddings = self.extract_embedding(
+            query_data, id_mappings=id_mappings, as_tensor=True, realtime=realtime
+        )
         num_chunks = max(1, len(response_data) // chunk_size)
         top_k = max(cutoffs)
         for response_chunk in np.array_split(response_data, num_chunks):
-            response_embeddings = self.extract_embedding(response_chunk, id_mappings=id_mappings, as_tensor=True)
+            response_embeddings = self.extract_embedding(
+                response_chunk, id_mappings=id_mappings, as_tensor=True, realtime=realtime
+            )
             similarity_scores = compute_semantic_similarity(
                 a=query_embeddings, b=response_embeddings, similarity_type=similarity_type
             )
@@ -1306,11 +1310,15 @@ class MultiModalMatcher:
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ):
-        outputs = self._predict(
+        outputs = predict(
+            predictor=self,
             data=data,
             id_mappings=id_mappings,
             requires_label=True,
+            is_matching=True,
+            realtime=realtime,
         )
         prob = extract_from_output(ret_type=PROBABILITY, outputs=outputs)
 
@@ -1369,6 +1377,7 @@ class MultiModalMatcher:
         similarity_type: Optional[str] = "cosine",
         cutoffs: Optional[List[int]] = [1, 5, 10],
         label: Optional[str] = None,
+        realtime: Optional[bool] = None,
     ):
         """
         Evaluate model on a test dataset.
@@ -1402,6 +1411,10 @@ class MultiModalMatcher:
         label
             The label column name in data. Some tasks, e.g., image<-->text matching, have no label column in training data,
             but the label column is still required in evaluation.
+        realtime
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
 
         Returns
         -------
@@ -1438,6 +1451,7 @@ class MultiModalMatcher:
                 chunk_size=chunk_size,
                 similarity_type=similarity_type,
                 cutoffs=cutoffs,
+                realtime=realtime,
             )
         elif data is not None:
             return self._evaluate_matching(
@@ -1445,6 +1459,7 @@ class MultiModalMatcher:
                 id_mappings=id_mappings,
                 metrics=metrics,
                 return_pred=return_pred,
+                realtime=realtime,
             )
         else:
             raise ValueError(f"Invalid input.")
@@ -1454,6 +1469,7 @@ class MultiModalMatcher:
         data: Union[pd.DataFrame, dict, list],
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
+        realtime: Optional[bool] = None,
     ):
         """
         Predict values for the label column of new data.
@@ -1468,15 +1484,22 @@ class MultiModalMatcher:
              This is used when data contain the query/response identifiers instead of their contents.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
+        realtime
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
 
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        outputs = self._predict(
+        outputs = predict(
+            predictor=self,
             data=data,
             id_mappings=id_mappings,
             requires_label=False,
+            is_matching=True,
+            realtime=realtime,
         )
         prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
 
@@ -1501,6 +1524,7 @@ class MultiModalMatcher:
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
+        realtime: Optional[bool] = None,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -1519,6 +1543,10 @@ class MultiModalMatcher:
         as_multiclass
             Whether to return the probability of all labels or
             just return the probability of the positive class for binary classification problems.
+        realtime
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
 
         Returns
         -------
@@ -1526,10 +1554,13 @@ class MultiModalMatcher:
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-        outputs = self._predict(
+        outputs = predict(
+            predictor=self,
             data=data,
             id_mappings=id_mappings,
             requires_label=False,
+            is_matching=True,
+            realtime=realtime,
         )
         prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
 
@@ -1554,6 +1585,7 @@ class MultiModalMatcher:
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ):
         """
         Extract features for each sample, i.e., one row in the provided dataframe `data`.
@@ -1572,6 +1604,10 @@ class MultiModalMatcher:
             Whether to return a Pytorch tensor.
         as_pandas
             Whether to return the output as a pandas DataFrame (True) or numpy array (False).
+        realtime
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
 
         Returns
         -------
@@ -1596,11 +1632,14 @@ class MultiModalMatcher:
             else:
                 signature = QUERY
 
-        outputs = self._predict(
+        outputs = predict(
+            predictor=self,
             data=data,
             id_mappings=id_mappings,
             signature=signature,
             requires_label=False,
+            is_matching=True,
+            realtime=realtime,
         )
         features = extract_from_output(outputs=outputs, ret_type=FEATURES, as_ndarray=as_tensor is False)
 
