@@ -177,6 +177,7 @@ def analyze_interaction(
 def quick_fit(
     train_data: pd.DataFrame,
     label: str,
+    path: Optional[str] = None,
     val_size: float = 0.3,
     problem_type: str = "auto",
     sample: Union[None, int, float] = None,
@@ -207,6 +208,8 @@ def quick_fit(
         training dataset
     label: str
         target variable
+    path: Optional[str], default = None,
+        path for models saving
     problem_type: str, default = 'auto'
         problem type to use. Valid problem_type values include ['auto', 'binary', 'multiclass', 'regression', 'quantile', 'softclass']
         auto means it will be Auto-detected using AutoGluon methods.
@@ -278,6 +281,7 @@ def quick_fit(
                 problem_type=problem_type,
                 children=[
                     AutoGluonModelQuickFit(
+                        estimator_args={"path": path},
                         verbosity=verbosity,
                         problem_type=problem_type,
                         children=[

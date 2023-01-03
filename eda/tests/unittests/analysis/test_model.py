@@ -41,14 +41,7 @@ def test_AutoGluonModelEvaluator_regression():
     assert len(state.model_evaluation.y_pred) == len(df_test)
     expected = [c for c in df_train.columns if c not in ["Street", "Utilities", "SalePrice"]]
     assert sorted(state.model_evaluation.importance.index.to_list()) == sorted(expected)
-    assert state.model_evaluation.importance.columns.to_list() == [
-        "importance",
-        "stddev",
-        "p_value",
-        "n",
-        "p99_high",
-        "p99_low",
-    ]
+    _assert_importance_is_present(state)
     assert state.model_evaluation.confusion_matrix is None
     assert state.model_evaluation.confusion_matrix_normalized is None
 
@@ -73,6 +66,51 @@ def test_AutoGluonModelEvaluator_classification():
     assert len(state.model_evaluation.y_pred) == len(df_test)
     expected = [c for c in df_train.columns if c not in ["class"]]
     assert sorted(state.model_evaluation.importance.index.to_list()) == sorted(expected)
+    _assert_importance_is_present(state)
+
+
+def test_AutoGluonModelQuickFit():
+    df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
+    target_col = "class"
+
+    with tempfile.TemporaryDirectory() as path:
+        state = auto.analyze(
+            train_data=df_train,
+            label=target_col,
+            return_state=True,
+            anlz_facets=[
+                eda.dataset.TrainValidationSplit(
+                    children=[
+                        eda.model.AutoGluonModelQuickFit(
+                            estimator_args=dict(path=path),
+                            verbosity=0,
+                            hyperparameters={
+                                "RF": {
+                                    "criterion": "entropy",
+                                    "max_depth": 15,
+                                    "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]},
+                                }
+                            },
+                            children=[eda.model.AutoGluonModelEvaluator()],
+                        )
+                    ]
+                )
+            ],
+        )
+
+    assert state.model_evaluation.problem_type == "binary"
+    assert len(state.model_evaluation.y_true) == int(len(df_train) * 0.3)
+    assert len(state.model_evaluation.y_pred) == int(len(df_train) * 0.3)
+    expected = [c for c in df_train.columns if c not in ["class"]]
+    assert sorted(state.model_evaluation.importance.index.to_list()) == sorted(expected)
+    _assert_importance_is_present(state)
+
+
+def test_AutoGluonModelQuickFit__constructor_defaults():
+    assert eda.model.AutoGluonModelQuickFit().estimator_args == {}
+
+
+def _assert_importance_is_present(state):
     assert state.model_evaluation.importance.columns.to_list() == [
         "importance",
         "stddev",

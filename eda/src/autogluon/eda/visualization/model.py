@@ -240,19 +240,9 @@ class ModelLeaderboard(AbstractVisualization, JupyterMixin):
     :py:class:`~autogluon.eda.analysis.model.AutoGluonModelEvaluator`
     """
 
-    def __init__(
-        self,
-        fig_args: Optional[Dict[str, Any]] = None,
-        headers: bool = False,
-        namespace: Optional[str] = None,
-        **kwargs,
-    ) -> None:
+    def __init__(self, namespace: Optional[str] = None, headers: bool = False, **kwargs) -> None:
         super().__init__(namespace, **kwargs)
         self.headers = headers
-
-        if fig_args is None:
-            fig_args = {}
-        self.fig_args = fig_args
 
     def can_handle(self, state: AnalysisState) -> bool:
         return "model_evaluation" in state and "leaderboard" in state.model_evaluation
