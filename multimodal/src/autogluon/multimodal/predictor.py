@@ -254,7 +254,7 @@ class MultiModalPredictor:
         pipeline
             Pipeline has been deprecated and merged in problem_type.
         presets
-            The presets for loading model parameters / training the model
+            Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
@@ -378,6 +378,7 @@ class MultiModalPredictor:
 
         self._label_column = label
         self._problem_type = problem_type
+        self._presets = presets.lower() if presets else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = num_classes
@@ -422,7 +423,8 @@ class MultiModalPredictor:
                 response=response,
                 label=label,
                 match_label=match_label,
-                problem_type=self._problem_type,  # Ensure that matcher will always infer problem type.
+                problem_type=problem_type,
+                presets=presets,
                 hyperparameters=hyperparameters,
                 eval_metric=eval_metric,
                 path=path,
@@ -441,9 +443,9 @@ class MultiModalPredictor:
         if self._problem_type is not None:
             if self.problem_property.support_zero_shot:
                 # Load pretrained model via the provided hyperparameters and presets
-                # FIXME!, Revise the logic to use presets and add problem_type in init_pretrained
                 self._config, self._model, self._data_processors = init_pretrained(
-                    presets=self._problem_type,
+                    problem_type=self._problem_type,
+                    presets=self._presets,
                     hyperparameters=hyperparameters,
                     num_classes=self._output_shape,
                     classes=self._classes,
@@ -555,7 +557,7 @@ class MultiModalPredictor:
         train_data
             A dataframe containing training data.
         presets
-            Name of the presets. See the available presets in `presets.py`.
+            Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
         config
             A dictionary with four keys "model", "data", "optimization", and "environment".
             Each key's value can be a string, yaml file path, or OmegaConf's DictConfig.
@@ -747,6 +749,10 @@ class MultiModalPredictor:
             data=train_data,
             valid_data=tuning_data,
         )
+        if self._presets is not None:
+            presets = self._presets
+        else:
+            self._presets = presets
 
         if self._config is not None:  # continuous training
             config = self._config
@@ -1111,10 +1117,9 @@ class MultiModalPredictor:
         standalone: bool = True,
         **hpo_kwargs,
     ):
-        if self._config is not None:  # continuous training
-            config = self._config
 
         config = get_config(
+            problem_type=self._problem_type,
             presets=presets,
             config=config,
             overrides=hyperparameters,
@@ -2554,6 +2559,7 @@ class MultiModalPredictor:
                     "column_types": self._column_types,
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
+                    "presets": self._presets,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
@@ -2761,6 +2767,8 @@ class MultiModalPredictor:
         predictor._problem_type = assets["problem_type"]
         if "pipeline" in assets:  # backward compatibility
             predictor._problem_type = assets["pipeline"]
+        if "presets" in assets:
+            predictor._presets = assets["presets"]
         if "best_score" in assets:  # backward compatibility
             predictor._best_score = assets["best_score"]
         if "total_train_time" in assets:  # backward compatibility

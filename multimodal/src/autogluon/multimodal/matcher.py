@@ -114,6 +114,7 @@ class MultiModalMatcher:
         label: Optional[str] = None,
         match_label: Optional[Union[int, str]] = None,
         problem_type: Optional[str] = None,
+        presets: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -143,6 +144,8 @@ class MultiModalMatcher:
             if the label column contains binary, multiclass, or numeric labels.
             If `problem_type = None`, the prediction problem type is inferred
             based on the label-values in provided dataset.
+        presets
+            Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
@@ -195,6 +198,7 @@ class MultiModalMatcher:
         self._label_column = label
         self._problem_type = None  # always infer problem type for matching.
         self._pipeline = problem_type.lower() if problem_type is not None else None
+        self._presets = presets.lower() if presets else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = None
@@ -228,7 +232,9 @@ class MultiModalMatcher:
                 self._response_model,
                 self._query_processors,
                 self._response_processors,
-            ) = init_pretrained_matcher(presets=self._pipeline, hyperparameters=hyperparameters)
+            ) = init_pretrained_matcher(
+                pipeline=self._pipeline, presets=self._presets, hyperparameters=hyperparameters
+            )
 
     @property
     def query(self):
@@ -307,7 +313,7 @@ class MultiModalMatcher:
              Id-to-content mappings. The contents can be text, image, etc.
              This is used when the dataframe contains the query/response identifiers instead of their contents.
         presets
-            Name of the presets. See the available presets in `presets.py`.
+            Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
         tuning_data
             A dataframe containing validation data, which should have the same columns as the train_data.
             If `tuning_data = None`, `fit()` will automatically
@@ -598,6 +604,7 @@ class MultiModalMatcher:
         if presets == "siamese_network":
             config = self._config
             config = get_config(
+                problem_type=self._pipeline,
                 presets=presets,
                 config=config,
                 overrides=hyperparameters,
@@ -1766,6 +1773,7 @@ class MultiModalMatcher:
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
                     "pipeline": self._pipeline,
+                    "presets": self._presets,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
@@ -1863,6 +1871,8 @@ class MultiModalMatcher:
         matcher._label_column = assets["label_column"]
         matcher._problem_type = assets["problem_type"]
         matcher._pipeline = assets["pipeline"]
+        if "presets" in assets:
+            matcher._presets = assets["presets"]
         matcher._eval_metric_name = assets["eval_metric_name"]
         matcher._verbosity = verbosity
         matcher._resume = resume
