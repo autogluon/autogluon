@@ -1,5 +1,5 @@
 import warnings
-from typing import List, Optional, Dict, Any, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -9,8 +9,8 @@ from scipy import stats
 from scipy.cluster import hierarchy as hc
 from scipy.stats import spearmanr
 
-from .base import AbstractAnalysis
 from .. import AnalysisState
+from .base import AbstractAnalysis
 
 __all__ = ["Correlation", "CorrelationSignificance", "FeatureInteraction", "DistributionFit"]
 

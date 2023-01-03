@@ -1,20 +1,20 @@
-from unittest.mock import MagicMock, ANY
+from unittest.mock import ANY, MagicMock
 
 import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
+import scipy
 import seaborn as sns
 from hamcrest.library.integration import match_equality
 from pandas import DataFrame
-import scipy
 
 import autogluon.eda.auto as auto
-from autogluon.common.features.types import R_INT, R_FLOAT, R_OBJECT, R_CATEGORY, R_BOOL
+from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, R_OBJECT
 from autogluon.eda import AnalysisState
 from autogluon.eda.visualization import (
-    CorrelationVisualization,
     CorrelationSignificanceVisualization,
+    CorrelationVisualization,
     FeatureInteractionVisualization,
 )
 from autogluon.eda.visualization.interaction import FeatureDistanceAnalysisVisualization

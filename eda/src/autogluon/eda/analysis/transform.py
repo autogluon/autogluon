@@ -4,9 +4,9 @@ from typing import List, Optional
 import pandas as pd
 
 from autogluon.features import AbstractFeatureGenerator, AutoMLPipelineFeatureGenerator
+
+from ..state import AnalysisState, StateCheckMixin
 from .base import AbstractAnalysis
-from ..state import AnalysisState
-from ..state import StateCheckMixin
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
         super().__init__(parent, children, state, **kwargs)
         self.category_to_numbers = category_to_numbers
         if feature_generator is None:
-            args = dict(
+            feature_generator = AutoMLPipelineFeatureGenerator(
                 enable_numeric_features=True,
                 enable_categorical_features=True,
                 enable_datetime_features=False,
@@ -69,9 +69,8 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
                 enable_raw_text_features=False,
                 enable_vision_features=False,
                 verbosity=0,
+                **kwargs,
             )
-            args = {**args, **kwargs}
-            feature_generator = AutoMLPipelineFeatureGenerator(**args)
         self.feature_generator = feature_generator
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Type, Tuple
+from typing import Any, Dict, Optional, Tuple, Type
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,10 +8,11 @@ import seaborn as sns
 from scipy import stats
 from scipy.cluster import hierarchy as hc
 
-from autogluon.common.features.types import R_OBJECT, R_CATEGORY, R_BOOL, R_INT, R_FLOAT
+from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, R_OBJECT
+
+from ..state import AnalysisState
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
-from ..state import AnalysisState
 
 __all__ = ["CorrelationVisualization", "CorrelationSignificanceVisualization", "FeatureInteractionVisualization"]
 

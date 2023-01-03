@@ -1,18 +1,18 @@
+import os
 from unittest.mock import MagicMock
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
-import os
 
 import autogluon.eda.auto as auto
 from autogluon.eda import AnalysisState
 from autogluon.eda.analysis import (
+    ApplyFeatureGenerator,
     Correlation,
     CorrelationSignificance,
-    FeatureInteraction,
     DistributionFit,
-    ApplyFeatureGenerator,
+    FeatureInteraction,
 )
 from autogluon.eda.analysis.dataset import RawTypesAnalysis
 from autogluon.eda.analysis.interaction import FeatureDistanceAnalysis
