@@ -15,7 +15,6 @@ then
 else
     setup_torch_gpu
     export CUDA_VISIBLE_DEVICES=0
-
 fi
 
 install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/[all,tests]"
