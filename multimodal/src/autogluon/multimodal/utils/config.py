@@ -487,12 +487,6 @@ def update_config_by_rules(
                 "the loss_function automatically otherwise.",
                 UserWarning,
             )
-    if problem_type == NER:
-        if FUSION_MLP in config.model.names:
-            config.model.names.remove(FUSION_MLP)
-    else:
-        if FUSION_NER in config.model.names:
-            config.model.names.remove(FUSION_NER)
 
     return config
 
