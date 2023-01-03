@@ -1,13 +1,13 @@
 import logging
 import pprint
 import time
+import traceback
 import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, Union
 
 import pandas as pd
 
-from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
@@ -199,12 +199,24 @@ class TimeSeriesPredictor:
     def validation_splitter(self) -> AbstractTimeSeriesSplitter:
         return self._learner.validation_splitter
 
-    def _check_and_prepare_data_frame(self, df: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+    def _check_and_prepare_data_frame(self, df: Union[TimeSeriesDataFrame, pd.DataFrame]) -> TimeSeriesDataFrame:
         """Ensure that TimeSeriesDataFrame has a frequency, or replace its time index with a dummy if
         ``self.ignore_time_index`` is True.
         """
         if df is None:
             return df
+        if not isinstance(df, TimeSeriesDataFrame):
+            if isinstance(df, pd.DataFrame):
+                try:
+                    df = TimeSeriesDataFrame(df)
+                except:
+                    raise ValueError(
+                        f"Provided data of type {type(df)} cannot be automatically converted to a TimeSeriesDataFrame."
+                    )
+            else:
+                raise ValueError(
+                    f"Please provide data in TimeSeriesDataFrame format (received an object of type {type(df)})."
+                )
         if self.ignore_time_index:
             df = df.get_reindexed_view(freq="S")
         timestamps = df.reset_index(level=TIMESTAMP)[TIMESTAMP]
@@ -247,8 +259,8 @@ class TimeSeriesPredictor:
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)
     def fit(
         self,
-        train_data: TimeSeriesDataFrame,
-        tuning_data: Optional[TimeSeriesDataFrame] = None,
+        train_data: Union[TimeSeriesDataFrame, pd.DataFrame],
+        tuning_data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame]] = None,
         time_limit: Optional[int] = None,
         presets: Optional[str] = None,
         hyperparameters: Dict[Union[str, Type], Any] = None,
@@ -261,7 +273,7 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        train_data : TimeSeriesDataFrame
+        train_data : Union[TimeSeriesDataFrame, pd.DataFrame]
             Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format. For best performance, all
             time series should have length ``> 2 * prediction_length``.
 
@@ -279,7 +291,10 @@ class TimeSeriesPredictor:
 
                 data.static_features["store_id"] = data.static_features["store_id"].astype("category")
 
-        tuning_data : TimeSeriesDataFrame, optional
+            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
+            to a ``TimeSeriesDataFrame``.
+
+        tuning_data : Union[TimeSeriesDataFrame, pd.DataFrame], optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
             time series are used for computing the validation score.
@@ -298,6 +313,10 @@ class TimeSeriesPredictor:
 
             If ``train_data`` has static features, ``tuning_data`` must have also have static features with the same
             column names and dtypes.
+
+            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
+            to a ``TimeSeriesDataFrame``.
+
         time_limit : int, optional
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
             seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models
@@ -486,7 +505,7 @@ class TimeSeriesPredictor:
 
     def predict(
         self,
-        data: TimeSeriesDataFrame,
+        data: Union[TimeSeriesDataFrame, pd.DataFrame],
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[str] = None,
         random_seed: Optional[int] = 123,
@@ -496,7 +515,7 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        data : TimeSeriesDataFrame
+        data : Union[TimeSeriesDataFrame, pd.DataFrame]
             Time series data to forecast with.
 
             If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
@@ -504,6 +523,9 @@ class TimeSeriesPredictor:
 
             If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
             static features that have the same columns and dtypes.
+
+            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
+            to a ``TimeSeriesDataFrame``.
         known_covariates : TimeSeriesDataFrame, optional
             If ``known_covariates_names`` were specified when creating the predictor, it is necessary to provide the
             values of the known covariates for each time series during the forecast horizon. That is:
@@ -561,13 +583,13 @@ class TimeSeriesPredictor:
         data = self._check_and_prepare_data_frame(data)
         return self._learner.predict(data, known_covariates=known_covariates, model=model, **kwargs)
 
-    def evaluate(self, data: TimeSeriesDataFrame, **kwargs):
+    def evaluate(self, data: Union[TimeSeriesDataFrame, pd.DataFrame], **kwargs):
         """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``
         on the given data set, and with the same ``prediction_length`` used when training models.
 
         Parameters
         ----------
-        data : TimeSeriesDataFrame
+        data : Union[TimeSeriesDataFrame, pd.DataFrame]
             The data to evaluate the best model on. The last ``prediction_length`` time steps of the data set, for each
             item, will be held out for prediction and forecast accuracy will be calculated on these time steps.
 
@@ -576,6 +598,9 @@ class TimeSeriesPredictor:
 
             If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
             static features that have the same columns and dtypes.
+
+            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
+            to a ``TimeSeriesDataFrame``.
 
         Other Parameters
         ----------------
@@ -594,7 +619,7 @@ class TimeSeriesPredictor:
         data = self._check_and_prepare_data_frame(data)
         return self._learner.score(data, **kwargs)
 
-    def score(self, data: TimeSeriesDataFrame, **kwargs):
+    def score(self, data: Union[TimeSeriesDataFrame, pd.DataFrame], **kwargs):
         """See, :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate`."""
         return self.evaluate(data, **kwargs)
 
@@ -640,7 +665,9 @@ class TimeSeriesPredictor:
         """Returns the name of the best model from trainer."""
         return self._trainer.get_model_best()
 
-    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, silent=False) -> pd.DataFrame:
+    def leaderboard(
+        self, data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame]] = None, silent=False
+    ) -> pd.DataFrame:
         """Return a leaderboard showing the performance of every trained model, the output is a
         pandas data frame with columns:
 
@@ -660,7 +687,7 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        data : TimeSeriesDataFrame, optional
+        data : Union[TimeSeriesDataFrame, pd.DataFrame], optional
             dataset used for additional evaluation. If not provided, the validation set used during training will be
             used.
 
@@ -669,6 +696,9 @@ class TimeSeriesPredictor:
 
             If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
             static features that have the same columns and dtypes.
+
+            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
+            to a ``TimeSeriesDataFrame``.
 
         silent : bool, default = False
             If False, the leaderboard DataFrame will be printed.
