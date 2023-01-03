@@ -126,7 +126,6 @@ def setup_save_path(
     resume: Optional[bool] = None,
     old_save_path: Optional[str] = None,
     proposed_save_path: Optional[str] = None,
-    hyperparameter_tune_kwargs: Optional[dict] = None,
     warn_if_exist: Optional[bool] = True,
     raise_if_exist: Optional[bool] = False,
     model_loaded: Optional[bool] = None,
@@ -136,7 +135,6 @@ def setup_save_path(
     rank = int(os.environ.get("LOCAL_RANK", 0))
     save_path = None
     if resume:
-        assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
         save_path = process_save_path(path=old_save_path, resume=True)
     elif proposed_save_path is not None:  # TODO: distinguish DDP and existed predictor
         save_path = process_save_path(path=proposed_save_path, raise_if_exist=(raise_if_exist and rank == 0))
