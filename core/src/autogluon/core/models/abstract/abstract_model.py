@@ -19,6 +19,7 @@ from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.common.utils.log_utils import DuplicateFilter
+from autogluon.common.utils.resource_utils import ResourceManager
 
 from .model_trial import model_trial, skip_hpo
 from ._tags import _DEFAULT_TAGS
@@ -30,7 +31,6 @@ from ...hpo.constants import RAY_BACKEND, CUSTOM_BACKEND
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
 from ...ray.resources_calculator import ResourceCalculator
 from ...scheduler import LocalSequentialScheduler
-from ...utils import ResourceManager
 from ...utils import get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMemoryError

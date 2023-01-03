@@ -5,17 +5,16 @@ import random
 import re
 import time
 import warnings
-import psutil
 
 import numpy as np
 from pandas import DataFrame, Series
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
-from autogluon.core.utils import ResourceManager
 from autogluon.core.utils import try_import_lightgbm
 
 from . import lgb_utils

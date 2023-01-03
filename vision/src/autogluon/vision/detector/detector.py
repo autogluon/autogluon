@@ -9,7 +9,7 @@ import os
 import pandas as pd
 import numpy as np
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.core.utils import ResourceManager
+from autogluon.common.utils.resource_utils import ResourceManager
 from .._gluoncv import ObjectDetection
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 

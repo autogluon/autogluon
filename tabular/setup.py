@@ -24,7 +24,6 @@ install_requires = [
     'scipy',
     'pandas',
     'scikit-learn',
-    'psutil',
     'networkx>=2.3,<3.0',
     f'autogluon.core=={version}',
     f'autogluon.features=={version}',
