@@ -8,11 +8,7 @@ from typing import Dict, List, Optional, Tuple, Union
 import torch
 from torch import nn
 
-try:
-    from mmcv.parallel import DataContainer
-except:
-    pass
-
+from .mmcv import DataContainer
 from ..constants import AUTOMM, OBJECT_DETECTION, OCR
 
 logger = logging.getLogger(AUTOMM)
