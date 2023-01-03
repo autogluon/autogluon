@@ -589,8 +589,15 @@ class AbstractModel:
         )
         minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
         minimum_model_num_gpus = minimum_model_resources.get('num_gpus', 0)
-        assert num_cpus >= minimum_model_num_cpus, f'Specified num_cpus per {self.__class__.__name__} is less than minimum num_cpus requirement {minimum_model_num_cpus}'
-        assert num_gpus >= minimum_model_num_gpus, f'Specified num_gpus per {self.__class__.__name__} is less than minimum num_gpus requirement {minimum_model_num_gpus}'
+
+        assert system_num_cpus >= num_cpus
+        assert system_num_gpus >= num_gpus
+
+        assert system_num_cpus >= minimum_model_num_cpus, f'The total system num_cpus={system_num_cpus} is less than minimum num_cpus={minimum_model_num_cpus} to fit {self.__class__.__name__}. Consider using a machine with more CPUs.'
+        assert system_num_gpus >= minimum_model_num_gpus, f'The total system num_gpus={system_num_gpus} is less than minimum num_gpus={minimum_model_num_gpus} to fit {self.__class__.__name__}. Consider using a machine with more GPUs.'
+
+        assert num_cpus >= minimum_model_num_cpus, f'Specified num_cpus={num_cpus} per {self.__class__.__name__} is less than minimum num_cpus={minimum_model_num_cpus}'
+        assert num_gpus >= minimum_model_num_gpus, f'Specified num_gpus={num_gpus} per {self.__class__.__name__} is less than minimum num_gpus={minimum_model_num_gpus}'
         
         kwargs['num_cpus'] = num_cpus
         kwargs['num_gpus'] = num_gpus
