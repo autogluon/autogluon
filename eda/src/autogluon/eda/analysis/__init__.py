@@ -1,6 +1,6 @@
 from .base import Namespace
-from .dataset import Sampler
-from .interaction import Correlation, CorrelationSignificance, FeatureInteraction, DistributionFit
+from .dataset import Sampler, TrainValidationSplit
+from .interaction import Correlation, CorrelationSignificance, DistributionFit, FeatureInteraction
 from .missing import MissingValuesAnalysis
 from .model import AutoGluonModelEvaluator
 from .shift import XShiftDetector

@@ -1,10 +1,11 @@
-from typing import Union, List, Optional
+from typing import List, Optional, Union
 
 from sklearn.metrics import confusion_matrix
 
 from autogluon.core.constants import BINARY, MULTICLASS
 from autogluon.tabular import TabularPredictor
-from .base import AnalysisState, AbstractAnalysis
+
+from .base import AbstractAnalysis, AnalysisState
 
 __all__ = ["AutoGluonModelEvaluator"]
 

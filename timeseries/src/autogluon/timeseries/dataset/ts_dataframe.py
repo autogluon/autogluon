@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from pandas.core.internals import ArrayManager, BlockManager
 
+from autogluon.common.loaders import load_pd
 from autogluon.common.utils.deprecated import deprecated
 
 ITEMID = "item_id"
@@ -29,18 +30,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
     Parameters
     ----------
     data : Any
-        Time-series data to construct a ``TimeSeriesDataFrame``. The class currently supports three
-        input formats.
+        Time-series data to construct a ``TimeSeriesDataFrame``. The class currently supports four input formats.
 
-        1. Time-series data in Iterable format. For example::
-
-                iterable_dataset = [
-                    {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq='D')},
-                    {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq='D')},
-                    {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq='D')}
-                ]
-
-        2. Time-series data in a pandas DataFrame format without multi-index. For example::
+        1. Time-series data in a pandas DataFrame format without multi-index. For example::
 
                    item_id  timestamp  target
                 0        0 2019-01-01       0
@@ -53,7 +45,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 7        2 2019-01-02       7
                 8        2 2019-01-03       8
 
-        3. Time-series data in pandas DataFrame format with multi-index on item_id and timestamp. For example::
+        2. Time-series data in pandas DataFrame format with multi-index on item_id and timestamp. For example::
 
                                         target
                 item_id timestamp
@@ -66,6 +58,16 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 2       2019-01-01       6
                         2019-01-02       7
                         2019-01-03       8
+
+        3. Path to a data file in CSV or Parquet format. The file must contain columns ``item_id`` and ``timestamp``, as well as columns with time series values. This is similar to Option 1 above (pandas DataFrame format without multi-index). Both remote (e.g., S3) and local paths are accepted.
+
+        4. Time-series data in Iterable format. For example::
+
+                iterable_dataset = [
+                    {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq='D')},
+                    {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq='D')},
+                    {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq='D')}
+                ]
 
     static_features : Optional[pd.DataFrame]
         An optional data frame describing the metadata attributes of individual items in the item index. These
@@ -104,10 +106,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 self._validate_multi_index_data_frame(data)
             else:
                 data = self._construct_pandas_frame_from_data_frame(data)
+        elif isinstance(data, str):
+            data = self._load_data_frame_from_file(data)
         elif isinstance(data, Iterable):
             data = self._construct_pandas_frame_from_iterable_dataset(data)
         else:
-            raise ValueError("Data input type not recognized, must be DataFrame or iterable.")
+            raise ValueError("Data input type not recognized, must be DataFrame, iterable or string.")
         super().__init__(data=data, *args, **kwargs)
         self._static_features: Optional[pd.DataFrame] = None
         if static_features is not None:
@@ -309,6 +313,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return cls(cls._construct_pandas_frame_from_iterable_dataset(iterable_dataset))
 
     @classmethod
+    def _load_data_frame_from_file(cls, path: str) -> pd.DataFrame:
+        df = load_pd.load(path)
+        return cls._construct_pandas_frame_from_data_frame(df)
+
+    @classmethod
     def _construct_pandas_frame_from_data_frame(
         cls,
         df: pd.DataFrame,
@@ -325,8 +334,52 @@ class TimeSeriesDataFrame(pd.DataFrame):
             assert timestamp_column in df.columns, f"Column {timestamp_column} not found!"
             df.rename(columns={timestamp_column: TIMESTAMP}, inplace=True)
 
+        if TIMESTAMP in df.columns:
+            df[TIMESTAMP] = pd.to_datetime(df[TIMESTAMP])
+
         cls._validate_data_frame(df)
         return df.set_index([ITEMID, TIMESTAMP])
+
+    @classmethod
+    def from_path(
+        cls,
+        path: str,
+        id_column: Optional[str] = None,
+        timestamp_column: Optional[str] = None,
+    ) -> TimeSeriesDataFrame:
+        """Construct a ``TimeSeriesDataFrame`` from a CSV or Parquet file.
+
+        Parameters
+        ----------
+        path : str
+            Path to a local or remote (e.g., S3) file containing the time series data in CSV or Parquet format.
+            Example file contents::
+
+            .. code-block::
+
+                item_id,timestamp,target
+                0,2019-01-01,0
+                0,2019-01-02,1
+                0,2019-01-03,2
+                1,2019-01-01,3
+                1,2019-01-02,4
+                1,2019-01-03,5
+                2,2019-01-01,6
+                2,2019-01-02,7
+                2,2019-01-03,8
+
+        id_column: str
+            Name of the 'item_id' column if column name is different
+        timestamp_column: str
+            Name of the 'timestamp' column if column name is different
+
+        Returns
+        -------
+        ts_df: TimeSeriesDataFrame
+            A data frame in TimeSeriesDataFrame format.
+        """
+        df = load_pd.load(path)
+        return cls.from_data_frame(df, id_column=id_column, timestamp_column=timestamp_column)
 
     @classmethod
     def from_data_frame(

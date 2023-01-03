@@ -1,11 +1,12 @@
 import logging
-from typing import Union, List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional, Union
 
 from autogluon.common.utils.log_utils import verbosity2loglevel
+
 from .. import AnalysisState
 from ..analysis import FeatureInteraction
-from ..analysis.base import BaseAnalysis, AbstractAnalysis
-from ..analysis.dataset import Sampler, RawTypesAnalysis
+from ..analysis.base import AbstractAnalysis, BaseAnalysis
+from ..analysis.dataset import RawTypesAnalysis, Sampler
 from ..visualization import FeatureInteractionVisualization
 from ..visualization.base import AbstractVisualization
 from ..visualization.layouts import SimpleVerticalLinearLayout

@@ -1,13 +1,14 @@
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
 from autogluon.core.constants import REGRESSION
+
+from ..state import AnalysisState
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
-from ..state import AnalysisState
 
 __all__ = ["ConfusionMatrix", "FeatureImportance", "RegressionEvaluation"]
 

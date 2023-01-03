@@ -12,7 +12,8 @@ logger = logging.getLogger(AUTOMM)
 
 
 def init_pretrained(
-    presets: Optional[str],
+    problem_type: Optional[str] = None,
+    presets: Optional[str] = None,
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
     num_classes: Optional[int] = None,
     classes: Optional[list] = None,
@@ -23,8 +24,10 @@ def init_pretrained(
 
     Parameters
     ----------
+    problem_type
+        Problem type.
     presets
-        The preset to load
+        Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
     hyperparameters
         The customized hyperparameters used to override the default.
 
@@ -37,8 +40,7 @@ def init_pretrained(
     data_processors
         The data processors associated with the pre-trained model.
     """
-    # TODO: Fix the logic and add presets
-    config = get_config(presets=presets, overrides=hyperparameters)
+    config = get_config(problem_type=problem_type, presets=presets, overrides=hyperparameters)
     assert (
         len(config.model.names) == 1
     ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
@@ -53,7 +55,8 @@ def init_pretrained(
 
 
 def init_pretrained_matcher(
-    presets: Optional[str],
+    pipeline: Optional[str] = None,
+    presets: Optional[str] = None,
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
 ):
     """
@@ -61,8 +64,10 @@ def init_pretrained_matcher(
 
     Parameters
     ----------
+    pipeline
+        Matching pipeline.
     presets
-        Name of the pipeline.
+        Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
     hyperparameters
         The customized hyperparameters used to override the default.
 
@@ -84,6 +89,7 @@ def init_pretrained_matcher(
         The data processors associated with the response model.
     """
     config = get_config(
+        problem_type=pipeline,
         presets=presets,
         overrides=hyperparameters,
         extra=["matcher"],

@@ -1,11 +1,11 @@
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from pandas import DataFrame
 
+from ..state import AnalysisState, StateCheckMixin
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
-from ..state import AnalysisState, StateCheckMixin
 
 __all__ = ["DatasetStatistics", "DatasetTypeMismatch"]
 

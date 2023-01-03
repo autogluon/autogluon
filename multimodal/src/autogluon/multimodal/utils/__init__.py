@@ -32,7 +32,7 @@ from .environment import (
     move_to_device,
 )
 from .hpo import hyperparameter_tune
-from .inference import extract_from_output, infer_batch, use_realtime
+from .inference import extract_from_output, infer_batch, predict, process_batch, use_realtime
 from .load import CustomUnpickler, load_text_tokenizers
 from .log import LogFilter, apply_log_filter, make_exp_dir
 from .map import MeanAveragePrecision

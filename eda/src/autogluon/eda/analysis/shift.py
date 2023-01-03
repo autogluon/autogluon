@@ -1,5 +1,5 @@
 import copy
-from typing import Union, List, Any, Optional, Dict
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -8,9 +8,10 @@ from autogluon.core.constants import BINARY
 from autogluon.core.metrics import BINARY_METRICS, roc_auc
 from autogluon.core.utils import generate_train_test_split
 from autogluon.tabular import TabularPredictor
-from .base import AbstractAnalysis
+
 from .. import AnalysisState
 from ..state import StateCheckMixin
+from .base import AbstractAnalysis
 
 __all__ = ["XShiftDetector"]
 
