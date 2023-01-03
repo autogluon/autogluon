@@ -1,20 +1,23 @@
-from unittest.mock import MagicMock, ANY
+from unittest.mock import ANY, MagicMock
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import pytest
+import scipy
 import seaborn as sns
 from hamcrest.library.integration import match_equality
 from pandas import DataFrame
 
 import autogluon.eda.auto as auto
-from autogluon.common.features.types import R_INT, R_FLOAT, R_OBJECT, R_CATEGORY, R_BOOL
+from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, R_OBJECT
 from autogluon.eda import AnalysisState
 from autogluon.eda.visualization import (
-    CorrelationVisualization,
     CorrelationSignificanceVisualization,
+    CorrelationVisualization,
     FeatureInteractionVisualization,
 )
+from autogluon.eda.visualization.interaction import FeatureDistanceAnalysisVisualization
 
 
 def test_CorrelationVisualization_single_value(monkeypatch):
@@ -186,8 +189,8 @@ def test_FeatureInteractionVisualization__happy_path(monkeypatch):
     call_subplots.assert_called_with(key="value")
 
 
-@pytest.mark.parametrize("is_single", [True, False])
-def test_FeatureInteractionVisualization__headers(monkeypatch, is_single):
+@pytest.mark.parametrize("is_single, header", [(True, True), (False, True), (True, False), (False, False)])
+def test_FeatureInteractionVisualization__headers(monkeypatch, is_single, header):
     state = __get_feature_interaction_state()
     if is_single:
         state.interactions.train_data.abc.features.pop("y")
@@ -195,7 +198,7 @@ def test_FeatureInteractionVisualization__headers(monkeypatch, is_single):
     call_show = MagicMock()
     call_subplots = MagicMock(return_value=("fig", "ax"))
 
-    viz = FeatureInteractionVisualization(key="abc", numeric_as_categorical_threshold=2, headers=True)
+    viz = FeatureInteractionVisualization(key="abc", numeric_as_categorical_threshold=2, headers=header)
     viz.render_text = MagicMock()
 
     with monkeypatch.context() as m:
@@ -207,7 +210,9 @@ def test_FeatureInteractionVisualization__headers(monkeypatch, is_single):
             m.setattr(viz._RegPlotRenderer, "_render", call_render)
         auto.analyze(state=state, viz_facets=[viz])
 
-    if is_single:
+    if not header:
+        viz.render_text.assert_not_called()
+    elif is_single:
         viz.render_text.assert_called_with("a in train_data", text_type="h3")
     else:
         viz.render_text.assert_called_with("Feature interaction between a/b in train_data", text_type="h3")
@@ -456,3 +461,93 @@ def test_FeatureInteractionVisualization__HistPlotRenderer(monkeypatch, has_dist
         ax.plot.assert_not_called()
         ax.set_xlim.assert_not_called()
         call_plt_legend.assert_not_called()
+
+
+@pytest.mark.parametrize("has_near_duplicates", [True, False])
+def test_FeatureDistanceAnalysisVisualization__happy_path(monkeypatch, has_near_duplicates):
+    state = AnalysisState(
+        {
+            "feature_distance": {
+                "columns": [
+                    "age",
+                    "fnlwgt",
+                    "education-num",
+                    "sex",
+                    "capital-gain",
+                    "capital-loss",
+                    "hours-per-week",
+                    "workclass",
+                    "education",
+                    "marital-status",
+                    "occupation",
+                    "relationship",
+                    "race",
+                    "native-country",
+                ],
+                "linkage": np.array(
+                    [
+                        [9.0, 11.0, 0.6113, 2.0],
+                        [3.0, 10.0, 0.7652, 2.0],
+                        [7.0, 15.0, 0.7905, 3.0],
+                        [2.0, 6.0, 0.8097, 2.0],
+                        [0.0, 4.0, 0.8306, 2.0],
+                        [17.0, 18.0, 0.86785, 4.0],
+                        [12.0, 13.0, 0.8872, 2.0],
+                        [8.0, 20.0, 0.9333, 3.0],
+                        [1.0, 5.0, 0.946, 2.0],
+                        [16.0, 19.0, 0.94793333, 7.0],
+                        [21.0, 23.0, 0.9676619, 10.0],
+                        [22.0, 24.0, 0.981165, 12.0],
+                        [14.0, 25.0, 1.13729167, 14.0],
+                    ]
+                ),
+                "near_duplicates": [],
+                "near_duplicates_threshold": 0.85,
+            }
+        }
+    )
+
+    if has_near_duplicates:
+        state.feature_distance["near_duplicates"] = [
+            {"distance": 0.6113, "nodes": ["marital-status", "relationship"]},
+            {"distance": 0.7905, "nodes": ["occupation", "sex", "workclass"]},
+            {"distance": 0.8097, "nodes": ["education-num", "hours-per-week"]},
+            {"distance": 0.8306, "nodes": ["age", "capital-gain"]},
+        ]
+
+    ax = MagicMock()
+    call_subplots = MagicMock(return_value=("fig", ax))
+    call_dendrogram = MagicMock()
+    call_show = MagicMock()
+    call_render_markdown = MagicMock()
+
+    viz = FeatureDistanceAnalysisVisualization(some_chart_arg=123, fig_args=dict(key="value"))
+    viz.render_markdown = call_render_markdown
+
+    with monkeypatch.context() as m:
+        m.setattr(plt, "subplots", call_subplots)
+        m.setattr(plt, "show", call_show)
+        m.setattr(scipy.cluster.hierarchy, "dendrogram", call_dendrogram)
+        auto.analyze(state=state, viz_facets=[viz])
+
+    call_dendrogram.assert_called_with(
+        ax=ax, Z=ANY, labels=state.feature_distance.columns, orientation="left", some_chart_arg=123
+    )
+    np.testing.assert_array_equal(call_dendrogram.call_args[1]["Z"], state.feature_distance.linkage)
+    call_show.assert_called_with("fig")
+    call_subplots.assert_called_with(key="value")
+    if has_near_duplicates:
+        call_render_markdown.assert_called_with(
+            "**The following feature groups are considered as near-duplicates**:\n\nDistance threshold: <= `0.85`. "
+            "Consider keeping only some of the columns within each group:\n\n"
+            " - `marital-status`, `relationship` - distance `0.61`\n"
+            " - `occupation`, `sex`, `workclass` - distance `0.79`\n"
+            " - `education-num`, `hours-per-week` - distance `0.81`\n"
+            " - `age`, `capital-gain` - distance `0.83`"
+        )
+    else:
+        call_render_markdown.assert_not_called()
+
+
+def test_FeatureInteractionVisualization__no_fig_args():
+    assert FeatureDistanceAnalysisVisualization().fig_args == {}

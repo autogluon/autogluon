@@ -1,13 +1,16 @@
 import warnings
-from typing import List, Optional, Dict, Any, Union
+from typing import Any, Dict, List, Optional, Union
 
+import numpy as np
 import pandas as pd
 import phik  # noqa - required for significance_matrix instrumentation on pandas dataframes
 from pandas.core.dtypes.common import is_numeric_dtype
 from scipy import stats
+from scipy.cluster import hierarchy as hc
+from scipy.stats import spearmanr
 
-from .base import AbstractAnalysis
 from .. import AnalysisState
+from .base import AbstractAnalysis
 
 __all__ = ["Correlation", "CorrelationSignificance", "FeatureInteraction", "DistributionFit"]
 
@@ -117,6 +120,7 @@ class CorrelationSignificance(AbstractAnalysis):
 
 class FeatureInteraction(AbstractAnalysis):
     """
+    Feature interaction analysis
 
     Parameters
     ----------
@@ -362,3 +366,108 @@ class DistributionFit(AbstractAnalysis):
                 df = df[: self.keep_top_n]
             results = df.T.to_dict()
             return results
+
+
+class FeatureDistanceAnalysis(AbstractAnalysis):
+    """
+    The component performs feature correlation distance analysis using Spearman rank correlation and hierarchical clustering
+    for the data passed in `train_data` excluding `label`.
+    The near duplicates grouping is automatically suggested given `near_duplicates_threshold`.
+    The results can be visualized using :py:class:`~autogluon.eda.visualization.interaction.FeatureDistanceAnalysisVisualization`.
+
+    Note: it is recommended to apply :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator` before the analysis
+    to ensure correlations are calculated for categorical variables.
+
+    Parameters
+    ----------
+    near_duplicates_threshold: float, default = 0.01
+        defines feature distance to be considered as near duplicates
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: Optional[List[AbstractAnalysis]], default None
+        wrapped analyses; these will receive sampled `args` during `fit` call
+    kwargs
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.visualization as viz
+    >>> import autogluon.eda.auto as auto
+    >>> import pandas as pd
+    >>> import numpy as np
+    >>>
+    >>> df_train = pd.DataFrame(...)
+    >>>
+    >>> auto.analyze(
+    >>>     train_data=df_train, label=target_col,
+    >>>     anlz_facets=[
+    >>>         eda.transform.ApplyFeatureGenerator(category_to_numbers=True, children=[
+    >>>             eda.interaction.FeatureDistanceAnalysis(near_duplicates_threshold=0.7),
+    >>>         ])
+    >>>     ],
+    >>>     viz_facets=[
+    >>>         viz.interaction.FeatureDistanceAnalysisVisualization(fig_args=dict(figsize=(12,6))),
+    >>>     ]
+    >>> )
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
+    :py:class:`~autogluon.eda.visualization.interaction.FeatureDistanceAnalysisVisualization`
+    `Removing redundant features <https://github.com/fastai/book_nbs/blob/master/10_tabular.ipynb>`_ section of
+        Jeremy Howard's "Deep Learning for Coders with Fastai and PyTorch" book.
+
+    """
+
+    def __init__(
+        self,
+        near_duplicates_threshold: float = 0.01,
+        parent: Optional[AbstractAnalysis] = None,
+        children: Optional[List[AbstractAnalysis]] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(parent, children, **kwargs)
+        self.near_duplicates_threshold = near_duplicates_threshold
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return self.all_keys_must_be_present(args, "train_data", "label", "feature_generator")
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
+        x = args.train_data.drop(labels=[args.label], axis=1)
+        corr = np.round(spearmanr(x).correlation, 4)
+        np.fill_diagonal(corr, 1)
+        corr_condensed = hc.distance.squareform(1 - np.nan_to_num(corr))
+        z = hc.linkage(corr_condensed, method="average")
+        columns = list(x.columns)
+        s = {
+            "columns": columns,
+            "linkage": z,
+            "near_duplicates_threshold": self.near_duplicates_threshold,
+            "near_duplicates": self.__get_linkage_clusters(z, columns, self.near_duplicates_threshold),
+        }
+        state["feature_distance"] = s
+
+    @staticmethod
+    def __get_linkage_clusters(linkage, columns, threshold: float):
+        idx_to_col = {i: v for i, v in enumerate(columns)}
+        idx_to_dist: Dict[int, float] = {}
+        clusters: Dict[int, List[int]] = {}
+        for (f1, f2, d, _l), i in zip(linkage, np.arange(len(idx_to_col), len(idx_to_col) + len(linkage))):
+            idx_to_dist[i] = d
+            f1 = int(f1)
+            f2 = int(f2)
+            if d <= threshold:
+                clusters[i] = [*clusters.pop(f1, [f1]), *clusters.pop(f2, [f2])]
+
+        results = []
+        for i, nodes in clusters.items():
+            d = idx_to_dist[i]
+            nodes = [idx_to_col[n] for n in nodes]
+            results.append(
+                {
+                    "nodes": sorted(nodes),
+                    "distance": d,
+                }
+            )
+
+        return results

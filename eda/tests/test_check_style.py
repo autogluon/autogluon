@@ -1,6 +1,6 @@
 import logging
 import warnings
-from subprocess import Popen, PIPE
+from subprocess import PIPE, Popen
 
 
 def test_check_style():

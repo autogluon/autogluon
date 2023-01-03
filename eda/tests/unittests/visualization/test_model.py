@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, ANY
+from unittest.mock import ANY, MagicMock
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,7 +7,7 @@ import pytest
 import seaborn as sns
 
 from autogluon.eda import AnalysisState
-from autogluon.eda.visualization import ConfusionMatrix, RegressionEvaluation, FeatureImportance
+from autogluon.eda.visualization import ConfusionMatrix, FeatureImportance, RegressionEvaluation
 
 
 @pytest.mark.parametrize("confusion_matrix_normalized,expected_fmt", [(True, ",.2%"), (False, "d")])

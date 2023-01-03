@@ -4,9 +4,9 @@ from typing import List, Optional
 import pandas as pd
 
 from autogluon.features import AbstractFeatureGenerator, AutoMLPipelineFeatureGenerator
+
+from ..state import AnalysisState, StateCheckMixin
 from .base import AbstractAnalysis
-from ..state import AnalysisState
-from ..state import StateCheckMixin
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +68,8 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
                 enable_text_ngram_features=False,
                 enable_raw_text_features=False,
                 enable_vision_features=False,
+                verbosity=0,
+                **kwargs,
             )
         self.feature_generator = feature_generator
 

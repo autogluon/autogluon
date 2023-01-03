@@ -1,21 +1,32 @@
 from __future__ import annotations
 
-from typing import List, Union, Optional, Dict, Set
+from typing import Dict, List, Optional, Set, Union
 
 import pandas as pd
 
 from autogluon.common.features.infer_types import get_type_group_map_special, get_type_map_raw
-from autogluon.common.features.types import R_INT, R_FLOAT, R_OBJECT, R_CATEGORY, R_BOOL
-from .base import AbstractAnalysis
-from ..state import AnalysisState
+from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, R_OBJECT
 
-__all__ = ["DatasetSummary", "RawTypesAnalysis", "Sampler", "SpecialTypesAnalysis", "VariableTypeAnalysis"]
+from ..state import AnalysisState
+from .base import AbstractAnalysis
+
+__all__ = [
+    "DatasetSummary",
+    "RawTypesAnalysis",
+    "Sampler",
+    "SpecialTypesAnalysis",
+    "VariableTypeAnalysis",
+    "TrainValidationSplit",
+]
+
+from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION, PROBLEM_TYPES_REGRESSION
+from autogluon.core.utils import generate_train_test_split_combined, infer_problem_type
 
 
 class Sampler(AbstractAnalysis):
     """
     Sampler is a wrapper that provides sampling capabilites for the wrapped analyses.
-    The sampling is performed for all datasets in `args` and passed to all `children` during `fit` call.
+    The sampling is performed for all datasets in `args` and passed to all `children` during `fit` call shadowing outer parameters.
 
     Parameters
     ----------
@@ -67,6 +78,89 @@ class Sampler(AbstractAnalysis):
                 if self.sample is not None and isinstance(self.sample, float):
                     arg = "frac"
                 self.args[ds] = df.sample(**{arg: self.sample}, random_state=0)
+
+
+class TrainValidationSplit(AbstractAnalysis):
+    """
+    This wrapper splits `train_data` into training and validation sets stored in `train_data` and `val_data` for the wrapped analyses.
+    The split is performed for datasets in `args` and passed to all `children` during `fit` call shadowing outer parameters.
+
+
+    Parameters
+    ----------
+    problem_type: str, default = 'auto'
+        problem type to use. Valid problem_type values include ['auto', 'binary', 'multiclass', 'regression', 'quantile', 'softclass']
+        auto means it will be Auto-detected using AutoGluon methods.
+    val_size: float, default = 0.3
+        fraction of training set to be assigned as validation set during the split.
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: Optional[List[AbstractAnalysis]], default None
+        wrapped analyses; these will receive sampled `args` during `fit` call
+    kwargs
+
+    Examples
+    --------
+    >>> from autogluon.eda.analysis.base import BaseAnalysis
+    >>> from autogluon.eda.analysis import Sampler
+    >>> import pandas as pd
+    >>> import numpy as np
+    >>>
+    >>> df_train = pd.DataFrame(np.random.randint(0, 100, size=(100, 4)), columns=list("ABCD"))
+    >>> analysis = BaseAnalysis(train_data=df_train, label="D", children=[
+    >>>         Namespace(namespace="ns_val_split_specified", children=[
+    >>>             TrainValidationSplit(val_pct=0.4, children=[
+    >>>                 # This analysis sees 60/40 split of df_train between train_data and val_data
+    >>>                 SomeAnalysis()
+    >>>             ])
+    >>>         ]),
+    >>>         Namespace(namespace="ns_val_split_default", children=[
+    >>>             TrainValidationSplit(children=[
+    >>>                 # This analysis sees 70/30 split (default) of df_train between train_data and val_data
+    >>>                 SomeAnalysis()
+    >>>             ])
+    >>>         ]),
+    >>>         Namespace(namespace="ns_no_split", children=[
+    >>>                 # This analysis sees only original train_data
+    >>>             SomeAnalysis()
+    >>>         ]),
+    >>>     ],
+    >>> )
+    >>>
+    >>> state = analysis.fit()
+    >>>
+    """
+
+    def __init__(
+        self,
+        val_size: float = 0.3,
+        problem_type: str = "auto",
+        parent: Optional[AbstractAnalysis] = None,
+        children: Optional[List[AbstractAnalysis]] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(parent, children, **kwargs)
+
+        assert 0 < val_size < 1.0, "val_size must be between 0 and 1"
+        self.val_size = val_size
+
+        valid_problem_types = ["auto"] + PROBLEM_TYPES_REGRESSION + PROBLEM_TYPES_CLASSIFICATION
+        assert problem_type in valid_problem_types, f"Valid problem_type values include {valid_problem_types}"
+        self.problem_type = problem_type
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return self.all_keys_must_be_present(args, "train_data", "label")
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
+        problem_type = self.problem_type
+        if problem_type == "auto":
+            problem_type = infer_problem_type(args.train_data[args.label], silent=True)
+        train_data, val_data = generate_train_test_split_combined(
+            args.train_data, args.label, problem_type, test_size=self.val_size, **self.args
+        )
+        self.args["train_data"] = train_data
+        self.args["val_data"] = val_data
+        state["problem_type"] = problem_type
 
 
 class DatasetSummary(AbstractAnalysis):

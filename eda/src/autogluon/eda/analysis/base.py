@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Optional, Generator
+from typing import Generator, List, Optional, Tuple
 
 from pandas import DataFrame
 
