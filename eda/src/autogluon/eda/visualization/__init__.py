@@ -6,5 +6,5 @@ from .interaction import (
 )
 from .layouts import MarkdownSectionComponent, SimpleHorizontalLayout, SimpleVerticalLinearLayout, TabLayout
 from .missing import MissingValues
-from .model import ConfusionMatrix, FeatureImportance, RegressionEvaluation
+from .model import ConfusionMatrix, FeatureImportance, ModelLeaderboard, RegressionEvaluation
 from .shift import XShiftSummary

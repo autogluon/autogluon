@@ -1,13 +1,44 @@
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from sklearn.metrics import confusion_matrix
 
-from autogluon.core.constants import BINARY, MULTICLASS
+from autogluon.core.constants import BINARY, MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, PROBLEM_TYPES_REGRESSION
 from autogluon.tabular import TabularPredictor
 
 from .base import AbstractAnalysis, AnalysisState
 
-__all__ = ["AutoGluonModelEvaluator"]
+__all__ = ["AutoGluonModelEvaluator", "AutoGluonModelQuickFit"]
+
+
+class AutoGluonModelQuickFit(AbstractAnalysis):
+    def __init__(
+        self,
+        estimator_args: Optional[Dict[str, Any]] = None,
+        parent: Optional[AbstractAnalysis] = None,
+        children: Optional[List[AbstractAnalysis]] = None,
+        problem_type: str = "auto",
+        **kwargs,
+    ) -> None:
+        super().__init__(parent, children, **kwargs)
+
+        valid_problem_types = ["auto"] + PROBLEM_TYPES_REGRESSION + PROBLEM_TYPES_CLASSIFICATION
+        assert problem_type in valid_problem_types, f"Valid problem_type values include {valid_problem_types}"
+        self.problem_type: Optional[str] = None if problem_type == "auto" else problem_type
+
+        if estimator_args is not None:
+            self.estimator_args = estimator_args
+        else:
+            self.estimator_args = {}
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return self.all_keys_must_be_present(args, "train_data", "val_data", "label")
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
+        estimator: TabularPredictor = TabularPredictor(
+            label=args.label, problem_type=self.problem_type, **self.estimator_args
+        )
+        estimator.fit(train_data=args.train_data, **self.args)
+        self.args["model"] = estimator
 
 
 class AutoGluonModelEvaluator(AbstractAnalysis):
@@ -87,12 +118,14 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
         y_true = val_data[label]
         y_pred = predictor.predict(val_data)
         importance = predictor.feature_importance(val_data.reset_index(drop=True))
+        leaderboard = predictor.leaderboard(val_data, silent=True)
 
         s = {
             "problem_type": predictor.problem_type,
             "y_true": y_true,
             "y_pred": y_pred,
             "importance": importance,
+            "leaderboard": leaderboard,
         }
         if problem_type in [BINARY, MULTICLASS]:
             cm = confusion_matrix(y_true, y_pred, normalize=self.normalize, labels=y_true.unique())

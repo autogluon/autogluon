@@ -1,1 +1,1 @@
-from .simple import analyze, analyze_interaction
+from .simple import analyze, analyze_interaction, quick_fit
