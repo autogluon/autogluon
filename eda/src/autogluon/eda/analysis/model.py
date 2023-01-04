@@ -19,13 +19,33 @@ class AutoGluonModelQuickFit(AbstractAnalysis):
     Note: this component can be wrapped into :py:class:`~autogluon.eda.analysis.dataset.TrainValidationSplit` and `~autogluon.eda.analysis.dataset.Sampler`
     to perform automated sampling and train-test split. This whole logic is implemented in :py:meth`~autogluon.eda.auto.simple.quick_fit` shortcut.
 
+    Examples
+    --------
+    >>> from autogluon.eda.analysis.base import BaseAnalysis
+    >>> from autogluon.eda.analysis import Sampler
+    >>> import pandas as pd
+    >>> import numpy as np
+    >>>
+    >>> # Quick fit
+    >>> data = full_data[full_data['Age'].notna()]
+    >>> columns=['Pclass', 'Age', 'Embarked', 'SibSp', 'Parch', 'Fare', 'Cabin']
+    >>> state = auto.quick_fit(train_data=data[columns], label='Age', return_state=True, save_model_to_state=True, hyperparameters={'GBM': {}})
+    >>>
+    >>> # Using quick fit model as an imputer
+    >>> age_imputer = state.model
+    >>> na_data = all_data[all_data.Age.isna()].copy()
+    >>> na_data.Age = age_imputer.predict(na_data)
+
     Parameters
     ----------
     problem_type: str, default = 'auto'
         problem type to use. Valid problem_type values include ['auto', 'binary', 'multiclass', 'regression', 'quantile', 'softclass']
         auto means it will be Auto-detected using AutoGluon methods.
-    estimator_args
+    estimator_args: Optional[Dict[str, Any]], default = None,
         kwargs to pass into estimator constructor (`TabularPredictor`)
+    save_model_to_state: bool, default = False,
+        save fitted model into `state` under `model` key.
+        This functionality might be helpful in cases when the fitted model could be usable for other purposes (i.e. imputers)
     parent: Optional[AbstractAnalysis], default = None
         parent Analysis
     children: Optional[List[AbstractAnalysis]], default None
