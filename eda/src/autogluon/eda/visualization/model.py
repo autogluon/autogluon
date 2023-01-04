@@ -209,7 +209,6 @@ class FeatureImportance(AbstractVisualization, JupyterMixin):
 
 class ModelLeaderboard(AbstractVisualization, JupyterMixin):
     """
-
     Render model leaderboard for trained model ensemble.
 
     Parameters

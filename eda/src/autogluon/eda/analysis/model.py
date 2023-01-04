@@ -11,12 +11,69 @@ __all__ = ["AutoGluonModelEvaluator", "AutoGluonModelQuickFit"]
 
 
 class AutoGluonModelQuickFit(AbstractAnalysis):
+    """
+    Fit a quick model using AutoGluon.
+
+    `train_data`, `val_data` and `label` must be present in args.
+
+    Note: this component can be wrapped into :py:class:`~autogluon.eda.analysis.dataset.TrainValidationSplit` and `~autogluon.eda.analysis.dataset.Sampler`
+    to perform automated sampling and train-test split. This whole logic is implemented in :py:meth`~autogluon.eda.auto.simple.quick_fit` shortcut.
+
+    Parameters
+    ----------
+    problem_type: str, default = 'auto'
+        problem type to use. Valid problem_type values include ['auto', 'binary', 'multiclass', 'regression', 'quantile', 'softclass']
+        auto means it will be Auto-detected using AutoGluon methods.
+    estimator_args
+        kwargs to pass into estimator constructor (`TabularPredictor`)
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: Optional[List[AbstractAnalysis]], default None
+        wrapped analyses; these will receive sampled `args` during `fit` call
+    kwargs
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.visualization as viz
+    >>> import autogluon.eda.auto as auto
+    >>> auto.analyze(
+    >>>     train_data=df_train,
+    >>>     label=label,
+    >>>     anlz_facets=[
+    >>>         eda.dataset.TrainValidationSplit(children=[
+    >>>             eda.model.AutoGluonModelQuickFit(
+    >>>                 estimator_args=dict(path=path),
+    >>>                 verbosity=0,
+    >>>                 hyperparameters={
+    >>>                     "RF": {
+    >>>                         "criterion": "entropy",
+    >>>                         "max_depth": 15,
+    >>>                         "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]},
+    >>>                     }
+    >>>                 },
+    >>>                 children=[
+    >>>                     eda.model.AutoGluonModelEvaluator()
+    >>>                 ],
+    >>>             )
+    >>>         ])
+    >>>     ],
+    >>> )
+
+    See Also
+    --------
+    :py:meth`~autogluon.eda.auto.simple.quick_fit`
+    :py:class:`~autogluon.eda.analysis.dataset.TrainValidationSplit`
+    :py:class:`~autogluon.eda.analysis.dataset.Sampler`
+
+    """
+
     def __init__(
         self,
+        problem_type: str = "auto",
         estimator_args: Optional[Dict[str, Any]] = None,
         parent: Optional[AbstractAnalysis] = None,
         children: Optional[List[AbstractAnalysis]] = None,
-        problem_type: str = "auto",
         **kwargs,
     ) -> None:
         super().__init__(parent, children, **kwargs)
