@@ -74,6 +74,7 @@ class AutoGluonModelQuickFit(AbstractAnalysis):
         estimator_args: Optional[Dict[str, Any]] = None,
         parent: Optional[AbstractAnalysis] = None,
         children: Optional[List[AbstractAnalysis]] = None,
+        save_model_to_state: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(parent, children, **kwargs)
@@ -81,6 +82,8 @@ class AutoGluonModelQuickFit(AbstractAnalysis):
         valid_problem_types = ["auto"] + PROBLEM_TYPES_REGRESSION + PROBLEM_TYPES_CLASSIFICATION
         assert problem_type in valid_problem_types, f"Valid problem_type values include {valid_problem_types}"
         self.problem_type: Optional[str] = None if problem_type == "auto" else problem_type
+
+        self.save_model_to_state = save_model_to_state
 
         if estimator_args is not None:
             self.estimator_args = estimator_args
@@ -96,6 +99,9 @@ class AutoGluonModelQuickFit(AbstractAnalysis):
         )
         estimator.fit(train_data=args.train_data, **self.args)
         self.args["model"] = estimator
+
+        if self.save_model_to_state:
+            state["model"] = estimator
 
 
 class AutoGluonModelEvaluator(AbstractAnalysis):
@@ -177,15 +183,18 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
         importance = predictor.feature_importance(val_data.reset_index(drop=True), silent=True)
         leaderboard = predictor.leaderboard(val_data, silent=True)
 
+        labels = y_true.unique()
         s = {
             "problem_type": predictor.problem_type,
             "y_true": y_true,
             "y_pred": y_pred,
             "importance": importance,
             "leaderboard": leaderboard,
+            "labels": labels,
         }
+
         if problem_type in [BINARY, MULTICLASS]:
-            cm = confusion_matrix(y_true, y_pred, normalize=self.normalize, labels=y_true.unique())
+            cm = confusion_matrix(y_true, y_pred, normalize=self.normalize, labels=labels)
             s["confusion_matrix_normalized"] = self.normalize is not None
             s["confusion_matrix"] = cm
 

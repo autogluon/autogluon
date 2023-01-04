@@ -68,7 +68,8 @@ class ConfusionMatrix(AbstractVisualization, JupyterMixin):
 
     def _render(self, state: AnalysisState) -> None:
         self.render_header_if_needed(state, "Confusion Matrix")
-        cm = pd.DataFrame(state.model_evaluation.confusion_matrix)
+        labels = state.model_evaluation.labels
+        cm = pd.DataFrame(state.model_evaluation.confusion_matrix, columns=labels, index=labels)
         cm.index.name = "Actual"
         cm.columns.name = "Predicted"
         normalized = state.model_evaluation.confusion_matrix_normalized

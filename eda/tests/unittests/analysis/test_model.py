@@ -2,6 +2,7 @@ import os.path
 import tempfile
 
 import pandas as pd
+import pytest
 
 import autogluon.eda.analysis as eda
 import autogluon.eda.auto as auto
@@ -69,7 +70,8 @@ def test_AutoGluonModelEvaluator_classification():
     _assert_importance_is_present(state)
 
 
-def test_AutoGluonModelQuickFit():
+@pytest.mark.parametrize("save_model_to_state", [True, False])
+def test_AutoGluonModelQuickFit(save_model_to_state):
     df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
     target_col = "class"
 
@@ -82,6 +84,7 @@ def test_AutoGluonModelQuickFit():
                 eda.dataset.TrainValidationSplit(
                     children=[
                         eda.model.AutoGluonModelQuickFit(
+                            save_model_to_state=save_model_to_state,
                             estimator_args=dict(path=path),
                             verbosity=0,
                             hyperparameters={
@@ -104,6 +107,10 @@ def test_AutoGluonModelQuickFit():
     expected = [c for c in df_train.columns if c not in ["class"]]
     assert sorted(state.model_evaluation.importance.index.to_list()) == sorted(expected)
     _assert_importance_is_present(state)
+    if save_model_to_state:
+        assert str(state.model.__class__) == "<class 'autogluon.tabular.predictor.predictor.TabularPredictor'>"
+    else:
+        assert "model" not in state
 
 
 def test_AutoGluonModelQuickFit__constructor_defaults():
