@@ -22,7 +22,7 @@ from autogluon.common.utils.log_utils import DuplicateFilter
 from autogluon.common.utils.resource_utils import ResourceManager
 
 from .model_trial import model_trial, skip_hpo
-from ._tags import _DEFAULT_TAGS
+from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
@@ -1613,8 +1613,14 @@ class AbstractModel:
     def _features(self):
         return self._features_internal
 
-    def _get_tags(self):
-        collected_tags = {}
+    def _get_tags(self) -> dict:
+        """
+        Tags are key-value pairs assigned to an object.
+        These can be accessed after initializing an object.
+        Tags are used for identifying if an object supports certain functionality.
+        """
+        # first get class tags, which are overwritten by any object tags
+        collected_tags = self._get_class_tags()
         for base_class in reversed(inspect.getmro(self.__class__)):
             if hasattr(base_class, '_more_tags'):
                 # need the if because mixins might not have _more_tags
@@ -1624,7 +1630,31 @@ class AbstractModel:
                 collected_tags.update(more_tags)
         return collected_tags
 
-    def _more_tags(self):
+    @classmethod
+    def _get_class_tags(cls) -> dict:
+        """
+        Class tags are tags assigned to a class that are fixed.
+        These can be accessed prior to initializing an object.
+        Tags are used for identifying if an object supports certain functionality.
+        """
+        collected_tags = {}
+        for base_class in reversed(inspect.getmro(cls)):
+            if hasattr(base_class, '_class_tags'):
+                # need the if because mixins might not have _class_tags
+                # but might do redundant work in estimators
+                # (i.e. calling more tags on BaseEstimator multiple times)
+                more_tags = base_class._class_tags()
+                collected_tags.update(more_tags)
+        return collected_tags
+
+    @classmethod
+    def _class_tags(cls) -> dict:
+        """
+        [Advanced] Optional tags used to communicate model capabilities to AutoML systems, such as if the model supports text features.
+        """
+        return _DEFAULT_CLASS_TAGS
+
+    def _more_tags(self) -> dict:
         return _DEFAULT_TAGS
     
     def _get_model_base(self):
