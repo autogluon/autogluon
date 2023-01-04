@@ -1261,6 +1261,7 @@ class MultiModalPredictor:
             monitor=task.validation_metric_name,
             patience=config.optimization.patience,
             mode=minmax_mode,
+            stopping_threshold=1 - 1e-6 if minmax_mode == MAX else 1e-6,
         )
         lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
         model_summary = pl.callbacks.ModelSummary(max_depth=1)
