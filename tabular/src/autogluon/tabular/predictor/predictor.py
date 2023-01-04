@@ -3496,6 +3496,7 @@ class TabularPredictor:
         for key in hyperparameters:
             if isinstance(key, int) or key == 'default':
                 is_advanced_hyperparameter_type = True
+                break
         if is_advanced_hyperparameter_type:
             for key in hyperparameters:
                 for m in hyperparameters[key]:
