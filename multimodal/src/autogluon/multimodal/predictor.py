@@ -2439,6 +2439,7 @@ class MultiModalPredictor:
                     "classes": self._classes,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
+                    "fit_called": self._fit_called,
                     "best_score": self._best_score,
                     "total_train_time": self._total_train_time,
                     "version": ag_version.__version__,
@@ -2651,6 +2652,10 @@ class MultiModalPredictor:
         predictor._resume = resume
         predictor._save_path = path  # in case the original exp dir is copied to somewhere else
         predictor._pretrain_path = path
+        if "fit_called" in assets:
+            predictor._fit_called = assets["fit_called"]
+        else:
+            predictor._fit_called = True  # backward compatible
         predictor._config = config
         predictor._output_shape = assets["output_shape"]
         if "classes" in assets:
@@ -2784,7 +2789,6 @@ class MultiModalPredictor:
             loss_func=loss_func,
         )
         predictor._model_postprocess_fn = model_postprocess_fn
-        predictor._fit_called = False
 
         return predictor
 
