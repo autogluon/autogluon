@@ -29,6 +29,7 @@ from ..constants import (
 )
 from ..data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from ..data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
+from ..models.utils import run_model
 from .environment import (
     compute_inference_batch_size,
     compute_num_gpus,
@@ -154,7 +155,7 @@ def infer_batch(
     batch = move_to_device(batch, device=device)
     precision_context = get_precision_context(precision=precision, device_type=device_type)
     with precision_context, torch.no_grad():
-        output = model(batch)
+        output = run_model(model, batch)
         if model_postprocess_fn:
             output = model_postprocess_fn(output)
 
