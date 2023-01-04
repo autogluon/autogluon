@@ -1,3 +1,5 @@
+import os
+import tempfile
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -6,8 +8,17 @@ import pandas as pd
 from autogluon.eda import AnalysisState
 from autogluon.eda.analysis import Namespace
 from autogluon.eda.analysis.base import BaseAnalysis
-from autogluon.eda.auto import analyze
+from autogluon.eda.auto import analyze, quick_fit
+from autogluon.eda.visualization import (
+    ConfusionMatrix,
+    FeatureImportance,
+    MarkdownSectionComponent,
+    ModelLeaderboard,
+    RegressionEvaluation,
+)
 from autogluon.eda.visualization.base import AbstractVisualization
+
+RESOURCE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources"))
 
 
 class SomeAnalysis(BaseAnalysis):
@@ -84,3 +95,29 @@ def test_analyze_state_no_AnalysisState_convert():
     assert _state == state
     assert _state is state
     assert isinstance(_state, AnalysisState)
+
+
+def test_quick_fit(monkeypatch):
+    df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
+
+    call_md_render = MagicMock()
+    call_cm_render = MagicMock()
+    call_reg_render = MagicMock()
+    call_ldr_render = MagicMock()
+    call_fi_render = MagicMock()
+
+    with monkeypatch.context() as m:
+        m.setattr(MarkdownSectionComponent, "render", call_md_render)
+        m.setattr(ConfusionMatrix, "render", call_cm_render)
+        m.setattr(RegressionEvaluation, "render", call_reg_render)
+        m.setattr(ModelLeaderboard, "render", call_ldr_render)
+        m.setattr(FeatureImportance, "render", call_fi_render)
+
+        with tempfile.TemporaryDirectory() as path:
+            quick_fit(path=path, train_data=df_train, label="class")
+
+    assert call_md_render.call_count == 3
+    call_cm_render.assert_called_once()
+    call_reg_render.assert_called_once()
+    call_ldr_render.assert_called_once()
+    call_fi_render.assert_called_once()

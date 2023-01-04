@@ -1,17 +1,34 @@
 import logging
 from typing import Any, Dict, List, Optional, Union
 
+import pandas as pd
+
 from autogluon.common.utils.log_utils import verbosity2loglevel
 
 from .. import AnalysisState
-from ..analysis import FeatureInteraction
+from ..analysis import (
+    AutoGluonModelEvaluator,
+    AutoGluonModelQuickFit,
+    FeatureInteraction,
+    MissingValuesAnalysis,
+    TrainValidationSplit,
+)
 from ..analysis.base import AbstractAnalysis, BaseAnalysis
-from ..analysis.dataset import RawTypesAnalysis, Sampler
-from ..visualization import FeatureInteractionVisualization
+from ..analysis.dataset import DatasetSummary, RawTypesAnalysis, Sampler, SpecialTypesAnalysis
+from ..visualization import (
+    ConfusionMatrix,
+    DatasetStatistics,
+    DatasetTypeMismatch,
+    FeatureImportance,
+    FeatureInteractionVisualization,
+    MarkdownSectionComponent,
+    ModelLeaderboard,
+    RegressionEvaluation,
+)
 from ..visualization.base import AbstractVisualization
 from ..visualization.layouts import SimpleVerticalLinearLayout
 
-__all__ = ["analyze", "analyze_interaction"]
+__all__ = ["analyze", "analyze_interaction", "quick_fit", "dataset_overview"]
 
 
 def analyze(
@@ -161,5 +178,200 @@ def analyze_interaction(
         ],
         viz_facets=[
             FeatureInteractionVisualization(key=key, fig_args=fig_args, **viz_args),
+        ],
+    )
+
+
+def quick_fit(
+    train_data: pd.DataFrame,
+    label: str,
+    path: Optional[str] = None,
+    val_size: float = 0.3,
+    problem_type: str = "auto",
+    sample: Union[None, int, float] = None,
+    state: Union[None, dict, AnalysisState] = None,
+    return_state: bool = False,
+    verbosity: int = 0,
+    show_feature_importance_barplots: bool = False,
+    fig_args: Optional[Dict[str, Any]] = None,
+    **fit_args,
+):
+    """
+    This helper performs quick model fit analysis and then produces a composite report of the results.
+
+    The analysis is structured in a sequence of operations:
+        - Sample if `sample` is specified.
+        - Perform train-test split using `val_size` ratio
+        - Fit AutoGluon estimator given `fit_args`; if `hyperparameters` not present in args, then use default ones
+            (Random Forest by default - because it is interpretable)
+        - Display report
+
+    The reports include:
+        - confusion matrix for classification problems; predictions vs actual for regression problems
+        - model leaderboard
+        - feature importance
+
+    Parameters
+    ----------
+    train_data: DataFrame
+        training dataset
+    label: str
+        target variable
+    path: Optional[str], default = None,
+        path for models saving
+    problem_type: str, default = 'auto'
+        problem type to use. Valid problem_type values include ['auto', 'binary', 'multiclass', 'regression', 'quantile', 'softclass']
+        auto means it will be Auto-detected using AutoGluon methods.
+    sample: Union[None, int, float], default = None
+        sample size; if `int`, then row number is used;
+        `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
+        `None` means no sampling
+        See also :func:`autogluon.eda.analysis.dataset.Sampler`
+    val_size: float, default = 0.3
+        fraction of training set to be assigned as validation set during the split.
+    state: Union[None, dict, AnalysisState], default = None
+        pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
+    return_state: bool, default = False
+        return state if `True`
+    verbosity: int, default = 0
+        Verbosity levels range from 0 to 4 and control how much information is printed.
+        Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+        If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
+        where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
+    show_feature_importance_barplots: bool, default = False
+        if `True`, then barplot char will ba added with feature importance visualization
+    fig_args: Optional[Dict[str, Any]] = None,
+        kwargs to pass into chart figure
+    fit_args
+        kwargs to pass into `TabularPredictor` fit
+
+    Returns
+    -------
+        state after `fit` call if `return_state` is `True`; `None` otherwise
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.visualization.model.ConfusionMatrix`
+    :py:class:`~autogluon.eda.visualization.model.RegressionEvaluation`
+    :py:class:`~autogluon.eda.visualization.model.ModelLeaderboard`
+    :py:class:`~autogluon.eda.visualization.model.FeatureImportance`
+
+    """
+    if state is not None:
+        assert isinstance(state, (dict, AnalysisState))
+
+    if not isinstance(state, AnalysisState):
+        state = AnalysisState(state)
+
+    if fig_args is None:
+        fig_args = {}
+
+    if "hyperparameters" not in fit_args:
+        fit_args = fit_args.copy()
+        fit_args["hyperparameters"] = {
+            "RF": [
+                {
+                    "criterion": "entropy",
+                    "max_depth": 15,
+                    "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]},
+                },
+                {
+                    "criterion": "squared_error",
+                    "max_depth": 15,
+                    "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
+                },
+            ],
+        }
+
+    return analyze(
+        train_data=train_data,
+        label=label,
+        sample=sample,
+        state=state,
+        return_state=return_state,
+        anlz_facets=[
+            TrainValidationSplit(
+                val_size=val_size,
+                problem_type=problem_type,
+                children=[
+                    AutoGluonModelQuickFit(
+                        estimator_args={"path": path},
+                        verbosity=verbosity,
+                        problem_type=problem_type,
+                        children=[
+                            AutoGluonModelEvaluator(),
+                        ],
+                        **fit_args,
+                    ),
+                ],
+            )
+        ],
+        viz_facets=[
+            MarkdownSectionComponent(markdown=f"### Model Prediction for {label}"),
+            ConfusionMatrix(fig_args=fig_args, annot_kws={"size": 12}),
+            RegressionEvaluation(fig_args=fig_args, marker="o", scatter_kws={"s": 5}),
+            MarkdownSectionComponent(markdown="### Model Leaderboard"),
+            ModelLeaderboard(),
+            MarkdownSectionComponent(markdown="### Feature Importance for Trained Model"),
+            FeatureImportance(show_barplots=show_feature_importance_barplots),
+        ],
+    )
+
+
+def dataset_overview(
+    train_data: Optional[pd.DataFrame] = None,
+    test_data: Optional[pd.DataFrame] = None,
+    val_data: Optional[pd.DataFrame] = None,
+    label: Optional[str] = None,
+    state: Union[None, dict, AnalysisState] = None,
+    sample: Union[None, int, float] = None,
+):
+    """
+    Shortcut to perform high-level datasets summary overview (counts, frequencies, missing statistics, types info).
+
+    Parameters
+    ----------
+    train_data: Optional[DataFrame], default = None
+        training dataset
+    test_data: Optional[DataFrame], default = None
+        test dataset
+    val_data: Optional[DataFrame], default = None
+        validation dataset
+    label: : Optional[str], default = None
+        target variable
+    state: Union[None, dict, AnalysisState], default = None
+        pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
+    sample: Union[None, int, float], default = None
+        sample size; if `int`, then row number is used;
+        `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
+        `None` means no sampling
+        See also :func:`autogluon.eda.analysis.dataset.Sampler`
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.dataset.DatasetSummary`
+    :py:class:`~autogluon.eda.analysis.dataset.RawTypesAnalysis`
+    :py:class:`~autogluon.eda.analysis.dataset.SpecialTypesAnalysis`
+    :py:class:`~autogluon.eda.analysis.missing.MissingValuesAnalysis`
+    :py:class:`~autogluon.eda.visualization.dataset.DatasetStatistics`
+    :py:class:`~autogluon.eda.visualization.dataset.DatasetTypeMismatch`
+
+    """
+    return analyze(
+        train_data=train_data,
+        test_data=test_data,
+        val_data=val_data,
+        label=label,
+        sample=sample,
+        state=state,
+        anlz_facets=[
+            DatasetSummary(),
+            MissingValuesAnalysis(),
+            RawTypesAnalysis(),
+            SpecialTypesAnalysis(),
+        ],
+        viz_facets=[
+            DatasetStatistics(headers=True),
+            DatasetTypeMismatch(headers=True),
         ],
     )

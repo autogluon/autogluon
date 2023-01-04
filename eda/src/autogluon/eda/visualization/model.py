@@ -10,7 +10,7 @@ from ..state import AnalysisState
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
 
-__all__ = ["ConfusionMatrix", "FeatureImportance", "RegressionEvaluation"]
+__all__ = ["ConfusionMatrix", "FeatureImportance", "RegressionEvaluation", "ModelLeaderboard"]
 
 
 class ConfusionMatrix(AbstractVisualization, JupyterMixin):
@@ -68,7 +68,8 @@ class ConfusionMatrix(AbstractVisualization, JupyterMixin):
 
     def _render(self, state: AnalysisState) -> None:
         self.render_header_if_needed(state, "Confusion Matrix")
-        cm = pd.DataFrame(state.model_evaluation.confusion_matrix)
+        labels = state.model_evaluation.labels
+        cm = pd.DataFrame(state.model_evaluation.confusion_matrix, columns=labels, index=labels)
         cm.index.name = "Actual"
         cm.columns.name = "Predicted"
         normalized = state.model_evaluation.confusion_matrix_normalized
@@ -205,3 +206,47 @@ class FeatureImportance(AbstractVisualization, JupyterMixin):
             fig, ax = plt.subplots(**self.fig_args)
             sns.barplot(ax=ax, data=importance.reset_index(), y="index", x="importance", **self._kwargs)
             plt.show(fig)
+
+
+class ModelLeaderboard(AbstractVisualization, JupyterMixin):
+    """
+    Render model leaderboard for trained model ensemble.
+
+    Parameters
+    ----------
+    headers: bool, default = False
+        if `True` then render headers
+    namespace: str, default = None
+        namespace to use; can be nested like `ns_a.ns_b.ns_c`
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.visualization as viz
+    >>> import autogluon.eda.auto as auto
+    >>>
+    >>> df_train = ...
+    >>> df_test = ...
+    >>> predictor = ...
+    >>>
+    >>> auto.analyze(model=predictor, val_data=df_test, anlz_facets=[
+    >>>     eda.model.AutoGluonModelEvaluator(),
+    >>> ], viz_facets=[
+    >>>     viz.model.ModelLeaderboard(),
+    >>> ])
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.model.AutoGluonModelEvaluator`
+    """
+
+    def __init__(self, namespace: Optional[str] = None, headers: bool = False, **kwargs) -> None:
+        super().__init__(namespace, **kwargs)
+        self.headers = headers
+
+    def can_handle(self, state: AnalysisState) -> bool:
+        return "model_evaluation" in state and "leaderboard" in state.model_evaluation
+
+    def _render(self, state: AnalysisState) -> None:
+        self.render_header_if_needed(state, "Model Leaderboard")
+        self.display_obj(state.model_evaluation.leaderboard)

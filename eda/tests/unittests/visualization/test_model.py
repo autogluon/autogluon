@@ -7,7 +7,7 @@ import pytest
 import seaborn as sns
 
 from autogluon.eda import AnalysisState
-from autogluon.eda.visualization import ConfusionMatrix, FeatureImportance, RegressionEvaluation
+from autogluon.eda.visualization import ConfusionMatrix, FeatureImportance, ModelLeaderboard, RegressionEvaluation
 
 
 @pytest.mark.parametrize("confusion_matrix_normalized,expected_fmt", [(True, ",.2%"), (False, "d")])
@@ -190,3 +190,18 @@ def test_FeatureImportance(monkeypatch, show_barplots):
         call_plt_subplots.assert_not_called()
         call_plt_show.assert_not_called()
         call_sns_barplot.assert_not_called()
+
+
+def test_ModelLeaderboard():
+    assert ModelLeaderboard().can_handle(state=AnalysisState(model_evaluation={})) is False
+
+    state = AnalysisState(model_evaluation={"leaderboard": "some_leaderboard"})
+
+    viz = ModelLeaderboard(headers=True)
+    assert viz.can_handle(state=state) is True
+
+    viz.render_text = MagicMock()
+    viz.display_obj = MagicMock()
+    viz.render(state)
+    viz.render_text.assert_called_with("Model Leaderboard", text_type="h3")
+    viz.display_obj.assert_called_with("some_leaderboard")
