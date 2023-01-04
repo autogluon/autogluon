@@ -14,3 +14,4 @@ from .missing import MissingValuesAnalysis
 from .model import AutoGluonModelEvaluator, AutoGluonModelQuickFit
 from .shift import XShiftDetector
 from .transform import ApplyFeatureGenerator
+from .anomaly import AnomalyDetector
