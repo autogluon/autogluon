@@ -1,4 +1,5 @@
 # Release process
+# TODO: need to update all these resources based on new doc build approach
 
 ### Prior to release: 1 week out
 
