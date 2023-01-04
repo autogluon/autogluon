@@ -7,7 +7,6 @@ my_model
 **/AutogluonModels
 jupyter_execute
 _autogen
-*.py
 tabular/*.csv
 *.zip
 
