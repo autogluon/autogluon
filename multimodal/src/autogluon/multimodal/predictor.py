@@ -401,23 +401,12 @@ class MultiModalPredictor:
         self._init_scratch = init_scratch
         self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
-        self._model_loaded = False  # Whether the model has been loaded
         self._matcher = None
+        self._save_path = path
 
         # Summary statistics used in fit summary. TODO: wrap it in a class.
         self._total_train_time = None
         self._best_score = None
-
-        if path is not None:
-            self._save_path = setup_save_path(
-                resume=self._resume,
-                proposed_save_path=path,
-                raise_if_exist=True,
-                warn_if_exist=self._warn_if_exist,
-                model_loaded=self._model_loaded,
-            )
-        else:
-            self._save_path = None
 
         if self.problem_property and self.problem_property.is_matching:
             self._matcher = MultiModalMatcher(
@@ -716,7 +705,6 @@ class MultiModalPredictor:
             proposed_save_path=save_path,
             raise_if_exist=True,
             warn_if_exist=False,
-            model_loaded=self._model_loaded,
             fit_called=fit_called,
         )
 
@@ -855,7 +843,7 @@ class MultiModalPredictor:
         return self
 
     def _verify_inference_ready(self):
-        if not self._fit_called and not self._model_loaded:
+        if not self._fit_called:
             if self._problem_type and not self.problem_property.support_zero_shot:
                 raise RuntimeError(
                     f"problem_type='{self._problem_type}' does not support running inference directly. "
@@ -1815,7 +1803,6 @@ class MultiModalPredictor:
         # Cache prediction results as COCO format # TODO: refactor this
         self._save_path = setup_save_path(
             old_save_path=self._save_path,
-            model_loaded=self._model_loaded,
             warn_if_exist=False,
         )
         cocoeval_cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
@@ -2160,7 +2147,6 @@ class MultiModalPredictor:
 
             self._save_path = setup_save_path(
                 old_save_path=self._save_path,
-                model_loaded=self._model_loaded,
                 warn_if_exist=False,
             )
 
@@ -2457,6 +2443,7 @@ class MultiModalPredictor:
                     "classes": self._classes,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
+                    "fit_called": self._fit_called,
                     "best_score": self._best_score,
                     "total_train_time": self._total_train_time,
                     "version": ag_version.__version__,
@@ -2680,6 +2667,10 @@ class MultiModalPredictor:
         predictor._resume = resume
         predictor._save_path = path  # in case the original exp dir is copied to somewhere else
         predictor._pretrain_path = path
+        if "fit_called" in assets:
+            predictor._fit_called = assets["fit_called"]
+        else:
+            predictor._fit_called = True  # backward compatible
         predictor._config = config
         predictor._output_shape = assets["output_shape"]
         if "classes" in assets:
@@ -2813,8 +2804,6 @@ class MultiModalPredictor:
             loss_func=loss_func,
         )
         predictor._model_postprocess_fn = model_postprocess_fn
-        predictor._model_loaded = True
-        predictor._fit_called = False
 
         return predictor
 

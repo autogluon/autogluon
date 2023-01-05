@@ -128,7 +128,6 @@ def setup_save_path(
     proposed_save_path: Optional[str] = None,
     warn_if_exist: Optional[bool] = True,
     raise_if_exist: Optional[bool] = False,
-    model_loaded: Optional[bool] = None,
     fit_called: Optional[bool] = None,
 ):
     # TODO: remove redundant folders in DDP mode
@@ -139,10 +138,10 @@ def setup_save_path(
     elif proposed_save_path is not None:  # TODO: distinguish DDP and existed predictor
         save_path = process_save_path(path=proposed_save_path, raise_if_exist=(raise_if_exist and rank == 0))
     elif old_save_path is not None:
-        if model_loaded or fit_called:
+        if fit_called:
             save_path = process_save_path(path=old_save_path, raise_if_exist=False)
         else:
-            save_path = os.path.abspath(os.path.expanduser(old_save_path))
+            save_path = process_save_path(path=old_save_path, raise_if_exist=(raise_if_exist and rank == 0))
 
     if not resume:
         save_path = setup_outputdir(

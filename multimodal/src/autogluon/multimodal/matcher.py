@@ -97,6 +97,7 @@ from .utils import (
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
+    setup_save_path,
     try_to_infer_pos_label,
 )
 
@@ -181,9 +182,6 @@ class MultiModalMatcher:
         if verbosity is not None:
             set_logger_verbosity(verbosity, logger=logger)
 
-        if path is not None:
-            path = process_save_path(path=path)
-
         if isinstance(query, str):
             query = [query]
         if query:
@@ -221,6 +219,7 @@ class MultiModalMatcher:
         self._query_model = None
         self._response_model = None
         self._resume = False
+        self._fit_called = False
         self._continuous_training = False
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
@@ -365,24 +364,19 @@ class MultiModalMatcher:
         -------
         An "MultiModalMatcher" object (itself).
         """
+        fit_called = self._fit_called  # used in current function
+        self._fit_called = True
 
         pl.seed_everything(seed, workers=True)
 
-        if self._resume:
-            save_path = process_save_path(path=self._save_path, resume=True)
-        elif save_path is not None:
-            save_path = process_save_path(path=save_path)
-        elif self._save_path is not None:
-            save_path = process_save_path(path=self._save_path, raise_if_exist=False)
-
-        if not self._resume:
-            save_path = setup_outputdir(
-                path=save_path,
-                warn_if_exist=self._warn_if_exist,
-            )
-
-        save_path = os.path.abspath(os.path.expanduser(save_path))
-        logger.debug(f"save path: {save_path}")
+        self._save_path = setup_save_path(
+            resume=self._resume,
+            old_save_path=self._save_path,
+            proposed_save_path=save_path,
+            raise_if_exist=True,
+            warn_if_exist=False,
+            fit_called=fit_called,
+        )
 
         # Generate general info that's not config specific
         if tuning_data is None:
@@ -465,7 +459,6 @@ class MultiModalMatcher:
         self._problem_type = problem_type  # In case problem type isn't provided in __init__().
         self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
-        self._save_path = save_path
         self._output_shape = output_shape
         self._column_types = column_types
 
@@ -476,7 +469,7 @@ class MultiModalMatcher:
             validation_metric_name=validation_metric_name,
             minmax_mode=minmax_mode,
             max_time=time_limit,
-            save_path=save_path,
+            save_path=self._save_path,
             ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
             resume=False if hyperparameter_tune_kwargs is not None else self._resume,
             enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
@@ -501,7 +494,7 @@ class MultiModalMatcher:
             return predictor
 
         self._fit(**_fit_args)
-        logger.info(f"Models and intermediate outputs are saved to {save_path} ")
+        logger.info(f"Models and intermediate outputs are saved to {self._save_path} ")
         return self
 
     def _get_matcher_df_preprocessor(
@@ -1821,6 +1814,7 @@ class MultiModalMatcher:
                     "output_shape": self._output_shape,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
+                    "fit_called": self._fit_called,
                     "version": ag_version.__version__,
                 },
                 fp,
@@ -1920,6 +1914,10 @@ class MultiModalMatcher:
         matcher._resume = resume
         matcher._save_path = path  # in case the original exp dir is copied to somewhere else
         matcher._pretrain_path = path
+        if "fit_called" in assets:
+            matcher._fit_called = assets["fit_called"]
+        else:
+            matcher._fit_called = True  # backward compatible
         matcher._config = config
         matcher._query_config = query_config
         matcher._response_config = response_config
