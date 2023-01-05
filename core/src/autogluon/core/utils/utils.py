@@ -4,7 +4,7 @@ import pickle
 import time
 import random
 import sys
-from typing import Callable, List
+from typing import Callable, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -349,8 +349,8 @@ def generate_train_test_split(X: DataFrame,
                               y: Series,
                               problem_type: str,
                               test_size: float = 0.1,
-                              random_state: int = 0,
-                              min_cls_count_train: int = 1) -> (DataFrame, DataFrame, Series, Series):
+                              random_state=0,
+                              min_cls_count_train=1) -> Tuple[DataFrame, DataFrame, Series, Series]:
     """
     Generate a train test split from input X, y.
     If you have a combined X, y DataFrame, refer to `generate_train_test_split_combined` instead.

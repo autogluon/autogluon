@@ -19,6 +19,10 @@ class Correlation(AbstractAnalysis):
     """
     Correlation analysis.
 
+    Note: it is recommended to apply AutoGluon standard pre-processing - this will allow to include categorical variables into the analysis.
+    This can be done via wrapping analysis into :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
+
+
     Parameters
     ----------
     method: str  {'pearson', 'kendall', 'spearman', 'phik'}, default='spearman'
@@ -43,9 +47,29 @@ class Correlation(AbstractAnalysis):
     children: List[AbstractAnalysis], default = []
         wrapped analyses; these will receive sampled `args` during `fit` call
 
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.visualization as viz
+    >>> import autogluon.eda.auto as auto
+    >>> import pandas as pd
+    >>> import numpy as np
+    >>> df_train = pd.DataFrame(...)
+    >>>
+    >>> auto.analyze(return_sttrain_data=df_train, label=target_col, anlz_facets=[
+    >>>     # Apply standard AutoGluon pre-processing to transform categorical variables to numbers to ensure correlation includes them.
+    >>>     eda.transform.ApplyFeatureGenerator(category_to_numbers=True, children=[
+    >>>         # We use `spearman` correlation to capture non-linear interactions because it is based on the order rank.
+    >>>         eda.interaction.Correlation(method='spearman', focus_field=target_col, focus_field_threshold=0.3),
+    >>>     ])
+    >>> ], viz_facets=[
+    >>>     viz.interaction.CorrelationVisualization(fig_args=dict(figsize=(12,8)), **common_args),
+    >>> ])
+
     See Also
     --------
     `phik <https://github.com/KaveIO/PhiK>`_ documentation
+    :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
 
     """
 
@@ -96,15 +120,39 @@ class Correlation(AbstractAnalysis):
 class CorrelationSignificance(AbstractAnalysis):
     """
     Significance of correlation of all variable combinations in the DataFrame.
+
     See :py:meth:`~phik.significance.significance_matrix` for more details.
     This analysis requires :py:class:`~autogluon.eda.analysis.interaction.Correlation` results to be
     available in the state.
+
+    Note: it is recommended to apply AutoGluon standard pre-processing - this will allow to include categorical variables into the analysis.
+    This can be done via wrapping analysis into :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.visualization as viz
+    >>> import autogluon.eda.auto as auto
+    >>> import pandas as pd
+    >>> df_train = pd.DataFrame(...)
+    >>>
+    >>> auto.analyze(return_sttrain_data=df_train, label=target_col, anlz_facets=[
+    >>>     # Apply standard AutoGluon pre-processing to transform categorical variables to numbers to ensure correlation includes them.
+    >>>     eda.transform.ApplyFeatureGenerator(category_to_numbers=True, children=[
+    >>>         # We use `spearman` correlation to capture non-linear interactions because it is based on the order rank.
+    >>>         eda.interaction.Correlation(method='spearman', focus_field=target_col, focus_field_threshold=0.3),
+    >>>         eda.interaction.CorrelationSignificance()
+    >>>     ])
+    >>> ], viz_facets=[
+    >>>     viz.interaction.CorrelationSignificanceVisualization(fig_args=dict(figsize=(12,8))),
+    >>> ])
 
     See Also
     --------
     `phik <https://github.com/KaveIO/PhiK>`_ documentation
     :py:meth:`~phik.significance.significance_matrix`
     :py:class:`~autogluon.eda.analysis.interaction.Correlation`
+    :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
     """
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:

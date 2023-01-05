@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import List, Optional
 
 import torch
 from timm import create_model
@@ -78,6 +78,10 @@ class TimmAutoModelForImagePrediction(nn.Module):
         return f"{self.prefix}_{LABEL}"
 
     @property
+    def input_keys(self):
+        return [self.image_key, self.image_valid_num_key]
+
+    @property
     def image_column_prefix(self):
         return f"{self.image_key}_{COLUMN}"
 
@@ -87,21 +91,35 @@ class TimmAutoModelForImagePrediction(nn.Module):
 
     def forward(
         self,
-        batch: dict,
+        images: torch.FloatTensor,
+        image_valid_num: torch.Tensor,
+        image_column_names: Optional[List[str]] = None,
+        image_column_indices: Optional[List[torch.Tensor]] = None,
     ):
         """
         Parameters
         ----------
-        batch
-            A dictionary containing the input mini-batch data.
-            We need to use the keys with the model prefix to index required data.
+        images
+            A tensor in [N, C, H, W] layout to represent the images.
+        image_valid_num
+            A tensor that describes valid number of input images.
+        image_column_names
+            A list of strings that indicates names of the image columns.
+        image_column_indices
+            A list of tensors that indicates start and stop indices of the image columns.
 
         Returns
         -------
             A dictionary with logits and features.
         """
-        images = batch[self.image_key]
-        image_valid_num = batch[self.image_valid_num_key]
+        batch = {
+            self.image_key: images,
+            self.image_valid_num_key: image_valid_num,
+        }
+        if image_column_names:
+            assert len(image_column_names) == len(image_column_indices), "invalid image column inputs"
+            batch.update(**dict(zip(image_column_names, image_column_indices)))
+
         ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
         if self.mix_choice == "all_images":  # mix inputs
             mixed_images = (

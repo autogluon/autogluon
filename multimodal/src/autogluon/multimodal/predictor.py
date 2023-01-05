@@ -12,7 +12,7 @@ import shutil
 import sys
 import time
 import warnings
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Dict, List, Optional, Union
@@ -141,6 +141,7 @@ from .utils import (
     get_mixup,
     get_onnx_input,
     get_stopping_threshold,
+    get_precision_context,
     hyperparameter_tune,
     infer_batch,
     infer_dtypes_by_model_names,
@@ -153,6 +154,7 @@ from .utils import (
     load_text_tokenizers,
     logits_to_prob,
     modify_duplicate_model_names,
+    move_to_device,
     predict,
     process_batch,
     save_pretrained_model_configs,
@@ -2478,11 +2480,11 @@ class MultiModalPredictor:
 
     def export_onnx(
         self,
-        onnx_path: Optional[str] = None,
         data: Optional[pd.DataFrame] = None,
+        onnx_path: Optional[str] = None,
         batch_size: Optional[int] = None,
         verbose: Optional[bool] = False,
-        opset_version: Optional[int] = 13,
+        opset_version: Optional[int] = 16,
     ):
         """
         Export this predictor's model to ONNX file.
@@ -2504,6 +2506,10 @@ class MultiModalPredictor:
         """
         # TODO: Support CLIP
         # TODO: Add test
+        from .models.timm_image import TimmAutoModelForImagePrediction
+
+        if not isinstance(self._model, TimmAutoModelForImagePrediction):
+            raise NotImplementedError(f"export_onnx doesn't support model type {type(self._model)}")
         warnings.warn("Currently, the functionality of exporting to ONNX is experimental.")
 
         valid_input, dynamic_axes, default_onnx_path, batch = get_onnx_input(
@@ -2518,21 +2524,35 @@ class MultiModalPredictor:
             )
 
         if not onnx_path:
-            onnx_path = default_onnx_path
+            onnx_path = os.path.join(self.path, default_onnx_path)
 
-        torch.onnx.export(
-            self._model.eval(),
-            batch,
-            onnx_path,
-            opset_version=opset_version,
-            verbose=verbose,
-            input_names=valid_input,
-            dynamic_axes=dynamic_axes,
-        )
+        device_type = "cuda" if torch.cuda.is_available() else "cpu"
+        device = torch.device(device_type)
+        self._model.to(device).eval()
+        batch = move_to_device(batch, device=device)
+
+        InputBatch = namedtuple("InputBatch", self._model.input_keys)
+        input_vec = InputBatch(**batch)
+
+        strategy = "dp"  # default used in inference.
+        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
+        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False)
+        precision_context = get_precision_context(precision=precision, device_type=device_type)
+
+        with precision_context, torch.no_grad():
+            torch.onnx.export(
+                self._model.eval(),
+                args=input_vec,
+                f=onnx_path,
+                opset_version=opset_version,
+                verbose=verbose,
+                input_names=valid_input,
+                dynamic_axes=dynamic_axes,
+            )
 
     def get_processed_batch_for_deployment(
         self,
-        data: pd.DataFrame,
+        data: Union[pd.DataFrame, dict],
         valid_input: Optional[List] = None,
         onnx_tracing: bool = False,
         batch_size: int = None,
@@ -2561,13 +2581,6 @@ class MultiModalPredictor:
         Tensor or numpy array.
         The output processed batch could be used for export/evaluate deployed model.
         """
-        # TODO: add support for data = dict or list
-        if onnx_tracing:
-            if batch_size:
-                data = data[:batch_size]
-            else:
-                data = data[:2]
-
         data, df_preprocessor, data_processors = self._on_predict_start(
             data=data,
             requires_label=requires_label,
@@ -2912,3 +2925,49 @@ class AutoMMPredictor(MultiModalPredictor):
             "raise an exception starting in v0.7."
         )
         super(AutoMMPredictor, self).__init__(**kwargs)
+
+
+class MultiModalOnnxPredictor:
+    def __init__(self, base_predictor, model):
+        self._predictor = base_predictor
+        import onnxruntime as ort
+
+        self.sess = ort.InferenceSession(model.SerializeToString(), providers=["CUDAExecutionProvider"])
+
+    def predict(self, data: Union[pd.DataFrame, dict, list, str]):
+        raise NotImplementedError()
+
+    def predict_proba(self, data: Union[pd.DataFrame, dict, list, str]):
+        data, df_preprocessor, data_processors = self._predictor._on_predict_start(
+            data=data,
+            requires_label=False,
+        )
+        data = process_batch(
+            data=data,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+        )
+
+        inputs = self.sess.get_inputs()
+        outputs = self.sess.get_outputs()
+        input_names = [i.name for i in inputs]
+        input_dict = {k: data[k].numpy() for k in input_names}
+
+        # Taking second output, since outputs are (feature, logits)
+        # TODO: Make output consistent. Currently relying on keys of the output dict.
+        assert len(outputs) == 2, "expecting two outputs from the model."
+        label_name = outputs[1].name
+        onnx_logits = self.sess.run([label_name], input_dict)[0]
+        onnx_proba = logits_to_prob(onnx_logits)
+
+        return onnx_proba
+
+    @staticmethod
+    def load(path):
+        import onnx
+
+        base_predictor = MultiModalPredictor.load(path=path)
+        onnx_path = os.path.join(path, "model.onnx")
+        onnx_bytes = onnx.load(onnx_path)
+
+        return MultiModalOnnxPredictor(base_predictor=base_predictor, model=onnx_bytes)

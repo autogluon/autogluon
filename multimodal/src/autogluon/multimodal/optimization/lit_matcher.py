@@ -10,6 +10,7 @@ from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
 from ..constants import AUTOMM, FEATURES, LOGIT_SCALE, PROBABILITY, QUERY, RESPONSE
+from ..models.utils import run_model
 from ..utils.matcher import compute_matching_probability
 from .losses import MultiNegativesSoftmaxLoss
 from .utils import (
@@ -230,10 +231,10 @@ class MatcherLitModule(pl.LightningModule):
         self,
         batch: Dict,
     ):
-        query_outputs = self.query_model(batch)[self.query_model.prefix]
+        query_outputs = run_model(self.query_model, batch)[self.query_model.prefix]
         query_embeddings = query_outputs[FEATURES]
 
-        response_outputs = self.response_model(batch)[self.response_model.prefix]
+        response_outputs = run_model(self.response_model, batch)[self.response_model.prefix]
         response_embeddings = response_outputs[FEATURES]
 
         logit_scale = (response_outputs[LOGIT_SCALE] if LOGIT_SCALE in response_outputs else None,)
@@ -330,14 +331,14 @@ class MatcherLitModule(pl.LightningModule):
         A dictionary with the mini-batch's logits and features.
         """
         if self.signature == QUERY:
-            embeddings = self.query_model(batch)[self.query_model.prefix][FEATURES]
+            embeddings = run_model(self.query_model, batch)[self.query_model.prefix][FEATURES]
             return {FEATURES: embeddings}
         elif self.signature == RESPONSE:
-            embeddings = self.response_model(batch)[self.response_model.prefix][FEATURES]
+            embeddings = run_model(self.response_model, batch)[self.response_model.prefix][FEATURES]
             return {FEATURES: embeddings}
         else:
-            query_embeddings = self.query_model(batch)[self.query_model.prefix][FEATURES]
-            response_embeddings = self.response_model(batch)[self.response_model.prefix][FEATURES]
+            query_embeddings = run_model(self.query_model, batch)[self.query_model.prefix][FEATURES]
+            response_embeddings = run_model(self.response_model, batch)[self.response_model.prefix][FEATURES]
 
         match_prob = compute_matching_probability(
             embeddings1=query_embeddings,
