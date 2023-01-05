@@ -165,6 +165,12 @@ Cloud Training and Deployment
       Checkout managed AutoGluon experience on Amazon SageMaker Autopilot
 
    .. card::
+      :title: AutoGluon Cloud
+      :link: cloud_fit_deploy/autogluon-cloud.html
+
+      A tutorial on using AutoGluon Cloud module to train/deploy AutoGluon backed models on SageMaker.
+
+   .. card::
       :title: Cloud Training with AWS SageMaker
       :link: cloud_fit_deploy/cloud-aws-sagemaker-training.html
 

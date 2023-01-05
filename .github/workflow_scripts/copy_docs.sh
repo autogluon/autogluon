@@ -42,7 +42,8 @@ if [ $COMMAND_EXIT_CODE -ne 0 ]; then
     exit COMMAND_EXIT_CODE
 fi
 
-aws s3 sync ${flags} ${BUILD_DOCS_PATH}/all/ s3://${bucket}/${path} --acl public-read ${cacheControl}
+cloud_tutorial=${BUILD_DOCS_PATH}/all/tutorials/cloud_fit_deploy/autogluon-cloud.md
+aws s3 sync ${flags} ${BUILD_DOCS_PATH}/all/ s3://${bucket}/${path} --acl public-read ${cacheControl} --exclude $cloud_tutorial
 echo "Uploaded doc to http://${site}/index.html"
 
 if [[ ($BRANCH == 'master') && ($GIT_REPO == autogluon/autogluon) ]]
