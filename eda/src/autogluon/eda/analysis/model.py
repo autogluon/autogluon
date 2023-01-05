@@ -21,20 +21,19 @@ class AutoGluonModelQuickFit(AbstractAnalysis):
 
     Examples
     --------
-    >>> from autogluon.eda.analysis.base import BaseAnalysis
-    >>> from autogluon.eda.analysis import Sampler
-    >>> import pandas as pd
-    >>> import numpy as np
+    >>> import autogluon.eda.analysis as eda
     >>>
     >>> # Quick fit
-    >>> data = full_data[full_data['Age'].notna()]
-    >>> columns=['Pclass', 'Age', 'Embarked', 'SibSp', 'Parch', 'Fare', 'Cabin']
-    >>> state = auto.quick_fit(train_data=data[columns], label='Age', return_state=True, save_model_to_state=True, hyperparameters={'GBM': {}})
+    >>> state = auto.quick_fit(
+    >>>     train_data=..., label=...,
+    >>>     return_state=True,  # return state object from call
+    >>>     save_model_to_state=True,  # store fitted model into the state
+    >>>     hyperparameters={'GBM': {}}  # train specific model
+    >>> )
     >>>
-    >>> # Using quick fit model as an imputer
-    >>> age_imputer = state.model
-    >>> na_data = all_data[all_data.Age.isna()].copy()
-    >>> na_data.Age = age_imputer.predict(na_data)
+    >>> # Using quick fit model
+    >>> model = state.model
+    >>> y_pred = model.predict(test_data)
 
     Parameters
     ----------

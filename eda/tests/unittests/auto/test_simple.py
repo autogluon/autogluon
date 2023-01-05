@@ -8,15 +8,18 @@ import pandas as pd
 from autogluon.eda import AnalysisState
 from autogluon.eda.analysis import Namespace
 from autogluon.eda.analysis.base import BaseAnalysis
-from autogluon.eda.auto import analyze, quick_fit
+from autogluon.eda.auto import analyze, dataset_overview, quick_fit
 from autogluon.eda.visualization import (
     ConfusionMatrix,
+    DatasetStatistics,
+    DatasetTypeMismatch,
     FeatureImportance,
     MarkdownSectionComponent,
     ModelLeaderboard,
     RegressionEvaluation,
 )
 from autogluon.eda.visualization.base import AbstractVisualization
+from autogluon.eda.visualization.interaction import FeatureDistanceAnalysisVisualization
 
 RESOURCE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources"))
 
@@ -121,3 +124,25 @@ def test_quick_fit(monkeypatch):
     call_reg_render.assert_called_once()
     call_ldr_render.assert_called_once()
     call_fi_render.assert_called_once()
+
+
+def test_dataset_overview(monkeypatch):
+    df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
+
+    call_ds_render = MagicMock()
+    call_dtm_render = MagicMock()
+    call_md_render = MagicMock()
+    call_fdav_render = MagicMock()
+
+    with monkeypatch.context() as m:
+        m.setattr(DatasetStatistics, "render", call_ds_render)
+        m.setattr(DatasetTypeMismatch, "render", call_dtm_render)
+        m.setattr(MarkdownSectionComponent, "render", call_md_render)
+        m.setattr(FeatureDistanceAnalysisVisualization, "render", call_fdav_render)
+
+        dataset_overview(train_data=df_train, label="class")
+
+    call_ds_render.assert_called_once()
+    call_dtm_render.assert_called_once()
+    call_md_render.assert_called_once()
+    call_fdav_render.assert_called_once()

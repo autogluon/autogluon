@@ -7,6 +7,7 @@ from autogluon.common.utils.log_utils import verbosity2loglevel
 
 from .. import AnalysisState
 from ..analysis import (
+    ApplyFeatureGenerator,
     AutoGluonModelEvaluator,
     AutoGluonModelQuickFit,
     FeatureInteraction,
@@ -15,6 +16,7 @@ from ..analysis import (
 )
 from ..analysis.base import AbstractAnalysis, BaseAnalysis
 from ..analysis.dataset import DatasetSummary, RawTypesAnalysis, Sampler, SpecialTypesAnalysis
+from ..analysis.interaction import FeatureDistanceAnalysis
 from ..visualization import (
     ConfusionMatrix,
     DatasetStatistics,
@@ -26,6 +28,7 @@ from ..visualization import (
     RegressionEvaluation,
 )
 from ..visualization.base import AbstractVisualization
+from ..visualization.interaction import FeatureDistanceAnalysisVisualization
 from ..visualization.layouts import SimpleVerticalLinearLayout
 
 __all__ = ["analyze", "analyze_interaction", "quick_fit", "dataset_overview"]
@@ -131,8 +134,8 @@ def analyze_interaction(
     x: Optional[str] = None,
     y: Optional[str] = None,
     hue: Optional[str] = None,
-    viz_args: Optional[Dict[str, Any]] = None,
     fig_args: Optional[Dict[str, Any]] = None,
+    chart_args: Optional[Dict[str, Any]] = None,
     **analysis_args,
 ):
     """
@@ -143,7 +146,7 @@ def analyze_interaction(
     x: Optional[str], default = None
     y: Optional[str], default = None
     hue: Optional[str], default = None
-    viz_args: Optional[dict], default = None
+    chart_args: Optional[dict], default = None
         kwargs to pass into visualization component
     fig_args: Optional[Dict[str, Any]], default = None,
         kwargs to pass into chart figure
@@ -155,7 +158,7 @@ def analyze_interaction(
     >>>
     >>> df_train = pd.DataFrame(...)
     >>>
-    >>> auto.analyze_interaction(x='Age', hue='Survived', train_data=df_train, viz_args=dict(headers=True, alpha=0.2))
+    >>> auto.analyze_interaction(x='Age', hue='Survived', train_data=df_train, chart_args=dict(headers=True, alpha=0.2))
 
     See Also
     --------
@@ -163,11 +166,8 @@ def analyze_interaction(
     :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`
 
     """
-    if viz_args is None:
-        viz_args = {}
-
-    if fig_args is None:
-        fig_args = {}
+    fig_args = get_empty_dict_if_none(fig_args)
+    chart_args = get_empty_dict_if_none(chart_args)
 
     key = "__analysis__"
     return analyze(
@@ -177,7 +177,7 @@ def analyze_interaction(
             FeatureInteraction(key=key, x=x, y=y, hue=hue),
         ],
         viz_facets=[
-            FeatureInteractionVisualization(key=key, fig_args=fig_args, **viz_args),
+            FeatureInteractionVisualization(key=key, fig_args=fig_args, **chart_args),
         ],
     )
 
@@ -193,7 +193,8 @@ def quick_fit(
     return_state: bool = False,
     verbosity: int = 0,
     show_feature_importance_barplots: bool = False,
-    fig_args: Optional[Dict[str, Any]] = None,
+    fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
+    chart_args: Optional[Dict[str, Dict[str, Any]]] = None,
     **fit_args,
 ):
     """
@@ -210,6 +211,12 @@ def quick_fit(
         - confusion matrix for classification problems; predictions vs actual for regression problems
         - model leaderboard
         - feature importance
+
+    Supported `fig_args`/`chart_args` keys:
+        - confusion_matrix - confusion matrix chart for classification predictor
+        - regression_eval - regression predictor results chart
+        - feature_importance - feature importance barplot chart
+
 
     Parameters
     ----------
@@ -240,14 +247,32 @@ def quick_fit(
         where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
     show_feature_importance_barplots: bool, default = False
         if `True`, then barplot char will ba added with feature importance visualization
-    fig_args: Optional[Dict[str, Any]] = None,
-        kwargs to pass into chart figure
     fit_args
         kwargs to pass into `TabularPredictor` fit
+    fig_args: Optional[Dict[str, Any]], default = None,
+        figures args for vizualizations; key == component; value = dict of kwargs for component figure
+    chart_args: Optional[Dict[str, Any]], default = None,
+        figures args for vizualizations; key == component; value = dict of kwargs for component chart
 
     Returns
     -------
         state after `fit` call if `return_state` is `True`; `None` otherwise
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>>
+    >>> # Quick fit
+    >>> state = auto.quick_fit(
+    >>>     train_data=..., label=...,
+    >>>     return_state=True,  # return state object from call
+    >>>     save_model_to_state=True,  # store fitted model into the state
+    >>>     hyperparameters={'GBM': {}}  # train specific model
+    >>> )
+    >>>
+    >>> # Using quick fit model
+    >>> model = state.model
+    >>> y_pred = model.predict(test_data)
 
     See Also
     --------
@@ -263,10 +288,10 @@ def quick_fit(
     if not isinstance(state, AnalysisState):
         state = AnalysisState(state)
 
-    if fig_args is None:
-        fig_args = {}
+    fig_args = get_empty_dict_if_none(fig_args)
+    chart_args = get_empty_dict_if_none(chart_args)
 
-    if "hyperparameters" not in fit_args:
+    if ("hyperparameters" not in fit_args) and ("presets" not in fit_args):
         fit_args = fit_args.copy()
         fit_args["hyperparameters"] = {
             "RF": [
@@ -308,12 +333,22 @@ def quick_fit(
         ],
         viz_facets=[
             MarkdownSectionComponent(markdown=f"### Model Prediction for {label}"),
-            ConfusionMatrix(fig_args=fig_args, annot_kws={"size": 12}),
-            RegressionEvaluation(fig_args=fig_args, marker="o", scatter_kws={"s": 5}),
+            ConfusionMatrix(
+                fig_args=fig_args.get("confusion_matrix", {}),
+                **chart_args.get("confusion_matrix", dict(annot_kws={"size": 12})),
+            ),
+            RegressionEvaluation(
+                fig_args=fig_args.get("regression_eval", {}),
+                **chart_args.get("regression_eval", dict(marker="o", scatter_kws={"s": 5})),
+            ),
             MarkdownSectionComponent(markdown="### Model Leaderboard"),
             ModelLeaderboard(),
             MarkdownSectionComponent(markdown="### Feature Importance for Trained Model"),
-            FeatureImportance(show_barplots=show_feature_importance_barplots),
+            FeatureImportance(
+                show_barplots=show_feature_importance_barplots,
+                fig_args=fig_args.get("feature_importance", {}),
+                **chart_args.get("feature_importance", {}),
+            ),
         ],
     )
 
@@ -325,9 +360,15 @@ def dataset_overview(
     label: Optional[str] = None,
     state: Union[None, dict, AnalysisState] = None,
     sample: Union[None, int, float] = None,
+    fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
+    chart_args: Optional[Dict[str, Dict[str, Any]]] = None,
 ):
     """
     Shortcut to perform high-level datasets summary overview (counts, frequencies, missing statistics, types info).
+
+    Supported `fig_args`/`chart_args` keys:
+        - feature_distance - feature distance dendrogram chart
+
 
     Parameters
     ----------
@@ -346,6 +387,20 @@ def dataset_overview(
         `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
         `None` means no sampling
         See also :func:`autogluon.eda.analysis.dataset.Sampler`
+    fig_args: Optional[Dict[str, Any]], default = None,
+        figures args for vizualizations; key == component; value = dict of kwargs for component figure
+    chart_args: Optional[Dict[str, Any]], default = None,
+        figures args for vizualizations; key == component; value = dict of kwargs for component chart
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>>
+    >>> auto.dataset_overview(
+    >>>     train_data=df_train, test_data=df_test, label=target_col,
+    >>>     chart_args={'feature_distance': dict(orientation='left')},
+    >>>     fig_args={'feature_distance': dict(figsize=(6,6))},
+    >>> )
 
     See Also
     --------
@@ -357,6 +412,10 @@ def dataset_overview(
     :py:class:`~autogluon.eda.visualization.dataset.DatasetTypeMismatch`
 
     """
+
+    fig_args = get_empty_dict_if_none(fig_args)
+    chart_args = get_empty_dict_if_none(chart_args)
+
     return analyze(
         train_data=train_data,
         test_data=test_data,
@@ -369,9 +428,20 @@ def dataset_overview(
             MissingValuesAnalysis(),
             RawTypesAnalysis(),
             SpecialTypesAnalysis(),
+            ApplyFeatureGenerator(category_to_numbers=True, children=[FeatureDistanceAnalysis()]),
         ],
         viz_facets=[
             DatasetStatistics(headers=True),
             DatasetTypeMismatch(headers=True),
+            MarkdownSectionComponent("### Feature Distance"),
+            FeatureDistanceAnalysisVisualization(
+                fig_args=fig_args.get("feature_distance", {}), **chart_args.get("feature_distance", {})
+            ),
         ],
     )
+
+
+def get_empty_dict_if_none(value) -> dict:
+    if value is None:
+        value = {}
+    return value
