@@ -40,6 +40,7 @@ This section provides an overview on how AutoGluon can be trained and deployed o
    :hidden:
 
    autopilot-autogluon
+   autogluon-cloud
    cloud-aws-sagemaker-training
    cloud-aws-sagemaker-deployment
    cloud-aws-lambda-deployment
