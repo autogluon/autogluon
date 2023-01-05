@@ -506,6 +506,9 @@ class TabularPredictor:
                             use_orig_features: (bool) Whether a stack model will use the original features along with the stack features to train (akin to skip-connections). If the model has no stack features (no base models), this value is ignored and the stack model will use the original features.
                             max_base_models: (int, default=25) Maximum number of base models whose predictions form the features input to this stacker model. If more than `max_base_models` base models are available, only the top `max_base_models` models with highest validation score are used.
                             max_base_models_per_type: (int, default=5) Similar to `max_base_models`. If more than `max_base_models_per_type` of any particular model type are available, only the top `max_base_models_per_type` of that type are used. This occurs before the `max_base_models` filter.
+                            max_sets: (int, default=None) If specified, the maximum sets to fit in the bagged model.
+                                The lesser of `max_sets` and the predictor.fit `num_bag_sets` argument will be used for the given model.
+                                Useful if a particular model is expensive relative to others and you want to avoid repeated bagging of the expensive model while still repeated bagging the cheaper models.
                             save_bag_folds: (bool, default=True)
                                 If True, bagged models will save their fold models (the models from each individual fold of bagging). This is required to use bagged models for prediction.
                                 If False, bagged models will not save their fold models. This means that bagged models will not be valid models during inference.
