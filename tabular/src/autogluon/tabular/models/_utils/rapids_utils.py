@@ -1,6 +1,6 @@
 from typing import Dict
 
-from autogluon.core.utils import ResourceManager
+from autogluon.common.utils.resource_utils import ResourceManager
 
 
 class RapidsModelMixin:

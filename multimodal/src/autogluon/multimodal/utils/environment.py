@@ -8,12 +8,8 @@ from typing import Dict, List, Optional, Tuple, Union
 import torch
 from torch import nn
 
-try:
-    from mmcv.parallel import DataContainer
-except:
-    pass
-
 from ..constants import AUTOMM, OBJECT_DETECTION, OCR
+from .mmcv import DataContainer
 
 logger = logging.getLogger(AUTOMM)
 
@@ -155,7 +151,7 @@ def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List, Tuple], devic
         for v in obj:
             res.append(move_to_device(v, device))
         return res
-    elif isinstance(obj, DataContainer):
+    elif isinstance(obj, (int, float, str, DataContainer)):
         return obj
     else:
         raise TypeError(

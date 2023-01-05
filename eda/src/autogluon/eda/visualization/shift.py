@@ -1,8 +1,8 @@
 from typing import Optional
 
+from .. import AnalysisState
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
-from .. import AnalysisState
 
 __all__ = ["XShiftSummary"]
 

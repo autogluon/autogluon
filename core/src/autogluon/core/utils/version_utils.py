@@ -7,9 +7,8 @@ import sys
 
 from datetime import datetime
 
-from .nvutil import cudaInit, cudaSystemGetNVMLVersion
-from .utils import ResourceManager
-
+from autogluon.common.utils.nvutil import cudaInit, cudaSystemGetNVMLVersion
+from autogluon.common.utils.resource_utils import ResourceManager
 
 # We don't include test dependency here
 autogluon_extras_dict = {

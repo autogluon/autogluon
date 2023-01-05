@@ -18,7 +18,7 @@ from ..constants import (
 )
 from .ft_transformer import CLSToken, FT_Transformer
 from .mlp import MLP
-from .utils import init_weights
+from .utils import init_weights, run_model
 
 logger = logging.getLogger(AUTOMM)
 
@@ -157,7 +157,7 @@ class MultimodalFusionMLP(nn.Module):
         multimodal_features = []
         output = {}
         for per_model, per_adapter in zip(self.model, self.adapter):
-            per_output = per_model(batch)
+            per_output = run_model(per_model, batch)
             multimodal_features.append(per_adapter(per_output[per_model.prefix][FEATURES]))
             if self.loss_weight is not None:
                 per_output[per_model.prefix].update({WEIGHT: self.loss_weight})
@@ -351,7 +351,7 @@ class MultimodalFusionNER(MultimodalFusionMLP):
         output = {}
         ner_output = self.ner_model(batch)
         for per_model, per_adapter in zip(self.other_models, self.adapter):
-            per_output = per_model(batch)
+            per_output = run_model(per_model, batch)
             multimodal_features.append(per_adapter(per_output[per_model.prefix][FEATURES]))
 
         features = self.fusion_mlp(torch.cat(multimodal_features, dim=1))
@@ -553,7 +553,7 @@ class MultimodalFusionTransformer(nn.Module):
         multimodal_features = []
         output = {}
         for per_model, per_adapter in zip(self.model, self.adapter):
-            per_output = per_model(batch)
+            per_output = run_model(per_model, batch)
             multimodal_feature = per_adapter(per_output[per_model.prefix][FEATURES])
             if multimodal_feature.ndim == 2:
                 multimodal_feature = torch.unsqueeze(multimodal_feature, dim=1)

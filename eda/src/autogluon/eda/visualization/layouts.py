@@ -1,10 +1,10 @@
-from typing import Union, List, Dict, Optional
+from typing import Dict, List, Optional, Union
 
-from IPython.display import display, Markdown
-from ipywidgets import HBox, Output, Layout, Tab
+from IPython.display import Markdown, display
+from ipywidgets import HBox, Layout, Output, Tab
 
-from .base import AbstractVisualization
 from .. import AnalysisState
+from .base import AbstractVisualization
 
 __all__ = ["MarkdownSectionComponent", "SimpleVerticalLinearLayout", "SimpleHorizontalLayout", "TabLayout"]
 

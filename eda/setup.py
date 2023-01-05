@@ -24,7 +24,7 @@ install_requires = [
     'scipy',
     'scikit-learn',
     'pandas',
-    'matplotlib',
+    'matplotlib>3.3',
     'missingno>=0.5.1,<0.6',
     'phik>=0.12.2,<0.13',
     'seaborn>=0.12.0,<0.13',
@@ -44,7 +44,9 @@ test_requirements = [
     'pytest-cov',
     'types-requests',
     'types-setuptools',
-    'pytest-mypy'
+    'pytest-mypy',
+    'PyHamcrest',
+    'isort'
 ]
 
 test_requirements = list(set(test_requirements))

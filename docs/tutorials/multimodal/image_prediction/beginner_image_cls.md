@@ -19,12 +19,21 @@ import pandas as pd
 
 from autogluon.multimodal.utils.misc import shopee_dataset
 download_dir = './ag_automm_tutorial_imgcls'
-train_data, test_data = shopee_dataset(download_dir)
-print(train_data)
+train_data_path, test_data_path = shopee_dataset(download_dir)
+print(train_data_path)
 ```
 
-We can see there are 800 rows and 2 columns in this training dataframe. The 2 columns are **image** and **label**, and each row represents a different training sample.
+We can see there are 800 rows and 2 columns in this training dataframe. The 2 columns are **image** and **label**, and the **image** column contains the absolute paths of the images. Each row represents a different training sample.
 
+In addition to image paths, `MultiModalPredictor` also supports image bytearrays during training and inference. We can load the dataset with bytearrays with the option `is_bytearray` set to `True`:
+
+```{.python .input}
+import warnings
+warnings.filterwarnings('ignore')
+
+download_dir = './ag_automm_tutorial_imgcls'
+train_data_byte, test_data_byte = shopee_dataset(download_dir, is_bytearray=True)
+```
 
 ## Use AutoMM to Fit Models
 
@@ -36,7 +45,7 @@ import uuid
 model_path = f"./tmp/{uuid.uuid4().hex}-automm_shopee"
 predictor = MultiModalPredictor(label="label", path=model_path)
 predictor.fit(
-    train_data=train_data,
+    train_data=train_data_path, # you can use train_data_byte as well
     time_limit=30, # seconds
 ) # you can trust the default config, e.g., we use a `swin_base_patch4_window7_224` model
 ```
@@ -49,17 +58,23 @@ predictor.fit(
 You can evaluate the classifier on the test dataset to see how it performs, the test top-1 accuracy is:
 
 ```{.python .input}
-scores = predictor.evaluate(test_data, metrics=["accuracy"])
+scores = predictor.evaluate(test_data_path, metrics=["accuracy"])
 print('Top-1 test acc: %.3f' % scores["accuracy"])
 ```
 
+You can also evaluate on test data with image bytearray using the model trained on training data with image path, and vice versa:
+
+```{.python .input}
+scores = predictor.evaluate(test_data_byte, metrics=["accuracy"])
+print('Top-1 test acc: %.3f' % scores["accuracy"])
+```
 
 ## Predict on a New Image
 
 Given an example image, let's visualize it first,
 
 ```{.python .input}
-image_path = test_data.iloc[0]['image']
+image_path = test_data_path.iloc[0]['image']
 from IPython.display import Image, display
 pil_img = Image(filename=image_path)
 display(pil_img)
@@ -79,6 +94,16 @@ proba = predictor.predict_proba({'image': [image_path]})
 print(proba)
 ```
 
+Similarly as `predictor.evaluate`, we can also parse image_bytearrays into `.predict` and `.predict_proba`:
+
+```{.python .input}
+image_byte = test_data_byte.iloc[0]['image']
+predictions = predictor.predict({'image': [image_byte]})
+print(predictions)
+
+proba = predictor.predict_proba({'image': [image_byte]})
+print(proba)
+```
 
 ## Extract Embeddings
 
@@ -89,6 +114,12 @@ feature = predictor.extract_embedding({'image': [image_path]})
 print(feature[0].shape)
 ```
 
+You should expect the same result when extract embedding from image bytearray:
+
+```{.python .input}
+feature = predictor.extract_embedding({'image': [image_byte]})
+print(feature[0].shape)
+```
 
 ## Save and Load
 

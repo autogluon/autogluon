@@ -21,7 +21,6 @@ install_requires = [
     'numpy',
     'pandas',
     'scikit-learn',
-    'psutil',
     f'autogluon.common=={version}',
 ] if not ag.LITE_MODE else [
     # version ranges added in ag.get_dependency_version_ranges()

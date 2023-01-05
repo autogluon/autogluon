@@ -20,7 +20,7 @@ from ..constants import (
     REGRESSION,
     VALID_CONFIG_KEYS,
 )
-from ..presets import get_automm_presets, get_basic_automm_config
+from ..presets import get_automm_presets, get_basic_automm_config, get_preset_str
 
 logger = logging.getLogger(AUTOMM)
 
@@ -61,6 +61,7 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
 
 
 def get_config(
+    problem_type: Optional[str] = None,
     presets: Optional[str] = None,
     config: Optional[Union[dict, DictConfig]] = None,
     overrides: Optional[Union[str, List[str], Dict]] = None,
@@ -72,11 +73,13 @@ def get_config(
 
     Parameters
     ----------
+    problem_type
+        Problem type.
     presets
-        Name of the presets.
+        Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
     config
         A dictionary including four keys: "model", "data", "optimization", and "environment".
-        If any key is not not given, we will fill in with the default value.
+        If any key is not given, we will fill in with the default value.
 
         The value of each key can be a string, yaml path, or DictConfig object. For example:
         config = {
@@ -123,6 +126,8 @@ def get_config(
     -------
     Configurations as a DictConfig object
     """
+    presets = get_preset_str(problem_type=problem_type, presets=presets)
+
     if config is None:
         config = {}
 
@@ -482,12 +487,6 @@ def update_config_by_rules(
                 "the loss_function automatically otherwise.",
                 UserWarning,
             )
-    if problem_type == NER:
-        if FUSION_MLP in config.model.names:
-            config.model.names.remove(FUSION_MLP)
-    else:
-        if FUSION_NER in config.model.names:
-            config.model.names.remove(FUSION_NER)
 
     return config
 

@@ -19,9 +19,10 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
+from autogluon.common.utils.resource_utils import ResourceManager
 
 from .model_trial import model_trial, skip_hpo
-from ._tags import _DEFAULT_TAGS
+from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
@@ -30,7 +31,6 @@ from ...hpo.constants import RAY_BACKEND, CUSTOM_BACKEND
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
 from ...ray.resources_calculator import ResourceCalculator
 from ...scheduler import LocalSequentialScheduler
-from ...utils import ResourceManager
 from ...utils import get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMemoryError
@@ -485,9 +485,9 @@ class AbstractModel:
             user_specified_total_resource = math.inf
         
         # retrieve model level requirement when self is bagged model
-        user_specified_model_level_resource = self.model_base._user_params_aux.get(resource_type, None)
+        user_specified_model_level_resource = self._get_child_aux_val(key=resource_type, default=None)
         if user_specified_model_level_resource is not None:
-            assert user_specified_model_level_resource <= system_resource, f'Specified {resource_type} per {self.model_base.__class__.__name__} is more than the total: {system_resource}'
+            assert user_specified_model_level_resource <= system_resource, f'Specified {resource_type} per model base is more than the total: {system_resource}'
         user_specified_lower_level_resource = user_specified_ensemble_resource
         if user_specified_ensemble_resource is not None:
             if user_specified_model_level_resource is not None:
@@ -589,8 +589,15 @@ class AbstractModel:
         )
         minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
         minimum_model_num_gpus = minimum_model_resources.get('num_gpus', 0)
-        assert num_cpus >= minimum_model_num_cpus, f'Specified num_cpus per {self.__class__.__name__} is less than minimum num_cpus requirement {minimum_model_num_cpus}'
-        assert num_gpus >= minimum_model_num_gpus, f'Specified num_gpus per {self.__class__.__name__} is less than minimum num_gpus requirement {minimum_model_num_gpus}'
+
+        assert system_num_cpus >= num_cpus
+        assert system_num_gpus >= num_gpus
+
+        assert system_num_cpus >= minimum_model_num_cpus, f'The total system num_cpus={system_num_cpus} is less than minimum num_cpus={minimum_model_num_cpus} to fit {self.__class__.__name__}. Consider using a machine with more CPUs.'
+        assert system_num_gpus >= minimum_model_num_gpus, f'The total system num_gpus={system_num_gpus} is less than minimum num_gpus={minimum_model_num_gpus} to fit {self.__class__.__name__}. Consider using a machine with more GPUs.'
+
+        assert num_cpus >= minimum_model_num_cpus, f'Specified num_cpus={num_cpus} per {self.__class__.__name__} is less than minimum num_cpus={minimum_model_num_cpus}'
+        assert num_gpus >= minimum_model_num_gpus, f'Specified num_gpus={num_gpus} per {self.__class__.__name__} is less than minimum num_gpus={minimum_model_num_gpus}'
         
         kwargs['num_cpus'] = num_cpus
         kwargs['num_gpus'] = num_gpus
@@ -1040,7 +1047,12 @@ class AbstractModel:
                                             compiler_fallback_to_native=compiler_fallback_to_native)
         if self._compiler is not None:
             input_types = self._get_input_types(batch_size=batch_size)
-            self.model = self._compiler.compile(model=self.model, path=self.path, input_types=input_types)
+            self._compile(input_types=input_types)
+
+    def _compile(self, **kwargs):
+        """Take the compiler to perform actual compilation."""
+        input_types = kwargs.get('input_types', self._get_input_types(batch_size=None))
+        self.model = self._compiler.compile(model=self.model, path=self.path, input_types=input_types)
 
     # FIXME: This won't work for all models, and self._features is not
     # a trustworthy variable for final input shape
@@ -1602,8 +1614,14 @@ class AbstractModel:
     def _features(self):
         return self._features_internal
 
-    def _get_tags(self):
-        collected_tags = {}
+    def _get_tags(self) -> dict:
+        """
+        Tags are key-value pairs assigned to an object.
+        These can be accessed after initializing an object.
+        Tags are used for identifying if an object supports certain functionality.
+        """
+        # first get class tags, which are overwritten by any object tags
+        collected_tags = self._get_class_tags()
         for base_class in reversed(inspect.getmro(self.__class__)):
             if hasattr(base_class, '_more_tags'):
                 # need the if because mixins might not have _more_tags
@@ -1613,7 +1631,31 @@ class AbstractModel:
                 collected_tags.update(more_tags)
         return collected_tags
 
-    def _more_tags(self):
+    @classmethod
+    def _get_class_tags(cls) -> dict:
+        """
+        Class tags are tags assigned to a class that are fixed.
+        These can be accessed prior to initializing an object.
+        Tags are used for identifying if an object supports certain functionality.
+        """
+        collected_tags = {}
+        for base_class in reversed(inspect.getmro(cls)):
+            if hasattr(base_class, '_class_tags'):
+                # need the if because mixins might not have _class_tags
+                # but might do redundant work in estimators
+                # (i.e. calling more tags on BaseEstimator multiple times)
+                more_tags = base_class._class_tags()
+                collected_tags.update(more_tags)
+        return collected_tags
+
+    @classmethod
+    def _class_tags(cls) -> dict:
+        """
+        [Advanced] Optional tags used to communicate model capabilities to AutoML systems, such as if the model supports text features.
+        """
+        return _DEFAULT_CLASS_TAGS
+
+    def _more_tags(self) -> dict:
         return _DEFAULT_TAGS
     
     def _get_model_base(self):

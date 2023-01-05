@@ -1,6 +1,6 @@
 import pytest
 
-from autogluon.core.utils import ResourceManager
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from autogluon.tabular.models import AbstractModel
 
@@ -31,11 +31,13 @@ class DummyBaggedModel(BaggedEnsembleModel):
 def test_bagged_model_with_total_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold):
     with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
         model_base = DummyModel()
+        model_base.initialize()
         bagged_model = DummyBaggedModel(model_base)
         total_resources = {
             'num_cpus': 1,
             'num_gpus': 0,
         }
+        bagged_model.initialize()
         resources = bagged_model._preprocess_fit_resources(total_resources=total_resources, k_fold=k_fold)
         resources.pop('k_fold')
         assert resources == total_resources
@@ -57,6 +59,7 @@ def test_bagged_model_with_total_resources_and_ensemble_resources(mock_system_re
             'num_gpus': 1,
         }
         model_base = DummyModel()
+        model_base.initialize()
         bagged_model = DummyBaggedModel(
             model_base,
             hyperparameters={
@@ -66,6 +69,7 @@ def test_bagged_model_with_total_resources_and_ensemble_resources(mock_system_re
                 }
             }
         )
+        bagged_model.initialize()
         with pytest.raises(AssertionError) as e:
             bagged_model._preprocess_fit_resources(total_resources=total_resources, k_fold=k_fold)
         
@@ -78,24 +82,28 @@ def test_bagged_model_with_total_resources_and_ensemble_resources(mock_system_re
             'num_cpus': 4,
             'num_gpus': 1,
         }
+        model_base.initialize()
         bagged_model = DummyBaggedModel(
             model_base,
             hyperparameters={
                 'ag_args_fit': ensemble_ag_args_fit
             }
         )
+        bagged_model.initialize()
         resources = bagged_model._preprocess_fit_resources(total_resources=total_resources, k_fold=k_fold)
         resources.pop('k_fold')
         assert resources == ensemble_ag_args_fit
-    
+
 
 def test_bagged_model_with_total_resources_but_no_gpu_specified(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold):
     with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
         model_base = DummyModel()
+        model_base.initialize()
         total_resources = {
             'num_cpus': 2,
         }
         bagged_model = DummyBaggedModel(model_base)
+        bagged_model.initialize()
         resources = bagged_model._preprocess_fit_resources(total_resources=total_resources, k_fold=k_fold)
         resources.pop('k_fold')
         default_model_resources = {'num_cpus': 2, 'num_gpus': ResourceManager.get_gpu_count_all()}  # return all gpu resources as default needs gpu
@@ -105,6 +113,7 @@ def test_bagged_model_with_total_resources_but_no_gpu_specified(mock_system_reso
 def test_bagged_model_without_total_resources_but_with_ensemble_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold):
     with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
         model_base = DummyModel()
+        model_base.initialize()
         bagged_model = DummyBaggedModel(
             model_base,
             hyperparameters={
@@ -114,10 +123,12 @@ def test_bagged_model_without_total_resources_but_with_ensemble_resources(mock_s
                 }
             }
         )
+        bagged_model.initialize()
         with pytest.raises(AssertionError) as e:
             bagged_model._preprocess_fit_resources(k_fold=k_fold)
         
         model_base = DummyModel()
+        model_base.initialize()
         ensemble_ag_args_fit = {
             'num_cpus': 1,
             'num_gpus': 0,
@@ -128,6 +139,7 @@ def test_bagged_model_without_total_resources_but_with_ensemble_resources(mock_s
                 'ag_args_fit': ensemble_ag_args_fit
             }
         )
+        bagged_model.initialize()
         resources = bagged_model._preprocess_fit_resources(k_fold=k_fold)
         resources.pop('k_fold')
         assert resources == ensemble_ag_args_fit
@@ -136,9 +148,11 @@ def test_bagged_model_without_total_resources_but_with_ensemble_resources(mock_s
 def test_bagged_model_without_total_resources_and_without_model_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold):
     with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
         model_base = DummyModel()
+        model_base.initialize()
         bagged_model = DummyBaggedModel(
             model_base
         )
+        bagged_model.initialize()
         resources = bagged_model._preprocess_fit_resources(k_fold=k_fold)
         resources.pop('k_fold')
         # Bagged model should take all resources and internally calculate correct resources given ag_args_ensemble and ag_args_fit

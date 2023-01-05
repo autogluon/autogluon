@@ -1,8 +1,10 @@
 from ast import literal_eval
 
+import numpy as np
+import pandas as pd
 import pytest
 
-from autogluon.timeseries.splitter import MultiWindowSplitter, append_suffix_to_item_id
+from autogluon.timeseries.splitter import MultiWindowSplitter
 
 from .common import (
     DATAFRAME_WITH_COVARIATES,
@@ -69,8 +71,22 @@ def test_when_all_series_too_short_then_multi_window_splitter_raises_value_error
 
 def test_when_splitter_adds_suffix_to_index_then_data_is_not_copied():
     ts_df = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy()
-    ts_df_with_suffix = append_suffix_to_item_id(ts_dataframe=ts_df, suffix="_[None:None]")
+    splitter = MultiWindowSplitter()
+    ts_df_with_suffix = splitter._append_suffix_to_item_id(ts_dataframe=ts_df, suffix="_[None:None]")
     assert ts_df.values.base is ts_df_with_suffix.values.base
+
+
+def test_when_static_features_are_present_then_static_features_index_is_aligned_with_data():
+    item_id_to_length = {"B": 15, "A": 7, "Z": 22, "1": 10}
+    ts_dataframe = get_data_frame_with_variable_lengths(item_id_to_length=item_id_to_length)
+    ts_dataframe.static_features = pd.DataFrame(
+        np.random.normal(size=len(item_id_to_length)), index=item_id_to_length.keys()
+    )
+    splitter = MultiWindowSplitter()
+    prediction_length = 7
+    train, val = splitter.split(ts_dataframe, prediction_length)
+    assert (train.item_ids == train.static_features.index).all()
+    assert (val.item_ids == val.static_features.index).all()
 
 
 def test_when_static_features_are_present_then_splitter_correctly_splits_them():

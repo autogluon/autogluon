@@ -188,3 +188,7 @@ class FastTextModel(AbstractModel):
     def _more_tags(self):
         # `can_refit_full=True` because validation data is not used and there is no form of early stopping implemented.
         return {'can_refit_full': True}
+
+    @classmethod
+    def _class_tags(cls):
+        return {'handles_text': True}

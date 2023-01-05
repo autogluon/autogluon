@@ -52,13 +52,14 @@ from ..constants import (
     PEFT_STRATEGIES,
     QUADRATIC_KAPPA,
     R2,
+    RECALL,
     REGRESSION,
     RMSE,
     ROC_AUC,
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
 )
-from ..utils import MeanAveragePrecision
+from ..utils.map import MeanAveragePrecision
 from .losses import MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
@@ -234,6 +235,7 @@ def get_metric(
     metric_name: str,
     num_classes: Optional[int] = None,
     pos_label: Optional[int] = None,
+    is_matching: Optional[bool] = False,
 ):
     """
     Obtain a torchmerics.Metric from its name.
@@ -247,6 +249,8 @@ def get_metric(
         Number of classes.
     pos_label
         The label (0 or 1) of binary classification's positive class, which is used in some metrics, e.g., AUROC.
+    is_matching
+        Whether is matching.
 
     Returns
     -------
@@ -278,7 +282,10 @@ def get_metric(
     elif metric_name == PEARSONR:
         return torchmetrics.PearsonCorrCoef(), None
     elif metric_name == SPEARMANR:
-        return torchmetrics.SpearmanCorrCoef(), None
+        if is_matching:  # TODO: add support for matching.
+            raise ValueError("spearman relation is not supported for matching yet.")
+        else:
+            return torchmetrics.SpearmanCorrCoef(), None
     elif metric_name == F1:
         return CustomF1Score(num_classes=num_classes, pos_label=pos_label), None
     elif metric_name == MAP.lower():
@@ -291,8 +298,11 @@ def get_metric(
             torchmetrics.MeanMetric(nan_strategy="warn"),
             None,
         )  # This only works for detection where custom_metric is not required for BaseAggregator
-    elif metric_name == HIT_RATE:
-        return CustomHitRate(), None
+    elif metric_name in [RECALL, HIT_RATE]:
+        if is_matching:
+            return CustomHitRate(), None
+        else:  # TODO: support recall for general classification tasks.
+            raise ValueError("Recall is not supported yet.")
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 
@@ -966,39 +976,3 @@ def generate_metric_learning_labels(
     metric_learning_labels = torch.cat([labels_1, labels_2], dim=0)
 
     return metric_learning_labels
-
-
-def compute_probability(
-    logits: Optional[torch.Tensor] = None,
-    embeddings1: Optional[torch.Tensor] = None,
-    embeddings2: Optional[torch.Tensor] = None,
-    reverse_prob: Optional[bool] = False,
-):
-    """
-    Compute probabilities from logits or embedding pairs.
-
-    Parameters
-    ----------
-    logits
-        The output of a model's head layer.
-    embeddings1
-        Feature embeddings of one side in matching.
-    embeddings2
-        Feature embeddings 2 of the other side in matching.
-    reverse_prob
-        Whether to reverse the probability.
-
-    Returns
-    -------
-    Probabilities.
-    """
-    if logits is not None:
-        prob = F.softmax(logits.float(), dim=1)[:, 1]
-    else:
-        cosine_similarity = F.cosine_similarity(embeddings1, embeddings2)
-        prob = 0.5 * (cosine_similarity + 1)
-
-    if reverse_prob:
-        prob = 1 - prob
-
-    return prob

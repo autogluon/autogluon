@@ -5,8 +5,8 @@ import math
 import time
 
 from autogluon.common.features.types import R_INT, R_FLOAT, S_BOOL
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.core.utils import ResourceManager
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.utils import normalize_pred_probas

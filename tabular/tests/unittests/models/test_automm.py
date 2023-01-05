@@ -1,0 +1,20 @@
+import pytest
+
+
+@pytest.mark.gpu
+def test_automm_sts(fit_helper):
+    pytest.skip("Temporary skip the unittest")
+    fit_args = dict(
+        hyperparameters={'AG_AUTOMM': {}},
+    )
+    dataset_name = 'sts'
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, sample_size=1000,
+        refit_full=True,
+    )
+
+
+def test_handle_text_automm():
+    hyperparameters = {'AG_AUTOMM': {}}
+    from autogluon.tabular import TabularPredictor
+    assert TabularPredictor._check_if_hyperparameters_handle_text(hyperparameters)

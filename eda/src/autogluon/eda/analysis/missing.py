@@ -1,6 +1,6 @@
-from typing import Dict, Any
+from typing import Any, Dict
 
-from .base import AnalysisState, AbstractAnalysis
+from .base import AbstractAnalysis, AnalysisState
 
 __all__ = ["MissingValuesAnalysis"]
 

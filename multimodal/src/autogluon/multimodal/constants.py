@@ -1,3 +1,5 @@
+"""Storing the constants"""
+
 # Column/Label Types
 NULL = "null"
 CATEGORICAL = "categorical"
@@ -19,8 +21,6 @@ DEFAULT_SHOT = "default_shot"
 DEPRECATED_ZERO_SHOT = "zero_shot"
 NER = "ner"
 NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
-
-# Pipelines
 FEATURE_EXTRACTION = "feature_extraction"
 ZERO_SHOT_IMAGE_CLASSIFICATION = "zero_shot_image_classification"
 OBJECT_DETECTION = "object_detection"
@@ -84,6 +84,7 @@ NDCG = "ndcg"
 PRECISION = "precision"
 RECALL = "recall"
 MRR = "mrr"
+RETRIEVAL_METRICS = [NDCG, PRECISION, RECALL, MRR]
 METRIC_MODE_MAP = {
     ACC: MAX,
     ACCURACY: MAX,
@@ -101,11 +102,7 @@ METRIC_MODE_MAP = {
     MAP: MAX,
     MEAN_AVERAGE_PRECISION: MAX,
     OVERALL_ACCURACY: MAX,
-    HIT_RATE: MAX,
-    NDCG: MAX,
-    PRECISION: MAX,
     RECALL: MAX,
-    MRR: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 

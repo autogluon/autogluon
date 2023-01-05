@@ -23,8 +23,6 @@ def create_preprocessor(impute_strategy, max_category_levels, unique_category_st
         transformers.append( ('skewed', power_transformer, skewed_features) )
     if onehot_features:
         onehot_transformer = Pipeline(steps=[
-            # TODO: Consider avoiding converting to string for improved memory efficiency
-            ('to_str', FunctionTransformer(convert_df_dtype_to_str)),
             ('imputer', SimpleImputer(strategy='constant', fill_value=unique_category_str)),
             ('onehot', OneHotMergeRaresHandleUnknownEncoder(max_levels=max_category_levels, sparse=False))])  # test-time unknown values will be encoded as all zeros vector
         transformers.append( ('onehot', onehot_transformer, onehot_features) )
