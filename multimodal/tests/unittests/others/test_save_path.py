@@ -54,6 +54,7 @@ def test_existing_save_path_with_content_inside(save_path):
     dummy_file_path = os.path.join(abs_path, "dummy.txt")
     with open(dummy_file_path, "w") as f:
         f.write("dummy")
+    predictor = MultiModalPredictor(path=save_path)
 
     dataset = PetFinderDataset()
     predictor = MultiModalPredictor(
