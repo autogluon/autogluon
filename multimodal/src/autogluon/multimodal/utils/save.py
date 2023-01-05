@@ -141,7 +141,7 @@ def setup_save_path(
         if fit_called:
             save_path = process_save_path(path=old_save_path, raise_if_exist=False)
         else:
-            save_path = os.path.abspath(os.path.expanduser(old_save_path))
+            save_path = process_save_path(path=old_save_path, raise_if_exist=(raise_if_exist and rank == 0))
 
     if not resume:
         save_path = setup_outputdir(

@@ -17,23 +17,41 @@ from .unittest_datasets import PetFinderDataset
     ],
 )
 def test_existing_save_path_but_empty_folder(save_path):
+    dataset = PetFinderDataset()
+    hyperparameters = {
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "model.names": ["timm_image", "hf_text", "fusion_mlp"],
+        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+    }
+
     abs_path = os.path.abspath(os.path.expanduser(save_path))
     os.makedirs(abs_path, exist_ok=True)
-    predictor = MultiModalPredictor(path=save_path)
-
-    dataset = PetFinderDataset()
     predictor = MultiModalPredictor(
-        label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=dataset.metric,
+        path=save_path,
     )
     predictor.fit(
         train_data=dataset.train_df,
-        hyperparameters={
-            "env.num_workers": 0,
-            "env.num_workers_evaluation": 0,
-            "model.names": ["timm_image", "hf_text", "fusion_mlp"],
-            "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
-            "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
-        },
+        hyperparameters=hyperparameters,
+        time_limit=10,
+    )
+
+    shutil.rmtree(abs_path)
+    os.makedirs(abs_path)
+
+    predictor = MultiModalPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=dataset.metric,
+    )
+    predictor.fit(
+        train_data=dataset.train_df,
+        hyperparameters=hyperparameters,
+        save_path=save_path,
         time_limit=10,
     )
 
@@ -49,21 +67,32 @@ def test_existing_save_path_but_empty_folder(save_path):
     ],
 )
 def test_existing_save_path_with_content_inside(save_path):
+    dataset = PetFinderDataset()
+    hyperparameters = {
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "model.names": ["timm_image", "hf_text", "fusion_mlp"],
+        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+    }
+
     abs_path = os.path.abspath(os.path.expanduser(save_path))
     os.makedirs(abs_path, exist_ok=True)
     dummy_file_path = os.path.join(abs_path, "dummy.txt")
     with open(dummy_file_path, "w") as f:
         f.write("dummy")
-    predictor = MultiModalPredictor(path=save_path)
 
-    dataset = PetFinderDataset()
+    predictor = MultiModalPredictor(path=save_path)
+    with pytest.raises(ValueError):
+        predictor.fit(train_data=dataset.train_df, hyperparameters=hyperparameters)
+
     predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=dataset.metric,
     )
     with pytest.raises(ValueError):
-        predictor.fit(train_data=dataset.train_df, save_path=save_path)
+        predictor.fit(train_data=dataset.train_df, hyperparameters=hyperparameters, save_path=save_path)
 
     shutil.rmtree(abs_path)
 
