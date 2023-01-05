@@ -140,6 +140,7 @@ from .utils import (
     get_minmax_mode,
     get_mixup,
     get_onnx_input,
+    get_stopping_threshold,
     hyperparameter_tune,
     infer_batch,
     infer_dtypes_by_model_names,
@@ -1261,7 +1262,7 @@ class MultiModalPredictor:
             monitor=task.validation_metric_name,
             patience=config.optimization.patience,
             mode=minmax_mode,
-            stopping_threshold=1 - 1e-6 if minmax_mode == MAX else 1e-6,
+            stopping_threshold=get_stopping_threshold(validation_metric_name),
         )
         lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
         model_summary = pl.callbacks.ModelSummary(max_depth=1)
