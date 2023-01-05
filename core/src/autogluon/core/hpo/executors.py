@@ -8,6 +8,7 @@ import time
 
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Union, Callable
+from autogluon.common.utils.resource_utils import ResourceManager
 
 from .constants import RAY_BACKEND, CUSTOM_BACKEND
 from .exceptions import EmptySearchSpace
@@ -16,7 +17,6 @@ from ..ray.resources_calculator import ResourceCalculator
 from ..scheduler.scheduler_factory import scheduler_factory
 
 from typing import TYPE_CHECKING
-from ..utils import ResourceManager
 
 if TYPE_CHECKING:
     from ..models import AbstractModel

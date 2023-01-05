@@ -2,7 +2,7 @@
 import logging
 import time
 
-from autogluon.core.utils import ResourceManager
+from autogluon.common.utils.resource_utils import ResourceManager
 
 logger = logging.getLogger(__name__)
 

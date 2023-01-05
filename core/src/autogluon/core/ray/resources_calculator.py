@@ -2,7 +2,7 @@ import logging
 import math
 
 from abc import ABC, abstractmethod
-from ..utils import ResourceManager
+from autogluon.common.utils.resource_utils import ResourceManager
 
 logger = logging.getLogger(__name__)
 

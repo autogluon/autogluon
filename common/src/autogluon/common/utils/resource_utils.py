@@ -2,9 +2,8 @@ import multiprocessing
 import os
 import subprocess
 
-import psutil
-
 from .utils import bytes_to_mega_bytes
+from .lite import disable_if_lite_mode
 
 
 class ResourceManager:
@@ -15,10 +14,13 @@ class ResourceManager:
         return multiprocessing.cpu_count()
 
     @staticmethod
+    @disable_if_lite_mode(ret=1)
     def get_cpu_count_psutil(logical=True):
+        import psutil
         return psutil.cpu_count(logical=logical)
 
     @staticmethod
+    @disable_if_lite_mode(ret=0)
     def get_gpu_count_all():
         num_gpus = ResourceManager._get_gpu_count_cuda()
         if num_gpus == 0:
@@ -68,8 +70,22 @@ class ResourceManager:
         return memory_free_values
 
     @staticmethod
+    @disable_if_lite_mode(ret=4096)
     def get_memory_size():
+        import psutil
         return bytes_to_mega_bytes(psutil.virtual_memory().total)
+
+    @staticmethod
+    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
+    def get_memory_rss():
+        import psutil
+        return psutil.Process().memory_info().rss
+
+    @staticmethod
+    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
+    def get_available_virtual_mem():
+        import psutil
+        return psutil.virtual_memory().available
 
     @staticmethod
     def get_available_disk_size():
