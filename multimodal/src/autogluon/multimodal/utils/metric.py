@@ -151,6 +151,28 @@ def get_minmax_mode(
     return METRIC_MODE_MAP.get(metric_name)
 
 
+def get_stopping_threshold(metric_name: str):
+    """
+    Get the metric threshold for early stopping.
+
+    Parameters
+    ----------
+    metric_name
+        Name of validation metric.
+
+    Returns
+    -------
+    The stopping threshold.
+    """
+    try:
+        metric = get_metric(metric_name)
+        stopping_threshold = metric.optimum - metric._sign * 1e-7
+    except:
+        stopping_threshold = None
+
+    return stopping_threshold
+
+
 def compute_score(
     metric_data: dict,
     metric_name: str,
