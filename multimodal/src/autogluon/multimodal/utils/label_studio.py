@@ -231,7 +231,7 @@ class LabelStudioReader:
                 # data imported from Label-Studio local storage
                 # changed to the local path of the file
                 return s[len(local_storage_prefix) :]
-            elif s.startswith(upload_prefix) == 'upload':
+            elif s.startswith(upload_prefix):
                 # the uploaded file can not be accessed
                 print("Warning: cannot read {} with the label-studio host off.".format(s))
                 return s
@@ -348,5 +348,3 @@ class LabelStudioReader:
                 print("skip '{}' for not in the data column names.".format(col))
 
         return df, df[label]
-
-
