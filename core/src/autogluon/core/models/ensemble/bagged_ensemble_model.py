@@ -88,6 +88,7 @@ class BaggedEnsembleModel(AbstractModel):
             # 'use_child_oof': False,  # [Advanced] Whether to defer to child model for OOF preds and only train a single child.
             'save_bag_folds': True,
             # 'refit_folds': False,  # [Advanced, Experimental] Whether to refit bags immediately to a refit_full model in a single .fit call.
+            # 'max_sets': None,  # Maximum bagged repeats to allow, if specified, will set `self.can_fit()` to `self._n_repeats_finished < max_repeats`
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -117,7 +118,12 @@ class BaggedEnsembleModel(AbstractModel):
         return len(self.models) != 0
 
     def can_fit(self) -> bool:
-        return not self.is_fit() or self._bagged_mode
+        if not self.is_fit():
+            return True
+        if not self._bagged_mode:
+            return False
+        # If max_sets is specified and the model has already fit >=max_sets, return False
+        return self._get_model_params().get('max_sets', None) is None or self._get_model_params().get('max_sets') > self._n_repeats_finished
 
     def is_valid_oof(self):
         return self.is_fit() and (self._child_oof or self._bagged_mode)
@@ -184,6 +190,10 @@ class BaggedEnsembleModel(AbstractModel):
             k_fold = 1
         if k_fold is None or k_fold > 1:
             k_fold = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups).n_splits
+        max_sets = self._get_model_params().get('max_sets', None)
+        if max_sets is not None:
+            if n_repeats > max_sets:
+                n_repeats = max_sets
         self._validate_bag_kwargs(
             k_fold=k_fold,
             k_fold_start=k_fold_start,
