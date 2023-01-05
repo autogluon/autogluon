@@ -26,10 +26,13 @@ We should create an Label-Studio Reader object first by:
 from autogluon.multimodal.utils import LabelStudioReader
 
 # initialize LabelStudioReader with default localhost host
-ls=LabelStudioReader() 
+ls = LabelStudioReader() 
+
+# set 
+ls.set_labelstudio_host("http://localhost:8080")
 ```
 
-the `LabelStudioReader` should be initialized with an given label-studio host. If it's not given by the user, the  LabelStudioReader's default port is http://localhost:8080, which is Label-Studio's default host & port on a local machine. **If user import the files directly into Label-Studio Web without given the file's original URL, this host param will help user to access these files.**
+the `LabelStudioReader` should be initialized with an given label-studio host. If it's not given by the user, the  LabelStudioReader's default port is http://localhost:8080, which is Label-Studio's default host & port on a local machine. **If user import the files directly into Label-Studio Web without given the file's original URL, this host param will help user to access these files when users set** `ls_host_on=True`.
 
 
 
@@ -41,21 +44,47 @@ On the first PR of this function, we provide 3 types of tasks to handle the Labe
 
 ```python
 # transforming the export files from Label-Studio image classification template (image)
-df,labels=ls.from_image_classification("ic.json",ls_host_on=False) 
+df, labels = ls.from_image_classification("ic.json", ls_host_on=False) 
 
 # transforming the export files from Label-Studio named entity recognition template (text)
-df,labels=ls.from_named_entity_recognition('neg.json')
+df, labels = ls.from_named_entity_recognition('neg.json')
 
 # transforming the export files from user's customized labeling template
-df,labels=ls.from_customized('custom.csv',
-                             ls_host_on=True, 
-                             data_columns=['image1','image2','image3'],
-                             label_columns=['label'])
+df, labels=ls.from_customized('custom.csv',
+                              ls_host_on=True, 
+                              data_columns=['image1','image2','image3'],
+                              label_columns=['label'])
 ```
 
 
 
-### 1. data with files  
+### Explanations of parameters
+
+####  `ls_host_on` 
+
+If user follows the Label-Studio's import data instruction(https://labelstud.io/guide/tasks.html#How-to-import-your-data) and provide a list of URLs in a TXT, CSV, or TSV file, or reference the URLs in JSON, their file export will contains the data file's URL. In this way they don't need the Label-Studio host to address the data, so they can set the `ls_host_on` to `False` (default value).
+
+However, if the labeling tasks contains data that are imported directly through Label-Studio Web UI, it's recommended to set the `ls_host_on` to `True` and make sure the Label-Studio Web UI host is on.
+
+Some examples are given below to demostrate the impact of the value of  `ls_host_on` .
+
+
+
+####  `data_columns` and `label_columns`
+
+These two params indicate the data and label contents of an exported file that user want to set. 
+
+- exported through CSV:  `data_columns` and `label_columns` here refer to a list of the CSV column names of the data or the labels. For example, if a ".csv" table of a 2-image classificiation export file has two image columns "image1" and "image2" that contains the image urls of the dataset, and their label column names are "label", we should set `data_columns=['image1','image2']` and `label_columns=['label']` to extract the columns
+-  exported through JSON-MIN: The JSON-MIN template can be seen in https://labelstud.io/guide/export.html#JSON-MIN, here `data_columns` and `label_columns` here refer to a list of the .json key names of the data or the labels. For the given examples in the link above, we should set `data_columns=['image']` and `label_columns=['tag']` .
+- exported through JSON:  The JSON template can be seen in https://labelstud.io/guide/export.html#Label-Studio-JSON-format-of-annotated-tasks, which is rather complex.  To handle nested JSON objects, a normalization under the record path `['annotations','result']` is conducted, which provides nested parsing for the `label_columns`. For the given examples of the object detection demo in the link above, we should set  `data_columns=['image']` and `label_columns=['value.height','value.rectanglelabels','value.rotation','value.width','value.x','value.y']` .
+
+
+
+
+
+
+
+### Example 1. data with files  
 
 we use the label-studio **Image Classification Template** export file to demostrate how we deal with data with files. In this use case, user:
 
@@ -77,11 +106,7 @@ The params of `from_image_classification` are as follows:
 
 
 
-- explanation of `ls_host_on` 
 
-If user follows the Label-Studio's import data instruction(https://labelstud.io/guide/tasks.html#How-to-import-your-data) and provide a list of URLs in a TXT, CSV, or TSV file, or reference the URLs in JSON, their file export will contains the data file's URL. In this way they don't need the Label-Studio host to address the data, so they can set the `ls_host_on` to `False` (default value).
-
-However, if the labeling tasks contains data that are imported directly through Label-Studio Web UI, it's recommended to set the `ls_host_on` to `True` and make sure the Label-Studio Web UI host is on.
 
 
 
@@ -112,7 +137,7 @@ An demo output with `ls_host_on=False` :
 
 ![image-20221230233443558](assets/image-20221230233443558.png)
 
-### 2. Text annotations  (URL not required )
+### Example 2. Text annotations  (URL not required )
 
 To we use the label-studio **named entity recognition** export file to demostrate cases like this. In this use case, user: 
 
@@ -156,7 +181,7 @@ The processed result of a JSON file:
 
 
 
-### 3. Customized template
+### Example 3. Customized template
 
 If user create their own Label-Studio template and export the annotations, they can call `from_customized` to transform the export file into the Dataframe for Autogluon input. In this case, user should provide the `data_columns` and `label_columns` to identify the data and label content.
 

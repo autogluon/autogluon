@@ -173,8 +173,8 @@ def get_dataframes_by_path(path, data_columns, label_columns):
 
 class LabelStudioReader:
     """
-    a tool that transfer label-studio export file to the dataframe for
-    autogluon training
+    a tool that transfer label-studio export file to the dataframe for autogluon training. Docs available at
+    https://github.com/autogluon/autogluon/tree/master/examples/automm/label_studio/label_studio_export_reader
     """
 
     def __init__(self, host=None):
@@ -225,12 +225,13 @@ class LabelStudioReader:
                 return s
 
         else:
-            split_lst = s.split("/")
-            if split_lst[2] == "local-files":
+            local_storage_prefix = "/data/local-files/?d="
+            upload_prefix = "/data/upload"
+            if s.startswith(local_storage_prefix):
                 # data imported from Label-Studio local storage
                 # changed to the local path of the file
-                return s[len("/data/local-files/?d=") :]
-            elif split_lst[2] == "upload":
+                return s[len(local_storage_prefix) :]
+            elif s.startswith(upload_prefix) == 'upload':
                 # the uploaded file can not be accessed
                 print("Warning: cannot read {} with the label-studio host off.".format(s))
                 return s
@@ -349,20 +350,3 @@ class LabelStudioReader:
         return df, df[label]
 
 
-"""
-Usage:
-
-ls=LabelStudioReader()
-
-# transforming the export files from Label-Studio image classification template (image)
-df,labels=ls.from_image_classification("ic.json",ls_host_on=False) 
-
-# transforming the export files from Label-Studio named entity recognition template (text)
-df,labels=ls.from_named_entity_recognition('neg.json')
-
-# transforming the export files from user's customized labeling template
-df,labels=ls.from_customized('custom.csv',
-                             ls_host_on=True, 
-                             data_columns=['image1','image2','image3'],
-                             label_columns=['label'])
-"""
