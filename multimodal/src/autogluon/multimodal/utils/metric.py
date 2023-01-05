@@ -164,10 +164,9 @@ def get_stopping_threshold(metric_name: str):
     -------
     The stopping threshold.
     """
-    metric = get_metric(metric_name)
     try:
-        epsilon = 1e-7
-        stopping_threshold = metric.optimum - metric._sign * epsilon
+        metric = get_metric(metric_name)
+        stopping_threshold = metric.optimum - metric._sign * 1e-7
     except:
         stopping_threshold = None
 
