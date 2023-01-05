@@ -168,6 +168,26 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 url="https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_l_8x8_300e_coco/yolox_l_8x8_300e_coco_20211126_140236-d3bd2b23.pth",
             )
             config_file = "/media/code/autogluon/examples/automm/object_detection/mmdet_configs/yolox_l_8x8_300e_coco.py"
+        elif checkpoint_name == "faster_rcnn_r50_fpn_32x2_1x_openimages_challenge":
+            from ..utils import download
+            from mim.commands import download as mimdownload
+            # download config and checkpoint files using openmim
+            checkpoint = mimdownload(package="mmdet", configs=["faster_rcnn_r50_fpn_2x_coco"], dest_root=".")[0]
+            config_file = checkpoint_name + ".py"
+
+            checkpoint =  download(
+                url="https://download.openmmlab.com/mmdetection/v2.0/openimages/faster_rcnn_r50_fpn_32x2_1x_openimages_challenge/faster_rcnn_r50_fpn_32x2_1x_openimages_challenge_20220114_045100-0e79e5df.pth",
+            )
+        elif checkpoint_name == "retinanet_r50_fpn_32x2_1x_openimages":
+            from ..utils import download
+            from mim.commands import download as mimdownload
+            # download config and checkpoint files using openmim
+            checkpoint = mimdownload(package="mmdet", configs=["retinanet_r50_fpn_2x_coco"], dest_root=".")[0]
+            config_file = checkpoint_name + ".py"
+
+            checkpoint =  download(
+                url="https://download.openmmlab.com/mmdetection/v2.0/openimages/retinanet_r50_fpn_32x2_1x_openimages/retinanet_r50_fpn_32x2_1x_openimages_20211223_071954-d2ae5462.pth",
+            )
         else:
             from mim.commands import download
 

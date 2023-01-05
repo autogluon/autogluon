@@ -31,6 +31,18 @@ def get_hp(short_name, lr_mode):
         full_name = "vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco"
         base_head_lr = 0.001
         batch_size = 2
+    elif short_name == "yolox_l":
+        full_name = "yolox_l_8x8_300e_coco"
+        base_head_lr = 0.005
+        batch_size = 8
+    elif short_name == "retina_r50_openimages":
+        full_name = "retinanet_r50_fpn_32x2_1x_openimages"
+        base_head_lr = 0.001
+        batch_size = 8
+    elif short_name == "faster_r50_openimages":
+        full_name = "faster_rcnn_r50_fpn_32x2_1x_openimages_challenge"
+        base_head_lr = 0.0001
+        batch_size = 4
     else:
         raise ValueError(f"Invalid checkpoint_name: {short_name}.")
 
@@ -82,45 +94,45 @@ def get_data_path(dataset_name):
         )
     elif dataset_name == "LISA":
         return (
-            "/media/code/detdata/DetBenchmark/LISA/Annotations/train_cocoformat.json",
+            "/media/code/datasets/detection/LISA/Annotations/train_cocoformat.json",
             None,
-            "/media/code/detdata/DetBenchmark/LISA/Annotations/test_cocoformat.json",
+            "/media/code/datasets/detection/LISA/Annotations/test_cocoformat.json",
         )
     elif dataset_name == "clipart":
         return (
-            "/media/code/detdata/DetBenchmark/clipart/Annotations/train_cocoformat.json",
+            "/media/code/datasets/detection/clipart/Annotations/train_cocoformat.json",
             None,
-            "/media/code/detdata/DetBenchmark/clipart/Annotations/test_cocoformat.json",
+            "/media/code/datasets/detection/clipart/Annotations/test_cocoformat.json",
         )
     elif dataset_name == "comic":
         return (
-            "/media/code/detdata/DetBenchmark/comic/Annotations/train_cocoformat.json",
+            "/media/code/datasets/detection/comic/Annotations/train_cocoformat.json",
             None,
-            "/media/code/detdata/DetBenchmark/comic/Annotations/test_cocoformat.json",
+            "/media/code/datasets/detection/comic/Annotations/test_cocoformat.json",
         )
     elif dataset_name == "deeplesion":
         return (
-            "/media/code/detdata/DetBenchmark/deeplesion/Annotations/train_cocoformat.json",
-            "/media/code/detdata/DetBenchmark/deeplesion/Annotations/val_cocoformat.json",
-            "/media/code/detdata/DetBenchmark/deeplesion/Annotations/test_cocoformat.json",
+            "/media/code/datasets/detection/deeplesion/Annotations/train_cocoformat.json",
+            "/media/code/datasets/detection/deeplesion/Annotations/val_cocoformat.json",
+            "/media/code/datasets/detection/deeplesion/Annotations/test_cocoformat.json",
         )
     elif dataset_name == "dota":
         return (
-            "/media/code/detdata/DetBenchmark/dota/Annotations/train_cocoformat.json",
+            "/media/code/datasets/detection/dota/Annotations/train_cocoformat.json",
             None,
-            "/media/code/detdata/DetBenchmark/dota/Annotations/val_cocoformat.json",
+            "/media/code/datasets/detection/dota/Annotations/val_cocoformat.json",
         )
     elif dataset_name == "watercolor":
         return (
-            "/media/code/detdata/DetBenchmark/watercolor/Annotations/train_cocoformat.json",
+            "/media/code/datasets/detection/watercolor/Annotations/train_cocoformat.json",
             None,
-            "/media/code/detdata/DetBenchmark/watercolor/Annotations/test_cocoformat.json",
+            "/media/code/datasets/detection/watercolor/Annotations/test_cocoformat.json",
         )
     elif dataset_name == "widerface":
         return (
-            "/media/code/detdata/DetBenchmark/widerface/Annotations/train_cocoformat.json",
+            "/media/code/datasets/detection/widerface/Annotations/train_cocoformat.json",
             None,
-            "/media/code/detdata/DetBenchmark/widerface/Annotations/val_cocoformat.json",
+            "/media/code/datasets/detection/widerface/Annotations/val_cocoformat.json",
         )
     elif dataset_name == "VOC":
         return (

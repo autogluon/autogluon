@@ -36,7 +36,7 @@ def detection_evaluation(
     import time
 
     start = time.time()
-    result = predictor.evaluate("/media/code/autogluon/examples/automm/object_detection/coco17/annotations/instances_train2017.json")
+    result = predictor.evaluate("/media/code/datasets/coco17/coco17/annotations/instances_val2017.json")
     print("time usage: %.2f" % (time.time() - start))
     print(result)
 

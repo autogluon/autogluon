@@ -704,7 +704,11 @@ class MultiModalPredictor:
             self.detection_anno_train = train_data
             train_data = from_coco_or_voc(train_data, "train")
             if tuning_data is not None:
+                self.detection_anno_train = tuning_data
                 tuning_data = from_coco_or_voc(tuning_data, "val")
+                # TODO: set an option to remove it
+                if len(tuning_data) > 3000:
+                    tuning_data = tuning_data.sample(n=3000, replace=False).reset_index(drop=True)
 
         if hyperparameter_tune_kwargs is not None:
             # TODO: can we support hyperparameters being the same format as regular training?
@@ -1650,7 +1654,7 @@ class MultiModalPredictor:
                 return
 
         # Average all the ingredients
-        avg_state_dict = average_checkpoints(
+        avg_state_dict = average_che1ckpoints(
             checkpoint_paths=ingredients,
         )
         self._model = self._load_state_dict(
@@ -1687,16 +1691,17 @@ class MultiModalPredictor:
 
         torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
-        # clean old checkpoints + the intermediate files stored
-        for per_path in top_k_model_paths:
-            if os.path.isfile(per_path):
-                os.remove(per_path)
-        # remove the yaml file after cleaning the checkpoints
-        if os.path.isfile(best_k_models_yaml_path):
-            os.remove(best_k_models_yaml_path)
-        # clean the last checkpoint
-        if os.path.isfile(last_ckpt_path):
-            os.remove(last_ckpt_path)
+        if False:  # TODO: add a flag here
+            # clean old checkpoints + the intermediate files stored
+            for per_path in top_k_model_paths:
+                if os.path.isfile(per_path):
+                    os.remove(per_path)
+            # remove the yaml file after cleaning the checkpoints
+            if os.path.isfile(best_k_models_yaml_path):
+                os.remove(best_k_models_yaml_path)
+            # clean the last checkpoint
+            if os.path.isfile(last_ckpt_path):
+                os.remove(last_ckpt_path)
 
     def _default_predict(
         self,

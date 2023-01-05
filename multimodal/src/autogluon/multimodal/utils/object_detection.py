@@ -453,7 +453,8 @@ def from_coco(
         else:
             abs_path = os.path.join(root, entry["file_name"])
         if not os.path.exists(abs_path):
-            raise IOError("Image: {} not exists.".format(abs_path))
+            continue
+            # raise IOError("Image: {} not exists.".format(abs_path))
         rois, _ = _check_load_coco_bbox(
             coco,
             entry,
