@@ -258,6 +258,22 @@ def quick_fit(
     -------
         state after `fit` call if `return_state` is `True`; `None` otherwise
 
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>>
+    >>> # Quick fit
+    >>> state = auto.quick_fit(
+    >>>     train_data=..., label=...,
+    >>>     return_state=True,  # return state object from call
+    >>>     save_model_to_state=True,  # store fitted model into the state
+    >>>     hyperparameters={'GBM': {}}  # train specific model
+    >>> )
+    >>>
+    >>> # Using quick fit model
+    >>> model = state.model
+    >>> y_pred = model.predict(test_data)
+
     See Also
     --------
     :py:class:`~autogluon.eda.visualization.model.ConfusionMatrix`
@@ -376,6 +392,15 @@ def dataset_overview(
     chart_args: Optional[Dict[str, Any]], default = None,
         figures args for vizualizations; key == component; value = dict of kwargs for component chart
 
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>>
+    >>> auto.dataset_overview(
+    >>>     train_data=df_train, test_data=df_test, label=target_col,
+    >>>     chart_args={'feature_distance': dict(orientation='left')},
+    >>>     fig_args={'feature_distance': dict(figsize=(6,6))},
+    >>> )
 
     See Also
     --------
