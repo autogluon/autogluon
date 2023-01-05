@@ -134,8 +134,8 @@ def analyze_interaction(
     x: Optional[str] = None,
     y: Optional[str] = None,
     hue: Optional[str] = None,
-    viz_args: Optional[Dict[str, Any]] = None,
     fig_args: Optional[Dict[str, Any]] = None,
+    chart_args: Optional[Dict[str, Any]] = None,
     **analysis_args,
 ):
     """
@@ -146,7 +146,7 @@ def analyze_interaction(
     x: Optional[str], default = None
     y: Optional[str], default = None
     hue: Optional[str], default = None
-    viz_args: Optional[dict], default = None
+    chart_args: Optional[dict], default = None
         kwargs to pass into visualization component
     fig_args: Optional[Dict[str, Any]], default = None,
         kwargs to pass into chart figure
@@ -158,7 +158,7 @@ def analyze_interaction(
     >>>
     >>> df_train = pd.DataFrame(...)
     >>>
-    >>> auto.analyze_interaction(x='Age', hue='Survived', train_data=df_train, viz_args=dict(headers=True, alpha=0.2))
+    >>> auto.analyze_interaction(x='Age', hue='Survived', train_data=df_train, chart_args=dict(headers=True, alpha=0.2))
 
     See Also
     --------
@@ -167,7 +167,7 @@ def analyze_interaction(
 
     """
     fig_args = get_empty_dict_if_none(fig_args)
-    viz_args = get_empty_dict_if_none(viz_args)
+    chart_args = get_empty_dict_if_none(chart_args)
 
     key = "__analysis__"
     return analyze(
@@ -177,7 +177,7 @@ def analyze_interaction(
             FeatureInteraction(key=key, x=x, y=y, hue=hue),
         ],
         viz_facets=[
-            FeatureInteractionVisualization(key=key, fig_args=fig_args, **viz_args),
+            FeatureInteractionVisualization(key=key, fig_args=fig_args, **chart_args),
         ],
     )
 

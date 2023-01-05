@@ -47,7 +47,7 @@ class TestShift(unittest.TestCase):
     def test_shift(self):
         train, test = load_adult_data()
         with tempfile.TemporaryDirectory() as path:
-            analysis_args = dict(
+            shft_ana = eda.shift.XShiftDetector(
                 path=path,
                 train_data=train,
                 test_data=test,
@@ -55,10 +55,8 @@ class TestShift(unittest.TestCase):
                 classifier_kwargs={"path": os.path.join(path, "AutogluonModels")},
                 classifier_fit_kwargs={"hyperparameters": {"RF": {}}},
             )
-            shft_ana = eda.shift.XShiftDetector(**analysis_args)
             shft_ana.fit()
-            viz_args = dict(headers=True)
-            shft_viz = viz.shift.XShiftSummary(**viz_args)
+            shft_viz = viz.shift.XShiftSummary(headers=True)
             shft_viz.render(shft_ana.state)
             res = shft_ana.state.xshift_results
             assert all(
