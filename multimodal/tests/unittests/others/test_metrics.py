@@ -6,7 +6,7 @@ from sklearn.metrics import f1_score, log_loss
 from torchmetrics import MeanMetric, RetrievalHitRate
 
 from autogluon.multimodal.constants import MULTICLASS, Y_PRED, Y_TRUE
-from autogluon.multimodal.optimization.utils import CustomF1Score, get_loss_func, get_metric, compute_hit_rate
+from autogluon.multimodal.optimization.utils import CustomF1Score, compute_hit_rate, get_loss_func, get_metric
 from autogluon.multimodal.utils import compute_score
 
 
@@ -122,7 +122,9 @@ def ref_symmetric_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10
     num_elements = len(features_a)
     for logits in [logits_per_a, logits_per_b]:
         preds = logits.reshape(-1)
-        indexes = torch.broadcast_to(torch.arange(num_elements).reshape(-1, 1), (num_elements, num_elements)).reshape(-1)
+        indexes = torch.broadcast_to(torch.arange(num_elements).reshape(-1, 1), (num_elements, num_elements)).reshape(
+            -1
+        )
         target = torch.eye(num_elements, dtype=bool).reshape(-1)
         for k in top_ks:
             hr_k = RetrievalHitRate(k=k)
