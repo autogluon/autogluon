@@ -479,9 +479,13 @@ def covariate_shift_detection(
 
     Examples
     --------
-    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.auto as auto
     >>>
+    >>> # use default settings
     >>> auto.covariate_shift_detection(train_data=..., test_data=..., label=...)
+    >>>
+    >>> # customize classifier and verbosity level
+    >>> auto.covariate_shift_detection(train_data=..., test_data=..., label=..., verbosity=2, hyperparameters = {'GBM': {}})
 
     See Also
     --------
