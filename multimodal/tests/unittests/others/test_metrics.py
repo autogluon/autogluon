@@ -3,10 +3,10 @@ import random
 import pytest
 import torch
 from sklearn.metrics import f1_score, log_loss
-from torchmetrics import MeanMetric
+from torchmetrics import MeanMetric, RetrievalHitRate
 
 from autogluon.multimodal.constants import MULTICLASS, Y_PRED, Y_TRUE
-from autogluon.multimodal.optimization.utils import CustomF1Score, get_loss_func, get_metric
+from autogluon.multimodal.optimization.utils import CustomF1Score, compute_hit_rate, get_loss_func, get_metric
 from autogluon.multimodal.utils import compute_score
 
 
@@ -112,3 +112,33 @@ def test_f1(pos_label):
     custom_f1 = CustomF1Score(num_classes=2, pos_label=pos_label)
     custom_f1.update(logits, y_true)
     assert pytest.approx(score1, 1e-6) == custom_f1.compute().item()
+
+
+def ref_symmetric_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
+    assert len(features_a) == len(features_b)
+    hit_rate = 0
+    logits_per_a = (logit_scale * features_a @ features_b.t()).detach().cpu()
+    logits_per_b = logits_per_a.t().detach().cpu()
+    num_elements = len(features_a)
+    for logits in [logits_per_a, logits_per_b]:
+        preds = logits.reshape(-1)
+        indexes = torch.broadcast_to(torch.arange(num_elements).reshape(-1, 1), (num_elements, num_elements)).reshape(
+            -1
+        )
+        target = torch.eye(num_elements, dtype=bool).reshape(-1)
+        for k in top_ks:
+            hr_k = RetrievalHitRate(k=k)
+            hit_rate += hr_k(preds, target, indexes=indexes)
+    return hit_rate / (2 * len(top_ks))
+
+
+def test_symmetric_hit_rate():
+    generator = torch.Generator()
+    generator.manual_seed(0)
+    for repeat in range(3):
+        for top_ks in [[1, 5, 10], [20], [3, 7, 9]]:
+            features_a = torch.randn(50, 2, generator=generator)
+            features_b = torch.randn(50, 2, generator=generator)
+            hit_rate_impl = compute_hit_rate(features_a, features_b, logit_scale=1.0, top_ks=top_ks)
+            hit_rate_ref = ref_symmetric_hit_rate(features_a, features_b, logit_scale=1.0, top_ks=top_ks)
+            assert pytest.approx(hit_rate_impl.item()) == hit_rate_ref.item()
