@@ -4,11 +4,13 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from autogluon.eda import AnalysisState
 from autogluon.eda.analysis import Namespace
 from autogluon.eda.analysis.base import BaseAnalysis
-from autogluon.eda.auto import analyze, dataset_overview, quick_fit
+from autogluon.eda.auto import analyze, covariate_shift_detection, dataset_overview, quick_fit
+from autogluon.eda.auto.simple import get_default_estimator_if_not_specified, get_empty_dict_if_none
 from autogluon.eda.visualization import (
     ConfusionMatrix,
     DatasetStatistics,
@@ -17,6 +19,7 @@ from autogluon.eda.visualization import (
     MarkdownSectionComponent,
     ModelLeaderboard,
     RegressionEvaluation,
+    XShiftSummary,
 )
 from autogluon.eda.visualization.base import AbstractVisualization
 from autogluon.eda.visualization.interaction import FeatureDistanceAnalysisVisualization
@@ -146,3 +149,51 @@ def test_dataset_overview(monkeypatch):
     call_dtm_render.assert_called_once()
     call_md_render.assert_called_once()
     call_fdav_render.assert_called_once()
+
+
+def test_covariate_shift_detection(monkeypatch):
+    df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
+    df_train["shift_col"] = np.random.rand(len(df_train))
+    df_test = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "test_data.csv")).sample(100, random_state=0)
+    df_test["shift_col"] = np.random.rand(len(df_test)) + 2
+
+    call_xss_render = MagicMock()
+    with monkeypatch.context() as m:
+        with tempfile.TemporaryDirectory() as path:
+            m.setattr(XShiftSummary, "render", call_xss_render)
+            state = covariate_shift_detection(
+                path=path, train_data=df_train, test_data=df_test, label="class", return_state=True, verbosity=2
+            )
+
+    call_xss_render.assert_called_once()
+    assert state.xshift_results.detection_status is True
+    assert state.xshift_results.test_statistic > 0.99
+    assert state.xshift_results.pvalue < 0.01
+    assert state.xshift_results.feature_importance.iloc[0].name == "shift_col"
+
+
+def test_get_empty_dict_if_none():
+    assert get_empty_dict_if_none(None) == {}
+    assert get_empty_dict_if_none({"q"}) == {"q"}
+
+
+@pytest.mark.parametrize(
+    "hyperparameters_present, presets_present",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_get_default_estimator_if_not_specified(hyperparameters_present, presets_present):
+    fit_args = {}
+    if hyperparameters_present:
+        fit_args["hyperparameters"] = "some_params"
+    if presets_present:
+        fit_args["presets"] = "some_presets"
+
+    if (not hyperparameters_present) and (not presets_present):
+        assert "RF" in get_default_estimator_if_not_specified(fit_args)["hyperparameters"]
+    else:
+        assert get_default_estimator_if_not_specified(fit_args) == fit_args

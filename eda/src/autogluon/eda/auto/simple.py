@@ -13,6 +13,7 @@ from ..analysis import (
     FeatureInteraction,
     MissingValuesAnalysis,
     TrainValidationSplit,
+    XShiftDetector,
 )
 from ..analysis.base import AbstractAnalysis, BaseAnalysis
 from ..analysis.dataset import DatasetSummary, RawTypesAnalysis, Sampler, SpecialTypesAnalysis
@@ -26,12 +27,13 @@ from ..visualization import (
     MarkdownSectionComponent,
     ModelLeaderboard,
     RegressionEvaluation,
+    XShiftSummary,
 )
 from ..visualization.base import AbstractVisualization
 from ..visualization.interaction import FeatureDistanceAnalysisVisualization
 from ..visualization.layouts import SimpleVerticalLinearLayout
 
-__all__ = ["analyze", "analyze_interaction", "quick_fit", "dataset_overview"]
+__all__ = ["analyze", "analyze_interaction", "quick_fit", "dataset_overview", "covariate_shift_detection"]
 
 
 def analyze(
@@ -291,22 +293,7 @@ def quick_fit(
     fig_args = get_empty_dict_if_none(fig_args)
     chart_args = get_empty_dict_if_none(chart_args)
 
-    if ("hyperparameters" not in fit_args) and ("presets" not in fit_args):
-        fit_args = fit_args.copy()
-        fit_args["hyperparameters"] = {
-            "RF": [
-                {
-                    "criterion": "entropy",
-                    "max_depth": 15,
-                    "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]},
-                },
-                {
-                    "criterion": "squared_error",
-                    "max_depth": 15,
-                    "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
-                },
-            ],
-        }
+    fit_args = get_default_estimator_if_not_specified(fit_args)
 
     return analyze(
         train_data=train_data,
@@ -439,6 +426,103 @@ def dataset_overview(
             ),
         ],
     )
+
+
+def covariate_shift_detection(
+    train_data: pd.DataFrame,
+    test_data: pd.DataFrame,
+    label: str,
+    sample: Union[None, int, float] = None,
+    path: Optional[str] = None,
+    state: Union[None, dict, AnalysisState] = None,
+    return_state: bool = False,
+    verbosity: int = 0,
+    **fit_args,
+):
+    """
+    Shortcut for covariate shift detection analysis.
+
+    Detects a change in covariate (X) distribution between training and test, which we call XShift.  It can tell you
+    if your training set is not representative of your test set distribution.  This is done with a Classifier 2
+    Sample Test.
+
+    Parameters
+    ----------
+    train_data: Optional[DataFrame]
+        training dataset
+    test_data: Optional[DataFrame]
+        test dataset
+    label: : Optional[str]
+        target variable
+    state: Union[None, dict, AnalysisState], default = None
+        pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
+    sample: Union[None, int, float], default = None
+        sample size; if `int`, then row number is used;
+        `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
+        `None` means no sampling
+        See also :func:`autogluon.eda.analysis.dataset.Sampler`
+    path: Optional[str], default = None,
+        path for models saving
+    return_state: bool, default = False
+        return state if `True`
+    verbosity: int, default = 0
+        Verbosity levels range from 0 to 4 and control how much information is printed.
+        Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+        If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
+        where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
+    fit_args
+        kwargs to pass into `TabularPredictor` fit
+
+    Returns
+    -------
+        state after `fit` call if `return_state` is `True`; `None` otherwise
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>>
+    >>> auto.covariate_shift_detection(train_data=..., test_data=..., label=...)
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.shift.XShiftDetector`
+    :py:class:`~autogluon.eda.visualization.shift.XShiftSummary`
+
+    """
+    fit_args = get_default_estimator_if_not_specified(fit_args)
+
+    return analyze(
+        train_data=train_data,
+        test_data=test_data,
+        label=label,
+        sample=sample,
+        state=state,
+        return_state=return_state,
+        anlz_facets=[
+            XShiftDetector(classifier_kwargs=dict(path=path, verbosity=verbosity), classifier_fit_kwargs=fit_args)
+        ],
+        viz_facets=[XShiftSummary()],
+    )
+
+
+def get_default_estimator_if_not_specified(fit_args):
+    if ("hyperparameters" not in fit_args) and ("presets" not in fit_args):
+        fit_args = fit_args.copy()
+        fit_args["hyperparameters"] = {
+            "RF": [
+                {
+                    "criterion": "entropy",
+                    "max_depth": 15,
+                    "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]},
+                },
+                {
+                    "criterion": "squared_error",
+                    "max_depth": 15,
+                    "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
+                },
+            ],
+        }
+    return fit_args
 
 
 def get_empty_dict_if_none(value) -> dict:
