@@ -78,6 +78,7 @@ LOG_LOSS = "log_loss"
 CROSS_ENTROPY = "cross_entropy"
 COSINE_EMBEDDING_LOSS = "cosine_embedding_loss"
 F1 = "f1"
+OVERALL_F1 = "overall_f1"
 DIRECT_LOSS = "direct_loss"
 HIT_RATE = "hit_rate"
 NDCG = "ndcg"
@@ -102,6 +103,7 @@ METRIC_MODE_MAP = {
     MAP: MAX,
     MEAN_AVERAGE_PRECISION: MAX,
     OVERALL_ACCURACY: MAX,
+    OVERALL_F1: MAX,
     RECALL: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
