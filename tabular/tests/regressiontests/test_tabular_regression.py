@@ -390,7 +390,7 @@ def make_dataset(request, seed):
 def myfloor(x, base=.01):
   return round(base * math.floor(float(x)/base),8)
 
-@pytest.mark.regression
+@pytest.mark.slow
 def inner_test_tabular(testname):
 
     # Find the named test
@@ -497,6 +497,6 @@ def inner_test_tabular(testname):
 
 # These results have only been confirmed for Linux.  Windows is known to give different results for Pytorch.
 @pytest.mark.skipif(sys.platform != 'linux', reason='Scores only confirmed on Linux')
-@pytest.mark.regression
+@pytest.mark.slow
 def test_tabular_score(testname):
     inner_test_tabular(testname)
