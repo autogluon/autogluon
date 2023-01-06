@@ -8,7 +8,7 @@ from autogluon.core.metrics import METRICS
 def test_no_weighted_ensemble(fit_helper):
     """Tests that fit_weighted_ensemble=False works"""
     fit_args = dict(
-        hyperparameters={'GBM': {}},
+        hyperparameters={'DUMMY': {}},
         fit_weighted_ensemble=False,
     )
     dataset_name = 'adult'
@@ -23,7 +23,7 @@ def test_no_weighted_ensemble(fit_helper):
 def test_max_sets(fit_helper):
     """Tests that max_sets works"""
     fit_args = dict(
-        hyperparameters={'GBM': {'ag_args_ensemble': {'max_sets': 3}}},
+        hyperparameters={'DUMMY': {'ag_args_ensemble': {'max_sets': 3}}},
         fit_weighted_ensemble=False,
         num_bag_folds=2,
         num_bag_sets=5,
@@ -46,7 +46,7 @@ def test_max_sets(fit_helper):
 def test_num_folds(fit_helper):
     """Tests that num_folds works"""
     fit_args = dict(
-        hyperparameters={'GBM': {'ag_args_ensemble': {'num_folds': 3}}},
+        hyperparameters={'DUMMY': {'ag_args_ensemble': {'num_folds': 3}}},
         fit_weighted_ensemble=False,
         num_bag_folds=7,
         num_bag_sets=2,
