@@ -499,7 +499,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             if col_type == ROIS:
                 processed_data = df[col_name].tolist()
             elif col_type in [IMAGE_PATH, IMAGE]:
-                processed_data = col_value.apply(lambda ele: ele.split(";") if ele else ["null"]).tolist()
+                processed_data = col_value.apply(lambda ele: str(ele).split(";")).tolist()
             elif col_type == IMAGE_BYTEARRAY:
                 processed_data = col_value.apply(lambda ele: ele if isinstance(ele, list) else [ele]).tolist()
             elif col_type == f"{IMAGE}_{IDENTIFIER}":
