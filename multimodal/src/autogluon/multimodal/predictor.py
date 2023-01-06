@@ -394,7 +394,6 @@ class MultiModalPredictor:
         self._model_postprocess_fn = None
         self._model = None
         self._resume = False
-        self._continuous_training = False
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
@@ -689,7 +688,7 @@ class MultiModalPredictor:
                 assert isinstance(
                     teacher_predictor, str
                 ), "HPO with distillation only supports passing a path to the predictor"
-            if self._continuous_training:
+            if fit_called:
                 warnings.warn(
                     "HPO while continuous training."
                     "Hyperparameters related to Model and Data will NOT take effect."
@@ -2790,8 +2789,6 @@ class MultiModalPredictor:
 
         predictor._ckpt_path = ckpt_path
         predictor._model = model
-        if not resume:
-            predictor._continuous_training = True
 
         loss_func = get_loss_func(
             problem_type=predictor._problem_type,

@@ -32,6 +32,7 @@ from .constants import (
     BEST_K_MODELS_FILE,
     BINARY,
     CLASSIFICATION,
+    DATA,
     FEATURES,
     GREEDY_SOUP,
     IMAGE_TEXT_SIMILARITY,
@@ -39,6 +40,7 @@ from .constants import (
     LAST_CHECKPOINT,
     MAX,
     MIN,
+    MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
     PAIR,
@@ -81,6 +83,7 @@ from .utils import (
     customize_model_names,
     data_to_df,
     extract_from_output,
+    filter_search_space,
     get_config,
     get_local_pretrained_config_paths,
     get_minmax_mode,
@@ -93,7 +96,6 @@ from .utils import (
     init_pretrained_matcher,
     load_text_tokenizers,
     predict,
-    process_save_path,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
@@ -220,7 +222,6 @@ class MultiModalMatcher:
         self._response_model = None
         self._resume = False
         self._fit_called = False
-        self._continuous_training = False
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
@@ -366,6 +367,18 @@ class MultiModalMatcher:
         """
         fit_called = self._fit_called  # used in current function
         self._fit_called = True
+
+        if hyperparameter_tune_kwargs is not None:
+            assert isinstance(
+                hyperparameters, dict
+            ), "Please provide hyperparameters as a dictionary if you want to do HPO"
+            if fit_called:
+                warnings.warn(
+                    "HPO while continuous training."
+                    "Hyperparameters related to Model and Data will NOT take effect."
+                    "We will filter them out from the search space."
+                )
+                hyperparameters = filter_search_space(hyperparameters, [MODEL, DATA])
 
         pl.seed_everything(seed, workers=True)
 
@@ -2018,9 +2031,6 @@ class MultiModalMatcher:
         matcher._ckpt_path = ckpt_path
         matcher._query_model = query_model
         matcher._response_model = response_model
-
-        if not resume:
-            matcher._continuous_training = True
 
         return matcher
 
