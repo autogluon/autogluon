@@ -570,7 +570,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
         model: TabularNeuralNetTorchModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-        if hasattr(model, '_compiler') and model._compiler:
+        if hasattr(model, '_compiler') and model._compiler and model._compiler.name != 'native':
             model.model.eval()
             model.processor = model._compiler.load(path=model.path)
         return model
@@ -633,7 +633,11 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         Instead, self.processor would be converted from sklearn ColumnTransformer
         to TabularNeuralNetTorchOnnxTransformer.
         """
+        from sklearn.compose._column_transformer import ColumnTransformer
+
         input_types = kwargs.get('input_types', self._get_input_types(batch_size=self.max_batch_size))
+        assert isinstance(self.processor, ColumnTransformer), f"unexpected processor type {type(self.processor)}, " \
+            "expecting processor type to be sklearn.compose._column_transformer.ColumnTransformer"
         self.processor = self._compiler.compile(model=(self.processor, self.model),
                                                 path=self.path,
                                                 input_types=input_types)
