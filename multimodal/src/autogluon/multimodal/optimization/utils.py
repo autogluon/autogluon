@@ -228,6 +228,7 @@ def compute_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
         for k in top_ks:
             hit_rate += (preds < k).float().mean()
 
+    hit_rate /= len(top_ks) * len(logits)
     return hit_rate
 
 
