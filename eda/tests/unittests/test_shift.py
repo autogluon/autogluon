@@ -48,7 +48,6 @@ class TestShift(unittest.TestCase):
         train, test = load_adult_data()
         with tempfile.TemporaryDirectory() as path:
             shft_ana = eda.shift.XShiftDetector(
-                path=path,
                 train_data=train,
                 test_data=test,
                 label="class",
