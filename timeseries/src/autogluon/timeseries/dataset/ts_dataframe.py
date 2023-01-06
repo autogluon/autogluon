@@ -355,8 +355,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
             Path to a local or remote (e.g., S3) file containing the time series data in CSV or Parquet format.
             Example file contents::
 
-            .. code-block::
-
                 item_id,timestamp,target
                 0,2019-01-01,0
                 0,2019-01-02,1
