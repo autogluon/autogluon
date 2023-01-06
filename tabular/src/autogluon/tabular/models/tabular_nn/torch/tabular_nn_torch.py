@@ -34,8 +34,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
     # Constants used throughout this class:
     unique_category_str = np.nan  # string used to represent missing values and unknown categories for categorical features.
-    params_file_name = 'net.params'  # Stores parameters of final network
-    temp_file_name = 'temp_net.params'  # Stores temporary network parameters (eg. during the course of training)
+    temp_file_name = 'temp_model.pt'  # Stores temporary network parameters (eg. during the course of training)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -568,27 +567,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         num_gpus = 0
         return num_cpus, num_gpus
 
-    def save(self, path: str = None, verbose=True) -> str:
-        temp_model = self.model
-        self.model = None
-        path_final = super().save(path=path, verbose=verbose)
-        self.model = temp_model
-
-        # Export model
-        if self.model is not None:
-            import torch
-
-            params_filepath = path_final + self.params_file_name
-            # TODO: Don't use os.makedirs here, have save_parameters function in tabular_nn_model that checks if local path or S3 path
-            os.makedirs(os.path.dirname(path_final), exist_ok=True)
-            torch.save(self.model, params_filepath)
-        return path_final
-
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
         model: TabularNeuralNetTorchModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-        import torch
-        model.model = torch.load(os.path.join(model.path, model.params_file_name))
         if hasattr(model, '_compiler') and model._compiler:
             model.model.eval()
             model.processor = model._compiler.load(path=model.path)
