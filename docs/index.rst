@@ -18,7 +18,7 @@ AutoGluon: AutoML for Text, Image, Time Series, and Tabular Data
 .. |License| image:: https://img.shields.io/github/license/autogluon/autogluon?color=blue
     :target: https://github.com/autogluon/autogluon/blob/master/LICENSE
 
-|ReleaseVersion| |StableVersion| |PythonVersion| |License| |Downloads| |GitHub| |Twitter| 
+|ReleaseVersion| |StableVersion| |PythonVersion| |License| |Downloads| |GitHub| |Twitter|
 
 `AutoGluon` enables easy-to-use and easy-to-extend AutoML with a focus on automated stack ensembling, deep learning, and real-world applications spanning image, text, and tabular data. Intended for both ML beginners and experts, `AutoGluon` enables you to:
 
@@ -46,6 +46,13 @@ AutoGluon: AutoML for Text, Image, Time Series, and Tabular Data
    >>> predictor = MultiModalPredictor(label='label').fit(train_data)
    >>> predictions = predictor.predict(test_data)
    >>> score = predictor.evaluate(test_data)
+
+   Example using AutoGluon to forecast future values of time series:
+
+   >>> from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
+   >>> data = TimeSeriesDataFrame('https://autogluon.s3.amazonaws.com/datasets/timeseries/m4_hourly/train.csv')
+   >>> predictor = TimeSeriesPredictor(target='target', prediction_length=48).fit(data)
+   >>> predictions = predictor.predict(data)
 
 
 Installation
