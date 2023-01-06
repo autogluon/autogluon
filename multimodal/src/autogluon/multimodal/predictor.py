@@ -1654,7 +1654,7 @@ class MultiModalPredictor:
                 return
 
         # Average all the ingredients
-        avg_state_dict = average_che1ckpoints(
+        avg_state_dict = average_checkpoints(
             checkpoint_paths=ingredients,
         )
         self._model = self._load_state_dict(
