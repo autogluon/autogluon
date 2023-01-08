@@ -74,6 +74,7 @@ from .constants import (
     OBJECT_DETECTION,
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
+    OVERALL_F1,
     PROBABILITY,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
@@ -1421,6 +1422,9 @@ class MultiModalPredictor:
         strict_loading=True,
         standalone=True,
     ):
+        if self._problem_type is not None and self._problem_type == NER:
+            validation_metric_name = OVERALL_F1  # seqeval only support overall_f1
+
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
             with open(best_k_models_yaml_path, "r") as f:

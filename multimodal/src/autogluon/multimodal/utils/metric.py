@@ -22,6 +22,7 @@ from ..constants import (
     MULTICLASS,
     NDCG,
     NER,
+    NER_TOKEN_F1,
     OBJECT_DETECTION,
     OVERALL_ACCURACY,
     OVERALL_F1,
@@ -101,7 +102,7 @@ def infer_metrics(
         else:
             eval_metric_name = ACCURACY
     elif problem_type == NER:
-        eval_metric_name = OVERALL_F1
+        return NER_TOKEN_F1, OVERALL_F1
     elif problem_type == BINARY:
         eval_metric_name = ROC_AUC
     elif problem_type == REGRESSION:
