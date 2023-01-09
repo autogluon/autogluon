@@ -8,9 +8,9 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.types import R_OBJECT, S_IMAGE_PATH
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
 from autogluon.core.models import AbstractModel
-from autogluon.core.utils import ResourceManager
 from autogluon.core.utils import try_import_autogluon_vision
 
 logger = logging.getLogger(__name__)

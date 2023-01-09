@@ -66,7 +66,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         if len(unused_local_model_args):
             logger.warning(
-                f" {self.name} ignores following hyperparameters: {unused_local_model_args}. "
+                f"{self.name} ignores following hyperparameters: {unused_local_model_args}. "
                 f"See the docstring of {self.name} for the list of supported hyperparameters."
             )
 
@@ -107,7 +107,8 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         items_to_fit = [item_id for item_id, ts_hash in data_hash.items() if ts_hash not in self._cached_predictions]
         if len(items_to_fit) > 0:
             logger.debug(f"{self.name} received {len(items_to_fit)} new items to predict, generating predictions")
-            time_series_to_fit = [data.loc[item_id][self.target] for item_id in items_to_fit]
+            target_series = data[self.target]
+            time_series_to_fit = (target_series.loc[item_id] for item_id in items_to_fit)
             with statsmodels_joblib_warning_filter():
                 predictions = Parallel(n_jobs=self.n_jobs)(
                     delayed(self._predict_with_local_model)(

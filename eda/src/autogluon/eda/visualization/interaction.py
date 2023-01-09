@@ -1,14 +1,18 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Type, Tuple
+from typing import Any, Dict, Optional, Tuple, Type
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
+from scipy import stats
+from scipy.cluster import hierarchy as hc
 
-from autogluon.common.features.types import R_OBJECT, R_CATEGORY, R_BOOL, R_INT, R_FLOAT
+from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, R_OBJECT
+
+from ..state import AnalysisState
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
-from ..state import AnalysisState
 
 __all__ = ["CorrelationVisualization", "CorrelationSignificanceVisualization", "FeatureInteractionVisualization"]
 
@@ -88,7 +92,7 @@ class CorrelationVisualization(_AbstractCorrelationChart):
 class _AbstractFeatureInteractionPlotRenderer(ABC):
     @abstractmethod
     def _render(self, state, ds, params, param_types, ax, data, chart_args):
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def render(self, state, ds, params, param_types, data, fig_args, chart_args):
         fig, ax = plt.subplots(**fig_args)
@@ -126,6 +130,58 @@ class CorrelationSignificanceVisualization(_AbstractCorrelationChart):
     def _render(self, state: AnalysisState) -> None:
         args = {"center": 3, "vmax": 5, "cmap": "Spectral", "robust": True}
         self._render_internal(state, "significance_matrix", "correlation significance matrix", args)
+
+
+class FeatureDistanceAnalysisVisualization(AbstractVisualization, JupyterMixin):
+    """
+
+    Parameters
+    ----------
+    headers: bool, default = False
+        if `True` then render headers
+    namespace: Optional[str], default = None
+        namespace to use; can be nested like `ns_a.ns_b.ns_c`
+    fig_args: Optional[Dict[str, Any]] = None,
+        kwargs to pass into chart figure
+    kwargs
+    """
+
+    def __init__(
+        self,
+        headers: bool = False,
+        namespace: Optional[str] = None,
+        fig_args: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(namespace, **kwargs)
+        self.headers = headers
+        if fig_args is None:
+            fig_args = {}
+        self.fig_args = fig_args
+
+    def can_handle(self, state: AnalysisState) -> bool:
+        return self.all_keys_must_be_present(state, "feature_distance")
+
+    def _render(self, state: AnalysisState) -> None:
+        fig, ax = plt.subplots(**self.fig_args)
+        default_args = dict(orientation="left")
+        ax.grid(False)
+        hc.dendrogram(
+            ax=ax,
+            Z=state.feature_distance.linkage,
+            labels=state.feature_distance.columns,
+            **{**default_args, **self._kwargs},
+        )
+        plt.show(fig)
+        if len(state.feature_distance.near_duplicates) > 0:
+            message = (
+                f"**The following feature groups are considered as near-duplicates**:\n\n"
+                f"Distance threshold: <= `{state.feature_distance.near_duplicates_threshold}`. "
+                f"Consider keeping only some of the columns within each group:\n"
+            )
+            for group in state.feature_distance.near_duplicates:
+                message += f'\n - `{"`, `".join(sorted(group["nodes"]))}` - distance `{group["distance"]:.2f}`'
+            self.render_markdown(message)
 
 
 class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
@@ -292,28 +348,32 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             return None
 
     class _HistPlotRenderer(_AbstractFeatureInteractionPlotRenderer):
-        def _render(self, state, ds, params, param_types, ax, data, chart_args):
+        def _render(self, state, ds, params, param_types, ax, data, chart_args, num_point_to_fit=200):
+            x = params[0]
+            fitted_distributions_present = (
+                ("distributions_fit" in state)
+                and (param_types == ("numeric", None, None))  # (x, y, hue)
+                and (state.distributions_fit[ds].get(x, None) is not None)
+            )
+
+            if fitted_distributions_present:
+                chart_args["stat"] = "density"
             sns.histplot(ax=ax, data=data, **chart_args)
-            # TODO: uncomment later when distributions fit is added
-            # x, _, _ = params
-            # # Handling fitted distributions if present
-            # if ("distributions_fit" in state) and (param_types == ("numeric", None, None)):  # types for  x, y, hue
-            #     chart_args["stat"] = "density"
-            #     dists = state.distributions_fit[ds][x]
-            #     if dists is not None:
-            #         x_min, x_max = ax.get_xlim()
-            #         xs = np.linspace(x_min, x_max, 200)
-            #         for dist, v in dists.items():
-            #             _dist = getattr(stats, dist)
-            #             ax.plot(
-            #                 xs,
-            #                 _dist.pdf(xs, *dists[dist]["param"]),
-            #                 ls="--",
-            #                 lw=0.7,
-            #                 label=f'{dist}: pvalue {dists[dist]["pvalue"]:.2f}',
-            #             )
-            #         ax.set_xlim(x_min, x_max)  # set the limits back to the ones of the distplot
-            #         plt.legend()
+
+            if fitted_distributions_present:  # types for  x, y, hue
+                dists = state.distributions_fit[ds][x]
+                x_min, x_max = ax.get_xlim()
+                xs = np.linspace(x_min, x_max, num_point_to_fit)
+                for dist, v in dists.items():
+                    _dist = getattr(stats, dist)
+                    ax.plot(
+                        xs,
+                        _dist.pdf(xs, *v["param"]),
+                        ls="--",
+                        label=f'{dist}: pvalue {v["pvalue"]:.2f}',
+                    )
+                ax.set_xlim(x_min, x_max)  # set the limits back to the ones of the distplot
+                plt.legend()
 
     class _KdePlotRenderer(_AbstractFeatureInteractionPlotRenderer):
         def _render(self, state, ds, params, param_types, ax, data, chart_args):

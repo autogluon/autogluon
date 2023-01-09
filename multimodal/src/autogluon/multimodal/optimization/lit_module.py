@@ -11,6 +11,7 @@ from torchmetrics.aggregation import BaseAggregator
 
 from ..constants import AUTOMM, LM_TARGET, LOGITS, T_FEW, TEMPLATE_LOGITS, WEIGHT
 from ..data.mixup import MixupModule, multimodel_mixup
+from ..models.utils import run_model
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(AUTOMM)
@@ -205,7 +206,7 @@ class LitModule(pl.LightningModule):
         if self.mixup_fn is not None:
             self.mixup_fn.mixup_enabled = self.training & (self.current_epoch < self.hparams.mixup_off_epoch)
             batch, label = multimodel_mixup(batch=batch, model=self.model, mixup_fn=self.mixup_fn)
-        output = self.model(batch)
+        output = run_model(self.model, batch)
         loss = self._compute_loss(output=output, label=label)
         return output, loss
 
@@ -286,7 +287,7 @@ class LitModule(pl.LightningModule):
         -------
         A dictionary with the mini-batch's logits and features.
         """
-        output = self.model(batch)
+        output = run_model(self.model, batch)
         if self.model_postprocess_fn:
             output = self.model_postprocess_fn(output)
 

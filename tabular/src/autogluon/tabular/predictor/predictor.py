@@ -6,7 +6,7 @@ import os
 import pprint
 import shutil
 import time
-from typing import Union, List
+from typing import Union, List, Tuple
 
 import networkx as nx
 import numpy as np
@@ -35,6 +35,7 @@ from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_dict, tabular_presets_alias
 from ..learner import AbstractTabularLearner, DefaultLearner
+from ..trainer.model_presets.presets import MODEL_TYPES
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
 
@@ -392,13 +393,15 @@ class TabularPredictor:
                     'XT' (extremely randomized trees)
                     'KNN' (k-nearest neighbors)
                     'LR' (linear regression)
-                    'NN_MXNET' (neural network implemented in MXNet)
                     'NN_TORCH' (neural network implemented in Pytorch)
                     'FASTAI' (neural network with FastAI backend)
+                    'AG_AUTOMM' (`MultimodalPredictor` from `autogluon.multimodal`. Supports Tabular, Text, and Image modalities. GPU is required.)
                 Experimental model options include:
+                    'FT_TRANSFORMER' (Tabular Transformer, GPU is recommended. Does not scale well to >100 features.)
                     'FASTTEXT' (FastText)
-                    'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required)
-                    'TRANSF' (Tabular Transformer, GPU is recommended)
+                    'VW' (VowpalWabbit)
+                    'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
+                    'AG_IMAGE_NN' (Image model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
                 If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.
                 For example, set `hyperparameters = { 'NN_TORCH':{...} }` if say you only want to train (PyTorch) neural networks and no other types of models.
             Values = dict of hyperparameter settings for each model type, or list of dicts.
@@ -503,6 +506,11 @@ class TabularPredictor:
                             use_orig_features: (bool) Whether a stack model will use the original features along with the stack features to train (akin to skip-connections). If the model has no stack features (no base models), this value is ignored and the stack model will use the original features.
                             max_base_models: (int, default=25) Maximum number of base models whose predictions form the features input to this stacker model. If more than `max_base_models` base models are available, only the top `max_base_models` models with highest validation score are used.
                             max_base_models_per_type: (int, default=5) Similar to `max_base_models`. If more than `max_base_models_per_type` of any particular model type are available, only the top `max_base_models_per_type` of that type are used. This occurs before the `max_base_models` filter.
+                            num_folds: (int, default=None) If specified, the number of folds to fit in the bagged model.
+                                If specified, overrides any other value used to determine the number of folds such as predictor.fit `num_bag_folds` argument.
+                            max_sets: (int, default=None) If specified, the maximum sets to fit in the bagged model.
+                                The lesser of `max_sets` and the predictor.fit `num_bag_sets` argument will be used for the given model.
+                                Useful if a particular model is expensive relative to others and you want to avoid repeated bagging of the expensive model while still repeated bagging the cheaper models.
                             save_bag_folds: (bool, default=True)
                                 If True, bagged models will save their fold models (the models from each individual fold of bagging). This is required to use bagged models for prediction.
                                 If False, bagged models will not save their fold models. This means that bagged models will not be valid models during inference.
@@ -789,18 +797,9 @@ class TabularPredictor:
         # in case the hyperprams are large in memory
         self.fit_hyperparameters_ = hyperparameters
 
-        ###################################
-        # FIXME: v0.1 This section is a hack
         if 'enable_raw_text_features' not in feature_generator_init_kwargs:
-            if 'AG_TEXT_NN' in hyperparameters or 'VW' in hyperparameters:
+            if self._check_if_hyperparameters_handle_text(hyperparameters=hyperparameters):
                 feature_generator_init_kwargs['enable_raw_text_features'] = True
-            else:
-                for key in hyperparameters:
-                    if isinstance(key, int) or key == 'default':
-                        if 'AG_TEXT_NN' in hyperparameters[key] or 'VW' in hyperparameters[key]:
-                            feature_generator_init_kwargs['enable_raw_text_features'] = True
-                            break
-        ###################################
 
         if feature_metadata is not None and isinstance(feature_metadata, str) and feature_metadata == 'infer':
             feature_metadata = None
@@ -3267,7 +3266,7 @@ class TabularPredictor:
                                  f'\tYou can identify the indices which are duplicated via `{name}.index.duplicated(keep=False)`')
 
     @staticmethod
-    def _validate_infer_limit(infer_limit: float, infer_limit_batch_size: int) -> (float, int):
+    def _validate_infer_limit(infer_limit: float, infer_limit_batch_size: int) -> Tuple[float, int]:
         if infer_limit_batch_size is not None:
             if not isinstance(infer_limit_batch_size, int):
                 raise ValueError(f'infer_limit_batch_size must be type int, but was instead type {type(infer_limit_batch_size)}')
@@ -3494,6 +3493,39 @@ class TabularPredictor:
         predictor_clone.save_space()
         return predictor_clone if return_clone else predictor_clone.path
 
+    @staticmethod
+    def _check_if_hyperparameters_handle_text(hyperparameters: dict) -> bool:
+        """Check if hyperparameters contain a model that supports raw text features as input"""
+        models_in_hyperparameters = set()
+        is_advanced_hyperparameter_type = False
+        for key in hyperparameters:
+            if isinstance(key, int) or key == 'default':
+                is_advanced_hyperparameter_type = True
+                break
+        if is_advanced_hyperparameter_type:
+            for key in hyperparameters:
+                for m in hyperparameters[key]:
+                    models_in_hyperparameters.add(m)
+        else:
+            for key in hyperparameters:
+                models_in_hyperparameters.add(key)
+        models_in_hyperparameters_raw_text_compatible = []
+        for m in models_in_hyperparameters:
+            if isinstance(m, str):
+                # TODO: Technically the use of MODEL_TYPES here is a hack since we should derive valid types from trainer,
+                #  but this is required prior to trainer existing.
+                if m in MODEL_TYPES:
+                    m = MODEL_TYPES[m]
+                else:
+                    continue
+            if m._get_class_tags().get('handles_text', False):
+                models_in_hyperparameters_raw_text_compatible.append(m)
+
+        if models_in_hyperparameters_raw_text_compatible:
+            return True
+        else:
+            return False
+
     def _assert_is_fit(self, message_suffix: str = None):
         if not self._learner.is_fit:
             error_message = "Predictor is not fit. Call `.fit` before calling"
@@ -3502,6 +3534,7 @@ class TabularPredictor:
             else:
                 error_message = f"{error_message} `.{message_suffix}`."
             raise AssertionError(error_message)
+
 
 # Location to store WIP functionality that will be later added to TabularPredictor
 class _TabularPredictorExperimental(TabularPredictor):

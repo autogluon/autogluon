@@ -1,7 +1,7 @@
 """Presets for vision predictors"""
 import functools
 import warnings
-from autogluon.core.utils import ResourceManager
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core import Categorical, Int, Real
 try:
     import timm

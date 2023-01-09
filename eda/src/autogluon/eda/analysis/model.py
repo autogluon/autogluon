@@ -1,12 +1,126 @@
-from typing import Union, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from sklearn.metrics import confusion_matrix
 
-from autogluon.core.constants import BINARY, MULTICLASS
+from autogluon.core.constants import BINARY, MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, PROBLEM_TYPES_REGRESSION
 from autogluon.tabular import TabularPredictor
-from .base import AnalysisState, AbstractAnalysis
 
-__all__ = ["AutoGluonModelEvaluator"]
+from .base import AbstractAnalysis, AnalysisState
+
+__all__ = ["AutoGluonModelEvaluator", "AutoGluonModelQuickFit"]
+
+
+class AutoGluonModelQuickFit(AbstractAnalysis):
+    """
+    Fit a quick model using AutoGluon.
+
+    `train_data`, `val_data` and `label` must be present in args.
+
+    Note: this component can be wrapped into :py:class:`~autogluon.eda.analysis.dataset.TrainValidationSplit` and `~autogluon.eda.analysis.dataset.Sampler`
+    to perform automated sampling and train-test split. This whole logic is implemented in :py:meth`~autogluon.eda.auto.simple.quick_fit` shortcut.
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>>
+    >>> # Quick fit
+    >>> state = auto.quick_fit(
+    >>>     train_data=..., label=...,
+    >>>     return_state=True,  # return state object from call
+    >>>     save_model_to_state=True,  # store fitted model into the state
+    >>>     hyperparameters={'GBM': {}}  # train specific model
+    >>> )
+    >>>
+    >>> # Using quick fit model
+    >>> model = state.model
+    >>> y_pred = model.predict(test_data)
+
+    Parameters
+    ----------
+    problem_type: str, default = 'auto'
+        problem type to use. Valid problem_type values include ['auto', 'binary', 'multiclass', 'regression', 'quantile', 'softclass']
+        auto means it will be Auto-detected using AutoGluon methods.
+    estimator_args: Optional[Dict[str, Any]], default = None,
+        kwargs to pass into estimator constructor (`TabularPredictor`)
+    save_model_to_state: bool, default = False,
+        save fitted model into `state` under `model` key.
+        This functionality might be helpful in cases when the fitted model could be usable for other purposes (i.e. imputers)
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: Optional[List[AbstractAnalysis]], default None
+        wrapped analyses; these will receive sampled `args` during `fit` call
+    kwargs
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.visualization as viz
+    >>> import autogluon.eda.auto as auto
+    >>> auto.analyze(
+    >>>     train_data=df_train,
+    >>>     label=label,
+    >>>     anlz_facets=[
+    >>>         eda.dataset.TrainValidationSplit(children=[
+    >>>             eda.model.AutoGluonModelQuickFit(
+    >>>                 estimator_args=dict(path=path),
+    >>>                 verbosity=0,
+    >>>                 hyperparameters={
+    >>>                     "RF": {
+    >>>                         "criterion": "entropy",
+    >>>                         "max_depth": 15,
+    >>>                         "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]},
+    >>>                     }
+    >>>                 },
+    >>>                 children=[
+    >>>                     eda.model.AutoGluonModelEvaluator()
+    >>>                 ],
+    >>>             )
+    >>>         ])
+    >>>     ],
+    >>> )
+
+    See Also
+    --------
+    :py:meth`~autogluon.eda.auto.simple.quick_fit`
+    :py:class:`~autogluon.eda.analysis.dataset.TrainValidationSplit`
+    :py:class:`~autogluon.eda.analysis.dataset.Sampler`
+
+    """
+
+    def __init__(
+        self,
+        problem_type: str = "auto",
+        estimator_args: Optional[Dict[str, Any]] = None,
+        parent: Optional[AbstractAnalysis] = None,
+        children: Optional[List[AbstractAnalysis]] = None,
+        save_model_to_state: bool = False,
+        **kwargs,
+    ) -> None:
+        super().__init__(parent, children, **kwargs)
+
+        valid_problem_types = ["auto"] + PROBLEM_TYPES_REGRESSION + PROBLEM_TYPES_CLASSIFICATION
+        assert problem_type in valid_problem_types, f"Valid problem_type values include {valid_problem_types}"
+        self.problem_type: Optional[str] = None if problem_type == "auto" else problem_type
+
+        self.save_model_to_state = save_model_to_state
+
+        if estimator_args is not None:
+            self.estimator_args = estimator_args
+        else:
+            self.estimator_args = {}
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return self.all_keys_must_be_present(args, "train_data", "val_data", "label")
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
+        estimator: TabularPredictor = TabularPredictor(
+            label=args.label, problem_type=self.problem_type, **self.estimator_args
+        )
+        estimator.fit(train_data=args.train_data, **self.args)
+        self.args["model"] = estimator
+
+        if self.save_model_to_state:
+            state["model"] = estimator
 
 
 class AutoGluonModelEvaluator(AbstractAnalysis):
@@ -85,16 +199,21 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
         label = predictor.label
         y_true = val_data[label]
         y_pred = predictor.predict(val_data)
-        importance = predictor.feature_importance(val_data.reset_index(drop=True))
+        importance = predictor.feature_importance(val_data.reset_index(drop=True), silent=True)
+        leaderboard = predictor.leaderboard(val_data, silent=True)
 
+        labels = y_true.unique()
         s = {
             "problem_type": predictor.problem_type,
             "y_true": y_true,
             "y_pred": y_pred,
             "importance": importance,
+            "leaderboard": leaderboard,
+            "labels": labels,
         }
+
         if problem_type in [BINARY, MULTICLASS]:
-            cm = confusion_matrix(y_true, y_pred, normalize=self.normalize, labels=y_true.unique())
+            cm = confusion_matrix(y_true, y_pred, normalize=self.normalize, labels=labels)
             s["confusion_matrix_normalized"] = self.normalize is not None
             s["confusion_matrix"] = cm
 

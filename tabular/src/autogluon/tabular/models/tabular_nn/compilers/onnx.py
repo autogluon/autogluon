@@ -276,7 +276,7 @@ class TabularNeuralNetTorchOnnxTransformer:
 
 class TabularNeuralNetTorchOnnxCompiler:
     name = "onnx"
-    save_in_pkl = False
+    save_in_pkl = True
 
     @staticmethod
     def can_compile():

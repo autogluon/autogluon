@@ -7,8 +7,8 @@ import pandas as pd
 
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
     S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import REGRESSION
-from autogluon.core.utils import ResourceManager
 from autogluon.core.utils import try_import_autogluon_text
 from autogluon.core.models import AbstractModel
 
@@ -210,3 +210,7 @@ class TextPredictorModel(AbstractModel):
     def _more_tags(self):
         # `can_refit_full=False` because TextPredictor does not communicate how to train until the best epoch in refit_full.
         return {'can_refit_full': False}
+
+    @classmethod
+    def _class_tags(cls):
+        return {'handles_text': True}

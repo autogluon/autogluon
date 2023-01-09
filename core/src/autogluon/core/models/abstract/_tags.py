@@ -22,3 +22,10 @@ _DEFAULT_TAGS = {
     #  It is recommended in these scenarios to set `can_refit_full` to False until a correct implementation is added.
     'can_refit_full': False,
 }
+
+
+_DEFAULT_CLASS_TAGS = {
+    # Whether the model can handle raw text input features.
+    #  Used for informing the global feature preprocessor on if it should keep raw text features.
+    'handles_text': False,
+}

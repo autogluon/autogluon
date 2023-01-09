@@ -8,6 +8,7 @@ import pandas as pd
 import torch
 from omegaconf import DictConfig
 from torch import nn
+from torch.nn import functional as F
 
 from ..constants import AUTOMM, FUSION, QUERY, RESPONSE
 from .data import data_to_df
@@ -501,3 +502,39 @@ def convert_data_for_ranking(
     response_data = pd.DataFrame({response_column: data[response_column].unique().tolist()})
 
     return data_with_label, query_data, response_data, label_column
+
+
+def compute_matching_probability(
+    logits: Optional[torch.Tensor] = None,
+    embeddings1: Optional[torch.Tensor] = None,
+    embeddings2: Optional[torch.Tensor] = None,
+    reverse_prob: Optional[bool] = False,
+):
+    """
+    Compute probabilities from logits or embedding pairs.
+
+    Parameters
+    ----------
+    logits
+        The output of a model's head layer.
+    embeddings1
+        Feature embeddings of one side in matching.
+    embeddings2
+        Feature embeddings 2 of the other side in matching.
+    reverse_prob
+        Whether to reverse the probability.
+
+    Returns
+    -------
+    Probabilities.
+    """
+    if logits is not None:
+        prob = F.softmax(logits.float(), dim=1)[:, 1]
+    else:
+        cosine_similarity = F.cosine_similarity(embeddings1, embeddings2)
+        prob = 0.5 * (cosine_similarity + 1)
+
+    if reverse_prob:
+        prob = 1 - prob
+
+    return prob

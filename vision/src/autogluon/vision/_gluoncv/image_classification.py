@@ -16,8 +16,8 @@ import numpy as np
 import pandas as pd
 import autogluon.core as ag
 from autocfg import dataclass
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import MULTICLASS
-from autogluon.core.utils import ResourceManager
 from autogluon.core.task.base import BaseTask
 from autogluon.core.searcher import DummySearcher
 

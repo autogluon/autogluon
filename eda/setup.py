@@ -45,7 +45,8 @@ test_requirements = [
     'types-requests',
     'types-setuptools',
     'pytest-mypy',
-    'PyHamcrest'
+    'PyHamcrest',
+    'isort'
 ]
 
 test_requirements = list(set(test_requirements))
