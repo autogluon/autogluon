@@ -30,7 +30,6 @@ class CovariateMetadata:
     past_covariates_cat: List[str] = field(default_factory=list)
 
 
-
 class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
     """Generates categorical and continuous features for time series models."""
 
@@ -57,7 +56,7 @@ class TimeSeriesFeatureGenerator:
         self.known_covariates_names = known_covariates_names
         self.past_covariates_names = []
         self.static_feature_pipeline = ContinuousAndCategoricalFeatureGenerator()
-        self.feature_metadata: CovariateMetadata = None
+        self.covariate_metadata: CovariateMetadata = None
 
     @property
     def required_column_names(self) -> pd.Index:
@@ -78,12 +77,12 @@ class TimeSeriesFeatureGenerator:
             if column != self.target and column not in self.known_covariates_names:
                 past_covariates_names.append(column)
 
+        static_features_cat = []
+        static_features_real = []
         if data.static_features is not None:
             static = self.static_feature_pipeline.fit_transform(data.static_features)
             static = self._convert_numerical_features_to_float(static)
 
-            static_features_cat = []
-            static_features_real = []
             unused = []
             for col_name in data.static_features.columns:
                 if static[col_name].dtype == "category":
@@ -102,7 +101,7 @@ class TimeSeriesFeatureGenerator:
                 "To learn how to fix incorrectly inferred types, please see documentation for TimeSeriesPredictor.fit "
             )
 
-        self.feature_metadata = CovariateMetadata(
+        self.covariate_metadata = CovariateMetadata(
             static_features_cat=static_features_cat,
             static_features_real=static_features_real,
             known_covariates_real=self.known_covariates_names,
@@ -147,7 +146,8 @@ class TimeSeriesFeatureGenerator:
         )
 
         if self.static_feature_pipeline.is_fit():
-            self._check_static_features(data.static_features)
+            if data.static_features is None:
+                raise ValueError(f"Provided {data_frame_name} must contain static_features")
             static_features = self.static_feature_pipeline.transform(data.static_features)
             data.static_features = self._convert_numerical_features_to_float(static_features)
         else:

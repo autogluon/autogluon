@@ -47,11 +47,6 @@ class TimeSeriesLearner(AbstractLearner):
         self.validation_splitter = validation_splitter
         self.ignore_time_index = ignore_time_index
 
-        # TODO: Remove
-        # self.static_feature_pipeline = ContinuousAndCategoricalFeatureGenerator()
-        # self._train_static_feature_columns: pd.Index = None
-        # self._train_static_feature_dtypes: pd.Series = None
-
         self.feature_generator = TimeSeriesFeatureGenerator(
             target=self.target, known_covariates_names=self.known_covariates_names
         )
@@ -125,6 +120,7 @@ class TimeSeriesLearner(AbstractLearner):
                 quantile_levels=self.quantile_levels,
                 verbosity=kwargs.get("verbosity", 2),
                 enable_ensemble=kwargs.get("enable_ensemble", True),
+                metadata=self.feature_generator.covariate_metadata,
             )
         )
         self.trainer = self.trainer_type(**trainer_init_kwargs)
@@ -214,7 +210,8 @@ class TimeSeriesLearner(AbstractLearner):
         return self.load_trainer().score(data=data, model=model, metric=metric)
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
-        data = self.feature_generator.transform(data)
+        if data is not None:
+            data = self.feature_generator.transform(data)
         return self.load_trainer().leaderboard(data)
 
     def get_info(self, include_model_info: bool = False, **kwargs) -> Dict[str, Any]:

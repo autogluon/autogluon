@@ -21,7 +21,8 @@ from autogluon.core.utils import warning_filter
 from autogluon.core.utils.savers import save_pkl
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.utils.features import get_categorical_and_continuous_features
+
+# from autogluon.timeseries.utils.features import get_categorical_and_continuous_features
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_root_logger
 
@@ -199,15 +200,15 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
             model_params = self._get_model_params()
             disable_static_features = model_params.get("disable_static_features", False)
+            if not disable_static_features:
+                self.num_feat_static_cat = len(self.metadata.static_features_cat)
+                self.num_feat_static_real = len(self.metadata.static_features_real)
+                if self.num_feat_static_cat > 0:
+                    feat_static_cat = ds.static_features[self.metadata.static_features_cat]
+                    self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
             disable_known_covariates = model_params.get("disable_known_covariates", False)
-            if not disable_static_features and ds.static_features is not None:
-                feat_static_cat, feat_static_real = get_categorical_and_continuous_features(ds.static_features)
-                self.num_feat_static_cat = len(feat_static_cat.columns)
-                self.num_feat_static_real = len(feat_static_real.columns)
-                self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
             if not disable_known_covariates:
-                feat_dynamic_real = ds.drop(self.target, axis=1)
-                self.num_feat_dynamic_real = len(feat_dynamic_real.columns)
+                self.num_feat_dynamic_real = len(self.metadata.known_covariates_real)
 
         if "callbacks" in kwargs:
             self.callbacks += kwargs["callbacks"]
@@ -240,43 +241,27 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self, time_series_df: Optional[TimeSeriesDataFrame], known_covariates: Optional[TimeSeriesDataFrame] = None
     ) -> Optional[GluonTSDataset]:
         if time_series_df is not None:
-            feat_static_cat = None
-            feat_static_real = None
-            if time_series_df.static_features is not None and (self.num_feat_static_cat or self.num_feat_static_real):
-                feat_static_cat, feat_static_real = get_categorical_and_continuous_features(
-                    time_series_df.static_features
-                )
-                if self.num_feat_static_cat > 0:
-                    if len(feat_static_cat.columns) != self.num_feat_static_cat:
-                        raise ValueError(
-                            f"Static features must contain {self.num_feat_dynamic_real} columns of type 'category', "
-                            f"(got {len(feat_static_cat.columns)} columns of type 'category')."
-                        )
-                else:
-                    feat_static_cat = None
-                if self.num_feat_static_real > 0:
-                    if len(feat_static_real.columns) != self.num_feat_static_real:
-                        raise ValueError(
-                            f"Static features must contain {self.num_feat_dynamic_real} columns of type 'float', "
-                            f"(got {len(feat_static_real.columns)} columns of type 'float')."
-                        )
-                else:
-                    feat_static_real = None
+            if self.num_feat_static_cat > 0:
+                feat_static_cat = time_series_df.static_features[self.metadata.static_features_cat]
+            else:
+                feat_static_cat = None
 
-            feat_dynamic_real = time_series_df.drop(self.target, axis=1)
-            if known_covariates is not None:
-                feat_dynamic_real = pd.concat([feat_dynamic_real, known_covariates], axis=0)
-                if len(feat_dynamic_real) != len(time_series_df) + self.prediction_length * time_series_df.num_items:
-                    raise ValueError(
-                        f"known_covariates must contain values for the next prediction_length = "
-                        f"{self.prediction_length} time steps in each time series."
-                    )
+            if self.num_feat_static_real > 0:
+                feat_static_real = time_series_df.static_features[self.metadata.static_features_real]
+            else:
+                feat_static_real = None
+
             if self.num_feat_dynamic_real > 0:
-                if len(feat_dynamic_real.columns) != self.num_feat_dynamic_real:
-                    raise ValueError(
-                        f"Data must contain {self.num_feat_dynamic_real} columns with known covariates, "
-                        f"(received {len(feat_dynamic_real.columns)} columns with known covariates)."
-                    )
+                feat_dynamic_real = time_series_df[self.metadata.known_covariates_real]
+                # Append future values of known covariates
+                if known_covariates is not None:
+                    feat_dynamic_real = pd.concat([feat_dynamic_real, known_covariates], axis=0)
+                    expected_length = len(time_series_df) + self.prediction_length * time_series_df.num_items
+                    if len(feat_dynamic_real) != expected_length:
+                        raise ValueError(
+                            f"known_covariates must contain values for the next prediction_length = "
+                            f"{self.prediction_length} time steps in each time series."
+                        )
             else:
                 feat_dynamic_real = None
 
