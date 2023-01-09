@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -12,7 +12,6 @@ from autogluon.features.generators import (
     IdentityFeatureGenerator,
     PipelineFeatureGenerator,
 )
-
 from autogluon.timeseries import TimeSeriesDataFrame
 
 logger = logging.getLogger(__name__)
