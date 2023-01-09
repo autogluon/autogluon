@@ -1422,7 +1422,7 @@ class MultiModalPredictor:
         strict_loading=True,
         standalone=True,
     ):
-        # FIXME: we need to change validation_metric to evaluation_metric for model choosing 
+        # FIXME: we need to change validation_metric to evaluation_metric for model choosing
         # since we called self.evaluate. Below is a temporal fix for NER.
         if self._problem_type is not None and self._problem_type == NER:
             validation_metric_name = OVERALL_F1  # seqeval only support overall_f1
@@ -1485,7 +1485,9 @@ class MultiModalPredictor:
                                 prefix=prefix,
                                 strict=strict_loading,
                             )
-                            cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
+                            cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[
+                                validation_metric_name
+                            ]
                             if monitor_op(cand_score, best_score):
                                 # Add new ingredient
                                 ingredients.append(top_k_model_paths[i])
