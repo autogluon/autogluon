@@ -1422,6 +1422,8 @@ class MultiModalPredictor:
         strict_loading=True,
         standalone=True,
     ):
+        # FIXME: we need to change validation_metric to evaluation_metric for model choosing 
+        # since we called self.evaluate. Below is a temporal fix for NER.
         if self._problem_type is not None and self._problem_type == NER:
             validation_metric_name = OVERALL_F1  # seqeval only support overall_f1
 
@@ -1472,7 +1474,7 @@ class MultiModalPredictor:
                             prefix=prefix,
                             strict=strict_loading,
                         )
-                        best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                        best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
                         for i in range(1, len(top_k_model_paths)):
                             cand_avg_state_dict = average_checkpoints(
                                 checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -1483,7 +1485,7 @@ class MultiModalPredictor:
                                 prefix=prefix,
                                 strict=strict_loading,
                             )
-                            cand_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                            cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
                             if monitor_op(cand_score, best_score):
                                 # Add new ingredient
                                 ingredients.append(top_k_model_paths[i])
@@ -1517,7 +1519,7 @@ class MultiModalPredictor:
         )
 
         if self._problem_type != OBJECT_DETECTION:  # TODO: update detection's evaluation to support this
-            self._best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+            self._best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
 
         if is_distill:
             avg_state_dict = self._replace_model_name_prefix(
