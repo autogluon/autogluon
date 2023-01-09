@@ -59,7 +59,7 @@ class TimeSeriesFeatureGenerator:
 
     @property
     def required_column_names(self) -> pd.Index:
-        return pd.Index(list([self.target]) + list(self.known_covariates_names) + list(self.past_covariates_names))
+        return pd.Index([self.target] + list(self.known_covariates_names) + list(self.past_covariates_names))
 
     @staticmethod
     def _convert_numerical_features_to_float(df: pd.DataFrame, float_dtype=np.float64) -> pd.DataFrame:

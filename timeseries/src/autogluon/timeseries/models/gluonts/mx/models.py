@@ -354,13 +354,8 @@ class TemporalFusionTransformerMXNetModel(AbstractGluonTSMXNetModel):
         init_kwargs = super()._get_estimator_init_args()
         if self.num_feat_static_real > 0:
             init_kwargs["static_feature_dims"] = {FieldName.FEAT_STATIC_REAL: self.num_feat_static_real}
-        if self.num_feat_dynamic_real > 0 or self.num_past_feat_dynamic_real > 0:
-            init_kwargs["dynamic_feature_dims"] = {}
-            if self.num_feat_dynamic_real > 0:
-                init_kwargs["dynamic_feature_dims"][FieldName.FEAT_DYNAMIC_REAL] = self.num_feat_dynamic_real
-            if self.num_past_feat_dynamic_real > 0:
-                init_kwargs["dynamic_feature_dims"][FieldName.PAST_FEAT_DYNAMIC_REAL] = self.num_past_feat_dynamic_real
-                init_kwargs["past_dynamic_features"] = [FieldName.PAST_FEAT_DYNAMIC_REAL]
+        if self.num_feat_dynamic_real > 0:
+            init_kwargs["dynamic_feature_dims"] = {FieldName.FEAT_DYNAMIC_REAL: self.num_feat_dynamic_real}
 
         # Turning off hybridization prevents MXNet errors when training on GPU
         init_kwargs["hybridize"] = False
