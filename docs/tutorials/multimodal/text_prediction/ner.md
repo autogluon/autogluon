@@ -45,6 +45,7 @@ model_path = f"./tmp/{uuid.uuid4().hex}-automm_ner"
 predictor = MultiModalPredictor(problem_type="ner", label=label_col, path=model_path)
 predictor.fit(
     train_data=train_data,
+    hyperparameters={'model.ner_text.checkpoint_name':'bert-base-cased'},
     time_limit=300, #second
 )
 ```
@@ -64,8 +65,6 @@ sentence = "Game of Thrones is an American fantasy drama television series creat
 predictions = predictor.predict({'text_snippet': [sentence]})
 print('Predicted entities:', predictions[0])
 
-for entity in predictions[0]:
-    print(f"Word '{sentence[entity['start']:entity['end']]}' belongs to group: {entity['entity_group']}")
 ```
 
 ## Visualization

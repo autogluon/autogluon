@@ -22,8 +22,10 @@ from ..constants import (
     MULTICLASS,
     NDCG,
     NER,
+    NER_TOKEN_F1,
     OBJECT_DETECTION,
     OVERALL_ACCURACY,
+    OVERALL_F1,
     PRECISION,
     RECALL,
     REGRESSION,
@@ -100,7 +102,7 @@ def infer_metrics(
         else:
             eval_metric_name = ACCURACY
     elif problem_type == NER:
-        eval_metric_name = OVERALL_ACCURACY
+        return NER_TOKEN_F1, OVERALL_F1
     elif problem_type == BINARY:
         eval_metric_name = ROC_AUC
     elif problem_type == REGRESSION:
@@ -195,7 +197,7 @@ def compute_score(
     -------
     Computed score.
     """
-    if metric_name == OVERALL_ACCURACY:
+    if metric_name in [OVERALL_ACCURACY, OVERALL_F1]:
         metric = evaluate.load("seqeval")
         warnings.filterwarnings("ignore")
         return metric.compute(references=metric_data[Y_TRUE], predictions=metric_data[Y_PRED])
