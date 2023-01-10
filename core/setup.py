@@ -21,6 +21,7 @@ install_requires = [
     'numpy',
     'scipy',
     'scikit-learn',
+    'psutil',
     'networkx',
     'pandas',
     'tqdm',
