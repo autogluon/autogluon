@@ -27,7 +27,6 @@ install_requires = [
     "numpy",
     "scipy",
     "pandas",
-    "psutil",
     "statsmodels~=0.13.0",
     "gluonts~=0.11.0",
     "torch>=1.9,<1.13",
