@@ -163,9 +163,13 @@ def test_covariate_shift_detection(monkeypatch):
     df_test["shift_col"] = np.random.rand(len(df_test)) + 2
 
     call_xss_render = MagicMock()
+    call_md_render = MagicMock()
+    call_fiv_render = MagicMock()
     with monkeypatch.context() as m:
         with tempfile.TemporaryDirectory() as path:
             m.setattr(XShiftSummary, "render", call_xss_render)
+            m.setattr(MarkdownSectionComponent, "render_markdown", call_md_render)
+            m.setattr(FeatureInteractionVisualization, "render", call_fiv_render)
             state = covariate_shift_detection(
                 path=path, train_data=df_train, test_data=df_test, label="class", return_state=True, verbosity=2
             )
@@ -175,6 +179,8 @@ def test_covariate_shift_detection(monkeypatch):
     assert state.xshift_results.test_statistic > 0.99
     assert state.xshift_results.pvalue < 0.01
     assert state.xshift_results.feature_importance.iloc[0].name == "shift_col"
+    call_fiv_render.assert_called_once()
+    call_md_render.assert_called_once_with("#### `shift_col` values distribution between datasets; p-value: `0.0000`")
 
 
 def test_get_empty_dict_if_none():
@@ -209,7 +215,7 @@ def test_get_default_estimator_if_not_specified(hyperparameters_present, presets
     [
         (["exponpow", "nakagami", "beta", "gamma", "lognorm"], ["exponpow", "nakagami", "beta", "lognorm", "gamma"]),
         ("lognorm", ["lognorm"]),
-        (True, ["exponpow", "nakagami", "gompertz"]),
+        (True, ["exponpow", "nakagami", "gompertz", "foldnorm", "genpareto"]),
     ],
 )
 def test_analyze_interaction__with_distribution(monkeypatch, fit_distributions, expected_dist):

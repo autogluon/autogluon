@@ -10,6 +10,7 @@ from ..analysis import (
     ApplyFeatureGenerator,
     AutoGluonModelEvaluator,
     AutoGluonModelQuickFit,
+    Correlation,
     DistributionFit,
     FeatureInteraction,
     MissingValuesAnalysis,
@@ -21,6 +22,7 @@ from ..analysis.dataset import DatasetSummary, RawTypesAnalysis, Sampler, Specia
 from ..analysis.interaction import FeatureDistanceAnalysis
 from ..visualization import (
     ConfusionMatrix,
+    CorrelationVisualization,
     DatasetStatistics,
     DatasetTypeMismatch,
     FeatureImportance,
@@ -34,7 +36,14 @@ from ..visualization.base import AbstractVisualization
 from ..visualization.interaction import FeatureDistanceAnalysisVisualization
 from ..visualization.layouts import SimpleVerticalLinearLayout
 
-__all__ = ["analyze", "analyze_interaction", "quick_fit", "dataset_overview", "covariate_shift_detection"]
+__all__ = [
+    "analyze",
+    "analyze_interaction",
+    "quick_fit",
+    "dataset_overview",
+    "covariate_shift_detection",
+    "target_analysis",
+]
 
 
 def analyze(
@@ -49,7 +58,7 @@ def analyze(
     viz_facets: Optional[List[AbstractVisualization]] = None,
     return_state: bool = False,
     verbosity: int = 2,
-):
+) -> Optional[AnalysisState]:
     """
     This helper creates `BaseAnalysis` wrapping passed analyses into
     `Sampler` if needed, then fits and renders produced state with
@@ -129,8 +138,7 @@ def analyze(
 
     root_logger.setLevel(root_log_level)  # Reset log level
 
-    if return_state:
-        return state
+    return state if return_state else None
 
 
 def analyze_interaction(
@@ -172,14 +180,17 @@ def analyze_interaction(
     :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`
 
     """
-    fig_args = get_empty_dict_if_none(fig_args)
+    fig_args = get_empty_dict_if_none(fig_args).copy()
+    if "figsize" not in fig_args:
+        fig_args["figsize"] = (12, 6)
+
     chart_args = get_empty_dict_if_none(chart_args)
 
     key = "__analysis__"
 
     _analysis_args = analysis_args.copy()
     _analysis_args.pop("return_state", None)
-    state = analyze(return_state=True, **_analysis_args, anlz_facets=[RawTypesAnalysis(), VariableTypeAnalysis()])
+    state: AnalysisState = analyze(return_state=True, **_analysis_args, anlz_facets=[RawTypesAnalysis(), VariableTypeAnalysis()])  # type: ignore
 
     analysis_facets: List[AbstractAnalysis] = [
         FeatureInteraction(key=key, x=x, y=y, hue=hue),
@@ -195,10 +206,13 @@ def analyze_interaction(
         else:
             dists = fit_distributions
 
-        analysis_facets.append(DistributionFit(columns=x, distributions_to_fit=dists))  # type: ignore # x is always present
+        analysis_facets.append(DistributionFit(columns=x, keep_top_n=5, distributions_to_fit=dists))  # type: ignore # x is always present
+
+    _analysis_args = analysis_args.copy()
+    _analysis_args.pop("state", None)
 
     return analyze(
-        **analysis_args,
+        **_analysis_args,
         state=state,
         anlz_facets=analysis_facets,
         viz_facets=[
@@ -373,6 +387,7 @@ def dataset_overview(
     val_data: Optional[pd.DataFrame] = None,
     label: Optional[str] = None,
     state: Union[None, dict, AnalysisState] = None,
+    return_state: bool = False,
     sample: Union[None, int, float] = None,
     fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
     chart_args: Optional[Dict[str, Dict[str, Any]]] = None,
@@ -396,6 +411,8 @@ def dataset_overview(
         target variable
     state: Union[None, dict, AnalysisState], default = None
         pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
+    return_state: bool, default = False
+        return state if `True`
     sample: Union[None, int, float], default = None
         sample size; if `int`, then row number is used;
         `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
@@ -430,13 +447,14 @@ def dataset_overview(
     fig_args = get_empty_dict_if_none(fig_args)
     chart_args = get_empty_dict_if_none(chart_args)
 
-    return analyze(
+    state = analyze(
         train_data=train_data,
         test_data=test_data,
         val_data=val_data,
         label=label,
         sample=sample,
         state=state,
+        return_state=True,
         anlz_facets=[
             DatasetSummary(),
             MissingValuesAnalysis(),
@@ -453,6 +471,25 @@ def dataset_overview(
             ),
         ],
     )
+
+    # Groups analysis
+    distance = state.feature_distance  # type: ignore # state is always present
+    if len(distance.near_duplicates) > 0:  # type: ignore # state is always present
+        for group in distance.near_duplicates:
+            nodes = group["nodes"]
+            analyze(
+                train_data=train_data,
+                state=state,
+                anlz_facets=[FeatureInteraction(key=f"{nodes[0]}:{n}", x=nodes[0], y=n) for n in nodes[1:]],
+                viz_facets=[
+                    MarkdownSectionComponent(
+                        f'### Near duplicate group analysis: `{"`, `".join(nodes)}` - distance `{group["distance"]}`'
+                    ),
+                    *[FeatureInteractionVisualization(headers=True, key=f"{nodes[0]}:{n}") for n in nodes[1:]],
+                ],
+            )
+
+    return state if return_state else None
 
 
 def covariate_shift_detection(
@@ -522,18 +559,44 @@ def covariate_shift_detection(
     """
     fit_args = get_default_estimator_if_not_specified(fit_args)
 
-    return analyze(
+    state = analyze(
         train_data=train_data,
         test_data=test_data,
         label=label,
         sample=sample,
         state=state,
-        return_state=return_state,
+        return_state=True,
         anlz_facets=[
             XShiftDetector(classifier_kwargs=dict(path=path, verbosity=verbosity), classifier_fit_kwargs=fit_args)
         ],
         viz_facets=[XShiftSummary()],
     )
+
+    # Plot distribution differences between datasets
+    xshift_results: AnalysisState = state.xshift_results  # type: ignore # state is always present
+    if xshift_results.detection_status:
+        fi = xshift_results.feature_importance
+        fi = fi[fi.p_value <= xshift_results.pvalue_threshold]
+        vars_to_plot = fi.index.tolist()
+        if len(vars_to_plot) > 0:
+            _train_data = train_data[vars_to_plot].copy()
+            _train_data["__dataset__"] = "train_data"
+            _test_data = test_data[vars_to_plot].copy()
+            _test_data["__dataset__"] = "test_data"
+            df_all = pd.concat([_train_data, _test_data], ignore_index=True)
+
+            for var in vars_to_plot:
+                pvalue = fi.loc[var]["p_value"]
+                analyze(
+                    viz_facets=[
+                        MarkdownSectionComponent(
+                            f"#### `{var}` values distribution between datasets; p-value: `{pvalue:.4f}`"
+                        )
+                    ]
+                )
+                analyze_interaction(train_data=df_all, state=state, x=var, hue="__dataset__")
+
+    return state if return_state else None
 
 
 def get_default_estimator_if_not_specified(fit_args):
@@ -560,3 +623,101 @@ def get_empty_dict_if_none(value) -> dict:
     if value is None:
         value = {}
     return value
+
+
+def target_analysis(
+    train_data: pd.DataFrame,
+    label: str,
+    sample: Union[None, int, float] = None,
+    state: Union[None, dict, AnalysisState] = None,
+    return_state: bool = False,
+) -> Optional[AnalysisState]:
+    # Basic variable information table
+    state: AnalysisState = analyze(  # type: ignore # state is always present
+        train_data=train_data[[label]],
+        state=state,
+        sample=sample,
+        return_state=True,
+        anlz_facets=[
+            DatasetSummary(),
+            MissingValuesAnalysis(),
+            RawTypesAnalysis(),
+            SpecialTypesAnalysis(),
+        ],
+        viz_facets=[
+            MarkdownSectionComponent("## Target variable analysis"),
+            DatasetStatistics(),
+        ],
+    )
+
+    # Distribution chart
+    state = analyze_interaction(
+        train_data=train_data,
+        sample=sample,
+        x=label,
+        state=state,
+        return_state=True,
+        fit_distributions=True,
+    )
+
+    # Distributions fit information if available
+    if state.distributions_fit is not None:  # type: ignore # state is always present
+        dist_fit_state = state.distributions_fit.train_data  # type: ignore
+        dist_info = ["### Distribution fits for target variable"]
+        if (label in dist_fit_state) and (len(dist_fit_state[label]) > 0):
+            for d, p in state.distributions_fit.train_data[label].items():  # type: ignore
+                dist_info.append(
+                    f" - [{d}](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.{d}.html)"
+                )
+                if p.param is not None and len(p.param) > 0:
+                    params = ", ".join([f"{shape}: {param}" for shape, param in zip(p.shapes, p.param)])
+                    dist_info.append(f'   - p-value: {p["pvalue"]:.3f}')
+                    dist_info.append(f"   - Parameters: ({params})")
+        else:
+            dist_info.append(
+                f" - ⚠️ none of the [attempted](https://docs.scipy.org/doc/scipy/reference/stats.html#continuous-distributions) "  # type: ignore
+                f"distribution fits satisfy specified minimum p-value threshold: `{state.distributions_fit_pvalue_min}`"
+            )
+        analyze(viz_facets=[MarkdownSectionComponent("\n".join(dist_info))])
+
+    # Correlations analysis
+    state = analyze(
+        train_data=train_data,
+        sample=sample,
+        state=state,
+        return_state=True,
+        label=label,
+        anlz_facets=[ApplyFeatureGenerator(category_to_numbers=True, children=[Correlation(focus_field=label)])],
+    )
+
+    corr_info = ["### Target variable correlations"]
+    if len(state.correlations_focus_high_corr.train_data) < 1:  # type: ignore
+        corr_info.append(
+            f" - ⚠️ no fields with absolute correlation greater than "  # type: ignore
+            f"`{state.correlations_focus_field_threshold}` found for target variable `{label}`."
+        )
+    else:
+        corr_info.append(
+            f" - absolute correlation greater than `{state.correlations_focus_field_threshold}` found for target variable `{label}`:"  # type: ignore
+        )
+    analyze(
+        state=state,
+        viz_facets=[
+            MarkdownSectionComponent("\n".join(corr_info)),
+            CorrelationVisualization(headers=True),
+        ],
+    )
+
+    # Highly correlated variables vs target interactions
+    fields = state.correlations_focus_high_corr.train_data.index.tolist()  # type: ignore
+
+    analyze(
+        train_data=train_data,
+        state=state,
+        sample=sample,
+        return_state=True,
+        anlz_facets=[FeatureInteraction(key=f"{f}:{label}", x=f, y=label) for f in fields],
+        viz_facets=[FeatureInteractionVisualization(headers=True, key=f"{f}:{label}") for f in fields],
+    )
+
+    return state if return_state else None

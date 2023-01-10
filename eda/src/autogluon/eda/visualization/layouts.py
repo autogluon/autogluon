@@ -1,10 +1,11 @@
 from typing import Dict, List, Optional, Union
 
-from IPython.display import Markdown, display
+from IPython.display import display
 from ipywidgets import HBox, Layout, Output, Tab
 
 from .. import AnalysisState
 from .base import AbstractVisualization
+from .jupyter import JupyterMixin
 
 __all__ = ["MarkdownSectionComponent", "SimpleVerticalLinearLayout", "SimpleHorizontalLayout", "TabLayout"]
 
@@ -72,7 +73,7 @@ class TabLayout(SimpleVerticalLinearLayout):
                 facet.render(state)
 
 
-class MarkdownSectionComponent(AbstractVisualization):
+class MarkdownSectionComponent(AbstractVisualization, JupyterMixin):
     """
     Render provided string as a Markdown cell.
     See `Jupyter Markdown cell <https://jupyter-notebook.readthedocs.io/en/stable/examples/Notebook/Working%20With%20Markdown%20Cells.html>`_
@@ -87,4 +88,4 @@ class MarkdownSectionComponent(AbstractVisualization):
         return True
 
     def _render(self, state: AnalysisState) -> None:
-        display(Markdown(self.markdown))
+        self.render_markdown(self.markdown)

@@ -386,6 +386,7 @@ class DistributionFit(AbstractAnalysis):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         state.distributions_fit = {}
+        state.distributions_fit_pvalue_min = self.pvalue_min
         for (ds, df) in self.available_datasets(args):
             state.distributions_fit[ds] = {}
             for c in self.columns:
@@ -410,19 +411,36 @@ class DistributionFit(AbstractAnalysis):
                 if pvalue >= pvalue_min:
                     results[i] = {
                         "param": param,
+                        "shapes": self._list_parameters(dist),
                         "statistic": statistic,
                         "pvalue": pvalue,
                     }
             if len(results) == 0:
-                self.logger.warning(
-                    f"{series.name}: none of the distributions were able to fit to satisfy specified pvalue_min: {self.pvalue_min}"
-                )
                 return None
             df = pd.DataFrame(results).T.sort_values("pvalue", ascending=False)
             if self.keep_top_n is not None:
                 df = df[: self.keep_top_n]
             results = df.T.to_dict()
             return results
+
+    def _list_parameters(self, distribution):
+        """List parameters for scipy.stats.distribution.
+        # Arguments
+            distribution: a string or scipy.stats distribution object.
+        # Returns
+            A list of distribution parameter strings.
+        """
+        if isinstance(distribution, str):
+            distribution = getattr(stats, distribution)
+        if distribution.shapes:
+            parameters = [name.strip() for name in distribution.shapes.split(",")]
+        else:
+            parameters = []
+        if distribution.name in stats._discrete_distns._distn_names:
+            parameters += ["loc"]
+        elif distribution.name in stats._continuous_distns._distn_names:
+            parameters += ["loc", "scale"]
+        return parameters
 
 
 class FeatureDistanceAnalysis(AbstractAnalysis):
