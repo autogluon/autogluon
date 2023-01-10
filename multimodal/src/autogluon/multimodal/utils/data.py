@@ -11,7 +11,6 @@ from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
 from autogluon.core.utils.loaders import load_pd
-from ..data.infer_types import is_imagepath_column
 
 from ..constants import (
     AUTOMM,
@@ -43,6 +42,7 @@ from ..data import (
     NumericalProcessor,
     TextProcessor,
 )
+from ..data.infer_types import is_imagepath_column
 
 logger = logging.getLogger(AUTOMM)
 
