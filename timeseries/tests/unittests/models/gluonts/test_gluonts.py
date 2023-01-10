@@ -116,11 +116,34 @@ def test_when_static_features_present_then_they_are_passed_to_dataset(model_clas
         try:
             model.fit(train_data=df)
         except TypeError:
+            pass
+        finally:
             call_kwargs = patch_dataset.call_args[1]
             feat_static_cat = call_kwargs["feat_static_cat"]
             feat_static_real = call_kwargs["feat_static_real"]
             assert (feat_static_cat.dtypes == "category").all()
             assert (feat_static_real.dtypes == "float").all()
+
+
+@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
+def test_given_fit_with_static_features_when_predicting_then_static_features_are_used(model_class, df_with_static):
+    df, metadata = df_with_static
+    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata)
+    model.fit(train_data=df)
+    if model.name.endswith("MXNet"):
+        predictor_method = "gluonts.mx.model.predictor.RepresentableBlockPredictor.predict"
+    else:
+        predictor_method = "gluonts.torch.model.predictor.PyTorchPredictor.predict"
+    with mock.patch(predictor_method) as mock_predict:
+        try:
+            model.predict(df)
+        except IndexError:  # expected because of mock
+            pass
+        finally:
+            gluonts_dataset = mock_predict.call_args[1]["dataset"]
+            item = next(iter(gluonts_dataset))
+            assert item["feat_static_cat"].shape == (1,)
+            assert item["feat_static_real"].shape == (2,)
 
 
 @pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
@@ -144,6 +167,8 @@ def test_when_disable_static_features_set_to_true_then_static_features_are_not_u
         try:
             model.fit(train_data=df)
         except TypeError:
+            pass
+        finally:
             call_kwargs = patch_dataset.call_args[1]
             feat_static_cat = call_kwargs["feat_static_cat"]
             feat_static_real = call_kwargs["feat_static_real"]
@@ -151,7 +176,7 @@ def test_when_disable_static_features_set_to_true_then_static_features_are_not_u
             assert feat_static_real is None
 
 
-@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
+@pytest.mark.parametrize("model_class", MODELS_WITH_KNOWN_COVARIATES)
 def test_when_known_covariates_present_then_they_are_passed_to_dataset(model_class, df_with_covariates):
     df, metadata = df_with_covariates
     model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata)
@@ -161,6 +186,8 @@ def test_when_known_covariates_present_then_they_are_passed_to_dataset(model_cla
         try:
             model.fit(train_data=df)
         except TypeError:
+            pass
+        finally:
             call_kwargs = patch_dataset.call_args[1]
             feat_dynamic_real = call_kwargs["feat_dynamic_real"]
             assert (feat_dynamic_real.dtypes == "float").all()
@@ -184,6 +211,8 @@ def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not
         try:
             model.fit(train_data=df)
         except TypeError:
+            pass
+        finally:
             call_kwargs = patch_dataset.call_args[1]
             feat_dynamic_real = call_kwargs["feat_dynamic_real"]
             assert feat_dynamic_real is None
