@@ -124,9 +124,8 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
         else:
             fi_scores = None
         pvalue = self.C2ST.pvalue(num_permutations=self.num_permutations)
-        det_status = pvalue <= self.pvalue_thresh
         state.xshift_results = {
-            "detection_status": det_status,
+            "detection_status": bool(pvalue <= self.pvalue_thresh),  # numpy.bool_ -> bool
             "test_statistic": self.C2ST.test_stat,
             "pvalue": pvalue,
             "pvalue_threshold": self.pvalue_thresh,

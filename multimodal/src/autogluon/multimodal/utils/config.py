@@ -25,7 +25,7 @@ from ..presets import get_automm_presets, get_basic_automm_config, get_preset_st
 logger = logging.getLogger(AUTOMM)
 
 
-def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[str]]):
+def filter_search_space(hyperparameters: Dict, keys_to_filter: Union[str, List[str]]):
     """
     Filter search space within hyperparameters without the given keys as prefixes.
     Hyperparameters that are not search space will not be filtered.
@@ -41,6 +41,9 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
     -------
         hyperparameters being filtered
     """
+    if isinstance(keys_to_filter, str):
+        keys_to_filter = [keys_to_filter]
+
     assert any(
         key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter
     ), f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
@@ -49,8 +52,6 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
     from autogluon.core.space import Space
 
     hyperparameters = copy.deepcopy(hyperparameters)
-    if isinstance(keys_to_filter, str):
-        keys_to_filter = [keys_to_filter]
     for hyperparameter, value in hyperparameters.copy().items():
         if not isinstance(value, (Space, Domain)):
             continue

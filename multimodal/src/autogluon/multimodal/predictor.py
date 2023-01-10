@@ -74,6 +74,7 @@ from .constants import (
     OBJECT_DETECTION,
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
+    OVERALL_F1,
     PROBABILITY,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
@@ -394,7 +395,6 @@ class MultiModalPredictor:
         self._model_postprocess_fn = None
         self._model = None
         self._resume = False
-        self._continuous_training = False
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
@@ -689,7 +689,7 @@ class MultiModalPredictor:
                 assert isinstance(
                     teacher_predictor, str
                 ), "HPO with distillation only supports passing a path to the predictor"
-            if self._continuous_training:
+            if fit_called:
                 warnings.warn(
                     "HPO while continuous training."
                     "Hyperparameters related to Model and Data will NOT take effect."
@@ -1422,6 +1422,11 @@ class MultiModalPredictor:
         strict_loading=True,
         standalone=True,
     ):
+        # FIXME: we need to change validation_metric to evaluation_metric for model choosing
+        # since we called self.evaluate. Below is a temporal fix for NER.
+        if self._problem_type is not None and self._problem_type == NER:
+            validation_metric_name = OVERALL_F1  # seqeval only support overall_f1
+
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
             with open(best_k_models_yaml_path, "r") as f:
@@ -1469,7 +1474,7 @@ class MultiModalPredictor:
                             prefix=prefix,
                             strict=strict_loading,
                         )
-                        best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                        best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
                         for i in range(1, len(top_k_model_paths)):
                             cand_avg_state_dict = average_checkpoints(
                                 checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -1480,7 +1485,9 @@ class MultiModalPredictor:
                                 prefix=prefix,
                                 strict=strict_loading,
                             )
-                            cand_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                            cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[
+                                validation_metric_name
+                            ]
                             if monitor_op(cand_score, best_score):
                                 # Add new ingredient
                                 ingredients.append(top_k_model_paths[i])
@@ -1514,7 +1521,7 @@ class MultiModalPredictor:
         )
 
         if self._problem_type != OBJECT_DETECTION:  # TODO: update detection's evaluation to support this
-            self._best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+            self._best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
 
         if is_distill:
             avg_state_dict = self._replace_model_name_prefix(
@@ -2790,8 +2797,6 @@ class MultiModalPredictor:
 
         predictor._ckpt_path = ckpt_path
         predictor._model = model
-        if not resume:
-            predictor._continuous_training = True
 
         loss_func = get_loss_func(
             problem_type=predictor._problem_type,

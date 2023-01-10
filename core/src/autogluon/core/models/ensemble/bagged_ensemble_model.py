@@ -87,6 +87,7 @@ class BaggedEnsembleModel(AbstractModel):
             # 'use_child_oof': False,  # [Advanced] Whether to defer to child model for OOF preds and only train a single child.
             'save_bag_folds': True,
             # 'refit_folds': False,  # [Advanced, Experimental] Whether to refit bags immediately to a refit_full model in a single .fit call.
+            # 'num_folds' None,  # Number of bagged folds per set. If specified, overrides .fit `k_fold` value.
             # 'max_sets': None,  # Maximum bagged repeats to allow, if specified, will set `self.can_fit()` to `self._n_repeats_finished < max_repeats`
         }
         for param, val in default_params.items():
@@ -183,6 +184,8 @@ class BaggedEnsembleModel(AbstractModel):
             k_fold = 1
             k_fold_end = None
             groups = None
+        else:
+            k_fold, k_fold_end = self._update_k_fold(k_fold=k_fold, k_fold_end=k_fold_end)
         if k_fold is None and groups is None:
             k_fold = 5
         if k_fold is not None and k_fold < 1:
@@ -261,6 +264,18 @@ class BaggedEnsembleModel(AbstractModel):
                 return refit_template
             else:
                 return self
+
+    def _update_k_fold(self, k_fold, k_fold_end=None, verbose=True):
+        """Update k_fold and k_fold_end in case num_folds was specified"""
+        k_fold_override = self.params.get('num_folds', None)
+        if k_fold_override is not None:
+            if k_fold is not None:
+                if k_fold != k_fold_override and verbose:
+                    logger.log(20, f'\tSetting folds to {k_fold_override}. Ignoring `k_fold={k_fold}` because `num_folds={k_fold_override}` overrides.')
+                if k_fold_end is not None and k_fold_end == k_fold:
+                    k_fold_end = k_fold_override
+            k_fold = k_fold_override
+        return k_fold, k_fold_end
 
     def _get_child_aux_val(self, key: str, default=None):
         assert self.is_initialized(), "Model must be initialized before calling self._get_child_aux_val!"
@@ -1082,12 +1097,14 @@ class BaggedEnsembleModel(AbstractModel):
         y,
         X_val,
         y_val,
-        k_fold,
         hpo_executor,
+        k_fold=None,
+        k_fold_end=None,
         **kwargs
     ):
         time_start = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
+        k_fold, k_fold_end = self._update_k_fold(k_fold=k_fold, k_fold_end=k_fold_end)
         # initialize the model base to get necessary info for search space and estimating memory usage
         initialized_model_base = copy.deepcopy(self.model_base)
         model_init_args = self.model_base.get_params()
@@ -1133,6 +1150,7 @@ class BaggedEnsembleModel(AbstractModel):
 
         fit_kwargs = copy.deepcopy(kwargs)
         fit_kwargs['k_fold'] = k_fold
+        fit_kwargs['k_fold_end'] = k_fold_end
         fit_kwargs['feature_metadata'] = self.feature_metadata
         fit_kwargs['num_classes'] = self.num_classes
         fit_kwargs['sample_weight'] = kwargs.get('sample_weight', None)

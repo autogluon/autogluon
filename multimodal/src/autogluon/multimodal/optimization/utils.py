@@ -44,9 +44,11 @@ from ..constants import (
     MULTI_NEGATIVES_SOFTMAX_LOSS,
     MULTICLASS,
     NER,
+    NER_TOKEN_F1,
     NORM_FIT,
     OBJECT_DETECTION,
     OVERALL_ACCURACY,
+    OVERALL_F1,
     PAIR_MARGIN_MINER,
     PEARSONR,
     PEFT_STRATEGIES,
@@ -228,6 +230,7 @@ def compute_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
         for k in top_ks:
             hit_rate += (preds < k).float().mean()
 
+    hit_rate /= len(top_ks) * len(logits)
     return hit_rate
 
 
@@ -262,6 +265,8 @@ def get_metric(
     metric_name = metric_name.lower()
     if metric_name in [ACC, ACCURACY, OVERALL_ACCURACY]:
         return torchmetrics.Accuracy(), None
+    elif metric_name == NER_TOKEN_F1:
+        return torchmetrics.F1Score(ignore_index=1), None
     elif metric_name in [RMSE, ROOT_MEAN_SQUARED_ERROR]:
         return torchmetrics.MeanSquaredError(squared=False), None
     elif metric_name == R2:
