@@ -336,7 +336,16 @@ class DistributionFit(AbstractAnalysis):
     """
 
     # Getting the list of distributions: https://docs.scipy.org/doc/scipy/tutorial/stats.html#getting-help
-    AVAILABLE_DISTRIBUTIONS = sorted([d for d in dir(stats) if isinstance(getattr(stats, d), stats.rv_continuous)])
+    AVAILABLE_DISTRIBUTIONS = sorted(
+        [
+            dist
+            for dist in dir(stats)
+            if isinstance(getattr(stats, dist), stats.rv_continuous)
+            # kstwo can't be fit on a single variable
+            # levy_stable, studentized_range are too slow
+            and dist not in ["kstwo", "levy_stable", "studentized_range"]
+        ]
+    )
 
     def __init__(
         self,

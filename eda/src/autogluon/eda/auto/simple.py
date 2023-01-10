@@ -10,13 +10,14 @@ from ..analysis import (
     ApplyFeatureGenerator,
     AutoGluonModelEvaluator,
     AutoGluonModelQuickFit,
+    DistributionFit,
     FeatureInteraction,
     MissingValuesAnalysis,
     TrainValidationSplit,
     XShiftDetector,
 )
 from ..analysis.base import AbstractAnalysis, BaseAnalysis
-from ..analysis.dataset import DatasetSummary, RawTypesAnalysis, Sampler, SpecialTypesAnalysis
+from ..analysis.dataset import DatasetSummary, RawTypesAnalysis, Sampler, SpecialTypesAnalysis, VariableTypeAnalysis
 from ..analysis.interaction import FeatureDistanceAnalysis
 from ..visualization import (
     ConfusionMatrix,
@@ -136,6 +137,7 @@ def analyze_interaction(
     x: Optional[str] = None,
     y: Optional[str] = None,
     hue: Optional[str] = None,
+    fit_distributions: Union[bool, str, List[str]] = False,
     fig_args: Optional[Dict[str, Any]] = None,
     chart_args: Optional[Dict[str, Any]] = None,
     **analysis_args,
@@ -148,6 +150,8 @@ def analyze_interaction(
     x: Optional[str], default = None
     y: Optional[str], default = None
     hue: Optional[str], default = None
+    fit_distributions: Union[bool, str, List[str]], default = False,
+        If `True`, or list of distributions is provided, then fit distributions. Performed only if `y` and `hue` are not present.
     chart_args: Optional[dict], default = None
         kwargs to pass into visualization component
     fig_args: Optional[Dict[str, Any]], default = None,
@@ -172,16 +176,39 @@ def analyze_interaction(
     chart_args = get_empty_dict_if_none(chart_args)
 
     key = "__analysis__"
+
+    _analysis_args = analysis_args.copy()
+    _analysis_args.pop("return_state", None)
+    state = analyze(return_state=True, **_analysis_args, anlz_facets=[RawTypesAnalysis(), VariableTypeAnalysis()])
+
+    analysis_facets: List[AbstractAnalysis] = [
+        FeatureInteraction(key=key, x=x, y=y, hue=hue),
+    ]
+
+    x_type = state.variable_type.train_data[x]
+    if _is_single_numeric_variable(x, y, hue, x_type) and (fit_distributions is not False):
+        dists: Optional[List[str]]  # fit all
+        if fit_distributions is True:
+            dists = None
+        elif isinstance(fit_distributions, str):
+            dists = [fit_distributions]
+        else:
+            dists = fit_distributions
+
+        analysis_facets.append(DistributionFit(columns=x, distributions_to_fit=dists))  # type: ignore # x is always present
+
     return analyze(
         **analysis_args,
-        anlz_facets=[
-            RawTypesAnalysis(),
-            FeatureInteraction(key=key, x=x, y=y, hue=hue),
-        ],
+        state=state,
+        anlz_facets=analysis_facets,
         viz_facets=[
             FeatureInteractionVisualization(key=key, fig_args=fig_args, **chart_args),
         ],
     )
+
+
+def _is_single_numeric_variable(x, y, hue, x_type):
+    return (x is not None) and (y is None) and (hue is None) and (x_type == "numeric")
 
 
 def quick_fit(

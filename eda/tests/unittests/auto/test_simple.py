@@ -9,13 +9,18 @@ import pytest
 from autogluon.eda import AnalysisState
 from autogluon.eda.analysis import Namespace
 from autogluon.eda.analysis.base import BaseAnalysis
-from autogluon.eda.auto import analyze, covariate_shift_detection, dataset_overview, quick_fit
-from autogluon.eda.auto.simple import get_default_estimator_if_not_specified, get_empty_dict_if_none
+from autogluon.eda.auto import analyze, analyze_interaction, covariate_shift_detection, dataset_overview, quick_fit
+from autogluon.eda.auto.simple import (
+    _is_single_numeric_variable,
+    get_default_estimator_if_not_specified,
+    get_empty_dict_if_none,
+)
 from autogluon.eda.visualization import (
     ConfusionMatrix,
     DatasetStatistics,
     DatasetTypeMismatch,
     FeatureImportance,
+    FeatureInteractionVisualization,
     MarkdownSectionComponent,
     ModelLeaderboard,
     RegressionEvaluation,
@@ -197,3 +202,59 @@ def test_get_default_estimator_if_not_specified(hyperparameters_present, presets
         assert "RF" in get_default_estimator_if_not_specified(fit_args)["hyperparameters"]
     else:
         assert get_default_estimator_if_not_specified(fit_args) == fit_args
+
+
+@pytest.mark.parametrize(
+    "fit_distributions, expected_dist",
+    [
+        (["exponpow", "nakagami", "beta", "gamma", "lognorm"], ["exponpow", "nakagami", "beta", "lognorm", "gamma"]),
+        ("lognorm", ["lognorm"]),
+        (True, ["exponpow", "nakagami", "gompertz"]),
+    ],
+)
+def test_analyze_interaction__with_distribution(monkeypatch, fit_distributions, expected_dist):
+    df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
+
+    call_fiv_render = MagicMock()
+    with monkeypatch.context() as m:
+        m.setattr(FeatureInteractionVisualization, "render", call_fiv_render)
+        state = analyze_interaction(
+            train_data=df_train,
+            x="age",
+            fit_distributions=fit_distributions,
+            return_state=True,
+        )
+    assert list(state.distributions_fit.train_data.age.keys()) == expected_dist
+    call_fiv_render.assert_called_once()
+
+
+def test_analyze_interaction__do_not_fit(monkeypatch):
+    df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
+
+    call_fiv_render = MagicMock()
+    with monkeypatch.context() as m:
+        m.setattr(FeatureInteractionVisualization, "render", call_fiv_render)
+        state = analyze_interaction(
+            train_data=df_train,
+            x="age",
+            return_state=True,
+        )
+    assert state.distributions_fit is None
+    call_fiv_render.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "x, y, hue, x_type, expected",
+    [
+        ("x", "y", "hue", "numeric", False),
+        ("x", "y", "hue", "category", False),
+        ("x", "y", None, "numeric", False),
+        ("x", "y", None, "category", False),
+        ("x", None, "hue", "numeric", False),
+        ("x", None, "hue", "category", False),
+        ("x", None, None, "numeric", True),
+        ("x", None, None, "category", False),
+    ],
+)
+def test_analyze_interaction__is_single_numeric_variable(x, y, hue, x_type, expected):
+    assert _is_single_numeric_variable(x, y, hue, x_type) is expected
