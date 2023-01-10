@@ -76,10 +76,15 @@ class ResourceManager:
         return bytes_to_mega_bytes(psutil.virtual_memory().total)
 
     @staticmethod
+    @disable_if_lite_mode(ret=None)
+    def get_process(pid=None):
+        import psutil
+        return psutil.Process(pid)
+
+    @staticmethod
     @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
     def get_memory_rss():
-        import psutil
-        return psutil.Process().memory_info().rss
+        return ResourceManager.get_process().memory_info().rss
 
     @staticmethod
     @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.

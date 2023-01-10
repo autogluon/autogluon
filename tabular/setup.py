@@ -25,15 +25,6 @@ install_requires = [
     'pandas',
     'scikit-learn',
     'networkx>=2.3,<3.0',
-    f'autogluon.core=={version}',
-    f'autogluon.features=={version}',
-] if not ag.LITE_MODE else [
-    # version ranges added in ag.get_dependency_version_ranges()
-    'numpy',
-    'scipy',
-    'pandas',
-    'scikit-learn',
-    'networkx>=2.3,<3.0',
     f'{ag.PACKAGE_NAME}.core=={version}',
     f'{ag.PACKAGE_NAME}.features=={version}',
 ]

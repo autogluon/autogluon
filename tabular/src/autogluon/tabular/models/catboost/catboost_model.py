@@ -220,7 +220,6 @@ class CatBoostModel(AbstractModel):
     #  It will return an updated iterations to train on that will avoid running OOM and running over time limit.
     #  Remove this logic once CatBoost fixes GPU support for callbacks and custom metrics.
     def _estimate_iter_in_time_gpu(self, *, X, eval_set, time_limit, verbose, params, num_rows_train, time_start, model_type):
-        import psutil
         import math
         import pickle
         import sys
@@ -248,7 +247,7 @@ class CatBoostModel(AbstractModel):
         time_taken_per_iter = (time_left_start - time_left_end) / num_sample_iter
         estimated_iters_in_time = round(time_left_end / time_taken_per_iter)
 
-        available_mem = psutil.virtual_memory().available
+        available_mem = ResourceManager.get_available_virtual_mem()
         if self.problem_type == SOFTCLASS:
             model_size_bytes = 1  # skip memory check
         else:
@@ -289,11 +288,10 @@ class CatBoostModel(AbstractModel):
 
     @disable_if_lite_mode()
     def _validate_fit_memory_usage(self, **kwargs):
-        import psutil
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         approx_mem_size_req = self.estimate_memory_usage(**kwargs)
         if approx_mem_size_req > 1e9:  # > 1 GB
-            available_mem = psutil.virtual_memory().available
+            available_mem = ResourceManager.get_available_virtual_mem()
             ratio = approx_mem_size_req / available_mem
             if ratio > (1 * max_memory_usage_ratio):
                 logger.warning('\tWarning: Not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))

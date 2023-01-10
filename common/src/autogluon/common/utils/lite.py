@@ -8,7 +8,7 @@ def disable_if_lite_mode(ret=None):
                 return ret(*args, **kwargs)
             return ret
         metadata = get_autogluon_metadata()
-        if metadata['lite']:
+        if 'lite' in metadata and metadata['lite']:
             return do_nothing
         return func
     return inner
