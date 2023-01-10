@@ -14,7 +14,7 @@ from .download import download, is_url
 logger = logging.getLogger(AUTOMM)
 
 
-def convert_data_to_df(data) -> pd.DataFrame:
+def convert_data_to_df(data: Union[Dict, List[str], str]) -> pd.DataFrame:
     """
     Construct a dataframe from a data dictionary, json file path (for COCO), folder path (for VOC),
     image path (for single image), list of image paths (for multiple images)
@@ -40,7 +40,7 @@ def convert_data_to_df(data) -> pd.DataFrame:
     )
 
 
-def from_str(data) -> pd.DataFrame:
+def from_str(data: str) -> pd.DataFrame:
     """
     Construct a dataframe a string representing a single image path
     Parameters
@@ -60,7 +60,7 @@ def from_str(data) -> pd.DataFrame:
     return df.sort_values("image").reset_index(drop=True)
 
 
-def from_list(data) -> pd.DataFrame:
+def from_list(data: List[str]) -> pd.DataFrame:
     """
     Construct a dataframe from list of image paths
     Parameters
