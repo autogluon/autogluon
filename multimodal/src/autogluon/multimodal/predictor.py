@@ -1704,26 +1704,17 @@ class MultiModalPredictor:
         data = data_to_df(data=data)
 
         if self._column_types is None:
-            allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
-            column_types = infer_column_types(
-                data=data, allowable_column_types=allowable_dtypes, fallback_column_type=fallback_dtype
-            )
-            if self._label_column and self._label_column in data.columns:
-                column_types = infer_label_column_type_by_problem_type(
-                    column_types=column_types,
-                    label_columns=self._label_column,
-                    problem_type=self._problem_type,
-                    data=data,
-                )
-            if self._problem_type == OBJECT_DETECTION:
-                column_types = infer_rois_column_type(
-                    column_types=column_types,
-                    data=data,
-                )
+            column_types = self._infer_prediction_column_types(data)
         else:  # called .fit() or .load()
             column_types = self._column_types
             column_types_copy = copy.deepcopy(column_types)
             for col_name, col_type in column_types.items():
+                if col_name not in list(data.columns):
+                    # Found a column name mismatch after .fit() or .load() is called
+                    # Infer column titles for data if not matching with self._column_types
+                    logger.info(f"Column name {col_name} not found in data. Inferring the column types for data...")
+                    data_column_names = self._infer_data_column_names(data)
+                    data.columns = data_column_names
                 if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
                     if is_imagepath_column(data=data[col_name], col_name=col_name, sample_n=1):
                         image_type = IMAGE_PATH
@@ -1734,7 +1725,6 @@ class MultiModalPredictor:
                     if col_type != image_type:
                         column_types_copy[col_name] = image_type
             self._df_preprocessor._column_types = column_types_copy
-
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
                 config=self._config,
@@ -1752,6 +1742,35 @@ class MultiModalPredictor:
             data_processors.pop(LABEL, None)
 
         return data, df_preprocessor, data_processors
+
+    def _infer_prediction_column_types(self, data):
+        allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
+        column_types = infer_column_types(
+            data=data, allowable_column_types=allowable_dtypes, fallback_column_type=fallback_dtype
+        )
+        if self._label_column and self._label_column in data.columns:
+            column_types = infer_label_column_type_by_problem_type(
+                column_types=column_types,
+                label_columns=self._label_column,
+                problem_type=self._problem_type,
+                data=data,
+            )
+        if self._problem_type == OBJECT_DETECTION:
+            column_types = infer_rois_column_type(
+                column_types=column_types,
+                data=data,
+            )
+        return column_types
+
+    def _infer_data_column_names(self, data: pd.DataFrame):
+        data_column_types = self._infer_prediction_column_types(data)
+        column_names = []
+        col_type_to_col_name = {v: k for k, v in self._column_types.items()}
+        for col_name in list(data.columns):
+            col_type = data_column_types[col_name]
+            adj_col_name = col_type_to_col_name[col_type]
+            column_names.append(adj_col_name)
+        return column_names
 
     def evaluate_coco(
         self,

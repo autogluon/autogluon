@@ -9,14 +9,26 @@ def test_classification_str_list_input():
     train_data, test_data = shopee_dataset(download_dir)
 
     model_path = f"./tmp/{uuid.uuid4().hex}-automm_shopee"
-    predictor = MultiModalPredictor(label="label", path=model_path)
+    predictor = MultiModalPredictor(
+        label="label",
+        path=model_path,
+        hyperparameters={
+            "env.num_gpus": 1,
+        },
+    )
     predictor.fit(
         train_data=train_data,
         time_limit=30,  # seconds
     )  # you can trust the default config, e.g., we use a `swin_base_patch4_window7_224` model
 
     image_path = test_data.iloc[0]["image"]
-
-    predictions_str = predictor.predict(image_path)
+    predictions_str = predictor.predict([image_path])
     predictions_list1 = predictor.predict([image_path])
     predictions_list10 = predictor.predict([image_path] * 10)
+    assert len(predictions_str) == 1
+    assert len(predictions_list1) == 1
+    assert len(predictions_list10) == 10
+
+
+if __name__ == "__main__":
+    test_classification_str_list_input()
