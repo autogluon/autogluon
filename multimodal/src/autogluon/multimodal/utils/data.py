@@ -457,10 +457,6 @@ def data_to_df(
         data = pd.DataFrame(data)
     elif isinstance(data, list):
         assert len(data) > 0, f"Expected data to have length > 0, but got {data} of len {len(data)}"
-        # if header is None:
-        #     data = pd.DataFrame(data)
-        #     data = check_if_imagepath_and_add_column_title(data)
-        # else:
         data = pd.DataFrame(data)
     elif isinstance(data, str):
         if is_valid_imagepath(data):
