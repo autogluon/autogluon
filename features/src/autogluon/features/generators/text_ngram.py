@@ -8,7 +8,7 @@ import psutil
 from pandas import DataFrame, Series
 from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 
-from autogluon.common.features.types import S_IMAGE_PATH, S_TEXT, S_TEXT_NGRAM
+from autogluon.common.features.types import S_IMAGE_PATH, S_IMAGE_BYTEARRAY, S_TEXT, S_TEXT_NGRAM
 
 from .abstract import AbstractFeatureGenerator
 from ..vectorizers import get_ngram_freq, downscale_vectorizer, vectorizer_auto_ml_default
@@ -112,7 +112,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict(required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH])
+        return dict(required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY])
 
     def _fit_transform_ngrams(self, X):
         if not self.features_in:

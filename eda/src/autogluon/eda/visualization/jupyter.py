@@ -1,4 +1,4 @@
-from IPython.display import display, HTML, Markdown
+from IPython.display import HTML, Markdown, display
 
 
 class JupyterMixin:

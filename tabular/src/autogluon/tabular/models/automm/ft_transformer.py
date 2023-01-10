@@ -98,3 +98,7 @@ class FTTransformerModel(MultiModalPredictorModel):
         }
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
+
+    @classmethod
+    def _class_tags(cls):
+        return {'handles_text': False}

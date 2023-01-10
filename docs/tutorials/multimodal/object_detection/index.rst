@@ -1,9 +1,9 @@
-Object Detection
-================
+Image Data -- Object Detection
+==============================
 
 Pre-requisite
 -------------
-All detection modules depend on ``mmcv-full`` and ``mmdet`` packages.
+All detection modules depend on ``mmcv-full``, ``mmdet`` and ``pycocotools`` packages.
 
 
 To install ``mmcv-full``, run:
@@ -14,10 +14,18 @@ To install ``mmdet``, run:
 
     ``pip install mmdet``
 
+To install ``pycocotools``, run:
+
+    ``pip install pycocotools``
+
+We suggest to install the version between ``pycocotools>=2.0.5,<2.0.7``.
+Note that Windows users should install ``pycocotools`` by: ``pip install pycocotools-windows``, but it only supports python 3.6/3.7/3.8.
+
 For additional support, please refer to official instructions for mmdet_ and mmcv-full_
 
 .. _mmdet: https://mmdetection.readthedocs.io/en/v2.2.1/install.html
 .. _mmcv-full: https://mmcv.readthedocs.io/en/latest/get_started/installation.html
+
 
 
 Quick Start

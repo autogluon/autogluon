@@ -4,9 +4,9 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import missingno as msno
 
+from .. import AnalysisState
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
-from .. import AnalysisState
 
 __all__ = ["MissingValues"]
 logger = logging.getLogger(__name__)

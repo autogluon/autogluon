@@ -252,3 +252,7 @@ class VowpalWabbitModel(AbstractModel):
     def _more_tags(self):
         # `can_refit_full=True` because best epoch is communicated at end of `_fit`: `self.params_trained['passes'] = epoch`
         return {'can_refit_full': True}
+
+    @classmethod
+    def _class_tags(cls):
+        return {'handles_text': True}

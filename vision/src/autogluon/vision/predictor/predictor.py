@@ -14,9 +14,9 @@ except ImportError:
     timm = None
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
-from autogluon.core.utils import ResourceManager
 from autogluon.core.utils.try_import import try_import_d8
 from autogluon.core.utils.utils import generate_train_test_split
 from autogluon.multimodal.predictor import MultiModalPredictor

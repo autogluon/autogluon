@@ -26,6 +26,7 @@ from ..constants import (
     NUMERICAL,
     ROIS,
     TEXT,
+    TEXT_NER,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -87,7 +88,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
-            if col_type.startswith((TEXT, IMAGE, ROIS)) or col_type == NULL:
+            if col_type.startswith((TEXT, IMAGE, ROIS, TEXT_NER)) or col_type == NULL:
                 continue
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(
@@ -128,6 +129,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self._categorical_num_categories = []
         self._numerical_feature_names = []
         self._image_feature_names = []
+        self._rois_feature_names = []
+        self._ner_feature_names = []
 
     @property
     def label_column(self):
@@ -143,6 +146,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             return self._image_path_names
         else:
             return [col_name for col_name in self._image_feature_names if self._column_types[col_name] == IMAGE_PATH]
+
+    @property
+    def rois_feature_names(self):
+        return self._rois_feature_names
 
     @property
     def image_bytearray_names(self):
@@ -165,6 +172,17 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return self._numerical_feature_names
 
     @property
+    def ner_feature_names(self):
+        # Added for backward compatibility for v0.6.0 where column_type is not specified.
+        if hasattr(self, "_ner_feature_names"):
+            return self._ner_feature_names
+        else:
+            if len(self.text_feature_names) > 0:
+                return self.text_feature_names[:1]
+            else:
+                return []
+
+    @property
     def required_feature_names(self):
         image_feature_names = (
             self._image_path_names if hasattr(self, "_image_path_names") else self._image_feature_names
@@ -175,6 +193,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             + self._text_feature_names
             + self._numerical_feature_names
             + self._categorical_feature_names
+            + self._rois_feature_names
         )
 
     @property
@@ -215,12 +234,14 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return self._fit_y_called
 
     def get_column_names(self, modality: str):
-        if modality.startswith(IMAGE) or modality == ROIS:
+        if modality.startswith(IMAGE):
             if hasattr(self, "_image_path_names"):
                 return self._image_path_names
             else:
                 return self._image_feature_names
-        elif modality.startswith(TEXT):
+        elif modality == ROIS:
+            return self._rois_feature_names
+        elif modality == TEXT:
             return self._text_feature_names
         elif modality == CATEGORICAL:
             return self._categorical_feature_names
@@ -229,7 +250,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif modality == LABEL:
             return [self._label_column]  # as a list to be consistent with others
         elif self.label_type == NER_ANNOTATION:
-            return self._text_feature_names + [self._label_column]
+            return self.ner_feature_names + [self._label_column]
         else:
             raise ValueError(f"Unknown modality: {modality}.")
 
@@ -258,6 +279,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             col_value = X[col_name]
             if col_type == NULL:
                 self._ignore_columns_set.add(col_name)
+            elif col_type.startswith(TEXT_NER):
+                self._ner_feature_names.append(col_name)
             elif col_type.startswith(TEXT):
                 self._text_feature_names.append(col_name)
             elif col_type == CATEGORICAL:
@@ -293,8 +316,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     generator = self._feature_generators[col_name]
                     generator.fit(np.expand_dims(processed_data.to_numpy(), axis=-1))
                     self._numerical_feature_names.append(col_name)
-            elif col_type.startswith(IMAGE) or col_type == ROIS:  # TODO: Use transform_multimodal and remove this hack
+            elif col_type.startswith(IMAGE):
                 self._image_feature_names.append(col_name)
+            elif col_type == ROIS:
+                self._rois_feature_names.append(col_name)
             else:
                 raise NotImplementedError(
                     f"Type of the column is not supported currently. Received {col_name}={col_type}."
@@ -321,7 +346,18 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif self.label_type == ROIS:
             pass  # Do nothing. TODO: Shall we call fit here?
         elif self.label_type == NER_ANNOTATION:
-            self._label_generator.fit(y, X[self._text_feature_names[0]])
+            # If there are ner annotations and text columns but no NER feature columns,
+            # we will convert the first text column into a ner column.
+            # Added for backward compatibility for v0.6.0 where column_type is not specified.
+            if len(self._ner_feature_names) == 0:
+                if len(self._text_feature_names) != 0:
+                    self._ner_feature_names.append(self._text_feature_names.pop(0))
+                    self.column_types[self._ner_feature_names[0]] = TEXT_NER
+                else:
+                    raise NotImplementedError(
+                        f"Text column is necessary for named entity recognition, however, no text column is detected."
+                    )
+            self._label_generator.fit(y, X[self.ner_feature_names[0]])
         else:
             raise NotImplementedError(f"Type of label column is not supported. Label column type={self.label_type}")
 
@@ -386,6 +422,50 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         return text_features, text_types
 
+    def transform_rois(
+        self,
+        df: pd.DataFrame,
+    ) -> Tuple[Dict[str, List[List[str]]], Dict[str, str]]:
+        """
+        Preprocess image + rois data.
+        For image data we preprocess them by collecting their paths together. If one sample has multiple images
+        in an image column, assume that their image paths are separated by ";".
+        For rois data we simply convert them from a column of pandas dataframe to a list.
+        This function needs to be called preceding the rois processor in "process_rois.py".
+
+        Parameters
+        ----------
+        df
+            The multimodal pd.DataFrame.
+
+        Returns
+        -------
+        image_features
+            All the image data stored in a dictionary.
+        image_types
+            The column types of these image data, e.g., image_path or image_identifier.
+        """
+        assert (
+            self._fit_called or self._fit_x_called
+        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_rois."
+
+        x = self.transform_image(df)
+        ret_data = x[0]
+        ret_type = x[1]
+
+        for col_name in self._rois_feature_names:
+            col_type = self._column_types[col_name]
+
+            if col_type == ROIS:
+                processed_data = df[col_name].tolist()
+            else:
+                raise ValueError(f"Unknown image type {col_type} for column {col_name}")
+
+            ret_data[col_name] = processed_data
+            ret_type[col_name] = self._column_types[col_name]
+
+        return ret_data, ret_type
+
     def transform_image(
         self,
         df: pd.DataFrame,
@@ -419,7 +499,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             if col_type == ROIS:
                 processed_data = df[col_name].tolist()
             elif col_type in [IMAGE_PATH, IMAGE]:
-                processed_data = col_value.apply(lambda ele: ele.split(";")).tolist()
+                processed_data = col_value.apply(lambda ele: str(ele).split(";")).tolist()
             elif col_type == IMAGE_BYTEARRAY:
                 processed_data = col_value.apply(lambda ele: ele if isinstance(ele, list) else [ele]).tolist()
             elif col_type == f"{IMAGE}_{IDENTIFIER}":
@@ -542,15 +622,29 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         return {self._label_column: y}, {self._label_column: self.label_type}
 
-    def transform_ner(
+    def transform_text_ner(
         self,
         df: pd.DataFrame,
     ) -> Tuple[Dict[str, NDArray[(Any,), Any]], Dict[str, str]]:
+        assert (
+            self._fit_called or self._fit_x_called
+        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_ner."
         ret_data, ret_type = {}, {}
+        ner_text_features = {}
+        ner_text_types = {}
+        for col_name in self.ner_feature_names:
+            col_value = df[col_name]
+            col_type = self._column_types[col_name]
+            if col_type.startswith((TEXT_NER, TEXT)):
+                col_value = col_value.astype("object")
+                processed_data = col_value.apply(lambda ele: "" if pd.isnull(ele) else str(ele))
+            else:
+                raise ValueError(f"Column {col_name} has type {col_type}, which can't be converted to text.")
+            ner_text_features[col_name] = processed_data.values.tolist()
+            ner_text_types[col_name] = col_type
         if self.label_type == NER_ANNOTATION:
-            x = self.transform_text(df)
-            ret_data.update(x[0])
-            ret_type.update(x[1])
+            ret_data.update(ner_text_features)
+            ret_type.update(ner_text_types)
             if self._label_column in df:
                 y = self.transform_label(df)
                 ret_data.update(y[0])
@@ -590,7 +684,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             # need to compute the metric on the raw numerical values (no normalization)
             y = pd.to_numeric(y_df).to_numpy()
         elif self.label_type == NER_ANNOTATION:
-            x_df = df[self._text_feature_names[0]]
+            x_df = df[self.ner_feature_names[0]]
             y = self._label_generator.transform_label_for_metric(y_df, x_df, tokenizer)
         else:
             raise NotImplementedError

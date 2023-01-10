@@ -7,7 +7,7 @@ import pytest
 from contextlib import contextmanager
 from typing import List
 
-from autogluon.core.utils import ResourceManager
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.utils import download, unzip
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
@@ -129,6 +129,7 @@ class FitHelper:
     @staticmethod
     def fit_and_validate_dataset(dataset_name,
                                  fit_args,
+                                 init_args=None,
                                  sample_size=1000,
                                  refit_full=True,
                                  delete_directory=True,
@@ -142,10 +143,15 @@ class FitHelper:
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
         label = dataset_info['label']
         save_path = os.path.join(directory_prefix, dataset_name, f'AutogluonOutput_{uuid.uuid4()}')
-        init_args = dict(
+        _init_args = dict(
             label=label,
             path=save_path,
         )
+        if init_args is None:
+            init_args = _init_args
+        else:
+            _init_args.update(init_args)
+            init_args = _init_args
         predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)
         if compile_models:
             predictor.compile_models(models="all", compiler_configs=compiler_configs)
@@ -285,4 +291,8 @@ def mock_num_cpus():
 
 @pytest.fixture
 def mock_num_gpus():
+    return 2
+
+@pytest.fixture
+def k_fold():
     return 2

@@ -10,6 +10,8 @@ from torch import nn
 from ..constants import (
     AUTOMM,
     CATEGORICAL_TRANSFORMER,
+    FUSION_MLP,
+    FUSION_NER,
     FUSION_TRANSFORMER,
     HF_MODELS,
     NER,
@@ -18,12 +20,12 @@ from ..constants import (
     REGRESSION,
     VALID_CONFIG_KEYS,
 )
-from ..presets import get_automm_presets, get_basic_automm_config
+from ..presets import get_automm_presets, get_basic_automm_config, get_preset_str
 
 logger = logging.getLogger(AUTOMM)
 
 
-def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[str]]):
+def filter_search_space(hyperparameters: Dict, keys_to_filter: Union[str, List[str]]):
     """
     Filter search space within hyperparameters without the given keys as prefixes.
     Hyperparameters that are not search space will not be filtered.
@@ -39,6 +41,9 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
     -------
         hyperparameters being filtered
     """
+    if isinstance(keys_to_filter, str):
+        keys_to_filter = [keys_to_filter]
+
     assert any(
         key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter
     ), f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
@@ -47,8 +52,6 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
     from autogluon.core.space import Space
 
     hyperparameters = copy.deepcopy(hyperparameters)
-    if isinstance(keys_to_filter, str):
-        keys_to_filter = [keys_to_filter]
     for hyperparameter, value in hyperparameters.copy().items():
         if not isinstance(value, (Space, Domain)):
             continue
@@ -59,6 +62,7 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
 
 
 def get_config(
+    problem_type: Optional[str] = None,
     presets: Optional[str] = None,
     config: Optional[Union[dict, DictConfig]] = None,
     overrides: Optional[Union[str, List[str], Dict]] = None,
@@ -70,11 +74,13 @@ def get_config(
 
     Parameters
     ----------
+    problem_type
+        Problem type.
     presets
-        Name of the presets.
+        Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
     config
         A dictionary including four keys: "model", "data", "optimization", and "environment".
-        If any key is not not given, we will fill in with the default value.
+        If any key is not given, we will fill in with the default value.
 
         The value of each key can be a string, yaml path, or DictConfig object. For example:
         config = {
@@ -121,6 +127,8 @@ def get_config(
     -------
     Configurations as a DictConfig object
     """
+    presets = get_preset_str(problem_type=problem_type, presets=presets)
+
     if config is None:
         config = {}
 
@@ -480,8 +488,7 @@ def update_config_by_rules(
                 "the loss_function automatically otherwise.",
                 UserWarning,
             )
-    if problem_type == NER:
-        config.model.names = [NER_TEXT]
+
     return config
 
 

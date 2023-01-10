@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from .constants import DATA, DISTILLER, ENVIRONMENT, MATCHER, MODEL, OPTIMIZATION, QUERY, RESPONSE
+from .constants import BINARY, DATA, ENVIRONMENT, MODEL, MULTICLASS, OPTIMIZATION, REGRESSION
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")
@@ -8,9 +8,15 @@ matcher_presets = Registry("matcher_presets")
 
 
 @automm_presets.register()
-def default():
+def high_quality_fast_inference():
     return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+        "model.names": [
+            "categorical_mlp",
+            "numerical_mlp",
+            "timm_image",
+            "hf_text",
+            "fusion_mlp",
+        ],
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
         "env.num_workers": 2,
@@ -18,9 +24,20 @@ def default():
 
 
 @automm_presets.register()
+def default():
+    return automm_presets.create("high_quality_fast_inference")
+
+
+@automm_presets.register()
 def medium_quality_faster_train():
     return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+        "model.names": [
+            "categorical_mlp",
+            "numerical_mlp",
+            "timm_image",
+            "hf_text",
+            "fusion_mlp",
+        ],
         "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
         "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
         "optimization.learning_rate": 4e-4,
@@ -439,7 +456,13 @@ def medium_quality_faster_inference_image_text_similarity():
 @automm_presets.register()
 def best_quality_ner():
     return {
-        "model.names": ["ner_text"],
+        "model.names": [
+            "categorical_mlp",
+            "numerical_mlp",
+            "timm_image",
+            "ner_text",
+            "fusion_ner",
+        ],
         "model.ner_text.checkpoint_name": "microsoft/deberta-v3-large",
         "env.per_gpu_batch_size": 4,
     }
@@ -448,7 +471,13 @@ def best_quality_ner():
 @automm_presets.register()
 def medium_quality_faster_inference_ner():
     return {
-        "model.names": ["ner_text"],
+        "model.names": [
+            "categorical_mlp",
+            "numerical_mlp",
+            "timm_image",
+            "ner_text",
+            "fusion_ner",
+        ],
         "model.ner_text.checkpoint_name": "google/electra-small-discriminator",
     }
 
@@ -456,9 +485,20 @@ def medium_quality_faster_inference_ner():
 @automm_presets.register()
 def high_quality_fast_inference_ner():
     return {
-        "model.names": ["ner_text"],
+        "model.names": [
+            "categorical_mlp",
+            "numerical_mlp",
+            "timm_image",
+            "ner_text",
+            "fusion_ner",
+        ],
         "model.ner_text.checkpoint_name": "microsoft/deberta-v3-base",
     }
+
+
+@automm_presets.register()
+def ner():
+    return automm_presets.create("high_quality_fast_inference_ner")
 
 
 def list_automm_presets(verbose: bool = False):
@@ -526,3 +566,33 @@ def get_automm_presets(presets: str):
         )
 
     return overrides
+
+
+def get_preset_str(problem_type: str, presets: str):
+    """
+    Concatenate problem type and presets to get a registered preset string.
+
+    Parameters
+    ----------
+    problem_type
+        Problem type.
+    presets
+        Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+
+    Returns
+    -------
+    A registered preset string.
+    """
+    if problem_type in [
+        BINARY,
+        MULTICLASS,
+        REGRESSION,
+    ]:
+        return presets
+
+    if problem_type and presets:
+        return f"{presets}_{problem_type}"
+    elif problem_type:
+        return problem_type
+    else:
+        return presets

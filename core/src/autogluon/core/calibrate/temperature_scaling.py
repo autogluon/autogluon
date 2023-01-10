@@ -30,7 +30,7 @@ def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_va
     import torch
 
     # This is required to avoid error when passing np.uint16 to torch.tensor. This can occur if >255 classes (Dionis)
-    y_val = y_val.astype('int')
+    y_val = y_val.astype(np.int64)
 
     y_val_tensor = torch.tensor(y_val)
     temperature_param = torch.nn.Parameter(torch.ones(1).fill_(init_val))
