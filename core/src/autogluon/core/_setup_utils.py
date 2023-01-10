@@ -21,6 +21,7 @@ DEPENDENT_PACKAGES = {
     'scikit-learn': '>=1.0.0,<1.2',
     'scipy': '>=1.5.4,<1.10.0',
     'psutil': '>=5.7.3,<6',
+    'networkx': '>=2.3,<3.0',
     'gluoncv': '>=0.10.5,<0.10.6',
     'tqdm': '>=4.38.0',
     'Pillow': '>=9.3.0,<=9.4.0',

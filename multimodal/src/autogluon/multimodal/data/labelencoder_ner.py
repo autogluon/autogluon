@@ -81,8 +81,6 @@ class NerLabelEncoder:
             sentence_annotations = []
             for annot in json_ner_annotations:
                 entity_group = annot[ENTITY_GROUP]
-                if not (entity_group.startswith(self.b_prefix) or entity_group.startswith(self.i_prefix)):
-                    entity_group = self.b_prefix + entity_group
                 all_entity_groups.append(entity_group)
                 if self.entity_map is not None:
                     if entity_group in self.entity_map:
@@ -178,13 +176,7 @@ class NerLabelEncoder:
             temp_pred, temp_offset = [], []
             for token_pred, offset in zip(token_preds, offsets):
                 inverse_pred_label = self.inverse_entity_map[token_pred]
-                if (
-                    not (inverse_pred_label.startswith(self.b_prefix) or inverse_pred_label.startswith(self.i_prefix))
-                    and inverse_pred_label != self.ner_special_tags[-1]
-                ):
-                    temp_pred.append(self.b_prefix + inverse_pred_label)
-                else:
-                    temp_pred.append(inverse_pred_label)
+                temp_pred.append(inverse_pred_label)
                 if inverse_pred_label != self.ner_special_tags[-1]:
                     temp_offset.append(
                         {
