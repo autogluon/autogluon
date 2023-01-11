@@ -632,6 +632,42 @@ def target_analysis(
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
 ) -> Optional[AnalysisState]:
+    """
+    Target variable composite analysis.
+
+    Performs the following analysis components of the label field:
+     - basic summary stats
+     - feature values distribution charts; adds fitted distributions for numeric targets
+     - target correlations analysis; with interaction charts of target vs high-correlated features
+
+    Parameters
+    ----------
+    train_data: Optional[DataFrame]
+        training dataset
+    label: : Optional[str]
+        target variable
+    state: Union[None, dict, AnalysisState], default = None
+        pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
+    sample: Union[None, int, float], default = None
+        sample size; if `int`, then row number is used;
+        `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
+        `None` means no sampling
+        See also :func:`autogluon.eda.analysis.dataset.Sampler`
+    return_state: bool, default = False
+        return state if `True`
+
+    Returns
+    -------
+        state after `fit` call if `return_state` is `True`; `None` otherwise
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>>
+    >>> auto.target_analysis(train_data=..., label=...)
+
+
+    """
 
     assert label in train_data.columns, f"label `{label}` is not in `train_data` columns: `{train_data.columns}`"
 
