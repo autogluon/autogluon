@@ -235,6 +235,7 @@ class MultiModalPredictor:
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
         sample_data_path: Optional[str] = None,
+        clean_old_ckpts: Optional[bool] = True,
     ):
         """
         Parameters
@@ -422,6 +423,7 @@ class MultiModalPredictor:
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._model_loaded = False  # Whether the model has been loaded
         self._matcher = None
+        self._clean_old_ckpts = clean_old_ckpts
 
         if path is not None:
             self._save_path = setup_save_path(
@@ -555,6 +557,7 @@ class MultiModalPredictor:
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         tuning_data: Optional[Union[pd.DataFrame, str]] = None,
+        max_tuning_num: Optional[int] = None,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         time_limit: Optional[int] = None,
         save_path: Optional[str] = None,
@@ -706,9 +709,9 @@ class MultiModalPredictor:
             if tuning_data is not None:
                 self.detection_anno_train = tuning_data
                 tuning_data = from_coco_or_voc(tuning_data, "val")
-                # TODO: set an option to remove it
-                if len(tuning_data) > 3000:
-                    tuning_data = tuning_data.sample(n=3000, replace=False).reset_index(drop=True)
+                if max_tuning_num is not None:
+                    if len(tuning_data) > max_tuning_num:
+                        tuning_data = tuning_data.sample(n=max_tuning_num, replace=False).reset_index(drop=True)
 
         if hyperparameter_tune_kwargs is not None:
             # TODO: can we support hyperparameters being the same format as regular training?
@@ -1691,7 +1694,7 @@ class MultiModalPredictor:
 
         torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
-        if False:  # TODO: add a flag here
+        if self._clean_old_ckpts:
             # clean old checkpoints + the intermediate files stored
             for per_path in top_k_model_paths:
                 if os.path.isfile(per_path):
