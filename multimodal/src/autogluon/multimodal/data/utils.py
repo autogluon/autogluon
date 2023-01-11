@@ -1,5 +1,6 @@
 import codecs
 import random
+import re
 import warnings
 from typing import Dict, Iterable, List, Optional, Tuple, Union
 
@@ -347,13 +348,14 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
             # support multiple words in an annotated offset range.
             if word_offset[0] >= custom_offset[0] and word_offset[1] <= custom_offset[1]:
                 if not (custom_label.startswith(b_prefix) or custom_label.startswith(i_prefix)):
-                    if is_start_word:
+                    if is_start_word and b_prefix + custom_label in entity_map:
                         word_label[idx] = entity_map[b_prefix + custom_label]
                         is_start_word = False
-                    else:
+                    elif i_prefix + custom_label in entity_map:
                         word_label[idx] = entity_map[i_prefix + custom_label]
                 else:
-                    word_label[idx] = entity_map[custom_label]
+                    if custom_label in entity_map:
+                        word_label[idx] = entity_map[custom_label]
 
     token_label = [0] * len(col_tokens.input_ids)
     temp = set()

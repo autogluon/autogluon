@@ -81,7 +81,10 @@ class NerLabelEncoder:
             sentence_annotations = []
             for annot in json_ner_annotations:
                 entity_group = annot[ENTITY_GROUP]
-                if not (entity_group.startswith(self.b_prefix) or entity_group.startswith(self.i_prefix)):
+                if not (
+                    re.match(self.b_prefix, entity_group, re.IGNORECASE)
+                    or re.match(self.i_prefix, entity_group, re.IGNORECASE)
+                ):
                     all_entity_groups.append(self.b_prefix + entity_group)
                     all_entity_groups.append(self.i_prefix + entity_group)
                 else:
