@@ -158,6 +158,7 @@ def create_data_processor(
         data_processor = NerProcessor(
             model=model,
             max_len=model_config.max_text_len,
+            config=config,
         )
     elif data_type == ROIS:
         data_processor = MMDetProcessor(

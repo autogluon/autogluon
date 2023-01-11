@@ -22,6 +22,7 @@ class NerLabelEncoder:
 
     def __init__(self, config: DictConfig, entity_map: Optional[dict] = None):
         self.entity_map = entity_map
+        self.config = config
         model_config = config.model.ner_text
         self.ner_special_tags = OmegaConf.to_object(model_config.special_tags)
         self.prefix = config.model.names[0]
@@ -35,6 +36,7 @@ class NerLabelEncoder:
         _, entity_groups = self.extract_ner_annotations(y)
         self.unique_entity_groups = self.ner_special_tags + entity_groups
         self.entity_map = {entity: index for index, entity in enumerate(self.unique_entity_groups)}
+        self.config.entity_map = self.entity_map
         self.inverse_entity_map = {index: entity for index, entity in enumerate(self.unique_entity_groups)}
         logger.debug(f"Unique entity groups in the data: {entity_groups}")
 
@@ -93,7 +95,6 @@ class NerLabelEncoder:
                     (
                         (annot[START_OFFSET], annot[END_OFFSET]),
                         entity_group,
-                        self.entity_map,
                     )
                 )
             all_annotations.append(sentence_annotations)
@@ -140,7 +141,9 @@ class NerLabelEncoder:
         all_annotations, _ = self.extract_ner_annotations(y)
         transformed_y = []
         for annotation, text_snippet in zip(all_annotations, x.items()):
-            word_label, _, _, _ = process_ner_annotations(annotation, text_snippet[-1], tokenizer, is_eval=True)
+            word_label, _, _, _ = process_ner_annotations(
+                annotation, text_snippet[-1], self.entity_map, tokenizer, is_eval=True
+            )
             word_label_invers = []
             for l in word_label:
                 entity_group = self.inverse_entity_map[l]
