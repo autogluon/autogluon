@@ -25,7 +25,7 @@ python3 -m pip install -r requirements_doc.txt
 python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
 ```
 
-Now you are ready to run the doc build:
+Now you can run the doc build:
 
 ```
 bash build_doc.sh
