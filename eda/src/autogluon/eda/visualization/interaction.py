@@ -34,8 +34,13 @@ class _AbstractCorrelationChart(AbstractVisualization, JupyterMixin, ABC):
     def _render_internal(self, state: AnalysisState, render_key: str, header: str, chart_args: Dict[str, Any]) -> None:
         for ds, corr in state[render_key].items():
             # Don't render single cell
-            if len(state.correlations[ds]) <= 1:
+            cells_num = len(state.correlations[ds])
+            if cells_num <= 1:
                 continue
+
+            fig_args = self.fig_args.copy()
+            if "figsize" not in fig_args:
+                fig_args["figsize"] = (cells_num, cells_num)
 
             if state.correlations_focus_field is not None:
                 focus_field_header = f"; focus: absolute correlation for {state.correlations_focus_field} >= {state.correlations_focus_field_threshold}"
@@ -43,13 +48,13 @@ class _AbstractCorrelationChart(AbstractVisualization, JupyterMixin, ABC):
                 focus_field_header = ""
             self.render_header_if_needed(state, f"{ds} - {state.correlations_method} {header}{focus_field_header}")
 
-            fig, ax = plt.subplots(**self.fig_args)
+            fig, ax = plt.subplots(**fig_args)
             sns.heatmap(
                 corr,
                 annot=True,
                 ax=ax,
-                linewidths=0.9,
-                linecolor="white",
+                linewidths=0.5,
+                linecolor="lightgrey",
                 fmt=".2f",
                 square=True,
                 cbar_kws={"shrink": 0.5},
@@ -163,13 +168,18 @@ class FeatureDistanceAnalysisVisualization(AbstractVisualization, JupyterMixin):
         return self.all_keys_must_be_present(state, "feature_distance")
 
     def _render(self, state: AnalysisState) -> None:
-        fig, ax = plt.subplots(**self.fig_args)
+        fig_args = self.fig_args.copy()
+        if "figsize" not in fig_args:
+            fig_args["figsize"] = (12, len(state.feature_distance.columns) / 4)
+
+        fig, ax = plt.subplots(**fig_args)
         default_args = dict(orientation="left")
         ax.grid(False)
         hc.dendrogram(
             ax=ax,
             Z=state.feature_distance.linkage,
             labels=state.feature_distance.columns,
+            leaf_font_size=10,
             **{**default_args, **self._kwargs},
         )
         plt.show(fig)
@@ -216,7 +226,8 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
     def __init__(
         self,
         key: str,
-        numeric_as_categorical_threshold=20,
+        numeric_as_categorical_threshold: int = 20,
+        max_categories_to_consider_render: int = 30,
         headers: bool = False,
         namespace: Optional[str] = None,
         fig_args: Optional[Dict[str, Any]] = None,
@@ -226,6 +237,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
         self.key = key
         self.headers = headers
         self.numeric_as_categorical_threshold = numeric_as_categorical_threshold
+        self.max_categories_to_consider_render = max_categories_to_consider_render
         if fig_args is None:
             fig_args = {}
         self.fig_args = fig_args
@@ -244,6 +256,17 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             y, y_type = self._get_value_and_type(ds, df, state, interaction_features, "y")
             hue, hue_type = self._get_value_and_type(ds, df, state, interaction_features, "hue")
 
+            # Don't render high-cardinality category variables
+            features = "/".join([interaction_features[k] for k in ["x", "y", "hue"] if k in interaction_features])
+            for f, t in [(x, x_type), (y, y_type), (hue, hue_type)]:
+                if t == "category" and df[f].nunique() > self.max_categories_to_consider_render:
+                    self.render_markdown(
+                        f"Interaction `{features}` is not rendered due to `{f}` "
+                        f"having too many categories (`{df[f].nunique()}` > `{self.max_categories_to_consider_render}`) "
+                        f"for comfortable read."
+                    )
+                    return
+
             y, y_type, hue, hue_type = self._swap_y_and_hue_if_necessary(x_type, y, y_type, hue, hue_type)
 
             renderer_cls: Optional[Type[_AbstractFeatureInteractionPlotRenderer]] = self._get_chart_renderer(
@@ -257,9 +280,12 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             chart_args, data, is_single_var = self._prepare_chart_args(df, x, x_type, y, y_type, hue)
 
             if self.headers:
-                features = "/".join([interaction_features[k] for k in ["x", "y", "hue"] if k in interaction_features])
                 prefix = "" if is_single_var else "Feature interaction between "
                 self.render_header_if_needed(state, f"{prefix}{features} in {ds}")
+
+            fig_args = self.fig_args.copy()
+            if "figsize" not in fig_args:
+                fig_args["figsize"] = (12, 6)
 
             renderer.render(
                 state=state,
@@ -267,7 +293,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                 params=(x, y, hue),
                 param_types=(x_type, y_type, hue_type),
                 data=data,
-                fig_args=self.fig_args,
+                fig_args=fig_args,
                 chart_args=chart_args,
             )
 

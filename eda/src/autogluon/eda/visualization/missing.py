@@ -90,7 +90,7 @@ class MissingValues(AbstractVisualization, JupyterMixin):
 
     @staticmethod
     def _internal_render(widget, data, **kwargs):
-        fig = widget(data, **kwargs)
+        fig = widget(data, fontsize=10, **kwargs)
         plt.show(fig)
 
     def _get_operation(self, graph_type):
