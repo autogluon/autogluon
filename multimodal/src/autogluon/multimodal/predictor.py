@@ -1710,20 +1710,22 @@ class MultiModalPredictor:
         requires_label: bool,
     ):
         data = data_to_df(data=data)
-
         if self._column_types is None:
             column_types = self._infer_prediction_column_types(data)
         else:  # called .fit() or .load()
             column_types = self._column_types
             column_types_copy = copy.deepcopy(column_types)
             for col_name, col_type in column_types.items():
-                if col_name not in list(data.columns):
-                    # Found a column name mismatch after .fit() or .load() is called
-                    # Infer column titles for data if not matching with self._column_types
-                    logger.info(f"Column name {col_name} not found in data. Inferring the column types for data...")
-                    data_column_names = self._infer_data_column_names(data)
-                    data.columns = data_column_names
                 if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
+                    if col_name not in list(data.columns):
+                        # For tasks related to images ONLY!!!
+                        # Found a column name mismatch after .fit() or .load() is called
+                        # Infer column titles for data if not matching with self._column_types
+                        logger.info(
+                            f"Column name {col_name} not found in data. Inferring the column types for data..."
+                        )
+                        data_column_names = self._infer_data_column_names(data)
+                        data.columns = data_column_names
                     if is_imagepath_column(data=data[col_name], col_name=col_name, sample_n=1):
                         image_type = IMAGE_PATH
                     elif is_imagebytearray_column(data=data[col_name], col_name=col_name, sample_n=1):
