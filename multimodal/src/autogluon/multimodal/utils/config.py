@@ -551,3 +551,12 @@ def update_tabular_config_by_resources(
         )
 
     return config
+
+
+def get_pretrain_configs_dir(subfolder: Optional[str] = None):
+    import autogluon.multimodal
+
+    pretrain_config_dir = os.path.join(autogluon.multimodal.__path__, "configs", "pretrain")
+    if subfolder:
+        pretrain_config_dir = os.path.join(pretrain_config_dir, subfolder)
+    return pretrain_config_dir

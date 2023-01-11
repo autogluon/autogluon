@@ -26,6 +26,7 @@ except ImportError as e:
     mmdet = None
 
 from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
+from ..utils import get_pretrain_configs_dir
 from .utils import lookup_mmdet_config, update_mmdet_config
 
 logger = logging.getLogger(AUTOMM)
@@ -129,70 +130,35 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
     def _load_checkpoint_and_config(self, checkpoint_name=None):
+        from ..utils import download
+        from mim.commands import download as mimdownload
+
+        # TODO: add sha1_hash
+
+        mmdet_configs_dir = get_pretrain_configs_dir(subfolder="detection")
         if not checkpoint_name:
             checkpoint_name = self.checkpoint_name
-        if checkpoint_name == "faster_rcnn_r50_fpn_1x_voc0712":
-            # download voc configs in our s3 bucket
-            from ..utils import download
 
+        if checkpoint_name == "faster_rcnn_r50_fpn_1x_voc0712":
             if not os.path.exists("voc_config"):
                 os.makedirs("voc_config")
-            # TODO: add sha1_hash
             checkpoint = download(
                 url="https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn_1x_voc0712_20220320_192712-54bef0f3.pth",
             )
-            config_file = download(
-                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn_1x_voc0712.py",
-            )
-            download(
-                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/default_runtime.py",
-                path="voc_config",
-            )
-            download(
-                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn.py",
-                path="voc_config",
-            )
-            download(
-                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/voc0712.py",
-                path="voc_config",
-            )
+            config_file = os.path.join(mmdet_configs_dir, "voc", "faster_rcnn_r50_fpn_1x_voc0712.py")
         elif checkpoint_name == "yolox_s_8x8_300e_coco":
-            from ..utils import download
             checkpoint = download(
                 url="https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_s_8x8_300e_coco/yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth",
             )
-            config_file = "/media/code/autogluon/examples/automm/object_detection/mmdet_configs/yolox_s_8x8_300e_coco.py"
+            config_file = os.path.join(mmdet_configs_dir, "yolox", "yolox_s_8x8_300e_coco.py")
         elif checkpoint_name == "yolox_l_8x8_300e_coco":
-            from ..utils import download
             checkpoint = download(
                 url="https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_l_8x8_300e_coco/yolox_l_8x8_300e_coco_20211126_140236-d3bd2b23.pth",
             )
-            config_file = "/media/code/autogluon/examples/automm/object_detection/mmdet_configs/yolox_l_8x8_300e_coco.py"
-        elif checkpoint_name == "faster_rcnn_r50_fpn_32x2_1x_openimages_challenge":
-            from ..utils import download
-            from mim.commands import download as mimdownload
-            # download config and checkpoint files using openmim
-            checkpoint = mimdownload(package="mmdet", configs=["faster_rcnn_r50_fpn_2x_coco"], dest_root=".")[0]
-            config_file = checkpoint_name + ".py"
-
-            checkpoint =  download(
-                url="https://download.openmmlab.com/mmdetection/v2.0/openimages/faster_rcnn_r50_fpn_32x2_1x_openimages_challenge/faster_rcnn_r50_fpn_32x2_1x_openimages_challenge_20220114_045100-0e79e5df.pth",
-            )
-        elif checkpoint_name == "retinanet_r50_fpn_32x2_1x_openimages":
-            from ..utils import download
-            from mim.commands import download as mimdownload
-            # download config and checkpoint files using openmim
-            checkpoint = mimdownload(package="mmdet", configs=["retinanet_r50_fpn_2x_coco"], dest_root=".")[0]
-            config_file = checkpoint_name + ".py"
-
-            checkpoint =  download(
-                url="https://download.openmmlab.com/mmdetection/v2.0/openimages/retinanet_r50_fpn_32x2_1x_openimages/retinanet_r50_fpn_32x2_1x_openimages_20211223_071954-d2ae5462.pth",
-            )
+            config_file = os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py")
         else:
-            from mim.commands import download
-
             # download config and checkpoint files using openmim
-            checkpoint = download(package="mmdet", configs=[checkpoint_name], dest_root=".")[0]
+            checkpoint = mimdownload(package="mmdet", configs=[checkpoint_name], dest_root=".")[0]
             config_file = checkpoint_name + ".py"
 
         return checkpoint, config_file

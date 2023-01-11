@@ -5,6 +5,7 @@ from .config import (
     customize_model_names,
     filter_search_space,
     get_config,
+    get_pretrain_configs_dir,
     get_local_pretrained_config_paths,
     parse_dotlist_conf,
     update_config_by_rules,
