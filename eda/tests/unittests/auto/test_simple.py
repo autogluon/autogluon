@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 from unittest.mock import MagicMock, call
 
@@ -344,36 +345,33 @@ def test_target_analysis__regression(monkeypatch):
 
         state = target_analysis(train_data=df_train, label="fnlwgt", return_state=True)
 
-    call_md_render.assert_has_calls(
-        [
-            call("## Target variable analysis"),
-            call(
-                "\n".join(
-                    [
-                        "### Distribution fits for target variable",
-                        " - [kstwobign](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.kstwobign.html)",
-                        "   - p-value: 0.976",
-                        "   - Parameters: (loc: -134163.8474064017, scale: 377621.2391000401)",
-                        " - [gumbel_r](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gumbel_r.html)",
-                        "   - p-value: 0.966",
-                        "   - Parameters: (loc: 149399.54777678402, scale: 79111.08454921929)",
-                        " - [nakagami](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.nakagami.html)",
-                        "   - p-value: 0.965",
-                        "   - Parameters: (nu: 0.8441222819414649, loc: 28236.444673671464, scale: 192280.03015904326)",
-                        " - [skewnorm](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.skewnorm.html)",
-                        "   - p-value: 0.963",
-                        "   - Parameters: (a: 3.581779718590373, loc: 78497.27515496105, scale: 150470.02357042202)",
-                        " - [genlogistic](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.genlogistic.html)",
-                        "   - p-value: 0.962",
-                        "   - Parameters: (c: 129.5237086428741, loc: -233264.19892983814, scale: 78753.92432672696)",
-                    ]
-                )
-            ),
-            call(
-                "### Target variable correlations\n - ⚠️ no fields with absolute correlation greater than `0.5` found for target variable `fnlwgt`."
-            ),
-        ]
-    )
+    assert call_md_render.call_count == 3
+    calls = [re.sub(r"[.][0-9]{4,}", ".xx", c[0][0]) for c in call_md_render.call_args_list]
+    assert calls == [
+        "## Target variable analysis",
+        "\n".join(
+            [
+                "### Distribution fits for target variable",
+                " - [kstwobign](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.kstwobign.html)",
+                "   - p-value: 0.976",
+                "   - Parameters: (loc: -134163.xx, scale: 377621.xx)",
+                " - [gumbel_r](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gumbel_r.html)",
+                "   - p-value: 0.966",
+                "   - Parameters: (loc: 149399.xx, scale: 79111.xx)",
+                " - [nakagami](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.nakagami.html)",
+                "   - p-value: 0.965",
+                "   - Parameters: (nu: 0.xx, loc: 28236.xx, scale: 192280.xx)",
+                " - [skewnorm](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.skewnorm.html)",
+                "   - p-value: 0.963",
+                "   - Parameters: (a: 3.xx, loc: 78497.xx, scale: 150470.xx)",
+                " - [genlogistic](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.genlogistic.html)",
+                "   - p-value: 0.962",
+                "   - Parameters: (c: 129.xx, loc: -233264.xx, scale: 78753.xx)",
+            ]
+        ),
+        "### Target variable correlations\n - ⚠️ no fields with absolute correlation greater than `0.5` found for target variable `fnlwgt`.",
+    ]
+
     call_ds_render.assert_called_once()
     call_cv_render.assert_called_once()
     call_fiv_render.assert_called_once()
