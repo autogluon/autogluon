@@ -27,6 +27,15 @@ def test_rf_regression(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
 
 
+def test_rf_quantile(fit_helper):
+    fit_args = dict(
+        hyperparameters={'RF': {}},
+    )
+    dataset_name = 'ames'
+    init_args = dict(problem_type='quantile', quantile_levels=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, init_args=init_args)
+
+
 def test_rf_binary_compile_onnx(fit_helper):
     fit_args = dict(
         hyperparameters={RFModel: {}},

@@ -11,7 +11,7 @@
 
     .. code-block:: bash
 
-        pip install torch==1.12.0+cu113 torchvision==0.13.0+cu113 torchtext==0.13.0 --extra-index-url https://download.pytorch.org/whl/cu113
+        pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchtext==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu113
 
     5. Sanity check that your installation is valid and can detect your GPU via testing in Python:
 

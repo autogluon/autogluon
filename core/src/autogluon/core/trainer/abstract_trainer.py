@@ -2938,8 +2938,9 @@ class AbstractTrainer:
             y_val_probs = self.predict_proba(X_val, model_name_og)
             y_val = self.load_y_val().to_numpy()
 
-            if self.problem_type == BINARY:
-                y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
+        if self.problem_type == BINARY:
+            # Convert one-dimensional array to be in the form of a 2-class multiclass predict_proba output
+            y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
 
         model = self.load_model(model_name=model_name)
         if self.problem_type == QUANTILE:

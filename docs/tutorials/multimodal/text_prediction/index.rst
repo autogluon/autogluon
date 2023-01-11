@@ -1,5 +1,5 @@
-Text Prediction and Entity Extraction
--------------------------------------
+Text Data
+---------
 .. container:: cards
 
    .. card::

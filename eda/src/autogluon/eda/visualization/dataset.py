@@ -1,11 +1,11 @@
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from pandas import DataFrame
 
+from ..state import AnalysisState, StateCheckMixin
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
-from ..state import AnalysisState, StateCheckMixin
 
 __all__ = ["DatasetStatistics", "DatasetTypeMismatch"]
 
@@ -99,7 +99,8 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
             self.render_header_if_needed(state, f"{ds} dataset summary")
             if self.sort_by in df.columns:
                 df = df.sort_values(by=self.sort_by, ascending=self.sort_asc)
-            self.display_obj(df)
+            with pd.option_context("display.max_rows", 100 if len(df) <= 100 else 20):
+                self.display_obj(df)
 
     @staticmethod
     def _merge_analysis_facets(ds: str, state: AnalysisState):

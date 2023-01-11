@@ -24,8 +24,7 @@ install_requires = [
     'scipy',
     'pandas',
     'scikit-learn',
-    'psutil',
-    'networkx>=2.3,<3.0',
+    'networkx',
     f'autogluon.core=={version}',
     f'autogluon.features=={version}',
 ]
@@ -51,7 +50,7 @@ extras_require = {
         'scikit-learn-intelex>=2021.6,<2021.8',
     ],
     'imodels': [
-        'imodels>=1.3.0,<1.3.8',  # 1.3.8 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
+        'imodels>=1.3.10,<1.4.0',  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
     ],
     'vowpalwabbit': [
         'vowpalwabbit>=8.10,<8.11'

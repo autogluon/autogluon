@@ -1,10 +1,13 @@
+import os
+import shutil
+
 import onnxruntime as ort
 import pytest
 from datasets import load_dataset
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics.pairwise import paired_cosine_distances
 
-from autogluon.multimodal import MultiModalPredictor
+from autogluon.multimodal import MultiModalOnnxPredictor, MultiModalPredictor
 
 
 def evaluate(predictor, df, onnx_session=None):
@@ -56,3 +59,60 @@ def test_onnx_export(checkpoint_name):
     onnx_pearson, onnx_spearman = evaluate(predictor, test_df, ort_sess)
     assert pytest.approx(onnx_pearson, 1e-2) == ag_pearson
     assert pytest.approx(onnx_spearman, 1e-2) == ag_spearman
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name,num_gpus",
+    [
+        ("swin_tiny_patch4_window7_224", -1),
+        ("vit_tiny_patch16_224", -1),
+        ("resnet18", 0),
+        ("legacy_seresnet18", -1),
+    ],
+)
+def test_onnx_export_image_cls(checkpoint_name, num_gpus):
+    import numpy as np
+    import torch
+    from torch import FloatTensor
+
+    from autogluon.multimodal.utils import logits_to_prob
+    from autogluon.multimodal.utils.misc import shopee_dataset
+
+    model_path = "./automm_shopee"
+    download_dir = "./ag_automm_tutorial_imgcls"
+    train_data, test_data = shopee_dataset(download_dir)
+    image_path_export = test_data.iloc[0]["image"]
+    image_path_test = test_data.iloc[1]["image"]
+
+    if os.path.exists(model_path):
+        shutil.rmtree(model_path)
+
+    # train
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.names": ["timm_image"],
+            "model.timm_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": num_gpus,
+        },
+        label="label",
+        path=model_path,
+    )
+    predictor.fit(
+        train_data=train_data,
+        time_limit=20,  # seconds
+    )
+    predictor.save(path=model_path)
+    loaded_predictor = MultiModalPredictor.load(path=model_path)
+
+    # predict
+    load_proba = loaded_predictor.predict_proba({"image": [image_path_test]})
+
+    # convert
+    loaded_predictor.export_onnx({"image": [image_path_export]})
+
+    # onnx predict
+    onnx_predictor = MultiModalOnnxPredictor.load(model_path)
+    onnx_proba = onnx_predictor.predict_proba({"image": [image_path_test]})
+
+    # assert allclose
+    np.testing.assert_allclose(load_proba, onnx_proba, rtol=1e-3, atol=1e-3)

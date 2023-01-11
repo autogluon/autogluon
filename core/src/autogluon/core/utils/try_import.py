@@ -15,6 +15,7 @@ __all__ = [
     'try_import_fastai',
     'try_import_torch',
     'try_import_d8',
+    'try_import_autogluon_multimodal',
     'try_import_autogluon_text',
     'try_import_autogluon_vision',
     'try_import_rapids_cuml',
@@ -215,6 +216,14 @@ def try_import_d8():
     except ImportError as e:
         raise ImportError("`import d8` failed. d8 is an optional dependency.\n"
                           "A quick tip is to install via `pip install d8`.\n")
+
+
+def try_import_autogluon_multimodal():
+    try:
+        import autogluon.multimodal
+    except ImportError:
+        raise ImportError("`import autogluon.multimodal` failed.\n"
+                          f"A quick tip is to install via `pip install autogluon.multimodal=={__version__}`.\n")
 
 
 def try_import_autogluon_text():

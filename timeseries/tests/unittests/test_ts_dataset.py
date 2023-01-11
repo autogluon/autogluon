@@ -3,6 +3,7 @@ import datetime
 import tempfile
 import traceback
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Iterable
 
 import numpy as np
@@ -722,27 +723,27 @@ def test_when_static_features_are_modified_on_shallow_copy_then_original_df_does
     assert old_df.static_features is not None
 
 
-@pytest.mark.parametrize(
-    "data",
-    [
-        SAMPLE_DATAFRAME.sample(frac=1),
-        SAMPLE_TS_DATAFRAME.sample(frac=1),
-    ],
-)
-def test_when_raw_timestamps_are_not_sorted_then_ts_dataframe_has_sorted_timestamps(data):
-    tsdf = TimeSeriesDataFrame(data)
-    for item_id in tsdf.item_ids:
-        assert tsdf.loc[item_id].index.is_monotonic_increasing
+@pytest.mark.parametrize("timestamp_column", ["timestamp", None, "custom_ts_column"])
+def test_when_dataset_constructed_from_dataframe_then_timestamp_column_is_converted_to_datetime(timestamp_column):
+    timestamps = ["2020-01-01", "2020-01-02", "2020-01-03"]
+    df = pd.DataFrame(
+        {
+            "item_id": np.ones(len(timestamps), dtype=np.int64),
+            timestamp_column or "timestamp": timestamps,
+            "target": np.ones(len(timestamps)),
+        }
+    )
+    ts_df = TimeSeriesDataFrame.from_data_frame(df, timestamp_column=timestamp_column)
+    assert ts_df.index.get_level_values(level=TIMESTAMP).dtype == "datetime64[ns]"
 
 
-@pytest.mark.parametrize(
-    "data",
-    [
-        SAMPLE_DATAFRAME.sample(frac=1),
-        SAMPLE_TS_DATAFRAME.sample(frac=1),
-    ],
-)
-def test_when_raw_timestamps_are_not_sorted_then_freq_inference_works(data):
-    tsdf = TimeSeriesDataFrame(data)
-    assert tsdf.freq is not None
-    assert tsdf.freq == SAMPLE_TS_DATAFRAME.freq
+def test_when_path_is_given_to_constructor_then_tsdf_is_constructed_correctly():
+    df = SAMPLE_TS_DATAFRAME.reset_index()
+    with TemporaryDirectory() as temp_dir:
+        temp_file = str(Path(temp_dir) / f"temp.csv")
+        df.to_csv(temp_file)
+
+        ts_df = TimeSeriesDataFrame(temp_file)
+        assert isinstance(ts_df.index, pd.MultiIndex)
+        assert ts_df.index.names == [ITEMID, TIMESTAMP]
+        assert len(ts_df) == len(SAMPLE_TS_DATAFRAME)
