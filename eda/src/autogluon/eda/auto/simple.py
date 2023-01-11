@@ -632,6 +632,9 @@ def target_analysis(
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
 ) -> Optional[AnalysisState]:
+
+    assert label in train_data.columns, f"label `{label}` is not in `train_data` columns: `{train_data.columns}`"
+
     # Basic variable information table
     state: AnalysisState = analyze(  # type: ignore # state is always present
         train_data=train_data[[label]],
@@ -660,7 +663,56 @@ def target_analysis(
         fit_distributions=True,
     )
 
-    # Distributions fit information if available
+    state = _render_distribution_fit_information_if_available(state, label)
+    state = _render_correlation_analysis(state, train_data, label, sample)
+    state = _render_features_highly_correlated_with_target(state, train_data, label, sample)
+
+    return state if return_state else None
+
+
+def _render_features_highly_correlated_with_target(state, train_data, label, sample) -> AnalysisState:
+    fields = state.correlations_focus_high_corr.train_data.index.tolist()  # type: ignore
+    analyze(
+        train_data=train_data,
+        state=state,
+        sample=sample,
+        return_state=True,
+        anlz_facets=[FeatureInteraction(key=f"{f}:{label}", x=f, y=label) for f in fields],
+        viz_facets=[FeatureInteractionVisualization(headers=True, key=f"{f}:{label}") for f in fields],
+    )
+    return state
+
+
+def _render_correlation_analysis(state, train_data, label, sample) -> AnalysisState:
+    state = analyze(
+        train_data=train_data,
+        sample=sample,
+        state=state,
+        return_state=True,
+        label=label,
+        anlz_facets=[ApplyFeatureGenerator(category_to_numbers=True, children=[Correlation(focus_field=label)])],
+    )
+    corr_info = ["### Target variable correlations"]
+    if len(state.correlations_focus_high_corr.train_data) < 1:  # type: ignore
+        corr_info.append(
+            f" - ⚠️ no fields with absolute correlation greater than "  # type: ignore
+            f"`{state.correlations_focus_field_threshold}` found for target variable `{label}`."
+        )
+    else:
+        corr_info.append(
+            f" - absolute correlation greater than `{state.correlations_focus_field_threshold}` found for target variable `{label}`"  # type: ignore
+        )
+    analyze(
+        state=state,
+        viz_facets=[
+            MarkdownSectionComponent("\n".join(corr_info)),
+            CorrelationVisualization(headers=True),
+        ],
+    )
+    return state
+
+
+def _render_distribution_fit_information_if_available(state, label) -> Optional[AnalysisState]:
     if state.distributions_fit is not None:  # type: ignore # state is always present
         dist_fit_state = state.distributions_fit.train_data  # type: ignore
         dist_info = ["### Distribution fits for target variable"]
@@ -679,45 +731,4 @@ def target_analysis(
                 f"distribution fits satisfy specified minimum p-value threshold: `{state.distributions_fit_pvalue_min}`"
             )
         analyze(viz_facets=[MarkdownSectionComponent("\n".join(dist_info))])
-
-    # Correlations analysis
-    state = analyze(
-        train_data=train_data,
-        sample=sample,
-        state=state,
-        return_state=True,
-        label=label,
-        anlz_facets=[ApplyFeatureGenerator(category_to_numbers=True, children=[Correlation(focus_field=label)])],
-    )
-
-    corr_info = ["### Target variable correlations"]
-    if len(state.correlations_focus_high_corr.train_data) < 1:  # type: ignore
-        corr_info.append(
-            f" - ⚠️ no fields with absolute correlation greater than "  # type: ignore
-            f"`{state.correlations_focus_field_threshold}` found for target variable `{label}`."
-        )
-    else:
-        corr_info.append(
-            f" - absolute correlation greater than `{state.correlations_focus_field_threshold}` found for target variable `{label}`:"  # type: ignore
-        )
-    analyze(
-        state=state,
-        viz_facets=[
-            MarkdownSectionComponent("\n".join(corr_info)),
-            CorrelationVisualization(headers=True),
-        ],
-    )
-
-    # Highly correlated variables vs target interactions
-    fields = state.correlations_focus_high_corr.train_data.index.tolist()  # type: ignore
-
-    analyze(
-        train_data=train_data,
-        state=state,
-        sample=sample,
-        return_state=True,
-        anlz_facets=[FeatureInteraction(key=f"{f}:{label}", x=f, y=label) for f in fields],
-        viz_facets=[FeatureInteractionVisualization(headers=True, key=f"{f}:{label}") for f in fields],
-    )
-
-    return state if return_state else None
+    return state

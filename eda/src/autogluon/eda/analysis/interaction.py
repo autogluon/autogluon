@@ -14,6 +14,8 @@ from .base import AbstractAnalysis
 
 __all__ = ["Correlation", "CorrelationSignificance", "FeatureInteraction", "DistributionFit"]
 
+from autogluon.common.features.types import R_FLOAT, R_INT
+
 
 class Correlation(AbstractAnalysis):
     """
@@ -95,6 +97,10 @@ class Correlation(AbstractAnalysis):
         state.correlations = {}
         state.correlations_method = self.method
         for (ds, df) in self.available_datasets(args):
+
+            if args.label in df.columns and df[args.label].dtype not in [R_INT, R_FLOAT]:
+                df[args.label] = df[args.label].astype("category").cat.codes
+
             if self.method == "phik":
                 state.correlations[ds] = df.phik_matrix(**self.args, verbose=False)
             else:

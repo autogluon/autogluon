@@ -1,6 +1,6 @@
 import os
 import tempfile
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import numpy as np
 import pandas as pd
@@ -9,7 +9,14 @@ import pytest
 from autogluon.eda import AnalysisState
 from autogluon.eda.analysis import Namespace
 from autogluon.eda.analysis.base import BaseAnalysis
-from autogluon.eda.auto import analyze, analyze_interaction, covariate_shift_detection, dataset_overview, quick_fit
+from autogluon.eda.auto import (
+    analyze,
+    analyze_interaction,
+    covariate_shift_detection,
+    dataset_overview,
+    quick_fit,
+    target_analysis,
+)
 from autogluon.eda.auto.simple import (
     _is_single_numeric_variable,
     get_default_estimator_if_not_specified,
@@ -17,6 +24,7 @@ from autogluon.eda.auto.simple import (
 )
 from autogluon.eda.visualization import (
     ConfusionMatrix,
+    CorrelationVisualization,
     DatasetStatistics,
     DatasetTypeMismatch,
     FeatureImportance,
@@ -136,24 +144,33 @@ def test_quick_fit(monkeypatch):
 
 def test_dataset_overview(monkeypatch):
     df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
+    df_train["near_duplicate"] = df_train["education-num"] + 1
 
     call_ds_render = MagicMock()
     call_dtm_render = MagicMock()
     call_md_render = MagicMock()
     call_fdav_render = MagicMock()
+    call_fiv_render = MagicMock()
 
     with monkeypatch.context() as m:
         m.setattr(DatasetStatistics, "render", call_ds_render)
         m.setattr(DatasetTypeMismatch, "render", call_dtm_render)
-        m.setattr(MarkdownSectionComponent, "render", call_md_render)
+        m.setattr(MarkdownSectionComponent, "render_markdown", call_md_render)
         m.setattr(FeatureDistanceAnalysisVisualization, "render", call_fdav_render)
+        m.setattr(FeatureInteractionVisualization, "render", call_fiv_render)
 
         dataset_overview(train_data=df_train, label="class")
 
+    call_md_render.assert_has_calls(
+        [
+            call("### Feature Distance"),
+            call("### Near duplicate group analysis: `education-num`, `near_duplicate` - distance `0.0`"),
+        ]
+    )
     call_ds_render.assert_called_once()
     call_dtm_render.assert_called_once()
-    call_md_render.assert_called_once()
     call_fdav_render.assert_called_once()
+    call_fiv_render.assert_called_once()
 
 
 def test_covariate_shift_detection(monkeypatch):
@@ -264,3 +281,125 @@ def test_analyze_interaction__do_not_fit(monkeypatch):
 )
 def test_analyze_interaction__is_single_numeric_variable(x, y, hue, x_type, expected):
     assert _is_single_numeric_variable(x, y, hue, x_type) is expected
+
+
+def test_target_analysis__classification(monkeypatch):
+    df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
+
+    call_md_render = MagicMock()
+    call_ds_render = MagicMock()
+    call_cv_render = MagicMock()
+    call_fiv_render = MagicMock()
+    with monkeypatch.context() as m:
+        m.setattr(MarkdownSectionComponent, "render_markdown", call_md_render)
+        m.setattr(DatasetStatistics, "render", call_ds_render)
+        m.setattr(CorrelationVisualization, "render", call_cv_render)
+        m.setattr(FeatureInteractionVisualization, "render", call_fiv_render)
+
+        state = target_analysis(train_data=df_train, label="class", return_state=True)
+
+    call_md_render.assert_has_calls(
+        [
+            call("## Target variable analysis"),
+            call(
+                "### Target variable correlations\n"
+                " - absolute correlation greater than `0.5` found for target variable `class`"
+            ),
+        ]
+    )
+    call_ds_render.assert_called_once()
+    call_cv_render.assert_called_once()
+    assert call_fiv_render.call_count == 2
+    assert sorted(set(state.keys())) == [
+        "correlations",
+        "correlations_focus_field",
+        "correlations_focus_field_threshold",
+        "correlations_focus_high_corr",
+        "correlations_method",
+        "dataset_stats",
+        "interactions",
+        "missing_statistics",
+        "raw_type",
+        "special_types",
+        "variable_type",
+    ]
+
+    assert sorted(set(state.interactions.train_data.keys())) == ["__analysis__", "relationship:class"]
+    assert sorted(state.correlations.train_data.columns.tolist()) == ["class", "relationship"]
+    assert state.correlations_focus_high_corr.train_data.index.tolist() == ["relationship"]
+
+
+def test_target_analysis__regression(monkeypatch):
+    df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
+
+    call_md_render = MagicMock()
+    call_ds_render = MagicMock()
+    call_cv_render = MagicMock()
+    call_fiv_render = MagicMock()
+    with monkeypatch.context() as m:
+        m.setattr(MarkdownSectionComponent, "render_markdown", call_md_render)
+        m.setattr(DatasetStatistics, "render", call_ds_render)
+        m.setattr(CorrelationVisualization, "render", call_cv_render)
+        m.setattr(FeatureInteractionVisualization, "render", call_fiv_render)
+
+        state = target_analysis(train_data=df_train, label="fnlwgt", return_state=True)
+
+    call_md_render.assert_has_calls(
+        [
+            call("## Target variable analysis"),
+            call(
+                "\n".join(
+                    [
+                        "### Distribution fits for target variable",
+                        " - [kstwobign](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.kstwobign.html)",
+                        "   - p-value: 0.976",
+                        "   - Parameters: (loc: -134163.8474064017, scale: 377621.2391000401)",
+                        " - [gumbel_r](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gumbel_r.html)",
+                        "   - p-value: 0.966",
+                        "   - Parameters: (loc: 149399.54777678402, scale: 79111.08454921929)",
+                        " - [nakagami](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.nakagami.html)",
+                        "   - p-value: 0.965",
+                        "   - Parameters: (nu: 0.8441222819414649, loc: 28236.444673671464, scale: 192280.03015904326)",
+                        " - [skewnorm](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.skewnorm.html)",
+                        "   - p-value: 0.963",
+                        "   - Parameters: (a: 3.581779718590373, loc: 78497.27515496105, scale: 150470.02357042202)",
+                        " - [genlogistic](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.genlogistic.html)",
+                        "   - p-value: 0.962",
+                        "   - Parameters: (c: 129.5237086428741, loc: -233264.19892983814, scale: 78753.92432672696)",
+                    ]
+                )
+            ),
+            call(
+                "### Target variable correlations\n - ⚠️ no fields with absolute correlation greater than `0.5` found for target variable `fnlwgt`."
+            ),
+        ]
+    )
+    call_ds_render.assert_called_once()
+    call_cv_render.assert_called_once()
+    call_fiv_render.assert_called_once()
+    assert sorted(set(state.keys())) == [
+        "correlations",
+        "correlations_focus_field",
+        "correlations_focus_field_threshold",
+        "correlations_focus_high_corr",
+        "correlations_method",
+        "dataset_stats",
+        "distributions_fit",
+        "distributions_fit_pvalue_min",
+        "interactions",
+        "missing_statistics",
+        "raw_type",
+        "special_types",
+        "variable_type",
+    ]
+
+    assert sorted(set(state.interactions.train_data.keys())) == ["__analysis__"]
+    assert sorted(state.correlations.train_data.columns.tolist()) == ["fnlwgt"]
+    assert state.correlations_focus_high_corr.train_data.index.tolist() == []
+    assert list(state.distributions_fit.train_data.fnlwgt.keys()) == [
+        "kstwobign",
+        "gumbel_r",
+        "nakagami",
+        "skewnorm",
+        "genlogistic",
+    ]
