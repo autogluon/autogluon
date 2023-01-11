@@ -1030,6 +1030,10 @@ class MultiModalPredictor:
         )
         config = select_model(config=config, df_preprocessor=df_preprocessor)
 
+        # Update output_shape with label_generator.
+        if self._problem_type == NER:
+            self._output_shape = len(df_preprocessor.label_generator.unique_entity_groups)
+
         if self._model is None:
             model = create_fusion_model(
                 config=config,

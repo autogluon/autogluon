@@ -336,13 +336,24 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
     num_words = len(set(token_to_word_mappings)) - 1
     word_label = [1] * num_words
     # TODO: Potentially optimize word label generation via binary search
-    for idx, word_offset in enumerate(word_offsets[:num_words, :]):
-        for annot in ner_annotations:
-            custom_offset = annot[0]
-            custom_label = annot[1]
+    b_prefix = "B-"
+    i_prefix = "I-"
+    for annot in ner_annotations:
+        custom_offset = annot[0]
+        custom_label = annot[1]
+        entity_map = annot[2]
+        is_start_word = True
+        for idx, word_offset in enumerate(word_offsets[:num_words, :]):
             # support multiple words in an annotated offset range.
             if word_offset[0] >= custom_offset[0] and word_offset[1] <= custom_offset[1]:
-                word_label[idx] = custom_label
+                if not (custom_label.startswith(b_prefix) or custom_label.startswith(i_prefix)):
+                    if is_start_word:
+                        word_label[idx] = entity_map[b_prefix + custom_label]
+                        is_start_word = False
+                    else:
+                        word_label[idx] = entity_map[i_prefix + custom_label]
+                else:
+                    word_label[idx] = entity_map[custom_label]
 
     token_label = [0] * len(col_tokens.input_ids)
     temp = set()
@@ -378,7 +389,7 @@ def tokenize_ner_text(text, tokenizer):
     """
     # pre-tokenization is required for NER token-level label generation.
     words_with_offsets = tokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-    words_with_offsets = is_space_counted(words_with_offsets)
+    words_with_offsets = is_space_counted(words_with_offsets) if len(words_with_offsets) > 1 else words_with_offsets
     words = [word for word, offset in words_with_offsets]
     word_offsets = np.array([[offset[0], offset[1]] for word, offset in words_with_offsets], dtype=np.int32)
     col_tokens = tokenizer(
@@ -390,12 +401,21 @@ def tokenize_ner_text(text, tokenizer):
         max_length=tokenizer.model_max_length,
         return_token_type_ids=True,
     )
-    # token to word mappings: it will tell us which token belongs to which word.
-    token_to_word_mappings = [i if i != None else -1 for i in col_tokens.word_ids()]
-    if len(set(token_to_word_mappings)) != len(words) + 1:
-        warnings.warn(f"The token to word mappings are incorrect!")
     offset_mapping = np.array(col_tokens.offset_mapping, dtype=np.int32)
-    word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
+    if len(words_with_offsets) > 1:
+        word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
+        # token to word mappings: it will tell us which token belongs to which word.
+        token_to_word_mappings = [i if i != None else -1 for i in col_tokens.word_ids()]
+        if len(set(token_to_word_mappings)) != len(words) + 1:
+            warnings.warn(f"The token to word mappings are incorrect!")
+    else:
+        # If pre_tokenizer does not give word offsets, use word_ids and offset_mappings instead.
+        word_offsets = np.append(offset_mapping[1:], [[0, 0]], axis=0)
+        word_idx = np.arange(len(col_tokens.word_ids()) - col_tokens.word_ids().count(None))
+        token_to_word_mappings = [
+            val + word_idx[idx - 1] if val != None else -1 for idx, val in enumerate(col_tokens.word_ids())
+        ]
+
     return col_tokens, token_to_word_mappings, word_offsets
 
 

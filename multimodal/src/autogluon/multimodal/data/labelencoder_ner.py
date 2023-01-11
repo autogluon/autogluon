@@ -81,22 +81,18 @@ class NerLabelEncoder:
             sentence_annotations = []
             for annot in json_ner_annotations:
                 entity_group = annot[ENTITY_GROUP]
-                all_entity_groups.append(entity_group)
-                if self.entity_map is not None:
-                    if entity_group in self.entity_map:
-                        sentence_annotations.append(
-                            (
-                                (annot[START_OFFSET], annot[END_OFFSET]),
-                                self.entity_map[entity_group],
-                            )
-                        )
+                if not (entity_group.startswith(self.b_prefix) or entity_group.startswith(self.i_prefix)):
+                    all_entity_groups.append(self.b_prefix + entity_group)
+                    all_entity_groups.append(self.i_prefix + entity_group)
                 else:
-                    sentence_annotations.append(
-                        (
-                            (annot[START_OFFSET], annot[END_OFFSET]),
-                            entity_group,
-                        )
+                    all_entity_groups.append(entity_group)
+                sentence_annotations.append(
+                    (
+                        (annot[START_OFFSET], annot[END_OFFSET]),
+                        entity_group,
+                        self.entity_map,
                     )
+                )
             all_annotations.append(sentence_annotations)
         unique_entity_groups = list(set(all_entity_groups))
         return all_annotations, unique_entity_groups
@@ -145,11 +141,6 @@ class NerLabelEncoder:
             word_label_invers = []
             for l in word_label:
                 entity_group = self.inverse_entity_map[l]
-                if (
-                    not (entity_group.startswith(self.b_prefix) or entity_group.startswith(self.i_prefix))
-                    and entity_group is not self.ner_special_tags[-1]
-                ):
-                    entity_group = self.b_prefix + entity_group
                 word_label_invers.append(entity_group)
             transformed_y.append(word_label_invers)
         return transformed_y
