@@ -314,7 +314,7 @@ def normalize_txt(text: str) -> str:
     return text
 
 
-def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False):
+def process_ner_annotations(ner_annotations, ner_text, entity_map, tokenizer, is_eval=False):
     """
     Generate token-level/word-level labels with given text and NER annotations.
 
@@ -342,12 +342,13 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
     for annot in ner_annotations:
         custom_offset = annot[0]
         custom_label = annot[1]
-        entity_map = annot[2]
         is_start_word = True
         for idx, word_offset in enumerate(word_offsets[:num_words, :]):
             # support multiple words in an annotated offset range.
             if word_offset[0] >= custom_offset[0] and word_offset[1] <= custom_offset[1]:
-                if not (custom_label.startswith(b_prefix) or custom_label.startswith(i_prefix)):
+                if not (
+                    re.match(b_prefix, custom_label, re.IGNORECASE) or re.match(i_prefix, custom_label, re.IGNORECASE)
+                ):
                     if is_start_word and b_prefix + custom_label in entity_map:
                         word_label[idx] = entity_map[b_prefix + custom_label]
                         is_start_word = False
