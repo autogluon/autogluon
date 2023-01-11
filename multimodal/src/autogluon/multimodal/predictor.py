@@ -28,7 +28,6 @@ from packaging import version
 from sklearn.model_selection import train_test_split
 from torch import nn
 
-import autogluon.multimodal.utils.object_detection
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.multimodal.utils import save_result_df
@@ -2091,14 +2090,14 @@ class MultiModalPredictor:
                 realtime=realtime,
             )
         if self._problem_type == OBJECT_DETECTION:
-            if isinstance(data, (str, dict, list)):
-                data = autogluon.multimodal.utils.object_detection.convert_data_to_df(data)
+            if isinstance(data, str):
+                data = from_coco_or_voc(data, "test")
+            elif isinstance(data, dict):
+                data = from_dict(data)
             else:
                 assert isinstance(
                     data, pd.DataFrame
-                ), "TypeError: Expected data type to be of type dict, list, or str, but got {} of type {}".format(
-                    data, type(data)
-                )
+                ), "TypeError: Expected data type to be a filepath, a folder or a dictionary, but got {}".format(data)
 
             if self._label_column not in data:
                 self._label_column = None

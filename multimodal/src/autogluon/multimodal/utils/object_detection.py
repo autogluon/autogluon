@@ -14,74 +14,7 @@ from .download import download, is_url
 logger = logging.getLogger(AUTOMM)
 
 
-def convert_data_to_df(data: Union[Dict, List[str], str]) -> pd.DataFrame:
-    """
-    Construct a dataframe from a data dictionary, json file path (for COCO), folder path (for VOC),
-    image path (for single image), list of image paths (for multiple images)
-    Parameters
-    ----------
-    data (dict, str, list)
-
-    Returns
-    -------
-    a pandas DataFrame with columns "image", "rois", and "label".
-    """
-    if isinstance(data, dict):
-        return from_dict(data)
-    if isinstance(data, list):
-        return from_list(data)
-    if isinstance(data, str):
-        if os.path.isdir(data) or data.endswith(".json"):
-            return from_coco_or_voc(data)
-        return from_str(data)
-
-    raise TypeError(
-        "Expected data to be an instance of dict, list or str, but got {} of type {}".format(data, type(data))
-    )
-
-
-def from_str(data: str) -> pd.DataFrame:
-    """
-    Construct a dataframe a string representing a single image path
-    Parameters
-    ----------
-    data
-        string of the image path
-    Returns
-    -------
-    a pandas DataFrame with columns "image", "rois", and "label".
-    """
-    d = {"image": [], "rois": [], "label": []}
-    d["image"].append(data)
-    # Dummy rois
-    d["rois"].append([[-1, -1, -1, -1, 0]])
-    d["label"].append([[-1, -1, -1, -1, 0]])
-    df = pd.DataFrame(d)
-    return df.sort_values("image").reset_index(drop=True)
-
-
-def from_list(data: List[str]) -> pd.DataFrame:
-    """
-    Construct a dataframe from list of image paths
-    Parameters
-    ----------
-    data
-        List containing the image paths
-    Returns
-    -------
-    a pandas DataFrame with columns "image", "rois", and "label".
-    """
-    d = {"image": [], "rois": [], "label": []}
-    for image_name in data:
-        d["image"].append(image_name)
-        # Dummy rois
-        d["rois"].append([[-1, -1, -1, -1, 0]])
-        d["label"].append([[-1, -1, -1, -1, 0]])
-    df = pd.DataFrame(d)
-    return df.sort_values("image").reset_index(drop=True)
-
-
-def from_dict(data: dict) -> pd.DataFrame:
+def from_dict(data: dict):
     """
     Construct a dataframe (dummy) from a data dictionary, with the form {"image": ["img1.jpg", "img2.jpg", ...]}
     Parameters
