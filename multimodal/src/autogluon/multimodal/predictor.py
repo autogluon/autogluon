@@ -202,7 +202,6 @@ class MultiModalPredictor:
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
         sample_data_path: Optional[str] = None,
-        clean_old_ckpts: Optional[bool] = True,
     ):
         """
         Parameters
@@ -403,7 +402,6 @@ class MultiModalPredictor:
         self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._matcher = None
-        self._clean_old_ckpts = clean_old_ckpts
         self._save_path = path
 
         # Summary statistics used in fit summary. TODO: wrap it in a class.
@@ -541,6 +539,7 @@ class MultiModalPredictor:
         seed: Optional[int] = 123,
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[dict] = None,
+        clean_ckpts: Optional[bool] = True,
     ):
         """
         Fit MultiModalPredictor predict label column of a dataframe based on the other columns,
@@ -645,6 +644,8 @@ class MultiModalPredictor:
                     scheduler_init_args: Optional[dict] = None
                         If provided str to `searcher`, you can optionally provide custom init_args to the searcher
                         You don't need to worry about `metric` and `mode`. AutoGluon will figure it out by itself.
+        clean_ckpts
+            Whether to clean the checkpoints of each validation step after training.
 
         Returns
         -------
@@ -684,7 +685,7 @@ class MultiModalPredictor:
                 tuning_data = from_coco_or_voc(tuning_data, "val")
                 if max_tuning_num is not None:
                     if len(tuning_data) > max_tuning_num:
-                        tuning_data = tuning_data.sample(n=max_tuning_num, replace=False).reset_index(drop=True)
+                        tuning_data = tuning_data.sample(n=max_tuning_num, replace=False, random_state=seed).reset_index(drop=True)
 
         if hyperparameter_tune_kwargs is not None:
             # TODO: can we support hyperparameters being the same format as regular training?
@@ -827,6 +828,7 @@ class MultiModalPredictor:
             teacher_predictor=teacher_predictor,
             standalone=standalone,
             hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
+            clean_ckpts=clean_ckpts,
         )
 
         if hyperparameter_tune_kwargs is not None:
@@ -1000,6 +1002,7 @@ class MultiModalPredictor:
         teacher_predictor: Union[str, MultiModalPredictor] = None,
         hpo_mode: bool = False,
         standalone: bool = True,
+        clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
 
@@ -1118,6 +1121,7 @@ class MultiModalPredictor:
                 validation_metric_name=validation_metric_name,
                 strict_loading=not trainable_param_names,
                 standalone=standalone,
+                clean_ckpts=clean_ckpts,
             )
 
             return self
@@ -1411,6 +1415,7 @@ class MultiModalPredictor:
                     strategy=strategy,
                     strict_loading=not trainable_param_names,  # Not strict loading if using parameter-efficient finetuning
                     standalone=standalone,
+                    clean_ckpts=clean_ckpts,
                 )
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
@@ -1428,6 +1433,7 @@ class MultiModalPredictor:
         last_ckpt_path=None,
         strict_loading=True,
         standalone=True,
+        clean_ckpts=True,
     ):
         # FIXME: we need to change validation_metric to evaluation_metric for model choosing
         # since we called self.evaluate. Below is a temporal fix for NER.
@@ -1554,7 +1560,7 @@ class MultiModalPredictor:
 
         torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
-        if self._clean_old_ckpts:
+        if clean_ckpts:
             # clean old checkpoints + the intermediate files stored
             for per_path in top_k_model_paths:
                 if os.path.isfile(per_path):
