@@ -49,7 +49,8 @@ class HFAutoModelForTextPrediction(nn.Module):
         prefix
             The model prefix.
         checkpoint_name
-            Name of the checkpoint. We support loading checkpoint from
+            Name of the checkpoint or the local directory of a custom checkpoint.
+            We support loading checkpoint from
             Huggingface Models list: https://huggingface.co/models
             For example, you may use
                 English backbones:

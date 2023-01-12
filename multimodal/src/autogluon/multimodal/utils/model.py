@@ -1,4 +1,5 @@
 import functools
+import json
 import logging
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -523,3 +524,47 @@ def modify_duplicate_model_names(
 
 def list_timm_models(pretrained=True):
     return timm.list_models(pretrained=pretrained)
+
+
+def _filter_timm_pretrained_cfg(cfg, remove_source=False, remove_null=True):
+    filtered_cfg = {}
+    keep_null = {"pool_size", "first_conv", "classifier"}  # always keep these keys, even if none
+    for k, v in cfg.items():
+        if remove_source and k in {"url", "file", "hf_hub_id", "hf_hub_id", "hf_hub_filename", "source"}:
+            continue
+        if remove_null and v is None and k not in keep_null:
+            continue
+        filtered_cfg[k] = v
+    return filtered_cfg
+
+
+def save_timm_config(
+    model: TimmAutoModelForImagePrediction,
+    config_path: str,
+):
+    """
+    Save TIMM image model configs to a local file.
+
+    Parameters
+    ----------
+    model
+        A TimmAutoModelForImagePrediction model object.
+    config_path:
+        A file to where the config is written to.
+    """
+    config = {}
+    pretrained_cfg = _filter_timm_pretrained_cfg(model.config, remove_source=True, remove_null=True)
+    # set some values at root config level
+    config["architecture"] = pretrained_cfg.pop("architecture")
+    config["num_classes"] = model.num_classes
+    config["num_features"] = model.out_features
+
+    global_pool_type = getattr(model, "global_pool", None)
+    if isinstance(global_pool_type, str) and global_pool_type:
+        config["global_pool"] = global_pool_type
+
+    config["pretrained_cfg"] = pretrained_cfg
+
+    with open(config_path, "w") as f:
+        json.dump(config, f, indent=2)
+        logger.info(f"Timm config saved to {config_path}.")
