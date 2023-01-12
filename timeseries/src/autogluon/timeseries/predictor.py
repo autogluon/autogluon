@@ -274,8 +274,10 @@ class TimeSeriesPredictor:
 
             If ``known_covariates_names`` were specified when creating the predictor, ``train_data`` must include the
             columns listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
-            The known covariates must have a numeric (float or integer) dtype. Columns of ``train_data`` except
-            ``target`` and those listed in ``known_covariates_names`` will be ignored.
+            The known covariates must have a numeric (float or integer) dtype.
+
+            Columns of ``train_data`` except ``target`` and those listed in ``known_covariates_names`` will be
+            interpreted as ``past_covariates`` - covariates that are known only in the past.
 
             If ``train_data`` has static features (i.e., ``train_data.static_features`` is a pandas DataFrame), the
             predictor will interpret columns with ``int`` and ``float`` dtypes as continuous (real-valued) features,
@@ -306,8 +308,8 @@ class TimeSeriesPredictor:
             the columns listed in ``known_covariates_names`` with the covariates values aligned with the target time
             series.
 
-            If ``train_data`` has static features, ``tuning_data`` must have also have static features with the same
-            column names and dtypes.
+            If ``train_data`` has past covariates or static features, ``tuning_data`` must have also include them (with
+            same columns names and dtypes).
 
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.
@@ -508,8 +510,8 @@ class TimeSeriesPredictor:
             If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
             listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
 
-            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
-            static features that have the same columns and dtypes.
+            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
+            must also include them (with same column names and dtypes).
 
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.
@@ -583,8 +585,8 @@ class TimeSeriesPredictor:
             If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
             listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
 
-            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
-            static features that have the same columns and dtypes.
+            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
+            must also include them (with same column names and dtypes).
 
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.
@@ -681,8 +683,8 @@ class TimeSeriesPredictor:
             If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
             listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
 
-            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
-            static features that have the same columns and dtypes.
+            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
+            must also include them (with same column names and dtypes).
 
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.

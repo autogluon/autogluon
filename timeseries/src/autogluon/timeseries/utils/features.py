@@ -86,11 +86,11 @@ class TimeSeriesFeatureGenerator:
                 self.past_covariates_names.append(column)
 
         logger.info("\nProvided dataset contains following columns:")
-        logger.info(f"\ttarget: {self.target}")
+        logger.info(f"\ttarget:           '{self.target}'")
         if len(self.known_covariates_names) > 0:
             logger.info(f"\tknown covariates: {self.known_covariates_names}")
         if len(self.known_covariates_names) > 0:
-            logger.info(f"\tpast covariates: {self.past_covariates_names}")
+            logger.info(f"\tpast covariates:  {self.past_covariates_names}")
 
         static_features_cat = []
         static_features_real = []
@@ -108,7 +108,7 @@ class TimeSeriesFeatureGenerator:
                     unused.append(col_name)
 
             logger.info("Following types of static features have been inferred:")
-            logger.info(f"\tcategorical: {static_features_cat}")
+            logger.info(f"\tcategorical:        {static_features_cat}")
             logger.info(f"\tcontinuous (float): {static_features_real}")
             if len(unused) > 0:
                 logger.info(f"\tremoved (neither categorical nor continuous): {unused}")
