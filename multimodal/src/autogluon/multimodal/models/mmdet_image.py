@@ -130,8 +130,9 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
     def _load_checkpoint_and_config(self, checkpoint_name=None):
-        from ..utils import download
         from mim.commands import download as mimdownload
+
+        from ..utils import download
 
         # TODO: add sha1_hash
 
