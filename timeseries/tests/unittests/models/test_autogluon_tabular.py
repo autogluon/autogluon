@@ -24,7 +24,7 @@ def test_when_feature_df_is_constructed_then_shape_is_correct(data, last_k_value
     # Initialize model._lag_indices and model._time_features from freq
     model.fit(train_data=data, time_limit=2)
     df = model._get_features_dataframe(data, last_k_values=last_k_values)
-    expected_num_features = len(model._lag_indices) + len(model._time_features) + 1
+    expected_num_features = len(model._target_lag_indices) + len(model._time_features) + 1
     assert df.shape == (expected_length, expected_num_features)
 
 
@@ -49,10 +49,12 @@ def test_when_predict_is_called_then_get_features_dataframe_receives_correct_inp
 def test_when_static_features_present_then_shape_is_correct(temp_model_path):
     data = DATAFRAME_WITH_STATIC.copy()
     model = AutoGluonTabularModel(path=temp_model_path)
-    # Initialize model._lag_indices and model._time_features from freq
+    # Initialize model._target_lag_indices and model._time_features from freq
     model.fit(train_data=data, time_limit=2)
     df = model._get_features_dataframe(data)
-    expected_num_features = len(model._lag_indices) + len(model._time_features) + 1 + len(data.static_features.columns)
+    expected_num_features = (
+        len(model._target_lag_indices) + len(model._time_features) + 1 + len(data.static_features.columns)
+    )
     assert len(df.columns) == expected_num_features
     assert all(col in df.columns for col in data.static_features.columns)
 

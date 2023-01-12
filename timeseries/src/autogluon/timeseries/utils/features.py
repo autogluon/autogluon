@@ -77,9 +77,6 @@ class TimeSeriesFeatureGenerator:
     def fit(self, data: TimeSeriesDataFrame) -> None:
         assert not self._is_fit, f"{self.__class__.__name__} has already been fit"
 
-        for column in self.known_covariates_names:
-            assert column in data.columns, f"known_covariates column {column} is missing from the provided data"
-
         self.past_covariates_names = []
         for column in data.columns:
             if column != self.target and column not in self.known_covariates_names:

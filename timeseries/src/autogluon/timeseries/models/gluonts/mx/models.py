@@ -195,6 +195,8 @@ class MQCNNMXNetModel(AbstractGluonTSSeq2SeqModel):
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = MQCNNEstimator
+    supports_known_covariates = True
+    supports_past_covariates = True
 
     def _get_estimator_init_args(self) -> dict:
         init_kwargs = super()._get_estimator_init_args()
@@ -202,6 +204,7 @@ class MQCNNMXNetModel(AbstractGluonTSSeq2SeqModel):
         init_kwargs["use_feat_static_real"] = self.num_feat_static_real > 0
         init_kwargs["cardinality"] = self.feat_static_cat_cardinality
         init_kwargs["use_feat_dynamic_real"] = self.num_feat_dynamic_real > 0
+        init_kwargs["use_past_feat_dynamic_real"] = self.num_past_feat_dynamic_real > 0
         return init_kwargs
 
 
