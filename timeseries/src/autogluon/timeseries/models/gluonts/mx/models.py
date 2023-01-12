@@ -97,6 +97,7 @@ class DeepARMXNetModel(AbstractGluonTSMXNetModel):
 
     gluonts_estimator_class: Type[GluonTSEstimator] = DeepAREstimator
     default_num_samples: int = 250
+    supports_known_covariates = True
 
     def _get_estimator_init_args(self) -> dict:
         init_kwargs = super()._get_estimator_init_args()
@@ -251,6 +252,7 @@ class MQRNNMXNetModel(AbstractGluonTSSeq2SeqModel):
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = MQRNNEstimator
+    supports_known_covariates = True
 
 
 class SimpleFeedForwardMXNetModel(AbstractGluonTSMXNetModel):
@@ -349,6 +351,8 @@ class TemporalFusionTransformerMXNetModel(AbstractGluonTSMXNetModel):
 
     gluonts_estimator_class: Type[GluonTSEstimator] = TemporalFusionTransformerEstimator
     supported_quantiles: set = set([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+    supports_known_covariates = True
+    supports_past_covariates = True
 
     def _get_estimator_init_args(self) -> dict:
         init_kwargs = super()._get_estimator_init_args()

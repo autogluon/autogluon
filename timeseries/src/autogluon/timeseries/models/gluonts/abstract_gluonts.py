@@ -136,6 +136,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     int_dtype: Type = np.int64
     # default number of samples for prediction
     default_num_samples: int = 1000
+    supports_known_covariates: bool = False
+    supports_past_covariates: bool = False
 
     def __init__(
         self,
@@ -212,10 +214,10 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                     feat_static_cat = ds.static_features[self.metadata.static_features_cat]
                     self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
             disable_known_covariates = model_params.get("disable_known_covariates", False)
-            if not disable_known_covariates:
+            if not disable_known_covariates and self.supports_known_covariates:
                 self.num_feat_dynamic_real = len(self.metadata.known_covariates_real)
             disable_past_covariates = model_params.get("disable_past_covariates", False)
-            if not disable_past_covariates:
+            if not disable_past_covariates and self.supports_past_covariates:
                 self.num_past_feat_dynamic_real = len(self.metadata.past_covariates_real)
 
         if "callbacks" in kwargs:
