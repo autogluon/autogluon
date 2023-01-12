@@ -49,6 +49,12 @@ class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
 
 
 class TimeSeriesFeatureGenerator:
+    """Takes care of preprocessing for static_features and past/known covariates.
+
+    Covariates are all converted to float dtype. Static features, if present, are all converted to categorical & float
+    dtypes.
+    """
+
     def __init__(self, target: str, known_covariates_names: List[str]):
         self.target = target
         self._is_fit = False
@@ -58,8 +64,8 @@ class TimeSeriesFeatureGenerator:
         self.covariate_metadata: CovariateMetadata = None
 
     @property
-    def required_column_names(self) -> pd.Index:
-        return pd.Index([self.target] + list(self.known_covariates_names) + list(self.past_covariates_names))
+    def required_column_names(self) -> List[str]:
+        return [self.target] + list(self.known_covariates_names) + list(self.past_covariates_names)
 
     @staticmethod
     def _convert_numerical_features_to_float(df: pd.DataFrame, float_dtype=np.float64) -> pd.DataFrame:
@@ -111,8 +117,8 @@ class TimeSeriesFeatureGenerator:
         )
         self._is_fit = True
 
+    @staticmethod
     def _check_and_prepare_covariates(
-        self,
         data: TimeSeriesDataFrame,
         required_column_names: List[str],
         data_frame_name: str,
@@ -134,6 +140,13 @@ class TimeSeriesFeatureGenerator:
         return data
 
     def transform(self, data: TimeSeriesDataFrame, data_frame_name: str = "data") -> TimeSeriesDataFrame:
+        """Transform static features and past/known covariates.
+
+        Transformed data is guaranteed to match the specification (same columns / dtypes) of the data seen during fit.
+        Extra columns not seen during fitting will be removed.
+
+        If some columns are missing or are incompatible, an exception will be raised.
+        """
         assert self._is_fit, f"{self.__class__.__name__} has not been fit yet"
         # Avoid modifying inplace
         data = data.copy(deep=False)
