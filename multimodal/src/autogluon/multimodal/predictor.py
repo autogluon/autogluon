@@ -528,7 +528,7 @@ class MultiModalPredictor:
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         tuning_data: Optional[Union[pd.DataFrame, str]] = None,
-        max_tuning_num: Optional[int] = None,
+        max_num_tuning_data: Optional[int] = None,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         time_limit: Optional[int] = None,
         save_path: Optional[str] = None,
@@ -683,9 +683,9 @@ class MultiModalPredictor:
             if tuning_data is not None:
                 self.detection_anno_train = tuning_data
                 tuning_data = from_coco_or_voc(tuning_data, "val")
-                if max_tuning_num is not None:
-                    if len(tuning_data) > max_tuning_num:
-                        tuning_data = tuning_data.sample(n=max_tuning_num, replace=False, random_state=seed).reset_index(drop=True)
+                if max_num_tuning_data is not None:
+                    if len(tuning_data) > max_num_tuning_data:
+                        tuning_data = tuning_data.sample(n=max_num_tuning_data, replace=False, random_state=seed).reset_index(drop=True)
 
         if hyperparameter_tune_kwargs is not None:
             # TODO: can we support hyperparameters being the same format as regular training?
