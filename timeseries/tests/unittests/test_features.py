@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
 from .common import get_data_frame_with_variable_lengths
