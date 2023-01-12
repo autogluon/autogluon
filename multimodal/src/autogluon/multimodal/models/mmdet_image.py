@@ -26,7 +26,6 @@ except ImportError as e:
     mmdet = None
 
 from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
-from ..utils import get_pretrain_configs_dir
 from .utils import lookup_mmdet_config, update_mmdet_config
 
 logger = logging.getLogger(AUTOMM)
@@ -132,7 +131,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
     def _load_checkpoint_and_config(self, checkpoint_name=None):
         from mim.commands import download as mimdownload
 
-        from ..utils import download
+        from ..utils import download, get_pretrain_configs_dir
 
         # TODO: add sha1_hash
 
