@@ -122,7 +122,7 @@ class NERVisualizer:
                     (entity_group.startswith("I-") and last_label[2:] == entity_group[2:])
                     or last_label == entity_group
                 )
-                and self.sent[last_end:start].isspace()
+                and (self.sent[last_end:start].isspace() or (last_end == start))
             ):
                 last_end = end
             else:
