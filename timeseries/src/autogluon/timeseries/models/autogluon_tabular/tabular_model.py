@@ -26,6 +26,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
 
     - lag features (observed time series values) based on ``freq`` of the data
     - time features (e.g., day of the week) based on the timestamp of the measurement
+    - lagged known and past covariates (if available)
     - static features of each item (if available)
 
     Quantiles are obtained by assuming that the residuals follow zero-mean normal distribution, scale of which is
@@ -51,10 +52,10 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
     PREDICTION_BATCH_SIZE = 100_000
 
     TIMESERIES_METRIC_TO_TABULAR_METRIC = {
-        "MASE": "root_mean_squared_error",
+        "MASE": "mean_absolute_error",
         "MAPE": "mean_absolute_percentage_error",
         "sMAPE": "mean_absolute_percentage_error",
-        "mean_wQuantileLoss": "root_mean_squared_error",
+        "mean_wQuantileLoss": "mean_absolute_error",
         "MSE": "mean_squared_error",
         "RMSE": "root_mean_squared_error",
     }
@@ -79,7 +80,9 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             hyperparameters=hyperparameters,
             **kwargs,
         )
-        self._lag_indices: np.array = None
+        self._target_lag_indices: np.array = None
+        self._known_covariates_lag_indices = np.arange(0, 10)
+        self._past_covariates_lag_indices = np.arange(1, 10)
         self._time_features: List[Callable] = None
         self._available_features: pd.Index = None
         self.residuals_std = 0.0
@@ -106,25 +109,62 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             If provided, features will be generated only for the last `last_k_values` timesteps of each time series.
         """
 
-        def get_lag_features_and_target(group):
-            timestamp = group.index.get_level_values(TIMESTAMP)
-            lag_columns = {f"lag_{idx}": group.shift(idx).values.ravel() for idx in self._lag_indices}
-            features = pd.DataFrame(lag_columns, index=timestamp)
+        def get_lags(df: pd.DataFrame, lag_indices: List[int]) -> pd.DataFrame:
+            shifted = [df.shift(idx).add_suffix(f"_lag_{idx}") for idx in lag_indices]
+            return pd.concat(shifted, axis=1)
+
+        def apply_mask(
+            df: pd.DataFrame, num_hidden: np.ndarray, lag_indices: np.ndarray, num_columns: int = 1
+        ) -> pd.DataFrame:
+            if num_columns > 1:
+                lag_indices = np.repeat(lag_indices, num_columns)
+            mask = num_hidden[:, None] >= lag_indices[None]  # shape [len(num_hidden), len(lag_indices) * num_columns]
+            df[mask] = np.nan
+            return df
+
+        def get_lag_features_and_target(time_series):
             # Starting from the end of the time series, mask the values as if the last `prediction_length` steps weren't observed
             # This mimics what will happen at test time, when we simultaneously predict the next `prediction_length` values
-            num_windows = (len(group) - 1) // self.prediction_length
+            num_windows = (len(time_series) - 1) // self.prediction_length
             # We don't hide any past values for the first `remainder` values, otherwise the features will be all empty
-            remainder = len(group) - num_windows * self.prediction_length
+            remainder = len(time_series) - num_windows * self.prediction_length
             num_hidden = np.concatenate([np.zeros(remainder), np.tile(np.arange(self.prediction_length), num_windows)])
-            mask = num_hidden[:, None] >= self._lag_indices[None]  # shape [num_timesteps, num_lags]
-            features[mask] = np.nan
+
+            target_lags = get_lags(time_series[[self.target]], self._target_lag_indices)
+            target_lags = apply_mask(target_lags, num_hidden=num_hidden, lag_indices=self._target_lag_indices)
+            feature_dfs = [target_lags]
+
+            if self.metadata.past_covariates_real:
+                past_covariates_lags = get_lags(
+                    time_series[self.metadata.past_covariates_real], self._past_covariates_lag_indices
+                )
+                past_covariates_lags = apply_mask(
+                    past_covariates_lags,
+                    num_hidden=num_hidden,
+                    lag_indices=self._past_covariates_lag_indices,
+                    num_columns=len(self.metadata.past_covariates_real),
+                )
+                feature_dfs.append(past_covariates_lags)
+
+            if self.metadata.known_covariates_real:
+                known_covariates_lags = get_lags(
+                    time_series[self.metadata.known_covariates_real], self._known_covariates_lag_indices
+                )
+                feature_dfs.append(known_covariates_lags)
+
+            if len(feature_dfs) > 1:
+                features = pd.concat(feature_dfs, axis=1)
+            else:
+                features = target_lags
 
             # Prediction target
-            features[self.target] = group.values.ravel()
+            features[self.target] = time_series[self.target]
             return features
 
-        features = data[self.target].groupby(level=ITEMID, sort=False).apply(get_lag_features_and_target)
-        timestamps = features.index.get_level_values(TIMESTAMP)
+        df = pd.DataFrame(data).reset_index(level=TIMESTAMP)
+        timestamps = pd.DatetimeIndex(df.pop(TIMESTAMP))
+        features = df.groupby(level=ITEMID, sort=False).apply(get_lag_features_and_target)
+
         for time_feat in self._time_features:
             features[time_feat.__name__] = time_feat(timestamps)
 
@@ -149,7 +189,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         if self.tabular_predictor._learner.is_fit:
             raise AssertionError(f"{self.name} predictor has already been fit!")
         verbosity = kwargs.get("verbosity", 2)
-        self._lag_indices = np.array(get_lags_for_frequency(train_data.freq), dtype=np.int64)
+        self._target_lag_indices = np.array(get_lags_for_frequency(train_data.freq), dtype=np.int64)
         self._time_features = time_features_from_frequency_str(train_data.freq)
 
         train_data, _ = self._normalize_targets(train_data)

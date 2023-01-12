@@ -292,8 +292,9 @@ class AbstractTimeSeriesModel(AbstractModel):
             of input items.
         """
         past_data = data.slice_by_timestep(None, -self.prediction_length)
-        if len(data.columns) > 1:
-            known_covariates = data.slice_by_timestep(-self.prediction_length, None).drop(self.target, axis=1)
+        if len(self.metadata.known_covariates_real) > 0:
+            future_data = data.slice_by_timestep(-self.prediction_length, None)
+            known_covariates = future_data[self.metadata.known_covariates_real]
         else:
             known_covariates = None
         return self.predict(past_data, known_covariates=known_covariates, **kwargs)
