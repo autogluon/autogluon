@@ -381,7 +381,7 @@ def test_when_ignore_index_is_true_and_known_covariates_available_then_learner_c
         prediction_length=prediction_length,
         ignore_time_index=True,
     )
-    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Y", "X"])
+    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["Y", "X"])
     learner.fit(train_data=train_data, hyperparameters={"DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}})
     known_covariates = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["X", "Y"])
     preds = learner.predict(train_data, known_covariates=known_covariates)

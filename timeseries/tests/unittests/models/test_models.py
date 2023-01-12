@@ -108,6 +108,8 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         quantile_levels=[0.1, 0.9],
         hyperparameters={
             "epochs": ag.Int(1, 3),
+            "num_epochs_per_batch": 1,
+            "maxiter": 1,
         },
     )
     if model.name == "AutoGluonTabular":
