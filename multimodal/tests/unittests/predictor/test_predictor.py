@@ -6,6 +6,8 @@ import uuid
 
 import numpy.testing as npt
 import pytest
+import timm
+import transformers
 from omegaconf import OmegaConf
 from torch import nn
 
@@ -679,3 +681,97 @@ def test_image_bytearray():
     npt.assert_array_equal(
         [prediction_prob_1, prediction_prob_2, prediction_prob_3, prediction_prob_4], [prediction_prob_1] * 4
     )
+
+
+def test_dump_timm_image():
+    download_dir = "./"
+    model_dump_path = "./timm_image_test"
+    base_model_name = "mobilenetv3_large_100"
+    train_data, _ = shopee_dataset(download_dir=download_dir)
+    predictor_1 = MultiModalPredictor(
+        label="label",
+    )
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.timm_image.checkpoint_name": base_model_name,
+    }
+    predictor_1.fit(
+        train_data=train_data,
+        hyperparameters=hyperparameters,
+        time_limit=5,
+        seed=42,
+    )
+    predictor_1.dump_timm_image(path=model_dump_path)
+    model = timm.create_model(
+        model_name=base_model_name, checkpoint_path=f"{model_dump_path}/pytorch_model.bin", num_classes=0
+    )
+    assert isinstance(model, timm.models.mobilenetv3.MobileNetV3)
+    predictor_2 = MultiModalPredictor(
+        label="label",
+    )
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.timm_image.checkpoint_name": model_dump_path,
+    }
+    predictor_2.fit(
+        train_data=train_data,
+        hyperparameters=hyperparameters,
+        time_limit=5,
+        seed=42,
+    )
+
+
+def test_dump_hf_text():
+    model_dump_path = "./hf_text_test"
+    base_model_name = "prajjwal1/bert-tiny"
+    dataset = ALL_DATASETS["ae"]
+    predictor_1 = MultiModalPredictor(
+        label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric
+    )
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.hf_text.checkpoint_name": base_model_name,
+    }
+    predictor_1.fit(
+        train_data=dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=5,
+        seed=42,
+    )
+    predictor_1.dump_hf_text(path=model_dump_path)
+
+    model = transformers.AutoModel.from_pretrained(model_dump_path)
+    assert isinstance(model, transformers.models.bert.modeling_bert.BertModel)
+    predictor_2 = MultiModalPredictor(
+        label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric
+    )
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.hf_text.checkpoint_name": model_dump_path,
+    }
+    predictor_2.fit(
+        train_data=dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=5,
+        seed=42,
+    )
+
+
+def test_fusion_model_dump():
+    hf_text_dump_path = "./hf_text_fusion"
+    timm_image_dump_path = "./timm_image_fusion"
+    dataset = ALL_DATASETS["petfinder"]
+    predictor = MultiModalPredictor(
+        label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric
+    )
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+    }
+    predictor.fit(
+        train_data=dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=5,
+        seed=42,
+    )
+    predictor.dump_hf_text(path=hf_text_dump_path)
+    predictor.dump_timm_image(path=timm_image_dump_path)
