@@ -514,7 +514,9 @@ class FeatureDistanceAnalysis(AbstractAnalysis):
         return self.all_keys_must_be_present(args, "train_data", "label", "feature_generator")
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
-        x = args.train_data.drop(labels=[args.label], axis=1)
+        x = args.train_data
+        if args.label is not None:
+            x = x.drop(labels=[args.label], axis=1)
         corr = np.round(spearmanr(x).correlation, 4)
         np.fill_diagonal(corr, 1)
         corr_condensed = hc.distance.squareform(1 - np.nan_to_num(corr))

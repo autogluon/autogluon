@@ -8,7 +8,7 @@ import seaborn as sns
 from scipy import stats
 from scipy.cluster import hierarchy as hc
 
-from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, R_OBJECT
+from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_DATETIME, R_FLOAT, R_INT, R_OBJECT
 
 from ..state import AnalysisState
 from .base import AbstractVisualization
@@ -356,6 +356,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             ("numeric", "category", "category"): self._KdePlotRenderer,
             ("numeric", "numeric", None): self._RegPlotRenderer,
             ("numeric", "numeric", "category"): self._ScatterPlotRenderer,
+            ("datetime", "numeric", None): self._LinePlotRenderer,
         }
         return types.get((x_type, y_type, hue_type), None)
 
@@ -368,6 +369,8 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             return "category"
         elif raw_type in [R_INT, R_FLOAT]:
             return "numeric"
+        elif raw_type in [R_DATETIME]:
+            return "datetime"
         elif raw_type in [R_OBJECT, R_CATEGORY, R_BOOL]:
             return "category"
         else:
@@ -432,3 +435,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
     class _RegPlotRenderer(_AbstractFeatureInteractionPlotRenderer):
         def _render(self, state, ds, params, param_types, ax, data, chart_args):
             sns.regplot(ax=ax, data=data, **chart_args)
+
+    class _LinePlotRenderer(_AbstractFeatureInteractionPlotRenderer):
+        def _render(self, state, ds, params, param_types, ax, data, chart_args):
+            sns.lineplot(ax=ax, data=data, **chart_args)
