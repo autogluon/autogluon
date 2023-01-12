@@ -138,6 +138,7 @@ def tutorial_script_for_finetune_yolox_pothole_in_coco_format():
 
     predictor.evaluate(test_path)
 
+
 def tutorial_script_for_finetune_high_performance_pothole_in_coco_format():
     zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/dataset/pothole.zip"
     download_dir = "./pothole"
@@ -290,4 +291,4 @@ def main():
 
 
 if __name__ == "__main__":
-    tutorial_script_for_finetune_yolox_pothole_in_coco_format()
+    main()
