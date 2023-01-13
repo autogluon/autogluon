@@ -7,6 +7,7 @@ import pprint
 import shutil
 import time
 from typing import Union, List, Tuple
+import warnings
 
 import networkx as nx
 import numpy as np
@@ -93,6 +94,12 @@ class TabularPredictor:
         Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
         If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
         where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
+        Verbosity levels:
+            0: Only log exceptions
+            1: Only log warnings + exceptions
+            2: Standard logging
+            3: Verbose logging (ex: log validation score every 50 iterations)
+            4: Maximally verbose logging (ex: log validation score every iteration)
     sample_weight : str, default = None
         If specified, this column-name indicates which column of the data should be treated as sample weights. This column will NOT be considered as a predictive feature.
         Sample weights should be non-negative (and cannot be nan), with larger values indicating which rows are more important than others.
@@ -1370,6 +1377,7 @@ class TabularPredictor:
         data = self.__get_dataset(data)
         return self._learner.predict(X=data, model=model, as_pandas=as_pandas, transform_features=transform_features)
 
+    # TODO: v0.8: Error if called with self.problem_type='regression' or 'quantile'
     def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=True, transform_features=True):
         """
         Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
@@ -1407,6 +1415,12 @@ class TabularPredictor:
         """
         self._assert_is_fit('predict_proba')
         data = self.__get_dataset(data)
+        if self.problem_type in [REGRESSION, QUANTILE]:
+            warnings.warn(
+                f'Calling `predictor.predict_proba` when problem_type={self.problem_type} will raise an AssertionError starting in AutoGluon v0.8. '
+                'Please call `predictor.predict` instead.',
+                category=FutureWarning
+            )
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass, transform_features=transform_features)
 
     def evaluate(self, data, model=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
