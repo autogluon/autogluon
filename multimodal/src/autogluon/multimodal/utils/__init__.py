@@ -6,6 +6,7 @@ from .config import (
     filter_search_space,
     get_config,
     get_local_pretrained_config_paths,
+    get_pretrain_configs_dir,
     parse_dotlist_conf,
     update_config_by_rules,
     update_tabular_config_by_resources,

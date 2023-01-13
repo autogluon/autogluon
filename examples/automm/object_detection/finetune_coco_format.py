@@ -99,6 +99,46 @@ def tutorial_script_for_finetune_fast_pothole_in_coco_format():
     predictor.evaluate(test_path)
 
 
+def tutorial_script_for_finetune_yolox_pothole_in_coco_format():
+    zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/dataset/pothole.zip"
+    download_dir = "./pothole"
+
+    load_zip.unzip(zip_file, unzip_dir=download_dir)
+    data_dir = os.path.join(download_dir, "pothole")
+    train_path = os.path.join(data_dir, "Annotations", "usersplit_train_cocoformat.json")
+    val_path = os.path.join(data_dir, "Annotations", "usersplit_val_cocoformat.json")
+    test_path = os.path.join(data_dir, "Annotations", "usersplit_test_cocoformat.json")
+
+    checkpoint_name = "yolox_l_8x8_300e_coco"
+    num_gpus = 1
+
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": num_gpus,
+            "optimization.val_metric": "map",
+        },
+        problem_type="object_detection",
+        sample_data_path=train_path,
+    )
+
+    start = time.time()
+    predictor.fit(
+        train_path,
+        tuning_data=val_path,
+        hyperparameters={
+            "optimization.learning_rate": 5e-5,  # we use two stage and detection head has 100x lr
+            "optimization.max_epochs": 30,
+            "env.per_gpu_batch_size": 8,  # decrease it when model is large
+        },
+    )
+    end = time.time()
+
+    print("This finetuning takes %.2f seconds." % (end - start))
+
+    predictor.evaluate(test_path)
+
+
 def tutorial_script_for_finetune_high_performance_pothole_in_coco_format():
     zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/dataset/pothole.zip"
     download_dir = "./pothole"

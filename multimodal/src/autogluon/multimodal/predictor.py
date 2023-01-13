@@ -529,6 +529,7 @@ class MultiModalPredictor:
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         tuning_data: Optional[Union[pd.DataFrame, str]] = None,
+        max_num_tuning_data: Optional[int] = None,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         time_limit: Optional[int] = None,
         save_path: Optional[str] = None,
@@ -539,6 +540,7 @@ class MultiModalPredictor:
         seed: Optional[int] = 123,
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[dict] = None,
+        clean_ckpts: Optional[bool] = True,
     ):
         """
         Fit MultiModalPredictor predict label column of a dataframe based on the other columns,
@@ -643,6 +645,8 @@ class MultiModalPredictor:
                     scheduler_init_args: Optional[dict] = None
                         If provided str to `searcher`, you can optionally provide custom init_args to the searcher
                         You don't need to worry about `metric` and `mode`. AutoGluon will figure it out by itself.
+        clean_ckpts
+            Whether to clean the checkpoints of each validation step after training.
 
         Returns
         -------
@@ -678,7 +682,13 @@ class MultiModalPredictor:
             self._detection_anno_train = train_data
             train_data = from_coco_or_voc(train_data, "train")
             if tuning_data is not None:
+                self.detection_anno_train = tuning_data
                 tuning_data = from_coco_or_voc(tuning_data, "val")
+                if max_num_tuning_data is not None:
+                    if len(tuning_data) > max_num_tuning_data:
+                        tuning_data = tuning_data.sample(
+                            n=max_num_tuning_data, replace=False, random_state=seed
+                        ).reset_index(drop=True)
 
         if hyperparameter_tune_kwargs is not None:
             # TODO: can we support hyperparameters being the same format as regular training?
@@ -821,6 +831,7 @@ class MultiModalPredictor:
             teacher_predictor=teacher_predictor,
             standalone=standalone,
             hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
+            clean_ckpts=clean_ckpts,
         )
 
         if hyperparameter_tune_kwargs is not None:
@@ -994,6 +1005,7 @@ class MultiModalPredictor:
         teacher_predictor: Union[str, MultiModalPredictor] = None,
         hpo_mode: bool = False,
         standalone: bool = True,
+        clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
 
@@ -1116,6 +1128,7 @@ class MultiModalPredictor:
                 validation_metric_name=validation_metric_name,
                 strict_loading=not trainable_param_names,
                 standalone=standalone,
+                clean_ckpts=clean_ckpts,
             )
 
             return self
@@ -1409,6 +1422,7 @@ class MultiModalPredictor:
                     strategy=strategy,
                     strict_loading=not trainable_param_names,  # Not strict loading if using parameter-efficient finetuning
                     standalone=standalone,
+                    clean_ckpts=clean_ckpts,
                 )
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
@@ -1426,6 +1440,7 @@ class MultiModalPredictor:
         last_ckpt_path=None,
         strict_loading=True,
         standalone=True,
+        clean_ckpts=True,
     ):
         # FIXME: we need to change validation_metric to evaluation_metric for model choosing
         # since we called self.evaluate. Below is a temporal fix for NER.
@@ -1552,16 +1567,17 @@ class MultiModalPredictor:
 
         torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
-        # clean old checkpoints + the intermediate files stored
-        for per_path in top_k_model_paths:
-            if os.path.isfile(per_path):
-                os.remove(per_path)
-        # remove the yaml file after cleaning the checkpoints
-        if os.path.isfile(best_k_models_yaml_path):
-            os.remove(best_k_models_yaml_path)
-        # clean the last checkpoint
-        if os.path.isfile(last_ckpt_path):
-            os.remove(last_ckpt_path)
+        if clean_ckpts:
+            # clean old checkpoints + the intermediate files stored
+            for per_path in top_k_model_paths:
+                if os.path.isfile(per_path):
+                    os.remove(per_path)
+            # remove the yaml file after cleaning the checkpoints
+            if os.path.isfile(best_k_models_yaml_path):
+                os.remove(best_k_models_yaml_path)
+            # clean the last checkpoint
+            if os.path.isfile(last_ckpt_path):
+                os.remove(last_ckpt_path)
 
     def _default_predict(
         self,
