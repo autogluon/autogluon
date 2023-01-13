@@ -96,7 +96,7 @@ def test_ner_chinese():
         train_data=train_df,
         tuning_data=dev_df,
         hyperparameters={
-            "model.ner_text.checkpoint_name": "microsoft/mdeberta-v3-base",
+            "model.ner_text.checkpoint_name": "bert-base-chinese",
             "optimization.top_k": 1,
             "env.num_gpus": -1,
             "optimization.max_epochs": 1,

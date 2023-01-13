@@ -154,6 +154,7 @@ from .utils import (
     list_timm_models,
     load_text_tokenizers,
     logits_to_prob,
+    merge_bio_format,
     modify_duplicate_model_names,
     move_to_device,
     predict,
@@ -2150,6 +2151,8 @@ class MultiModalPredictor:
                 else:
                     pred = logits
 
+            if self._problem_type == NER:
+                pred = merge_bio_format(data[self._df_preprocessor.ner_feature_names[0]], pred)
         if save_results:
             ## Dumping Result for detection only now
             assert (

@@ -324,6 +324,8 @@ def process_ner_annotations(ner_annotations, ner_text, entity_map, tokenizer, is
         The NER annotations.
     ner_text
         The corresponding raw text.
+    entity_map
+        The map between tags and tag indexes. e.g., {"PER":2, "LOC":3}.
     tokenizer
         The tokenizer to be used.
     is_eval
