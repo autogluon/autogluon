@@ -154,6 +154,7 @@ from .utils import (
     list_timm_models,
     load_text_tokenizers,
     logits_to_prob,
+    merge_bio_format,
     modify_duplicate_model_names,
     move_to_device,
     predict,
@@ -778,7 +779,7 @@ class MultiModalPredictor:
             column_types = self._column_types
 
         if self._problem_type != OBJECT_DETECTION:
-            if self._output_shape is not None:
+            if self._output_shape is not None and output_shape is not None:
                 assert self._output_shape == output_shape, (
                     f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
                 )
@@ -1028,6 +1029,10 @@ class MultiModalPredictor:
             num_categorical_columns=len(df_preprocessor.categorical_num_categories),
         )
         config = select_model(config=config, df_preprocessor=df_preprocessor)
+
+        # Update output_shape with label_generator.
+        if self._problem_type == NER:
+            self._output_shape = len(df_preprocessor.label_generator.unique_entity_groups)
 
         if self._model is None:
             model = create_fusion_model(
@@ -2146,6 +2151,8 @@ class MultiModalPredictor:
                 else:
                     pred = logits
 
+            if self._problem_type == NER:
+                pred = merge_bio_format(data[self._df_preprocessor.ner_feature_names[0]], pred)
         if save_results:
             ## Dumping Result for detection only now
             assert (

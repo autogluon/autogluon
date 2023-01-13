@@ -640,12 +640,7 @@ def infer_problem_type_output_shape(
         elif provided_problem_type == REGRESSION:
             return provided_problem_type, 1
         elif provided_problem_type == NER:
-            unique_entity_groups = [
-                annot[ENTITY_GROUP]
-                for annotation in data[label_column].items()
-                for annot in json.loads(annotation[-1])
-            ]
-            return provided_problem_type, len(set(unique_entity_groups)) + 2
+            return provided_problem_type, None
         elif provided_problem_type == OBJECT_DETECTION:
             return provided_problem_type, None
         else:

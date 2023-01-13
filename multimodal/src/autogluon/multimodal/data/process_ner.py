@@ -45,18 +45,24 @@ class NerProcessor:
         self,
         model: nn.Module,
         max_len: Optional[int] = None,
+        config: Optional[DictConfig] = None,
     ):
         """
         Parameters
         ----------
-        prefix
-            The prefix connecting a processor to its corresponding model.
+        model
+            The NER model.
+        max_len
+            The max length of the tokenizer.
+        config
+            Config dictionary.
         """
         self.model = model
         self.prefix = model.prefix
         self.tokenizer = None
         self.tokenizer_name = model.prefix
         self.max_len = max_len
+        self.config = config
 
         if self.prefix == NER_TEXT:
             self.tokenizer = model.tokenizer
@@ -139,7 +145,7 @@ class NerProcessor:
         if is_training or annotation_column is not None:
             ner_annotation = all_features[annotation_column]
             label, col_tokens, token_to_word_mappings, word_offsets = process_ner_annotations(
-                ner_annotation, ner_text, self.tokenizer
+                ner_annotation, ner_text, self.config.entity_map, self.tokenizer
             )
             ret.update({self.model.label_key: label})
         else:
