@@ -102,9 +102,11 @@ def merge_spans(sent, pred):
         try:
             pred = json.loads(pred)
         except Exception as exp:
-            raise RuntimeError(f"The received entity annotations is {pred}, "
-                               f"which can not be encoded with the json format. "
-                               f"Check your input again, or running `json.loads(pred)` to verify your data.")
+            raise RuntimeError(
+                f"The received entity annotations is {pred}, "
+                f"which can not be encoded with the json format. "
+                f"Check your input again, or running `json.loads(pred)` to verify your data."
+            )
     spans = {}
     last_start = -1
     last_end = -1
