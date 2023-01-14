@@ -159,8 +159,10 @@ def test_is_url(path, is_valid_url):
 
 def test_misc_visualize_ner():
     sentence = "Albert Einstein was born in Germany and is widely acknowledged to be one of the greatest physicists."
-    annotation = [{"entity_group": "PERSON", "start": 0, "end": 15},
-                  {"entity_group": "LOCATION", "start": 28, "end": 35}]
+    annotation = [
+        {"entity_group": "PERSON", "start": 0, "end": 15},
+        {"entity_group": "LOCATION", "start": 28, "end": 35},
+    ]
     visualize_ner(sentence, annotation)
 
     # Test using string for annotation
