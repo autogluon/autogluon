@@ -106,9 +106,9 @@ def merge_spans(sent, pred):
         last = end = entity["end"]
         if (
             last_start >= 0
-            and (not re.match("B-", last_label, re.IGNORECASE))
+            and (not re.match("B-", entity_group, re.IGNORECASE))
             and (
-                (re.match("I-", last_label, re.IGNORECASE) and last_label[2:] == entity_group[2:])
+                (re.match("I-", entity_group, re.IGNORECASE) and last_label[2:] == entity_group[2:])
                 or last_label == entity_group
             )
             and (sent[last_end:start].isspace() or (last_end == start))
