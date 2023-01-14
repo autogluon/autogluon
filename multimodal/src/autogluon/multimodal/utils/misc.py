@@ -3,6 +3,7 @@ import os
 import re
 
 import numpy as np
+import json
 import pandas as pd
 import torch
 from scipy.special import softmax
@@ -96,6 +97,14 @@ def shopee_dataset(
 
 def merge_spans(sent, pred):
     """Merge subsequent predictions."""
+    if isinstance(sent, str):
+        # For string values, we assume that it is json-encoded string of the sentences.
+        try:
+            sent = json.loads(sent)
+        except Exception as exp:
+            raise RuntimeError(f"The received sentence is {sent}, which can not be encoded with the json format. "
+                               f"Check your input again, or running `json.loads(sent)` to verify if it "
+                               f"can be encoded in json.")
     spans = {}
     last_start = -1
     last_end = -1
