@@ -1,9 +1,9 @@
+import json
 import logging
 import os
 import re
 
 import numpy as np
-import json
 import pandas as pd
 import torch
 from scipy.special import softmax
