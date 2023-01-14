@@ -41,3 +41,9 @@ To ensure that the tutorial contents are easy for code review, we adopt the Mark
 python3 -m pip install mu-notedown
 jupyter notebook --NotebookApp.contents_manager_class='notedown.NotedownContentsManager'
 ```
+
+To convert the Jupyter notebook file to markdown file, you can execute the following command:
+
+```shell
+jupyter nbconvert --ClearOutputPreprocessor.enabled=True --to markdown YOUR_NOTE_BOOK_FILENAME.ipynb
+```
