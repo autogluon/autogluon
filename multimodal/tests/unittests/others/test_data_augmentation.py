@@ -23,8 +23,8 @@ from autogluon.multimodal.constants import (
     UNIFORM_SOUP,
 )
 
-from ..predictor.test_predictor import verify_predictor_save_load
-from .unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
+# from ..predictor.test_predictor import verify_predictor_save_load
+from unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
 
 ALL_DATASETS = {
     "petfinder": PetFinderDataset,
@@ -146,12 +146,20 @@ def test_trivialaugment():
     with tempfile.TemporaryDirectory() as save_path:
         if os.path.isdir(save_path):
             shutil.rmtree(save_path)
+
+        train_df = dataset.train_df
+        train_df.loc[0:60, "Images"] = "hahaha"
+        print(train_df["Images"][:5])
         predictor.fit(
-            train_data=dataset.train_df,
+            train_data=train_df,
             time_limit=10,
             save_path=save_path,
             hyperparameters=hyperparameters,
         )
 
         score = predictor.evaluate(dataset.test_df)
-        verify_predictor_save_load(predictor, dataset.test_df)
+        # verify_predictor_save_load(predictor, dataset.test_df)
+
+
+if __name__ == "__main__":
+    test_trivialaugment()

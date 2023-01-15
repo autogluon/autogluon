@@ -95,8 +95,7 @@ from .data.infer_types import (
     infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
     infer_rois_column_type,
-    is_imagebytearray_column,
-    is_imagepath_column,
+    is_image_column,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
@@ -1754,9 +1753,9 @@ class MultiModalPredictor:
             column_types_copy = copy.deepcopy(column_types)
             for col_name, col_type in column_types.items():
                 if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
-                    if is_imagepath_column(data=data[col_name], col_name=col_name, sample_n=1):
+                    if is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_PATH):
                         image_type = IMAGE_PATH
-                    elif is_imagebytearray_column(data=data[col_name], col_name=col_name, sample_n=1):
+                    elif is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_BYTEARRAY):
                         image_type = IMAGE_BYTEARRAY
                     else:
                         raise ValueError(f"Image type in column {col_name} is not supported!")
