@@ -166,4 +166,4 @@ def test_misc_visualize_ner():
     visualize_ner(sentence, annotation)
 
     # Test using string for annotation
-    visualize_ner(sentence, str(annotation))
+    visualize_ner(sentence, json.dumps(annotation))
