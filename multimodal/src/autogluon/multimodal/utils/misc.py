@@ -94,7 +94,7 @@ def shopee_dataset(
     return train_data, test_data
 
 
-def merge_spans(sent, pred):
+def merge_spans(sent, pred, for_visualizer=False):
     """Merge subsequent predictions."""
     spans = {}
     last_start = -1
@@ -106,6 +106,7 @@ def merge_spans(sent, pred):
         last = end = entity["end"]
         if (
             last_start >= 0
+            and not for_visualizer
             and (not re.match("B-", entity_group, re.IGNORECASE))
             and (
                 (re.match("I-", entity_group, re.IGNORECASE) and last_label[2:] == entity_group[2:])
@@ -148,7 +149,7 @@ class NERVisualizer:
         self.pred = pred
         self.sent = sent
         self.colors = {}
-        self.spans = merge_spans(sent, pred)
+        self.spans = merge_spans(sent, pred, for_visualizer=True)
         self.rng = np.random.RandomState(seed)
 
     @staticmethod
