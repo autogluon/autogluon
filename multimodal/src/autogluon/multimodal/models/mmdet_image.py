@@ -128,6 +128,11 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
+    def save(self, save_path="./temp.pth"):
+        #print(self.model.state_dict().keys())
+        #exit()
+        torch.save({"state_dict": self.model.state_dict()}, save_path)
+
     def _load_checkpoint_and_config(self, checkpoint_name=None):
         from mim.commands import download as mimdownload
 
@@ -155,6 +160,9 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             checkpoint = download(
                 url="https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_l_8x8_300e_coco/yolox_l_8x8_300e_coco_20211126_140236-d3bd2b23.pth",
             )
+            config_file = os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py")
+        elif checkpoint_name == "yoloxl365":
+            checkpoint = "/media/code/autogluon/examples/automm/object_detection/temp_yoloxl365.pth"
             config_file = os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py")
         else:
             # download config and checkpoint files using openmim
