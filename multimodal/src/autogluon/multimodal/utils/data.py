@@ -4,13 +4,16 @@ import random
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import pandas as pd
 import PIL
 from omegaconf import DictConfig, OmegaConf
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
 from autogluon.core.utils.loaders import load_pd
+from autogluon.core.utils.utils import default_holdout_frac
 
 from ..constants import (
     AUTOMM,
@@ -588,3 +591,24 @@ def contains_valid_images(data: Union[str, list], sample_n: Optional[int] = 50) 
         return False
     else:
         raise Exception(f"Expected data to be a list or a str, but got {type(data)}")
+
+
+def split_train_tuning_data(train_data, tuning_data, holdout_frac, is_classification, label_column, seed):
+
+    if tuning_data is None:
+        if is_classification:
+            stratify = train_data[label_column]
+        else:
+            stratify = None
+        if holdout_frac is None:
+            val_frac = default_holdout_frac(len(train_data), hyperparameter_tune=False)
+        else:
+            val_frac = holdout_frac
+        train_data, tuning_data = train_test_split(
+            train_data,
+            test_size=val_frac,
+            stratify=stratify,
+            random_state=np.random.RandomState(seed),
+        )
+
+    return train_data, tuning_data
