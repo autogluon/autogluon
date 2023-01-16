@@ -185,10 +185,6 @@ def is_image_column(
     -------
     Whether the column is an image-path column.
     """
-    data = data.dropna()
-    if len(data) == 0:
-        return False
-
     sample_num = min(len(data), sample_n)
     data = data.sample(n=sample_num, random_state=0)
     if image_type == IMAGE_PATH:
@@ -200,7 +196,7 @@ def is_image_column(
 
     failure_count = 0
     for images in data:
-        success = True
+        success = False
         if not isinstance(images, list):
             images = [images]
         for per_image in images:
@@ -211,9 +207,13 @@ def is_image_column(
                 elif image_type == IMAGE_BYTEARRAY:
                     with PIL.Image.open(BytesIO(per_image)) as img:
                         pass
+                else:
+                    raise ValueError(f"Unsupported image type: {image_type}")
             except:
                 success = False
                 break
+
+            success = True
 
         if not success:
             failure_count += 1
@@ -438,7 +438,9 @@ def infer_column_types(
             column_types[col_name] = IMAGE_PATH
         elif is_text_column(data[col_name]):  # Infer text column
             column_types[col_name] = TEXT
-        elif is_image_column(data[col_name], col_name=col_name, image_type=IMAGE_BYTEARRAY):  # Infer image-bytearray column
+        elif is_image_column(
+            data[col_name], col_name=col_name, image_type=IMAGE_BYTEARRAY
+        ):  # Infer image-bytearray column
             column_types[col_name] = IMAGE_BYTEARRAY
         else:  # All the other columns are treated as categorical
             column_types[col_name] = CATEGORICAL
