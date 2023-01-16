@@ -594,7 +594,28 @@ def contains_valid_images(data: Union[str, list], sample_n: Optional[int] = 50) 
 
 
 def split_train_tuning_data(train_data, tuning_data, holdout_frac, is_classification, label_column, seed):
+    """
+    Split training and tuning data.
 
+    Parameters
+    ----------
+    train_data
+        Provided training data.
+    tuning_data
+        Provided tuning data.
+    holdout_frac
+        Fraction of train_data to holdout as tuning_data.
+    is_classification
+        Whether is a classification task.
+    label_column
+        Header of label column.
+    seed
+        Random seed.
+
+    Returns
+    -------
+    The splitted training and tuning data.
+    """
     if tuning_data is None:
         if is_classification:
             stratify = train_data[label_column]
