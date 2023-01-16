@@ -393,7 +393,7 @@ class MultiModalMatcher:
             train_data=train_data,
             tuning_data=tuning_data,
             holdout_frac=holdout_frac,
-            is_classification=self.problem_property and self.problem_property.is_classification,
+            is_classification=self._problem_type in [BINARY, MULTICLASS, CLASSIFICATION],
             label_column=self._label_column,
             seed=seed,
         )
