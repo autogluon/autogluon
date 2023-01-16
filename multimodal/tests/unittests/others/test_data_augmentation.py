@@ -146,7 +146,6 @@ def test_trivialaugment():
     with tempfile.TemporaryDirectory() as save_path:
         if os.path.isdir(save_path):
             shutil.rmtree(save_path)
-
         predictor.fit(
             train_data=dataset.train_df,
             time_limit=10,
