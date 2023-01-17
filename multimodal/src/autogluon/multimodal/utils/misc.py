@@ -95,7 +95,7 @@ def shopee_dataset(
     return train_data, test_data
 
 
-def merge_spans(sent, pred):
+def merge_spans(sent, pred, for_visualizer=False):
     """Merge subsequent predictions."""
     if isinstance(pred, str):
         # For string values, we assume that it is json-encoded string of the sentences.
@@ -117,9 +117,10 @@ def merge_spans(sent, pred):
         end = entity["end"]
         if (
             last_start >= 0
-            and (not re.match("B-", last_label, re.IGNORECASE))
+            and not for_visualizer
+            and (not re.match("B-", entity_group, re.IGNORECASE))
             and (
-                (re.match("I-", last_label, re.IGNORECASE) and last_label[2:] == entity_group[2:])
+                (re.match("I-", entity_group, re.IGNORECASE) and last_label[2:] == entity_group[2:])
                 or last_label == entity_group
             )
             and (sent[last_end:start].isspace() or (last_end == start))
@@ -159,7 +160,7 @@ class NERVisualizer:
         self.pred = pred
         self.sent = sent
         self.colors = {}
-        self.spans = merge_spans(sent, pred)
+        self.spans = merge_spans(sent, pred, for_visualizer=True)
         self.rng = np.random.RandomState(seed)
 
     @staticmethod
