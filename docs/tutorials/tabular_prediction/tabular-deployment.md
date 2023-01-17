@@ -134,6 +134,23 @@ path_clone_opt = predictor.clone_for_deployment(path=save_path_clone_opt)
 predictor_clone_opt = TabularPredictor.load(path=path_clone_opt)
 ```
 
+To avoid loading the model in every prediction call, we can persist the model in memory by:
+
+```{.python .input}
+predictor_clone_opt.persist_models()
+```
+
+In order to improve inference efficiency, we can call `.compile_models()` to automatically
+convert sklearn function calls into their onnx equivalence.
+Note that this is currently an experimental feature, which only improves RandomForest and TabularNeuralNetwork models.
+The compilation and inference speed acceleration require installation of `skl2onnx` and `onnxruntime` packages.
+
+It is important to make sure the predictor is cloned, because once the models are compiled, it won't support fitting.
+
+```{.python .input}
+predictor_clone_opt.compile_models()
+```
+
 We can see that the optimized clone still makes the same predictions:
 
 ```{.python .input}
