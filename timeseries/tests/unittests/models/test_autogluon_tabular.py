@@ -52,7 +52,7 @@ def test_when_predict_is_called_then_get_features_dataframe_receives_correct_inp
 @pytest.mark.parametrize("known_covariates_names", [["known_1", "known_2"], []])
 @pytest.mark.parametrize("past_covariates_names", [["past_1", "past_2", "past_3"], []])
 @pytest.mark.parametrize("static_features_names", [["cat_1"], []])
-def test_when_covariates_and_features_present_then_shape_is_correct(
+def test_when_covariates_and_features_present_then_feature_df_shape_is_correct(
     temp_model_path, known_covariates_names, past_covariates_names, static_features_names
 ):
     item_id_to_length = {1: 10, 5: 20, 2: 30}

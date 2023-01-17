@@ -81,8 +81,8 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             **kwargs,
         )
         self._target_lag_indices: np.array = None
-        self._known_covariates_lag_indices = np.arange(0, 10)
-        self._past_covariates_lag_indices = np.arange(1, 10)
+        self._known_covariates_lag_indices: np.array = None
+        self._past_covariates_lag_indices: np.array = None
         self._time_features: List[Callable] = None
         self._available_features: pd.Index = None
         self.residuals_std = 0.0
@@ -108,29 +108,98 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         last_k_values: int, optional
             If provided, features will be generated only for the last `last_k_values` timesteps of each time series.
         """
+        # TODO: Rethink the featurization process for time series based on SotA tree-based models (scaling, rolling feautres)
+        # TODO: More efficient featurization with tsfresh? (currently sequential over time series => slow)
 
         def get_lags(df: pd.DataFrame, lag_indices: List[int]) -> pd.DataFrame:
+            """Construct a dataframe consisting of shifted copies of the original df.
+
+            Parameters
+            ----------
+            df
+                Original dataframe, shape [N, D]
+            lag_indices
+                List of lag features to compute.
+
+            Returns
+            -------
+            lag_df
+                Dataframe with lag features, shape [N, D * len(lag_indices)]
+            """
             shifted = [df.shift(idx).add_suffix(f"_lag_{idx}") for idx in lag_indices]
             return pd.concat(shifted, axis=1)
 
         def apply_mask(
             df: pd.DataFrame, num_hidden: np.ndarray, lag_indices: np.ndarray, num_columns: int = 1
         ) -> pd.DataFrame:
+            """Apply a mask that mimics the situation at prediction time when target/covariates are unknown during the
+            forecast horizon.
+
+            Parameters
+            ----------
+            df
+                Dataframe to mask, shape [N, D * len(lag_indices)]
+            num_hidden
+                Number of entries hidden in each row, shape [N]
+            lag_indices
+                Lag indices used to construct the dataframe
+            num_columns
+                D - number of columns in the original dataframe, before lag features were constructed
+
+            Returns
+            -------
+            masked_df
+                Dataframe with the masking applied, shape [N, D * len(lag_indices)]
+
+
+            For example, given the following inputs
+
+            df = [
+                [1, 1, 1, 1],
+                [1, 1, 1, 1],
+                [1, 1, 1, 1],
+            ]
+            num_hidden = [6, 0, 1]
+            lag_indices = [1, 2, 5, 10]
+            num_columns = 1
+
+            The resulting masked dataframe will be
+
+            masked_df = [
+                [NaN, NaN, NaN, 1],
+                [1, 1, 1, 1],
+                [NaN, 1, 1, 1],
+            ]
+
+            """
             if num_columns > 1:
                 lag_indices = np.repeat(lag_indices, num_columns)
             mask = num_hidden[:, None] >= lag_indices[None]  # shape [len(num_hidden), len(lag_indices) * num_columns]
             df[mask] = np.nan
             return df
 
-        def get_lag_features_and_target(time_series):
+        def get_lag_features_and_target(time_series: pd.DataFrame) -> pd.DataFrame:
+            """Construct the dataframe with lagged features and prediction target for a single time series.
+
+            Parameters
+            ----------
+            time_series
+                Dataframe containing a single time series, including target & past/known covariates.
+                Such time series can equivalently be obtained with data.loc[item_id] for some item_id in the dataset.
+
+            Returns
+            -------
+            features
+                Feature dataframe, where each row corresponds to a single timestep of the input time series.
+            """
+            target_lags = get_lags(time_series[[self.target]], self._target_lag_indices)
+
             # Starting from the end of the time series, mask the values as if the last `prediction_length` steps weren't observed
             # This mimics what will happen at test time, when we simultaneously predict the next `prediction_length` values
             num_windows = (len(time_series) - 1) // self.prediction_length
             # We don't hide any past values for the first `remainder` values, otherwise the features will be all empty
             remainder = len(time_series) - num_windows * self.prediction_length
             num_hidden = np.concatenate([np.zeros(remainder), np.tile(np.arange(self.prediction_length), num_windows)])
-
-            target_lags = get_lags(time_series[[self.target]], self._target_lag_indices)
             target_lags = apply_mask(target_lags, num_hidden=num_hidden, lag_indices=self._target_lag_indices)
             feature_dfs = [target_lags]
 
@@ -190,6 +259,8 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             raise AssertionError(f"{self.name} predictor has already been fit!")
         verbosity = kwargs.get("verbosity", 2)
         self._target_lag_indices = np.array(get_lags_for_frequency(train_data.freq), dtype=np.int64)
+        self._past_covariates_lag_indices = self._target_lag_indices
+        self._known_covariates_lag_indices = np.concatenate([[0], self._target_lag_indices])
         self._time_features = time_features_from_frequency_str(train_data.freq)
 
         train_data, _ = self._normalize_targets(train_data)
