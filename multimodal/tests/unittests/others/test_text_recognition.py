@@ -2,7 +2,12 @@ import numpy as np
 import pytest
 import requests
 from mim.commands.download import download
-from mmocr.utils.ocr import MMOCR
+
+try:
+    from mmocr.utils.ocr import MMOCR
+except ImportError:
+    pytest.skip("Skip the OCR test because there is no mmocr installed. Try to install it via mim install mmocr")
+
 from PIL import Image
 
 from autogluon.multimodal import MultiModalPredictor
