@@ -14,6 +14,8 @@ from .base import AbstractAnalysis
 
 __all__ = ["Correlation", "CorrelationSignificance", "FeatureInteraction", "DistributionFit"]
 
+from autogluon.common.features.types import R_FLOAT, R_INT
+
 
 class Correlation(AbstractAnalysis):
     """
@@ -95,6 +97,10 @@ class Correlation(AbstractAnalysis):
         state.correlations = {}
         state.correlations_method = self.method
         for (ds, df) in self.available_datasets(args):
+
+            if args.label in df.columns and df[args.label].dtype not in [R_INT, R_FLOAT]:
+                df[args.label] = df[args.label].astype("category").cat.codes
+
             if self.method == "phik":
                 state.correlations[ds] = df.phik_matrix(**self.args, verbose=False)
             else:
@@ -336,7 +342,16 @@ class DistributionFit(AbstractAnalysis):
     """
 
     # Getting the list of distributions: https://docs.scipy.org/doc/scipy/tutorial/stats.html#getting-help
-    AVAILABLE_DISTRIBUTIONS = sorted([d for d in dir(stats) if isinstance(getattr(stats, d), stats.rv_continuous)])
+    AVAILABLE_DISTRIBUTIONS = sorted(
+        [
+            dist
+            for dist in dir(stats)
+            if isinstance(getattr(stats, dist), stats.rv_continuous)
+            # kstwo can't be fit on a single variable
+            # levy_stable, studentized_range are too slow
+            and dist not in ["kstwo", "levy_stable", "studentized_range"]
+        ]
+    )
 
     def __init__(
         self,
@@ -377,6 +392,7 @@ class DistributionFit(AbstractAnalysis):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         state.distributions_fit = {}
+        state.distributions_fit_pvalue_min = self.pvalue_min
         for (ds, df) in self.available_datasets(args):
             state.distributions_fit[ds] = {}
             for c in self.columns:
@@ -401,19 +417,36 @@ class DistributionFit(AbstractAnalysis):
                 if pvalue >= pvalue_min:
                     results[i] = {
                         "param": param,
+                        "shapes": self._list_parameters(dist),
                         "statistic": statistic,
                         "pvalue": pvalue,
                     }
             if len(results) == 0:
-                self.logger.warning(
-                    f"{series.name}: none of the distributions were able to fit to satisfy specified pvalue_min: {self.pvalue_min}"
-                )
                 return None
             df = pd.DataFrame(results).T.sort_values("pvalue", ascending=False)
             if self.keep_top_n is not None:
                 df = df[: self.keep_top_n]
             results = df.T.to_dict()
             return results
+
+    def _list_parameters(self, distribution):
+        """List parameters for scipy.stats.distribution.
+        # Arguments
+            distribution: a string or scipy.stats distribution object.
+        # Returns
+            A list of distribution parameter strings.
+        """
+        if isinstance(distribution, str):
+            distribution = getattr(stats, distribution)
+        if distribution.shapes:
+            parameters = [name.strip() for name in distribution.shapes.split(",")]
+        else:
+            parameters = []
+        if distribution.name in stats._discrete_distns._distn_names:
+            parameters += ["loc"]
+        elif distribution.name in stats._continuous_distns._distn_names:
+            parameters += ["loc", "scale"]
+        return parameters
 
 
 class FeatureDistanceAnalysis(AbstractAnalysis):
@@ -481,7 +514,9 @@ class FeatureDistanceAnalysis(AbstractAnalysis):
         return self.all_keys_must_be_present(args, "train_data", "label", "feature_generator")
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
-        x = args.train_data.drop(labels=[args.label], axis=1)
+        x = args.train_data
+        if args.label is not None:
+            x = x.drop(labels=[args.label], axis=1)
         corr = np.round(spearmanr(x).correlation, 4)
         np.fill_diagonal(corr, 1)
         corr_condensed = hc.distance.squareform(1 - np.nan_to_num(corr))

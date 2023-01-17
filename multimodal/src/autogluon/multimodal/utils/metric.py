@@ -200,6 +200,12 @@ def compute_score(
     if metric_name in [OVERALL_ACCURACY, OVERALL_F1]:
         metric = evaluate.load("seqeval")
         warnings.filterwarnings("ignore")
+        for p in metric_data[Y_TRUE]:
+            if "_" in p:
+                print(p)
+        for p in metric_data[Y_PRED]:
+            if "_" in p:
+                print(p)
         return metric.compute(references=metric_data[Y_TRUE], predictions=metric_data[Y_PRED])
 
     metric = get_metric(metric_name)

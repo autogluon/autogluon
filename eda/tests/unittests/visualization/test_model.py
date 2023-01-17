@@ -45,10 +45,18 @@ def test_ConfusionMatrix(monkeypatch, confusion_matrix_normalized, expected_fmt)
         viz = ConfusionMatrix(fig_args=dict(a=1, b=2), headers=True, some_kwarg=123)
         viz.render_text = call_render_text
         viz.render(state)
-    call_plt_subplots.assert_called_with(a=1, b=2)
+    call_plt_subplots.assert_called_with(a=1, b=2, figsize=(2, 2))
     call_plt_show.assert_called_with("fig")
     call_sns_heatmap.assert_called_with(
-        ANY, ax="ax", cmap="Blues", annot=True, fmt=expected_fmt, cbar=False, some_kwarg=123
+        ANY,
+        ax="ax",
+        cmap="Blues",
+        annot=True,
+        linewidths=0.5,
+        linecolor="lightgrey",
+        fmt=expected_fmt,
+        cbar=False,
+        some_kwarg=123,
     )
     call_render_text.assert_called_with("Confusion Matrix", text_type="h3")
 
@@ -183,7 +191,7 @@ def test_FeatureImportance(monkeypatch, show_barplots):
     call_display_obj.assert_called_once()
     call_render_text.assert_called_with("Feature Importance", text_type="h3")
     if show_barplots:
-        call_plt_subplots.assert_called_with(a=1, b=2)
+        call_plt_subplots.assert_called_with(a=1, b=2, figsize=(12, 0.75))
         call_plt_show.assert_called_with("fig")
         call_sns_barplot.assert_called_with(ax="ax", data=ANY, y="index", x="importance", some_kwarg=123)
     else:

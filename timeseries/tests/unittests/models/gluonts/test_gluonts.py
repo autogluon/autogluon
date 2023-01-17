@@ -7,7 +7,7 @@ from gluonts.model.predictor import Predictor as GluonTSPredictor
 import autogluon.timeseries as agts
 from autogluon.timeseries.models.gluonts import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.models.gluonts.torch.models import AbstractGluonTSPyTorchModel
-from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
+from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
 from ...common import DATAFRAME_WITH_COVARIATES, DATAFRAME_WITH_STATIC, DUMMY_TS_DATAFRAME
 
@@ -91,21 +91,33 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(model_class, te
 
 @pytest.fixture(scope="module")
 def df_with_static():
-    feature_pipeline = ContinuousAndCategoricalFeatureGenerator()
+    feature_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=[])
     df = DATAFRAME_WITH_STATIC.copy(deep=False)
-    df.static_features = feature_pipeline.fit_transform(df.static_features)
-    return df
+    df = feature_generator.fit_transform(df)
+    return df, feature_generator.covariate_metadata
+
+
+@pytest.fixture(scope="module")
+def df_with_covariates():
+    known_covariates_names = [col for col in DATAFRAME_WITH_COVARIATES.columns if col != "target"]
+    feature_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
+    df = DATAFRAME_WITH_COVARIATES.copy(deep=False)
+    df = feature_generator.fit_transform(df)
+    return df, feature_generator.covariate_metadata
 
 
 @pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
 def test_when_static_features_present_then_they_are_passed_to_dataset(model_class, df_with_static):
-    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS)
+    df, metadata = df_with_static
+    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata)
     with mock.patch(
         "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
     ) as patch_dataset:
         try:
-            model.fit(train_data=df_with_static)
+            model.fit(train_data=df)
         except TypeError:
+            pass
+        finally:
             call_kwargs = patch_dataset.call_args[1]
             feat_static_cat = call_kwargs["feat_static_cat"]
             feat_static_real = call_kwargs["feat_static_real"]
@@ -114,9 +126,31 @@ def test_when_static_features_present_then_they_are_passed_to_dataset(model_clas
 
 
 @pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
+def test_given_fit_with_static_features_when_predicting_then_static_features_are_used(model_class, df_with_static):
+    df, metadata = df_with_static
+    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata)
+    model.fit(train_data=df)
+    if model.name.endswith("MXNet"):
+        predictor_method = "gluonts.mx.model.predictor.RepresentableBlockPredictor.predict"
+    else:
+        predictor_method = "gluonts.torch.model.predictor.PyTorchPredictor.predict"
+    with mock.patch(predictor_method) as mock_predict:
+        try:
+            model.predict(df)
+        except IndexError:  # expected because of mock
+            pass
+        finally:
+            gluonts_dataset = mock_predict.call_args[1]["dataset"]
+            item = next(iter(gluonts_dataset))
+            assert item["feat_static_cat"].shape == (1,)
+            assert item["feat_static_real"].shape == (2,)
+
+
+@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
 def test_when_static_features_present_then_model_attributes_set_correctly(model_class, df_with_static):
-    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS)
-    model.fit(train_data=df_with_static)
+    df, metadata = df_with_static
+    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata)
+    model.fit(train_data=df)
     assert model.num_feat_static_cat > 0
     assert model.num_feat_static_real > 0
     assert len(model.feat_static_cat_cardinality) == model.num_feat_static_cat
@@ -125,13 +159,16 @@ def test_when_static_features_present_then_model_attributes_set_correctly(model_
 
 @pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
 def test_when_disable_static_features_set_to_true_then_static_features_are_not_used(model_class, df_with_static):
-    model = model_class(hyperparameters={**DUMMY_HYPERPARAMETERS, "disable_static_features": True})
+    df, metadata = df_with_static
+    model = model_class(hyperparameters={**DUMMY_HYPERPARAMETERS, "disable_static_features": True}, metadata=metadata)
     with mock.patch(
         "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
     ) as patch_dataset:
         try:
-            model.fit(train_data=df_with_static)
+            model.fit(train_data=df)
         except TypeError:
+            pass
+        finally:
             call_kwargs = patch_dataset.call_args[1]
             feat_static_cat = call_kwargs["feat_static_cat"]
             feat_static_real = call_kwargs["feat_static_real"]
@@ -139,36 +176,43 @@ def test_when_disable_static_features_set_to_true_then_static_features_are_not_u
             assert feat_static_real is None
 
 
-@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
-def test_when_known_covariates_present_then_they_are_passed_to_dataset(model_class, df_with_static):
-    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS)
+@pytest.mark.parametrize("model_class", MODELS_WITH_KNOWN_COVARIATES)
+def test_when_known_covariates_present_then_they_are_passed_to_dataset(model_class, df_with_covariates):
+    df, metadata = df_with_covariates
+    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata)
     with mock.patch(
         "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
     ) as patch_dataset:
         try:
-            model.fit(train_data=DATAFRAME_WITH_COVARIATES)
+            model.fit(train_data=df)
         except TypeError:
+            pass
+        finally:
             call_kwargs = patch_dataset.call_args[1]
             feat_dynamic_real = call_kwargs["feat_dynamic_real"]
             assert (feat_dynamic_real.dtypes == "float").all()
 
 
 @pytest.mark.parametrize("model_class", MODELS_WITH_KNOWN_COVARIATES)
-def test_when_known_covariates_present_then_model_attributes_set_correctly(model_class, df_with_static):
-    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS)
-    model.fit(train_data=DATAFRAME_WITH_COVARIATES)
+def test_when_known_covariates_present_then_model_attributes_set_correctly(model_class, df_with_covariates):
+    df, metadata = df_with_covariates
+    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata)
+    model.fit(train_data=df)
     assert model.num_feat_dynamic_real > 0
 
 
 @pytest.mark.parametrize("model_class", MODELS_WITH_KNOWN_COVARIATES)
-def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not_used(model_class, df_with_static):
-    model = model_class(hyperparameters={**DUMMY_HYPERPARAMETERS, "disable_known_covariates": True})
+def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not_used(model_class, df_with_covariates):
+    df, metadata = df_with_covariates
+    model = model_class(hyperparameters={**DUMMY_HYPERPARAMETERS, "disable_known_covariates": True}, metadata=metadata)
     with mock.patch(
         "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
     ) as patch_dataset:
         try:
-            model.fit(train_data=DATAFRAME_WITH_COVARIATES)
+            model.fit(train_data=df)
         except TypeError:
+            pass
+        finally:
             call_kwargs = patch_dataset.call_args[1]
             feat_dynamic_real = call_kwargs["feat_dynamic_real"]
             assert feat_dynamic_real is None
@@ -177,11 +221,15 @@ def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not
 @pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES)
 def test_when_static_and_dynamic_covariates_present_then_model_trains_normally(model_class):
     dataframe_with_static_and_covariates = DATAFRAME_WITH_STATIC.copy()
-    for col_name in ["cov1", "cov2"]:
+    known_covariates_names = ["cov1", "cov2"]
+    for col_name in known_covariates_names:
         dataframe_with_static_and_covariates[col_name] = np.random.normal(
             size=len(dataframe_with_static_and_covariates)
         )
 
-    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS)
-    model.fit(train_data=dataframe_with_static_and_covariates)
-    model.predict_for_scoring(dataframe_with_static_and_covariates)
+    gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
+    df = gen.fit_transform(dataframe_with_static_and_covariates)
+
+    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=gen.covariate_metadata)
+    model.fit(train_data=df)
+    model.predict_for_scoring(df)

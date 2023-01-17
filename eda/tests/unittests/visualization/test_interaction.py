@@ -140,15 +140,15 @@ def __test_internal(monkeypatch, render_key, state, heatmap_args, facet_cls, tex
         auto.analyze(state=state, viz_facets=[analysis])
 
     call_yticks.assert_called_with(rotation=0)
-    call_subplots.assert_called_with(some_arg=123)
+    call_subplots.assert_called_with(some_arg=123, figsize=(4, 4))
     call_show.assert_called_with("fig")
 
     call_heatmap.assert_called_with(
         state[render_key].train_data,
         annot=True,
         ax="ax",
-        linewidths=0.9,
-        linecolor="white",
+        linewidths=0.5,
+        linecolor="lightgrey",
         fmt=".2f",
         square=True,
         cbar_kws={"shrink": 0.5},
@@ -186,7 +186,7 @@ def test_FeatureInteractionVisualization__happy_path(monkeypatch):
         dict(x="a", y="b", some_chart_arg=123),
     )
     call_show.assert_called_with("fig")
-    call_subplots.assert_called_with(key="value")
+    call_subplots.assert_called_with(key="value", figsize=(12, 6))
 
 
 @pytest.mark.parametrize("is_single, header", [(True, True), (False, True), (True, False), (False, False)])
@@ -531,11 +531,11 @@ def test_FeatureDistanceAnalysisVisualization__happy_path(monkeypatch, has_near_
         auto.analyze(state=state, viz_facets=[viz])
 
     call_dendrogram.assert_called_with(
-        ax=ax, Z=ANY, labels=state.feature_distance.columns, orientation="left", some_chart_arg=123
+        ax=ax, Z=ANY, labels=state.feature_distance.columns, leaf_font_size=10, orientation="left", some_chart_arg=123
     )
     np.testing.assert_array_equal(call_dendrogram.call_args[1]["Z"], state.feature_distance.linkage)
     call_show.assert_called_with("fig")
-    call_subplots.assert_called_with(key="value")
+    call_subplots.assert_called_with(key="value", figsize=(12, 3.5))
     if has_near_duplicates:
         call_render_markdown.assert_called_with(
             "**The following feature groups are considered as near-duplicates**:\n\nDistance threshold: <= `0.85`. "

@@ -1,5 +1,7 @@
+import json
 import logging
 import os
+import re
 
 import numpy as np
 import pandas as pd
@@ -93,6 +95,62 @@ def shopee_dataset(
     return train_data, test_data
 
 
+def merge_spans(sent, pred, for_visualizer=False):
+    """Merge subsequent predictions."""
+    if isinstance(pred, str):
+        # For string values, we assume that it is json-encoded string of the sentences.
+        try:
+            pred = json.loads(pred)
+        except Exception as exp:
+            raise RuntimeError(
+                f"The received entity annotations is {pred}, "
+                f"which can not be encoded with the json format. "
+                f"Check your input again, or running `json.loads(pred)` to verify your data."
+            )
+    spans = {}
+    last_start = -1
+    last_end = -1
+    last_label = ""
+    for entity in pred:
+        entity_group = entity["entity_group"]
+        start = entity["start"]
+        end = entity["end"]
+        if (
+            last_start >= 0
+            and not for_visualizer
+            and (not re.match("B-", entity_group, re.IGNORECASE))
+            and (
+                (re.match("I-", entity_group, re.IGNORECASE) and last_label[2:] == entity_group[2:])
+                or last_label == entity_group
+            )
+            and (sent[last_end:start].isspace() or (last_end == start))
+        ):
+            last_end = end
+        else:
+            last_start = start
+            last_end = end
+            last_label = entity_group
+
+        if re.match("B-", last_label, re.IGNORECASE) or re.match("I-", last_label, re.IGNORECASE):
+            spans.update({last_start: (last_end, last_label[2:])})
+        else:
+            spans.update({last_start: (last_end, last_label)})
+    return spans
+
+
+def merge_bio_format(data, preds):
+    """Merge predictions with BIO format during prediction."""
+    results = []
+    for sent, pred in zip(data, preds):
+        results.append(
+            [
+                {"entity_group": value[-1], "start": key, "end": value[0]}
+                for key, value in merge_spans(sent, pred).items()
+            ]
+        )
+    return results
+
+
 class NERVisualizer:
     """An NER visualizer that renders NER prediction as a string of HTML
     inline to any Python class Jupyter notebooks.
@@ -102,36 +160,8 @@ class NERVisualizer:
         self.pred = pred
         self.sent = sent
         self.colors = {}
-        self.spans = self.merge_spans()
+        self.spans = merge_spans(sent, pred, for_visualizer=True)
         self.rng = np.random.RandomState(seed)
-
-    def merge_spans(self):
-        """Merge subsequent predictions."""
-        spans = {}
-        last_start = -1
-        last_end = -1
-        last_label = ""
-        for entity in self.pred:
-            entity_group = entity["entity_group"]
-            start = entity["start"]
-            last = end = entity["end"]
-            if (
-                last_start >= 0
-                and (not entity_group.startswith("B-"))
-                and (
-                    (entity_group.startswith("I-") and last_label[2:] == entity_group[2:])
-                    or last_label == entity_group
-                )
-                and self.sent[last_end:start].isspace()
-            ):
-                last_end = end
-            else:
-                last_start = start
-                last_end = end
-                last_label = entity_group
-
-            spans.update({last_start: (last_end, last_label)})
-        return spans
 
     @staticmethod
     def escape_html(text: str) -> str:
@@ -172,7 +202,7 @@ class NERVisualizer:
         last = 0
         for key, value in self.spans.items():
             entity_group = value[-1]
-            if entity_group.startswith("B-") or entity_group.startswith("I-"):
+            if re.match("B-", entity_group, re.IGNORECASE) or re.match("I-", entity_group, re.IGNORECASE):
                 entity_group = entity_group[2:]
             if entity_group not in self.colors:
                 self.colors.update({entity_group: "#%06X" % self.rng.randint(0, 0xFFFFFF)})
