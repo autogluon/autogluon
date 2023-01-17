@@ -73,8 +73,8 @@ class NerLabelEncoder:
         }
         all_annotations = []
         all_entity_groups = []
-        for ner_annotations in y.items():
-            json_ner_annotations = json.loads(ner_annotations[-1])  # load the json annotations
+        for _, ner_annotations in y.items():
+            json_ner_annotations = json.loads(ner_annotations)  # load the json annotations
             try:
                 jsonschema.validate(json_ner_annotations, schema)  # verify the json schema
             except jsonschema.ValidationError as e:
