@@ -56,8 +56,8 @@ predictor.evaluate(dev_data)
 ## Prediction and Visualization
 You can easily obtain the predictions given an input sentence by by calling `predictor.predict(...)`.
 ```{.python .input}
-output = predictor.predict(dev_df)
-visualize_ner(dev_df["text_snippet"].iloc[0], output[0])
+output = predictor.predict(dev_data)
+visualize_ner(dev_data["text_snippet"].iloc[0], output[0])
 ```
 Now, let's make predictions on the rabbit toy example.
 ```{.python .input}
