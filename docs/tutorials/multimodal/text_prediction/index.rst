@@ -18,7 +18,13 @@ Text Data
       :title: Named Entity Recognition with AutoMM - Quick Start
       :link: ner.html
 
-      How to use MultiModalPredictor for entity extraction.
+      How to use MultiModalPredictor for named entity recognition.
+
+   .. card::
+      :title: AutoMM for Chinese Named Entity Recognition - Quick Start
+      :link: chinese_ner.html
+
+      How to use MultiModalPredictor for Chinese named entity recognition.
 
 .. toctree::
    :maxdepth: 1
@@ -27,3 +33,4 @@ Text Data
    beginner_text
    multilingual_text
    ner
+   chinese_ner
