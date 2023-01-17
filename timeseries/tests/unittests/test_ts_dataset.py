@@ -614,7 +614,7 @@ def test_when_static_features_index_has_wrong_name_then_its_renamed_to_item_id()
 
 def test_when_dataset_sliced_by_time_then_static_features_are_correct():
     df = SAMPLE_TS_DATAFRAME_STATIC
-    dfv = df.subsequence(START_TIMESTAMP, START_TIMESTAMP + datetime.timedelta(days=1))
+    dfv = df.slice_by_time(START_TIMESTAMP, START_TIMESTAMP + datetime.timedelta(days=1))
 
     assert isinstance(dfv, TimeSeriesDataFrame)
     assert len(dfv) == 1 * len(dfv.item_ids)
