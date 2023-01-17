@@ -1,4 +1,4 @@
-from .utils import get_autogluon_metadata
+from .utils import LITE_MODE
 
 
 def disable_if_lite_mode(ret=None):
@@ -7,8 +7,7 @@ def disable_if_lite_mode(ret=None):
             if callable(ret):
                 return ret(*args, **kwargs)
             return ret
-        metadata = get_autogluon_metadata()
-        if 'lite' in metadata and metadata['lite']:
+        if LITE_MODE:
             return do_nothing
         return func
     return inner
