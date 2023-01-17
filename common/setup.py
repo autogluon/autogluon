@@ -23,7 +23,11 @@ install_requires = [
     'boto3',
     'psutil',
     'setuptools',
-]
+] if not ag.LITE_MODE else {
+    'numpy',
+    'pandas',
+    'setuptools',
+}
 
 extras_require = dict()
 

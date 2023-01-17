@@ -6,9 +6,9 @@ import sys
 import time
 
 import numpy as np
-import psutil
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from autogluon.core.utils.utils import normalize_pred_probas
@@ -130,11 +130,15 @@ class RFModel(AbstractModel):
 
     def _validate_fit_memory_usage(self, **kwargs):
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
-        available_mem = psutil.virtual_memory().available
+        available_mem = ResourceManager.get_available_virtual_mem()
         expected_min_memory_usage = self.estimate_memory_usage(**kwargs) / available_mem
         if expected_min_memory_usage > (0.5 * max_memory_usage_ratio):  # if minimum estimated size is greater than 50% memory
             logger.warning(f'\tWarning: Model is expected to require {round(expected_min_memory_usage * 100, 2)}% of available memory (Estimated before training)...')
             raise NotEnoughMemoryError
+
+    def _expected_mem_usage(self, n_estimators_final, bytes_per_estimator):
+        available_mem = ResourceManager.get_available_virtual_mem()
+        return n_estimators_final * bytes_per_estimator / available_mem
 
     def _fit(self,
              X,
@@ -161,9 +165,8 @@ class RFModel(AbstractModel):
 
         num_trees_per_estimator = self._get_num_trees_per_estimator()
         bytes_per_estimator = num_trees_per_estimator * len(X) / 60000 * 1e6  # Underestimates by 3x on ExtraTrees
-        available_mem = psutil.virtual_memory().available
-        expected_memory_usage = n_estimators_final * bytes_per_estimator / available_mem
-        
+        expected_memory_usage = self._expected_mem_usage(n_estimators_final, bytes_per_estimator)
+
         if n_estimators_final > n_estimators_test * 2:
             if self.problem_type == MULTICLASS:
                 n_estimator_increments = [n_estimators_test, n_estimators_final]
@@ -198,7 +201,7 @@ class RFModel(AbstractModel):
                 for estimator in model.estimators_:  # Uses far less memory than pickling the entire forest at once
                     model_size_bytes += sys.getsizeof(pickle.dumps(estimator))
                 expected_final_model_size_bytes = model_size_bytes * (n_estimators_final / model.n_estimators)
-                available_mem = psutil.virtual_memory().available
+                available_mem = ResourceManager.get_available_virtual_mem()
                 model_memory_ratio = expected_final_model_size_bytes / available_mem
 
                 ideal_memory_ratio = 0.15 * max_memory_usage_ratio

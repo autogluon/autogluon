@@ -5,6 +5,9 @@
 import os
 
 AUTOGLUON = 'autogluon'
+PACKAGE_NAME = os.getenv('AUTOGLUON_PACKAGE_NAME', AUTOGLUON)
+# TODO: make it more explicit, maybe use another env variable
+LITE_MODE = 'lite' in PACKAGE_NAME
 
 AUTOGLUON_ROOT_PATH = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..')
@@ -27,6 +30,12 @@ DEPENDENT_PACKAGES = {
     'Pillow': '>=9.3.0,<=9.4.0',
     'timm': '>=0.5.4,<0.7.0',
 }
+if LITE_MODE:
+    DEPENDENT_PACKAGES = {
+        package: version for package, version in DEPENDENT_PACKAGES.items()
+        if package not in ['psutil', 'gluoncv', 'Pillow', 'timm']
+    }
+
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
 # TODO: Use DOCS_PACKAGES and TEST_PACKAGES
 DOCS_PACKAGES = []
@@ -80,15 +89,16 @@ def create_version_file(*, version, submodule):
     with open(version_path, 'w') as f:
         f.write(f'"""This is the {AUTOGLUON} version file."""\n')
         f.write("__version__ = '{}'\n".format(version))
+        f.write("__lite__ = {}\n".format(LITE_MODE))
 
 
 def default_setup_args(*, version, submodule):
     from setuptools import find_packages
     long_description = open(os.path.join(AUTOGLUON_ROOT_PATH, 'README.md')).read()
     if submodule is None:
-        name = AUTOGLUON
+        name = PACKAGE_NAME
     else:
-        name = f'{AUTOGLUON}.{submodule}'
+        name = f'{PACKAGE_NAME}.{submodule}'
     setup_args = dict(
         name=name,
         version=version,

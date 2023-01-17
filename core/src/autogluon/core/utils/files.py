@@ -1,7 +1,6 @@
 import contextlib
 import os
 from pathlib import Path
-import requests
 import shutil
 import hashlib
 import zipfile
@@ -59,6 +58,7 @@ def download(url, path=None, overwrite=False, sha1_hash=None):
             fname = path
 
     if overwrite or not os.path.exists(fname) or (sha1_hash and not check_sha1(fname, sha1_hash)):
+        import requests
         dirname = os.path.dirname(os.path.abspath(os.path.expanduser(fname)))
         if not os.path.exists(dirname):
             os.makedirs(dirname)

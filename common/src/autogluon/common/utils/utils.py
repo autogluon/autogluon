@@ -72,11 +72,12 @@ def get_package_versions() -> Dict[str, str]:
 
 
 def get_autogluon_metadata() -> Dict[str, Any]:
-    from ..version import __version__
+    from ..version import __version__, __lite__
 
     metadata = dict(
         system=platform.system(),
         version=f"{__version__}",
+        lite=__lite__,
         py_version=get_python_version(include_micro=False),
         py_version_micro=get_python_version(include_micro=True),
         packages=get_package_versions(),
