@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -96,6 +97,16 @@ def shopee_dataset(
 
 def merge_spans(sent, pred, for_visualizer=False):
     """Merge subsequent predictions."""
+    if isinstance(pred, str):
+        # For string values, we assume that it is json-encoded string of the sentences.
+        try:
+            pred = json.loads(pred)
+        except Exception as exp:
+            raise RuntimeError(
+                f"The received entity annotations is {pred}, "
+                f"which can not be encoded with the json format. "
+                f"Check your input again, or running `json.loads(pred)` to verify your data."
+            )
     spans = {}
     last_start = -1
     last_end = -1
@@ -103,7 +114,7 @@ def merge_spans(sent, pred, for_visualizer=False):
     for entity in pred:
         entity_group = entity["entity_group"]
         start = entity["start"]
-        last = end = entity["end"]
+        end = entity["end"]
         if (
             last_start >= 0
             and not for_visualizer

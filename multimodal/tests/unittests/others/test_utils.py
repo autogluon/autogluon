@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 import pytest
 from omegaconf import OmegaConf
@@ -15,6 +17,7 @@ from autogluon.multimodal.utils import (
     merge_bio_format,
     parse_dotlist_conf,
     try_to_infer_pos_label,
+    visualize_ner,
 )
 
 
@@ -157,6 +160,7 @@ def test_is_url(path, is_valid_url):
     assert is_url(path) == is_valid_url
 
 
+
 def test_merge_bio():
     sentence = "Game of Thrones is an American fantasy drama television series created by David Benioff"
     predictions = [
@@ -181,3 +185,16 @@ def test_merge_bio():
         ]
     ]
     assert res == expected_res, f"Wrong results {res} from merge_bio_format!"
+
+
+def test_misc_visualize_ner():
+    sentence = "Albert Einstein was born in Germany and is widely acknowledged to be one of the greatest physicists."
+    annotation = [
+        {"entity_group": "PERSON", "start": 0, "end": 15},
+        {"entity_group": "LOCATION", "start": 28, "end": 35},
+    ]
+    visualize_ner(sentence, annotation)
+
+    # Test using string for annotation
+    visualize_ner(sentence, json.dumps(annotation))
+
