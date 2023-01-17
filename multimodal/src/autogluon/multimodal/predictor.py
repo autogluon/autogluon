@@ -2843,25 +2843,28 @@ class MultiModalPredictor:
         path : str
             Path to directory where models and configs should be saved.
         """
-        model = None
+        models = []
         if isinstance(self._model, MultimodalFusionMLP) and isinstance(
             self._model.model, torch.nn.modules.container.ModuleList
         ):
             for per_model in self._model.model:
                 if isinstance(per_model, TimmAutoModelForImagePrediction):
-                    model = per_model
-                    break
-
-        model = self._model if model is None else model
-        if isinstance(model, TimmAutoModelForImagePrediction) and model.model is not None:
-            os.makedirs(path)
-            weights_path = f"{path}/pytorch_model.bin"
-            torch.save(model.model.state_dict(), weights_path)
-            logger.info(f"Model weights saved to {weights_path}.")
-            config_path = f"{path}/config.json"
-            save_timm_config(model, config_path)
+                    models.append(per_model)
+            if not models:
+                raise NotImplementedError("No TIMM models available for dump.")
+        elif isinstance(self._model, TimmAutoModelForImagePrediction):
+            models.append(self._model)
         else:
-            raise NotImplementedError("Only TIMM image models are supported for dump.")
+            raise NotImplementedError("No TIMM models available for dump.")
+
+        for model in models:
+            subdir = path + "/" + model.prefix
+            os.makedirs(subdir, exist_ok=True)
+            weights_path = f"{subdir}/pytorch_model.bin"
+            torch.save(model.model.state_dict(), weights_path)
+            logger.info(f"Model {model.prefix} weights saved to {weights_path}.")
+            config_path = f"{subdir}/config.json"
+            save_timm_config(model, config_path)
 
     def dump_hf_text(
         self,
@@ -2877,30 +2880,34 @@ class MultiModalPredictor:
         path : str
             Path to directory where models and configs should be saved.
         """
-        model = None
+        models = {}
         if isinstance(self._model, MultimodalFusionMLP) and isinstance(
             self._model.model, torch.nn.modules.container.ModuleList
         ):
             for per_model in self._model.model:
                 if isinstance(per_model, HFAutoModelForTextPrediction):
-                    model = per_model
-                    break
-
-        model = self._model if model is None else model
-        if isinstance(model, HFAutoModelForTextPrediction) and model.model is not None:
-            os.makedirs(path)
-            model.model.save_pretrained(path)
-            logger.info(f"Model saved to {path}.")
-            if TEXT in self._data_processors.keys():
-                for data_processor in self._data_processors[TEXT]:
-                    if data_processor.prefix == HF_TEXT:
-                        data_processor.tokenizer.save_pretrained(path)
-                        logger.info(f"Tokenizer saved to {path}.")
-                        break
-            else:
-                raise KeyError("Tokenizer not available for dump.")
+                    models[per_model.prefix] = per_model
+            if not models:
+                raise NotImplementedError("No HuggingFace text models available for dump.")
+        elif isinstance(self._model, HFAutoModelForTextPrediction):
+            models[self._model.prefix] = self._model
         else:
-            raise NotImplementedError("Only HuggingFace text models are supported for dump.")
+            raise NotImplementedError("No HuggingFace text models available for dump.")
+
+        text_processors = self._data_processors.get(TEXT, {})
+        tokenizers = {}
+        for per_processor in text_processors:
+            if per_processor.prefix in models.keys():
+                tokenizers[per_processor.prefix] = per_processor.tokenizer
+
+        for prefix in models.keys():
+            subdir = path + "/" + prefix
+            os.makedirs(subdir, exist_ok=True)
+            models[prefix].model.save_pretrained(subdir)
+            logger.info(f"Model {prefix} weights saved to {subdir}.")
+            if prefix in tokenizers.keys():
+                tokenizers[prefix].save_pretrained(subdir)
+                logger.info(f"Tokenizer {prefix} saved to {subdir}.")
 
     @property
     def class_labels(self):

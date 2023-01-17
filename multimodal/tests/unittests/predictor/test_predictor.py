@@ -693,7 +693,8 @@ def test_dump_timm_image():
     )
     hyperparameters = {
         "optimization.max_epochs": 1,
-        "model.timm_image.checkpoint_name": base_model_name,
+        "model.names": ["timm_image_1"],
+        "model.timm_image_1.checkpoint_name": base_model_name,
     }
     predictor_1.fit(
         train_data=train_data,
@@ -703,7 +704,7 @@ def test_dump_timm_image():
     )
     predictor_1.dump_timm_image(path=model_dump_path)
     model = timm.create_model(
-        model_name=base_model_name, checkpoint_path=f"{model_dump_path}/pytorch_model.bin", num_classes=0
+        model_name=base_model_name, checkpoint_path=f"{model_dump_path}/timm_image_1/pytorch_model.bin", num_classes=0
     )
     assert isinstance(model, timm.models.mobilenetv3.MobileNetV3)
     predictor_2 = MultiModalPredictor(
@@ -711,7 +712,7 @@ def test_dump_timm_image():
     )
     hyperparameters = {
         "optimization.max_epochs": 1,
-        "model.timm_image.checkpoint_name": model_dump_path,
+        "model.timm_image.checkpoint_name": f"{model_dump_path}/timm_image_1",
     }
     predictor_2.fit(
         train_data=train_data,
@@ -740,14 +741,14 @@ def test_dump_hf_text():
     )
     predictor_1.dump_hf_text(path=model_dump_path)
 
-    model = transformers.AutoModel.from_pretrained(model_dump_path)
+    model = transformers.AutoModel.from_pretrained(f"{model_dump_path}/hf_text")
     assert isinstance(model, transformers.models.bert.modeling_bert.BertModel)
     predictor_2 = MultiModalPredictor(
         label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric
     )
     hyperparameters = {
         "optimization.max_epochs": 1,
-        "model.hf_text.checkpoint_name": model_dump_path,
+        "model.hf_text.checkpoint_name": f"{model_dump_path}/hf_text",
     }
     predictor_2.fit(
         train_data=dataset.train_df,
@@ -758,8 +759,7 @@ def test_dump_hf_text():
 
 
 def test_fusion_model_dump():
-    hf_text_dump_path = "./hf_text_fusion"
-    timm_image_dump_path = "./timm_image_fusion"
+    model_dump_path = "./test_fusion_models"
     dataset = ALL_DATASETS["petfinder"]
     predictor = MultiModalPredictor(
         label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric
@@ -773,5 +773,10 @@ def test_fusion_model_dump():
         time_limit=5,
         seed=42,
     )
-    predictor.dump_hf_text(path=hf_text_dump_path)
-    predictor.dump_timm_image(path=timm_image_dump_path)
+    predictor.dump_hf_text(path=model_dump_path)
+    predictor.dump_timm_image(path=model_dump_path)
+    hf_text_dir = f"{model_dump_path}/hf_text"
+    timm_image_dir = f"{model_dump_path}/timm_image"
+    assert os.path.exists(hf_text_dir) and (len(os.listdir(hf_text_dir)) > 2) == True
+    assert os.path.exists(timm_image_dir) and (len(os.listdir(timm_image_dir)) == 2) == True
+    print("done")
