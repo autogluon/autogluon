@@ -20,6 +20,7 @@ from .data import (
     infer_dtypes_by_model_names,
     infer_scarcity_mode_by_data_size,
     init_df_preprocessor,
+    split_train_tuning_data,
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
 )
