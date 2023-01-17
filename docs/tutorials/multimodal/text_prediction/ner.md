@@ -8,10 +8,16 @@ The model will tell you that "Albert Einstein" is a PERSON and "Germany" is a LO
 
  
 ## Prepare Your Data
-Like other tasks in AutoMM, all you need to do is to prepare your data as data tables (i.e., dataframes) which contain a text column and an annotation column. The text column stores the raw textual data which contains the entities you want to identify. Correspondingly, the annotation column stores the label information (e.g., the *category* and the *start/end* offset in character level) for the entities. AutoMM requires the *annotation column* to have the following json format (Note: do not forget to call json.dumps() to convert python objects into a json string before creating your dataframe). 
+Like other tasks in AutoMM, all you need to do is to prepare your data as data tables (i.e., dataframes) which contain a text column and an annotation column. The text column stores the raw textual data which contains the entities you want to identify. Correspondingly, the annotation column stores the label information (e.g., the *category* and the *start/end* offset in character level) for the entities. AutoMM requires the *annotation column* to 
+have the following json format (Note: do not forget to call json.dumps() to convert python objects into a json string before creating your dataframe). 
 
-- [{"entity_group": "PERSON", "start": 0, "end": 15}, 
-{"entity_group": "LOCATION", "start": 28, "end": 35}]
+```{.python .input}
+import json
+json.dumps([
+    {"entity_group": "PERSON", "start": 0, "end": 15},
+    {"entity_group": "LOCATION", "start": 28, "end": 35}
+])
+```
 
 where **entity_group** is the category of the entity and **start** is a character-level position indicating where the entity begins while **end** represents the ending position of the enity. To make sure that AutoMM can recognise your json annotations, it is required to use the exactly same keys/properties (entity_group, start, end) specified above when constructing your data. You can annote "Albert Einstein" as a single entity group or you can also assign each word a label.
 
