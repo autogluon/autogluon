@@ -1,6 +1,6 @@
 name: autogluon_contrib
 dependencies:
-- python=3.9
+- python=3.10
 - pip
 - pip:
   - sphinx==3.2.0
