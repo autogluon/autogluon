@@ -159,9 +159,10 @@ def is_numerical_column(
         return False
 
 
-def is_imagepath_column(
+def is_image_column(
     data: pd.Series,
     col_name: str,
+    image_type: str,
     sample_n: Optional[int] = 500,
 ) -> bool:
     """
@@ -175,6 +176,10 @@ def is_imagepath_column(
         One column of a multimodal pd.DataFrame for training.
     col_name
         Name of column.
+    image_type
+        The image type to check.
+    sample_n
+        Number of sample images to open for sanity check.
 
     Returns
     -------
@@ -182,86 +187,43 @@ def is_imagepath_column(
     """
     sample_num = min(len(data), sample_n)
     data = data.sample(n=sample_num, random_state=0)
-    data = data.apply(lambda ele: str(ele).split(";")).tolist()
+    if image_type == IMAGE_PATH:
+        data = data.apply(lambda ele: str(ele).split(";")).tolist()
+    elif image_type == IMAGE_BYTEARRAY:
+        data = data.tolist()
+    else:
+        raise ValueError(f"Unsupported image type: {image_type}")
+
     failure_count = 0
-    for image_paths in data:
+    for images in data:
         success = False
-        for img_path in image_paths:
+        if not isinstance(images, list):
+            images = [images]
+        for per_image in images:
             try:
-                with PIL.Image.open(img_path) as img:
-                    pass
-                success = True
-                break
+                if image_type == IMAGE_PATH:
+                    with PIL.Image.open(per_image) as img:
+                        pass
+                elif image_type == IMAGE_BYTEARRAY:
+                    with PIL.Image.open(BytesIO(per_image)) as img:
+                        pass
+                else:
+                    raise ValueError(f"Unsupported image type: {image_type}")
             except:
-                pass
+                success = False
+                break
+
+            success = True
+
         if not success:
             failure_count += 1
     failure_ratio = failure_count / sample_num
-
     # Tolerate high failure rate in case that many image files may be corrupted.
     if failure_ratio <= 0.9:
         if failure_ratio > 0:
             warnings.warn(
                 f"Among {sample_num} sampled images in column '{col_name}', "
                 f"{failure_ratio:.0%} images can't be open. "
-                "You may need to thoroughly check your data to see the percentage of missing images, "
-                "and estimate the potential influence. By default, we skip the samples with missing images. "
-                "You can also set hyperparameter 'data.image.missing_value_strategy' to be 'zero', "
-                "which uses a zero image to replace any missing image.",
-                UserWarning,
-            )
-        return True
-    else:
-        return False
-
-
-def is_imagebytearray_column(
-    data: pd.Series,
-    col_name: str,
-    sample_n: Optional[int] = 500,
-) -> bool:
-    """
-    Identify if a column contains valid image bytearray.
-
-    Parameters
-    ----------
-    data
-        One column of a multimodal pd.DataFrame for training.
-    col_name
-        Name of column.
-    sample_n
-        Number of sample images to open for sanity check.
-
-    Returns
-    -------
-    Whether the column is an image-bytearray column.
-    """
-    sample_num = min(len(data), sample_n)
-    data = data.sample(n=sample_num, random_state=0)
-    data = data.tolist()
-    failure_count = 0
-    for image_bytearrays in data:
-        success = False
-        if not isinstance(image_bytearrays, list):
-            image_bytearrays = [image_bytearrays]
-
-        for img_bytearray in image_bytearrays:
-            try:
-                with PIL.Image.open(BytesIO(img_bytearray)) as img:
-                    pass
-                success = True
-                break
-            except:
-                pass
-            if not success:
-                failure_count += 1
-    failure_ratio = failure_count / sample_num
-    # Tolerate high failure rate in case that many image files may be corrupted.
-    if failure_ratio <= 0.9:
-        if failure_ratio > 0:
-            warnings.warn(
-                f"Among {sample_num} sampled images in column '{col_name}', "
-                f"{failure_count} images can't be open. "
                 "You may need to thoroughly check your data to see the percentage of missing images, "
                 "and estimate the potential influence. By default, we skip the samples with missing images. "
                 "You can also set hyperparameter 'data.image.missing_value_strategy' to be 'zero', "
@@ -376,11 +338,11 @@ def infer_id_mappings_types(id_mappings: Union[Dict[str, Dict], Dict[str, pd.Ser
             raise ValueError(
                 f"Invalid per_id_mappings type: {type(per_id_mappings)}. Make sure the id_mappings is a dict of dicts or a dict of pd.Series."
             )
-        if is_imagepath_column(per_id_mappings, col_name=per_name):
+        if is_image_column(per_id_mappings, col_name=per_name, image_type=IMAGE_PATH):
             id_mappings_types[per_name] = IMAGE_PATH
         elif is_text_column(per_id_mappings):
             id_mappings_types[per_name] = TEXT
-        elif is_imagebytearray_column(per_id_mappings, col_name=per_name):
+        elif is_image_column(per_id_mappings, col_name=per_name, image_type=IMAGE_BYTEARRAY):
             id_mappings_types[per_name] = IMAGE_BYTEARRAY
         else:
             raise ValueError(
@@ -472,11 +434,13 @@ def infer_column_types(
             column_types[col_name] = CATEGORICAL
         elif is_numerical_column(data[col_name], valid_data[col_name]):  # Infer numerical column
             column_types[col_name] = NUMERICAL
-        elif is_imagepath_column(data[col_name], col_name):  # Infer image-path column
+        elif is_image_column(data[col_name], col_name=col_name, image_type=IMAGE_PATH):  # Infer image-path column
             column_types[col_name] = IMAGE_PATH
         elif is_text_column(data[col_name]):  # Infer text column
             column_types[col_name] = TEXT
-        elif is_imagebytearray_column(data[col_name], col_name):  # Infer image-bytearray column
+        elif is_image_column(
+            data[col_name], col_name=col_name, image_type=IMAGE_BYTEARRAY
+        ):  # Infer image-bytearray column
             column_types[col_name] = IMAGE_BYTEARRAY
         else:  # All the other columns are treated as categorical
             column_types[col_name] = CATEGORICAL
