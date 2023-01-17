@@ -11,7 +11,6 @@ import pandas as pd
 from pandas.core.internals import ArrayManager, BlockManager
 
 from autogluon.common.loaders import load_pd
-from autogluon.common.utils.deprecated import deprecated
 
 ITEMID = "item_id"
 TIMESTAMP = "timestamp"
@@ -132,11 +131,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return self.index.unique(level=ITEMID)
 
     @property
-    @deprecated("Please use `TimeSeriesDataFrame.item_ids` instead.", version_removed="0.7")
-    def _item_index(self):
-        return self.index.unique(level=ITEMID)
-
-    @property
     def static_features(self):
         return self._static_features
 
@@ -189,10 +183,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         freq = freq.freqstr if isinstance(freq, pd._libs.tslibs.BaseOffset) else freq
         self._cached_freq = freq
         return freq
-
-    @deprecated("Please use `TimeSeriesDataFrame.item_ids` instead.", version_removed="0.7")
-    def iter_items(self) -> Iterable[Any]:
-        return iter(self.item_ids)
 
     @property
     def num_items(self):
@@ -555,43 +545,14 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 2019-01-05       8
 
         """
-
-        if isinstance(start_index, slice):
-            time_step_slice = start_index
-            warnings.warn(
-                f"Calling function slice_by_timestep with a `slice` argument is deprecated and won't be supported "
-                f"in v0.7. Please call the method as `slice_by_timestep(start_index, end_index)",
-                DeprecationWarning,
-            )
-            if time_step_slice.step is not None and time_step_slice.step != 1:
-                raise ValueError("Upsampling via slicing with step sizes is not supported with `slice_by_timestep`.")
-            start_index = time_step_slice.start
-            end_index = time_step_slice.stop
+        if not isinstance(start_index, (int, None)) or not isinstance(end_index, (int, None)):
+            raise ValueError("start_index and end_index must be of type int or None")
 
         time_step_slice = slice(start_index, end_index)
         result = self.groupby(level=ITEMID, sort=False, as_index=False).nth(time_step_slice)
         result.static_features = self.static_features
         result._cached_freq = self._cached_freq
         return result
-
-    @deprecated("Please use `TimeSeriesDataFrame.slice_by_time` instead.", version_removed="0.7")
-    def subsequence(self, start: pd.Timestamp, end: pd.Timestamp) -> TimeSeriesDataFrame:
-        """Select a subsequence from each time series between start (inclusive) and end (exclusive) timestamps.
-
-        Parameters
-        ----------
-        start_time: pd.Timestamp
-            Start time (inclusive) of the slice for each time series.
-        end_time: pd.Timestamp
-            End time (exclusive) of the slice for each time series.
-
-        Returns
-        -------
-        ts_df: TimeSeriesDataFrame
-            A new time series dataframe containing entries of the original time series between start and end timestamps.
-        """
-
-        return self.slice_by_time(start_time=start, end_time=end)
 
     def slice_by_time(self, start_time: pd.Timestamp, end_time: pd.Timestamp) -> TimeSeriesDataFrame:
         """Select a subsequence from each time series between start (inclusive) and end (exclusive) timestamps.
