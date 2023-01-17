@@ -7,7 +7,7 @@ The following figure shows an example of Taobao product description.
 ![Taobao product description. A rabbit toy for lunar new year decoration.](https://automl-mm-bench.s3.amazonaws.com/ner/images_for_tutorial/chinese_ner.png)
 :width:`200px`
 
-## Load the Data
+## Load the Data 
 We have preprocessed the dataset to make it ready-to-use with AutoMM. 
 
 ```{.python .input}
