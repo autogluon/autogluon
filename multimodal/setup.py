@@ -24,7 +24,7 @@ install_requires = [
     "scipy",
     "pandas",
     "scikit-learn",
-    "Pillow",
+    "Pillow>=9.1.0",
     "tqdm",
     "boto3",
     "requests",
