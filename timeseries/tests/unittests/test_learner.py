@@ -193,8 +193,8 @@ def test_when_static_features_in_tuning_data_are_missing_then_exception_is_raise
     )
     val_data = get_data_frame_with_variable_lengths({"B": 25, "A": 20}, static_features=None)
     learner = TimeSeriesLearner(path_context=temp_model_path)
-    with pytest.raises(ValueError, match="Provided tuning_data has no static_features,"):
-        learner._preprocess_static_features(train_data=train_data, val_data=val_data)
+    with pytest.raises(ValueError, match="Provided tuning_data must contain static_features"):
+        learner.fit(train_data=train_data, val_data=val_data)
 
 
 def test_when_static_features_columns_in_tuning_data_are_missing_then_exception_is_raised(temp_model_path):
@@ -205,8 +205,8 @@ def test_when_static_features_columns_in_tuning_data_are_missing_then_exception_
         {"B": 25, "A": 20}, static_features=get_static_features(["B", "A"], feature_names=["f1"])
     )
     learner = TimeSeriesLearner(path_context=temp_model_path)
-    with pytest.raises(ValueError, match="are missing in tuning_data.static_features but were present"):
-        learner._preprocess_static_features(train_data=train_data, val_data=val_data)
+    with pytest.raises(KeyError, match="required columns are missing from the provided"):
+        learner.fit(train_data=train_data, val_data=val_data)
 
 
 def test_when_train_data_has_no_static_features_but_val_data_has_static_features_then_val_data_features_get_removed(
@@ -217,7 +217,8 @@ def test_when_train_data_has_no_static_features_but_val_data_has_static_features
         {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2"])
     )
     learner = TimeSeriesLearner(path_context=temp_model_path)
-    _, val_data_processed = learner._preprocess_static_features(train_data=train_data, val_data=val_data)
+    learner.feature_generator.fit(train_data)
+    val_data_processed = learner.feature_generator.transform(val_data)
     assert val_data.static_features is not None
     assert val_data_processed.static_features is None
 
@@ -232,9 +233,9 @@ def test_when_train_data_static_features_are_subset_of_val_data_static_features_
         {"B": 25, "A": 20}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2", "f3"])
     )
     learner = TimeSeriesLearner(path_context=temp_model_path)
-    train_data_processed, val_data_processed = learner._preprocess_static_features(
-        train_data=train_data, val_data=val_data
-    )
+    learner.feature_generator.fit(train_data)
+    train_data_processed = learner.feature_generator.transform(train_data)
+    val_data_processed = learner.feature_generator.transform(val_data)
     assert sorted(val_data.static_features.columns) == ["f1", "f2", "f3"]
     for data in [val_data_processed, train_data, train_data_processed]:
         assert sorted(data.static_features.columns) == ["f1", "f2"]
@@ -245,7 +246,7 @@ def test_when_static_features_are_preprocessed_then_dtypes_are_correct(temp_mode
         {"B": 20, "A": 15}, static_features=get_static_features(["B", "A"], feature_names=["f1", "f2", "f3"])
     )
     learner = TimeSeriesLearner(path_context=temp_model_path)
-    train_data_processed, _ = learner._preprocess_static_features(train_data=train_data, val_data=None)
+    train_data_processed = learner.feature_generator.fit_transform(train_data)
     assert train_data_processed.static_features["f1"].dtype == np.float64
     assert train_data_processed.static_features["f2"].dtype == "category"
     assert train_data_processed.static_features["f3"].dtype == np.float64
@@ -258,7 +259,7 @@ def test_when_train_data_has_static_feat_but_pred_data_has_no_static_feat_then_e
     pred_data = get_data_frame_with_variable_lengths({"B": 20, "A": 15}, static_features=None)
     learner = TimeSeriesLearner(path_context=temp_model_path)
     learner.fit(train_data=train_data, hyperparameters={"ETS": {"maxiter": 1}})
-    with pytest.raises(ValueError, match="Provided data has no static_features"):
+    with pytest.raises(ValueError, match="Provided data must contain static_features"):
         learner.predict(pred_data)
 
 
@@ -271,7 +272,7 @@ def test_given_expected_known_covariates_missing_from_train_data_when_learner_fi
 ):
     learner = TimeSeriesLearner(path_context=temp_model_path, known_covariates_names=["Y", "Z", "X"])
     train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["X", "Z"])
-    with pytest.raises(ValueError, match="\\['Y'\\] provided as known_covariates_names are missing from train_data"):
+    with pytest.raises(ValueError, match="columns are missing from train_data: \\['Y'\\]"):
         learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
 
 
@@ -305,9 +306,7 @@ def test_given_expected_known_covariates_missing_from_data_when_learner_predicts
     pred_data = train_data.slice_by_timestep(None, -prediction_length)
     known_covariates = train_data.slice_by_timestep(-prediction_length, None).drop("target", axis=1)
     known_covariates.drop("X", axis=1, inplace=True)
-    with pytest.raises(
-        ValueError, match="\\['X'\\] provided as known_covariates_names are missing from known_covariates."
-    ):
+    with pytest.raises(ValueError, match="columns are missing from known_covariates: \\['X'\\]"):
         learner.predict(data=pred_data, known_covariates=known_covariates)
 
 

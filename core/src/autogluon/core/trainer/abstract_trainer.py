@@ -62,11 +62,13 @@ class AbstractTrainer:
         else:
             self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
 
-        logger.log(25, f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric.name}'")
+        logger.log(20, f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric.name}'")
         if not self.eval_metric.greater_is_better_internal:
-            logger.log(25, "\tThis metric's sign has been flipped to adhere to being higher_is_better. The metric score can be multiplied by -1 to get the metric value.")
+            logger.log(20, "\tThis metric's sign has been flipped to adhere to being higher_is_better. "
+                           "The metric score can be multiplied by -1 to get the metric value.")
         if not (self.eval_metric.needs_pred or self.eval_metric.needs_quantile):
-            logger.log(25, "\tThis metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
+            logger.log(20, "\tThis metric expects predicted probabilities rather than predicted class labels, "
+                           "so you'll need to use predict_proba() instead of predict()")
 
         logger.log(20, "\tTo change this, specify the eval_metric parameter of Predictor()")
         self.num_classes = num_classes

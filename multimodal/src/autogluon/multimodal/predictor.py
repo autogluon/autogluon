@@ -25,11 +25,9 @@ import transformers
 import yaml
 from omegaconf import DictConfig, OmegaConf
 from packaging import version
-from sklearn.model_selection import train_test_split
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.multimodal.utils import save_result_df
 
 from . import version as ag_version
@@ -95,8 +93,7 @@ from .data.infer_types import (
     infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
     infer_rois_column_type,
-    is_imagebytearray_column,
-    is_imagepath_column,
+    is_image_column,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
@@ -154,6 +151,7 @@ from .utils import (
     list_timm_models,
     load_text_tokenizers,
     logits_to_prob,
+    merge_bio_format,
     modify_duplicate_model_names,
     move_to_device,
     predict,
@@ -162,6 +160,7 @@ from .utils import (
     save_text_tokenizers,
     select_model,
     setup_save_path,
+    split_train_tuning_data,
     tensor_to_ndarray,
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
@@ -528,6 +527,7 @@ class MultiModalPredictor:
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         tuning_data: Optional[Union[pd.DataFrame, str]] = None,
+        max_num_tuning_data: Optional[int] = None,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         time_limit: Optional[int] = None,
         save_path: Optional[str] = None,
@@ -538,6 +538,7 @@ class MultiModalPredictor:
         seed: Optional[int] = 123,
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[dict] = None,
+        clean_ckpts: Optional[bool] = True,
     ):
         """
         Fit MultiModalPredictor predict label column of a dataframe based on the other columns,
@@ -642,6 +643,8 @@ class MultiModalPredictor:
                     scheduler_init_args: Optional[dict] = None
                         If provided str to `searcher`, you can optionally provide custom init_args to the searcher
                         You don't need to worry about `metric` and `mode`. AutoGluon will figure it out by itself.
+        clean_ckpts
+            Whether to clean the checkpoints of each validation step after training.
 
         Returns
         -------
@@ -677,7 +680,13 @@ class MultiModalPredictor:
             self._detection_anno_train = train_data
             train_data = from_coco_or_voc(train_data, "train")
             if tuning_data is not None:
+                self.detection_anno_train = tuning_data
                 tuning_data = from_coco_or_voc(tuning_data, "val")
+                if max_num_tuning_data is not None:
+                    if len(tuning_data) > max_num_tuning_data:
+                        tuning_data = tuning_data.sample(
+                            n=max_num_tuning_data, replace=False, random_state=seed
+                        ).reset_index(drop=True)
 
         if hyperparameter_tune_kwargs is not None:
             # TODO: can we support hyperparameters being the same format as regular training?
@@ -708,23 +717,14 @@ class MultiModalPredictor:
             fit_called=fit_called,
         )
 
-        # Generate general info that's not config specific
-        if tuning_data is None:
-            # TODO(Refactor) Refactor the data split function into another file.
-            if self.problem_property and self.problem_property.is_classification:
-                stratify = train_data[self._label_column]
-            else:
-                stratify = None
-            if holdout_frac is None:
-                val_frac = default_holdout_frac(len(train_data), hyperparameter_tune=False)
-            else:
-                val_frac = holdout_frac
-            train_data, tuning_data = train_test_split(
-                train_data,
-                test_size=val_frac,
-                stratify=stratify,
-                random_state=np.random.RandomState(seed),
-            )
+        train_data, tuning_data = split_train_tuning_data(
+            train_data=train_data,
+            tuning_data=tuning_data,
+            holdout_frac=holdout_frac,
+            is_classification=self.problem_property and self.problem_property.is_classification,
+            label_column=self._label_column,
+            seed=seed,
+        )
 
         column_types = infer_column_types(
             data=train_data,
@@ -778,7 +778,7 @@ class MultiModalPredictor:
             column_types = self._column_types
 
         if self._problem_type != OBJECT_DETECTION:
-            if self._output_shape is not None:
+            if self._output_shape is not None and output_shape is not None:
                 assert self._output_shape == output_shape, (
                     f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
                 )
@@ -820,6 +820,7 @@ class MultiModalPredictor:
             teacher_predictor=teacher_predictor,
             standalone=standalone,
             hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
+            clean_ckpts=clean_ckpts,
         )
 
         if hyperparameter_tune_kwargs is not None:
@@ -993,6 +994,7 @@ class MultiModalPredictor:
         teacher_predictor: Union[str, MultiModalPredictor] = None,
         hpo_mode: bool = False,
         standalone: bool = True,
+        clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
 
@@ -1028,6 +1030,10 @@ class MultiModalPredictor:
             num_categorical_columns=len(df_preprocessor.categorical_num_categories),
         )
         config = select_model(config=config, df_preprocessor=df_preprocessor)
+
+        # Update output_shape with label_generator.
+        if self._problem_type == NER:
+            self._output_shape = len(df_preprocessor.label_generator.unique_entity_groups)
 
         if self._model is None:
             model = create_fusion_model(
@@ -1111,6 +1117,7 @@ class MultiModalPredictor:
                 validation_metric_name=validation_metric_name,
                 strict_loading=not trainable_param_names,
                 standalone=standalone,
+                clean_ckpts=clean_ckpts,
             )
 
             return self
@@ -1404,6 +1411,7 @@ class MultiModalPredictor:
                     strategy=strategy,
                     strict_loading=not trainable_param_names,  # Not strict loading if using parameter-efficient finetuning
                     standalone=standalone,
+                    clean_ckpts=clean_ckpts,
                 )
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
@@ -1421,6 +1429,7 @@ class MultiModalPredictor:
         last_ckpt_path=None,
         strict_loading=True,
         standalone=True,
+        clean_ckpts=True,
     ):
         # FIXME: we need to change validation_metric to evaluation_metric for model choosing
         # since we called self.evaluate. Below is a temporal fix for NER.
@@ -1547,16 +1556,17 @@ class MultiModalPredictor:
 
         torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
-        # clean old checkpoints + the intermediate files stored
-        for per_path in top_k_model_paths:
-            if os.path.isfile(per_path):
-                os.remove(per_path)
-        # remove the yaml file after cleaning the checkpoints
-        if os.path.isfile(best_k_models_yaml_path):
-            os.remove(best_k_models_yaml_path)
-        # clean the last checkpoint
-        if os.path.isfile(last_ckpt_path):
-            os.remove(last_ckpt_path)
+        if clean_ckpts:
+            # clean old checkpoints + the intermediate files stored
+            for per_path in top_k_model_paths:
+                if os.path.isfile(per_path):
+                    os.remove(per_path)
+            # remove the yaml file after cleaning the checkpoints
+            if os.path.isfile(best_k_models_yaml_path):
+                os.remove(best_k_models_yaml_path)
+            # clean the last checkpoint
+            if os.path.isfile(last_ckpt_path):
+                os.remove(last_ckpt_path)
 
     def _default_predict(
         self,
@@ -1733,9 +1743,9 @@ class MultiModalPredictor:
             column_types_copy = copy.deepcopy(column_types)
             for col_name, col_type in column_types.items():
                 if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
-                    if is_imagepath_column(data=data[col_name], col_name=col_name, sample_n=1):
+                    if is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_PATH):
                         image_type = IMAGE_PATH
-                    elif is_imagebytearray_column(data=data[col_name], col_name=col_name, sample_n=1):
+                    elif is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_BYTEARRAY):
                         image_type = IMAGE_BYTEARRAY
                     else:
                         raise ValueError(f"Image type in column {col_name} is not supported!")
@@ -2146,6 +2156,8 @@ class MultiModalPredictor:
                 else:
                     pred = logits
 
+            if self._problem_type == NER:
+                pred = merge_bio_format(data[self._df_preprocessor.ner_feature_names[0]], pred)
         if save_results:
             ## Dumping Result for detection only now
             assert (

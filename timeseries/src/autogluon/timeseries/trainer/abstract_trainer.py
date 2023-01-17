@@ -21,6 +21,7 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesEnsembleSelection, TimeSeriesEnsembleWrapper
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from autogluon.timeseries.models.presets import contains_searchspace
+from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.warning_filters import disable_tqdm
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
@@ -288,6 +289,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
         self.target = kwargs.get("target", "target")
+        self.metadata = kwargs.get("metadata", CovariateMetadata())
         self.is_data_saved = False
         self.enable_ensemble = enable_ensemble
 

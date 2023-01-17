@@ -17,12 +17,9 @@ import pytorch_lightning as pl
 import torch
 import yaml
 from omegaconf import DictConfig, OmegaConf
-from sklearn.model_selection import train_test_split
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.common.utils.utils import setup_outputdir
-from autogluon.core.utils.utils import default_holdout_frac
 
 from . import version as ag_version
 from .constants import (
@@ -100,6 +97,7 @@ from .utils import (
     save_text_tokenizers,
     select_model,
     setup_save_path,
+    split_train_tuning_data,
     try_to_infer_pos_label,
 )
 
@@ -391,22 +389,14 @@ class MultiModalMatcher:
             fit_called=fit_called,
         )
 
-        # Generate general info that's not config specific
-        if tuning_data is None:
-            if self._problem_type in [BINARY, MULTICLASS, CLASSIFICATION]:
-                stratify = train_data[self._label_column]
-            else:
-                stratify = None
-            if holdout_frac is None:
-                val_frac = default_holdout_frac(len(train_data), hyperparameter_tune=False)
-            else:
-                val_frac = holdout_frac
-            train_data, tuning_data = train_test_split(
-                train_data,
-                test_size=val_frac,
-                stratify=stratify,
-                random_state=np.random.RandomState(seed),
-            )
+        train_data, tuning_data = split_train_tuning_data(
+            train_data=train_data,
+            tuning_data=tuning_data,
+            holdout_frac=holdout_frac,
+            is_classification=self._problem_type in [BINARY, MULTICLASS, CLASSIFICATION],
+            label_column=self._label_column,
+            seed=seed,
+        )
 
         column_types = infer_column_types(
             data=train_data,
