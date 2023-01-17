@@ -160,7 +160,6 @@ def test_is_url(path, is_valid_url):
     assert is_url(path) == is_valid_url
 
 
-
 def test_merge_bio():
     sentence = "Game of Thrones is an American fantasy drama television series created by David Benioff"
     predictions = [
@@ -197,4 +196,3 @@ def test_misc_visualize_ner():
 
     # Test using string for annotation
     visualize_ner(sentence, json.dumps(annotation))
-
