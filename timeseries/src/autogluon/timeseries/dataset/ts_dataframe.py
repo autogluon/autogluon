@@ -545,8 +545,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 2019-01-05       8
 
         """
-        if not isinstance(start_index, (int, None)) or not isinstance(end_index, (int, None)):
-            raise ValueError("start_index and end_index must be of type int or None")
+        if start_index is not None and not isinstance(start_index, int):
+            raise ValueError(f"start_index must be of type int or None (got {type(start_index)})")
+        if end_index is not None and not isinstance(end_index, int):
+            raise ValueError(f"end_index must be of type int or None (got {type(end_index)})")
 
         time_step_slice = slice(start_index, end_index)
         result = self.groupby(level=ITEMID, sort=False, as_index=False).nth(time_step_slice)
