@@ -1,7 +1,8 @@
 
 import logging
 import time
-import psutil
+
+from autogluon.common.utils.resource_utils import ResourceManager
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +22,8 @@ class MemoryCheckCallback:
     """
     def __init__(self, period: int = 10, verbose=False):
         self.period = period
-        self.mem_status = psutil.Process()
-        self.init_mem_rss = self.mem_status.memory_info().rss
-        self.init_mem_avail = psutil.virtual_memory().available
+        self.init_mem_rss = ResourceManager.get_memory_rss()
+        self.init_mem_avail = ResourceManager.get_available_virtual_mem()
         self.verbose = verbose
 
         self._cur_period = 1
@@ -39,8 +39,8 @@ class MemoryCheckCallback:
 
     def memory_check(self, iter) -> bool:
         """Checks if memory usage is unsafe. If so, then returns True to signal the model to stop training early."""
-        available_bytes = psutil.virtual_memory().available
-        cur_rss = self.mem_status.memory_info().rss
+        available_bytes = ResourceManager.get_available_virtual_mem()
+        cur_rss = ResourceManager.get_memory_rss()
 
         if cur_rss < self.init_mem_rss:
             self.init_mem_rss = cur_rss

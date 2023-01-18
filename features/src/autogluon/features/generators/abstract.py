@@ -168,7 +168,8 @@ class AbstractFeatureGenerator:
             self._post_generators.append(DropDuplicatesFeatureGenerator(post_drop_duplicates=False))
         if name_prefix or name_suffix:
             from .rename import RenameFeatureGenerator
-            self._post_generators.append(RenameFeatureGenerator(name_prefix=name_prefix, name_suffix=name_suffix, inplace=True))
+            # inplace=False required to avoid altering outer context: refer to https://github.com/autogluon/autogluon/issues/2688
+            self._post_generators.append(RenameFeatureGenerator(name_prefix=name_prefix, name_suffix=name_suffix, inplace=False))
 
         if self._post_generators:
             if not self.get_tags().get('allow_post_generators', True):
@@ -333,7 +334,8 @@ class AbstractFeatureGenerator:
                 if col not in X.columns:
                     missing_cols.append(col)
             raise KeyError(f'{len(missing_cols)} required columns are missing from the provided dataset to transform using {self.__class__.__name__}. '
-                           f'Missing columns: {missing_cols}')
+                           f'{len(missing_cols)} missing columns: {missing_cols} | '
+                           f'{len(list(X.columns))} available columns: {list(X.columns)}')
         if self._pre_astype_generator:
             X = self._pre_astype_generator.transform(X)
         X_out = self._transform(X)

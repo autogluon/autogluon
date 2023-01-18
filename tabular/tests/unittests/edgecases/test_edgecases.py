@@ -93,3 +93,29 @@ def test_num_folds_hpo(fit_helper):
     assert leaderboard.iloc[0]['num_models'] == 4
     assert leaderboard.iloc[1]['num_models'] == 4
     shutil.rmtree(predictor.path, ignore_errors=True)
+
+
+def test_use_bag_holdout_calibrate(fit_helper):
+    """
+    Test that use_bag_holdout=True works for calibration
+    Ensures the bug is fixed in https://github.com/autogluon/autogluon/issues/2674
+    """
+    init_args = dict(
+        eval_metric='log_loss'
+    )
+
+    fit_args = dict(
+        hyperparameters={'DUMMY': {}},
+        num_bag_folds=2,
+        use_bag_holdout=True,
+        calibrate=True,
+    )
+
+    dataset_name = 'adult'
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name,
+        init_args=init_args,
+        fit_args=fit_args,
+        expected_model_count=2,
+        refit_full=False,
+    )

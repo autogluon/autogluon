@@ -8,12 +8,13 @@ from typing import Dict, List, Union, Tuple
 import networkx as nx
 import numpy as np
 import pandas as pd
-import psutil
 import shutil
 from pathlib import Path
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
+from autogluon.common.utils.resource_utils import ResourceManager
 
 from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
@@ -62,11 +63,13 @@ class AbstractTrainer:
         else:
             self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
 
-        logger.log(25, f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric.name}'")
+        logger.log(20, f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric.name}'")
         if not self.eval_metric.greater_is_better_internal:
-            logger.log(25, "\tThis metric's sign has been flipped to adhere to being higher_is_better. The metric score can be multiplied by -1 to get the metric value.")
+            logger.log(20, "\tThis metric's sign has been flipped to adhere to being higher_is_better. "
+                           "The metric score can be multiplied by -1 to get the metric value.")
         if not (self.eval_metric.needs_pred or self.eval_metric.needs_quantile):
-            logger.log(25, "\tThis metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
+            logger.log(20, "\tThis metric expects predicted probabilities rather than predicted class labels, "
+                           "so you'll need to use predict_proba() instead of predict()")
 
         logger.log(20, "\tTo change this, specify the eval_metric parameter of Predictor()")
         self.num_classes = num_classes
@@ -92,6 +95,7 @@ class AbstractTrainer:
 
         self._num_rows_train = None
         self._num_cols_train = None
+        self._num_rows_val = None
 
         self.is_data_saved = False
         self._X_saved = False
@@ -124,6 +128,11 @@ class AbstractTrainer:
     @property
     def path_data(self) -> str:
         return self.path_utils + 'data' + os.path.sep
+
+    @property
+    def has_val(self) -> bool:
+        """Whether the trainer uses validation data"""
+        return self._num_rows_val is not None
 
     def load_X(self):
         if self._X_saved:
@@ -1228,21 +1237,27 @@ class AbstractTrainer:
             logger.log(30, f'No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.')
             return []
         if max_memory is not None:
-            info = self.get_models_info(model_names)
-            model_mem_size_map = {model: info[model]['memory_size'] for model in model_names}
-            for model in model_mem_size_map:
-                if 'children_info' in info[model]:
-                    for child in info[model]['children_info'].values():
-                        model_mem_size_map[model] += child['memory_size']
-            total_mem_required = sum(model_mem_size_map.values())
-            available_mem = psutil.virtual_memory().available
-            memory_proportion = total_mem_required / available_mem
-            if memory_proportion > max_memory:
-                logger.log(30, f'Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory*100, 2)}%.')
-                logger.log(30, f'\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.')
+            @disable_if_lite_mode(ret=True)
+            def _check_memory():
+                info = self.get_models_info(model_names)
+                model_mem_size_map = {model: info[model]['memory_size'] for model in model_names}
+                for model in model_mem_size_map:
+                    if 'children_info' in info[model]:
+                        for child in info[model]['children_info'].values():
+                            model_mem_size_map[model] += child['memory_size']
+                total_mem_required = sum(model_mem_size_map.values())
+                available_mem = ResourceManager.get_available_virtual_mem()
+                memory_proportion = total_mem_required / available_mem
+                if memory_proportion > max_memory:
+                    logger.log(30, f'Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory*100, 2)}%.')
+                    logger.log(30, f'\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.')
+                    return False
+                else:
+                    logger.log(20, f'Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion*100, 2)}% of memory.')
+                return True
+
+            if not _check_memory():
                 return []
-            else:
-                logger.log(20, f'Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion*100, 2)}% of memory.')
 
         models = []
         for model_name in model_names:
@@ -1959,7 +1974,7 @@ class AbstractTrainer:
             self._groups = groups
         self._num_rows_train = len(X)
         if X_val is not None:
-            self._num_rows_train += len(X_val)
+            self._num_rows_val = len(X_val)
         self._num_cols_train = len(list(X.columns))
         model_names_fit = self.train_multi_levels(X, y, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val,
                                                   X_unlabeled=X_unlabeled, level_start=1, level_end=num_stack_levels+1, time_limit=time_limit, **kwargs)
@@ -2446,6 +2461,7 @@ class AbstractTrainer:
         time_train_start = self._time_train_start
         num_rows_train = self._num_rows_train
         num_cols_train = self._num_cols_train
+        num_rows_val = self._num_rows_val
         num_classes = self.num_classes
         # TODO:
         #  Disk size of models
@@ -2463,6 +2479,7 @@ class AbstractTrainer:
             'time_train_start': time_train_start,
             'num_rows_train': num_rows_train,
             'num_cols_train': num_cols_train,
+            'num_rows_val': num_rows_val,
             'num_classes': num_classes,
             'problem_type': problem_type,
             'eval_metric': eval_metric,
@@ -2930,13 +2947,13 @@ class AbstractTrainer:
             if m_full == model_name:
                 model_name_og = m
                 break
-        if self.bagged_mode:
-            y_val_probs = self.get_model_oof(model_name_og)
-            y_val = self.load_y().to_numpy()
-        else:
+        if self.has_val:
             X_val = self.load_X_val()
             y_val_probs = self.predict_proba(X_val, model_name_og)
             y_val = self.load_y_val().to_numpy()
+        else:  # bagged mode
+            y_val_probs = self.get_model_oof(model_name_og)
+            y_val = self.load_y().to_numpy()
 
         if self.problem_type == BINARY:
             # Convert one-dimensional array to be in the form of a 2-class multiclass predict_proba output

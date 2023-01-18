@@ -25,8 +25,8 @@ install_requires = [
     'pandas',
     'scikit-learn',
     'networkx',
-    f'autogluon.core=={version}',
-    f'autogluon.features=={version}',
+    f'{ag.PACKAGE_NAME}.core=={version}',
+    f'{ag.PACKAGE_NAME}.features=={version}',
 ]
 
 extras_require = {

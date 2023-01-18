@@ -220,16 +220,11 @@ class LGBModel(AbstractModel):
 
     def _predict_proba(self, X, num_cpus=0, **kwargs):
         X = self.preprocess(X, **kwargs)
-        # FIXME This is a HACK. Passing in value -1, 0, or None will only use 1 cores. Need to pass in a large number instead
-        if num_cpus == 0:
-            # TODO Avoid using psutil when lgb fixed the mem leak.
-            # logical=True is faster in inference
-            num_cpus = ResourceManager.get_cpu_count_psutil(logical=True)
-        if self.problem_type == REGRESSION:
-            return self.model.predict(X, num_threads=num_cpus)
 
         y_pred_proba = self.model.predict(X, num_threads=num_cpus)
-        if self.problem_type == BINARY:
+        if self.problem_type == REGRESSION:
+            return y_pred_proba
+        elif self.problem_type == BINARY:
             if len(y_pred_proba.shape) == 1:
                 return y_pred_proba
             elif y_pred_proba.shape[1] > 1:

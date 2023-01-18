@@ -2,7 +2,6 @@ import logging
 
 import numpy as np
 import math
-import psutil
 import time
 
 from autogluon.common.features.types import R_INT, R_FLOAT, S_BOOL
@@ -111,7 +110,7 @@ class KNNModel(AbstractModel):
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         expected_final_model_size_bytes = self.estimate_memory_usage(**kwargs) 
         if expected_final_model_size_bytes > 10000000:  # Only worth checking if expected model size is >10MB
-            available_mem = psutil.virtual_memory().available
+            available_mem = ResourceManager.get_available_virtual_mem()
             model_memory_ratio = expected_final_model_size_bytes / available_mem
             if model_memory_ratio > (0.15 * max_memory_usage_ratio):
                 logger.warning(f'\tWarning: Model is expected to require {round(model_memory_ratio * 100, 2)}% of available memory...')

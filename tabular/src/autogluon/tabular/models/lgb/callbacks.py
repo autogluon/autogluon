@@ -1,13 +1,14 @@
 import copy
 import logging
 import os
-import psutil
 import time
 import warnings
 from operator import gt, lt
 
 from lightgbm.callback import _format_eval_result, EarlyStopException
 
+from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.core.utils.early_stopping import SimpleES
 
 logger = logging.getLogger(__name__)
@@ -53,10 +54,11 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
     cmp_op = []
     enabled = [True]
     indices_to_check = []
-    mem_status = psutil.Process()
     init_mem_rss = []
     init_mem_avail = []
     es = []
+
+    mem_status = ResourceManager.get_process()
 
     def _init(env):
         if not ignore_dart_warning:
@@ -106,8 +108,48 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
                     if first_metric_only:
                         break
 
-        init_mem_rss.append(mem_status.memory_info().rss)
-        init_mem_avail.append(psutil.virtual_memory().available)
+        @disable_if_lite_mode()
+        def _init_mem():
+            init_mem_rss.append(mem_status.memory_info().rss)
+            init_mem_avail.append(ResourceManager.get_available_virtual_mem())
+
+        _init_mem()
+
+    @disable_if_lite_mode()
+    def _mem_early_stop():
+        available = ResourceManager.get_available_virtual_mem()
+        cur_rss = mem_status.memory_info().rss
+
+        if cur_rss < init_mem_rss[0]:
+            init_mem_rss[0] = cur_rss
+        estimated_model_size_mb = (cur_rss - init_mem_rss[0]) >> 20
+        available_mb = available >> 20
+
+        model_size_memory_ratio = estimated_model_size_mb / available_mb
+        if verbose or (model_size_memory_ratio > 0.25):
+            logging.debug('Available Memory: ' + str(available_mb) + ' MB')
+            logging.debug('Estimated Model Size: ' + str(estimated_model_size_mb) + ' MB')
+
+        early_stop = False
+        if model_size_memory_ratio > 1.0:
+            logger.warning('Warning: Large GBM model size may cause OOM error if training continues')
+            logger.warning('Available Memory: ' + str(available_mb) + ' MB')
+            logger.warning('Estimated GBM model size: ' + str(estimated_model_size_mb) + ' MB')
+            early_stop = True
+
+        # TODO: We will want to track size of model as well, even if we early stop before OOM, we will still crash when saving if the model is large enough
+        if available_mb < 512:  # Less than 500 MB
+            logger.warning('Warning: Low available memory may cause OOM error if training continues')
+            logger.warning('Available Memory: ' + str(available_mb) + ' MB')
+            logger.warning('Estimated GBM model size: ' + str(estimated_model_size_mb) + ' MB')
+            early_stop = True
+
+        if early_stop:
+            logger.warning(
+                'Warning: Early stopped GBM model prior to optimal result to avoid OOM error. Please increase available memory to avoid subpar model quality.')
+            logger.log(15, 'Early stopping, best iteration is:\n[%d]\t%s' % (
+                best_iter[0] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[0]])))
+            raise EarlyStopException(best_iter[0], best_score_list[0])
 
     def _callback(env):
         if not cmp_op:
@@ -181,38 +223,7 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
         # TODO: Add toggle parameter to early_stopping to disable this
         # TODO: Identify optimal threshold values for early_stopping based on lack of memory
         if env.iteration % 10 == 0:
-            available = psutil.virtual_memory().available
-            cur_rss = mem_status.memory_info().rss
-
-            if cur_rss < init_mem_rss[0]:
-                init_mem_rss[0] = cur_rss
-            estimated_model_size_mb = (cur_rss - init_mem_rss[0]) >> 20
-            available_mb = available >> 20
-
-            model_size_memory_ratio = estimated_model_size_mb / available_mb
-            if verbose or (model_size_memory_ratio > 0.25):
-                logging.debug('Available Memory: '+str(available_mb)+' MB')
-                logging.debug('Estimated Model Size: '+str(estimated_model_size_mb)+' MB')
-
-            early_stop = False
-            if model_size_memory_ratio > 1.0:
-                logger.warning('Warning: Large GBM model size may cause OOM error if training continues')
-                logger.warning('Available Memory: '+str(available_mb)+' MB')
-                logger.warning('Estimated GBM model size: '+str(estimated_model_size_mb)+' MB')
-                early_stop = True
-
-            # TODO: We will want to track size of model as well, even if we early stop before OOM, we will still crash when saving if the model is large enough
-            if available_mb < 512:  # Less than 500 MB
-                logger.warning('Warning: Low available memory may cause OOM error if training continues')
-                logger.warning('Available Memory: '+str(available_mb)+' MB')
-                logger.warning('Estimated GBM model size: '+str(estimated_model_size_mb)+' MB')
-                early_stop = True
-
-            if early_stop:
-                logger.warning('Warning: Early stopped GBM model prior to optimal result to avoid OOM error. Please increase available memory to avoid subpar model quality.')
-                logger.log(15, 'Early stopping, best iteration is:\n[%d]\t%s' % (
-                        best_iter[0] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[0]])))
-                raise EarlyStopException(best_iter[0], best_score_list[0])
+            _mem_early_stop()
 
     _callback.order = 30
     return _callback
