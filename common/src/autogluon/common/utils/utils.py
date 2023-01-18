@@ -7,7 +7,15 @@ import platform
 import sys
 from typing import Dict, Any
 
+from ..version import __version__
+try:
+    from ..version import __lite__
+except ImportError:
+    __lite__ = False
+
 logger = logging.getLogger(__name__)
+
+LITE_MODE: bool = __lite__ is not None and __lite__
 
 
 def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None):
@@ -72,8 +80,6 @@ def get_package_versions() -> Dict[str, str]:
 
 
 def get_autogluon_metadata() -> Dict[str, Any]:
-    from ..version import __version__, __lite__
-
     metadata = dict(
         system=platform.system(),
         version=f"{__version__}",
