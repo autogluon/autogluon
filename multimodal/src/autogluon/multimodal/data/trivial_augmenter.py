@@ -7,12 +7,10 @@ Code is partially adapted from its official implementation https://github.com/au
 import logging
 import random
 
-import nlpaug.augmenter.word as naw
 import nltk
 from PIL import Image, ImageEnhance, ImageOps
 
 from ..constants import AUTOMM, IMAGE, TEXT
-from .utils import InsertPunctuation
 
 logger = logging.getLogger(AUTOMM)
 
@@ -278,6 +276,10 @@ class TrivialAugment:
         return op.augment(scale, data)
 
     def augment_text(self, data):
+        import nlpaug.augmenter.word as naw
+
+        from ..utils.nlpaug import InsertPunctuation
+
         op = random.choice(self.all_transform)
 
         # use specified operation magnitude if available
