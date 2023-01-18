@@ -1,8 +1,6 @@
-import argparse
 import os
 import time
 
-from autogluon.core.utils.loaders import load_zip
 from autogluon.multimodal import MultiModalPredictor
 
 def main():
@@ -11,7 +9,7 @@ def main():
     val_path = os.path.join(data_dir, "val", "annotations", "zhiyuan_objv2_val.json")
 
     checkpoint_name = "yolox_l_8x8_300e_coco"
-    num_gpus = -1
+    num_gpus = 3
 
     predictor = MultiModalPredictor(
         hyperparameters={
@@ -21,18 +19,19 @@ def main():
         },
         problem_type="object_detection",
         sample_data_path=train_path,
-        clean_old_ckpts=False,
     )
 
     start = time.time()
     predictor.fit(
         train_path,
         tuning_data=val_path,
-        max_tuning_num=3000,
+        max_num_tuning_data=5000,
         hyperparameters={
-            "optimization.learning_rate": 5e-5,  # we use two stage and detection head has 100x lr
-            "optimization.max_epochs": -1,
-            "optimization.max_steps": 180000,
+            "optimization.learning_rate": 1e-3,  # we use two stage and detection head has 100x lr
+            "optimization.lr_decay": 0.9,
+            "optimization.lr_mult": 1,
+            "optimization.max_epochs": 12,
+            #"optimization.max_steps": 180000,
             "optimization.warmup_steps": 0.1,
             "optimization.patience": 1000,
             "optimization.val_check_interval": 0.25,
@@ -40,6 +39,7 @@ def main():
             "optimization.top_k": 20,
             "env.per_gpu_batch_size": 6,  # decrease it when model is large
         },
+        clean_ckpts=False,
     )
     end = time.time()
 

@@ -1,6 +1,7 @@
 import logging
 import os
 import warnings
+import time
 from typing import Optional
 
 import torch
@@ -63,10 +64,20 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.prefix = prefix
         self.pretrained = pretrained
 
+        # TODO: Config only init (without checkpoint)
+
         self._get_checkpoint_and_config_file(checkpoint_name=checkpoint_name, config_file=config_file)
         self._load_config()
+
+        self._update_classes(classes)
+        self._load_checkpoint(self.checkpoint_file)
+
+    def _reset_classes(self, classes: list):
+        temp_ckpt_file = f"temp_ckpt_{int(time.time()*1000)}.pth"
+        self._save_weights(temp_ckpt_file)
         self._update_classes(classes)
         self._load_checkpoint()
+        os.remove(temp_ckpt_file)
 
     def _update_classes(self, classes: Optional[list] = None):
         if classes:
@@ -79,14 +90,15 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 raise ValueError("Cannot retrieve num_classes for current model structure.")
             self.classes = None
         self.id2label = dict(zip(range(self.num_classes), range(self.num_classes)))
+        return
 
-    def _load_checkpoint(self):
+    def _load_checkpoint(self, checkpoint_file):
         # build model and load pretrained weights
         assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
         self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
 
-        if self.pretrained and self.checkpoint_file is not None:  # TODO: enable training from scratch
-            self.checkpoint = load_checkpoint(self.model, self.checkpoint_file, map_location="cpu")
+        if self.pretrained and checkpoint_file is not None:  # TODO: enable training from scratch
+            self.checkpoint = load_checkpoint(self.model, checkpoint_file, map_location="cpu")
 
         # save the config and classes in the model for convenience
         self.model.cfg = self.config
@@ -179,21 +191,22 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 mimdownload(package="mmdet", configs=[checkpoint_name], dest_root=".")
                 config_file = checkpoint_name + ".py"
 
-        self.config_file = config_file
-        self.checkpoint_file = checkpoint_file
         self.checkpoint_name = checkpoint_name
+        self.checkpoint_file = checkpoint_file
+        self.config_file = config_file
 
-    def _load_config(self):
+    def _load_config(self, config_file):
         # read config files
         assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-        if isinstance(self.config_file, str):
-            self.config = mmcv.Config.fromfile(self.config_file)
+        if isinstance(config_file, str):
+            config = mmcv.Config.fromfile(config_file)
         else:
-            if not isinstance(self.config_file, dict):
+            if not isinstance(config_file, dict):
                 raise ValueError(
-                    f"The variable config_file has type {type(self.config_file)}."
+                    f"The variable config_file has type {type(config_file)}."
                     f"Detection Model's config_file should either be a str of file path, or a dict as config."
                 )
+        return config
 
     @property
     def image_key(self):
