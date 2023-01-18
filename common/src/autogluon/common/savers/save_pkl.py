@@ -38,7 +38,7 @@ def save_with_fn(path, object, pickle_fn, format=None, verbose=True, compression
     else:
         path_parent = os.path.dirname(path)
         if path_parent == '':
-            path_parent = '.'
+            path_parent = '.'  # Allows saving to working directory root without crashing
         os.makedirs(path_parent, exist_ok=True)
 
         if compression_fn_kwargs is None:
