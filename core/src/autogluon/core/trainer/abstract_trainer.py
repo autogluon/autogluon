@@ -95,6 +95,7 @@ class AbstractTrainer:
 
         self._num_rows_train = None
         self._num_cols_train = None
+        self._num_rows_val = None
 
         self.is_data_saved = False
         self._X_saved = False
@@ -127,6 +128,11 @@ class AbstractTrainer:
     @property
     def path_data(self) -> str:
         return self.path_utils + 'data' + os.path.sep
+
+    @property
+    def has_val(self) -> bool:
+        """Whether the trainer uses validation data"""
+        return self._num_rows_val is not None
 
     def load_X(self):
         if self._X_saved:
@@ -1968,7 +1974,7 @@ class AbstractTrainer:
             self._groups = groups
         self._num_rows_train = len(X)
         if X_val is not None:
-            self._num_rows_train += len(X_val)
+            self._num_rows_val = len(X_val)
         self._num_cols_train = len(list(X.columns))
         model_names_fit = self.train_multi_levels(X, y, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val,
                                                   X_unlabeled=X_unlabeled, level_start=1, level_end=num_stack_levels+1, time_limit=time_limit, **kwargs)
@@ -2455,6 +2461,7 @@ class AbstractTrainer:
         time_train_start = self._time_train_start
         num_rows_train = self._num_rows_train
         num_cols_train = self._num_cols_train
+        num_rows_val = self._num_rows_val
         num_classes = self.num_classes
         # TODO:
         #  Disk size of models
@@ -2472,6 +2479,7 @@ class AbstractTrainer:
             'time_train_start': time_train_start,
             'num_rows_train': num_rows_train,
             'num_cols_train': num_cols_train,
+            'num_rows_val': num_rows_val,
             'num_classes': num_classes,
             'problem_type': problem_type,
             'eval_metric': eval_metric,
@@ -2939,13 +2947,13 @@ class AbstractTrainer:
             if m_full == model_name:
                 model_name_og = m
                 break
-        if self.bagged_mode:
-            y_val_probs = self.get_model_oof(model_name_og)
-            y_val = self.load_y().to_numpy()
-        else:
+        if self.has_val:
             X_val = self.load_X_val()
             y_val_probs = self.predict_proba(X_val, model_name_og)
             y_val = self.load_y_val().to_numpy()
+        else:  # bagged mode
+            y_val_probs = self.get_model_oof(model_name_og)
+            y_val = self.load_y().to_numpy()
 
         if self.problem_type == BINARY:
             # Convert one-dimensional array to be in the form of a 2-class multiclass predict_proba output
