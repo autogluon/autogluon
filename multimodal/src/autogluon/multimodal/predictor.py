@@ -121,13 +121,12 @@ from .utils import (
     assign_feature_column_names,
     average_checkpoints,
     check_if_packages_installed,
-    cocoeval,
-    compute_inference_batch_size,
     compute_num_gpus,
     compute_score,
     create_fusion_data_processors,
     create_fusion_model,
     data_to_df,
+    evaluate_coco,
     extract_from_output,
     filter_search_space,
     from_coco_or_voc,
@@ -1771,73 +1770,6 @@ class MultiModalPredictor:
 
         return data, df_preprocessor, data_processors
 
-    def evaluate_coco(
-        self,
-        anno_file_or_df: str,
-        metrics: str,
-        return_pred: Optional[bool] = False,
-        seed: Optional[int] = 123,
-        eval_tool: Optional[str] = None,
-    ):
-        """
-        Evaluate object detection model on a test dataset in COCO format.
-
-        Parameters
-        ----------
-        anno_file
-            The annotation file in COCO format
-        return_pred
-            Whether to return the prediction result of each row.
-        eval_tool
-            The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
-        """
-        # TODO: support saving results to file
-        self._verify_inference_ready()
-        assert self._problem_type == OBJECT_DETECTION, (
-            f"predictor.evaluate_coco() is only supported when problem_type is {OBJECT_DETECTION}. "
-            f"Received problem_type={self._problem_type}."
-        )
-        # TODO: refactor this into evaluate()
-        if isinstance(anno_file_or_df, str):
-            anno_file = anno_file_or_df
-            data = from_coco_or_voc(
-                anno_file, "test"
-            )  # TODO: maybe remove default splits hardcoding (only used in VOC)
-            if os.path.isdir(anno_file):
-                eval_tool = "torchmetrics"  # we can only use torchmetrics for VOC format evaluation.
-        else:
-            # during validation, it will call evaluate with df as input
-            anno_file = self._detection_anno_train
-            data = anno_file_or_df
-
-        outputs = predict(
-            predictor=self,
-            data=data,
-            requires_label=True,
-            seed=seed,
-        )  # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
-
-        # Cache prediction results as COCO format # TODO: refactor this
-        self._save_path = setup_save_path(
-            old_save_path=self._save_path,
-            warn_if_exist=False,
-        )
-        cocoeval_cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
-
-        eval_results = cocoeval(
-            outputs=outputs,
-            data=data,
-            anno_file=anno_file,
-            cache_path=cocoeval_cache_path,
-            metrics=metrics,
-            tool=eval_tool,
-        )
-
-        if return_pred:
-            return eval_results, outputs
-        else:
-            return eval_results
-
     def set_num_gpus(self, num_gpus):
         assert isinstance(num_gpus, int)
         self._config.env.num_gpus = num_gpus
@@ -1927,8 +1859,13 @@ class MultiModalPredictor:
                 return NotImplementedError(
                     f"Current problem type {self._problem_type} does not support realtime predict."
                 )
-            return self.evaluate_coco(
-                anno_file_or_df=data, metrics=metrics, return_pred=return_pred, seed=seed, eval_tool=eval_tool
+            return evaluate_coco(
+                predictor=self,
+                anno_file_or_df=data,
+                metrics=metrics,
+                return_pred=return_pred,
+                seed=seed,
+                eval_tool=eval_tool,
             )
 
         if self._problem_type == NER:
