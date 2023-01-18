@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
+import numpy as np
 import pandas as pd
 
 from autogluon.common.features.infer_types import get_type_group_map_special, get_type_map_raw
@@ -17,9 +18,17 @@ __all__ = [
     "SpecialTypesAnalysis",
     "VariableTypeAnalysis",
     "TrainValidationSplit",
+    "ProblemTypeControl",
+    "LabelInsightsAnalysis",
 ]
 
-from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION, PROBLEM_TYPES_REGRESSION
+from autogluon.core.constants import (
+    BINARY,
+    MULTICLASS,
+    PROBLEM_TYPES_CLASSIFICATION,
+    PROBLEM_TYPES_REGRESSION,
+    REGRESSION,
+)
 from autogluon.core.utils import generate_train_test_split_combined, infer_problem_type
 
 
@@ -80,17 +89,53 @@ class Sampler(AbstractAnalysis):
                 self.args[ds] = df.sample(**{arg: self.sample}, random_state=0)
 
 
-class TrainValidationSplit(AbstractAnalysis):
+class ProblemTypeControl(AbstractAnalysis):
     """
-    This wrapper splits `train_data` into training and validation sets stored in `train_data` and `val_data` for the wrapped analyses.
-    The split is performed for datasets in `args` and passed to all `children` during `fit` call shadowing outer parameters.
-
+    Helper component to control problem type. Autodetect if `problem_type = 'auto'`.
 
     Parameters
     ----------
     problem_type: str, default = 'auto'
         problem type to use. Valid problem_type values include ['auto', 'binary', 'multiclass', 'regression', 'quantile', 'softclass']
         auto means it will be Auto-detected using AutoGluon methods.
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: Optional[List[AbstractAnalysis]], default None
+        wrapped analyses; these will receive sampled `args` during `fit` call
+    kwargs
+    """
+
+    def __init__(
+        self,
+        problem_type: str = "auto",
+        parent: Optional[AbstractAnalysis] = None,
+        children: Optional[List[AbstractAnalysis]] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(parent, children, **kwargs)
+        valid_problem_types = ["auto"] + PROBLEM_TYPES_REGRESSION + PROBLEM_TYPES_CLASSIFICATION
+        assert problem_type in valid_problem_types, f"Valid problem_type values include {valid_problem_types}"
+        self.problem_type = problem_type
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return self.all_keys_must_be_present(args, "train_data", "label")
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
+        if self.problem_type == "auto":
+            state.problem_type = infer_problem_type(args.train_data[args.label], silent=True)
+        else:
+            state.problem_type = self.problem_type
+
+
+class TrainValidationSplit(AbstractAnalysis):
+    """
+    This wrapper splits `train_data` into training and validation sets stored in `train_data` and `val_data` for the wrapped analyses.
+    The split is performed for datasets in `args` and passed to all `children` during `fit` call shadowing outer parameters.
+
+    This component requires :py:class:`~autogluon.eda.visualization.dataset.ProblemTypeControl` present in the analysis call to set `problem_type`.
+
+    Parameters
+    ----------
     val_size: float, default = 0.3
         fraction of training set to be assigned as validation set during the split.
     parent: Optional[AbstractAnalysis], default = None
@@ -109,12 +154,14 @@ class TrainValidationSplit(AbstractAnalysis):
     >>> df_train = pd.DataFrame(np.random.randint(0, 100, size=(100, 4)), columns=list("ABCD"))
     >>> analysis = BaseAnalysis(train_data=df_train, label="D", children=[
     >>>         Namespace(namespace="ns_val_split_specified", children=[
+    >>>             ProblemTypeControl(),
     >>>             TrainValidationSplit(val_pct=0.4, children=[
     >>>                 # This analysis sees 60/40 split of df_train between train_data and val_data
     >>>                 SomeAnalysis()
     >>>             ])
     >>>         ]),
     >>>         Namespace(namespace="ns_val_split_default", children=[
+    >>>             ProblemTypeControl(),
     >>>             TrainValidationSplit(children=[
     >>>                 # This analysis sees 70/30 split (default) of df_train between train_data and val_data
     >>>                 SomeAnalysis()
@@ -129,12 +176,16 @@ class TrainValidationSplit(AbstractAnalysis):
     >>>
     >>> state = analysis.fit()
     >>>
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.visualization.dataset.ProblemTypeControl`
+
     """
 
     def __init__(
         self,
         val_size: float = 0.3,
-        problem_type: str = "auto",
         parent: Optional[AbstractAnalysis] = None,
         children: Optional[List[AbstractAnalysis]] = None,
         **kwargs,
@@ -144,23 +195,15 @@ class TrainValidationSplit(AbstractAnalysis):
         assert 0 < val_size < 1.0, "val_size must be between 0 and 1"
         self.val_size = val_size
 
-        valid_problem_types = ["auto"] + PROBLEM_TYPES_REGRESSION + PROBLEM_TYPES_CLASSIFICATION
-        assert problem_type in valid_problem_types, f"Valid problem_type values include {valid_problem_types}"
-        self.problem_type = problem_type
-
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
-        return self.all_keys_must_be_present(args, "train_data", "label")
+        return self.all_keys_must_be_present(state, "problem_type")
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
-        problem_type = self.problem_type
-        if problem_type == "auto":
-            problem_type = infer_problem_type(args.train_data[args.label], silent=True)
         train_data, val_data = generate_train_test_split_combined(
-            args.train_data, args.label, problem_type, test_size=self.val_size, **self.args
+            args.train_data, args.label, state.problem_type, test_size=self.val_size, **self.args
         )
         self.args["train_data"] = train_data
         self.args["val_data"] = val_data
-        state["problem_type"] = problem_type
 
 
 class DatasetSummary(AbstractAnalysis):
@@ -353,3 +396,79 @@ class SpecialTypesAnalysis(AbstractAnalysis):
         for col, types in special_types.items():
             result[col] = ", ".join(sorted(types))
         return result
+
+
+class LabelInsightsAnalysis(AbstractAnalysis):
+    def __init__(
+        self,
+        problem_type: str = "auto",
+        low_cardinality_classes_threshold: int = 50,
+        regression_ood_threshold: float = 0.01,
+        parent: Optional[AbstractAnalysis] = None,
+        children: Optional[List[AbstractAnalysis]] = None,
+        state: Optional[AnalysisState] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(parent, children, state, **kwargs)
+        assert low_cardinality_classes_threshold > 0
+        self.low_cardinality_classes_threshold = low_cardinality_classes_threshold
+
+        valid_problem_types = ["auto"] + PROBLEM_TYPES_REGRESSION + PROBLEM_TYPES_CLASSIFICATION
+        assert problem_type in valid_problem_types, f"Valid problem_type values include {valid_problem_types}"
+        self.problem_type = problem_type
+
+        assert regression_ood_threshold >= 0, "regression_ood_threshold must be non-negative"
+        self.regression_ood_threshold = regression_ood_threshold
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return self.all_keys_must_be_present(args, "train_data", "label") and self.all_keys_must_be_present(
+            state, "problem_type"
+        )
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
+        label = args.label
+        train_data = args.train_data
+
+        s: Dict[str, Any] = {}
+
+        if state.problem_type in [BINARY, MULTICLASS]:
+            # Low-cardinality class
+            label_counts = train_data[label].value_counts()
+            label_counts = label_counts[label_counts < self.low_cardinality_classes_threshold].to_dict()
+            if len(label_counts) > 0:
+                s["low_cardinality_classes"] = {
+                    "instances": label_counts,
+                    "threshold": self.low_cardinality_classes_threshold,
+                }
+
+            # TODO: class imbalance
+
+            #  Classes not found in test_data
+            if self._test_data_with_label_present(args, label):
+                train_labels = set(train_data[label].unique())
+                test_labels = set(args.test_data[label].unique())
+                if sorted(train_labels) != sorted(test_labels):
+                    missing_classes = test_labels.difference(train_labels)
+                    s["not_present_in_train"] = missing_classes
+        elif (state.problem_type in [REGRESSION]) and self._test_data_with_label_present(args, label):
+            # Out-of-domain range detection
+            test_data = args.test_data
+            label_min, label_max = np.min(train_data[label]), np.max(train_data[label])
+            padding = np.abs(label_max - label_min) * self.regression_ood_threshold
+            df_ood = args.test_data[
+                (test_data[label] < label_min - padding) | (test_data[label] > label_max + padding)
+            ]
+            # from pdb import set_trace; set_trace()
+
+            if len(df_ood) > 0:
+                s["ood"] = {
+                    "count": len(df_ood),
+                    "train_range": [label_min, label_max],
+                    "test_range": [np.min(test_data[label]), np.max(test_data[label])],
+                    "threshold": self.regression_ood_threshold,
+                }
+        if len(s) > 0:
+            state.label_insights = s
+
+    def _test_data_with_label_present(self, args, label):
+        return (args.test_data is not None) and (label in args.test_data.columns)

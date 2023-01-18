@@ -3,11 +3,11 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 from pandas import DataFrame
 
-from ..state import AnalysisState, StateCheckMixin
+from ..state import AnalysisState
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
 
-__all__ = ["DatasetStatistics", "DatasetTypeMismatch"]
+__all__ = ["DatasetStatistics", "DatasetTypeMismatch", "LabelInsightsVisualization"]
 
 
 class DatasetStatistics(AbstractVisualization, JupyterMixin):
@@ -128,7 +128,7 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
         return df
 
 
-class DatasetTypeMismatch(AbstractVisualization, JupyterMixin, StateCheckMixin):
+class DatasetTypeMismatch(AbstractVisualization, JupyterMixin):
     """
     Display mismatch between raw types between datasets provided. In case if mismatch found, mark the row with a warning.
 
@@ -173,6 +173,52 @@ class DatasetTypeMismatch(AbstractVisualization, JupyterMixin, StateCheckMixin):
         warnings = df.eq(df.iloc[:, 0], axis=0)
         df["warnings"] = warnings.all(axis=1).map({True: "", False: "warning"})
         df.fillna("--", inplace=True)
+        df = df[df["warnings"] != ""]
 
-        self.render_header_if_needed(state, "Types warnings summary")
-        self.display_obj(df)
+        if len(df) > 0:
+            self.render_header_if_needed(state, "Types warnings summary")
+            with pd.option_context("display.max_rows", 100 if len(df) <= 100 else 20):
+                self.display_obj(df)
+
+
+class LabelInsightsVisualization(AbstractVisualization, JupyterMixin):
+    def __init__(self, headers: bool = False, namespace: Optional[str] = None, **kwargs) -> None:
+        super().__init__(namespace, **kwargs)
+        self.headers = headers
+
+    def can_handle(self, state: AnalysisState) -> bool:
+        return "label_insights" in state
+
+    def _render(self, state: AnalysisState) -> None:
+        insights = state.label_insights
+
+        md_lines = []
+        if insights.low_cardinality_classes is not None:
+            classes_info = "\n".join(
+                [f"   - class `{k}`: `{v}` instances" for k, v in insights.low_cardinality_classes.instances.items()]
+            )
+            md_lines.append(
+                f" - Low-cardinality classes are detected. It is recommended to have at least `{insights.low_cardinality_classes.threshold}` "
+                f"instances per class. Consider adding more data to cover the classes or remove such rows.\n"
+                f"{classes_info}"
+            )
+
+        if insights.not_present_in_train is not None:
+            md_lines.append(
+                f" - the following classes are found in `test_data`, but not present in `train_data`: "
+                f"`{'`, `'.join(map(str, insights.not_present_in_train))}`. "
+                f"Consider either removing the rows with classes not covered or adding more training data covering the classes."
+            )
+
+        if insights.ood is not None:
+            md_lines.append(
+                f" - Rows with out-of-domain labels were found. Consider removing rows with labels outside of this range or expand training data since "
+                f"some algorithms (i.e. trees) are unable to extrapolate beyond data present in the training data.\n"
+                f"   - `{insights.ood.count}` rows\n"
+                f"   - `train_data` values range `{insights.ood.train_range}`\n"
+                f"   - `test_data` values range `{insights.ood.test_range}`"
+            )
+
+        if len(md_lines) > 0:
+            self.render_header_if_needed(state, "Label insights")
+            self.render_markdown("\n".join(md_lines))

@@ -4,11 +4,17 @@ import pytest
 
 import autogluon.eda.auto as auto
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, R_OBJECT
-from autogluon.core.constants import MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.eda import AnalysisState
-from autogluon.eda.analysis import Namespace, Sampler, TrainValidationSplit
+from autogluon.eda.analysis import Namespace, ProblemTypeControl, Sampler, TrainValidationSplit
 from autogluon.eda.analysis.base import BaseAnalysis
-from autogluon.eda.analysis.dataset import DatasetSummary, RawTypesAnalysis, SpecialTypesAnalysis, VariableTypeAnalysis
+from autogluon.eda.analysis.dataset import (
+    DatasetSummary,
+    LabelInsightsAnalysis,
+    RawTypesAnalysis,
+    SpecialTypesAnalysis,
+    VariableTypeAnalysis,
+)
 
 
 class SomeAnalysis(BaseAnalysis):
@@ -70,11 +76,14 @@ def test_TrainValidationSplit():
         children=[
             Namespace(
                 namespace="ns_val_split_specified",
-                children=[TrainValidationSplit(val_size=0.4, children=[SomeAnalysis()])],
+                children=[ProblemTypeControl(), TrainValidationSplit(val_size=0.4, children=[SomeAnalysis()])],
             ),
             Namespace(
                 namespace="ns_val_split_default",
-                children=[TrainValidationSplit(problem_type=REGRESSION, children=[SomeAnalysis()])],
+                children=[
+                    ProblemTypeControl(problem_type=REGRESSION),
+                    TrainValidationSplit(children=[SomeAnalysis()]),
+                ],
             ),
             Namespace(namespace="ns_no_split", children=[SomeAnalysis()]),
         ],
@@ -187,3 +196,102 @@ def test_SpecialTypesAnalysis():
     expected_types = {"E": "text"}
     assert state.special_types.train_data == expected_types
     assert state.special_types.test_data == expected_types
+
+
+@pytest.mark.parametrize("threshold, is_warning_expected", [(None, False), (150, True)])
+def test_LabelInsightsAnalysis__classification__low_cardinality_classes(threshold, is_warning_expected):
+    df_train = pd.DataFrame({"label": [1] * 200 + [2] * 100})
+
+    if threshold is None:
+        label_insights = LabelInsightsAnalysis()
+    else:
+        label_insights = LabelInsightsAnalysis(low_cardinality_classes_threshold=threshold)
+
+    state = auto.analyze(
+        train_data=df_train,
+        test_data=df_train,  # same as train
+        label="label",
+        return_state=True,
+        anlz_facets=[
+            ProblemTypeControl(problem_type=BINARY),
+            label_insights,
+        ],
+    )
+
+    if is_warning_expected:
+        assert state == {
+            "label_insights": {"low_cardinality_classes": {"instances": {2: 100}, "threshold": 150}},
+            "problem_type": "binary",
+        }
+    else:
+        assert state == {"problem_type": "binary"}
+
+
+def test_LabelInsightsAnalysis__classification__not_present_in_train():
+    df_train = pd.DataFrame({"label": [1] * 200 + [2] * 100})
+    df_test = pd.DataFrame(  # classes 3 and 4 are not present in train
+        {"label": [1] * 20 + [2] * 40 + [3] * 20 + [4] * 20}
+    )
+
+    state = auto.analyze(
+        train_data=df_train,
+        test_data=df_test,
+        label="label",
+        return_state=True,
+        anlz_facets=[
+            ProblemTypeControl(problem_type=BINARY),
+            LabelInsightsAnalysis(),
+        ],
+    )
+
+    assert state == {"label_insights": {"not_present_in_train": {3, 4}}, "problem_type": "binary"}
+
+
+def test_LabelInsightsAnalysis__regression__no_ood():
+    df_train = pd.DataFrame({"label": np.arange(0, 100)})
+    df_test = pd.DataFrame({"label": np.arange(0, 100)})
+
+    state = auto.analyze(
+        train_data=df_train,
+        test_data=df_test,
+        label="label",
+        return_state=True,
+        anlz_facets=[
+            ProblemTypeControl(problem_type=REGRESSION),
+            LabelInsightsAnalysis(),
+        ],
+    )
+
+    assert state == {"problem_type": "regression"}
+
+
+@pytest.mark.parametrize("threshold, is_warning_expected", [(None, True), (0.02, False)])
+def test_LabelInsightsAnalysis__regression__ood(threshold, is_warning_expected):
+    df_train = pd.DataFrame({"label": np.arange(0, 1000)})
+    df_test = pd.DataFrame({"label": np.arange(-15, 1015)})
+
+    if threshold is None:
+        label_insights = LabelInsightsAnalysis()
+    else:
+        label_insights = LabelInsightsAnalysis(regression_ood_threshold=threshold)
+
+    state = auto.analyze(
+        train_data=df_train,
+        test_data=df_test,
+        label="label",
+        return_state=True,
+        anlz_facets=[
+            ProblemTypeControl(problem_type=REGRESSION),
+            label_insights,
+        ],
+    )
+
+    if is_warning_expected:
+        assert state == {
+            "label_insights": {
+                "ood": {"count": 12, "test_range": [-15, 1014], "threshold": 0.01, "train_range": [0, 999]}
+            },
+            "problem_type": "regression",
+        }
+    else:
+        assert state == {"problem_type": "regression"}

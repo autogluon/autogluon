@@ -14,11 +14,19 @@ from ..analysis import (
     DistributionFit,
     FeatureInteraction,
     MissingValuesAnalysis,
+    ProblemTypeControl,
     TrainValidationSplit,
     XShiftDetector,
 )
 from ..analysis.base import AbstractAnalysis, BaseAnalysis
-from ..analysis.dataset import DatasetSummary, RawTypesAnalysis, Sampler, SpecialTypesAnalysis, VariableTypeAnalysis
+from ..analysis.dataset import (
+    DatasetSummary,
+    LabelInsightsAnalysis,
+    RawTypesAnalysis,
+    Sampler,
+    SpecialTypesAnalysis,
+    VariableTypeAnalysis,
+)
 from ..analysis.interaction import FeatureDistanceAnalysis
 from ..state import is_key_present_in_state
 from ..visualization import (
@@ -28,6 +36,7 @@ from ..visualization import (
     DatasetTypeMismatch,
     FeatureImportance,
     FeatureInteractionVisualization,
+    LabelInsightsVisualization,
     MarkdownSectionComponent,
     ModelLeaderboard,
     PropertyRendererComponent,
@@ -180,8 +189,10 @@ def analyze_interaction(
     --------
     :py:class:`~autogluon.eda.analysis.interaction.FeatureInteraction`
     :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`
-
     """
+    assert (
+        (x is not None) or (y is not None) or (hue is not None)
+    ), "At least one of the parameters must be specified: x, y or hue"
     fig_args = get_empty_dict_if_none(fig_args).copy()
     if "figsize" not in fig_args:
         fig_args["figsize"] = (12, 6)
@@ -198,17 +209,18 @@ def analyze_interaction(
         FeatureInteraction(key=key, x=x, y=y, hue=hue),
     ]
 
-    x_type = state.variable_type.train_data[x]
-    if _is_single_numeric_variable(x, y, hue, x_type) and (fit_distributions is not False):
-        dists: Optional[List[str]]  # fit all
-        if fit_distributions is True:
-            dists = None
-        elif isinstance(fit_distributions, str):
-            dists = [fit_distributions]
-        else:
-            dists = fit_distributions
+    if x is not None:
+        x_type = state.variable_type.train_data[x]
+        if _is_single_numeric_variable(x, y, hue, x_type) and (fit_distributions is not False):
+            dists: Optional[List[str]]  # fit all
+            if fit_distributions is True:
+                dists = None
+            elif isinstance(fit_distributions, str):
+                dists = [fit_distributions]
+            else:
+                dists = fit_distributions
 
-        analysis_facets.append(DistributionFit(columns=x, keep_top_n=5, distributions_to_fit=dists))  # type: ignore # x is always present
+            analysis_facets.append(DistributionFit(columns=x, keep_top_n=5, distributions_to_fit=dists))  # type: ignore # x is always present
 
     _analysis_args = analysis_args.copy()
     _analysis_args.pop("state", None)
@@ -347,9 +359,9 @@ def quick_fit(
         state=state,
         return_state=return_state,
         anlz_facets=[
+            ProblemTypeControl(problem_type=problem_type),
             TrainValidationSplit(
                 val_size=val_size,
-                problem_type=problem_type,
                 children=[
                     AutoGluonModelQuickFit(
                         estimator_args={"path": path},
@@ -361,7 +373,7 @@ def quick_fit(
                         **fit_args,
                     ),
                 ],
-            )
+            ),
         ],
         viz_facets=[
             MarkdownSectionComponent(markdown=f"### Model Prediction for {label}"),
@@ -645,6 +657,8 @@ def get_empty_dict_if_none(value) -> dict:
 def target_analysis(
     train_data: pd.DataFrame,
     label: str,
+    test_data: Optional[pd.DataFrame] = None,
+    problem_type: str = "auto",
     sample: Union[None, int, float] = None,
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
@@ -661,8 +675,13 @@ def target_analysis(
     ----------
     train_data: Optional[DataFrame]
         training dataset
+    test_data: Optional[DataFrame], default = None
+        test dataset
     label: : Optional[str]
         target variable
+    problem_type: str, default = 'auto'
+        problem type to use. Valid problem_type values include ['auto', 'binary', 'multiclass', 'regression', 'quantile', 'softclass']
+        auto means it will be Auto-detected using AutoGluon methods.
     state: Union[None, dict, AnalysisState], default = None
         pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
     sample: Union[None, int, float], default = None
@@ -688,9 +707,16 @@ def target_analysis(
 
     assert label in train_data.columns, f"label `{label}` is not in `train_data` columns: `{train_data.columns}`"
 
+    if (test_data is not None) and (label in test_data.columns):
+        _test_data = test_data[[label]]
+    else:
+        _test_data = None
+
     # Basic variable information table
     state: AnalysisState = analyze(  # type: ignore # state is always present
         train_data=train_data[[label]],
+        test_data=_test_data,
+        label=label,
         state=state,
         sample=sample,
         return_state=True,
@@ -699,9 +725,16 @@ def target_analysis(
             MissingValuesAnalysis(),
             RawTypesAnalysis(),
             SpecialTypesAnalysis(),
+            ProblemTypeControl(problem_type=problem_type),
+            LabelInsightsAnalysis(),
         ],
         viz_facets=[
             MarkdownSectionComponent("## Target variable analysis"),
+            MarkdownSectionComponent(
+                "### Label Insights",
+                condition_fn=(lambda s: is_key_present_in_state(s, "label_insights")),
+            ),
+            LabelInsightsVisualization(),
             DatasetStatistics(),
         ],
     )
