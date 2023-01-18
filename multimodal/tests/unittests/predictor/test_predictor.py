@@ -6,6 +6,8 @@ import uuid
 
 import numpy.testing as npt
 import pytest
+import timm
+import transformers
 from omegaconf import OmegaConf
 from torch import nn
 
