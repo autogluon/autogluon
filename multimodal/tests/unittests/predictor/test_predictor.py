@@ -766,6 +766,9 @@ def test_fusion_model_dump():
     )
     hyperparameters = {
         "optimization.max_epochs": 1,
+        "model.names": ["timm_image", "hf_text", "fusion_mlp"],
+        "model.timm_image.checkpoint_name": "ghostnet_100",
+        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
     }
     predictor.fit(
         train_data=dataset.train_df,
@@ -779,4 +782,3 @@ def test_fusion_model_dump():
     timm_image_dir = f"{model_dump_path}/timm_image"
     assert os.path.exists(hf_text_dir) and (len(os.listdir(hf_text_dir)) > 2) == True
     assert os.path.exists(timm_image_dir) and (len(os.listdir(timm_image_dir)) == 2) == True
-    print("done")

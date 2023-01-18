@@ -28,7 +28,7 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.multimodal.models.fusion import MultimodalFusionMLP
+from autogluon.multimodal.models.fusion import MultimodalFusionMLP, MultimodalFusionTransformer
 from autogluon.multimodal.models.huggingface_text import HFAutoModelForTextPrediction
 from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePrediction
 from autogluon.multimodal.utils import save_result_df
@@ -2844,7 +2844,7 @@ class MultiModalPredictor:
             Path to directory where models and configs should be saved.
         """
         models = []
-        if isinstance(self._model, MultimodalFusionMLP) and isinstance(
+        if isinstance(self._model, (MultimodalFusionMLP, MultimodalFusionTransformer)) and isinstance(
             self._model.model, torch.nn.modules.container.ModuleList
         ):
             for per_model in self._model.model:
@@ -2880,31 +2880,31 @@ class MultiModalPredictor:
         path : str
             Path to directory where models and configs should be saved.
         """
-        models = {}
-        if isinstance(self._model, MultimodalFusionMLP) and isinstance(
+        models = []
+        if isinstance(self._model, (MultimodalFusionMLP, MultimodalFusionTransformer)) and isinstance(
             self._model.model, torch.nn.modules.container.ModuleList
         ):
             for per_model in self._model.model:
                 if isinstance(per_model, HFAutoModelForTextPrediction):
-                    models[per_model.prefix] = per_model
+                    models.append(per_model)
             if not models:
                 raise NotImplementedError("No HuggingFace text models available for dump.")
         elif isinstance(self._model, HFAutoModelForTextPrediction):
-            models[self._model.prefix] = self._model
+            models.append(self._model)
         else:
             raise NotImplementedError("No HuggingFace text models available for dump.")
 
         text_processors = self._data_processors.get(TEXT, {})
         tokenizers = {}
         for per_processor in text_processors:
-            if per_processor.prefix in models.keys():
-                tokenizers[per_processor.prefix] = per_processor.tokenizer
+            tokenizers[per_processor.prefix] = per_processor.tokenizer
 
-        for prefix in models.keys():
+        for model in models:
+            prefix = model.prefix
             subdir = path + "/" + prefix
             os.makedirs(subdir, exist_ok=True)
-            models[prefix].model.save_pretrained(subdir)
-            logger.info(f"Model {prefix} weights saved to {subdir}.")
+            model.model.save_pretrained(subdir)
+            logger.info(f"Model weights for {prefix} are saved to {subdir}.")
             if prefix in tokenizers.keys():
                 tokenizers[prefix].save_pretrained(subdir)
                 logger.info(f"Tokenizer {prefix} saved to {subdir}.")
