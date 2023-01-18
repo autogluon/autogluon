@@ -2844,17 +2844,17 @@ class MultiModalPredictor:
             Path to directory where models and configs should be saved.
         """
         models = []
+        # TODO: Add BaseMultimodalFusionModel class from which MultimodalFusionMLP and MultimodalFusionTransformer will inherit
         if isinstance(self._model, (MultimodalFusionMLP, MultimodalFusionTransformer)) and isinstance(
             self._model.model, torch.nn.modules.container.ModuleList
         ):
             for per_model in self._model.model:
                 if isinstance(per_model, TimmAutoModelForImagePrediction):
                     models.append(per_model)
-            if not models:
-                raise NotImplementedError("No TIMM models available for dump.")
         elif isinstance(self._model, TimmAutoModelForImagePrediction):
             models.append(self._model)
-        else:
+
+        if not models:
             raise NotImplementedError("No TIMM models available for dump.")
 
         for model in models:
@@ -2887,11 +2887,10 @@ class MultiModalPredictor:
             for per_model in self._model.model:
                 if isinstance(per_model, HFAutoModelForTextPrediction):
                     models.append(per_model)
-            if not models:
-                raise NotImplementedError("No HuggingFace text models available for dump.")
         elif isinstance(self._model, HFAutoModelForTextPrediction):
             models.append(self._model)
-        else:
+
+        if not models:
             raise NotImplementedError("No HuggingFace text models available for dump.")
 
         text_processors = self._data_processors.get(TEXT, {})
