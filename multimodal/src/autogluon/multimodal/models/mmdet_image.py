@@ -1,7 +1,7 @@
 import logging
 import os
-import warnings
 import time
+import warnings
 from typing import Optional
 
 import torch
@@ -123,8 +123,13 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         if not save_name:
             save_name = f"{self.checkpoint_name}_autogluon"
 
-        self._save_weights(save_path=os.path.join(save_dir, f"{save_name}.pth"))
-        self._save_configs(save_path=os.path.join(save_dir, f"{save_name}.py"))
+        weights_save_path = os.path.join(save_dir, f"{save_name}.pth")
+        configs_save_path = os.path.join(save_dir, f"{save_name}.py")
+
+        self._save_weights(save_path=weights_save_path)
+        self._save_configs(save_path=configs_save_path)
+
+        return weights_save_path, configs_save_path
 
     def _save_weights(self, save_path=None):
         if not save_path:

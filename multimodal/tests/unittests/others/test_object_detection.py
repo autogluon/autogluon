@@ -135,6 +135,39 @@ def test_mmdet_object_detection_inference_coco(checkpoint_name):
 
     pred = predictor.predict(test_path)
 
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "yolov3_mobilenetv2_320_300e_coco",
+    ],
+)
+def test_mmdet_object_detection_save_and_load(checkpoint_name):
+    data_dir = download_sample_dataset()
+
+    test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
+    # Init predictor
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": 1,
+        },
+        problem_type="object_detection",
+    )
+
+    pred = predictor.predict(test_path)
+
+    weights_save_path, configs_save_path = predictor._model.save_weights_and_configs()
+
+    new_predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": weights_save_path,
+            "model.mmdet_image.config_file": configs_save_path,
+            "env.num_gpus": 1,
+        },
+        problem_type="object_detection",
+    )
+    new_pred = new_predictor.predict(test_path)
+
 
 @pytest.mark.parametrize(
     "checkpoint_name",
