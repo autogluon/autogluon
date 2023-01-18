@@ -135,6 +135,7 @@ def test_mmdet_object_detection_inference_coco(checkpoint_name):
 
     pred = predictor.predict(test_path)
 
+
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
