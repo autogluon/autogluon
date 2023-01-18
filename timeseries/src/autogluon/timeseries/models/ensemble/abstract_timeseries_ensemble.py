@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
@@ -10,6 +10,11 @@ logger = logging.getLogger(__name__)
 
 class AbstractTimeSeriesEnsembleModel(AbstractTimeSeriesModel):
     """Abstract class for time series ensemble models."""
+
+    @property
+    def model_names(self) -> List[str]:
+        """Names of base models included in the ensemble."""
+        raise NotImplementedError
 
     def fit_ensemble(
         self,
