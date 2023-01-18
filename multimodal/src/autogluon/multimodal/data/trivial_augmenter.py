@@ -276,10 +276,6 @@ class TrivialAugment:
         return op.augment(scale, data)
 
     def augment_text(self, data):
-        import nlpaug.augmenter.word as naw
-
-        from ..utils.nlpaug import InsertPunctuation
-
         op = random.choice(self.all_transform)
 
         # use specified operation magnitude if available
@@ -290,7 +286,13 @@ class TrivialAugment:
 
         if op == "identity":
             return data
-        elif op == "syn_replacement":
+
+        # lazy import of nlpaug due to the speed issue. See more in https://github.com/autogluon/autogluon/issues/2706
+        import nlpaug.augmenter.word as naw
+
+        from ..utils.nlpaug import InsertPunctuation
+
+        if op == "syn_replacement":
             op = naw.SynonymAug(aug_src="wordnet", aug_p=scale, aug_max=None)
         elif op == "random_swap":
             op = naw.RandomWordAug(action="swap", aug_p=scale, aug_max=None)
