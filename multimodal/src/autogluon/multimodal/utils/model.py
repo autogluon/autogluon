@@ -285,7 +285,6 @@ def create_model(
         model = MMDetAutoModelForObjectDetection(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
-            num_classes=num_classes,
             classes=classes,
             pretrained=pretrained,
         )
