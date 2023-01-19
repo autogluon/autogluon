@@ -8,7 +8,7 @@ import pytest
 
 from autogluon.multimodal import MultiModalPredictor
 
-from ..others.unittest_datasets import PetFinderDataset
+from ..utils.unittest_datasets import PetFinderDataset
 from .test_predictor import verify_predictor_save_load
 
 

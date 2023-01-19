@@ -7,10 +7,10 @@ from ray import tune
 from autogluon.core.hpo.ray_tune_constants import SCHEDULER_PRESETS, SEARCHER_PRESETS
 from autogluon.multimodal import MultiModalPredictor
 
+from ..others.test_matcher import verify_matcher_save_load
 from ..predictor.test_predictor import verify_predictor_save_load
-from .test_matcher import verify_matcher_save_load
-from .unittest_datasets import IDChangeDetectionDataset, PetFinderDataset
-from .utils import get_home_dir
+from ..utils.unittest_datasets import IDChangeDetectionDataset, PetFinderDataset
+from ..utils.utils import get_home_dir
 
 
 @pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))

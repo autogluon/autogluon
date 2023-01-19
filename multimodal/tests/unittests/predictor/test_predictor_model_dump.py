@@ -6,7 +6,7 @@ import transformers
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils.misc import shopee_dataset
 
-from ..others.unittest_datasets import AEDataset, PetFinderDataset
+from ..utils.unittest_datasets import AEDataset, PetFinderDataset
 
 ALL_DATASETS = {
     "petfinder": PetFinderDataset(),

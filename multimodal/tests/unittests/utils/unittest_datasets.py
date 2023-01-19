@@ -7,7 +7,13 @@ from sklearn.model_selection import train_test_split
 from autogluon.multimodal.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.multimodal.utils import download
 
-from .utils import get_data_home_dir, get_repo_url, path_expander, path_to_bytearray_expander, protected_zip_extraction
+from ..utils.utils import (
+    get_data_home_dir,
+    get_repo_url,
+    path_expander,
+    path_to_bytearray_expander,
+    protected_zip_extraction,
+)
 
 
 class PetFinderDataset:
