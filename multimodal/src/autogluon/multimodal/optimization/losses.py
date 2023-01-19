@@ -390,12 +390,15 @@ class ReconstructionLoss:
         """
         batch_ = batch_[self.model.prefix]["logits"]
         loss = 0
+        norm_factor = 0
         for permodel in self.model.model:
             if hasattr(permodel, "categorical_key"):
                 for y_, y in zip(batch_["cat_out"], batch[permodel.categorical_key]):
                     loss += F.cross_entropy(y_, y.long())
+                    norm_factor += 1
             if hasattr(permodel, "numerical_key"):
                 y = batch[permodel.numerical_key]
                 y_ = batch_["num_out"]
                 loss += F.mse_loss(y_, y)
-        return loss
+                norm_factor += 1
+        return loss/norm_factor if norm_factor > 0 else 0
