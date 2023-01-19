@@ -118,6 +118,23 @@ predictions = predictor.predict(test_data)
 :::
 
 
+:::{dropdown} Time Series Forecasting
+:animate: fade-in-slide-down
+:color: primary
+
+Forecase future values of time series:
+
+```python
+from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
+
+data = TimeSeriesDataFrame('https://autogluon.s3.amazonaws.com/datasets/timeseries/m4_hourly/train.csv')
+
+predictor = TimeSeriesPredictor(target='target', prediction_length=48).fit(data)
+predictions = predictor.predict(data)
+```
+:::
+
+
 ## {octicon}`package` Installation
 
 ![](https://img.shields.io/pypi/pyversions/autogluon)
