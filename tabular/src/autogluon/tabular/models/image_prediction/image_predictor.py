@@ -28,6 +28,10 @@ class ImagePredictorModel(MultiModalPredictorModel):
         self._internal_feature_map = None
         self._dummy_pred_proba = None  # Dummy value to predict if image is NaN
 
+    @property
+    def _has_predict_proba(self):
+        return self.problem_type in [BINARY, MULTICLASS, SOFTCLASS]
+
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
@@ -86,6 +90,7 @@ class ImagePredictorModel(MultiModalPredictorModel):
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
+        pred_method = self.model.predict_proba if self._has_predict_proba else self.model.predict
         # TODO: Add option to crash if null is present for faster predict_proba
         null_indices = X['image'] == ''
         if null_indices.sum() > 0:
@@ -99,9 +104,9 @@ class ImagePredictorModel(MultiModalPredictorModel):
             null_indices_rows = list(null_indices[null_indices].index)
             non_null_indices_rows = list(null_indices[~null_indices].index)
             y_pred_proba[null_indices_rows] = self._dummy_pred_proba
-            y_pred_proba[non_null_indices_rows] = self.model.predict_proba(X, as_pandas=False)
+            y_pred_proba[non_null_indices_rows] = pred_method(X, as_pandas=False)
         else:
-            y_pred_proba = self.model.predict_proba(X, as_pandas=False)
+            y_pred_proba = pred_method(X, as_pandas=False)
         return self._convert_proba_to_unified_form(y_pred_proba)
 
     # TODO: Consider moving to AbstractModel or as a separate function
