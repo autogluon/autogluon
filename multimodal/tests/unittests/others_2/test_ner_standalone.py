@@ -9,7 +9,7 @@ import torch
 
 from autogluon.multimodal import MultiModalPredictor
 
-from .utils import get_home_dir
+from ..others.utils import get_home_dir
 
 
 def get_data():
