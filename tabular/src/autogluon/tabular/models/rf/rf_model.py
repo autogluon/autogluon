@@ -122,7 +122,10 @@ class RFModel(AbstractModel):
     def _estimate_memory_usage(self, X, **kwargs):
         params = self._get_model_params()
         n_estimators_final = params['n_estimators']
-        n_estimators_minimum = min(40, n_estimators_final)
+        if isinstance(n_estimators_final, int):
+            n_estimators_minimum = min(40, n_estimators_final)
+        else:  # if search space
+            n_estimators_minimum = 40
         num_trees_per_estimator = self._get_num_trees_per_estimator()
         bytes_per_estimator = num_trees_per_estimator * len(X) / 60000 * 1e6  # Underestimates by 3x on ExtraTrees
         expected_min_memory_usage = bytes_per_estimator * n_estimators_minimum
