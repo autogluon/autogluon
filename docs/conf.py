@@ -5,8 +5,8 @@ sys.path.insert(0, '.')
 import nbformat
 
 project = "AutoGluon"
-release = '0.6.0'
-copyright = "2022, All authors. Licensed under Apache 2.0."
+release = '0.6.2'
+copyright = "2023, All authors. Licensed under Apache 2.0."
 author = "AutoGluon contributors"
 
 extensions = [
