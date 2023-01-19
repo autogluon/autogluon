@@ -140,9 +140,6 @@ def tutorial_script_for_finetune_yolox_pothole_in_coco_format():
 
 
 def tutorial_script_for_finetune_yoloxo365_pothole_in_coco_format():
-    temp = MultiModalPredictor.load("/media/code/autogluon/examples/automm/object_detection/AutogluonModels/ag-20230104_201843")
-    temp._model.save(save_path="./temp_yoloxl365.pth")
-
     zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/dataset/pothole.zip"
     download_dir = "./pothole"
 
