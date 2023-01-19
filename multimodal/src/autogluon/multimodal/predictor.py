@@ -12,7 +12,7 @@ import shutil
 import sys
 import time
 import warnings
-from collections import OrderedDict, namedtuple
+from collections import namedtuple
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Dict, List, Optional, Union
@@ -28,6 +28,9 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
+from autogluon.multimodal.models.fusion import MultimodalFusionMLP, MultimodalFusionTransformer
+from autogluon.multimodal.models.huggingface_text import HFAutoModelForTextPrediction
+from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePrediction
 from autogluon.multimodal.utils import save_result_df
 
 from . import version as ag_version
@@ -51,6 +54,7 @@ from .constants import (
     FEW_SHOT,
     FEW_SHOT_TEXT_CLASSIFICATION,
     GREEDY_SOUP,
+    HF_TEXT,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
     IMAGE_SIMILARITY,
@@ -121,13 +125,12 @@ from .utils import (
     assign_feature_column_names,
     average_checkpoints,
     check_if_packages_installed,
-    cocoeval,
-    compute_inference_batch_size,
     compute_num_gpus,
     compute_score,
     create_fusion_data_processors,
     create_fusion_model,
     data_to_df,
+    evaluate_coco,
     extract_from_output,
     filter_search_space,
     from_coco_or_voc,
@@ -158,6 +161,7 @@ from .utils import (
     process_batch,
     save_pretrained_model_configs,
     save_text_tokenizers,
+    save_timm_config,
     select_model,
     setup_save_path,
     split_train_tuning_data,
@@ -1771,73 +1775,6 @@ class MultiModalPredictor:
 
         return data, df_preprocessor, data_processors
 
-    def evaluate_coco(
-        self,
-        anno_file_or_df: str,
-        metrics: str,
-        return_pred: Optional[bool] = False,
-        seed: Optional[int] = 123,
-        eval_tool: Optional[str] = None,
-    ):
-        """
-        Evaluate object detection model on a test dataset in COCO format.
-
-        Parameters
-        ----------
-        anno_file
-            The annotation file in COCO format
-        return_pred
-            Whether to return the prediction result of each row.
-        eval_tool
-            The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
-        """
-        # TODO: support saving results to file
-        self._verify_inference_ready()
-        assert self._problem_type == OBJECT_DETECTION, (
-            f"predictor.evaluate_coco() is only supported when problem_type is {OBJECT_DETECTION}. "
-            f"Received problem_type={self._problem_type}."
-        )
-        # TODO: refactor this into evaluate()
-        if isinstance(anno_file_or_df, str):
-            anno_file = anno_file_or_df
-            data = from_coco_or_voc(
-                anno_file, "test"
-            )  # TODO: maybe remove default splits hardcoding (only used in VOC)
-            if os.path.isdir(anno_file):
-                eval_tool = "torchmetrics"  # we can only use torchmetrics for VOC format evaluation.
-        else:
-            # during validation, it will call evaluate with df as input
-            anno_file = self._detection_anno_train
-            data = anno_file_or_df
-
-        outputs = predict(
-            predictor=self,
-            data=data,
-            requires_label=True,
-            seed=seed,
-        )  # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
-
-        # Cache prediction results as COCO format # TODO: refactor this
-        self._save_path = setup_save_path(
-            old_save_path=self._save_path,
-            warn_if_exist=False,
-        )
-        cocoeval_cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
-
-        eval_results = cocoeval(
-            outputs=outputs,
-            data=data,
-            anno_file=anno_file,
-            cache_path=cocoeval_cache_path,
-            metrics=metrics,
-            tool=eval_tool,
-        )
-
-        if return_pred:
-            return eval_results, outputs
-        else:
-            return eval_results
-
     def set_num_gpus(self, num_gpus):
         assert isinstance(num_gpus, int)
         self._config.env.num_gpus = num_gpus
@@ -1927,8 +1864,13 @@ class MultiModalPredictor:
                 return NotImplementedError(
                     f"Current problem type {self._problem_type} does not support realtime predict."
                 )
-            return self.evaluate_coco(
-                anno_file_or_df=data, metrics=metrics, return_pred=return_pred, seed=seed, eval_tool=eval_tool
+            return evaluate_coco(
+                predictor=self,
+                anno_file_or_df=data,
+                metrics=metrics,
+                return_pred=return_pred,
+                seed=seed,
+                eval_tool=eval_tool,
             )
 
         if self._problem_type == NER:
@@ -2823,6 +2765,85 @@ class MultiModalPredictor:
         predictor._model_postprocess_fn = model_postprocess_fn
 
         return predictor
+
+    def dump_timm_image(
+        self,
+        path: str,
+    ):
+        """
+        Save TIMM image model weights and config to local directory.
+        Model weights are saved in file `pytorch_model.bin`;
+        Configs are saved in file `config.json`
+
+        Parameters
+        ----------
+        path : str
+            Path to directory where models and configs should be saved.
+        """
+        models = []
+        # TODO: Add BaseMultimodalFusionModel class from which MultimodalFusionMLP and MultimodalFusionTransformer will inherit
+        if isinstance(self._model, (MultimodalFusionMLP, MultimodalFusionTransformer)) and isinstance(
+            self._model.model, torch.nn.modules.container.ModuleList
+        ):
+            for per_model in self._model.model:
+                if isinstance(per_model, TimmAutoModelForImagePrediction):
+                    models.append(per_model)
+        elif isinstance(self._model, TimmAutoModelForImagePrediction):
+            models.append(self._model)
+
+        if not models:
+            raise NotImplementedError("No TIMM models available for dump.")
+
+        for model in models:
+            subdir = path + "/" + model.prefix
+            os.makedirs(subdir, exist_ok=True)
+            weights_path = f"{subdir}/pytorch_model.bin"
+            torch.save(model.model.state_dict(), weights_path)
+            logger.info(f"Model {model.prefix} weights saved to {weights_path}.")
+            config_path = f"{subdir}/config.json"
+            save_timm_config(model, config_path)
+
+    def dump_hf_text(
+        self,
+        path: str,
+    ):
+        """
+        Save HuggingFace Text model weights, config and tokenizers to local directory.
+        Model weights are saved in file `pytorch_model.bin`;
+        Configs are saved in file `config.json`
+
+        Parameters
+        ----------
+        path : str
+            Path to directory where models and configs should be saved.
+        """
+        models = []
+        if isinstance(self._model, (MultimodalFusionMLP, MultimodalFusionTransformer)) and isinstance(
+            self._model.model, torch.nn.modules.container.ModuleList
+        ):
+            for per_model in self._model.model:
+                if isinstance(per_model, HFAutoModelForTextPrediction):
+                    models.append(per_model)
+        elif isinstance(self._model, HFAutoModelForTextPrediction):
+            models.append(self._model)
+
+        if not models:
+            raise NotImplementedError("No HuggingFace text models available for dump.")
+
+        text_processors = self._data_processors.get(TEXT, {})
+        tokenizers = {}
+        for per_processor in text_processors:
+            tokenizers[per_processor.prefix] = per_processor.tokenizer
+
+        for model in models:
+            prefix = model.prefix
+            subdir = path + "/" + prefix
+            os.makedirs(subdir, exist_ok=True)
+            model.model.save_pretrained(subdir)
+            logger.info(f"Model weights for {prefix} are saved to {subdir}.")
+            if prefix in tokenizers.keys():
+                tokenizers[prefix].save_pretrained(subdir)
+                logger.info(f"Tokenizer {prefix} saved to {subdir}.")
 
     @property
     def class_labels(self):

@@ -7,7 +7,7 @@ import autogluon.multimodal
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils import download
 
-from .utils import get_home_dir
+from ..utils.utils import get_home_dir
 
 
 def download_ecommerce():

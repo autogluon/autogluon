@@ -548,7 +548,7 @@ def get_hf_config_and_model(
     Parameters
     ----------
     checkpoint_name
-        A model checkpoint name.
+        A model checkpoint name or a local path that saves a custom checkpoint.
     pretrained
          Whether using the pretrained weights. If pretrained=True, download the pretrained model.
     low_cpu_mem_usage

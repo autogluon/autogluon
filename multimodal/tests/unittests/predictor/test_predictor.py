@@ -6,6 +6,8 @@ import uuid
 
 import numpy.testing as npt
 import pytest
+import timm
+import transformers
 from omegaconf import OmegaConf
 from torch import nn
 
@@ -31,8 +33,8 @@ from autogluon.multimodal.constants import (
 from autogluon.multimodal.utils import modify_duplicate_model_names
 from autogluon.multimodal.utils.misc import shopee_dataset
 
-from ..others.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
-from ..others.utils import get_home_dir
+from ..utils.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
+from ..utils.utils import get_home_dir
 
 ALL_DATASETS = {
     "petfinder": PetFinderDataset(),
