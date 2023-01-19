@@ -23,8 +23,8 @@ from autogluon.multimodal.constants import (
     UNIFORM_SOUP,
 )
 
-from ..others.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
 from ..predictor.test_predictor import verify_predictor_save_load
+from ..utils.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
 
 ALL_DATASETS = {
     "petfinder": PetFinderDataset,

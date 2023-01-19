@@ -8,9 +8,9 @@ import pytest
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils import download
 
-from ..others.unittest_datasets import AmazonReviewSentimentCrossLingualDataset
-from ..others.utils import get_home_dir, protected_zip_extraction
 from ..predictor.test_predictor import verify_predictor_save_load
+from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset
+from ..utils.utils import get_home_dir, protected_zip_extraction
 
 
 @pytest.mark.parametrize("cls", [MultiModalPredictor])
