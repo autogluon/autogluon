@@ -173,7 +173,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py"),
             },
             "yolox_l_objects365": {
-                "url": "/media/code/autogluon/examples/automm/object_detection/temp_yoloxl365.pth",
+                "url": "https://automl-mm-bench.s3.amazonaws.com/object_detection/checkpoints/yolox/yolox_l_objects365_temp.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py"),
             },
         }

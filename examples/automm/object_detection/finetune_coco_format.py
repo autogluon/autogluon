@@ -156,7 +156,7 @@ def tutorial_script_for_finetune_yoloxo365_pothole_in_coco_format():
 
     predictor = MultiModalPredictor(
         hyperparameters={
-            "model.mmdet_image.checkpoint_name": "yoloxl365",
+            "model.mmdet_image.checkpoint_name": "yolox_l_objects365",
             "env.num_gpus": num_gpus,
             "optimization.val_metric": "map",
         },
@@ -333,4 +333,4 @@ def main():
 
 
 if __name__ == "__main__":
-    tutorial_script_for_finetune_yoloxo365_pothole_in_coco_format()
+    main()
