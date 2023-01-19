@@ -169,6 +169,8 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
     )
     new_pred = new_predictor.predict(test_path)
 
+    assert abs(pred["bboxes"][0][0]['score'] - new_pred["bboxes"][0][0]['score']) < 1e-4
+
 
 @pytest.mark.parametrize(
     "checkpoint_name",

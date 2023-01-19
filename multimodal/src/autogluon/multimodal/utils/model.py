@@ -285,7 +285,7 @@ def create_model(
         model = MMDetAutoModelForObjectDetection(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
-            config_file=OmegaConf.select(model_config, "config_file", default=None),
+            config_file=model_config.config_file,
             classes=classes,
             pretrained=pretrained,
         )

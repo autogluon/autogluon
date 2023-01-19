@@ -63,6 +63,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         super().__init__()
         self.prefix = prefix
         self.pretrained = pretrained
+        self.checkpoint_name = checkpoint_name
+        self.config_file = config_file
 
         # TODO: Config only init (without checkpoint)
 
@@ -117,7 +119,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
-    def save_weights_and_configs(self, save_dir: str, save_name: str):
+    def save_weights_and_configs(self, save_dir: str = None, save_name: str = None):
         if not save_dir:
             save_dir = "./"
         if not save_name:
@@ -135,7 +137,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         if not save_path:
             save_path = f"./{self.checkpoint_name}_autogluon.pth"
 
-        torch.save_weights({"state_dict": self.model.state_dict()}, save_path)
+        torch.save({"state_dict": self.model.state_dict(), "meta": {"CLASSES": self.model.CLASSES}}, save_path)
 
     def _save_configs(self, save_path=None):
         if not save_path:
@@ -188,30 +190,36 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 # download config and checkpoint files using openmim
                 checkpoint_file = mimdownload(package="mmdet", configs=[checkpoint_name], dest_root=".")[0]
 
-        if not os.path.isfile(config_file):
-            if checkpoint_name in AG_CUSTOM_MODELS:
-                config_file = AG_CUSTOM_MODELS[checkpoint_name]["config_file"]
-            else:
+        if config_file:
+            if not os.path.isfile(config_file):
+                if checkpoint_name in AG_CUSTOM_MODELS:
+                    config_file = AG_CUSTOM_MODELS[checkpoint_name]["config_file"]
+                else:
+                    raise ValueError(f"Invalid checkpoint_name ({checkpoint_name}) or config_file ({config_file}): ")
+        else:
+            try:
                 # download config and checkpoint files using openmim
                 mimdownload(package="mmdet", configs=[checkpoint_name], dest_root=".")
                 config_file = checkpoint_name + ".py"
+            except Exception as e:
+                print(e)
+                raise ValueError(f"Invalid checkpoint_name ({checkpoint_name}) or config_file ({config_file}): ")
 
         self.checkpoint_name = checkpoint_name
         self.checkpoint_file = checkpoint_file
         self.config_file = config_file
 
-    def _load_config(self, config_file):
+    def _load_config(self):
         # read config files
         assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-        if isinstance(config_file, str):
-            config = mmcv.Config.fromfile(config_file)
+        if isinstance(self.config_file, str):
+            self.config = mmcv.Config.fromfile(self.config_file)
         else:
-            if not isinstance(config_file, dict):
+            if not isinstance(self.config_file, dict):
                 raise ValueError(
-                    f"The variable config_file has type {type(config_file)}."
+                    f"The variable config_file has type {type(self.config_file)}."
                     f"Detection Model's config_file should either be a str of file path, or a dict as config."
                 )
-        return config
 
     @property
     def image_key(self):
