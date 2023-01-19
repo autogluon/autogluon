@@ -3,9 +3,9 @@ import shutil
 
 from autogluon.multimodal import MultiModalPredictor
 
-from ..predictor.test_predictor import verify_predictor_save_load
 from ..others.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
 from ..others.utils import get_home_dir
+from ..predictor.test_predictor import verify_predictor_save_load
 
 ALL_DATASETS = {
     "petfinder": PetFinderDataset,
