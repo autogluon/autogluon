@@ -134,9 +134,11 @@ AutoGluon supports Linux, MacOS, and Windows. See {doc}`./install` for detailed 
 
 
 ```{toctree}
-:hidden:
-:caption: Get Started
-:maxdepth: 1
+---
+caption: Get Started
+maxdepth: 1
+hidden:
+---
 
 install
 tutorials/tabular/tabular_quick_start
@@ -145,9 +147,23 @@ tutorials/timeseries/timeseries_quick_start
 ```
 
 ```{toctree}
-:caption: API
-:hidden:
-:maxdepth: 2
+---
+caption: Tutorials
+maxdepth: 3
+hidden:
+---
+
+tutorials/tabular/index
+tutorials/multimodal/index
+tutorials/timeseries/index
+```
+
+```{toctree}
+---
+caption: API
+maxdepth: 1
+hidden:
+---
 
 api/_autogen/autogluon.tabular.TabularDataset
 api/_autogen/autogluon.tabular.TabularPredictor
