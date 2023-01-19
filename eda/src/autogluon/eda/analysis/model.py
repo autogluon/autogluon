@@ -208,6 +208,8 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
         y_true = val_data[label]
         y_pred = predictor.predict(val_data)
 
+        highest_error = None
+        undecided = None
         if predictor.problem_type in [BINARY, MULTICLASS]:
             y_proba = predictor.predict_proba(val_data)
             highest_error = y_proba[y_true != y_pred].max(axis=1)
@@ -230,23 +232,23 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
                 .join(highest_error, how="inner")
                 .sort_values(by="error", ascending=False)
             )
-            undecided = None
 
         importance = predictor.feature_importance(val_data.reset_index(drop=True), silent=True)
         leaderboard = predictor.leaderboard(val_data, silent=True)
 
-        labels = y_true.unique()
+        labels = predictor.class_labels
         s = {
             "problem_type": predictor.problem_type,
             "y_true": y_true,
             "y_pred": y_pred,
-            "highest_error": highest_error,
             "importance": importance,
             "leaderboard": leaderboard,
             "labels": labels,
         }
         if undecided is not None:
             s["undecided"] = undecided
+        if highest_error is not None:
+            s["highest_error"] = highest_error
 
         if problem_type in [BINARY, MULTICLASS]:
             cm = confusion_matrix(y_true, y_pred, normalize=self.normalize, labels=labels)

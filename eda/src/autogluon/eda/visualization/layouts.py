@@ -11,8 +11,8 @@ __all__ = [
     "MarkdownSectionComponent",
     "SimpleVerticalLinearLayout",
     "SimpleHorizontalLayout",
-    "TabLayout",
     "PropertyRendererComponent",
+    "TabLayout",
 ]
 
 from ..state import is_key_present_in_state
