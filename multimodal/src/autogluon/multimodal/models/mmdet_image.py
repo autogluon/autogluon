@@ -63,6 +63,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         super().__init__()
         self.prefix = prefix
         self.pretrained = pretrained
+        self.checkpoint = None
         self.checkpoint_name = checkpoint_name
         self.config_file = config_file
 
@@ -107,7 +108,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         if self.classes:
             self.model.CLASSES = self.classes
         else:
-            if "CLASSES" in self.checkpoint.get("meta", {}):
+            if self.checkpoint and "CLASSES" in self.checkpoint.get("meta", {}):
                 warnings.simplefilter("once")
                 warnings.warn(
                     f"Using classes provided in checkpoints: {self.checkpoint['meta']['CLASSES']}. Provide data while init MultiModalPredictor if this is not expected."
