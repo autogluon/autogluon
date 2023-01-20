@@ -5,14 +5,12 @@ import pandas as pd
 
 from autogluon.common.features.types import R_OBJECT, S_IMAGE_PATH
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
-from typing import Optional
 
 from ..automm.automm_model import MultiModalPredictorModel
 
 logger = logging.getLogger(__name__)
 
 
-# FIXME: Avoid hard-coding 'image' column name
 # TODO: Handle multiple image columns?
 # TODO: Handle multiple images in a single image column?
 # TODO: Consider fully replacing with MultiModalPredictorModel
@@ -26,8 +24,8 @@ class ImagePredictorModel(MultiModalPredictorModel):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._internal_feature_map = None
         self._dummy_pred_proba = None  # Dummy value to predict if image is NaN
+        self._image_col_name = None
 
     @property
     def _has_predict_proba(self):
@@ -55,13 +53,12 @@ class ImagePredictorModel(MultiModalPredictorModel):
         return default_ag_args
 
     def preprocess_fit(self, X, y, X_val=None, y_val=None, **kwargs):
+        X, y, X_val, y_val = super().preprocess_fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
         X_features = list(X.columns)
         if len(X_features) != 1:
             raise AssertionError(f'ImagePredictorModel only supports one image feature, but {len(X_features)} were given: {X_features}')
-        if X_features[0] != 'image':
-            self._internal_feature_map = {X_features[0]: 'image'}
-        X, y, X_val, y_val = super().preprocess_fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
-        null_indices = X['image'] == ''
+        self._image_col_name = X_features[0]
+        null_indices = X[self._image_col_name] == ''
 
         # TODO: Consider some kind of weighting of the two options so there isn't a harsh cutoff at 50
         # FIXME: What if all rows in a class are null? Will probably crash.
@@ -76,82 +73,25 @@ class ImagePredictorModel(MultiModalPredictorModel):
             y = y[~null_indices]
 
         if X_val is not None:
-            null_indices_val = X_val['image'] == ''
+            null_indices_val = X_val[self._image_col_name] == ''
             if null_indices_val.sum() > 0:
                 X_val = X_val[~null_indices_val]
                 y_val = y_val[~null_indices_val]
 
         return X, y, X_val, y_val
-    
-    def _fit(
-        self,
-        X: pd.DataFrame,
-        y: pd.Series,
-        X_val: Optional[pd.DataFrame] = None,
-        y_val: Optional[pd.Series] = None,
-        time_limit: Optional[int] = None,
-        sample_weight=None,
-        **kwargs
-    ):
-        """The internal fit function
-
-        Parameters
-        ----------
-        X
-            Features of the training dataset
-        y
-            Labels of the training dataset
-        X_val
-            Features of the validation dataset
-        y_val
-            Labels of the validation dataset
-        time_limit
-            The time limits for the fit function
-        sample_weight
-            The weights of the samples
-        kwargs
-            Other keyword arguments
-
-        """
-        type_map_special = self.feature_metadata.get_type_map_special()
-        image_columns = []
-        for col, special_type in type_map_special.items():
-            if special_type == ['image_path']:
-                image_columns.append(col)
-        assert len(image_columns) == 1, f'ImagePredictorModel only supports one image feature, but {len(image_columns)} were given'
-        image_column = image_columns[0]
-        X = X.loc[:, [image_column]]
-        if X_val is not None:
-            X_val = X_val.loc[:, [image_column]]
-        
-        super()._fit(
-            X=X,
-            y=y,
-            X_val=X_val,
-            y_val=y_val,
-            time_limit=time_limit,
-            sample_weight=sample_weight,
-            **kwargs
-        )
-
-    def _preprocess(self, X, **kwargs):
-        X = super()._preprocess(X, **kwargs)
-        if self._internal_feature_map:
-            X = X.rename(columns=self._internal_feature_map)
-        return X
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
         pred_method = self.model.predict_proba if self._has_predict_proba else self.model.predict
         # TODO: Add option to crash if null is present for faster predict_proba
-        null_indices = X['image'] == ''
+        null_indices = X[self._image_col_name] == ''
         if null_indices.sum() > 0:
             if self.num_classes is None:
                 y_pred_proba = np.zeros(len(X))
             else:
                 y_pred_proba = np.zeros((len(X), self.num_classes))
             X = X.reset_index(drop=True)
-            null_indices = X['image'] == ''
+            null_indices = X[self._image_col_name] == ''
             X = X[~null_indices]
             null_indices_rows = list(null_indices[null_indices].index)
             non_null_indices_rows = list(null_indices[~null_indices].index)
