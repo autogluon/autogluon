@@ -330,4 +330,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    tutorial_script_for_finetune_yoloxo365_pothole_in_coco_format()
