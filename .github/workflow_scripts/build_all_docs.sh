@@ -64,7 +64,7 @@ sed -i -e "s@###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###@$other_doc_version_text@
 sed -i -e "s@###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###@$other_doc_version_branch@g" docs/conf.py
 
 shopt -s extglob
-# rm -rf ./docs/tutorials/!(index.rst)
+rm -rf ./docs/tutorials/!(index.md)
 cd docs && sphinx-autogen api/*.rst -t _templates/autosummary && sphinx-build -b html . _build/html/
 
 COMMAND_EXIT_CODE=$?
