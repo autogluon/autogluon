@@ -162,7 +162,6 @@ from .utils import (
     process_batch,
     save_pretrained_model_configs,
     save_text_tokenizers,
-    save_timm_config,
     select_model,
     setup_save_path,
     split_train_tuning_data,
