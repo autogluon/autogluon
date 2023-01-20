@@ -13,7 +13,7 @@ from gluonts.model.prophet import PROPHET_IS_INSTALLED
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel, ETSModel
-from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesEnsembleWrapper
+from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
 from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
 from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
@@ -378,7 +378,7 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
 
     for m in model_names:
         loaded_model = loaded_trainer.load_model(m)
-        if isinstance(loaded_model, TimeSeriesEnsembleWrapper):
+        if isinstance(loaded_model, TimeSeriesGreedyEnsemble):
             continue
 
         predictions = loaded_model.predict(DUMMY_TS_DATAFRAME)
@@ -397,8 +397,10 @@ def test_given_base_model_fails_when_trainer_predicts_then_weighted_ensemble_can
 ):
     trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
     trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
-    ensemble = TimeSeriesEnsembleWrapper(weights={"Naive": 0.5, "SeasonalNaive": 0.5}, name="WeightedEnsemble")
+    ensemble = TimeSeriesGreedyEnsemble(name="WeightedEnsemble")
+    ensemble.model_to_weight = {"Naive": 0.5, "SeasonalNaive": 0.5}
     trainer._add_model(ensemble, base_models=["Naive", "SeasonalNaive"])
+    trainer.save_model(model=ensemble)
 
     with mock.patch(f"autogluon.timeseries.models.local.naive.{failing_model}.predict") as fail_predict:
         fail_predict.side_effect = RuntimeError("Numerical error")
@@ -411,8 +413,10 @@ def test_given_base_model_fails_when_trainer_predicts_then_weighted_ensemble_can
 def test_given_base_model_fails_when_trainer_scores_then_weighted_ensemble_can_score(temp_model_path, failing_model):
     trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
     trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
-    ensemble = TimeSeriesEnsembleWrapper(weights={"Naive": 0.5, "SeasonalNaive": 0.5}, name="WeightedEnsemble")
+    ensemble = TimeSeriesGreedyEnsemble(name="WeightedEnsemble")
+    ensemble.model_to_weight = {"Naive": 0.5, "SeasonalNaive": 0.5}
     trainer._add_model(ensemble, base_models=["Naive", "SeasonalNaive"])
+    trainer.save_model(model=ensemble)
 
     with mock.patch(f"autogluon.timeseries.models.local.naive.{failing_model}.predict") as fail_predict:
         fail_predict.side_effect = RuntimeError("Numerical error")
@@ -432,10 +436,12 @@ def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict
     trainer.fit(df_train, hyperparameters={"ETS": {"maxiter": 1}, "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}})
 
     # Manually add ensemble to ensure that both models have non-zero weight
-    ensemble = TimeSeriesEnsembleWrapper(weights={"DeepAR": 0.5, "ETS": 0.5}, name="WeightedEnsemble")
+    ensemble = TimeSeriesGreedyEnsemble(name="WeightedEnsemble")
+    ensemble.model_to_weight = {"DeepAR": 0.5, "ETS": 0.5}
     trainer._add_model(model=ensemble, base_models=["DeepAR", "ETS"])
+    trainer.save_model(model=ensemble)
     with mock.patch(
-        "autogluon.timeseries.models.ensemble.greedy_ensemble.TimeSeriesEnsembleWrapper.predict"
+        "autogluon.timeseries.models.ensemble.greedy_ensemble.TimeSeriesGreedyEnsemble.predict"
     ) as mock_predict:
         trainer.predict(df_train, model="WeightedEnsemble", known_covariates=known_covariates)
         inputs = mock_predict.call_args[0][0]
