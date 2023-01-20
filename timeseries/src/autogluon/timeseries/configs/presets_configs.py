@@ -22,7 +22,4 @@ TIMESERIES_PRESETS_CONFIGS = dict(
     },
     medium_quality={"hyperparameters": "medium_quality"},
     fast_training={"hyperparameters": "local_only"},
-    # TODO: Remove deprecated presets below
-    good_quality={"hyperparameters": "medium_quality"},
-    low_quality={"hyperparameters": "local_only"},
 )
