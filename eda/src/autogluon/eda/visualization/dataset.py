@@ -182,6 +182,41 @@ class DatasetTypeMismatch(AbstractVisualization, JupyterMixin):
 
 
 class LabelInsightsVisualization(AbstractVisualization, JupyterMixin):
+    """
+    Render label insights performed by :py:class:`~autogluon.eda.analysis.dataset.LabelInsightsAnalysis`.
+
+    The following insights can be rendered:
+
+    - classification: low cardinality classes detection
+    - classification: classes present in test data, but not in the train data
+    - regression: out-of-domain labels detection
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.visualization as viz
+    >>> import autogluon.eda.auto as auto
+    >>> auto.analyze(
+    >>> auto.analyze(train_data=..., test_data=..., label=..., anlz_facets=[
+    >>>     eda.dataset.ProblemTypeControl(),
+    >>>     eda.dataset.LabelInsightsAnalysis(low_cardinality_classes_threshold=50, regression_ood_threshold=0.01),
+    >>> ], viz_facets=[
+    >>>     viz.dataset.LabelInsightsVisualization()
+    >>> ])
+
+    Parameters
+    ----------
+    headers: bool, default = False
+        if `True` then render headers
+    namespace: str, default = None
+        namespace to use; can be nested like `ns_a.ns_b.ns_c`
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.dataset.ProblemTypeControl`
+    :py:class:`~autogluon.eda.analysis.dataset.LabelInsightsAnalysis`
+    """
+
     def __init__(self, headers: bool = False, namespace: Optional[str] = None, **kwargs) -> None:
         super().__init__(namespace, **kwargs)
         self.headers = headers

@@ -399,9 +399,52 @@ class SpecialTypesAnalysis(AbstractAnalysis):
 
 
 class LabelInsightsAnalysis(AbstractAnalysis):
+    """
+     Analyze label for insights:
+
+     - classification: low cardinality classes detection
+     - classification: classes present in test data, but not in the train data
+     - regression: out-of-domain labels detection
+
+     Note: this Analysis requires `problem_type` present in state.
+     It can be detected/set via :py:class:`~autogluon.eda.analysis.dataset.ProblemTypeControl` component
+
+    Parameters
+     ----------
+     low_cardinality_classes_threshold: int, default = 50
+         Minimum class instances present in the dataset to consider marking a class as low-cardinality
+     regression_ood_threshold: float, default = 0.01
+         mark results as out-of-domain when test label range in regression task is beyond train data range + regression_ood_threshold margin,
+         This is performed because some algorithms can't extrapolate beyond training data.
+     parent: Optional[AbstractAnalysis], default = None
+         parent Analysis
+     children: Optional[List[AbstractAnalysis]], default None
+         wrapped analyses; these will receive sampled `args` during `fit` call
+     state: AnalysisState
+         state object to perform check on
+
+     Examples
+     --------
+     >>> import autogluon.eda.analysis as eda
+     >>> import autogluon.eda.visualization as viz
+     >>> import autogluon.eda.auto as auto
+     >>> auto.analyze(
+     >>> auto.analyze(train_data=..., test_data=..., label=..., anlz_facets=[
+     >>>     eda.dataset.ProblemTypeControl(),
+     >>>     eda.dataset.LabelInsightsAnalysis(low_cardinality_classes_threshold=50, regression_ood_threshold=0.01),
+     >>> ], viz_facets=[
+     >>>     viz.dataset.LabelInsightsVisualization()
+     >>> ])
+
+     See Also
+     --------
+     :py:class:`~autogluon.eda.analysis.dataset.ProblemTypeControl`
+     :py:class:`~autogluon.eda.visualization.dataset.LabelInsightsVisualization`
+
+    """
+
     def __init__(
         self,
-        problem_type: str = "auto",
         low_cardinality_classes_threshold: int = 50,
         regression_ood_threshold: float = 0.01,
         parent: Optional[AbstractAnalysis] = None,
@@ -412,10 +455,6 @@ class LabelInsightsAnalysis(AbstractAnalysis):
         super().__init__(parent, children, state, **kwargs)
         assert low_cardinality_classes_threshold > 0
         self.low_cardinality_classes_threshold = low_cardinality_classes_threshold
-
-        valid_problem_types = ["auto"] + PROBLEM_TYPES_REGRESSION + PROBLEM_TYPES_CLASSIFICATION
-        assert problem_type in valid_problem_types, f"Valid problem_type values include {valid_problem_types}"
-        self.problem_type = problem_type
 
         assert regression_ood_threshold >= 0, "regression_ood_threshold must be non-negative"
         self.regression_ood_threshold = regression_ood_threshold
