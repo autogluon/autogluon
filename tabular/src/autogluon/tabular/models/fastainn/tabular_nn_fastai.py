@@ -1,6 +1,5 @@
 import copy
 import logging
-import psutil
 import time
 from builtins import classmethod
 from pathlib import Path
@@ -382,16 +381,7 @@ class NNFastAiTabularModel(AbstractModel):
             objective_func_name_to_monitor = monitor_obj_func[objective_func_name]
         return objective_func_name_to_monitor
 
-    # FIXME: torch.set_num_threads(self._num_cpus_infer) is required because XGBoost<=1.5 mutates global OpenMP thread limit
-    #  If this isn't here, inference speed is slowed down massively.
-    #  Remove once upgraded to XGBoost>=1.6
     def _predict_proba(self, X, **kwargs):
-        from .._utils.torch_utils import TorchThreadManager
-        with TorchThreadManager(num_threads=self._num_cpus_infer):
-            pred_proba = self._predict_proba_internal(X=X, **kwargs)
-        return pred_proba
-
-    def _predict_proba_internal(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
 
         single_row = len(X) == 1

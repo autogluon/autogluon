@@ -8,6 +8,7 @@ from .config import (
     get_local_pretrained_config_paths,
     get_pretrain_configs_dir,
     parse_dotlist_conf,
+    save_timm_config,
     update_config_by_rules,
     update_tabular_config_by_resources,
 )
@@ -20,6 +21,7 @@ from .data import (
     infer_dtypes_by_model_names,
     infer_scarcity_mode_by_data_size,
     init_df_preprocessor,
+    split_train_tuning_data,
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
 )
@@ -47,6 +49,7 @@ from .object_detection import (
     COCODataset,
     bbox_xyxy_to_xywh,
     cocoeval,
+    evaluate_coco,
     from_coco,
     from_coco_or_voc,
     from_dict,

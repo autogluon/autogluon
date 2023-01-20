@@ -111,3 +111,139 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
 
     # text_ngram checks
     assert expected_output_data_feat_total == list(output_data['__nlp__._total_'].values)
+
+
+def test_auto_ml_pipeline_feature_generator_raw_text(generator_helper, data_helper):
+    # Given
+    input_data = data_helper.generate_multi_feature_full()
+
+    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=10, dtype=np.uint8)
+
+    generator = AutoMLPipelineFeatureGenerator(enable_raw_text_features=True, vectorizer=toy_vectorizer)
+
+    for generator_stage in generator.generators:
+        for generator_inner in generator_stage:
+            if isinstance(generator_inner, TextNgramFeatureGenerator):
+                # Necessary in test to avoid CI non-deterministically pruning ngram counts.
+                generator_inner.max_memory_ratio = None
+
+    expected_feature_metadata_in_full = {
+        ('category', ()): ['cat'],
+        ('datetime', ()): ['datetime'],
+        ('float', ()): ['float'],
+        ('int', ()): ['int'],
+        ('object', ()): ['obj'],
+        ('object', ('datetime_as_object',)): ['datetime_as_object'],
+        ('object', ('text',)): ['text']
+    }
+
+    expected_feature_metadata_full = {
+        ('category', ()): ['obj', 'cat'],
+        ('float', ()): ['float'],
+        ('int', ()): ['int'],
+        ('int', ('binned', 'text_special')): [
+            'text.char_count',
+            'text.word_count',
+            'text.lower_ratio',
+            'text.special_ratio',
+            'text.symbol_ratio. '
+        ],
+        ('int', ('datetime_as_int',)): [
+            'datetime',
+            'datetime.year',
+            'datetime.month',
+            'datetime.day',
+            'datetime.dayofweek',
+            'datetime_as_object',
+            'datetime_as_object.year',
+            'datetime_as_object.month',
+            'datetime_as_object.day',
+            'datetime_as_object.dayofweek'
+        ],
+        ('int', ('text_ngram',)): [
+            '__nlp__.breaks',
+            '__nlp__.end',
+            '__nlp__.end of',
+            '__nlp__.end of the',
+            '__nlp__.of',
+            '__nlp__.sentence',
+            '__nlp__.sentence breaks',
+            '__nlp__.the',
+            '__nlp__.the end',
+            '__nlp__.world',
+            '__nlp__._total_'
+        ],
+        ('object', ('text',)): [
+            'text_raw_text'
+        ],
+    }
+
+    # When
+    output_data = generator_helper.fit_transform_assert(
+        input_data=input_data,
+        generator=generator,
+        expected_feature_metadata_in_full=expected_feature_metadata_in_full,
+        expected_feature_metadata_full=expected_feature_metadata_full,
+    )
+
+    assert list(input_data['text'].values) == list(output_data['text_raw_text'].values)
+
+
+def test_auto_ml_pipeline_feature_generator_only_raw_text(generator_helper, data_helper):
+    """
+    Specifically tests when only text columns are provided.
+    This verifies the edge-case bug in v0.6.2 from https://github.com/autogluon/autogluon/issues/2688 is not present.
+    """
+
+    # Given
+    input_data = data_helper.generate_text_feature().to_frame('text')
+
+    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=10, dtype=np.uint8)
+
+    generator = AutoMLPipelineFeatureGenerator(enable_raw_text_features=True, vectorizer=toy_vectorizer)
+
+    for generator_stage in generator.generators:
+        for generator_inner in generator_stage:
+            if isinstance(generator_inner, TextNgramFeatureGenerator):
+                # Necessary in test to avoid CI non-deterministically pruning ngram counts.
+                generator_inner.max_memory_ratio = None
+
+    expected_feature_metadata_in_full = {
+        ('object', ('text',)): ['text']
+    }
+
+    expected_feature_metadata_full = {
+        ('int', ('binned', 'text_special')): [
+            'text.char_count',
+            'text.word_count',
+            'text.lower_ratio',
+            'text.special_ratio',
+            'text.symbol_ratio. '
+        ],
+        ('int', ('text_ngram',)): [
+            '__nlp__.breaks',
+            '__nlp__.end',
+            '__nlp__.end of',
+            '__nlp__.end of the',
+            '__nlp__.of',
+            '__nlp__.sentence',
+            '__nlp__.sentence breaks',
+            '__nlp__.the',
+            '__nlp__.the end',
+            '__nlp__.world',
+            '__nlp__._total_'
+        ],
+        ('object', ('text',)): [
+            'text_raw_text'
+        ],
+    }
+
+    # When
+    output_data = generator_helper.fit_transform_assert(
+        input_data=input_data,
+        generator=generator,
+        expected_feature_metadata_in_full=expected_feature_metadata_in_full,
+        expected_feature_metadata_full=expected_feature_metadata_full,
+    )
+
+    assert list(input_data['text'].values) == list(output_data['text_raw_text'].values)

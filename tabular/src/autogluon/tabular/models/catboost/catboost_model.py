@@ -1,7 +1,6 @@
 import logging
 import os
 import time
-import psutil
 import numpy as np
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
@@ -12,6 +11,7 @@ from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from autogluon.core.utils import try_import_catboost
+from autogluon.common.utils.lite import disable_if_lite_mode
 
 from .callbacks import EarlyStoppingCallback, MemoryCheckCallback, TimeCheckCallback
 from .catboost_utils import get_catboost_metric_from_ag_metric
@@ -247,7 +247,7 @@ class CatBoostModel(AbstractModel):
         time_taken_per_iter = (time_left_start - time_left_end) / num_sample_iter
         estimated_iters_in_time = round(time_left_end / time_taken_per_iter)
 
-        available_mem = psutil.virtual_memory().available
+        available_mem = ResourceManager.get_available_virtual_mem()
         if self.problem_type == SOFTCLASS:
             model_size_bytes = 1  # skip memory check
         else:
@@ -286,11 +286,12 @@ class CatBoostModel(AbstractModel):
     def _ag_params(self) -> set:
         return {'ag.early_stop'}
 
+    @disable_if_lite_mode()
     def _validate_fit_memory_usage(self, **kwargs):
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         approx_mem_size_req = self.estimate_memory_usage(**kwargs)
         if approx_mem_size_req > 1e9:  # > 1 GB
-            available_mem = psutil.virtual_memory().available
+            available_mem = ResourceManager.get_available_virtual_mem()
             ratio = approx_mem_size_req / available_mem
             if ratio > (1 * max_memory_usage_ratio):
                 logger.warning('\tWarning: Not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))

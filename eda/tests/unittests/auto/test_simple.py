@@ -32,6 +32,7 @@ from autogluon.eda.visualization import (
     FeatureInteractionVisualization,
     MarkdownSectionComponent,
     ModelLeaderboard,
+    PropertyRendererComponent,
     RegressionEvaluation,
     XShiftSummary,
 )
@@ -125,6 +126,7 @@ def test_quick_fit(monkeypatch):
     call_reg_render = MagicMock()
     call_ldr_render = MagicMock()
     call_fi_render = MagicMock()
+    call_prc_render = MagicMock()
 
     with monkeypatch.context() as m:
         m.setattr(MarkdownSectionComponent, "render", call_md_render)
@@ -132,11 +134,13 @@ def test_quick_fit(monkeypatch):
         m.setattr(RegressionEvaluation, "render", call_reg_render)
         m.setattr(ModelLeaderboard, "render", call_ldr_render)
         m.setattr(FeatureImportance, "render", call_fi_render)
+        m.setattr(PropertyRendererComponent, "render", call_prc_render)
 
         with tempfile.TemporaryDirectory() as path:
             quick_fit(path=path, train_data=df_train, label="class")
 
-    assert call_md_render.call_count == 3
+    assert call_md_render.call_count == 7
+    assert call_prc_render.call_count == 2
     call_cm_render.assert_called_once()
     call_reg_render.assert_called_once()
     call_ldr_render.assert_called_once()

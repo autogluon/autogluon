@@ -4,11 +4,11 @@ import copy
 import logging
 import math
 import os
-import psutil
 import time
 
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Union, Callable
+from autogluon.common.utils.resource_utils import ResourceManager
 
 from .constants import RAY_BACKEND, CUSTOM_BACKEND
 from .exceptions import EmptySearchSpace
@@ -181,12 +181,11 @@ class HpoExecutor(ABC):
                 }
         if 'resources_per_trial' not in self.hyperparameter_tune_kwargs:
             # User didn't provide any requirements
-            model_estimate_memory_usage = None
             num_jobs_in_parallel_with_mem = math.inf
 
             if initialized_model.estimate_memory_usage is not None:
                 model_estimate_memory_usage = initialized_model.estimate_memory_usage(**kwargs)
-                total_memory_available = psutil.virtual_memory().available
+                total_memory_available = ResourceManager.get_available_virtual_mem()
                 num_jobs_in_parallel_with_mem = total_memory_available // model_estimate_memory_usage
 
             num_jobs_in_parallel_with_cpu = num_cpus // minimum_model_num_cpus

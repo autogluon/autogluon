@@ -8,7 +8,6 @@ from typing import Callable, List, Tuple
 
 import numpy as np
 import pandas as pd
-import psutil
 import scipy.stats
 from pandas import DataFrame, Series
 from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold, LeaveOneGroupOut
@@ -915,7 +914,7 @@ def _get_safe_fi_batch_count(X, num_features, X_transformed=None, max_memory_rat
     X_size_bytes = sys.getsizeof(pickle.dumps(X, protocol=4))
     if X_transformed is not None:
         X_size_bytes += sys.getsizeof(pickle.dumps(X_transformed, protocol=4))
-    available_mem = psutil.virtual_memory().available
+    available_mem = ResourceManager.get_available_virtual_mem()
     X_memory_ratio = X_size_bytes / available_mem
 
     feature_batch_count_safe = math.floor(max_memory_ratio / X_memory_ratio)

@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 import pytest
 from omegaconf import OmegaConf
@@ -12,8 +14,10 @@ from autogluon.multimodal.utils import (
     filter_search_space,
     get_config,
     is_url,
+    merge_bio_format,
     parse_dotlist_conf,
     try_to_infer_pos_label,
+    visualize_ner,
 )
 
 
@@ -154,3 +158,41 @@ def test_data_to_df(data, required_columns, all_columns, is_valid_input):
 )
 def test_is_url(path, is_valid_url):
     assert is_url(path) == is_valid_url
+
+
+def test_merge_bio():
+    sentence = "Game of Thrones is an American fantasy drama television series created by David Benioff"
+    predictions = [
+        [
+            {"entity_group": "B-TITLE", "start": 0, "end": 4},
+            {"entity_group": "I-TITLE", "start": 5, "end": 7},
+            {"entity_group": "I-TITLE", "start": 8, "end": 15},
+            {"entity_group": "B-GENRE", "start": 22, "end": 30},
+            {"entity_group": "B-GENRE", "start": 31, "end": 38},
+            {"entity_group": "I-GENRE", "start": 39, "end": 44},
+            {"entity_group": "B-DIRECTOR", "start": 74, "end": 79},
+            {"entity_group": "I-DIRECTOR", "start": 80, "end": 87},
+        ]
+    ]
+    res = merge_bio_format([sentence], predictions)
+    expected_res = [
+        [
+            {"entity_group": "TITLE", "start": 0, "end": 15},
+            {"entity_group": "GENRE", "start": 22, "end": 30},
+            {"entity_group": "GENRE", "start": 31, "end": 44},
+            {"entity_group": "DIRECTOR", "start": 74, "end": 87},
+        ]
+    ]
+    assert res == expected_res, f"Wrong results {res} from merge_bio_format!"
+
+
+def test_misc_visualize_ner():
+    sentence = "Albert Einstein was born in Germany and is widely acknowledged to be one of the greatest physicists."
+    annotation = [
+        {"entity_group": "PERSON", "start": 0, "end": 15},
+        {"entity_group": "LOCATION", "start": 28, "end": 35},
+    ]
+    visualize_ner(sentence, annotation)
+
+    # Test using string for annotation
+    visualize_ner(sentence, json.dumps(annotation))

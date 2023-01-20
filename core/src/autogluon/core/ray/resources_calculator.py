@@ -1,9 +1,8 @@
 import logging
 import math
-import psutil
 
 from abc import ABC, abstractmethod
-
+from autogluon.common.utils.resource_utils import ResourceManager
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,7 @@ class CpuResourceCalculator(ResourceCalculator):
             max_jobs_in_parallel_memory = num_jobs
 
             if model_estimate_memory_usage is not None:
-                mem_available = psutil.virtual_memory().available
+                mem_available = ResourceManager.get_available_virtual_mem()
                 # calculate how many jobs can run in parallel given memory available
                 max_jobs_in_parallel_memory = max(1, int(mem_available // model_estimate_memory_usage))
             num_parallel_jobs = min(num_jobs, total_num_cpus // cpu_per_job, max_jobs_in_parallel_memory)
@@ -225,7 +224,7 @@ class RayLightningCpuResourceCalculator(ResourceCalculator):
         cpu_per_job = max(minimum_cpu_per_job, total_num_cpus // num_jobs)
         max_jobs_in_parallel_memory = num_jobs
         if model_estimate_memory_usage is not None:
-            mem_available = psutil.virtual_memory().available
+            mem_available = ResourceManager.get_available_virtual_mem()
             # calculate how many jobs can run in parallel given memory available
             max_jobs_in_parallel_memory = max(1, int(mem_available // model_estimate_memory_usage))
         num_parallel_jobs = min(num_jobs, total_num_cpus // cpu_per_job, max_jobs_in_parallel_memory)

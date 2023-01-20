@@ -21,7 +21,6 @@ install_requires = [
     'numpy',
     'scipy',
     'scikit-learn',
-    'psutil',
     'networkx',
     'pandas',
     'tqdm',
@@ -36,6 +35,16 @@ install_requires = [
     'boto3',
 
     f'autogluon.common=={version}',
+] if not ag.LITE_MODE else [
+    # version ranges added in ag.get_dependency_version_ranges()
+    'numpy',
+    'scipy',
+    'scikit-learn',
+    'pandas',
+    'tqdm',
+    'matplotlib',
+
+    f'{ag.PACKAGE_NAME}.common=={version}',
 ]
 
 extras_require = {
