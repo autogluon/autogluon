@@ -564,10 +564,11 @@ class TimeSeriesPredictor:
                 "predictor as `TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
                 category=DeprecationWarning,
             )
+            kwargs.pop("quantile_levels")
         if random_seed is not None:
             set_random_seed(random_seed)
         data = self._check_and_prepare_data_frame(data)
-        return self._learner.predict(data, known_covariates=known_covariates, model=model)
+        return self._learner.predict(data, known_covariates=known_covariates, model=model, **kwargs)
 
     def evaluate(self, data: Union[TimeSeriesDataFrame, pd.DataFrame], **kwargs):
         """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``
