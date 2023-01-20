@@ -6,8 +6,10 @@ from mim.commands.download import download
 try:
     from mmocr.utils.ocr import MMOCR
 except ImportError:
-    pytest.skip("Skip the OCR test because there is no mmocr installed. Try to install it via mim install mmocr",
-                allow_module_level=True)
+    pytest.skip(
+        "Skip the OCR test because there is no mmocr installed. Try to install it via mim install mmocr",
+        allow_module_level=True,
+    )
 
 from PIL import Image
 
