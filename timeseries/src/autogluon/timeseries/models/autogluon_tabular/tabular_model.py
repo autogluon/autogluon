@@ -309,8 +309,11 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
                 hyperparameters=tabular_hyperparameters,
                 verbosity=verbosity - 2,
             )
-        residuals = (self.tabular_predictor.predict(train_df) - train_df[self.target]).values
-        self.residuals_std = np.sqrt(np.mean(np.square(residuals)))
+        calibration_df = val_df if val_df is not None else train_df
+        residuals = (calibration_df[self.target] - self.tabular_predictor.predict(calibration_df)).values
+        self.quantile_corrections = {}
+        for q in self.quantile_levels:
+            self.quantile_corrections[q] = np.quantile(residuals, q)
         # Logger level is changed inside .fit(), restore to the initial value
         autogluon_logger.setLevel(logging_level)
 
@@ -348,7 +351,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         predictions.set_index(preds_index, inplace=True)
 
         for q in quantile_levels:
-            predictions[str(q)] = predictions["mean"] + self.residuals_std * scipy.stats.norm.ppf(q)
+            predictions[str(q)] = predictions["mean"] + self.quantile_corrections[q]
 
         predictions = self._rescale_targets(predictions, scale_per_item)
         return TimeSeriesDataFrame(predictions).loc[data.item_ids]
