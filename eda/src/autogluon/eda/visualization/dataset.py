@@ -227,24 +227,18 @@ class LabelInsightsVisualization(AbstractVisualization, JupyterMixin):
     def _render(self, state: AnalysisState) -> None:
         insights = state.label_insights
 
-        md_lines = []
-        if insights.low_cardinality_classes is not None:
-            classes_info = "\n".join(
-                [f"   - class `{k}`: `{v}` instances" for k, v in insights.low_cardinality_classes.instances.items()]
-            )
-            md_lines.append(
-                f" - Low-cardinality classes are detected. It is recommended to have at least `{insights.low_cardinality_classes.threshold}` "
-                f"instances per class. Consider adding more data to cover the classes or remove such rows.\n"
-                f"{classes_info}"
-            )
+        md_lines: List[str] = []
+        self._classification_add_low_cardinality_classes_insights(insights, md_lines)
+        self._classification_add_minority_class_imbalance_insights(insights, md_lines)
+        self._classification_add_missing_classes_insights(insights, md_lines)
+        self._regression_add_out_of_domain_insights(insights, md_lines)
 
-        if insights.not_present_in_train is not None:
-            md_lines.append(
-                f" - the following classes are found in `test_data`, but not present in `train_data`: "
-                f"`{'`, `'.join(map(str, insights.not_present_in_train))}`. "
-                f"Consider either removing the rows with classes not covered or adding more training data covering the classes."
-            )
+        if len(md_lines) > 0:
+            self.render_header_if_needed(state, "Label insights")
+            self.render_markdown("\n".join(md_lines))
 
+    @staticmethod
+    def _regression_add_out_of_domain_insights(insights: AnalysisState, md_lines: List[str]):
         if insights.ood is not None:
             md_lines.append(
                 f" - Rows with out-of-domain labels were found. Consider removing rows with labels outside of this range or expand training data since "
@@ -254,6 +248,41 @@ class LabelInsightsVisualization(AbstractVisualization, JupyterMixin):
                 f"   - `test_data` values range `{insights.ood.test_range}`"
             )
 
-        if len(md_lines) > 0:
-            self.render_header_if_needed(state, "Label insights")
-            self.render_markdown("\n".join(md_lines))
+    @staticmethod
+    def _classification_add_missing_classes_insights(insights: AnalysisState, md_lines: List[str]):
+        if insights.not_present_in_train is not None:
+            md_lines.append(
+                f" - the following classes are found in `test_data`, but not present in `train_data`: "
+                f"`{'`, `'.join(map(str, insights.not_present_in_train))}`. "
+                f"Consider either removing the rows with classes not covered or adding more training data covering the classes."
+            )
+
+    @staticmethod
+    def _classification_add_minority_class_imbalance_insights(insights: AnalysisState, md_lines: List[str]):
+        if insights.minority_class_imbalance is not None:
+            if insights.minority_class_imbalance.ratio < 0.01:
+                severity = "Extreme"
+            elif insights.minority_class_imbalance.ratio <= 0.2:
+                severity = "Moderate"
+            else:
+                severity = "Mild"
+            md_lines.append(
+                f" - {severity} minority class imbalance detected - imbalance ratio is `{insights.minority_class_imbalance.ratio:.2%}`. "
+                f"Recommendations:\n"
+                f"   - downsample majority class `{insights.minority_class_imbalance.majority_class}` to improve the balance\n"
+                f"   - upweight downsampled class so that `sample_weight = original_weight x downsampling_factor`."
+                f"[TabularPredictor](https://auto.gluon.ai/stable/api/autogluon.predictor.html#module-0) "
+                f"supports this via `sample_weight` parameter"
+            )
+
+    @staticmethod
+    def _classification_add_low_cardinality_classes_insights(insights: AnalysisState, md_lines: List[str]):
+        if insights.low_cardinality_classes is not None:
+            classes_info = "\n".join(
+                [f"   - class `{k}`: `{v}` instances" for k, v in insights.low_cardinality_classes.instances.items()]
+            )
+            md_lines.append(
+                f" - Low-cardinality classes are detected. It is recommended to have at least `{insights.low_cardinality_classes.threshold}` "
+                f"instances per class. Consider adding more data to cover the classes or remove such rows.\n"
+                f"{classes_info}"
+            )

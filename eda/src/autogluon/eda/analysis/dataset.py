@@ -416,6 +416,8 @@ class LabelInsightsAnalysis(AbstractAnalysis):
      regression_ood_threshold: float, default = 0.01
          mark results as out-of-domain when test label range in regression task is beyond train data range + regression_ood_threshold margin,
          This is performed because some algorithms can't extrapolate beyond training data.
+     class_imbalance_ratio_threshold: float, default = 0.4
+        minority class proportion to detect as imbalance.
      parent: Optional[AbstractAnalysis], default = None
          parent Analysis
      children: Optional[List[AbstractAnalysis]], default None
@@ -447,14 +449,21 @@ class LabelInsightsAnalysis(AbstractAnalysis):
         self,
         low_cardinality_classes_threshold: int = 50,
         regression_ood_threshold: float = 0.01,
+        class_imbalance_ratio_threshold: float = 0.4,
         parent: Optional[AbstractAnalysis] = None,
         children: Optional[List[AbstractAnalysis]] = None,
         state: Optional[AnalysisState] = None,
         **kwargs,
     ) -> None:
         super().__init__(parent, children, state, **kwargs)
-        assert low_cardinality_classes_threshold > 0
+        assert low_cardinality_classes_threshold > 0, "low_cardinality_classes_threshold must be greater than 0"
         self.low_cardinality_classes_threshold = low_cardinality_classes_threshold
+
+        assert 0 < class_imbalance_ratio_threshold < 1, "class_imbalance_ratio_threshold must be between 0 and 1"
+        self.class_imbalance_ratio_threshold = class_imbalance_ratio_threshold
+
+        assert 0 < regression_ood_threshold < 1, "regression_ood_threshold must be between 0 and 1"
+        self.regression_ood_threshold = regression_ood_threshold
 
         assert regression_ood_threshold >= 0, "regression_ood_threshold must be non-negative"
         self.regression_ood_threshold = regression_ood_threshold
@@ -471,8 +480,13 @@ class LabelInsightsAnalysis(AbstractAnalysis):
         s: Dict[str, Any] = {}
 
         if state.problem_type in [BINARY, MULTICLASS]:
-            # Low-cardinality class
+
             label_counts = train_data[label].value_counts()
+            minority_class = label_counts[label_counts == label_counts.min()].index.values[0]
+            majority_class = label_counts[label_counts == label_counts.max()].index.values[0]
+            minority_class_imbalance_ratio = min(label_counts) / max(label_counts)
+
+            # Low-cardinality class detection
             label_counts = label_counts[label_counts < self.low_cardinality_classes_threshold].to_dict()
             if len(label_counts) > 0:
                 s["low_cardinality_classes"] = {
@@ -480,9 +494,15 @@ class LabelInsightsAnalysis(AbstractAnalysis):
                     "threshold": self.low_cardinality_classes_threshold,
                 }
 
-            # TODO: class imbalance
+            # Class imbalance detection
+            if minority_class_imbalance_ratio < self.class_imbalance_ratio_threshold:
+                s["minority_class_imbalance"] = {
+                    "majority_class": majority_class,
+                    "minority_class": minority_class,
+                    "ratio": minority_class_imbalance_ratio,
+                }
 
-            #  Classes not found in test_data
+            # Classes not found in test_data
             if self._test_data_with_label_present(args, label):
                 train_labels = set(train_data[label].unique())
                 test_labels = set(args.test_data[label].unique())
@@ -490,6 +510,7 @@ class LabelInsightsAnalysis(AbstractAnalysis):
                     missing_classes = test_labels.difference(train_labels)
                     s["not_present_in_train"] = missing_classes
         elif (state.problem_type in [REGRESSION]) and self._test_data_with_label_present(args, label):
+
             # Out-of-domain range detection
             test_data = args.test_data
             label_min, label_max = np.min(train_data[label]), np.max(train_data[label])
@@ -497,7 +518,6 @@ class LabelInsightsAnalysis(AbstractAnalysis):
             df_ood = args.test_data[
                 (test_data[label] < label_min - padding) | (test_data[label] > label_max + padding)
             ]
-            # from pdb import set_trace; set_trace()
 
             if len(df_ood) > 0:
                 s["ood"] = {

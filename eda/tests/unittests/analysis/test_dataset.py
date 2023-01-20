@@ -198,9 +198,9 @@ def test_SpecialTypesAnalysis():
     assert state.special_types.test_data == expected_types
 
 
-@pytest.mark.parametrize("threshold, is_warning_expected", [(None, False), (150, True)])
+@pytest.mark.parametrize("threshold, is_warning_expected", [(None, False), (191, True)])
 def test_LabelInsightsAnalysis__classification__low_cardinality_classes(threshold, is_warning_expected):
-    df_train = pd.DataFrame({"label": [1] * 200 + [2] * 100})
+    df_train = pd.DataFrame({"label": [1] * 200 + [2] * 190})
 
     if threshold is None:
         label_insights = LabelInsightsAnalysis()
@@ -220,7 +220,35 @@ def test_LabelInsightsAnalysis__classification__low_cardinality_classes(threshol
 
     if is_warning_expected:
         assert state == {
-            "label_insights": {"low_cardinality_classes": {"instances": {2: 100}, "threshold": 150}},
+            "label_insights": {"low_cardinality_classes": {"instances": {2: 190}, "threshold": 191}},
+            "problem_type": "binary",
+        }
+    else:
+        assert state == {"problem_type": "binary"}
+
+
+@pytest.mark.parametrize("n_c1, n_c2, is_warning_expected", [(100, 100, False), (100, 39, True)])
+def test_LabelInsightsAnalysis__classification__class_imbalance(n_c1, n_c2, is_warning_expected):
+    df_train = pd.DataFrame({"label": [1] * n_c1 + [2] * n_c2})
+
+    label_insights = LabelInsightsAnalysis(low_cardinality_classes_threshold=1)
+
+    state = auto.analyze(
+        train_data=df_train,
+        test_data=df_train,  # same as train
+        label="label",
+        return_state=True,
+        anlz_facets=[
+            ProblemTypeControl(problem_type=BINARY),
+            label_insights,
+        ],
+    )
+
+    if is_warning_expected:
+        assert state == {
+            "label_insights": {
+                "minority_class_imbalance": {"majority_class": 1, "minority_class": 2, "ratio": 0.39},
+            },
             "problem_type": "binary",
         }
     else:
