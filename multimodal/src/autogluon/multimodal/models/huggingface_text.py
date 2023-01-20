@@ -261,4 +261,3 @@ class HFAutoModelForTextPrediction(nn.Module):
         if self.prefix in tokenizers:
             tokenizers[self.prefix].save_pretrained(save_path)
             logger.info(f"Tokenizer {self.prefix} saved to {save_path}.")
-
