@@ -33,7 +33,7 @@ def test_dump_timm_image():
         time_limit=5,
         seed=42,
     )
-    predictor_1.dump_timm_image(path=model_dump_path)
+    predictor_1.dump_multimodal(path=model_dump_path)
     model = timm.create_model(
         model_name=base_model_name, checkpoint_path=f"{model_dump_path}/timm_image_1/pytorch_model.bin", num_classes=0
     )
@@ -70,7 +70,7 @@ def test_dump_hf_text():
         time_limit=5,
         seed=42,
     )
-    predictor_1.dump_hf_text(path=model_dump_path)
+    predictor_1.dump_multimodal(path=model_dump_path)
 
     model = transformers.AutoModel.from_pretrained(f"{model_dump_path}/hf_text")
     assert isinstance(model, transformers.models.bert.modeling_bert.BertModel)
@@ -107,8 +107,7 @@ def test_fusion_model_dump():
         time_limit=5,
         seed=42,
     )
-    predictor.dump_hf_text(path=model_dump_path)
-    predictor.dump_timm_image(path=model_dump_path)
+    predictor.dump_multimodal(path=model_dump_path)
     hf_text_dir = f"{model_dump_path}/hf_text"
     timm_image_dir = f"{model_dump_path}/timm_image"
     assert os.path.exists(hf_text_dir) and (len(os.listdir(hf_text_dir)) > 2) == True

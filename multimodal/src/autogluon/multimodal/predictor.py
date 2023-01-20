@@ -12,7 +12,7 @@ import shutil
 import sys
 import time
 import warnings
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Dict, List, Optional, Union
@@ -85,6 +85,7 @@ from .constants import (
     TEXT,
     TEXT_NER,
     TEXT_SIMILARITY,
+    TIMM_IMAGE,
     UNIFORM_SOUP,
     Y_PRED,
     Y_PRED_PROB,
@@ -2766,84 +2767,52 @@ class MultiModalPredictor:
 
         return predictor
 
-    def dump_timm_image(
-        self,
-        path: str,
-    ):
+    def dump_multimodal(self, path: Optional[str] = None):
         """
-        Save TIMM image model weights and config to local directory.
-        Model weights are saved in file `pytorch_model.bin`;
-        Configs are saved in file `config.json`
+        Save model weights and config to local directory.
+        Model weights are saved in file `pytorch_model.bin` (timm, hf) or '<ckpt_name>.pth' (mmdet);
+        Configs are saved in file `config.json` (timm, hf) or  '<ckpt_name>.py' (mmdet).
 
         Parameters
         ----------
         path : str
             Path to directory where models and configs should be saved.
         """
-        models = []
+
+        if not path:
+            path = self._save_path
+
+        models = defaultdict(list)
         # TODO: Add BaseMultimodalFusionModel class from which MultimodalFusionMLP and MultimodalFusionTransformer will inherit
+        # TODO: simplify the code (class variable?)
         if isinstance(self._model, (MultimodalFusionMLP, MultimodalFusionTransformer)) and isinstance(
             self._model.model, torch.nn.modules.container.ModuleList
         ):
             for per_model in self._model.model:
                 if isinstance(per_model, TimmAutoModelForImagePrediction):
-                    models.append(per_model)
-        elif isinstance(self._model, TimmAutoModelForImagePrediction):
-            models.append(self._model)
+                    models[TIMM_IMAGE].append(per_model)
+                elif isinstance(per_model, HFAutoModelForTextPrediction):
+                    models[HF_TEXT].append(per_model)
+        else:
+            if isinstance(self._model, TimmAutoModelForImagePrediction):
+                models[TIMM_IMAGE].append(self._model)
+            elif isinstance(self._model, HFAutoModelForTextPrediction):
+                models[HF_TEXT].append(self._model)
 
         if not models:
-            raise NotImplementedError("No TIMM models available for dump.")
+            raise NotImplementedError("No TIMM/HuggingFace models available for dump.")
 
-        for model in models:
-            subdir = path + "/" + model.prefix
-            os.makedirs(subdir, exist_ok=True)
-            weights_path = f"{subdir}/pytorch_model.bin"
-            torch.save(model.model.state_dict(), weights_path)
-            logger.info(f"Model {model.prefix} weights saved to {weights_path}.")
-            config_path = f"{subdir}/config.json"
-            save_timm_config(model, config_path)
-
-    def dump_hf_text(
-        self,
-        path: str,
-    ):
-        """
-        Save HuggingFace Text model weights, config and tokenizers to local directory.
-        Model weights are saved in file `pytorch_model.bin`;
-        Configs are saved in file `config.json`
-
-        Parameters
-        ----------
-        path : str
-            Path to directory where models and configs should be saved.
-        """
-        models = []
-        if isinstance(self._model, (MultimodalFusionMLP, MultimodalFusionTransformer)) and isinstance(
-            self._model.model, torch.nn.modules.container.ModuleList
-        ):
-            for per_model in self._model.model:
-                if isinstance(per_model, HFAutoModelForTextPrediction):
-                    models.append(per_model)
-        elif isinstance(self._model, HFAutoModelForTextPrediction):
-            models.append(self._model)
-
-        if not models:
-            raise NotImplementedError("No HuggingFace text models available for dump.")
-
+        # get tokenizers for hf_text
         text_processors = self._data_processors.get(TEXT, {})
         tokenizers = {}
         for per_processor in text_processors:
             tokenizers[per_processor.prefix] = per_processor.tokenizer
 
-        for model in models:
-            prefix = model.prefix
-            subdir = path + "/" + prefix
-            os.makedirs(subdir, exist_ok=True)
-            model.model.save_pretrained(subdir)
-            logger.info(f"Model weights for {prefix} are saved to {subdir}.")
-            if prefix in tokenizers.keys():
-                tokenizers[prefix].save_pretrained(subdir)
-                logger.info(f"Tokenizer {prefix} saved to {subdir}.")
+        for model_key in models:
+            for per_model in models[model_key]:
+                subdir = os.path.join(path, per_model.prefix)
+                os.makedirs(subdir, exist_ok=True)
+                per_model.dump_weights_and_config(save_path=subdir, tokenizers=tokenizers)
 
     @property
     def class_labels(self):
