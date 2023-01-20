@@ -10,7 +10,6 @@ from pytorch_lightning.plugins.io.checkpoint_plugin import CheckpointIO
 from pytorch_lightning.utilities.cloud_io import atomic_save, get_filesystem
 from pytorch_lightning.utilities.cloud_io import load as pl_load
 from pytorch_lightning.utilities.rank_zero import rank_zero_warn
-from pytorch_lightning.utilities.types import _PATH
 
 from ..constants import AUTOMM, DEEPSPEED_STRATEGY
 
@@ -80,7 +79,7 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
         self.trainable_param_names = trainable_param_names
         self.model_name_to_id = model_name_to_id
 
-    def save_checkpoint(self, checkpoint: Dict[str, Any], path: _PATH, storage_options: Optional[Any] = None) -> None:
+    def save_checkpoint(self, checkpoint: Dict[str, Any], path, storage_options: Optional[Any] = None) -> None:
         """
         Save model/training states as a checkpoint file through state-dump and file-write.
 
