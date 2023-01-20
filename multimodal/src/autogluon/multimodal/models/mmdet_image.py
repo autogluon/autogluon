@@ -193,18 +193,18 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
         if config_file:
             if not os.path.isfile(config_file):
-                if checkpoint_name in AG_CUSTOM_MODELS:
-                    config_file = AG_CUSTOM_MODELS[checkpoint_name]["config_file"]
-                else:
-                    raise ValueError(f"Invalid checkpoint_name ({checkpoint_name}) or config_file ({config_file}): ")
-        else:
-            try:
-                # download config and checkpoint files using openmim
-                mimdownload(package="mmdet", configs=[checkpoint_name], dest_root=".")
-                config_file = checkpoint_name + ".py"
-            except Exception as e:
-                print(e)
                 raise ValueError(f"Invalid checkpoint_name ({checkpoint_name}) or config_file ({config_file}): ")
+        else:
+            if checkpoint_name in AG_CUSTOM_MODELS:
+                config_file = AG_CUSTOM_MODELS[checkpoint_name]["config_file"]
+            else:
+                try:
+                    # download config and checkpoint files using openmim
+                    mimdownload(package="mmdet", configs=[checkpoint_name], dest_root=".")
+                    config_file = checkpoint_name + ".py"
+                except Exception as e:
+                    print(e)
+                    raise ValueError(f"Invalid checkpoint_name ({checkpoint_name}) or config_file ({config_file}): ")
 
         self.checkpoint_name = checkpoint_name
         self.checkpoint_file = checkpoint_file
