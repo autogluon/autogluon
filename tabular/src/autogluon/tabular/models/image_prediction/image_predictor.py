@@ -5,6 +5,7 @@ import pandas as pd
 
 from autogluon.common.features.types import R_OBJECT, S_IMAGE_PATH
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
+from typing import Optional
 
 from ..automm.automm_model import MultiModalPredictorModel
 
@@ -81,6 +82,57 @@ class ImagePredictorModel(MultiModalPredictorModel):
                 y_val = y_val[~null_indices_val]
 
         return X, y, X_val, y_val
+    
+    def _fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        X_val: Optional[pd.DataFrame] = None,
+        y_val: Optional[pd.Series] = None,
+        time_limit: Optional[int] = None,
+        sample_weight=None,
+        **kwargs
+    ):
+        """The internal fit function
+
+        Parameters
+        ----------
+        X
+            Features of the training dataset
+        y
+            Labels of the training dataset
+        X_val
+            Features of the validation dataset
+        y_val
+            Labels of the validation dataset
+        time_limit
+            The time limits for the fit function
+        sample_weight
+            The weights of the samples
+        kwargs
+            Other keyword arguments
+
+        """
+        type_map_special = self.feature_metadata.get_type_map_special()
+        image_columns = []
+        for col, special_type in type_map_special.items():
+            if special_type == ['image_path']:
+                image_columns.append(col)
+        assert len(image_columns) == 1, f'ImagePredictorModel only supports one image feature, but {len(image_columns)} were given'
+        image_column = image_columns[0]
+        X = X.loc[:, [image_column]]
+        if X_val is not None:
+            X_val = X_val.loc[:, [image_column]]
+        
+        super()._fit(
+            X=X,
+            y=y,
+            X_val=X_val,
+            y_val=y_val,
+            time_limit=time_limit,
+            sample_weight=sample_weight,
+            **kwargs
+        )
 
     def _preprocess(self, X, **kwargs):
         X = super()._preprocess(X, **kwargs)
