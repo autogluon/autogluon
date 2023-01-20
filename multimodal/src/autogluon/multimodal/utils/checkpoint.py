@@ -127,7 +127,7 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
             rank_zero_warn(f"Warning, `{key}` dropped from checkpoint. An attribute is not picklable: {err}")
             atomic_save(checkpoint, path)
 
-    def load_checkpoint(self, path: _PATH, map_location: Optional[Any] = None) -> Dict[str, Any]:
+    def load_checkpoint(self, path, map_location: Optional[Any] = None) -> Dict[str, Any]:
         """
         Load checkpoint from a path when resuming or loading ckpt for test/validate/predict stages.
 
@@ -145,7 +145,7 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
 
         return pl_load(path, map_location=map_location)
 
-    def remove_checkpoint(self, path: _PATH) -> None:
+    def remove_checkpoint(self, path) -> None:
         """
         Remove checkpoint file from the filesystem.
 
