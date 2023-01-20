@@ -10,7 +10,7 @@ from pytorch_lightning.plugins.io.checkpoint_plugin import CheckpointIO
 from pytorch_lightning.utilities.cloud_io import atomic_save, get_filesystem
 from pytorch_lightning.utilities.cloud_io import load as pl_load
 from pytorch_lightning.utilities.rank_zero import rank_zero_warn
-from pytorch_lightning.utilities.types import _METRIC, _PATH
+from pytorch_lightning.utilities.types import _PATH
 
 from ..constants import AUTOMM, DEEPSPEED_STRATEGY
 
@@ -180,7 +180,7 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
         self,
         current: torch.Tensor,
         trainer: "pl.Trainer",
-        monitor_candidates: Dict[str, _METRIC],
+        monitor_candidates: Dict[str, torch.Tensor],
     ) -> None:
 
         super(AutoMMModelCheckpoint, self)._update_best_and_save(
