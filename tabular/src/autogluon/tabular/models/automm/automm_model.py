@@ -164,7 +164,7 @@ class MultiModalPredictorModel(AbstractModel):
                        presets=presets,
                        hyperparameters=params,
                        seed=seed,
-                       is_pretrain=kwargs["is_pretrain"])
+                       is_pretrain=kwargs["is_pretrain"] if "is_pretrain" in kwargs else {"is_pretrain": False})
         self.model.set_verbosity(verbosity)
         root_logger.setLevel(root_log_level)  # Reset log level
 
