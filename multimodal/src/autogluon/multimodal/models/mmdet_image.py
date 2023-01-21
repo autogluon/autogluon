@@ -120,19 +120,15 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
-    def save_weights_and_configs(self, save_dir: str = None, save_name: str = None):
-        if not save_dir:
-            save_dir = "./"
-        if not save_name:
-            save_name = f"{self.checkpoint_name}_autogluon"
+    def dump_weights_and_config(self, save_path: str = "./", tokenizers: Optional[dict] = None):
 
-        weights_save_path = os.path.join(save_dir, f"{save_name}.pth")
-        configs_save_path = os.path.join(save_dir, f"{save_name}.py")
+        weights_save_path = os.path.join(save_path, "model.pth")
+        configs_save_path = os.path.join(save_path, "config.py")
 
         self._save_weights(save_path=weights_save_path)
         self._save_configs(save_path=configs_save_path)
 
-        return weights_save_path, configs_save_path
+        return save_path
 
     def _save_weights(self, save_path=None):
         if not save_path:
@@ -181,6 +177,9 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
         if os.path.isfile(checkpoint_name):
             checkpoint_file = checkpoint_name
+        elif os.path.isdir(checkpoint_name):
+            checkpoint_file = os.path.join(checkpoint_name, "model.pth")
+            config_file = os.path.join(checkpoint_name, "config.py")
         else:
             if checkpoint_name in AG_CUSTOM_MODELS:
                 # TODO: add sha1_hash
