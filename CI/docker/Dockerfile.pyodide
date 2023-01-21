@@ -1,0 +1,11 @@
+FROM pyodide/pyodide-env:20221102-chrome107-firefox106
+
+RUN cd / \
+    && git clone https://github.com/pyodide/pyodide \
+    && cd pyodide \
+    && git checkout 4a1913d3adc672680f5a02c385841e303f6254ee \
+    && pip install -r requirements.txt \
+    && make  \
+    && PYODIDE_PACKAGES='*,!bcrypt,!sparseqr,!cryptography,!libmpfr,!pyerfa' make \
+    && cd pyodide-build && pip install -e '.[test]' && cd .. \
+    && pip install 'playwright<1.23.0' && python -m playwright install
