@@ -1768,7 +1768,7 @@ class MultiModalPredictor:
         else:  # called .fit() or .load()
             df_preprocessor = self._df_preprocessor
 
-        data_processors = copy.deepcopy(self._data_processors)
+        data_processors = copy.copy(self._data_processors)
         # For prediction data with no labels provided.
         if not requires_label:
             data_processors.pop(LABEL, None)
