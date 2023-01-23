@@ -275,6 +275,36 @@ def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
     return y_pred
 
 
+def convert_pred_probas_to_df(pred_proba_list: list, columns: List[str], problem_type: str, index: pd.Index = None) -> DataFrame:
+    """
+    Converts a list of pred_proba model outputs to a DataFrame
+
+    Parameters
+    ----------
+    pred_proba_list : list
+        A list of prediction probabilities.
+        Each element is a numpy array or ndarray of prediction probabilities for a given model.
+    columns : List[str]
+        The column names for the output DataFrame
+    problem_type : str
+        The problem type. This informs the way in which the DataFrame is constructed.
+    index : pd.Index, default = None
+        If specified, sets the output DataFrame's index.
+
+    Returns
+    -------
+    DataFrame
+    """
+    if problem_type in [MULTICLASS, SOFTCLASS, QUANTILE]:
+        pred_proba_list = np.concatenate(pred_proba_list, axis=1)
+        pred_proba_df = pd.DataFrame(data=pred_proba_list, columns=columns)
+    else:
+        pred_proba_df = pd.DataFrame(data=np.asarray(pred_proba_list).T, columns=columns)
+    if index is not None:
+        pred_proba_df.set_index(index, inplace=True)
+    return pred_proba_df
+
+
 def extract_label(data: DataFrame, label: str) -> (DataFrame, Series):
     """
     Extract the label column from a dataset and return X, y.

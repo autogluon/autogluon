@@ -20,10 +20,11 @@ from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
 from ..calibrate.conformity_score import compute_conformity_score
 from ..calibrate.temperature_scaling import tune_temperature_scaling
-from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from ..data.label_cleaner import LabelCleanerMulticlassToBinary
 from ..models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel
-from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
+from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, \
+    extract_column, compute_weighted_metric, convert_pred_probas_to_df
 from ..utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError, NotEnoughCudaMemoryError
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
@@ -873,6 +874,15 @@ class AbstractTrainer:
         else:
             return model_pred_proba_dict
 
+    def get_model_oof_dict(self, models: List[str]) -> dict:
+        """
+        Returns a dictionary of out-of-fold prediction probabilities, keyed by model name
+        """
+        model_oof_dict = {}
+        for model in models:
+            model_oof_dict[model] = self.get_model_oof(model=model)
+        return model_oof_dict
+
     def get_model_pred_dict(self,
                             X: pd.DataFrame,
                             models: List[str],
@@ -964,7 +974,57 @@ class AbstractTrainer:
         X_stacker_input = self._get_inputs_to_stacker_legacy(X=X, level_start=1, level_end=2, model_levels={1: base_models}, y_pred_probas=model_pred_proba_list, fit=fit)
         if not use_orig_features:
             X_stacker_input = X_stacker_input.drop(columns=X.columns)
-        return X_stacker_input
+
+        X_stacker_input_new = self.get_inputs_to_stacker_v2(X=X, base_models=base_models, model_pred_proba_dict=model_pred_proba_dict, fit=fit, use_orig_features=use_orig_features, use_val_cache=use_val_cache)
+
+        assert X_stacker_input.equals(X_stacker_input_new)  # FIXME: Remove prior to merge
+        return X_stacker_input_new
+
+    # TODO: Rename to get_inputs_to_stacker, delete old method
+    # TODO: Remove _get_inputs_to_stacker_legacy
+    # TODO: Add documentation
+    def get_inputs_to_stacker_v2(self,
+                                 X,
+                                 base_models: List[str],
+                                 model_pred_proba_dict: dict = None,
+                                 fit: bool = False,
+                                 use_orig_features: bool = True,
+                                 use_val_cache: bool = False) -> pd.DataFrame:
+        if not base_models:
+            return X
+        pred_proba_list = []
+        if fit:
+            model_pred_proba_dict = self.get_model_oof_dict(models=base_models)
+        else:
+            model_pred_proba_dict = self.get_model_pred_proba_dict(X=X,
+                                                                   models=base_models,
+                                                                   model_pred_proba_dict=model_pred_proba_dict,
+                                                                   use_val_cache=use_val_cache)
+        for model in base_models:
+            pred_proba_list.append(model_pred_proba_dict[model])
+        stack_column_names, _ = self._get_stack_column_names(models=base_models)
+        X_stacker = convert_pred_probas_to_df(pred_proba_list=pred_proba_list, problem_type=self.problem_type, columns=stack_column_names, index=X.index)
+        if use_orig_features:
+            X = pd.concat([X_stacker, X], axis=1)
+        else:
+            X = X_stacker
+        return X
+
+    def _get_stack_column_names(self, models: List[str]) -> Tuple[List[str], int]:
+        """
+        Get the stack column names generated when the provided models are used as base models in a stack ensemble.
+        Additionally output the number of columns per model as an int.
+        """
+        if self.problem_type in [MULTICLASS, SOFTCLASS]:
+            stack_column_names = [stack_column_prefix + '_' + str(cls) for stack_column_prefix in models for cls in range(self.num_classes)]
+            num_columns_per_model = self.num_classes
+        elif self.problem_type == QUANTILE:
+            stack_column_names = [stack_column_prefix + '_' + str(q) for stack_column_prefix in models for q in self.quantile_levels]
+            num_columns_per_model = len(self.quantile_levels)
+        else:
+            stack_column_names = models
+            num_columns_per_model = 1
+        return stack_column_names, num_columns_per_model
 
     # TODO: Legacy code, still used during training because it is technically slightly faster and more memory efficient than get_model_pred_proba_dict()
     #  Remove in future as it limits flexibility in stacker inputs during training
