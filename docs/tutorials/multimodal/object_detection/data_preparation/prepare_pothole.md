@@ -52,7 +52,7 @@ about COCO dataset and how to split and convert a VOC dataset to COCO.**
 
 ### Other Examples
 
-You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+You may go to [AutoMM Examples](https://github.com/autogluon/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ### Customization
 To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.
