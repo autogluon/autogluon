@@ -22,7 +22,7 @@ from ..constants import (
     VALID_CONFIG_KEYS,
 )
 from ..models import TimmAutoModelForImagePrediction
-from ..presets import get_automm_presets, get_basic_automm_config, get_preset_str
+from ..presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
 
@@ -129,8 +129,6 @@ def get_config(
     -------
     Configurations as a DictConfig object
     """
-    presets = get_preset_str(problem_type=problem_type, presets=presets)
-
     if config is None:
         config = {}
 
@@ -142,7 +140,7 @@ def get_config(
         if presets is None:
             preset_overrides = None
         else:
-            preset_overrides = get_automm_presets(presets=presets)
+            preset_overrides, _ = get_automm_presets(problem_type=problem_type, presets=presets)
 
         for k, default_value in basic_config.items():
             if k not in config:

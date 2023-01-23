@@ -243,3 +243,9 @@ RESPONSE = "response"
 QUERY_RESPONSE = f"{QUERY}_{RESPONSE}"
 PAIR = "pair"
 TRIPLET = "triplet"
+
+# model quality
+HIGH_QUALITY_FAST_INFERENCE = "high_quality_fast_inference"
+MEDIUM_QUALITY_FASTER_TRAIN = "medium_quality_faster_train"
+BEST_QUALITY = "best_quality"
+ALL_MODEL_QUALITIES = [HIGH_QUALITY_FAST_INFERENCE, MEDIUM_QUALITY_FASTER_TRAIN, BEST_QUALITY]

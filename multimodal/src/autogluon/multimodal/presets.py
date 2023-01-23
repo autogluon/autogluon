@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from .constants import BINARY, DATA, ENVIRONMENT, MODEL, MULTICLASS, OPTIMIZATION, REGRESSION
+from .constants import BINARY, DATA, ENVIRONMENT, MODEL, MULTICLASS, OPTIMIZATION, REGRESSION, BEST_QUALITY, HIGH_QUALITY_FAST_INFERENCE, MEDIUM_QUALITY_FASTER_TRAIN
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")
@@ -8,8 +8,8 @@ matcher_presets = Registry("matcher_presets")
 
 
 @automm_presets.register()
-def high_quality_fast_inference():
-    return {
+def default(presets: str = "default", hpo: bool = False):
+    hyperparameters = {
         "model.names": [
             "categorical_mlp",
             "numerical_mlp",
@@ -17,93 +17,162 @@ def high_quality_fast_inference():
             "hf_text",
             "fusion_mlp",
         ],
-        "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
-        "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
         "env.num_workers": 2,
     }
+    hyperparameter_tune_kwargs = None
+
+    if hpo:
+        hyperparameter_tune_kwargs = {
+            "searcher": "random",
+            "scheduler": "ASHA",
+            'num_trials': 128,
+        }
+
+    if presets in [HIGH_QUALITY_FAST_INFERENCE, "default"]:
+        if hpo:
+            pass
+        else:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
+                    "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+                }
+            )
+    elif presets == MEDIUM_QUALITY_FASTER_TRAIN:
+        if hpo:
+            pass
+        else:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
+                    "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+                    "optimization.learning_rate": 4e-4,
+                }
+            )
+    elif presets == BEST_QUALITY:
+        if hpo:
+            pass
+        else:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
+                    "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
+                    "env.per_gpu_batch_size": 1,
+                }
+            )
+    elif presets == "multilingual":
+        hyperparameters.update(
+            {
+                "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
+                "optimization.top_k": 1,
+                "env.precision": "bf16",
+                "env.per_gpu_batch_size": 4,
+            }
+        )
+        hyperparameters.pop("env.num_workers", None)
+    else:
+        raise ValueError(f"Unknown preset type: {presets}")
+
+    return hyperparameters, hyperparameter_tune_kwargs
 
 
-@automm_presets.register()
-def default():
-    return automm_presets.create("high_quality_fast_inference")
+# @automm_presets.register()
+# def high_quality_fast_inference():
+#     return {
+#         "model.names": [
+#             "categorical_mlp",
+#             "numerical_mlp",
+#             "timm_image",
+#             "hf_text",
+#             "fusion_mlp",
+#         ],
+#         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
+#         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+#         "env.num_workers": 2,
+#     }
 
 
-@automm_presets.register()
-def medium_quality_faster_train():
-    return {
-        "model.names": [
-            "categorical_mlp",
-            "numerical_mlp",
-            "timm_image",
-            "hf_text",
-            "fusion_mlp",
-        ],
-        "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
-        "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
-        "optimization.learning_rate": 4e-4,
-        "env.num_workers": 2,
-    }
+# @automm_presets.register()
+# def default():
+#     return automm_presets.create("high_quality_fast_inference")
 
 
-@automm_presets.register()
-def medium_quality_faster_inference_image_classification():
-    return {
-        "model.names": ["timm_image"],
-        "model.timm_image.checkpoint_name": "mobilenetv3_large_100",
-        "optimization.learning_rate": 1e-3,
-        "env.num_workers": 2,
-    }
+# @automm_presets.register()
+# def medium_quality_faster_train():
+#     return {
+#         "model.names": [
+#             "categorical_mlp",
+#             "numerical_mlp",
+#             "timm_image",
+#             "hf_text",
+#             "fusion_mlp",
+#         ],
+#         "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
+#         "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+#         "optimization.learning_rate": 4e-4,
+#         "env.num_workers": 2,
+#     }
 
 
-@automm_presets.register()
-def high_quality_fast_inference_image_classification():
-    return {
-        "model.names": ["timm_image"],
-        "model.timm_image.checkpoint_name": "resnet50",
-        "optimization.learning_rate": 1e-3,
-        "env.num_workers": 2,
-    }
+# @automm_presets.register()
+# def medium_quality_faster_inference_image_classification():
+#     return {
+#         "model.names": ["timm_image"],
+#         "model.timm_image.checkpoint_name": "mobilenetv3_large_100",
+#         "optimization.learning_rate": 1e-3,
+#         "env.num_workers": 2,
+#     }
+#
+#
+# @automm_presets.register()
+# def high_quality_fast_inference_image_classification():
+#     return {
+#         "model.names": ["timm_image"],
+#         "model.timm_image.checkpoint_name": "resnet50",
+#         "optimization.learning_rate": 1e-3,
+#         "env.num_workers": 2,
+#     }
+#
+#
+# @automm_presets.register()
+# def high_quality():
+#     return {
+#         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+#         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
+#         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+#         "env.num_workers": 2,
+#     }
+#
+#
+# @automm_presets.register()
+# def best_quality():
+#     return {
+#         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+#         "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
+#         "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
+#         "env.per_gpu_batch_size": 1,
+#         "env.num_workers": 2,
+#     }
 
 
-@automm_presets.register()
-def high_quality():
-    return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
-        "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
-        "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-        "env.num_workers": 2,
-    }
+# @automm_presets.register()
+# def high_quality_image_classification():
+#     return {
+#         "model.names": ["timm_image"],
+#         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+#         "env.num_workers": 2,
+#     }
 
 
-@automm_presets.register()
-def best_quality():
-    return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
-        "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
-        "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
-        "env.per_gpu_batch_size": 1,
-        "env.num_workers": 2,
-    }
-
-
-@automm_presets.register()
-def high_quality_image_classification():
-    return {
-        "model.names": ["timm_image"],
-        "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-        "env.num_workers": 2,
-    }
-
-
-@automm_presets.register()
-def multilingual():
-    return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
-        "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
-        "optimization.top_k": 1,
-        "env.precision": "bf16",
-        "env.per_gpu_batch_size": 4,
-    }
+# @automm_presets.register()
+# def multilingual():
+#     return {
+#         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+#         "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
+#         "optimization.top_k": 1,
+#         "env.precision": "bf16",
+#         "env.per_gpu_batch_size": 4,
+#     }
 
 
 @automm_presets.register()
@@ -158,18 +227,18 @@ def few_shot_text_classification_tfew():
     }
 
 
-# TODO: Consider to remove this preset
-@automm_presets.register()
-def zero_shot_classification():
-    return {
-        "model.names": ["hf_text"],
-        "model.hf_text.checkpoint_name": "cross-encoder/ms-marco-MiniLM-L-12-v2",
-        "env.eval_batch_size_ratio": 1,
-    }
+# # TODO: Consider to remove this preset
+# @automm_presets.register()
+# def zero_shot_classification():
+#     return {
+#         "model.names": ["hf_text"],
+#         "model.hf_text.checkpoint_name": "cross-encoder/ms-marco-MiniLM-L-12-v2",
+#         "env.eval_batch_size_ratio": 1,
+#     }
 
 
 @automm_presets.register()
-def zero_shot_image_classification():
+def zero_shot_image_classification(presets: str = "default", hpo: bool = False):
     return {
         "model.names": ["clip"],
         "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
@@ -522,10 +591,12 @@ def list_automm_presets(verbose: bool = False):
 def get_basic_automm_config(extra: Optional[List[str]] = None):
     """
     Get the basic config of AutoMM.
+
     Parameters
     ----------
     extra
         A list of extra config keys.
+
     Returns
     -------
     A dict config with keys: MODEL, DATA, OPTIMIZATION, ENVIRONMENT, and their default values.
@@ -543,29 +614,40 @@ def get_basic_automm_config(extra: Optional[List[str]] = None):
     return config
 
 
-def get_automm_presets(presets: str):
+def get_automm_presets(problem_type: str, presets: str):
     """
-    Map a AutoMM preset string to its config including a basic config and an overriding dict.
+    Get the default hyperparameters and hyperparameter_tune_kwargs given problem type and presets.
+
     Parameters
     ----------
+    problem_type
+        Problem type.
     presets
         Name of a preset.
+
     Returns
     -------
-    basic_config
-        The basic config of AutoMM.
-    overrides
+    hyperparameters
         The hyperparameter overrides of this preset.
+    hyperparameter_tune_kwargs
+        Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
     """
     presets = presets.lower()
-    if presets in automm_presets.list_keys():
-        overrides = automm_presets.create(presets)
+    if problem_type in [
+        BINARY,
+        MULTICLASS,
+        REGRESSION,
+    ]:
+        problem_type = "default"
+
+    if problem_type in automm_presets.list_keys():
+        hyperparameters, hyperparameter_tune_kwargs = automm_presets.create(problem_type, presets)
     else:
         raise ValueError(
             f"Provided preset '{presets}' is not supported. " f"Consider one of these: {automm_presets.list_keys()}"
         )
 
-    return overrides
+    return hyperparameters, hyperparameter_tune_kwargs
 
 
 def get_preset_str(problem_type: str, presets: str):

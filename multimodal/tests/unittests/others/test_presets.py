@@ -13,6 +13,7 @@ from autogluon.multimodal.constants import (
     OCR_TEXT_RECOGNITION,
     OPTIMIZATION,
     ZERO_SHOT_IMAGE_CLASSIFICATION,
+    ALL_MODEL_QUALIIES,
 )
 from autogluon.multimodal.presets import get_automm_presets, get_basic_automm_config, list_automm_presets
 from autogluon.multimodal.problem_types import PROBLEM_TYPES_REG
@@ -20,27 +21,31 @@ from autogluon.multimodal.utils import get_config
 
 
 def test_presets():
-    all_presets = list_automm_presets()
-    for preset in all_presets:
-        overrides = get_automm_presets(preset)
+    problem_types = list_automm_presets()
+    for per_type in problem_types:
+        for model_quality in ALL_MODEL_QUALIIES:
+            hyperparameters, hyperparameter_tune_kwargs = get_automm_presets(per_type, model_quality)
 
     # test non-existing types
     non_exist_types = ["hello", "haha"]
     for per_type in non_exist_types:
-        with pytest.raises(ValueError):
-            overrides = get_automm_presets(per_type)
+        for model_quality in ALL_MODEL_QUALIIES:
+            with pytest.raises(ValueError):
+                hyperparameters, hyperparameter_tune_kwargs = get_automm_presets(per_type, model_quality)
 
 
 def test_preset_to_config():
-    all_presets = list_automm_presets()
-    for preset in all_presets:
-        overrides = get_automm_presets(preset)
-        config = get_config(
-            presets=preset,
-            extra=["matcher", "distiller"],
-        )
-        for k, v in overrides.items():
-            assert OmegaConf.select(config, k) == v
+    problem_types = list_automm_presets()
+    for per_type in problem_types:
+        for model_quality in ALL_MODEL_QUALIIES:
+            overrides = get_automm_presets(per_type, model_quality)
+            config = get_config(
+                problem_type=per_type,
+                presets=model_quality,
+                extra=["matcher", "distiller"],
+            )
+            for k, v in overrides.items():
+                assert OmegaConf.select(config, k) == v
 
 
 def test_basic_config():
