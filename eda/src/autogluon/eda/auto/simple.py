@@ -512,7 +512,7 @@ def dataset_overview(
                 anlz_facets=[FeatureInteraction(key=f"{nodes[0]}:{n}", x=nodes[0], y=n) for n in nodes[1:]],
                 viz_facets=[
                     MarkdownSectionComponent(
-                        f'### Near duplicate group analysis: `{"`, `".join(nodes)}` - distance `{group["distance"]}`'
+                        f'### Near duplicate group analysis: `{"`, `".join(nodes)}` - distance `{group["distance"]:.4f}`'
                     ),
                     *[FeatureInteractionVisualization(headers=True, key=f"{nodes[0]}:{n}") for n in nodes[1:]],
                 ],

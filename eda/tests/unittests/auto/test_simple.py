@@ -170,7 +170,7 @@ def test_dataset_overview(monkeypatch):
     call_md_render.assert_has_calls(
         [
             call("### Feature Distance"),
-            call("### Near duplicate group analysis: `education-num`, `near_duplicate` - distance `0.0`"),
+            call("### Near duplicate group analysis: `education-num`, `near_duplicate` - distance `0.0000`"),
         ]
     )
     call_ds_render.assert_called_once()
