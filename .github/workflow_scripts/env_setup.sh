@@ -21,27 +21,21 @@ function setup_mxnet_gpu {
 }
 
 function setup_torch_gpu {
-    # Security-patched torch
-    TORCH_URL=https://aws-pytorch-unified-cicd-binaries.s3.us-west-2.amazonaws.com/r1.12.1_sm/20221201-232940/bbd58c88fe74811ebc2c7225a308eeadfa42a7b9/torch-1.12.1%2Bcu113-cp38-cp38-linux_x86_64.whl
-    TORCHVISION_URL=https://download.pytorch.org/whl/cu113/torchvision-0.13.1%2Bcu113-cp38-cp38-linux_x86_64.whl
-    python3 -m pip uninstall -y torch torchvision torchaudio torchdata
-    python3 -m pip install --no-cache-dir -U ${TORCH_URL} ${TORCHVISION_URL}
+    # Security-patched torch.
+    python3 -m pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
 }
 
 function setup_torch_cpu {
     # Security-patched torch
-    TORCH_URL=https://aws-pytorch-unified-cicd-binaries.s3.us-west-2.amazonaws.com/r1.12.1_sm/20221130-175350/98e79c6834c193ed3751a155c5309d441bf904e3/torch-1.12.1%2Bcpu-cp38-cp38-linux_x86_64.whl
-    TORCHVISION_URL=https://download.pytorch.org/whl/cpu/torchvision-0.13.1%2Bcpu-cp38-cp38-linux_x86_64.whl
-    python3 -m pip uninstall -y torch torchvision torchaudio torchdata
-    python3 -m pip install --no-cache-dir -U ${TORCH_URL} ${TORCHVISION_URL}
+    python3 -m pip install torch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cpu
 }
 
 function setup_torch_gpu_non_linux {
-    pip3 install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchtext==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu113
+    pip3 install torch==1.13.1+cu116 torchvision==0.14.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
 }
 
 function setup_torch_cpu_non_linux {
-    pip3 install torch==1.12.1 torchvision==0.13.1 torchtext==0.13.1
+    pip3 install torch==1.13.1 torchvision==0.14.1
 }
 
 function install_local_packages {

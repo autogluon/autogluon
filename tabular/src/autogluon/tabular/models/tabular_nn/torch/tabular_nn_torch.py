@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import psutil
 import random
 import time
 import warnings
@@ -395,19 +394,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.params_trained['batch_size'] = batch_size
         self.params_trained['num_epochs'] = best_epoch
 
-    # FIXME: torch.set_num_threads(self._num_cpus_infer) is required because XGBoost<=1.5 mutates global OpenMP thread limit
-    #  If this isn't here, inference speed is slowed down massively.
-    #  Remove once upgraded to XGBoost>=1.6
-    def _predict_proba(self, X, _reset_threads=True, **kwargs):
-        if _reset_threads:
-            from ..._utils.torch_utils import TorchThreadManager
-            with TorchThreadManager(num_threads=self._num_cpus_infer):
-                pred_proba = self._predict_proba_internal(X=X, **kwargs)
-        else:
-            pred_proba = self._predict_proba_internal(X=X, **kwargs)
-        return pred_proba
-
-    def _predict_proba_internal(self, X, **kwargs):
+    def _predict_proba(self, X, **kwargs):
         """ To align predict with abstract_model API.
             Preprocess here only refers to feature processing steps done by all AbstractModel objects,
             not tabularNN-specific preprocessing steps.

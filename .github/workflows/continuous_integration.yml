@@ -13,7 +13,17 @@ defaults:
     shell: bash
 
 jobs:
+  branch_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail on restricted branch
+        # https://docs.github.com/en/actions/learn-github-actions/expressions#example-matching-an-array-of-strings
+        if: ${{ github.event_name == 'push' && contains(fromJSON('["cloud"]'), github.ref_name) }}
+        run: |
+          echo This is a restricted branch reserved for certain modules. Please use another branch instead
+          exit 1
   lint_check:
+    needs: branch_check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -212,6 +222,26 @@ jobs:
           job-type: CI-GPU
           job-name: AutoGluon-Multimodal-Others
           command: chmod +x ./.github/workflow_scripts/test_multimodal_others.sh && ./.github/workflow_scripts/test_multimodal_others.sh
+  test_multimodal_others_2:
+    needs: lint_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
+      - name: Test Multimodal Others 2 on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-GPU
+          job-name: AutoGluon-Multimodal-Others-2
+          command: chmod +x ./.github/workflow_scripts/test_multimodal_others_2.sh && ./.github/workflow_scripts/test_multimodal_others_2.sh
   test_vision:
     needs: lint_check
     runs-on: ubuntu-latest
@@ -273,7 +303,7 @@ jobs:
           job-name: AutoGluon-Install
           command: chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
   build_image_prediction_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_vision, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -287,7 +317,7 @@ jobs:
           job-name: AutoGluon-BuildImagePrediction
           command: chmod +x ./.github/workflow_scripts/build_image_prediction_tutorial.sh && ./.github/workflow_scripts/build_image_prediction_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_object_detection_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_vision, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -301,7 +331,7 @@ jobs:
           job-name: AutoGluon-BuildObjectDetection
           command: chmod +x ./.github/workflow_scripts/build_object_detection_tutorial.sh && ./.github/workflow_scripts/build_object_detection_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_tabular_prediction_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_vision, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -318,7 +348,7 @@ jobs:
     strategy:
       matrix:
         SUB_DOC: ["advanced_topics", "image_prediction", "matching", "object_detection", "text_prediction", "multimodal_prediction"]
-    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_vision, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -332,7 +362,7 @@ jobs:
           job-name: AutoGluon-BuildMultimodal
           command: chmod +x ./.github/workflow_scripts/build_multimodal_tutorial.sh && ./.github/workflow_scripts/build_multimodal_tutorial.sh '${{ matrix.SUB_DOC }}' '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_cloud_fit_deploy_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_vision, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -346,7 +376,7 @@ jobs:
           job-name: AutoGluon-BuildCloudFitDeploy
           command: chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_timeseries_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_vision, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_fair, test_text, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_vision, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

@@ -16,8 +16,6 @@ __all__ = [
     'try_import_torch',
     'try_import_d8',
     'try_import_autogluon_multimodal',
-    'try_import_autogluon_text',
-    'try_import_autogluon_vision',
     'try_import_rapids_cuml',
     'try_import_imodels',
 ]
@@ -55,13 +53,13 @@ def try_import_mxnet():
 
 
 def try_import_ray() -> ModuleType:
-    RAY_MAX_VERSION = '2.1.0'
+    RAY_MAX_VERSION = '2.3.0'
     ray_max_version_os_map = dict(
         Darwin=RAY_MAX_VERSION,
         Windows=RAY_MAX_VERSION,
         Linux=RAY_MAX_VERSION,
     )
-    ray_min_version = '2.0.0'
+    ray_min_version = '2.2.0'
     current_os = platform.system()
     ray_max_version = ray_max_version_os_map.get(current_os, RAY_MAX_VERSION)
     try:
@@ -224,22 +222,6 @@ def try_import_autogluon_multimodal():
     except ImportError:
         raise ImportError("`import autogluon.multimodal` failed.\n"
                           f"A quick tip is to install via `pip install autogluon.multimodal=={__version__}`.\n")
-
-
-def try_import_autogluon_text():
-    try:
-        import autogluon.text
-    except ImportError:
-        raise ImportError("`import autogluon.text` failed.\n"
-                          f"A quick tip is to install via `pip install autogluon.text=={__version__}`.\n")
-
-
-def try_import_autogluon_vision():
-    try:
-        import autogluon.vision
-    except ImportError:
-        raise ImportError("`import autogluon.vision` failed.\n"
-                          f"A quick tip is to install via `pip install autogluon.vision=={__version__}`.\n")
 
 
 def try_import_rapids_cuml():

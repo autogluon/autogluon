@@ -22,11 +22,6 @@ from autogluon.timeseries.utils.random import set_random_seed
 
 logger = logging.getLogger(__name__)
 
-DEPRECATED_PRESETS_TO_FALLBACK = {
-    "low_quality": "fast_training",
-    "good_quality": "high_quality",
-}
-
 SUPPORTED_FREQUENCIES = {"D", "W", "M", "Q", "A", "Y", "H", "T", "min", "S"}
 
 
@@ -459,14 +454,6 @@ class TimeSeriesPredictor:
         logger.info("================ TimeSeriesPredictor ================")
         logger.info("TimeSeriesPredictor.fit() called")
         if presets is not None:
-            if presets in DEPRECATED_PRESETS_TO_FALLBACK:
-                new_presets = DEPRECATED_PRESETS_TO_FALLBACK[presets]
-                warnings.warn(
-                    f"Presets {presets} are deprecated as of version 0.6.0. Please see the documentation for "
-                    f"TimeSeriesPredictor.fit for the list of available presets. "
-                    f"Falling back to presets='{new_presets}'."
-                )
-                presets = new_presets
             logger.info(f"Setting presets to: {presets}")
         logger.info("Fitting with arguments:")
         logger.info(f"{pprint.pformat(fit_args)}")
@@ -572,12 +559,12 @@ class TimeSeriesPredictor:
         """
         if "quantile_levels" in kwargs:
             warnings.warn(
-                "Passing `quantile_levels` as a keyword argument to `TimeSeriesPredictor.predict` is deprecated and "
-                "will be removed in v0.7. This might also lead to some models not working properly. "
-                "Please specify the desired quantile levels when creating the predictor as "
-                "`TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
+                "Passing `quantile_levels` as a keyword argument to `TimeSeriesPredictor.predict` is deprecated as of "
+                "v0.7. This argument is ignored. Please specify the desired quantile levels when creating the "
+                "predictor as `TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
                 category=DeprecationWarning,
             )
+            kwargs.pop("quantile_levels")
         if random_seed is not None:
             set_random_seed(random_seed)
         data = self._check_and_prepare_data_frame(data)

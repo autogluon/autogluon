@@ -5,7 +5,7 @@ import pytest
 
 from autogluon.multimodal import MultiModalPredictor
 
-from .unittest_datasets import PetFinderDataset
+from ..utils.unittest_datasets import PetFinderDataset
 
 
 @pytest.mark.parametrize(

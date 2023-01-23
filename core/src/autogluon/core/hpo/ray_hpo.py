@@ -1,12 +1,12 @@
 import logging
 import os
-import psutil
 import shutil
 
 from ..utils.try_import import try_import_ray
 try_import_ray()  # try import ray before importing the remaining contents so we can give proper error messages
 import ray
 
+from autogluon.common.utils.resource_utils import ResourceManager
 from abc import ABC, abstractmethod
 from typing import Optional, Callable, Union, List
 
@@ -109,7 +109,7 @@ class RayTuneAdapter(ABC):
         self.check_user_provided_resources_per_trial(resources_per_trial)
         assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be a integer that is larger than 0'
         assert isinstance(minimum_gpu_per_trial, (int, float)) and minimum_gpu_per_trial >= 0, 'minimum_gpu_per_trial must be an integer or float that is equal to or larger than 0'
-        num_cpus = total_resources.get('num_cpus', psutil.cpu_count())
+        num_cpus = total_resources.get('num_cpus', ResourceManager.get_cpu_count_psutil())
         num_gpus = total_resources.get('num_gpus', 0)
         assert num_gpus >= minimum_gpu_per_trial, f'Total num_gpus available: {num_gpus} must be greater or equal to minimum_gpu_per_trial: {minimum_gpu_per_trial}'
         

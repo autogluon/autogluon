@@ -8,6 +8,7 @@ from .config import (
     get_local_pretrained_config_paths,
     get_pretrain_configs_dir,
     parse_dotlist_conf,
+    save_timm_config,
     update_config_by_rules,
     update_tabular_config_by_resources,
 )
@@ -48,6 +49,7 @@ from .object_detection import (
     COCODataset,
     bbox_xyxy_to_xywh,
     cocoeval,
+    evaluate_coco,
     from_coco,
     from_coco_or_voc,
     from_dict,

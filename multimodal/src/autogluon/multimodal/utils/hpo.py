@@ -150,17 +150,13 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
 
     from autogluon.core.hpo.ray_hpo import (
         AutommRayTuneAdapter,
-        AutommRayTuneLightningAdapter,
         EmptySearchSpace,
         cleanup_checkpoints,
         cleanup_trials,
         run,
     )
-    from autogluon.core.utils.try_import import try_import_ray_lightning
 
     ray_tune_adapter = AutommRayTuneAdapter()
-    if try_import_ray_lightning():
-        ray_tune_adapter = AutommRayTuneLightningAdapter()
     search_space = _fit_args.get("hyperparameters", dict())
     metric = "val_" + _fit_args.get("validation_metric_name")
     mode = _fit_args.get("minmax_mode")

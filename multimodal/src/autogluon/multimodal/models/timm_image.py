@@ -1,8 +1,10 @@
+import json
 import logging
+import os
 from typing import List, Optional
 
 import torch
-from timm import create_model
+from timm import create_model, models
 from torch import nn
 
 from ..constants import AUTOMM, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
@@ -33,7 +35,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
         prefix
             The prefix of the TimmAutoModelForImagePrediction model.
         checkpoint_name
-            Name of the timm checkpoint.
+            Name of the timm checkpoint, or local parent directory of the saved finetuned timm weights and config.
         num_classes
             The number of classes. 1 for a regression task.
         mix_choice
@@ -48,13 +50,36 @@ class TimmAutoModelForImagePrediction(nn.Module):
         super().__init__()
         # In TIMM, if num_classes==0, then create_model would automatically set self.model.head = nn.Identity()
         logger.debug(f"initializing {checkpoint_name}")
-        self.checkpoint_name = checkpoint_name
+        if os.path.exists(checkpoint_name):
+            checkpoint_path = f"{checkpoint_name}/pytorch_model.bin"
+            try:
+                with open(f"{checkpoint_name}/config.json") as f:
+                    self.config = json.load(f)
+                    pretrained_cfg = self.config.get("pretrained_cfg", {})
+                    for k, v in pretrained_cfg.items():
+                        if k not in self.config:
+                            self.config[k] = v
+                    self.checkpoint_name = self.config.get("architecture", None)
+                    self.model = create_model(self.checkpoint_name, checkpoint_path=checkpoint_path, num_classes=0)
+                    # create a head with new num_classes
+                    self.head = (
+                        models.layers.linear.Linear(in_features=self.config["num_features"], out_features=num_classes)
+                        if num_classes > 0
+                        else nn.Identity()
+                    )
+                    self.num_classes = num_classes if num_classes is not None else 0
+            except:
+                ValueError(f"Timm model path {checkpoint_name} does not exist or model is invalid.")
+        else:
+            self.checkpoint_name = checkpoint_name
+            self.model = create_model(checkpoint_name, pretrained=pretrained, num_classes=num_classes)
+            self.head = get_model_head(model=self.model)
+            self.config = self.model.default_cfg
+            self.num_classes = self.model.num_classes
+
         self.pretrained = pretrained
-        self.model = create_model(checkpoint_name, pretrained=pretrained, num_classes=num_classes)
-        self.config = self.model.default_cfg
-        self.num_classes = self.model.num_classes
         self.out_features = self.model.num_features
-        self.head = get_model_head(model=self.model)
+        self.global_pool = self.model.global_pool if hasattr(self.model, "global_pool") else None
         self.model.reset_classifier(0)  # remove the internal head
 
         self.mix_choice = mix_choice

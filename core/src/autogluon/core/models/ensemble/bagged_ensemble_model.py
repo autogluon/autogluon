@@ -4,7 +4,6 @@ import logging
 import math
 import os
 import platform
-import psutil
 import time
 from collections import Counter
 from statistics import mean
