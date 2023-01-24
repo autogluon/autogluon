@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
 
@@ -31,14 +31,12 @@ class ConformalizedQuantileRegression(AbstractConformalizer):
                 index_high = int(np.ceil(q * (num_samples + 1))) - 1
                 index_high = min(max(index_high, 0), num_samples - 1)
                 correction = error_high[index_high]
-            elif q < 0.5:
+            else:
                 error_low = y_pred - y_true
                 error_low = np.sort(error_low)
                 index_low = int(np.ceil((1 - q) * (num_samples + 1))) - 1
                 index_low = min(max(index_low, 0), num_samples - 1)
                 correction = -error_low[index_low]
-            else:
-                correction = 0.0
             self.quantile_adjustments[str(q)] = correction
         self._is_fit = True
 
@@ -57,11 +55,12 @@ class ScaledConformalizedQuantileRegression(ConformalizedQuantileRegression):
         return data.groupby(level=ITEMID, sort=False)[self.target_column].std().clip(lower=min_scale)
 
     def fit(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame):
+        # Avoid scaling the original data
+        data = data.copy()
         data_past = data.slice_by_timestep(None, -self.prediction_length)
         scale_per_item = self._compute_scale(data_past)
         for col in predictions.columns:
             predictions[col] = predictions[col] / scale_per_item
-        data = data.copy()
         data[self.target_column] = data[self.target_column] / scale_per_item
         super().fit(data, predictions)
 
