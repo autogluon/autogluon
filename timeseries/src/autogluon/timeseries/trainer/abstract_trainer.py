@@ -23,6 +23,7 @@ from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTS
 from autogluon.timeseries.models.presets import contains_searchspace
 from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.warning_filters import disable_tqdm
+from autogluon.timeseries.conformal.abstract_conformalizer import AbstractConformalizer
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
@@ -276,6 +277,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         save_data: bool = True,
         enable_ensemble: bool = True,
         verbosity: int = 2,
+        conformalizer_type: Optional[Type[AbstractConformalizer]] = None,
         **kwargs,
     ):
         super().__init__(path=path, save_data=save_data, low_memory=True, **kwargs)
@@ -302,6 +304,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self._model_full_dict_val_score = {}
         self.eval_metric = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.hpo_results = {}
+
+        self.conformalizer_type = conformalizer_type
+        self.model_to_conformalizer: Dict[str, AbstractConformalizer] = {}
 
     def save_train_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
         path = self.path_data + "train.pkl"
@@ -656,6 +661,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     logger.error(f"\t{err}")
                     logger.debug(traceback.format_exc())
 
+        # if self.conformalizer_type is not None:
+        #     self.conformalize_model(model_name=self.get_model_best(), val_data=val_data)
+
         logger.info(f"Training complete. Models trained: {model_names_trained}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
         try:
@@ -675,6 +683,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             increment += 1
             ensemble_name = f"WeightedEnsemble_{increment}"
         return ensemble_name
+
+    def conformalize_model(self, model_name: str, val_data: TimeSeriesDataFrame):
+        logger.debug(f"Applying conformalization to model {model_name}")
+        model = self.load_model(model_name)
+        predictions = self.predict_for_scoring(data=val_data, model=model)
+        conformalizer = self.conformalizer_type(
+            prediction_length=self.prediction_length, quantile_levels=self.quantile_levels, target_column=self.target
+        )
+        logger.info(f"Fitting {self.conformalizer_type} to {model_name}")
+        conformalizer.fit(data=val_data, predictions=predictions)
+        self.model_to_conformalizer[model_name] = conformalizer
 
     def fit_ensemble(
         self, val_data: TimeSeriesDataFrame, model_names: List[str], time_limit: Optional[float] = None
@@ -819,6 +838,20 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 logger.info(f"\tYou can call predict(data, model) with one of other available models: {other_models}")
             return None
 
+    def predict_for_scoring(
+        self,
+        data: TimeSeriesDataFrame,
+        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        **kwargs,
+    ) -> Union[TimeSeriesDataFrame, None]:
+        past_data = data.slice_by_timestep(None, -self.prediction_length)
+        if len(self.metadata.known_covariates_real) > 0:
+            future_data = data.slice_by_timestep(-self.prediction_length, None)
+            known_covariates = future_data[self.metadata.known_covariates_real]
+        else:
+            known_covariates = None
+        return self.predict(data=past_data, model=model, known_covariates=known_covariates, **kwargs)
+
     def score(
         self,
         data: TimeSeriesDataFrame,
@@ -827,29 +860,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     ) -> float:
         model = self._get_model_for_prediction(model)
         eval_metric = self.eval_metric if metric is None else metric
-
-        if isinstance(model, AbstractTimeSeriesEnsembleModel):
-            evaluator = TimeSeriesEvaluator(
-                eval_metric=eval_metric,
-                prediction_length=self.prediction_length,
-                target_column=self.target,
-            )
-            model_preds = {}
-            base_models = self.get_minimum_model_set(model, include_self=False)
-            for base_model in base_models:
-                try:
-                    base_model_loaded = self._get_model_for_prediction(base_model)
-                    model_preds[base_model] = base_model_loaded.predict_for_scoring(
-                        data, quantile_levels=self.quantile_levels
-                    )
-                except Exception:
-                    model_preds[base_model] = None
-            forecasts = model.predict(model_preds)
-
-            model_score = evaluator(data, forecasts) * evaluator.coefficient
-            return model_score
-
-        return model.score(data, metric=eval_metric)
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=eval_metric,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
+        )
+        predictions = self.predict_for_scoring(data=data, model=model)
+        return evaluator(data, predictions) * evaluator.coefficient
 
     def _predict_model(
         self,
@@ -860,8 +877,14 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     ) -> TimeSeriesDataFrame:
         if isinstance(model, str):
             model = self.load_model(model)
-        data = self.get_inputs_to_model(model=model, X=data, known_covariates=known_covariates)
-        return model.predict(data, known_covariates=known_covariates, **kwargs)
+        model_inputs = self.get_inputs_to_model(model=model, X=data, known_covariates=known_covariates)
+        predictions = model.predict(model_inputs, known_covariates=known_covariates, **kwargs)
+
+        model_name = str(model)
+        if model_name in self.model_to_conformalizer:
+            predictions = self.model_to_conformalizer[model_name].transform(predictions=predictions, data_past=data)
+            logger.debug(f"Conformalizing predictions of {model_name} with {self.model_to_conformalizer[model_name]}")
+        return predictions
 
     # TODO: experimental
     def refit_single_full(self, train_data=None, val_data=None, models=None):

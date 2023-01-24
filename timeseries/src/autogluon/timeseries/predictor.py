@@ -19,6 +19,7 @@ from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
 from autogluon.timeseries.splitter import AbstractTimeSeriesSplitter, LastWindowSplitter, MultiWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 from autogluon.timeseries.utils.random import set_random_seed
+from autogluon.timeseries.conformal import AbstractConformalizer, ConformalizedQuantileRegression
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +171,8 @@ class TimeSeriesPredictor:
 
         learner_type = kwargs.pop("learner_type", TimeSeriesLearner)
         learner_kwargs = kwargs.pop("learner_kwargs", dict())
+        default_conformalizer_type = ConformalizedQuantileRegression if eval_metric == "mean_wQuantileLoss" else None
+        conformalizer_type = kwargs.pop("conformalizer_type", default_conformalizer_type)
         learner_kwargs = learner_kwargs.copy()
         learner_kwargs.update(
             dict(
@@ -181,6 +184,7 @@ class TimeSeriesPredictor:
                 quantile_levels=self.quantile_levels,
                 validation_splitter=splitter,
                 ignore_time_index=ignore_time_index,
+                conformalizer_type=conformalizer_type,
             )
         )
         self._learner: AbstractLearner = learner_type(**learner_kwargs)
