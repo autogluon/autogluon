@@ -217,7 +217,8 @@ class FeatureImportance(AbstractVisualization, JupyterMixin):
     def _render(self, state: AnalysisState) -> None:
         self.render_header_if_needed(state, "Feature Importance")
         importance = state.model_evaluation.importance
-        self.display_obj(importance)
+        with pd.option_context("display.max_rows", 100 if len(importance) <= 100 else 20):
+            self.display_obj(importance)
         if self.show_barplots:
             fig_args = self.fig_args.copy()
             if "figsize" not in fig_args:
@@ -269,4 +270,6 @@ class ModelLeaderboard(AbstractVisualization, JupyterMixin):
 
     def _render(self, state: AnalysisState) -> None:
         self.render_header_if_needed(state, "Model Leaderboard")
-        self.display_obj(state.model_evaluation.leaderboard)
+        df = state.model_evaluation.leaderboard
+        with pd.option_context("display.max_rows", 100 if len(df) <= 100 else 20):
+            self.display_obj(df)

@@ -104,7 +104,7 @@ class Correlation(AbstractAnalysis):
             if self.method == "phik":
                 state.correlations[ds] = df.phik_matrix(**self.args, verbose=False)
             else:
-                state.correlations[ds] = df.corr(method=self.method, **self.args)
+                state.correlations[ds] = df.corr(method=self.method, numeric_only=True, **self.args)
 
             if self.focus_field is not None and self.focus_field in state.correlations[ds].columns:
                 state.correlations_focus_field = self.focus_field

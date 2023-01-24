@@ -20,6 +20,7 @@ from ..analysis import (
 from ..analysis.base import AbstractAnalysis, BaseAnalysis
 from ..analysis.dataset import DatasetSummary, RawTypesAnalysis, Sampler, SpecialTypesAnalysis, VariableTypeAnalysis
 from ..analysis.interaction import FeatureDistanceAnalysis
+from ..state import is_key_present_in_state
 from ..visualization import (
     ConfusionMatrix,
     CorrelationVisualization,
@@ -29,6 +30,7 @@ from ..visualization import (
     FeatureInteractionVisualization,
     MarkdownSectionComponent,
     ModelLeaderboard,
+    PropertyRendererComponent,
     RegressionEvaluation,
     XShiftSummary,
 )
@@ -254,6 +256,8 @@ def quick_fit(
         - confusion matrix for classification problems; predictions vs actual for regression problems
         - model leaderboard
         - feature importance
+        - samples with the highest prediction error - candidates for inspection
+        - smaples with the least distance from the other class - candidates for labeling
 
     Supported `fig_args`/`chart_args` keys:
         - confusion_matrix - confusion matrix chart for classification predictor
@@ -377,6 +381,19 @@ def quick_fit(
                 fig_args=fig_args.get("feature_importance", {}),
                 **chart_args.get("feature_importance", {}),
             ),
+            MarkdownSectionComponent(markdown="### Rows with the highest prediction error"),
+            MarkdownSectionComponent(markdown="Rows in this category worth inspecting for the causes of the error"),
+            PropertyRendererComponent("model_evaluation.highest_error", transform_fn=(lambda df: df.head(10))),
+            MarkdownSectionComponent(
+                condition_fn=(lambda state: is_key_present_in_state(state, "model_evaluation.undecided")),
+                markdown="### Rows with the least distance vs other class",
+            ),
+            MarkdownSectionComponent(
+                condition_fn=(lambda state: is_key_present_in_state(state, "model_evaluation.undecided")),
+                markdown="Rows in this category are the closest to the decision boundary vs the other class "
+                "and are good candidates for additional labeling",
+            ),
+            PropertyRendererComponent("model_evaluation.undecided", transform_fn=(lambda df: df.head(10))),
         ],
     )
 
