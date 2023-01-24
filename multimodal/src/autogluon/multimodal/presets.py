@@ -1,6 +1,18 @@
 from typing import List, Optional
 
-from .constants import BINARY, DATA, ENVIRONMENT, MODEL, MULTICLASS, OPTIMIZATION, REGRESSION, BEST_QUALITY, HIGH_QUALITY_FAST_INFERENCE, MEDIUM_QUALITY_FASTER_TRAIN
+from .constants import (
+    BEST_QUALITY,
+    BINARY,
+    DATA,
+    DEFAULT,
+    ENVIRONMENT,
+    HIGH_QUALITY_FAST_INFERENCE,
+    MEDIUM_QUALITY_FASTER_INFERENCE,
+    MODEL,
+    MULTICLASS,
+    OPTIMIZATION,
+    REGRESSION,
+)
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")
@@ -8,7 +20,7 @@ matcher_presets = Registry("matcher_presets")
 
 
 @automm_presets.register()
-def default(presets: str = "default", hpo: bool = False):
+def default(presets: str = DEFAULT, hpo: bool = False):
     hyperparameters = {
         "model.names": [
             "categorical_mlp",
@@ -21,14 +33,7 @@ def default(presets: str = "default", hpo: bool = False):
     }
     hyperparameter_tune_kwargs = None
 
-    if hpo:
-        hyperparameter_tune_kwargs = {
-            "searcher": "random",
-            "scheduler": "ASHA",
-            'num_trials': 128,
-        }
-
-    if presets in [HIGH_QUALITY_FAST_INFERENCE, "default"]:
+    if presets in [HIGH_QUALITY_FAST_INFERENCE, DEFAULT]:
         if hpo:
             pass
         else:
@@ -38,28 +43,22 @@ def default(presets: str = "default", hpo: bool = False):
                     "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
                 }
             )
-    elif presets == MEDIUM_QUALITY_FASTER_TRAIN:
-        if hpo:
-            pass
-        else:
-            hyperparameters.update(
-                {
-                    "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
-                    "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
-                    "optimization.learning_rate": 4e-4,
-                }
-            )
+    elif presets == MEDIUM_QUALITY_FASTER_INFERENCE:
+        hyperparameters.update(
+            {
+                "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
+                "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+                "optimization.learning_rate": 4e-4,
+            }
+        )
     elif presets == BEST_QUALITY:
-        if hpo:
-            pass
-        else:
-            hyperparameters.update(
-                {
-                    "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
-                    "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
-                    "env.per_gpu_batch_size": 1,
-                }
-            )
+        hyperparameters.update(
+            {
+                "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
+                "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
+                "env.per_gpu_batch_size": 1,
+            }
+        )
     elif presets == "multilingual":
         hyperparameters.update(
             {
@@ -76,108 +75,9 @@ def default(presets: str = "default", hpo: bool = False):
     return hyperparameters, hyperparameter_tune_kwargs
 
 
-# @automm_presets.register()
-# def high_quality_fast_inference():
-#     return {
-#         "model.names": [
-#             "categorical_mlp",
-#             "numerical_mlp",
-#             "timm_image",
-#             "hf_text",
-#             "fusion_mlp",
-#         ],
-#         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
-#         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-#         "env.num_workers": 2,
-#     }
-
-
-# @automm_presets.register()
-# def default():
-#     return automm_presets.create("high_quality_fast_inference")
-
-
-# @automm_presets.register()
-# def medium_quality_faster_train():
-#     return {
-#         "model.names": [
-#             "categorical_mlp",
-#             "numerical_mlp",
-#             "timm_image",
-#             "hf_text",
-#             "fusion_mlp",
-#         ],
-#         "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
-#         "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
-#         "optimization.learning_rate": 4e-4,
-#         "env.num_workers": 2,
-#     }
-
-
-# @automm_presets.register()
-# def medium_quality_faster_inference_image_classification():
-#     return {
-#         "model.names": ["timm_image"],
-#         "model.timm_image.checkpoint_name": "mobilenetv3_large_100",
-#         "optimization.learning_rate": 1e-3,
-#         "env.num_workers": 2,
-#     }
-#
-#
-# @automm_presets.register()
-# def high_quality_fast_inference_image_classification():
-#     return {
-#         "model.names": ["timm_image"],
-#         "model.timm_image.checkpoint_name": "resnet50",
-#         "optimization.learning_rate": 1e-3,
-#         "env.num_workers": 2,
-#     }
-#
-#
-# @automm_presets.register()
-# def high_quality():
-#     return {
-#         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
-#         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
-#         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-#         "env.num_workers": 2,
-#     }
-#
-#
-# @automm_presets.register()
-# def best_quality():
-#     return {
-#         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
-#         "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
-#         "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
-#         "env.per_gpu_batch_size": 1,
-#         "env.num_workers": 2,
-#     }
-
-
-# @automm_presets.register()
-# def high_quality_image_classification():
-#     return {
-#         "model.names": ["timm_image"],
-#         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-#         "env.num_workers": 2,
-#     }
-
-
-# @automm_presets.register()
-# def multilingual():
-#     return {
-#         "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
-#         "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
-#         "optimization.top_k": 1,
-#         "env.precision": "bf16",
-#         "env.per_gpu_batch_size": 4,
-#     }
-
-
 @automm_presets.register()
-def few_shot_text_classification():
-    return {
+def few_shot_text_classification(presets: str = DEFAULT, hpo: bool = False):
+    hyperparameters = {
         "model.names": ["t_few"],
         "model.t_few.checkpoint_name": "google/flan-t5-xl",  # 3B model. google/flan-t5-xxl for 11B model.
         "model.t_few.gradient_checkpointing": True,
@@ -199,65 +99,54 @@ def few_shot_text_classification():
         "data.templates.turn_on": True,
         "env.eval_batch_size_ratio": 2,
     }
+    hyperparameter_tune_kwargs = None
+
+    return hyperparameters, hyperparameter_tune_kwargs
 
 
 @automm_presets.register()
-def few_shot_text_classification_tfew():
-    return {
-        "model.names": ["t_few"],
-        "model.t_few.checkpoint_name": "bigscience/T0_3B",
-        "model.t_few.gradient_checkpointing": True,
-        "optimization.learning_rate": 3e-3,
-        "optimization.lr_decay": 1.0,
-        "optimization.efficient_finetune": "ia3",
-        "optimization.max_steps": 1000,  # Find better solution to train for long
-        "optimization.check_val_every_n_epoch": 10,  # Might need adjustment
-        "optimization.val_check_interval": 1.0,
-        "optimization.top_k_average_method": "best",
-        "optimization.warmup_steps": 0.06,
-        "optimization.lora.module_filter": [".*SelfAttention|.*EncDecAttention|.*DenseReluDense"],
-        "optimization.lora.filter": ["k|v|wi_1.*"],
-        "optimization.top_k": 1,
-        "optimization.max_epochs": -1,
-        "env.batch_size": 8,
-        "env.per_gpu_batch_size": 8,
-        "env.eval_batch_size_ratio": 2,
-        "env.precision": "bf16",
-        "data.templates.turn_on": True,
-    }
-
-
-# # TODO: Consider to remove this preset
-# @automm_presets.register()
-# def zero_shot_classification():
-#     return {
-#         "model.names": ["hf_text"],
-#         "model.hf_text.checkpoint_name": "cross-encoder/ms-marco-MiniLM-L-12-v2",
-#         "env.eval_batch_size_ratio": 1,
-#     }
-
-
-@automm_presets.register()
-def zero_shot_image_classification(presets: str = "default", hpo: bool = False):
-    return {
+def zero_shot_image_classification(presets: str = DEFAULT, hpo: bool = False):
+    hyperparameters = {
         "model.names": ["clip"],
-        "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
         "model.clip.max_text_len": 0,
-        "env.eval_batch_size_ratio": 1,
         "env.num_workers": 2,
     }
+    hyperparameter_tune_kwargs = None
+
+    if presets in [DEFAULT, BEST_QUALITY]:
+        hyperparameters.update(
+            {
+                "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+                "env.eval_batch_size_ratio": 1,
+            }
+        )
+    elif presets == HIGH_QUALITY_FAST_INFERENCE:
+        hyperparameters.update(
+            {
+                "model.clip.checkpoint_name": "openai/clip-vit-large-patch14",
+                "env.eval_batch_size_ratio": 1,
+            }
+        )
+    elif presets == MEDIUM_QUALITY_FASTER_INFERENCE:
+        hyperparameters.update(
+            {
+                "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
+            }
+        )
+    else:
+        raise ValueError(f"Unknown preset type: {presets}")
+
+    return hyperparameters, hyperparameter_tune_kwargs
 
 
 @automm_presets.register()
-def medium_quality_faster_inference_object_detection():
-    return {
+def object_detection(presets: str = DEFAULT, hpo: bool = False):
+    hyperparameters = {
         "model.names": ["mmdet_image"],
-        "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
         "env.eval_batch_size_ratio": 1,
         "env.precision": 32,
         "env.strategy": "ddp",
         "env.auto_select_gpus": False,  # Have to turn off for detection!
-        "optimization.learning_rate": 1e-4,
         "optimization.lr_decay": 0.95,
         "optimization.lr_mult": 100,
         "optimization.lr_choice": "two_stages",
@@ -265,266 +154,200 @@ def medium_quality_faster_inference_object_detection():
         "optimization.top_k_average_method": "best",
         "optimization.warmup_steps": 0.0,
         "optimization.patience": 10,
-        "optimization.max_epochs": 10,
-        "optimization.val_metric": "direct_loss",
         "env.num_workers": 2,
     }
+    hyperparameter_tune_kwargs = None
+
+    if presets in [DEFAULT, MEDIUM_QUALITY_FASTER_INFERENCE]:
+        hyperparameters.update(
+            {
+                "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
+                "optimization.learning_rate": 1e-4,
+                "optimization.max_epochs": 10,
+                "optimization.val_metric": "direct_loss",
+            }
+        )
+    elif presets == HIGH_QUALITY_FAST_INFERENCE:
+        hyperparameters.update(
+            {
+                "model.mmdet_image.checkpoint_name": "yolov3_d53_mstrain-416_273e_coco",
+                "optimization.learning_rate": 1e-5,
+                "optimization.max_epochs": 20,
+                "optimization.val_metric": "map",
+            }
+        )
+    elif presets == BEST_QUALITY:
+        hyperparameters.update(
+            {
+                "model.mmdet_image.checkpoint_name": "vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco",
+                "optimization.learning_rate": 1e-5,
+                "optimization.max_epochs": 30,
+                "optimization.val_metric": "map",
+            }
+        )
+    else:
+        raise ValueError(f"Unknown preset type: {presets}")
+
+    return hyperparameters, hyperparameter_tune_kwargs
 
 
 @automm_presets.register()
-def high_quality_fast_inference_object_detection():
-    return {
-        "model.names": ["mmdet_image"],
-        "model.mmdet_image.checkpoint_name": "yolov3_d53_mstrain-416_273e_coco",
-        "env.eval_batch_size_ratio": 1,
-        "env.precision": 32,
-        "env.strategy": "ddp",
-        "env.auto_select_gpus": False,  # Have to turn off for detection!
-        "env.num_workers": 2,
-        "optimization.learning_rate": 1e-5,
-        "optimization.lr_decay": 0.95,
-        "optimization.lr_mult": 100,
-        "optimization.lr_choice": "two_stages",
-        "optimization.top_k": 1,
-        "optimization.top_k_average_method": "best",
-        "optimization.warmup_steps": 0.0,
-        "optimization.patience": 10,
-        "optimization.max_epochs": 20,
-        "optimization.val_metric": "map",
-    }
+def ocr_text_detection(presets: str = DEFAULT, hpo: bool = False):
 
-
-@automm_presets.register()
-def higher_quality_object_detection():
-    return {
-        "model.names": ["mmdet_image"],
-        "model.mmdet_image.checkpoint_name": "vfnet_r50_fpn_mdconv_c3-c5_mstrain_2x_coco",
-        "env.eval_batch_size_ratio": 1,
-        "env.precision": 32,
-        "env.strategy": "ddp",
-        "env.auto_select_gpus": False,  # Have to turn off for detection!
-        "env.num_workers": 2,
-        "optimization.learning_rate": 5e-6,
-        "optimization.lr_decay": 0.95,
-        "optimization.lr_mult": 100,
-        "optimization.lr_choice": "two_stages",
-        "optimization.top_k": 1,
-        "optimization.top_k_average_method": "best",
-        "optimization.warmup_steps": 0.0,
-        "optimization.patience": 10,
-        "optimization.max_epochs": 30,
-        "optimization.val_metric": "map",
-    }
-
-
-@automm_presets.register()
-def best_quality_object_detection():
-    return {
-        "model.names": ["mmdet_image"],
-        "model.mmdet_image.checkpoint_name": "vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco",
-        "env.eval_batch_size_ratio": 1,
-        "env.precision": 32,
-        "env.strategy": "ddp",
-        "env.auto_select_gpus": False,  # Have to turn off for detection!
-        "env.num_workers": 2,
-        "optimization.learning_rate": 1e-5,
-        "optimization.lr_decay": 0.95,
-        "optimization.lr_mult": 100,
-        "optimization.lr_choice": "two_stages",
-        "optimization.top_k": 1,
-        "optimization.top_k_average_method": "best",
-        "optimization.warmup_steps": 0.0,
-        "optimization.patience": 10,
-        "optimization.max_epochs": 30,
-        "optimization.val_metric": "map",
-    }
-
-
-@automm_presets.register()
-def object_detection():
-    return {
-        "model.names": ["mmdet_image"],
-        "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
-        "env.eval_batch_size_ratio": 1,
-        "env.precision": 32,
-        "env.strategy": "ddp",  # TODO: support ddp_spawn for detection
-        "env.auto_select_gpus": False,  # Have to turn off for detection!
-        "env.num_workers": 2,
-        "optimization.learning_rate": 5e-5,
-        "optimization.lr_decay": 0.95,
-        "optimization.lr_mult": 100,
-        "optimization.lr_choice": "two_stages",
-        "optimization.top_k": 1,
-        "optimization.top_k_average_method": "best",
-        "optimization.warmup_steps": 0.0,
-        "optimization.patience": 40,
-    }
-
-
-@automm_presets.register()
-def ocr_text_detection():
-    return {
+    hyperparameters = {
         "model.names": ["mmocr_text_detection"],
         "model.mmocr_text_detection.checkpoint_name": "TextSnake",
         "env.eval_batch_size_ratio": 1,
         "env.num_gpus": 1,
         "env.precision": 32,
     }
+    hyperparameter_tune_kwargs = None
+
+    return hyperparameters, hyperparameter_tune_kwargs
 
 
 @automm_presets.register()
-def ocr_text_recognition():
-    return {
+def ocr_text_recognition(presets: str = DEFAULT, hpo: bool = False):
+    hyperparameters = {
         "model.names": ["mmocr_text_recognition"],
         "model.mmocr_text_recognition.checkpoint_name": "ABINet",
         "env.eval_batch_size_ratio": 1,
         "env.num_gpus": 1,
         "env.precision": 32,
     }
+    hyperparameter_tune_kwargs = None
+
+    return hyperparameters, hyperparameter_tune_kwargs
 
 
 @automm_presets.register()
-def feature_extraction():
-    return {
+def feature_extraction(
+    presets: str = DEFAULT, hpo: bool = False
+):  # TODO: rename the problem type as text_feature_extraction?
+
+    hyperparameters = {
         "model.names": ["hf_text"],
         "model.hf_text.checkpoint_name": "sentence-transformers/msmarco-MiniLM-L-12-v3",
         "model.hf_text.pooling_mode": "mean",
         "env.eval_batch_size_ratio": 1,
     }
+    hyperparameter_tune_kwargs = None
+
+    return hyperparameters, hyperparameter_tune_kwargs
 
 
 @automm_presets.register()
 @matcher_presets.register()
-def siamese_network():
-    return automm_presets.create("default")
+def image_similarity(presets: str = DEFAULT, hpo: bool = False):
 
-
-@automm_presets.register()
-@matcher_presets.register()
-def best_quality_image_similarity():
-    return {
+    hyperparameters = {
         "model.names": ["timm_image"],
-        "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
         "env.num_workers": 2,
     }
+    hyperparameter_tune_kwargs = None
+
+    if presets in [DEFAULT, HIGH_QUALITY_FAST_INFERENCE]:
+        hyperparameters.update(
+            {
+                "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+            }
+        )
+    elif presets == MEDIUM_QUALITY_FASTER_INFERENCE:
+        hyperparameters.update(
+            {
+                "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+            }
+        )
+    elif presets == BEST_QUALITY:
+        hyperparameters.update(
+            {
+                "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
+            }
+        )
+    else:
+        raise ValueError(f"Unknown preset type: {presets}")
+
+    return hyperparameters, hyperparameter_tune_kwargs
 
 
 @automm_presets.register()
 @matcher_presets.register()
-def high_quality_fast_inference_image_similarity():
-    return {
-        "model.names": ["timm_image"],
-        "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-        "env.num_workers": 2,
-    }
+def text_similarity(presets: str = DEFAULT, hpo: bool = False):
 
-
-@automm_presets.register()
-@matcher_presets.register()
-def medium_quality_faster_inference_image_similarity():
-    return {
-        "model.names": ["timm_image"],
-        "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
-        "env.num_workers": 2,
-    }
-
-
-@automm_presets.register()
-@matcher_presets.register()
-def image_similarity():
-    return automm_presets.create("high_quality_fast_inference_image_similarity")
-
-
-@automm_presets.register()
-@matcher_presets.register()
-def best_quality_text_similarity():
-    return {
+    hyperparameters = {
         "model.names": ["hf_text"],
-        "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",
         "model.hf_text.pooling_mode": "mean",
         "data.categorical.convert_to_text": True,
         "data.numerical.convert_to_text": True,
     }
+    hyperparameter_tune_kwargs = None
+
+    if presets in [DEFAULT, HIGH_QUALITY_FAST_INFERENCE]:
+        hyperparameters.update(
+            {
+                "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L12-v2",
+            }
+        )
+    elif presets == MEDIUM_QUALITY_FASTER_INFERENCE:
+        hyperparameters.update(
+            {
+                "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
+            }
+        )
+    elif presets == BEST_QUALITY:
+        hyperparameters.update(
+            {
+                "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",
+            }
+        )
+    else:
+        raise ValueError(f"Unknown preset type: {presets}")
+
+    return hyperparameters, hyperparameter_tune_kwargs
 
 
 @automm_presets.register()
 @matcher_presets.register()
-def high_quality_fast_inference_text_similarity():
-    return {
-        "model.names": ["hf_text"],
-        "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L12-v2",
-        "model.hf_text.pooling_mode": "mean",
-        "data.categorical.convert_to_text": True,
-        "data.numerical.convert_to_text": True,
-    }
-
-
-@automm_presets.register()
-@matcher_presets.register()
-def medium_quality_faster_inference_text_similarity():
-    return {
-        "model.names": ["hf_text"],
-        "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
-        "model.hf_text.pooling_mode": "mean",
-        "data.categorical.convert_to_text": True,
-        "data.numerical.convert_to_text": True,
-    }
-
-
-@automm_presets.register()
-@matcher_presets.register()
-def text_similarity():
-    return automm_presets.create("high_quality_fast_inference_text_similarity")
-
-
-@automm_presets.register()
-@matcher_presets.register()
-def best_quality_image_text_similarity():
-    return {
+def image_text_similarity(presets: str = DEFAULT, hpo: bool = False):
+    hyperparameters = {
         "model.names": ["clip"],
-        "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
         "matcher.loss.type": "multi_negatives_softmax_loss",
-        "env.per_gpu_batch_size": 8,
         "optimization.learning_rate": 1e-5,
         "env.num_workers": 2,
     }
+    hyperparameter_tune_kwargs = None
+
+    if presets in [DEFAULT, MEDIUM_QUALITY_FASTER_INFERENCE]:
+        hyperparameters.update(
+            {
+                "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
+                "env.per_gpu_batch_size": 128,
+            }
+        )
+    elif presets == HIGH_QUALITY_FAST_INFERENCE:
+        hyperparameters.update(
+            {
+                "model.clip.checkpoint_name": "openai/clip-vit-large-patch14",
+                "env.per_gpu_batch_size": 16,
+            }
+        )
+    elif presets == BEST_QUALITY:
+        hyperparameters.update(
+            {
+                "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+                "env.per_gpu_batch_size": 8,
+            }
+        )
+    else:
+        raise ValueError(f"Unknown preset type: {presets}")
+
+    return hyperparameters, hyperparameter_tune_kwargs
 
 
 @automm_presets.register()
-@matcher_presets.register()
-def high_quality_fast_inference_image_text_similarity():
-    return {
-        "model.names": ["clip"],
-        "model.clip.checkpoint_name": "openai/clip-vit-large-patch14",
-        "matcher.loss.type": "multi_negatives_softmax_loss",
-        "env.per_gpu_batch_size": 16,
-        "optimization.learning_rate": 1e-5,
-        "env.num_workers": 2,
-    }
+def ner(presets: str = DEFAULT, hpo: bool = False):
 
-
-@automm_presets.register()
-@matcher_presets.register()
-def image_text_similarity():
-    return automm_presets.create("medium_quality_faster_inference_image_text_similarity")
-
-
-@automm_presets.register()
-@matcher_presets.register()
-def medium_quality_faster_inference_image_text_similarity():
-    return {
-        "model.names": ["clip"],
-        "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
-        "matcher.loss.type": "multi_negatives_softmax_loss",
-        "env.per_gpu_batch_size": 128,
-        "optimization.learning_rate": 1e-5,
-        "env.num_workers": 2,
-    }
-
-
-@automm_presets.register()
-def best_quality_ner():
-    return {
+    hyperparameters = {
         "model.names": [
             "categorical_mlp",
             "numerical_mlp",
@@ -532,42 +355,32 @@ def best_quality_ner():
             "ner_text",
             "fusion_ner",
         ],
-        "model.ner_text.checkpoint_name": "microsoft/deberta-v3-large",
-        "env.per_gpu_batch_size": 4,
     }
+    hyperparameter_tune_kwargs = None
 
+    if presets in [DEFAULT, HIGH_QUALITY_FAST_INFERENCE]:
+        hyperparameters.update(
+            {
+                "model.ner_text.checkpoint_name": "microsoft/deberta-v3-base",
+            }
+        )
+    elif presets == MEDIUM_QUALITY_FASTER_INFERENCE:
+        hyperparameters.update(
+            {
+                "model.ner_text.checkpoint_name": "google/electra-small-discriminator",
+            }
+        )
+    elif presets == BEST_QUALITY:
+        hyperparameters.update(
+            {
+                "model.ner_text.checkpoint_name": "microsoft/deberta-v3-large",
+                "env.per_gpu_batch_size": 4,
+            }
+        )
+    else:
+        raise ValueError(f"Unknown preset type: {presets}")
 
-@automm_presets.register()
-def medium_quality_faster_inference_ner():
-    return {
-        "model.names": [
-            "categorical_mlp",
-            "numerical_mlp",
-            "timm_image",
-            "ner_text",
-            "fusion_ner",
-        ],
-        "model.ner_text.checkpoint_name": "google/electra-small-discriminator",
-    }
-
-
-@automm_presets.register()
-def high_quality_fast_inference_ner():
-    return {
-        "model.names": [
-            "categorical_mlp",
-            "numerical_mlp",
-            "timm_image",
-            "ner_text",
-            "fusion_ner",
-        ],
-        "model.ner_text.checkpoint_name": "microsoft/deberta-v3-base",
-    }
-
-
-@automm_presets.register()
-def ner():
-    return automm_presets.create("high_quality_fast_inference_ner")
+    return hyperparameters, hyperparameter_tune_kwargs
 
 
 def list_automm_presets(verbose: bool = False):
@@ -603,13 +416,13 @@ def get_basic_automm_config(extra: Optional[List[str]] = None):
     """
     config = {
         MODEL: "fusion_mlp_image_text_tabular",
-        DATA: "default",
+        DATA: DEFAULT,
         OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
+        ENVIRONMENT: DEFAULT,
     }
     if extra:
         for k in extra:
-            config[k] = "default"
+            config[k] = DEFAULT
 
     return config
 
@@ -638,7 +451,7 @@ def get_automm_presets(problem_type: str, presets: str):
         MULTICLASS,
         REGRESSION,
     ]:
-        problem_type = "default"
+        problem_type = DEFAULT
 
     if problem_type in automm_presets.list_keys():
         hyperparameters, hyperparameter_tune_kwargs = automm_presets.create(problem_type, presets)
@@ -648,33 +461,3 @@ def get_automm_presets(problem_type: str, presets: str):
         )
 
     return hyperparameters, hyperparameter_tune_kwargs
-
-
-def get_preset_str(problem_type: str, presets: str):
-    """
-    Concatenate problem type and presets to get a registered preset string.
-
-    Parameters
-    ----------
-    problem_type
-        Problem type.
-    presets
-        Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
-
-    Returns
-    -------
-    A registered preset string.
-    """
-    if problem_type in [
-        BINARY,
-        MULTICLASS,
-        REGRESSION,
-    ]:
-        return presets
-
-    if problem_type and presets:
-        return f"{presets}_{problem_type}"
-    elif problem_type:
-        return problem_type
-    else:
-        return presets
