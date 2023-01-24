@@ -661,8 +661,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     logger.error(f"\t{err}")
                     logger.debug(traceback.format_exc())
 
-        # if self.conformalizer_type is not None:
-        #     self.conformalize_model(model_name=self.get_model_best(), val_data=val_data)
+        if self.conformalizer_type is not None:
+            self.conformalize_model(model_name=self.get_model_best(), val_data=val_data)
 
         logger.info(f"Training complete. Models trained: {model_names_trained}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
