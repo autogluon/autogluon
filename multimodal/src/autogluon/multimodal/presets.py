@@ -450,6 +450,7 @@ def get_automm_presets(problem_type: str, presets: str):
         BINARY,
         MULTICLASS,
         REGRESSION,
+        None,
     ]:
         problem_type = DEFAULT
 
@@ -457,7 +458,8 @@ def get_automm_presets(problem_type: str, presets: str):
         hyperparameters, hyperparameter_tune_kwargs = automm_presets.create(problem_type, presets)
     else:
         raise ValueError(
-            f"Provided preset '{presets}' is not supported. " f"Consider one of these: {automm_presets.list_keys()}"
+            f"Problem type '{problem_type}' doesn't have any presets yet. "
+            f"Consider one of these: {automm_presets.list_keys()}"
         )
 
     return hyperparameters, hyperparameter_tune_kwargs
