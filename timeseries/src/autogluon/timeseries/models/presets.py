@@ -14,6 +14,9 @@ from . import (
     SeasonalNaiveModel,
     SimpleFeedForwardModel,
     ThetaModel,
+    AutoETSStatsForecastModel,
+    AutoARIMAStatsForecastModel,
+    DynamicOptimizedThetaStatsForecastModel,
 )
 from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
 
@@ -30,6 +33,9 @@ MODEL_TYPES = dict(
     AutoGluonTabular=AutoGluonTabularModel,
     Naive=NaiveModel,
     SeasonalNaive=SeasonalNaiveModel,
+    AutoETS=AutoETSStatsForecastModel,
+    AutoARIMA=AutoARIMAStatsForecastModel,
+    DynamicOptimizedTheta=DynamicOptimizedThetaStatsForecastModel,
 )
 if agts.MXNET_INSTALLED:
     from .gluonts.mx import (
@@ -75,6 +81,9 @@ DEFAULT_MODEL_PRIORITY = dict(
     TemporalFusionTransformerMXNet=50,
     SimpleFeedForward=40,
     TransformerMXNet=30,
+    AutoARIMA=30,
+    AutoETS=70,
+    DynamicOptimizedTheta=60,
     # Models below are not included in any presets
     AutoETSSktime=60,
     ARIMASktime=50,
