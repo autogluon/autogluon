@@ -1,5 +1,6 @@
 import logging
 import re
+from multiprocessing import cpu_count
 from typing import Any, Dict, List, Optional, Type
 
 import pandas as pd
@@ -14,6 +15,17 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractStatsForecastModel(AbstractTimeSeriesModel):
+    """Wrapper for StatsForecast models.
+
+    Cached predictions are stored inside the model to speed up validation & ensemble training downstream.
+
+    Attributes
+    ----------
+    allowed_local_model_args : List[str]
+        List of allowed arguments that can be passed to the underlying model.
+        Arguments not in this list will be filtered out and not passed to the underlying model.
+    """
+
     allowed_local_model_args: List[str] = []
 
     def get_model_type(self) -> Type:
@@ -39,17 +51,32 @@ class AbstractStatsForecastModel(AbstractTimeSeriesModel):
             hyperparameters=hyperparameters,
             **kwargs,
         )
+        # TODO: Replace with 'num_cpus' argument passed to fit (after predictor API is changed)
+        n_jobs = hyperparameters.get("n_jobs", -1)
+        if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
+            self.n_jobs = max(int(cpu_count() * n_jobs), 1)
+        elif isinstance(n_jobs, int):
+            self.n_jobs = n_jobs
+        else:
+            raise ValueError(f"n_jobs must be a float between 0 and 1 or an integer (received n_jobs = {n_jobs})")
         self._local_model_args: Dict[str, Any] = None
         self._cached_predictions: Dict[str, pd.DataFrame] = {}
 
     def _fit(self, train_data, time_limit=None, verbosity=2, **kwargs) -> None:
+        """Prepare hyperparameters that will be passed to the underlying model.
+
+        As for all local models, actual fitting + predictions are delegated to the ``predict`` method.
+        """
+        # TODO: Find a way to ensure that SF models respect time_limit
         # Fitting usually takes >= 20 seconds
         if time_limit is not None and time_limit < 20:
             raise TimeLimitExceeded
 
         unused_local_model_args = []
+        raw_local_model_args = self._get_model_params().copy()
+        raw_local_model_args.pop("n_jobs", None)
         local_model_args = {}
-        for key, value in self._get_model_params().copy().items():
+        for key, value in raw_local_model_args.items():
             if key in self.allowed_local_model_args:
                 local_model_args[key] = value
             else:
@@ -75,11 +102,12 @@ class AbstractStatsForecastModel(AbstractTimeSeriesModel):
         """Update arguments passed to the local model (e.g., overriding defaults)"""
         return local_model_args
 
-    def _to_statsforecast_dataframe(self, data: TimeSeriesDataFrame):
+    def _to_statsforecast_dataframe(self, data: TimeSeriesDataFrame) -> pd.DataFrame:
         target = data[[self.target]]
         return target.reset_index().rename({ITEMID: "unique_id", TIMESTAMP: "ds", self.target: "y"}, axis=1)
 
     def _fit_and_cache_predictions(self, data: TimeSeriesDataFrame):
+        """Make predictions for time series in data that are not cached yet."""
         # TODO: Improve prediction caching logic -> save predictions to a separate file, like in Tabular?
         from statsforecast import StatsForecast
         from statsforecast.models import SeasonalNaive
@@ -98,7 +126,7 @@ class AbstractStatsForecastModel(AbstractTimeSeriesModel):
                 fallback_model=SeasonalNaive(season_length=self._local_model_args["season_length"]),
                 sort_df=False,
                 freq=self.freq,
-                n_jobs=-1,
+                n_jobs=self.n_jobs,
             )
 
             # StatsForecast generates probabilistic forecasts in lo/hi confidence region boundaries
@@ -128,6 +156,12 @@ class AbstractStatsForecastModel(AbstractTimeSeriesModel):
             self.save()
 
     def predict(self, data: TimeSeriesDataFrame, **kwargs) -> TimeSeriesDataFrame:
+        if self.freq != data.freq:
+            raise RuntimeError(
+                f"{self.name} has frequency '{self.freq}', which doesn't match the frequency "
+                f"of the dataset '{data.freq}'."
+            )
+
         self._fit_and_cache_predictions(data)
         item_id_to_prediction = {}
         for item_id, ts_hash in hash_ts_dataframe_items(data).items():

@@ -32,6 +32,7 @@ install_requires = [
     "torch>=1.9,<1.14",
     "pytorch-lightning>=1.7.4,<1.9.0",
     "networkx",
+    "statsforecast==1.4.0",
     "tqdm",
     f"autogluon.core[raytune]=={version}",
     f"autogluon.common=={version}",

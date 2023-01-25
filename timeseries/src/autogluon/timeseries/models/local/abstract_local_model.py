@@ -40,6 +40,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         )
         if hyperparameters is None:
             hyperparameters = {}
+        # TODO: Replace with 'num_cpus' argument passed to fit (after predictor API is changed)
         n_jobs = hyperparameters.get("n_jobs", 0.5)
         if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
             self.n_jobs = max(int(cpu_count() * n_jobs), 1)
