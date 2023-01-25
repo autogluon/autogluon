@@ -50,6 +50,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
     }
 
     PREDICTION_BATCH_SIZE = 100_000
+    MAX_STEPS = 10
 
     TIMESERIES_METRIC_TO_TABULAR_METRIC = {
         "MASE": "mean_absolute_error",
@@ -232,13 +233,13 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
 
         df = pd.DataFrame(data).reset_index(level=TIMESTAMP)
         timestamps = pd.DatetimeIndex(df.pop(TIMESTAMP))
-        features = df.groupby(level=ITEMID, sort=False).apply(get_lag_features_and_target)
+        features = df.groupby(level=ITEMID, sort=False, group_keys=False).apply(get_lag_features_and_target)
 
         for time_feat in self._time_features:
             features[time_feat.__name__] = time_feat(timestamps)
 
         if last_k_values is not None:
-            features = features.groupby(level=ITEMID, sort=False).tail(last_k_values)
+            features = features.groupby(level=ITEMID, sort=False, group_keys=False).tail(last_k_values)
 
         if data.static_features is not None:
             features = pd.merge(features, data.static_features, how="left", on=ITEMID, suffixes=(None, "_static_feat"))
@@ -259,8 +260,8 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             raise AssertionError(f"{self.name} predictor has already been fit!")
         verbosity = kwargs.get("verbosity", 2)
         self._target_lag_indices = np.array(get_lags_for_frequency(train_data.freq), dtype=np.int64)
-        self._past_covariates_lag_indices = self._target_lag_indices
-        self._known_covariates_lag_indices = np.concatenate([[0], self._target_lag_indices])
+        self._past_covariates_lag_indices = self._target_lag_indices[: self.MAX_STEPS]
+        self._known_covariates_lag_indices = np.concatenate([[0], self._target_lag_indices])[: self.MAX_STEPS]
         self._time_features = time_features_from_frequency_str(train_data.freq)
 
         train_data, _ = self._normalize_targets(train_data)
@@ -275,6 +276,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
 
         if len(train_df) > max_train_size:
             train_df = train_df.sample(max_train_size)
+        logger.debug(f"Generated training dataframe with shape {val_df.shape}")
 
         if val_data is not None:
             if val_data.freq != train_data.freq:
@@ -287,6 +289,8 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
 
             if len(val_df) > max_train_size:
                 val_df = val_df.sample(max_train_size)
+
+            logger.debug(f"Generated validation dataframe with shape {val_df.shape}")
         else:
             logger.warning(
                 f"No val_data was provided to {self.name}. "

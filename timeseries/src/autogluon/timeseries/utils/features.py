@@ -86,7 +86,7 @@ class TimeSeriesFeatureGenerator:
         logger.info(f"\ttarget:           '{self.target}'")
         if len(self.known_covariates_names) > 0:
             logger.info(f"\tknown covariates: {self.known_covariates_names}")
-        if len(self.known_covariates_names) > 0:
+        if len(self.past_covariates_names) > 0:
             logger.info(f"\tpast covariates:  {self.past_covariates_names}")
 
         static_features_cat = []
