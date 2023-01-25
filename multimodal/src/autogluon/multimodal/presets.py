@@ -16,9 +16,11 @@ def high_quality_fast_inference():
             "timm_image",
             "hf_text",
             "fusion_mlp",
+            "document_transformer",
         ],
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+        "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-base",
         "env.num_workers": 2,
     }
 
@@ -321,6 +323,48 @@ def feature_extraction():
         "model.hf_text.checkpoint_name": "sentence-transformers/msmarco-MiniLM-L-12-v3",
         "model.hf_text.pooling_mode": "mean",
         "env.eval_batch_size_ratio": 1,
+    }
+
+
+@automm_presets.register()
+def high_quality_fast_inference_document_classification():
+    return {
+        "model.names": [
+            "categorical_mlp",
+            "numerical_mlp",
+            "timm_image",
+            "hf_text",
+            "document_transformer",
+        ],
+        "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-base",
+    }
+
+
+@automm_presets.register()
+def best_quality_document_classification():
+    return {
+        "model.names": [
+            "categorical_mlp",
+            "numerical_mlp",
+            "timm_image",
+            "hf_text",
+            "document_transformer",
+        ],
+        "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-large",
+    }
+
+
+@automm_presets.register()
+def medium_quality_faster_inference_document_classification():
+    return {
+        "model.names": [
+            "categorical_mlp",
+            "numerical_mlp",
+            "timm_image",
+            "hf_text",
+            "document_transformer",
+        ],
+        "model.document_transformer.checkpoint_name": "microsoft/layoutlm-base-uncased",
     }
 
 

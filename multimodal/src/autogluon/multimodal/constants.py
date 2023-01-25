@@ -9,6 +9,7 @@ NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
 IMAGE_BYTEARRAY = "image_bytearray"
 IDENTIFIER = "identifier"
+DOCUMENT = "document"
 
 # Problem types
 CLASSIFICATION = "classification"
@@ -40,6 +41,10 @@ CHOICES_IDS = "choices_ids"
 TEXT_VALID_LENGTH = "text_valid_length"
 TEXT_SEGMENT_IDS = "text_segment_ids"
 COLUMN = "column"
+ATTENTION_MASK = "attention_mask"
+TOKEN_TYPE_IDS = "token_type_ids"
+PIXEL_VALUES = "pixel_values"
+INPUT_IDS = "input_ids"
 
 # Output keys
 LOGITS = "logits"
@@ -204,7 +209,8 @@ MMDET_IMAGE = "mmdet_image"
 MMOCR_TEXT_DET = "mmocr_text_detection"
 MMOCR_TEXT_RECOG = "mmocr_text_recognition"
 NER_TEXT = "ner_text"
-HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT)
+DOCUMENT_TRANSFORMER = "document_transformer"
+HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT, DOCUMENT_TRANSFORMER)
 MMLAB_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
 
 # matcher loss type

@@ -7,10 +7,27 @@ from typing import Dict, Iterable, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from text_unidecode import unidecode
+from timm.data.constants import (
+    IMAGENET_DEFAULT_MEAN,
+    IMAGENET_DEFAULT_STD,
+    IMAGENET_INCEPTION_MEAN,
+    IMAGENET_INCEPTION_STD,
+)
+from torchvision import transforms
 
-from ..constants import IDENTIFIER, MMLAB_MODELS
+from ..constants import CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, IDENTIFIER, IMAGE, MMLAB_MODELS
 from .collator import DictCollator
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
+
+try:
+    from torchvision.transforms import InterpolationMode
+
+    BICUBIC = InterpolationMode.BICUBIC
+except ImportError:
+    BICUBIC = PIL.Image.BICUBIC
+
+from .randaug import RandAugment
+from .trivial_augmenter import TrivialAugment
 
 
 def extract_value_from_config(
@@ -425,3 +442,97 @@ def get_text_token_max_len(provided_max_len, config, tokenizer, checkpoint_name)
         max_len = min(provided_max_len, default_max_len)
 
     return max_len
+
+
+def construct_processor(
+    size,
+    normalization,
+    transform_types: List[str],
+) -> transforms.Compose:
+    """
+    Build up an image processor from the provided list of transform types.
+
+    Parameters
+    ----------
+    transform_types
+        A list of image transform types.
+
+    Returns
+    -------
+    A torchvision transform.
+    """
+    processor = []
+    for trans_type in transform_types:
+        args = None
+        kargs = None
+        if "(" in trans_type:
+            trans_mode = trans_type[0 : trans_type.find("(")]
+            if "{" in trans_type:
+                kargs = ast.literal_eval(trans_type[trans_type.find("{") : trans_type.rfind(")")])
+            else:
+                args = ast.literal_eval(trans_type[trans_type.find("(") :])
+        else:
+            trans_mode = trans_type
+
+        if trans_mode == "resize_to_square":
+            processor.append(transforms.Resize((size, size), interpolation=BICUBIC))
+        elif trans_mode == "resize_shorter_side":
+            processor.append(transforms.Resize(size, interpolation=BICUBIC))
+        elif trans_mode == "center_crop":
+            processor.append(transforms.CenterCrop(size))
+        elif trans_mode == "horizontal_flip":
+            processor.append(transforms.RandomHorizontalFlip())
+        elif trans_mode == "vertical_flip":
+            processor.append(transforms.RandomVerticalFlip())
+        elif trans_mode == "color_jitter":
+            if kargs is not None:
+                processor.append(transforms.ColorJitter(**kargs))
+            elif args is not None:
+                processor.append(transforms.ColorJitter(*args))
+            else:
+                processor.append(transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1))
+        elif trans_mode == "affine":
+            if kargs is not None:
+                processor.append(transforms.RandomAffine(**kargs))
+            elif args is not None:
+                processor.append(transforms.RandomAffine(*args))
+            else:
+                processor.append(transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)))
+        elif trans_mode == "randaug":
+            if kargs is not None:
+                processor.append(RandAugment(**kargs))
+            elif args is not None:
+                processor.append(RandAugment(*args))
+            else:
+                processor.append(RandAugment(2, 9))
+        elif trans_mode == "trivial_augment":
+            processor.append(TrivialAugment(IMAGE, 30))
+        else:
+            raise ValueError(f"unknown transform type: {trans_mode}")
+
+    processor.append(transforms.ToTensor())
+    processor.append(normalization)
+    return transforms.Compose(processor)
+
+
+def mean_std(norm_type: str):
+    """
+    Get image normalization mean and std by its name.
+
+    Parameters
+    ----------
+    norm_type
+        Name of image normalization.
+
+    Returns
+    -------
+    Normalization mean and std.
+    """
+    if norm_type == "inception":
+        return IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
+    elif norm_type == "imagenet":
+        return IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+    elif norm_type == "clip":
+        return CLIP_IMAGE_MEAN, CLIP_IMAGE_STD
+    else:
+        raise ValueError(f"unknown image normalization: {norm_type}")

@@ -88,6 +88,28 @@ model:
     special_tags: 
       - X # CLS, SEP, and non-first tokens of a word will be labelled as X
       - O # Outside of a named entity
+  document_transformer:
+    checkpoint_name: "microsoft/layoutlmv3-base" # document foundation models
+    gradient_checkpointing: False
+    pooling_mode: 'mean'  # The pooling mode, can be 'cls' or 'mean'
+    data_types:
+      - "document"
+    train_transform_types:
+      - "resize_shorter_side"
+      - "center_crop"
+    val_transform_types:
+      - "resize_shorter_side"
+      - "center_crop"
+    image_norm: "imagenet"
+    image_size: 224
+    tokenizer_name: "hf_auto"
+    max_text_len: 512  # If None or <=0, then use the max length of pretrained models.
+    insert_sep: True
+    low_cpu_mem_usage: False
+    text_segment_num: 2
+    stochastic_chunk: False
+    text_aug_detect_length: 10                # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
+    text_trivial_aug_maxscale: 0.0            # augmentation magnitude randomly drawn from [0, text_trivial_aug_maxscale]
   t_few:
     checkpoint_name: "t5-small" #"bigscience/T0_3B"
     gradient_checkpointing: False

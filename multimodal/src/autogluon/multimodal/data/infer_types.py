@@ -7,12 +7,14 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 import PIL
+import pytesseract
 
 from ..constants import (
     AUTOMM,
     BINARY,
     CATEGORICAL,
     CLASSIFICATION,
+    DOCUMENT,
     ENTITY_GROUP,
     IDENTIFIER,
     IMAGE,
@@ -235,6 +237,67 @@ def is_image_column(
         return False
 
 
+def is_document_column(
+    data: pd.Series,
+    col_name: str,
+    image_type: Optional[str] = IMAGE_PATH,
+    sample_n: Optional[int] = 500,
+    sample_m: Optional[int] = 30,
+    text_len_threshold: Optional[int] = 50,
+) -> bool:
+    """
+    Identify if a column is a document image column.
+
+    Parameters
+    ----------
+    data
+        One column of a multimodal pd.DataFrame for training.
+    col_name
+        Name of column.
+    image_type
+        The image type to check. Set to IMAGE_PATH by default.
+    sample_n
+        Number of sample images to open for sanity check.
+    sample_m
+        Number of sample images used to check if images are documents images.
+    text_len_threshold
+        If the average text length is longer than text_len_threshold, the images will be considered as document images.
+    Returns
+    -------
+    Whether the column is a document image column.
+    """
+
+    # TODO: Add support for other types (e.g., pdf) of document.
+
+    if is_image_column(
+        data=data,
+        col_name=col_name,
+        image_type=image_type,
+        sample_n=sample_n,
+    ):
+        words_len = []
+        if len(data) > sample_m:
+            # Sample to speed-up type inference
+            data = data.sample(n=sample_m, random_state=0)
+        for images in data:
+            success = False
+            if not isinstance(images, list):
+                images = [images]
+            for per_image in images:
+                try:
+                    # convert images to string
+                    words = pytesseract.image_to_string(PIL.Image.open(per_image))
+                    words_len.append(len(words))
+                except:
+                    return False
+        if sum(words_len) / len(words_len) > text_len_threshold:
+            return True
+        else:
+            return False
+    else:
+        return False
+
+
 def is_text_column(data: pd.Series) -> bool:
     """
     Identify if a column is one text column.
@@ -434,6 +497,8 @@ def infer_column_types(
             column_types[col_name] = CATEGORICAL
         elif is_numerical_column(data[col_name], valid_data[col_name]):  # Infer numerical column
             column_types[col_name] = NUMERICAL
+        elif is_document_column(data[col_name], col_name=col_name):
+            column_types[col_name] = DOCUMENT
         elif is_image_column(data[col_name], col_name=col_name, image_type=IMAGE_PATH):  # Infer image-path column
             column_types[col_name] = IMAGE_PATH
         elif is_text_column(data[col_name]):  # Infer text column
@@ -475,7 +540,7 @@ def infer_label_column_type_by_problem_type(
     problem_type: Optional[str],
     data: Optional[pd.DataFrame] = None,
     valid_data: Optional[pd.DataFrame] = None,
-    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, NER_ANNOTATION, ROIS),
+    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, NER_ANNOTATION, ROIS, DOCUMENT),
     fallback_label_type: Optional[str] = CATEGORICAL,
 ):
     """

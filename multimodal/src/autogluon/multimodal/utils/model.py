@@ -14,6 +14,8 @@ from ..constants import (
     CATEGORICAL_MLP,
     CATEGORICAL_TRANSFORMER,
     CLIP,
+    DOCUMENT,
+    DOCUMENT_TRANSFORMER,
     FUSION_MLP,
     FUSION_NER,
     FUSION_TRANSFORMER,
@@ -37,6 +39,7 @@ from ..models import (
     CategoricalMLP,
     CategoricalTransformer,
     CLIPForImageText,
+    DocumentTransformer,
     HFAutoModelForNER,
     HFAutoModelForTextPrediction,
     MMDetAutoModelForObjectDetection,
@@ -97,6 +100,8 @@ def select_model(
         data_status[NUMERICAL] = True
     if len(df_preprocessor.ner_feature_names) > 0:
         data_status[TEXT_NER] = True
+    if len(df_preprocessor.document_feature_names) > 0:
+        data_status[DOCUMENT] = True
 
     names = config.model.names
     if isinstance(names, str):
@@ -281,6 +286,13 @@ def create_model(
             cls_token=False,
             additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
+        )
+    elif model_name.lower().startswith(DOCUMENT_TRANSFORMER):
+        model = DocumentTransformer(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            pretrained=pretrained,
         )
     elif model_name.lower().startswith(MMDET_IMAGE):
         model = MMDetAutoModelForObjectDetection(
