@@ -261,7 +261,8 @@ def process_ner_annotations(ner_annotations, ner_text, entity_map, tokenizer, is
         is_start_word = True
         for idx, word_offset in enumerate(word_offsets[:num_words, :]):
             # support multiple words in an annotated offset range.
-            if word_offset[0] >= custom_offset[0] and word_offset[1] <= custom_offset[1]:
+            # Allow partial overlapping between custom annotations and pretokenized words.
+            if (word_offset[0] < custom_offset[1]) and (custom_offset[0] < word_offset[1]):
                 if not (
                     re.match(b_prefix, custom_label, re.IGNORECASE) or re.match(i_prefix, custom_label, re.IGNORECASE)
                 ):

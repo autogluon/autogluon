@@ -5,9 +5,11 @@ import pytest
 from omegaconf import OmegaConf
 from ray import tune
 from sklearn.preprocessing import LabelEncoder
+from transformers import AutoTokenizer
 
 from autogluon.multimodal.constants import BINARY, DATA, ENVIRONMENT, MODEL, MULTICLASS, OPTIMIZATION
 from autogluon.multimodal.data.preprocess_dataframe import MultiModalFeaturePreprocessor
+from autogluon.multimodal.data.utils import process_ner_annotations
 from autogluon.multimodal.utils import (
     apply_omegaconf_overrides,
     data_to_df,
@@ -196,3 +198,22 @@ def test_misc_visualize_ner():
 
     # Test using string for annotation
     visualize_ner(sentence, json.dumps(annotation))
+
+
+def test_process_ner_annotations():
+    text = "SwissGear Sion Softside Expandable Roller Luggage, Dark Grey, Checked-Medium 25-Inch"
+    annotation = [((0, 14), "Brand"), ((50, 60), "Color"), ((70, 85), "Dimensions")]
+    entity_map = {
+        "X": 1,
+        "O": 2,
+        "B-Brand": 3,
+        "I-Brand": 4,
+        "B-Color": 5,
+        "I-Color": 6,
+        "B-Dimensions": 7,
+        "I-Dimensions": 8,
+    }
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/deberta-v3-small")
+    tokenizer.model_max_length = 512
+    res = process_ner_annotations(annotation, text, entity_map, tokenizer, is_eval=True)[0]
+    assert res == [3, 4, 1, 1, 1, 1, 5, 6, 7, 8], "Labelling is wrong!"
