@@ -7,7 +7,7 @@ from typing import Dict, Optional
 import pandas as pd
 
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
-    S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
+    S_TEXT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.utils import try_import_autogluon_multimodal
@@ -169,6 +169,8 @@ class MultiModalPredictorModel(AbstractModel):
             X_val = X_val.copy()
             X_val.insert(len(X_val.columns), self._label_column_name, y_val)
 
+        column_types = self._construct_column_types()
+
         verbosity_text = max(0, verbosity - 1)
         root_logger = logging.getLogger('autogluon')
         root_log_level = root_logger.level
@@ -194,6 +196,7 @@ class MultiModalPredictorModel(AbstractModel):
             time_limit=time_limit,
             presets=presets,
             hyperparameters=params,
+            column_types=column_types,
             seed=seed,
         )
 
@@ -257,6 +260,30 @@ class MultiModalPredictorModel(AbstractModel):
             'num_cpus': 1,
             'num_gpus': 1,
         }
+
+    def _construct_column_types(self) -> dict:
+        # Construct feature types input to MultimodalPredictor
+        features_image_path = set(self._feature_metadata.get_features(required_special_types=[S_IMAGE_PATH]))
+        features_text = set(self._feature_metadata.get_features(required_special_types=[S_TEXT]))
+        features_categorical = set(self._feature_metadata.get_features(valid_raw_types=[R_CATEGORY]))
+        features_numerical = set(self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT]))
+
+        key_map = {
+            'image_path': features_image_path,
+            'text': features_text,
+            'categorical': features_categorical,
+            'numerical': features_numerical,
+        }
+
+        features = self._feature_metadata.get_features()
+
+        column_types = {}
+        for feature in features:
+            for key in ['image_path', 'text', 'categorical', 'numerical']:
+                if feature in key_map[key]:
+                    column_types[feature] = key
+                    break
+        return column_types
 
     def _more_tags(self):
         # `can_refit_full=False` because MultiModalPredictor does not communicate how to train until the best epoch in refit_full.

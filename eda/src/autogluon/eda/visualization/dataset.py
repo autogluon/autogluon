@@ -3,11 +3,11 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 from pandas import DataFrame
 
-from ..state import AnalysisState, StateCheckMixin
+from ..state import AnalysisState
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
 
-__all__ = ["DatasetStatistics", "DatasetTypeMismatch"]
+__all__ = ["DatasetStatistics", "DatasetTypeMismatch", "LabelInsightsVisualization"]
 
 
 class DatasetStatistics(AbstractVisualization, JupyterMixin):
@@ -128,7 +128,7 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
         return df
 
 
-class DatasetTypeMismatch(AbstractVisualization, JupyterMixin, StateCheckMixin):
+class DatasetTypeMismatch(AbstractVisualization, JupyterMixin):
     """
     Display mismatch between raw types between datasets provided. In case if mismatch found, mark the row with a warning.
 
@@ -173,6 +173,116 @@ class DatasetTypeMismatch(AbstractVisualization, JupyterMixin, StateCheckMixin):
         warnings = df.eq(df.iloc[:, 0], axis=0)
         df["warnings"] = warnings.all(axis=1).map({True: "", False: "warning"})
         df.fillna("--", inplace=True)
+        df = df[df["warnings"] != ""]
 
-        self.render_header_if_needed(state, "Types warnings summary")
-        self.display_obj(df)
+        if len(df) > 0:
+            self.render_header_if_needed(state, "Types warnings summary")
+            with pd.option_context("display.max_rows", 100 if len(df) <= 100 else 20):
+                self.display_obj(df)
+
+
+class LabelInsightsVisualization(AbstractVisualization, JupyterMixin):
+    """
+    Render label insights performed by :py:class:`~autogluon.eda.analysis.dataset.LabelInsightsAnalysis`.
+
+    The following insights can be rendered:
+
+    - classification: low cardinality classes detection
+    - classification: classes present in test data, but not in the train data
+    - regression: out-of-domain labels detection
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.visualization as viz
+    >>> import autogluon.eda.auto as auto
+    >>> auto.analyze(
+    >>> auto.analyze(train_data=..., test_data=..., label=..., anlz_facets=[
+    >>>     eda.dataset.ProblemTypeControl(),
+    >>>     eda.dataset.LabelInsightsAnalysis(low_cardinality_classes_threshold=50, regression_ood_threshold=0.01),
+    >>> ], viz_facets=[
+    >>>     viz.dataset.LabelInsightsVisualization()
+    >>> ])
+
+    Parameters
+    ----------
+    headers: bool, default = False
+        if `True` then render headers
+    namespace: str, default = None
+        namespace to use; can be nested like `ns_a.ns_b.ns_c`
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.dataset.ProblemTypeControl`
+    :py:class:`~autogluon.eda.analysis.dataset.LabelInsightsAnalysis`
+    """
+
+    def __init__(self, headers: bool = False, namespace: Optional[str] = None, **kwargs) -> None:
+        super().__init__(namespace, **kwargs)
+        self.headers = headers
+
+    def can_handle(self, state: AnalysisState) -> bool:
+        return "label_insights" in state
+
+    def _render(self, state: AnalysisState) -> None:
+        insights = state.label_insights
+
+        md_lines: List[str] = []
+        self._classification_add_low_cardinality_classes_insights(insights, md_lines)
+        self._classification_add_minority_class_imbalance_insights(insights, md_lines)
+        self._classification_add_missing_classes_insights(insights, md_lines)
+        self._regression_add_out_of_domain_insights(insights, md_lines)
+
+        if len(md_lines) > 0:
+            self.render_header_if_needed(state, "Label insights")
+            self.render_markdown("\n".join(md_lines))
+
+    @staticmethod
+    def _regression_add_out_of_domain_insights(insights: AnalysisState, md_lines: List[str]):
+        if insights.ood is not None:
+            md_lines.append(
+                f" - Rows with out-of-domain labels were found. Consider removing rows with labels outside of this range or expand training data since "
+                f"some algorithms (i.e. trees) are unable to extrapolate beyond data present in the training data.\n"
+                f"   - `{insights.ood.count}` rows\n"
+                f"   - `train_data` values range `{insights.ood.train_range}`\n"
+                f"   - `test_data` values range `{insights.ood.test_range}`"
+            )
+
+    @staticmethod
+    def _classification_add_missing_classes_insights(insights: AnalysisState, md_lines: List[str]):
+        if insights.not_present_in_train is not None:
+            md_lines.append(
+                f" - the following classes are found in `test_data`, but not present in `train_data`: "
+                f"`{'`, `'.join(map(str, insights.not_present_in_train))}`. "
+                f"Consider either removing the rows with classes not covered or adding more training data covering the classes."
+            )
+
+    @staticmethod
+    def _classification_add_minority_class_imbalance_insights(insights: AnalysisState, md_lines: List[str]):
+        if insights.minority_class_imbalance is not None:
+            if insights.minority_class_imbalance.ratio < 0.01:
+                severity = "Extreme"
+            elif insights.minority_class_imbalance.ratio <= 0.2:
+                severity = "Moderate"
+            else:
+                severity = "Mild"
+            md_lines.append(
+                f" - {severity} minority class imbalance detected - imbalance ratio is `{insights.minority_class_imbalance.ratio:.2%}`. "
+                f"Recommendations:\n"
+                f"   - downsample majority class `{insights.minority_class_imbalance.majority_class}` to improve the balance\n"
+                f"   - upweight downsampled class so that `sample_weight = original_weight x downsampling_factor`."
+                f"[TabularPredictor](https://auto.gluon.ai/stable/api/autogluon.predictor.html#module-0) "
+                f"supports this via `sample_weight` parameter"
+            )
+
+    @staticmethod
+    def _classification_add_low_cardinality_classes_insights(insights: AnalysisState, md_lines: List[str]):
+        if insights.low_cardinality_classes is not None:
+            classes_info = "\n".join(
+                [f"   - class `{k}`: `{v}` instances" for k, v in insights.low_cardinality_classes.instances.items()]
+            )
+            md_lines.append(
+                f" - Low-cardinality classes are detected. It is recommended to have at least `{insights.low_cardinality_classes.threshold}` "
+                f"instances per class. Consider adding more data to cover the classes or remove such rows.\n"
+                f"{classes_info}"
+            )

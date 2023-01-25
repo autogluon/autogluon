@@ -10,7 +10,6 @@ from pytorch_lightning.plugins.io.checkpoint_plugin import CheckpointIO
 from pytorch_lightning.utilities.cloud_io import atomic_save, get_filesystem
 from pytorch_lightning.utilities.cloud_io import load as pl_load
 from pytorch_lightning.utilities.rank_zero import rank_zero_warn
-from pytorch_lightning.utilities.types import _METRIC, _PATH
 
 from ..constants import AUTOMM, DEEPSPEED_STRATEGY
 
@@ -80,7 +79,7 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
         self.trainable_param_names = trainable_param_names
         self.model_name_to_id = model_name_to_id
 
-    def save_checkpoint(self, checkpoint: Dict[str, Any], path: _PATH, storage_options: Optional[Any] = None) -> None:
+    def save_checkpoint(self, checkpoint: Dict[str, Any], path, storage_options: Optional[Any] = None) -> None:
         """
         Save model/training states as a checkpoint file through state-dump and file-write.
 
@@ -128,7 +127,7 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
             rank_zero_warn(f"Warning, `{key}` dropped from checkpoint. An attribute is not picklable: {err}")
             atomic_save(checkpoint, path)
 
-    def load_checkpoint(self, path: _PATH, map_location: Optional[Any] = None) -> Dict[str, Any]:
+    def load_checkpoint(self, path, map_location: Optional[Any] = None) -> Dict[str, Any]:
         """
         Load checkpoint from a path when resuming or loading ckpt for test/validate/predict stages.
 
@@ -146,7 +145,7 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
 
         return pl_load(path, map_location=map_location)
 
-    def remove_checkpoint(self, path: _PATH) -> None:
+    def remove_checkpoint(self, path) -> None:
         """
         Remove checkpoint file from the filesystem.
 
@@ -180,7 +179,7 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
         self,
         current: torch.Tensor,
         trainer: "pl.Trainer",
-        monitor_candidates: Dict[str, _METRIC],
+        monitor_candidates: Dict[str, torch.Tensor],
     ) -> None:
 
         super(AutoMMModelCheckpoint, self)._update_best_and_save(
