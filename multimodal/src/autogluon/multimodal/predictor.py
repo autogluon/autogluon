@@ -1752,7 +1752,7 @@ class MultiModalPredictor:
                     elif is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_BYTEARRAY):
                         image_type = IMAGE_BYTEARRAY
                     else:
-                        raise ValueError(f"Image type in column {col_name} is not supported!")
+                        image_type = col_type
                     if col_type != image_type:
                         column_types_copy[col_name] = image_type
             self._df_preprocessor._column_types = column_types_copy
