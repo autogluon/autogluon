@@ -174,6 +174,15 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
             "bcewithlogitsloss",
         ),
         (
+            "ae",
+            ["hf_text"],
+            "CLTL/MedRoBERTa.nl",
+            None,
+            BEST,
+            None,
+            "auto",
+        ),
+        (
             "hateful_memes",
             ["clip"],
             None,
