@@ -2,10 +2,9 @@ from .autogluon_tabular import AutoGluonTabularModel
 from .gluonts import DeepARModel, SimpleFeedForwardModel
 from .local import ARIMAModel, ETSModel, NaiveModel, SeasonalNaiveModel, ThetaModel
 from .statsforecast import (
-    AutoETSStatsForecastModel,
     AutoARIMAStatsForecastModel,
+    AutoETSStatsForecastModel,
     DynamicOptimizedThetaStatsForecastModel,
-    ThetaStatsForecastModel,
 )
 
 __all__ = [
@@ -20,5 +19,4 @@ __all__ = [
     "AutoETSStatsForecastModel",
     "AutoARIMAStatsForecastModel",
     "DynamicOptimizedThetaStatsForecastModel",
-    "ThetaStatsForecastModel",
 ]

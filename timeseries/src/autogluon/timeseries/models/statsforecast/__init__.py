@@ -1,6 +1,1 @@
-from .models import (
-    AutoARIMAStatsForecastModel,
-    AutoETSStatsForecastModel,
-    DynamicOptimizedThetaStatsForecastModel,
-    ThetaStatsForecastModel,
-)
+from .models import AutoARIMAStatsForecastModel, AutoETSStatsForecastModel, DynamicOptimizedThetaStatsForecastModel

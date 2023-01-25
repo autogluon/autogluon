@@ -154,39 +154,3 @@ class DynamicOptimizedThetaStatsForecastModel(AbstractStatsForecastModel):
         from statsforecast.models import DynamicOptimizedTheta
 
         return DynamicOptimizedTheta
-
-
-class ThetaStatsForecastModel(AbstractStatsForecastModel):
-    """The Theta forecasting model of Assimakopoulos and Nikolopoulos (2000).
-
-    Based on `statsforecast.models.Theta <https://nixtla.github.io/statsforecast/models.html#theta>`_.
-
-
-    References
-    ----------
-    Assimakopoulos, Vassilis, and Konstantinos Nikolopoulos.
-    "The theta model: a decomposition approach to forecasting."
-    International journal of forecasting 16.4 (2000): 521-530.
-
-
-    Other Parameters
-    ----------------
-    decomposition_type : {"multiplicative", "additive"}, default = "multiplicative"
-        Seasonal decomposition type.
-    seasonal_period : int or None, default = None
-        Number of time steps in a complete seasonal cycle for seasonal models. For example, 7 for daily data with a
-        weekly cycle or 12 for monthly data with an annual cycle.
-        When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
-        specified manually by providing an integer > 1.
-        If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
-    """
-
-    allowed_local_model_args = [
-        "decomposition_type",
-        "seasonal_period",
-    ]
-
-    def get_model_type(self):
-        from statsforecast.models import Theta
-
-        return Theta

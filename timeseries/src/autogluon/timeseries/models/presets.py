@@ -7,16 +7,16 @@ import autogluon.timeseries as agts
 
 from . import (
     ARIMAModel,
+    AutoARIMAStatsForecastModel,
+    AutoETSStatsForecastModel,
     AutoGluonTabularModel,
     DeepARModel,
+    DynamicOptimizedThetaStatsForecastModel,
     ETSModel,
     NaiveModel,
     SeasonalNaiveModel,
     SimpleFeedForwardModel,
     ThetaModel,
-    AutoETSStatsForecastModel,
-    AutoARIMAStatsForecastModel,
-    DynamicOptimizedThetaStatsForecastModel,
 )
 from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
 
