@@ -21,6 +21,23 @@ matcher_presets = Registry("matcher_presets")
 
 @automm_presets.register()
 def default(presets: str = DEFAULT, hpo: bool = False):
+    """
+    Register the presets for problem types: binary, multiclass, classification, and regression.
+
+    Parameters
+    ----------
+    presets
+        The preset name.
+    hpo
+        Whether to use HPO presets.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
     hyperparameters = {
         "model.names": [
             "categorical_mlp",
@@ -34,20 +51,17 @@ def default(presets: str = DEFAULT, hpo: bool = False):
     hyperparameter_tune_kwargs = None
 
     if presets in [HIGH_QUALITY_FAST_INFERENCE, DEFAULT]:
-        if hpo:
-            pass
-        else:
-            hyperparameters.update(
-                {
-                    "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
-                    "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-                }
-            )
+        hyperparameters.update(
+            {
+                "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
+                "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+            }
+        )
     elif presets == MEDIUM_QUALITY_FASTER_INFERENCE:
         hyperparameters.update(
             {
                 "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
-                "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+                "model.timm_image.checkpoint_name": "mobilenetv3_large_100",
                 "optimization.learning_rate": 4e-4,
             }
         )
@@ -77,6 +91,23 @@ def default(presets: str = DEFAULT, hpo: bool = False):
 
 @automm_presets.register()
 def few_shot_text_classification(presets: str = DEFAULT, hpo: bool = False):
+    """
+    Register the presets for few_shot_text_classification.
+
+    Parameters
+    ----------
+    presets
+        The preset name.
+    hpo
+        Whether to use HPO presets.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
     hyperparameters = {
         "model.names": ["t_few"],
         "model.t_few.checkpoint_name": "google/flan-t5-xl",  # 3B model. google/flan-t5-xxl for 11B model.
@@ -106,6 +137,23 @@ def few_shot_text_classification(presets: str = DEFAULT, hpo: bool = False):
 
 @automm_presets.register()
 def zero_shot_image_classification(presets: str = DEFAULT, hpo: bool = False):
+    """
+    Register the presets for zero_shot_image_classification.
+
+    Parameters
+    ----------
+    presets
+        The preset name.
+    hpo
+        Whether to use HPO presets.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
     hyperparameters = {
         "model.names": ["clip"],
         "model.clip.max_text_len": 0,
@@ -141,6 +189,23 @@ def zero_shot_image_classification(presets: str = DEFAULT, hpo: bool = False):
 
 @automm_presets.register()
 def object_detection(presets: str = DEFAULT, hpo: bool = False):
+    """
+    Register the presets for object_detection.
+
+    Parameters
+    ----------
+    presets
+        The preset name.
+    hpo
+        Whether to use HPO presets.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
     hyperparameters = {
         "model.names": ["mmdet_image"],
         "env.eval_batch_size_ratio": 1,
@@ -193,7 +258,23 @@ def object_detection(presets: str = DEFAULT, hpo: bool = False):
 
 @automm_presets.register()
 def ocr_text_detection(presets: str = DEFAULT, hpo: bool = False):
+    """
+    Register the presets for ocr_text_detection.
 
+    Parameters
+    ----------
+    presets
+        The preset name.
+    hpo
+        Whether to use HPO presets.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
     hyperparameters = {
         "model.names": ["mmocr_text_detection"],
         "model.mmocr_text_detection.checkpoint_name": "TextSnake",
@@ -208,6 +289,23 @@ def ocr_text_detection(presets: str = DEFAULT, hpo: bool = False):
 
 @automm_presets.register()
 def ocr_text_recognition(presets: str = DEFAULT, hpo: bool = False):
+    """
+    Register the presets for ocr_text_recognition.
+
+    Parameters
+    ----------
+    presets
+        The preset name.
+    hpo
+        Whether to use HPO presets.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
     hyperparameters = {
         "model.names": ["mmocr_text_recognition"],
         "model.mmocr_text_recognition.checkpoint_name": "ABINet",
@@ -224,7 +322,23 @@ def ocr_text_recognition(presets: str = DEFAULT, hpo: bool = False):
 def feature_extraction(
     presets: str = DEFAULT, hpo: bool = False
 ):  # TODO: rename the problem type as text_feature_extraction?
+    """
+    Register the presets for feature_extraction.
 
+    Parameters
+    ----------
+    presets
+        The preset name.
+    hpo
+        It is not used and only to align with the APIs of other problem types.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
     hyperparameters = {
         "model.names": ["hf_text"],
         "model.hf_text.checkpoint_name": "sentence-transformers/msmarco-MiniLM-L-12-v3",
@@ -239,7 +353,23 @@ def feature_extraction(
 @automm_presets.register()
 @matcher_presets.register()
 def image_similarity(presets: str = DEFAULT, hpo: bool = False):
+    """
+    Register the presets for image_similarity.
 
+    Parameters
+    ----------
+    presets
+        The preset name.
+    hpo
+        Whether to use HPO presets.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
     hyperparameters = {
         "model.names": ["timm_image"],
         "env.num_workers": 2,
@@ -273,7 +403,23 @@ def image_similarity(presets: str = DEFAULT, hpo: bool = False):
 @automm_presets.register()
 @matcher_presets.register()
 def text_similarity(presets: str = DEFAULT, hpo: bool = False):
+    """
+    Register the presets for text_similarity.
 
+    Parameters
+    ----------
+    presets
+        The preset name.
+    hpo
+        Whether to use HPO presets.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
     hyperparameters = {
         "model.names": ["hf_text"],
         "model.hf_text.pooling_mode": "mean",
@@ -309,6 +455,23 @@ def text_similarity(presets: str = DEFAULT, hpo: bool = False):
 @automm_presets.register()
 @matcher_presets.register()
 def image_text_similarity(presets: str = DEFAULT, hpo: bool = False):
+    """
+    Register the presets for image_text_similarity.
+
+    Parameters
+    ----------
+    presets
+        The preset name.
+    hpo
+        Whether to use HPO presets.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
     hyperparameters = {
         "model.names": ["clip"],
         "matcher.loss.type": "multi_negatives_softmax_loss",
@@ -346,7 +509,23 @@ def image_text_similarity(presets: str = DEFAULT, hpo: bool = False):
 
 @automm_presets.register()
 def ner(presets: str = DEFAULT, hpo: bool = False):
+    """
+    Register the presets for ner.
 
+    Parameters
+    ----------
+    presets
+        The preset name.
+    hpo
+        Whether to use HPO presets.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
     hyperparameters = {
         "model.names": [
             "categorical_mlp",
