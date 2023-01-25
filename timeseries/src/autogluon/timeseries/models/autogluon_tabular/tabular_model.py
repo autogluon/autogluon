@@ -50,7 +50,6 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
     }
 
     PREDICTION_BATCH_SIZE = 100_000
-    MAX_STEPS = 10
 
     TIMESERIES_METRIC_TO_TABULAR_METRIC = {
         "MASE": "mean_absolute_error",
@@ -260,8 +259,8 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             raise AssertionError(f"{self.name} predictor has already been fit!")
         verbosity = kwargs.get("verbosity", 2)
         self._target_lag_indices = np.array(get_lags_for_frequency(train_data.freq), dtype=np.int64)
-        self._past_covariates_lag_indices = self._target_lag_indices[: self.MAX_STEPS]
-        self._known_covariates_lag_indices = np.concatenate([[0], self._target_lag_indices])[: self.MAX_STEPS]
+        self._past_covariates_lag_indices = self._target_lag_indices
+        self._known_covariates_lag_indices = np.concatenate([[0], self._target_lag_indices])
         self._time_features = time_features_from_frequency_str(train_data.freq)
 
         train_data, _ = self._normalize_targets(train_data)
