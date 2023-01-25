@@ -1701,7 +1701,7 @@ class MultiModalPredictor:
                         outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
                 elif self._problem_type == OBJECT_DETECTION:
                     # reformat single gpu output for object detection
-                    # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
+                    # outputs shape: num_batch, 1(["bbox"]), batch_size, 80, n, 5
                     # output LABEL if exists for evaluations
                     outputs = [
                         {BBOX: bbox, LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox}
