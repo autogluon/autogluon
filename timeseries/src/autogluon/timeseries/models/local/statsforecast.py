@@ -1,4 +1,100 @@
-from .abstract_statsforecast import AbstractStatsForecastModel
+import logging
+from typing import List, Type, Union
+
+import pandas as pd
+
+from autogluon.core.utils.exceptions import TimeLimitExceeded
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
+from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
+
+logger = logging.getLogger(__name__)
+
+
+class AbstractStatsForecastModel(AbstractLocalModel):
+    """Wrapper for StatsForecast models.
+
+    Cached predictions are stored inside the model to speed up validation & ensemble training downstream.
+
+    Attributes
+    ----------
+    allowed_local_model_args : List[str]
+        List of allowed arguments that can be passed to the underlying model.
+        Arguments not in this list will be filtered out and not passed to the underlying model.
+    """
+
+    allowed_local_model_args: List[str] = []
+    DEFAULT_N_JOBS: Union[float, int] = -1
+
+    def get_model_type(self) -> Type:
+        raise NotImplementedError
+
+    def _fit(self, train_data, time_limit=None, verbosity=2, **kwargs) -> None:
+        """Prepare hyperparameters that will be passed to the underlying model.
+
+        As for all local models, actual fitting + predictions are delegated to the ``predict`` method.
+        """
+        # TODO: Find a way to ensure that SF models respect time_limit
+        # Fitting usually takes >= 20 seconds
+        if time_limit is not None and time_limit < 20:
+            raise TimeLimitExceeded
+        super()._fit(train_data=train_data, time_limit=time_limit, verbosity=verbosity, **kwargs)
+        # seasonal_period is called season_length in StatsForecast
+        self._local_model_args["season_length"] = self._local_model_args.pop("seasonal_period")
+        return self
+
+    def _to_statsforecast_dataframe(self, data: TimeSeriesDataFrame) -> pd.DataFrame:
+        target = data[[self.target]]
+        return target.reset_index().rename({ITEMID: "unique_id", TIMESTAMP: "ds", self.target: "y"}, axis=1)
+
+    def _fit_and_cache_predictions(self, data: TimeSeriesDataFrame, **kwargs):
+        """Make predictions for time series in data that are not cached yet."""
+        # TODO: Improve prediction caching logic -> save predictions to a separate file, like in Tabular?
+        from statsforecast import StatsForecast
+        from statsforecast.models import SeasonalNaive
+
+        data_hash = hash_ts_dataframe_items(data)
+        items_to_fit = [item_id for item_id, ts_hash in data_hash.items() if ts_hash not in self._cached_predictions]
+        if len(items_to_fit) > 0:
+            logger.debug(f"{self.name} received {len(items_to_fit)} new items to predict, generating predictions")
+            data_to_fit = pd.DataFrame(data).query("item_id in @items_to_fit")
+
+            model_type = self.get_model_type()
+            model = model_type(**self._local_model_args)
+
+            sf = StatsForecast(
+                models=[model],
+                fallback_model=SeasonalNaive(season_length=self._local_model_args["season_length"]),
+                sort_df=False,
+                freq=self.freq,
+                n_jobs=self.n_jobs,
+            )
+
+            # StatsForecast generates probabilistic forecasts in lo/hi confidence region boundaries
+            # We chose the columns that correspond to the desired quantile_levels
+            model_name = str(model)
+            new_column_names = {"unique_id": ITEMID, "ds": TIMESTAMP, model_name: "mean"}
+            levels = []
+            for q in self.quantile_levels:
+                level = round(abs(q - 0.5) * 200, 1)
+                suffix = "lo" if q < 0.5 else "hi"
+                levels.append(level)
+                new_column_names[f"{model_name}-{suffix}-{level}"] = str(q)
+            levels = sorted(list(set(levels)))
+            chosen_columns = list(new_column_names.values())
+
+            raw_predictions = sf.forecast(
+                df=self._to_statsforecast_dataframe(data_to_fit),
+                h=self.prediction_length,
+                level=levels,
+            ).reset_index()
+            predictions = raw_predictions.rename(new_column_names, axis=1)[chosen_columns].set_index(TIMESTAMP)
+            item_ids = predictions.pop(ITEMID)
+
+            for item_id, preds in predictions.groupby(item_ids, sort=False):
+                self._cached_predictions[data_hash.loc[item_id]] = preds
+            # Make sure cached predictions can be reused by other models
+            self.save()
 
 
 class AutoARIMAStatsForecastModel(AbstractStatsForecastModel):
@@ -73,7 +169,7 @@ class AutoARIMAStatsForecastModel(AbstractStatsForecastModel):
         "seasonal_period",
     ]
 
-    def _update_local_model_args(self, local_model_args: dict) -> dict:
+    def _update_local_model_args(self, local_model_args: dict, data: TimeSeriesDataFrame) -> dict:
         local_model_args.setdefault("approximation", True)
         local_model_args.setdefault("allowmean", True)
         return local_model_args
@@ -110,7 +206,7 @@ class AutoETSStatsForecastModel(AbstractStatsForecastModel):
         "seasonal_period",
     ]
 
-    def _update_local_model_args(self, local_model_args: dict) -> dict:
+    def _update_local_model_args(self, local_model_args: dict, data: TimeSeriesDataFrame) -> dict:
         local_model_args.setdefault("model", "AAA")
         return local_model_args
 

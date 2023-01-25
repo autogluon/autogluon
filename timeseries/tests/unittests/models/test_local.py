@@ -3,11 +3,15 @@ import logging
 import pandas as pd
 import pytest
 
-from autogluon.timeseries.models.local import ARIMAModel, ETSModel, NaiveModel, SeasonalNaiveModel, ThetaModel
-from autogluon.timeseries.models.statsforecast import (
+from autogluon.timeseries.models.local import (
+    ARIMAModel,
     AutoARIMAStatsForecastModel,
     AutoETSStatsForecastModel,
     DynamicOptimizedThetaStatsForecastModel,
+    ETSModel,
+    NaiveModel,
+    SeasonalNaiveModel,
+    ThetaModel,
 )
 
 from ..common import (
