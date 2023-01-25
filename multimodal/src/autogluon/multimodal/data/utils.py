@@ -382,3 +382,45 @@ def is_rois_input(sample):
     bool, whether a sample is rois for object detection
     """
     return isinstance(sample, list) and len(sample) and isinstance(sample[0], list) and len(sample[0]) == 5
+
+
+def get_text_token_max_len(provided_max_len, config, tokenizer, checkpoint_name):
+    """
+    Compute the allowable max length of token sequences.
+
+    Parameters
+    ----------
+    provided_max_len
+        The provided max length.
+    config
+        Model config.
+    tokenizer
+        Text tokenizer.
+    checkpoint_name
+        Name of checkpoint.
+
+    Returns
+    -------
+    Token sequence max length.
+    """
+    if hasattr(config, "relative_attention") and config.relative_attention:
+        default_max_len = tokenizer.model_max_length
+    elif hasattr(config, "position_embedding_type") and "relative" in config.position_embedding_type:
+        default_max_len = tokenizer.model_max_length
+    elif hasattr(config, "max_position_embeddings"):
+        default_max_len = config.max_position_embeddings
+    else:
+        default_max_len = tokenizer.model_max_length
+
+    if provided_max_len is None or provided_max_len <= 0:
+        max_len = default_max_len
+    else:
+        if provided_max_len < default_max_len:
+            if default_max_len < 10**6:  # Larger than this value usually means infinite.
+                warnings.warn(
+                    f"provided max length: {provided_max_len} "
+                    f"is smaller than {checkpoint_name}'s default: {default_max_len}"
+                )
+        max_len = min(provided_max_len, default_max_len)
+
+    return max_len
