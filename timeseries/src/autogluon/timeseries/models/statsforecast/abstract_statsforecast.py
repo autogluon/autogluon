@@ -51,6 +51,8 @@ class AbstractStatsForecastModel(AbstractTimeSeriesModel):
             hyperparameters=hyperparameters,
             **kwargs,
         )
+        if hyperparameters is None:
+            hyperparameters = {}
         # TODO: Replace with 'num_cpus' argument passed to fit (after predictor API is changed)
         n_jobs = hyperparameters.get("n_jobs", -1)
         if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
