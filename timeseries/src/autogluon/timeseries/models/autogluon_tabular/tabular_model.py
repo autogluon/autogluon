@@ -275,7 +275,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
 
         if len(train_df) > max_train_size:
             train_df = train_df.sample(max_train_size)
-        logger.debug(f"Generated training dataframe with shape {val_df.shape}")
+        logger.debug(f"Generated training dataframe with shape {train_df.shape}")
 
         if val_data is not None:
             if val_data.freq != train_data.freq:
