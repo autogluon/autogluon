@@ -323,6 +323,9 @@ def test_standalone():  # test standalone feature in MultiModalPredictor.save()
         standalone=True,
     )
 
+    # make sure the dumping doesn't affect predictor loading
+    predictor.dump()
+
     del predictor
     torch.cuda.empty_cache()
 
