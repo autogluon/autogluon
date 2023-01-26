@@ -11,5 +11,5 @@ prepare_pothole
 prepare_watercolor
 prepare_coco17
 prepare_voc
-cov_to_coco
+voc_to_coco
 ```
