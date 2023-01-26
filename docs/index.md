@@ -122,7 +122,7 @@ predictions = predictor.predict(test_data)
 :animate: fade-in-slide-down
 :color: primary
 
-Forecase future values of time series:
+Forecast future values of time series:
 
 ```python
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
@@ -160,7 +160,7 @@ hidden:
 install
 tutorials/tabular/tabular_quick_start
 tutorials/multimodal/multimodal_quick_start
-tutorials/timeseries/timeseries_quick_start
+Timeseries Quick Start <tutorials/timeseries/forecasting-quickstart>
 ```
 
 ```{toctree}
