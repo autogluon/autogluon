@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import autogluon.eda as eda
 from autogluon.eda import AnalysisState
 from autogluon.eda.analysis import Namespace
 from autogluon.eda.analysis.base import BaseAnalysis
@@ -212,25 +213,35 @@ def test_get_empty_dict_if_none():
 
 
 @pytest.mark.parametrize(
-    "hyperparameters_present, presets_present",
+    "hyperparameters_present, lgbm_present, presets_present",
     [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
+        (True, False, True),
+        (True, False, False),
+        (False, False, True),
+        (False, False, False),
+        (True, True, True),
+        (True, True, False),
+        (False, True, True),
+        (False, True, False),
     ],
 )
-def test_get_default_estimator_if_not_specified(hyperparameters_present, presets_present):
+def test_get_default_estimator_if_not_specified(monkeypatch, hyperparameters_present, lgbm_present, presets_present):
     fit_args = {}
     if hyperparameters_present:
         fit_args["hyperparameters"] = "some_params"
     if presets_present:
         fit_args["presets"] = "some_presets"
 
-    if (not hyperparameters_present) and (not presets_present):
-        assert "RF" in get_default_estimator_if_not_specified(fit_args)["hyperparameters"]
-    else:
-        assert get_default_estimator_if_not_specified(fit_args) == fit_args
+    with monkeypatch.context() as m:
+        m.setattr(eda.auto.simple, "_is_lightgbm_available", lambda: lgbm_present)
+
+        if (not hyperparameters_present) and (not presets_present):
+            if lgbm_present:
+                assert "GBM" in get_default_estimator_if_not_specified(fit_args)["hyperparameters"]
+            else:
+                assert "RF" in get_default_estimator_if_not_specified(fit_args)["hyperparameters"]
+        else:
+            assert get_default_estimator_if_not_specified(fit_args) == fit_args
 
 
 @pytest.mark.parametrize(
