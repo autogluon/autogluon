@@ -35,10 +35,16 @@ class AbstractStatsForecastModel(AbstractLocalModel):
 
         As for all local models, actual fitting + predictions are delegated to the ``predict`` method.
         """
-        # TODO: Find a way to ensure that SF models respect time_limit
-        # Fitting usually takes >= 20 seconds
-        if time_limit is not None and time_limit < 20:
-            raise TimeLimitExceeded
+        # TODO: Find a way to ensure that SF models respect time_limit, e.g. https://docs.python.org/3/library/concurrent.futures.html
+        # Fitting usually takes >= 15 seconds
+        if time_limit is not None:
+            if time_limit < 10:
+                raise TimeLimitExceeded
+            elif time_limit < 30:
+                logger.warning(
+                    f"Warning: {self.__class__.__name__} does not support early stopping "
+                    f"and may exceed the remaining time_limit of {time_limit:.1f}s"
+                )
         super()._fit(train_data=train_data, time_limit=time_limit, verbosity=verbosity, **kwargs)
         # seasonal_period is called season_length in StatsForecast
         self._local_model_args["season_length"] = self._local_model_args.pop("seasonal_period")
@@ -100,10 +106,11 @@ class AbstractStatsForecastModel(AbstractLocalModel):
 
     def hyperparameter_tune(self, **kwargs):
         # FIXME: multiprocessing.pool.ApplyResult.get() hangs inside StatsForecast.forecast if HPO enabled - needs investigation
-        raise NotImplementedError(f"{self.__class__.__name__} does not support hyperparameter tuning.")
+        if self.n_jobs != 1:
+            raise NotImplementedError(f"{self.__class__.__name__} does not support hyperparameter tuning.")
 
 
-class AutoARIMAStatsForecastModel(AbstractStatsForecastModel):
+class AutoARIMA(AbstractStatsForecastModel):
     """Automatically tuned ARIMA model.
 
     Automatically selects the best (p,d,q,P,D,Q) model parameters using an information criterion
@@ -181,12 +188,12 @@ class AutoARIMAStatsForecastModel(AbstractStatsForecastModel):
         return local_model_args
 
     def get_model_type(self):
-        from statsforecast.models import AutoARIMA
+        from statsforecast.models import AutoARIMA as AutoARIMA_
 
-        return AutoARIMA
+        return AutoARIMA_
 
 
-class AutoETSStatsForecastModel(AbstractStatsForecastModel):
+class AutoETS(AbstractStatsForecastModel):
     """Automatically tuned exponential smoothing with trend and seasonality.
 
     Automatically selects the best ETS (Error, Trend, Seasonality) model using an information criterion
@@ -213,12 +220,12 @@ class AutoETSStatsForecastModel(AbstractStatsForecastModel):
     ]
 
     def get_model_type(self):
-        from statsforecast.models import AutoETS
+        from statsforecast.models import AutoETS as AutoETS_
 
-        return AutoETS
+        return AutoETS_
 
 
-class DynamicOptimizedThetaStatsForecastModel(AbstractStatsForecastModel):
+class DynamicOptimizedTheta(AbstractStatsForecastModel):
     """Optimized Theta forecasting model from Fiorucci et al. (2016).
 
     Based on `statsforecast.models.DynamicOptimizedTheta <https://nixtla.github.io/statsforecast/models.html#dynamic-optimized-theta-method>`_.
