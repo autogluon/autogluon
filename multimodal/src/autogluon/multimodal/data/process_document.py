@@ -257,36 +257,40 @@ class DocumentProcessor:
 
             normalized_word_boxes = ocr_res[BBOX]
 
-            # Truncation of token_boxes
-            token_boxes = []
-            for word, box in zip(words, normalized_word_boxes):
-                word_tokens = self.tokenizer.tokenize(word)
-                token_boxes.extend([box] * len(word_tokens))
-            pad_token_box = [0, 0, 0, 0]
-            special_tokens_count = 2
-            if len(token_boxes) > self.text_max_len - special_tokens_count:
-                token_boxes = token_boxes[: (self.text_max_len - special_tokens_count)]
-            # add bounding boxes of cls + sep tokens
-            token_boxes = [[0, 0, 0, 0]] + token_boxes + [[1000, 1000, 1000, 1000]]
-
             if self.is_text_only_flag:
-                sent = " ".join(words)
-                encoding = self.tokenizer(sent, padding="max_length", truncation=True, return_token_type_ids=True)
-                input_ids = self.tokenizer(sent, truncation=True)["input_ids"]
-            else:
-                sent = words
+                # Padding of token_boxes up the bounding boxes to the sequence length.
+                token_boxes = []
+                all_tokens = []
+                for word, box in zip(words, normalized_word_boxes):
+                    # Tokenize bounding box seperately.
+                    word_tokens = self.tokenizer.tokenize(word)
+                    all_tokens.append(word_tokens)
+                    token_boxes.extend([box] * len(word_tokens))
+
                 encoding = self.tokenizer(
-                    sent,
+                    " ".join(words), padding="max_length", truncation=True, return_token_type_ids=True
+                )
+
+                # Truncation of token_boxes
+                pad_token_box = [0, 0, 0, 0]
+                special_tokens_count = 2
+                if len(token_boxes) > self.text_max_len - special_tokens_count:
+                    token_boxes = token_boxes[: (self.text_max_len - special_tokens_count)]
+                # add bounding boxes of cls + sep tokens
+                token_boxes = [[0, 0, 0, 0]] + token_boxes + [[1000, 1000, 1000, 1000]]
+
+                padding_length = self.text_max_len - sum(encoding.attention_mask)
+                token_boxes += [pad_token_box] * padding_length
+
+            else:
+                encoding = self.tokenizer(
+                    words,
                     boxes=normalized_word_boxes,
                     padding="max_length",
                     truncation=True,
                     return_token_type_ids=True,
                 )
-                input_ids = self.tokenizer(sent, boxes=normalized_word_boxes, truncation=True)["input_ids"]
-
-            # Padding of token_boxes up the bounding boxes to the sequence length.
-            padding_length = self.text_max_len - len(input_ids)
-            token_boxes += [pad_token_box] * padding_length
+                token_boxes = encoding.bbox
 
             ret.update(
                 {
