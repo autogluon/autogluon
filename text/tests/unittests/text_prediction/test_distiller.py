@@ -19,7 +19,7 @@ def test_distillation():
     teacher_predictor = TextPredictor(label="label", eval_metric="acc")
 
     hyperparameters = {
-        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
     }

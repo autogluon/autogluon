@@ -55,7 +55,7 @@ def test_dump_timm_image():
 
 def test_dump_hf_text():
     model_dump_path = "./hf_text_test"
-    base_model_name = "prajjwal1/bert-tiny"
+    base_model_name = "nlpaueb/legal-bert-small-uncased"
     dataset = ALL_DATASETS["ae"]
     predictor_1 = MultiModalPredictor(
         label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric
@@ -99,7 +99,7 @@ def test_fusion_model_dump():
         "optimization.max_epochs": 1,
         "model.names": ["timm_image", "hf_text", "fusion_mlp"],
         "model.timm_image.checkpoint_name": "ghostnet_100",
-        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
     }
     predictor.fit(
         train_data=dataset.train_df,

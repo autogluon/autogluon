@@ -30,7 +30,7 @@ jobs:
         TWINE_PASSWORD: ${{ secrets. PYPI_PASSWORD }}
         RELEASE: 1
       run: |
-        for v in common core features tabular multimodal text vision timeseries autogluon
+        for v in common core features tabular multimodal vision timeseries autogluon
         do
           cd "$v"/
           python setup.py sdist bdist_wheel

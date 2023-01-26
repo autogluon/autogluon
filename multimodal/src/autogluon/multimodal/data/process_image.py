@@ -60,7 +60,7 @@ class ImageProcessor:
         norm_type: Optional[str] = None,
         size: Optional[int] = None,
         max_img_num_per_col: Optional[int] = 1,
-        missing_value_strategy: Optional[str] = "skip",
+        missing_value_strategy: Optional[str] = "zero",
         requires_column_info: bool = False,
     ):
         """

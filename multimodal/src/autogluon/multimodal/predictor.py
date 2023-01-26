@@ -1752,7 +1752,7 @@ class MultiModalPredictor:
                     elif is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_BYTEARRAY):
                         image_type = IMAGE_BYTEARRAY
                     else:
-                        raise ValueError(f"Image type in column {col_name} is not supported!")
+                        image_type = col_type
                     if col_type != image_type:
                         column_types_copy[col_name] = image_type
             self._df_preprocessor._column_types = column_types_copy
@@ -1768,7 +1768,7 @@ class MultiModalPredictor:
         else:  # called .fit() or .load()
             df_preprocessor = self._df_preprocessor
 
-        data_processors = copy.deepcopy(self._data_processors)
+        data_processors = copy.copy(self._data_processors)
         # For prediction data with no labels provided.
         if not requires_label:
             data_processors.pop(LABEL, None)
@@ -2766,7 +2766,7 @@ class MultiModalPredictor:
 
         return predictor
 
-    def dump_multimodal(self, path: Optional[str] = None):
+    def dump_model(self, path: Optional[str] = None):
         """
         Save model weights and config to local directory.
         Model weights are saved in file `pytorch_model.bin` (timm, hf) or '<ckpt_name>.pth' (mmdet);
@@ -2811,7 +2811,7 @@ class MultiModalPredictor:
             for per_model in models[model_key]:
                 subdir = os.path.join(path, per_model.prefix)
                 os.makedirs(subdir, exist_ok=True)
-                per_model.dump_weights_and_config(save_path=subdir, tokenizers=tokenizers)
+                per_model.dump(save_path=subdir, tokenizers=tokenizers)
 
     @property
     def class_labels(self):

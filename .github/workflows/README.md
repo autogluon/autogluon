@@ -17,9 +17,9 @@ The CI is consisted with two parts:
 **IMPORTANT:** You are only able to update the workflow if you have **write permission** to our repo for security concern. You are still able to add/modify unit tests/ docs and see the changes.
 
 ### Maintainers
-The general idea is that we only checkout workflow from our master branch unless the workflow is from a branch of `awslabs/autogluon`.
+The general idea is that we only checkout workflow from our master branch unless the workflow is from a branch of `autogluon/autogluon`.
 
-For maintainers with write permission, the easiest way to update our workflow is push to a branch under `awslabs/autogluon`.
+For maintainers with write permission, the easiest way to update our workflow is push to a branch under `autogluon/autogluon`.
 The Push event will trigger the workflow to reflect your latest changes.
 Once you are satisfied with the changes and the CI passed, start a pull request. CI for both Push and Pull Request event will be triggered in the pull request, and **only the one with Push event reflects your latest workflow changes**
 

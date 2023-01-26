@@ -254,7 +254,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
             json.dump(config, f, indent=2)
             logger.info(f"Timm config saved to {config_path}.")
 
-    def dump_weights_and_config(self, save_path: str = "./", tokenizers: Optional[dict] = None):
+    def dump(self, save_path: str = "./", tokenizers: Optional[dict] = None):
         weights_path = f"{save_path}/pytorch_model.bin"
         torch.save(self.model.state_dict(), weights_path)
         logger.info(f"Model {self.prefix} weights saved to {weights_path}.")

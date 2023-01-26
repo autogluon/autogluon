@@ -8,8 +8,8 @@ import pytest
 
 from autogluon.multimodal import MultiModalPredictor
 
+from ..predictor.test_predictor import verify_predictor_save_load
 from ..utils.unittest_datasets import PetFinderDataset
-from .test_predictor import verify_predictor_save_load
 
 
 @pytest.mark.parametrize("invalid_value", [None, "invalid/image/path"])

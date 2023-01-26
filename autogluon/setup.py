@@ -21,7 +21,6 @@ install_requires = [
     f'autogluon.features=={version}',
     f'autogluon.tabular[all]=={version}',
     f'autogluon.multimodal=={version}',
-    f'autogluon.text=={version}',
     f'autogluon.vision=={version}',
     f'autogluon.timeseries[all]=={version}',
 ] if not ag.LITE_MODE else [

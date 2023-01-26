@@ -108,6 +108,8 @@ class AbstractTrainer:
         self._regress_preds_asprobas = False  # whether to treat regression predictions as class-probabilities (during distillation)
 
         self._extra_banned_names = set()  # Names which are banned but are not used by a trained model.
+        
+        self._models_failed_to_train = []  # List of models which failed to train
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
 
@@ -1474,27 +1476,34 @@ class AbstractTrainer:
         except TimeLimitExceeded:
             logger.log(20, f'\tTime limit exceeded... Skipping {model.name}.')
             # logger.log(20, '\tTime wasted: ' + str(time.time() - fit_start_time))
+            self._models_failed_to_train.append(model.name)
             del model
         except NotEnoughMemoryError:
             logger.warning(f'\tNot enough memory to train {model.name}... Skipping this model.')
+            self._models_failed_to_train.append(model.name)
             del model
         except NoValidFeatures:
             logger.warning(f'\tNo valid features to train {model.name}... Skipping this model.')
+            self._models_failed_to_train.append(model.name)
             del model
         except NoGPUError:
             logger.warning(f'\tNo GPUs available to train {model.name}... Skipping this model.')
+            self._models_failed_to_train.append(model.name)
             del model
         except NotEnoughCudaMemoryError:
             logger.warning(f'\tNot enough CUDA memory available to train {model.name}... Skipping this model.')
+            self._models_failed_to_train.append(model.name)
             del model
         except ImportError as err:
             logger.error(f'\tWarning: Exception caused {model.name} to fail during training (ImportError)... Skipping this model.')
             logger.error(f'\t\t{err}')
+            self._models_failed_to_train.append(model.name)
             if self.verbosity > 2:
                 logger.exception('Detailed Traceback:')
         except Exception as err:
             logger.error(f'\tWarning: Exception caused {model.name} to fail during training... Skipping this model.')
             logger.error(f'\t\t{err}')
+            self._models_failed_to_train.append(model.name)
             if self.verbosity > 0:
                 logger.exception('Detailed Traceback:')
             del model
