@@ -206,6 +206,7 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
 
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DeepAREstimator
     default_num_samples: int = 250
+    supports_known_covariates = True
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()

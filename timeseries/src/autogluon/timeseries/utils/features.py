@@ -77,10 +77,17 @@ class TimeSeriesFeatureGenerator:
     def fit(self, data: TimeSeriesDataFrame) -> None:
         assert not self._is_fit, f"{self.__class__.__name__} has already been fit"
 
-        past_covariates_names = []
+        self.past_covariates_names = []
         for column in data.columns:
             if column != self.target and column not in self.known_covariates_names:
-                past_covariates_names.append(column)
+                self.past_covariates_names.append(column)
+
+        logger.info("\nProvided dataset contains following columns:")
+        logger.info(f"\ttarget:           '{self.target}'")
+        if len(self.known_covariates_names) > 0:
+            logger.info(f"\tknown covariates: {self.known_covariates_names}")
+        if len(self.past_covariates_names) > 0:
+            logger.info(f"\tpast covariates:  {self.past_covariates_names}")
 
         static_features_cat = []
         static_features_real = []
@@ -98,7 +105,7 @@ class TimeSeriesFeatureGenerator:
                     unused.append(col_name)
 
             logger.info("Following types of static features have been inferred:")
-            logger.info(f"\tcategorical: {static_features_cat}")
+            logger.info(f"\tcategorical:        {static_features_cat}")
             logger.info(f"\tcontinuous (float): {static_features_real}")
             if len(unused) > 0:
                 logger.info(f"\tremoved (neither categorical nor continuous): {unused}")
@@ -110,7 +117,7 @@ class TimeSeriesFeatureGenerator:
             static_features_cat=static_features_cat,
             static_features_real=static_features_real,
             known_covariates_real=self.known_covariates_names,
-            past_covariates_real=past_covariates_names,
+            past_covariates_real=self.past_covariates_names,
             # TODO: Categorical time-varying covariates are not yet supported
             known_covariates_cat=[],
             past_covariates_cat=[],
