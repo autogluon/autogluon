@@ -9,6 +9,7 @@ from .config import (
     get_local_pretrained_config_paths,
     get_pretrain_configs_dir,
     parse_dotlist_conf,
+    save_pretrained_model_configs,
     update_config_by_rules,
     update_tabular_config_by_resources,
 )
