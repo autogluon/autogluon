@@ -119,7 +119,6 @@ class DocumentProcessor:
                 self.model.text_token_ids_key: PadCollator(pad_val=self.tokenizer.pad_token_id),
                 self.model.text_attention_mask_key: PadCollator(pad_val=0),
                 self.model.text_bbox_key: PadCollator(pad_val=0),
-                self.model.label_key: StackCollator(),
                 self.model.text_segment_ids_key: PadCollator(pad_val=0),
             }
         )
@@ -286,7 +285,7 @@ class DocumentProcessor:
                 input_ids = self.tokenizer(sent, boxes=normalized_word_boxes, truncation=True)["input_ids"]
 
             # Padding of token_boxes up the bounding boxes to the sequence length.
-            padding_length = 512 - len(input_ids)
+            padding_length = self.text_max_len - len(input_ids)
             token_boxes += [pad_token_box] * padding_length
 
             ret.update(

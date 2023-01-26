@@ -91,7 +91,7 @@ model:
   document_transformer:
     checkpoint_name: "microsoft/layoutlmv3-base" # document foundation models
     gradient_checkpointing: False
-    pooling_mode: 'mean'  # The pooling mode, can be 'cls' or 'mean'
+    pooling_mode: 'cls'  # The pooling mode, can be 'cls' or 'mean'
     data_types:
       - "document"
     train_transform_types:

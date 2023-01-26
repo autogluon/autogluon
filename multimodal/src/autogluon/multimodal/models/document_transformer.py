@@ -190,10 +190,8 @@ class DocumentTransformer(HFAutoModelForTextPrediction):
         if self.pooling_mode == "cls":
             pooled_features = outputs.last_hidden_state[:, 0, :]
         elif self.pooling_mode == "mean":
-            pooled_features = (outputs.last_hidden_state * text_masks.unsqueeze(-1)).sum(1)
-            sum_mask = text_masks.unsqueeze(-1).sum(1)
-            sum_mask = torch.clamp(sum_mask, min=1e-9)
-            pooled_features = pooled_features / sum_mask
+            # In some models, last_hidden_state is the concatenation of document image features and text features.
+            pooled_features = outputs.last_hidden_state.mean(1)
         else:
             raise NotImplementedError(f"Pooling mode={self.pooling_mode} is not supported.")
 
