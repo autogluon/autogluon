@@ -94,7 +94,7 @@ def get_seasonal_period_from_fitted_local_model(model):
         return model._local_model_args["seasonal_periods"]
     elif model.name == "Theta":
         return model._local_model_args["period"]
-    elif "StatsForecast" in model.name:
+    elif model.name in ["AutoETS", "AutoARIMA", "DynamicOptimizedTheta"]:
         return model._local_model_args["season_length"]
     else:
         return model._local_model_args["seasonal_period"]
