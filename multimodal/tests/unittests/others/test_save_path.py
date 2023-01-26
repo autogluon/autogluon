@@ -22,7 +22,7 @@ def test_existing_save_path_but_empty_folder(save_path):
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
         "model.names": ["timm_image", "hf_text", "fusion_mlp"],
-        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
     }
 
@@ -72,7 +72,7 @@ def test_existing_save_path_with_content_inside(save_path):
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
         "model.names": ["timm_image", "hf_text", "fusion_mlp"],
-        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
     }
 
@@ -114,7 +114,7 @@ def test_continuous_training_save_path():
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
         "model.names": ["timm_image", "hf_text", "fusion_mlp"],
-        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
     }
     predictor.fit(train_data=dataset.train_df, save_path=save_path, hyperparameters=hyperparameters, time_limit=10)

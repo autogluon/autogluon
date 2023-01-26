@@ -97,6 +97,7 @@ class DeepARMXNetModel(AbstractGluonTSMXNetModel):
 
     gluonts_estimator_class: Type[GluonTSEstimator] = DeepAREstimator
     default_num_samples: int = 250
+    supports_known_covariates = True
 
     def _get_estimator_init_args(self) -> dict:
         init_kwargs = super()._get_estimator_init_args()
@@ -194,6 +195,8 @@ class MQCNNMXNetModel(AbstractGluonTSSeq2SeqModel):
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = MQCNNEstimator
+    supports_known_covariates = True
+    supports_past_covariates = True
 
     def _get_estimator_init_args(self) -> dict:
         init_kwargs = super()._get_estimator_init_args()
@@ -201,6 +204,7 @@ class MQCNNMXNetModel(AbstractGluonTSSeq2SeqModel):
         init_kwargs["use_feat_static_real"] = self.num_feat_static_real > 0
         init_kwargs["cardinality"] = self.feat_static_cat_cardinality
         init_kwargs["use_feat_dynamic_real"] = self.num_feat_dynamic_real > 0
+        init_kwargs["use_past_feat_dynamic_real"] = self.num_past_feat_dynamic_real > 0
         return init_kwargs
 
 
@@ -251,6 +255,7 @@ class MQRNNMXNetModel(AbstractGluonTSSeq2SeqModel):
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = MQRNNEstimator
+    supports_known_covariates = True
 
 
 class SimpleFeedForwardMXNetModel(AbstractGluonTSMXNetModel):
@@ -349,13 +354,20 @@ class TemporalFusionTransformerMXNetModel(AbstractGluonTSMXNetModel):
 
     gluonts_estimator_class: Type[GluonTSEstimator] = TemporalFusionTransformerEstimator
     supported_quantiles: set = set([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+    supports_known_covariates = True
+    supports_past_covariates = True
 
     def _get_estimator_init_args(self) -> dict:
         init_kwargs = super()._get_estimator_init_args()
         if self.num_feat_static_real > 0:
             init_kwargs["static_feature_dims"] = {FieldName.FEAT_STATIC_REAL: self.num_feat_static_real}
-        if self.num_feat_dynamic_real > 0:
-            init_kwargs["dynamic_feature_dims"] = {FieldName.FEAT_DYNAMIC_REAL: self.num_feat_dynamic_real}
+        if self.num_feat_dynamic_real > 0 or self.num_past_feat_dynamic_real > 0:
+            init_kwargs["dynamic_feature_dims"] = {}
+            if self.num_feat_dynamic_real > 0:
+                init_kwargs["dynamic_feature_dims"][FieldName.FEAT_DYNAMIC_REAL] = self.num_feat_dynamic_real
+            if self.num_past_feat_dynamic_real > 0:
+                init_kwargs["dynamic_feature_dims"][FieldName.PAST_FEAT_DYNAMIC_REAL] = self.num_past_feat_dynamic_real
+                init_kwargs["past_dynamic_features"] = [FieldName.PAST_FEAT_DYNAMIC_REAL]
 
         # Turning off hybridization prevents MXNet errors when training on GPU
         init_kwargs["hybridize"] = False
