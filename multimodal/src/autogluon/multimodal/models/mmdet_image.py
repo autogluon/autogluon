@@ -120,7 +120,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
-    def dump(self, save_path: str = "./", tokenizers: Optional[dict] = None):
+    def save(self, save_path: str = "./", tokenizers: Optional[dict] = None):
 
         weights_save_path = os.path.join(save_path, "model.pth")
         configs_save_path = os.path.join(save_path, "config.py")

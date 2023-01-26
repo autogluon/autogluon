@@ -255,7 +255,7 @@ class HFAutoModelForTextPrediction(nn.Module):
 
         return name_to_id
 
-    def dump(self, save_path: str = "./", tokenizers: Optional[dict] = None):
+    def save(self, save_path: str = "./", tokenizers: Optional[dict] = None):
         self.model.save_pretrained(save_path)
         logger.info(f"Model weights for {self.prefix} are saved to {save_path}.")
         if self.prefix in tokenizers:

@@ -2811,7 +2811,7 @@ class MultiModalPredictor:
             for per_model in models[model_key]:
                 subdir = os.path.join(path, per_model.prefix)
                 os.makedirs(subdir, exist_ok=True)
-                per_model.dump(save_path=subdir, tokenizers=tokenizers)
+                per_model.save(save_path=subdir, tokenizers=tokenizers)
 
     @property
     def class_labels(self):
