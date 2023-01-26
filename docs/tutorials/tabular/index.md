@@ -5,7 +5,7 @@
 maxdepth: 1
 ---
 
-Quick Start<tabular-quickstart>
+Quick Start <tabular-quickstart>
 In Depth <tabular-indepth>
 Multilabel <tabular-multilabel>
 Tabular + Text <tabular-multimodal-text-others>
