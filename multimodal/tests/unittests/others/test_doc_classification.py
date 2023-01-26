@@ -34,7 +34,7 @@ def get_rvl_cdip_sample_data():
 # Both text only backbones and document foundation models are supported.
 @pytest.mark.parametrize(
     "checkpoint_name",
-    [("google/electra-small-discriminator"), ("microsoft/layoutlmv2-base-uncased")],
+    [("google/electra-small-discriminator"), ("microsoft/layoutlmv3-base")],
 )
 def test_doc_classification(checkpoint_name):
     predictor = MultiModalPredictor(label="label")

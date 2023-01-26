@@ -1,3 +1,4 @@
+import ast
 import codecs
 import random
 import re
