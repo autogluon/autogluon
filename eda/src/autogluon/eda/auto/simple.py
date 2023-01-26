@@ -29,6 +29,7 @@ from ..analysis.dataset import (
 )
 from ..analysis.interaction import FeatureDistanceAnalysis
 from ..state import is_key_present_in_state
+from ..utils.defaults import QuickFitDefaults
 from ..visualization import (
     ConfusionMatrix,
     CorrelationVisualization,
@@ -643,26 +644,9 @@ def get_default_estimator_if_not_specified(fit_args):
 
         fit_args["fit_weighted_ensemble"] = False
         if _is_lightgbm_available():
-            fit_args["hyperparameters"] = {
-                "GBM": [
-                    {"extra_trees": True, "ag_args": {"name_suffix": "XT"}},
-                ]
-            }
+            fit_args["hyperparameters"] = QuickFitDefaults.DEFAULT_LGBM_CONFIG
         else:
-            fit_args["hyperparameters"] = {
-                "RF": [
-                    {
-                        "criterion": "entropy",
-                        "max_depth": 15,
-                        "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]},
-                    },
-                    {
-                        "criterion": "squared_error",
-                        "max_depth": 15,
-                        "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
-                    },
-                ],
-            }
+            fit_args["hyperparameters"] = QuickFitDefaults.DEFAULT_RF_CONFIG
     return fit_args
 
 
