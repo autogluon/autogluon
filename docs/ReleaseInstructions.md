@@ -1,7 +1,7 @@
 # Release process
 # TODO: need to update all these resources based on new doc build approach
 
-### Prior to release: 1 week out
+## Prior to release: 1 week out
 
 * Ensure the version specified in `docs/config.ini`, `VERSION`, `docs/index.rst`, and `docs/badges.rst` align with the intended release version.
 * Check all dependency version ranges.
@@ -49,7 +49,7 @@
 * If minor fixes are needed, create PRs and merge them as necessary if they are low risk. Ensure fixes are tested manually.
 * If major fixes are needed, consider the severity and if they are release critical. If they are, consider delaying release to ensure the issue is fixed (and tested).
 
-### Prior to release: 1 day out
+## Prior to release: 1 day out
 
 * Ensure that the mainline code you are planning to release is stable: Benchmark, ensure CI passes, check with team, etc.
 * Cut a release branch with format `0.x.y` (no v) - this branch is required to publish docs to versioned path
@@ -65,7 +65,7 @@
   * Prioritize major features before minor features when ordering, otherwise order by merge date.
   * Review with at least 2 core maintainers to ensure release notes are correct.
 
-### Release
+## Release
 
 * Update the `stable` documentation to the new release:
   * Delete the `stable` branch.
@@ -85,12 +85,12 @@
   * Click 'Publish release' and the release will go live.
 * Wait ~10 minutes and then locally test that the PyPi package is available and working with the latest release version, ask team members to also independently verify.
 
-### Conda-Forge Release
+## Conda-Forge Release
 
 After GitHub & PyPi release, conduct release on Conda-Forge
 * [TODO] Add Conda-Forge release steps.
 
-### Release Cheatsheet
+## Release Cheatsheet
 
 * If intending to create a new cheatsheet for the release, refer to [autogluon-doc-utils README.md](https://github.com/Innixma/autogluon-doc-utils) for instructions on creating a new cheatsheet.
 * If a cheatsheet exists for `0.x.y` (or `0.x`), update the `docs/cheatsheet.rst` url paths ([example](https://github.com/autogluon/autogluon/blob/0.4.1/docs/cheatsheet.rst)) in branch `0.x.y` to the correct location ([example for v0.4.0 and v0.4.1](https://github.com/Innixma/autogluon-doc-utils/tree/main/docs/cheatsheets/v0.4.0)).
@@ -98,7 +98,7 @@ After GitHub & PyPi release, conduct release on Conda-Forge
   * Do NOT do this for `stable` branch or `master` branch, instead have them continue pointing to the [stable cheatsheet files](https://github.com/Innixma/autogluon-doc-utils/tree/main/docs/cheatsheets/stable). This is to ensure that as we release new versions of the cheatsheet, old docs will still refer to the correct cheatsheet for their version.
   * Finally, update the stable files [here](https://github.com/Innixma/autogluon-doc-utils/tree/main/docs/cheatsheets/stable) to reflect the latest released version of the cheatsheet.
 
-### Post Release
+## Post Release
 
 * IF THERE IS A MAJOR ISSUE: Do an emergency hot-fix and a new release ASAP. Releases cannot be deleted, so a new release will have to be done.
 
