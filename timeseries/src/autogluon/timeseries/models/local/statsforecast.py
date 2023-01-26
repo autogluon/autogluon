@@ -7,6 +7,7 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
 from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
+from autogluon.timeseries.utils.warning_filters import statsmodels_warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -83,11 +84,12 @@ class AbstractStatsForecastModel(AbstractLocalModel):
             levels = sorted(list(set(levels)))
             chosen_columns = list(new_column_names.values())
 
-            raw_predictions = sf.forecast(
-                df=self._to_statsforecast_dataframe(data_to_fit),
-                h=self.prediction_length,
-                level=levels,
-            ).reset_index()
+            with statsmodels_warning_filter():
+                raw_predictions = sf.forecast(
+                    df=self._to_statsforecast_dataframe(data_to_fit),
+                    h=self.prediction_length,
+                    level=levels,
+                ).reset_index()
             predictions = raw_predictions.rename(new_column_names, axis=1)[chosen_columns].set_index(TIMESTAMP)
             item_ids = predictions.pop(ITEMID)
 
@@ -95,6 +97,10 @@ class AbstractStatsForecastModel(AbstractLocalModel):
                 self._cached_predictions[data_hash.loc[item_id]] = preds
             # Make sure cached predictions can be reused by other models
             self.save()
+
+    def hyperparameter_tune(self, **kwargs):
+        # FIXME: multiprocessing.pool.ApplyResult.get() hangs inside StatsForecast.forecast if HPO enabled - needs investigation
+        raise NotImplementedError(f"{self.__class__.__name__} does not support hyperparameter tuning.")
 
 
 class AutoARIMAStatsForecastModel(AbstractStatsForecastModel):
@@ -189,7 +195,7 @@ class AutoETSStatsForecastModel(AbstractStatsForecastModel):
 
     Other Parameters
     ----------------
-    model : str, default = "AAA"
+    model : str, default = "ZZZ"
         Model string describing the configuration of the E (error), T (trend) and S (seasonal) model components.
         Each component can be one of "M" (multiplicative), "A" (additive), "N" (omitted). For example when model="ANN"
         (additive error, no trend, and no seasonality), ETS will explore only a simple exponential smoothing.
@@ -205,10 +211,6 @@ class AutoETSStatsForecastModel(AbstractStatsForecastModel):
         "model",
         "seasonal_period",
     ]
-
-    def _update_local_model_args(self, local_model_args: dict, data: TimeSeriesDataFrame) -> dict:
-        local_model_args.setdefault("model", "AAA")
-        return local_model_args
 
     def get_model_type(self):
         from statsforecast.models import AutoETS
