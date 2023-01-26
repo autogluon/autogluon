@@ -628,23 +628,41 @@ def covariate_shift_detection(
     return state if return_state else None
 
 
+def _is_lightgbm_available() -> bool:
+    try:
+        import lightgbm  # noqa
+
+        return True
+    except (ImportError, OSError):
+        return False
+
+
 def get_default_estimator_if_not_specified(fit_args):
     if ("hyperparameters" not in fit_args) and ("presets" not in fit_args):
         fit_args = fit_args.copy()
-        fit_args["hyperparameters"] = {
-            "RF": [
-                {
-                    "criterion": "entropy",
-                    "max_depth": 15,
-                    "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]},
-                },
-                {
-                    "criterion": "squared_error",
-                    "max_depth": 15,
-                    "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
-                },
-            ],
-        }
+
+        fit_args["fit_weighted_ensemble"] = False
+        if _is_lightgbm_available():
+            fit_args["hyperparameters"] = {
+                "GBM": [
+                    {"extra_trees": True, "ag_args": {"name_suffix": "XT"}},
+                ]
+            }
+        else:
+            fit_args["hyperparameters"] = {
+                "RF": [
+                    {
+                        "criterion": "entropy",
+                        "max_depth": 15,
+                        "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]},
+                    },
+                    {
+                        "criterion": "squared_error",
+                        "max_depth": 15,
+                        "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
+                    },
+                ],
+            }
     return fit_args
 
 
