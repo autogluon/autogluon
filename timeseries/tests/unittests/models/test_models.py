@@ -26,6 +26,7 @@ AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
 TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS + TABULAR_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS
 DUMMY_HYPERPARAMETERS = {"epochs": 1, "num_batches_per_epoch": 1, "maxiter": 1, "n_jobs": 1}
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
+MODELS_WITHOUT_HPO = ["AutoGluonTabular", "AutoETS", "AutoARIMA", "DynamicOptimizedTheta"]
 
 
 @pytest.fixture(scope="module")
@@ -110,8 +111,8 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
             "epochs": ag.Int(1, 3),
         },
     )
-    if model.name == "AutoGluonTabular":
-        pytest.skip("AutoGluonTabular model doesn't support HPO")
+    if model.name in MODELS_WITHOUT_HPO:
+        pytest.skip(f"{model.name} doesn't support HPO")
 
     num_trials = 2
 
