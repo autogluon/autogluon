@@ -175,7 +175,11 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
     @property
     def document_feature_names(self):
-        return self._document_feature_names
+        # Added for backward compatibility.
+        if hasattr(self, "_document_feature_names"):
+            return self._document_feature_names
+        else:
+            return []
 
     @property
     def ner_feature_names(self):
