@@ -96,6 +96,12 @@ print('Predicted entities:', predictions[0])
 visualize_ner(sentence, predictions[0])
 ```
 
+## Prediction Probabilities 
+You can also output the probabilities for a deep dive into the predictions.
+```{.python .input}
+predictions = predictor.predict_proba({'text_snippet': [sentence]})
+print(predictions[0][0]['probability'])
+```
 ## Reloading and Continuous Training 
 The trained predictor is automatically saved and you can easily reload it using the path. If you are not saftisfied with the current model performance, you can continue training the loaded model with new data.
 

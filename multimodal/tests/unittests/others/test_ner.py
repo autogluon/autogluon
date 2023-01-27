@@ -75,4 +75,5 @@ def test_multi_ner(checkpoint_name):
     test_predict = train_data.drop(label_col, axis=1)
     test_predict = test_predict.head(2)
     predictions = predictor.predict(test_predict)
+    proba = predictor.predict_proba(test_predict)
     embeddings = predictor.extract_embedding(test_predict)
