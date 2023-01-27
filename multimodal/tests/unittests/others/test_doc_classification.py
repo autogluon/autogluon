@@ -6,7 +6,7 @@ import pytest
 from autogluon.core.utils.loaders import load_zip
 from autogluon.multimodal import MultiModalPredictor
 
-DOC_PATH_COL = "image_path"
+DOC_PATH_COL = "doc_path"
 
 
 def path_expander(path, base_folder):
