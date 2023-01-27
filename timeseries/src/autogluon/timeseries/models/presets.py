@@ -17,6 +17,7 @@ from . import (
     SeasonalNaiveModel,
     SimpleFeedForwardModel,
     ThetaModel,
+    TemporalFusionTransformerModel,
 )
 from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
 
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 MODEL_TYPES = dict(
     SimpleFeedForward=SimpleFeedForwardModel,
     DeepAR=DeepARModel,
+    TemporalFusionTransformer=TemporalFusionTransformerModel,
     # Prophet=ProphetModel,
     ETS=ETSModel,
     ARIMA=ARIMAModel,
@@ -78,7 +80,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     ARIMA=80,
     AutoGluonTabular=70,
     DeepAR=60,
-    TemporalFusionTransformerMXNet=50,
+    TemporalFusionTransformer=50,
     SimpleFeedForward=40,
     TransformerMXNet=30,
     AutoARIMA=50,
@@ -89,6 +91,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     ARIMASktime=50,
     DeepARMXNet=50,
     SimpleFeedForwardMXNet=30,
+    TemporalFusionTransformerMXNet=50,
     AutoARIMASktime=20,
     MQCNNMXNet=10,
     MQRNNMXNet=10,
@@ -136,6 +139,7 @@ def get_default_hps(key, prediction_length):
             "SimpleFeedForward": {
                 "context_length": context_length,
             },
+            "TemporalFusionTransformer": {},
         },
         "best_quality": {
             "Naive": {},
@@ -157,17 +161,14 @@ def get_default_hps(key, prediction_length):
                 "context_length": context_length,
                 "hidden_dimensions": ag.Categorical([40], [40, 40], [120]),
             },
+            "TemporalFusionTransformer": {},
         },
     }
 
     # update with MXNet if installed
     if agts.MXNET_INSTALLED:
         mxnet_default_updates = {
-            "high_quality": {
-                "TemporalFusionTransformerMXNet": {"context_length": context_length},
-            },
             "best_quality": {
-                "TemporalFusionTransformerMXNet": {"context_length": context_length},
                 "TransformerMXNet": {"context_length": context_length},
             },
         }

@@ -1,5 +1,5 @@
 from .autogluon_tabular import AutoGluonTabularModel
-from .gluonts import DeepARModel, SimpleFeedForwardModel
+from .gluonts import DeepARModel, SimpleFeedForwardModel, TemporalFusionTransformerModel
 from .local import (
     ARIMAModel,
     AutoARIMAModel,
@@ -14,6 +14,7 @@ from .local import (
 __all__ = [
     "DeepARModel",
     "SimpleFeedForwardModel",
+    "TemporalFusionTransformerModel",
     "ARIMAModel",
     "ETSModel",
     "ThetaModel",

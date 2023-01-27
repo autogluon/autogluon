@@ -14,19 +14,19 @@ import pandas as pd
 import torch
 from gluonts.core.component import from_hyperparameters
 from gluonts.model.forecast import QuantileForecast
-from gluonts.torch.distributions import AffineTransformed, NormalOutput
+from gluonts.torch.distributions import AffineTransformed
 from gluonts.torch.model.deepar import DeepAREstimator
 from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
-from gluonts.torch.model.forecast import DistributionForecast, Forecast
+from gluonts.torch.model.forecast import DistributionForecast
 from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPredictor
 from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
+from gluonts.torch.model.tft import TemporalFusionTransformerEstimator
 from pytorch_lightning.callbacks import Timer
 
 from autogluon.core.hpo.constants import CUSTOM_BACKEND
 from autogluon.core.utils.loaders import load_pkl
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
-from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import torch_warning_filter
 
 # FIXME: introduces cpflows dependency. We exclude this model until a future release.
@@ -133,14 +133,12 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
 
         quantile_keys = [str(q) for q in quantile_levels]
         if isinstance(forecast.distribution, AffineTransformed):
-            # FIXME: this is a hack to get around GluonTS not implementing quantiles for
-            # torch AffineTransformed. We hence force PyTorch SFF to always use Gaussian error.
-            # However, this leads to a ~2x regression in error compared to MXNet SFF.
-            fdist = forecast.distribution
-            quantiles_tensor = torch.tensor(quantile_levels, device=fdist.scale.device).unsqueeze(1)
-            q_transformed = (fdist.scale * fdist.base_dist.icdf(quantiles_tensor) + fdist.loc).cpu().numpy().tolist()
-        else:
-            q_transformed = [forecast.quantile(q) for q in quantile_keys]
+            # FIXME: Fix a bug where distribution parameters aren't moved to CPU
+            affine_transform = forecast.distribution.transforms[-1]
+            affine_transform.scale = affine_transform.scale.cpu()
+            affine_transform.loc = affine_transform.loc.cpu()
+
+        q_transformed = [forecast.quantile(q) for q in quantile_keys]
 
         forecast_arrays.extend(q_transformed)
         forecast_init_args = dict(
@@ -252,14 +250,21 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
 
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = SimpleFeedForwardEstimator
 
+
+class TemporalFusionTransformerModel(AbstractGluonTSPyTorchModel):
+    gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = TemporalFusionTransformerEstimator
+    supports_known_covariates = True
+    supports_past_covariates = True
+
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
-
-        # FIXME: PyTorch StudentT does not implement quantile functions
-        if "distr_output" in init_kwargs:
-            warnings.warn(
-                f"distr_output {init_kwargs['distr_output']} specified for SimpleFeedForward, however training"
-                "will default to the Gaussian distribution."
-            )
-        init_kwargs["distr_output"] = NormalOutput()
+        init_kwargs.setdefault("context_length", max(64, self.prediction_length))
+        if self.num_feat_dynamic_real > 0:
+            init_kwargs["dynamic_dims"] = [self.num_feat_dynamic_real]
+        if self.num_past_feat_dynamic_real > 0:
+            init_kwargs["past_dynamic_dims"] = [self.num_past_feat_dynamic_real]
+        if self.num_feat_static_real > 0:
+            init_kwargs["static_dims"] = [self.num_feat_static_real]
+        if len(self.feat_static_cat_cardinality):
+            init_kwargs["static_cardinalities"] = self.feat_static_cat_cardinality
         return init_kwargs
