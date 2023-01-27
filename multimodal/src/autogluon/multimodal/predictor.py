@@ -13,7 +13,6 @@ import sys
 import time
 import warnings
 from collections import namedtuple
-from dataclasses import dataclass
 from datetime import timedelta
 from typing import Dict, List, Optional, Union
 
@@ -54,11 +53,8 @@ from .constants import (
     FEW_SHOT,
     FEW_SHOT_TEXT_CLASSIFICATION,
     GREEDY_SOUP,
-    HF_TEXT,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
-    IMAGE_SIMILARITY,
-    IMAGE_TEXT_SIMILARITY,
     LABEL,
     LAST_CHECKPOINT,
     LOGITS,
@@ -84,7 +80,6 @@ from .constants import (
     SCORE,
     TEXT,
     TEXT_NER,
-    TEXT_SIMILARITY,
     UNIFORM_SOUP,
     Y_PRED,
     Y_PRED_PROB,
@@ -100,7 +95,6 @@ from .data.infer_types import (
     is_image_column,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
 from .matcher import MultiModalMatcher
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
@@ -144,7 +138,6 @@ from .utils import (
     get_precision_context,
     get_stopping_threshold,
     hyperparameter_tune,
-    infer_batch,
     infer_dtypes_by_model_names,
     infer_metrics,
     infer_precision,
