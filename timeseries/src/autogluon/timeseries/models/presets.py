@@ -7,8 +7,11 @@ import autogluon.timeseries as agts
 
 from . import (
     ARIMAModel,
+    AutoARIMA,
+    AutoETS,
     AutoGluonTabularModel,
     DeepARModel,
+    DynamicOptimizedTheta,
     ETSModel,
     NaiveModel,
     SeasonalNaiveModel,
@@ -30,6 +33,9 @@ MODEL_TYPES = dict(
     AutoGluonTabular=AutoGluonTabularModel,
     Naive=NaiveModel,
     SeasonalNaive=SeasonalNaiveModel,
+    AutoETS=AutoETS,
+    AutoARIMA=AutoARIMA,
+    DynamicOptimizedTheta=DynamicOptimizedTheta,
 )
 if agts.MXNET_INSTALLED:
     from .gluonts.mx import (
@@ -75,6 +81,9 @@ DEFAULT_MODEL_PRIORITY = dict(
     TemporalFusionTransformerMXNet=50,
     SimpleFeedForward=40,
     TransformerMXNet=30,
+    AutoARIMA=50,
+    AutoETS=70,
+    DynamicOptimizedTheta=60,
     # Models below are not included in any presets
     AutoETSSktime=60,
     ARIMASktime=50,
@@ -103,6 +112,7 @@ def get_default_hps(key, prediction_length):
             "SeasonalNaive": {},
             "ARIMA": {},
             "ETS": {},
+            "AutoETS": {},
             "Theta": {},
             "AutoGluonTabular": {},
             "DeepAR": {
@@ -112,14 +122,10 @@ def get_default_hps(key, prediction_length):
         "high_quality": {
             "Naive": {},
             "SeasonalNaive": {},
-            "ARIMA": {
-                "order": ag.Categorical((2, 1, 0), (2, 1, 1), (5, 1, 1)),
-                "seasonal_order": ag.Categorical((0, 0, 0), (1, 0, 0)),
-            },
-            "ETS": {
-                "trend": ag.Categorical("add", None),
-                "seasonal": ag.Categorical("add", None),
-            },
+            "ARIMA": {},
+            "ETS": {},
+            "AutoETS": {},
+            "AutoARIMA": {},
             "Theta": {
                 "deseasonalize": ag.Categorical(True, False),
             },
@@ -134,14 +140,11 @@ def get_default_hps(key, prediction_length):
         "best_quality": {
             "Naive": {},
             "SeasonalNaive": {},
-            "ARIMA": {
-                "order": ag.Categorical((2, 1, 0), (2, 1, 1), (5, 1, 1)),
-                "seasonal_order": ag.Categorical((0, 0, 0), (1, 0, 0)),
-            },
-            "ETS": {
-                "trend": ag.Categorical("add", None),
-                "seasonal": ag.Categorical("add", None),
-            },
+            "ARIMA": {},
+            "ETS": {},
+            "AutoETS": {},
+            "AutoARIMA": {},
+            "DynamicOptimizedTheta": {},
             "Theta": {
                 "deseasonalize": ag.Categorical(True, False),
             },
