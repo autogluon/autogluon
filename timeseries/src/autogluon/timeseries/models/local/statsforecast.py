@@ -110,7 +110,7 @@ class AbstractStatsForecastModel(AbstractLocalModel):
             raise NotImplementedError(f"{self.__class__.__name__} does not support hyperparameter tuning.")
 
 
-class AutoARIMA(AbstractStatsForecastModel):
+class AutoARIMAModel(AbstractStatsForecastModel):
     """Automatically tuned ARIMA model.
 
     Automatically selects the best (p,d,q,P,D,Q) model parameters using an information criterion
@@ -159,6 +159,11 @@ class AutoARIMA(AbstractStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
+    n_jobs : int or float, default = -1
+        Number of CPU cores used to fit the models in parallel.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
+        When set to a positive integer, that many cores are used.
+        When set to -1, all CPU cores are used.
     """
 
     allowed_local_model_args = [
@@ -193,7 +198,7 @@ class AutoARIMA(AbstractStatsForecastModel):
         return AutoARIMA_
 
 
-class AutoETS(AbstractStatsForecastModel):
+class AutoETSModel(AbstractStatsForecastModel):
     """Automatically tuned exponential smoothing with trend and seasonality.
 
     Automatically selects the best ETS (Error, Trend, Seasonality) model using an information criterion
@@ -212,6 +217,11 @@ class AutoETS(AbstractStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
+    n_jobs : int or float, default = -1
+        Number of CPU cores used to fit the models in parallel.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
+        When set to a positive integer, that many cores are used.
+        When set to -1, all CPU cores are used.
     """
 
     allowed_local_model_args = [
@@ -225,7 +235,7 @@ class AutoETS(AbstractStatsForecastModel):
         return AutoETS_
 
 
-class DynamicOptimizedTheta(AbstractStatsForecastModel):
+class DynamicOptimizedThetaModel(AbstractStatsForecastModel):
     """Optimized Theta forecasting model from Fiorucci et al. (2016).
 
     Based on `statsforecast.models.DynamicOptimizedTheta <https://nixtla.github.io/statsforecast/models.html#dynamic-optimized-theta-method>`_.
@@ -248,6 +258,11 @@ class DynamicOptimizedTheta(AbstractStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
+    n_jobs : int or float, default = 0.5
+        Number of CPU cores used to fit the models in parallel.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
+        When set to a positive integer, that many cores are used.
+        When set to -1, all CPU cores are used.
     """
 
     allowed_local_model_args = [

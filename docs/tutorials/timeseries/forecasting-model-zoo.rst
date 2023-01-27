@@ -47,6 +47,9 @@ Default models
    ARIMAModel
    ETSModel
    ThetaModel
+   AutoETSModel
+   AutoARIMAModel
+   DynamicOptimizedThetaModel
    AutoGluonTabularModel
    DeepARModel
    SimpleFeedForwardModel
@@ -83,6 +86,24 @@ Default models
 ~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: ThetaModel
+   :members: init
+
+:hidden:`AutoETSModel`
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: AutoETSModel
+   :members: init
+
+:hidden:`AutoARIMAModel`
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: AutoARIMAModel
+   :members: init
+
+:hidden:`DynamicOptimizedThetaModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: DynamicOptimizedThetaModel
    :members: init
 
 :hidden:`AutoGluonTabularModel`
@@ -186,25 +207,30 @@ Models not included in this table currently do not support any additional featur
    :header-rows: 1
    :stub-columns: 1
    :align: center
-   :widths: 40 20 20 20
+   :widths: 40 15 15 15 15
 
    * - Model
      - Static features (continuous)
      - Static features (categorical)
      - Known covariates (continuous)
+     - Past covariates (continuous)
    * - :class:`~autogluon.timeseries.models.AutoGluonTabularModel`
      - ✓
      - ✓
-     -
+     - ✓
+     - ✓
    * - :class:`~autogluon.timeseries.models.DeepARModel`
      - ✓
      - ✓
      - ✓
+     -
    * - :class:`~autogluon.timeseries.models.gluonts.mx.DeepARMXNetModel`
      - ✓
      - ✓
      - ✓
+     -
    * - :class:`~autogluon.timeseries.models.gluonts.mx.MQCNNMXNetModel`
+     - ✓
      - ✓
      - ✓
      - ✓
@@ -212,3 +238,4 @@ Models not included in this table currently do not support any additional featur
      - ✓
      -
      - ✓
+     -
