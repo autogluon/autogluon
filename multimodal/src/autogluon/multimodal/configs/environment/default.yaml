@@ -11,6 +11,6 @@ env:
   fast_dev_run: False
   deterministic: False
   auto_select_gpus: True
-  strategy: "ddp_spawn"
+  strategy: "ddp"
   deepspeed_allgather_size: 1e9 # DeepSpeed allgather size (number of elements gathered at a time). Limits memory required for allgather on large models.
   deepspeed_allreduce_size: 1e9 # DeepSpeed allreduce size (number of elements reduced at a time). Limits memory required for allreduce on large models.
