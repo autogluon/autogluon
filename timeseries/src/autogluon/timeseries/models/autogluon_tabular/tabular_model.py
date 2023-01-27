@@ -309,8 +309,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
                 hyperparameters=tabular_hyperparameters,
                 verbosity=verbosity - 2,
             )
-        calibration_df = val_df if val_df is not None else train_df
-        residuals = (calibration_df[self.target] - self.tabular_predictor.predict(calibration_df)).values
+        residuals = (train_df[self.target] - self.tabular_predictor.predict(train_df)).values
         self.quantile_corrections = {}
         for q in self.quantile_levels:
             self.quantile_corrections[q] = np.quantile(residuals, q)
