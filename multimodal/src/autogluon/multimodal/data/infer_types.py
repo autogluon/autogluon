@@ -288,8 +288,10 @@ def is_document_column(
                     # convert images to string
                     words = pytesseract.image_to_string(PIL.Image.open(per_image))
                     words_len.append(len(words))
-                except:
+                except Exception as e:
+                    logger.debug(f"Exception {e} found dealing with {per_image}.")
                     return False
+        logger.debug(f"Average length of words of this dataset is {sum(words_len) / len(words_len)}.")
         if sum(words_len) / len(words_len) > text_len_threshold:
             return True
         else:

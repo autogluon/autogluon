@@ -21,6 +21,12 @@ Multimodal Data
 
       How to use MultiModalPredictor to train a model for multimodal named entity recognition.
 
+   .. card::
+      :title: AutoMM for Scanned Document Classification - Quick Start
+      :link: document_classification.html
+
+      How to use MultiModalPredictor to build a scanned document classifier.
+
 
 .. toctree::
    :maxdepth: 1
@@ -29,4 +35,5 @@ Multimodal Data
    beginner_multimodal
    multimodal_text_tabular
    multimodal_ner
+   document_classification
 
