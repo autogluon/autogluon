@@ -59,9 +59,11 @@ aws s3 cp $BUILD_DOCS_PATH docs/_build/html/tutorials/ --recursive
 setup_build_contrib_env
 install_all_no_tests
 
-cd docs
-sphinx-autogen api/*.rst -t _templates/autosummary
-find ./tutorials/ -name "index.md" -type f | xargs sphinx-build -b html . _build/html/
+shopt -s extglob
+rm -rf ./docs/tutorials/!(index.md)
+cd docs && sphinx-build -b html . _build/html
+# sphinx-autogen api/*.rst -t _templates/autosummary
+# find ./tutorials -name "index.md" -type f | xargs sphinx-build -b html . _build/html/
 
 COMMAND_EXIT_CODE=$?
 if [ $COMMAND_EXIT_CODE -ne 0 ]; then
