@@ -24,8 +24,6 @@ class LabelProcessor:
             The prefix connecting a processor to its corresponding model.
         """
         self.prefix = model.prefix
-        self.tokenizer = None
-        self.model = model
 
     @property
     def label_key(self):
