@@ -2180,7 +2180,6 @@ class MultiModalPredictor:
 
         assert self._problem_type not in [
             REGRESSION,
-            NAMED_ENTITY_RECOGNITION,
         ], f"Problem {self._problem_type} has no probability output."
 
         if candidate_data:
@@ -2197,9 +2196,16 @@ class MultiModalPredictor:
                 realtime=realtime,
                 seed=seed,
             )
-            logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
 
-            prob = logits_to_prob(logits)
+            if self._problem_type == NER:
+                ner_outputs = extract_from_output(outputs=outputs, ret_type=NER_RET)
+                prob = self._df_preprocessor.transform_prediction(
+                    y_pred=ner_outputs,
+                    return_proba=True,
+                )
+            else:
+                logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
+                prob = logits_to_prob(logits)
 
         if not as_multiclass:
             if self._problem_type == BINARY:
