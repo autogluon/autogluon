@@ -147,7 +147,7 @@ class MultiModalMatcher:
             If `problem_type = None`, the prediction problem type is inferred
             based on the label-values in provided dataset.
         presets
-            Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+            Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
@@ -313,7 +313,7 @@ class MultiModalMatcher:
              Id-to-content mappings. The contents can be text, image, etc.
              This is used when the dataframe contains the query/response identifiers instead of their contents.
         presets
-            Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+            Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         tuning_data
             A dataframe containing validation data, which should have the same columns as the train_data.
             If `tuning_data = None`, `fit()` will automatically

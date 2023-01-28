@@ -79,7 +79,7 @@ def get_config(
     problem_type
         Problem type.
     presets
-        Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+        Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
     config
         A dictionary including four keys: "model", "data", "optimization", and "environment".
         If any key is not given, we will fill in with the default value.

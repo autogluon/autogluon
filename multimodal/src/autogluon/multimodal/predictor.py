@@ -253,7 +253,7 @@ class MultiModalPredictor:
         pipeline
             Pipeline has been deprecated and merged in problem_type.
         presets
-            Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+            Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
@@ -546,7 +546,7 @@ class MultiModalPredictor:
         train_data
             A dataframe containing training data.
         presets
-            Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+            Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         config
             A dictionary with four keys "model", "data", "optimization", and "environment".
             Each key's value can be a string, yaml file path, or OmegaConf's DictConfig.

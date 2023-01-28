@@ -6,8 +6,8 @@ from .constants import (
     DATA,
     DEFAULT,
     ENVIRONMENT,
-    HIGH_QUALITY_FAST_INFERENCE,
-    MEDIUM_QUALITY_FASTER_INFERENCE,
+    HIGH_QUALITY,
+    MEDIUM_QUALITY,
     MODEL,
     MULTICLASS,
     OPTIMIZATION,
@@ -20,7 +20,7 @@ matcher_presets = Registry("matcher_presets")
 
 
 @automm_presets.register()
-def default(presets: str = DEFAULT, hpo: bool = False):
+def default(presets: str = DEFAULT):
     """
     Register the presets for problem types: binary, multiclass, classification, and regression.
 
@@ -28,8 +28,6 @@ def default(presets: str = DEFAULT, hpo: bool = False):
     ----------
     presets
         The preset name.
-    hpo
-        Whether to use HPO presets.
 
     Returns
     -------
@@ -50,14 +48,14 @@ def default(presets: str = DEFAULT, hpo: bool = False):
     }
     hyperparameter_tune_kwargs = None
 
-    if presets in [HIGH_QUALITY_FAST_INFERENCE, DEFAULT]:
+    if presets in [HIGH_QUALITY, DEFAULT]:
         hyperparameters.update(
             {
                 "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
                 "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
             }
         )
-    elif presets == MEDIUM_QUALITY_FASTER_INFERENCE:
+    elif presets == MEDIUM_QUALITY:
         hyperparameters.update(
             {
                 "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
@@ -90,7 +88,7 @@ def default(presets: str = DEFAULT, hpo: bool = False):
 
 
 @automm_presets.register()
-def few_shot_text_classification(presets: str = DEFAULT, hpo: bool = False):
+def few_shot_text_classification(presets: str = DEFAULT):
     """
     Register the presets for few_shot_text_classification.
 
@@ -98,8 +96,6 @@ def few_shot_text_classification(presets: str = DEFAULT, hpo: bool = False):
     ----------
     presets
         The preset name.
-    hpo
-        Whether to use HPO presets.
 
     Returns
     -------
@@ -136,7 +132,7 @@ def few_shot_text_classification(presets: str = DEFAULT, hpo: bool = False):
 
 
 @automm_presets.register()
-def zero_shot_image_classification(presets: str = DEFAULT, hpo: bool = False):
+def zero_shot_image_classification(presets: str = DEFAULT):
     """
     Register the presets for zero_shot_image_classification.
 
@@ -144,8 +140,6 @@ def zero_shot_image_classification(presets: str = DEFAULT, hpo: bool = False):
     ----------
     presets
         The preset name.
-    hpo
-        Whether to use HPO presets.
 
     Returns
     -------
@@ -168,14 +162,14 @@ def zero_shot_image_classification(presets: str = DEFAULT, hpo: bool = False):
                 "env.eval_batch_size_ratio": 1,
             }
         )
-    elif presets == HIGH_QUALITY_FAST_INFERENCE:
+    elif presets == HIGH_QUALITY:
         hyperparameters.update(
             {
                 "model.clip.checkpoint_name": "openai/clip-vit-large-patch14",
                 "env.eval_batch_size_ratio": 1,
             }
         )
-    elif presets == MEDIUM_QUALITY_FASTER_INFERENCE:
+    elif presets == MEDIUM_QUALITY:
         hyperparameters.update(
             {
                 "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
@@ -188,7 +182,7 @@ def zero_shot_image_classification(presets: str = DEFAULT, hpo: bool = False):
 
 
 @automm_presets.register()
-def object_detection(presets: str = DEFAULT, hpo: bool = False):
+def object_detection(presets: str = DEFAULT):
     """
     Register the presets for object_detection.
 
@@ -196,8 +190,6 @@ def object_detection(presets: str = DEFAULT, hpo: bool = False):
     ----------
     presets
         The preset name.
-    hpo
-        Whether to use HPO presets.
 
     Returns
     -------
@@ -223,7 +215,7 @@ def object_detection(presets: str = DEFAULT, hpo: bool = False):
     }
     hyperparameter_tune_kwargs = None
 
-    if presets in [DEFAULT, MEDIUM_QUALITY_FASTER_INFERENCE]:
+    if presets in [DEFAULT, MEDIUM_QUALITY]:
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
@@ -232,7 +224,7 @@ def object_detection(presets: str = DEFAULT, hpo: bool = False):
                 "optimization.val_metric": "direct_loss",
             }
         )
-    elif presets == HIGH_QUALITY_FAST_INFERENCE:
+    elif presets == HIGH_QUALITY:
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "yolov3_d53_mstrain-416_273e_coco",
@@ -257,7 +249,7 @@ def object_detection(presets: str = DEFAULT, hpo: bool = False):
 
 
 @automm_presets.register()
-def ocr_text_detection(presets: str = DEFAULT, hpo: bool = False):
+def ocr_text_detection(presets: str = DEFAULT):
     """
     Register the presets for ocr_text_detection.
 
@@ -265,8 +257,6 @@ def ocr_text_detection(presets: str = DEFAULT, hpo: bool = False):
     ----------
     presets
         The preset name.
-    hpo
-        Whether to use HPO presets.
 
     Returns
     -------
@@ -288,7 +278,7 @@ def ocr_text_detection(presets: str = DEFAULT, hpo: bool = False):
 
 
 @automm_presets.register()
-def ocr_text_recognition(presets: str = DEFAULT, hpo: bool = False):
+def ocr_text_recognition(presets: str = DEFAULT):
     """
     Register the presets for ocr_text_recognition.
 
@@ -296,8 +286,6 @@ def ocr_text_recognition(presets: str = DEFAULT, hpo: bool = False):
     ----------
     presets
         The preset name.
-    hpo
-        Whether to use HPO presets.
 
     Returns
     -------
@@ -319,9 +307,7 @@ def ocr_text_recognition(presets: str = DEFAULT, hpo: bool = False):
 
 
 @automm_presets.register()
-def feature_extraction(
-    presets: str = DEFAULT, hpo: bool = False
-):  # TODO: rename the problem type as text_feature_extraction?
+def feature_extraction(presets: str = DEFAULT):  # TODO: rename the problem type as text_feature_extraction?
     """
     Register the presets for feature_extraction.
 
@@ -329,8 +315,6 @@ def feature_extraction(
     ----------
     presets
         The preset name.
-    hpo
-        It is not used and only to align with the APIs of other problem types.
 
     Returns
     -------
@@ -352,7 +336,7 @@ def feature_extraction(
 
 @automm_presets.register()
 @matcher_presets.register()
-def image_similarity(presets: str = DEFAULT, hpo: bool = False):
+def image_similarity(presets: str = DEFAULT):
     """
     Register the presets for image_similarity.
 
@@ -360,8 +344,6 @@ def image_similarity(presets: str = DEFAULT, hpo: bool = False):
     ----------
     presets
         The preset name.
-    hpo
-        Whether to use HPO presets.
 
     Returns
     -------
@@ -376,13 +358,13 @@ def image_similarity(presets: str = DEFAULT, hpo: bool = False):
     }
     hyperparameter_tune_kwargs = None
 
-    if presets in [DEFAULT, HIGH_QUALITY_FAST_INFERENCE]:
+    if presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
             {
                 "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
             }
         )
-    elif presets == MEDIUM_QUALITY_FASTER_INFERENCE:
+    elif presets == MEDIUM_QUALITY:
         hyperparameters.update(
             {
                 "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
@@ -402,7 +384,7 @@ def image_similarity(presets: str = DEFAULT, hpo: bool = False):
 
 @automm_presets.register()
 @matcher_presets.register()
-def text_similarity(presets: str = DEFAULT, hpo: bool = False):
+def text_similarity(presets: str = DEFAULT):
     """
     Register the presets for text_similarity.
 
@@ -410,8 +392,6 @@ def text_similarity(presets: str = DEFAULT, hpo: bool = False):
     ----------
     presets
         The preset name.
-    hpo
-        Whether to use HPO presets.
 
     Returns
     -------
@@ -428,13 +408,13 @@ def text_similarity(presets: str = DEFAULT, hpo: bool = False):
     }
     hyperparameter_tune_kwargs = None
 
-    if presets in [DEFAULT, HIGH_QUALITY_FAST_INFERENCE]:
+    if presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
             {
                 "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L12-v2",
             }
         )
-    elif presets == MEDIUM_QUALITY_FASTER_INFERENCE:
+    elif presets == MEDIUM_QUALITY:
         hyperparameters.update(
             {
                 "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
@@ -454,7 +434,7 @@ def text_similarity(presets: str = DEFAULT, hpo: bool = False):
 
 @automm_presets.register()
 @matcher_presets.register()
-def image_text_similarity(presets: str = DEFAULT, hpo: bool = False):
+def image_text_similarity(presets: str = DEFAULT):
     """
     Register the presets for image_text_similarity.
 
@@ -462,8 +442,6 @@ def image_text_similarity(presets: str = DEFAULT, hpo: bool = False):
     ----------
     presets
         The preset name.
-    hpo
-        Whether to use HPO presets.
 
     Returns
     -------
@@ -480,14 +458,14 @@ def image_text_similarity(presets: str = DEFAULT, hpo: bool = False):
     }
     hyperparameter_tune_kwargs = None
 
-    if presets in [DEFAULT, MEDIUM_QUALITY_FASTER_INFERENCE]:
+    if presets in [DEFAULT, MEDIUM_QUALITY]:
         hyperparameters.update(
             {
                 "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
                 "env.per_gpu_batch_size": 128,
             }
         )
-    elif presets == HIGH_QUALITY_FAST_INFERENCE:
+    elif presets == HIGH_QUALITY:
         hyperparameters.update(
             {
                 "model.clip.checkpoint_name": "openai/clip-vit-large-patch14",
@@ -508,7 +486,7 @@ def image_text_similarity(presets: str = DEFAULT, hpo: bool = False):
 
 
 @automm_presets.register()
-def ner(presets: str = DEFAULT, hpo: bool = False):
+def ner(presets: str = DEFAULT):
     """
     Register the presets for ner.
 
@@ -516,8 +494,6 @@ def ner(presets: str = DEFAULT, hpo: bool = False):
     ----------
     presets
         The preset name.
-    hpo
-        Whether to use HPO presets.
 
     Returns
     -------
@@ -537,13 +513,13 @@ def ner(presets: str = DEFAULT, hpo: bool = False):
     }
     hyperparameter_tune_kwargs = None
 
-    if presets in [DEFAULT, HIGH_QUALITY_FAST_INFERENCE]:
+    if presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
             {
                 "model.ner_text.checkpoint_name": "microsoft/deberta-v3-base",
             }
         )
-    elif presets == MEDIUM_QUALITY_FASTER_INFERENCE:
+    elif presets == MEDIUM_QUALITY:
         hyperparameters.update(
             {
                 "model.ner_text.checkpoint_name": "google/electra-small-discriminator",
