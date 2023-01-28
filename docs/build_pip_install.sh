@@ -43,6 +43,8 @@ cd ..
 
 cd eda/
 python3 -m pip install -e .[tests]
+# Resolve awscli and tox conflict
+python3 -m pip install "colorama<0.4.5,>=0.2.5"
 cd ..
 
 cd autogluon/
