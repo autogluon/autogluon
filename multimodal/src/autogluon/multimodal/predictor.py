@@ -1375,7 +1375,6 @@ class MultiModalPredictor:
                 check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
                 if hasattr(config.optimization, "check_val_every_n_epoch")
                 else 1,
-                reload_dataloaders_every_n_epochs=1,
                 plugins=[custom_checkpoint_plugin],
             )
 
@@ -1410,6 +1409,7 @@ class MultiModalPredictor:
                     standalone=standalone,
                     clean_ckpts=clean_ckpts,
                 )
+            self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"]
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
 
@@ -1525,9 +1525,6 @@ class MultiModalPredictor:
             prefix=prefix,
             strict=strict_loading,
         )
-
-        if self._problem_type != OBJECT_DETECTION:  # TODO: update detection's evaluation to support this
-            self._best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
 
         if is_distill:
             avg_state_dict = self._replace_model_name_prefix(
