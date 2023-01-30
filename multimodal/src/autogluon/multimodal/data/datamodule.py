@@ -146,7 +146,7 @@ class BaseDataModule(LightningDataModule):
                 data_processors=self.data_processors,
                 per_gpu_batch_size=self.per_gpu_batch_size,
             ),
-            persistent_workers=True,
+            persistent_workers=self.num_workers > 0,
         )
         return loader
 
@@ -170,7 +170,7 @@ class BaseDataModule(LightningDataModule):
                 data_processors=self.data_processors,
                 per_gpu_batch_size=self.per_gpu_batch_size,
             ),
-            persistent_workers=True,
+            persistent_workers=self.num_workers > 0,
         )
         return loader
 
@@ -194,7 +194,7 @@ class BaseDataModule(LightningDataModule):
                 data_processors=self.data_processors,
                 per_gpu_batch_size=self.per_gpu_batch_size,
             ),
-            persistent_workers=True,
+            persistent_workers=self.num_workers > 0,
         )
         return loader
 
@@ -218,6 +218,6 @@ class BaseDataModule(LightningDataModule):
                 data_processors=self.data_processors,
                 per_gpu_batch_size=self.per_gpu_batch_size,
             ),
-            persistent_workers=True,
+            persistent_workers=self.num_workers > 0,
         )
         return loader
