@@ -634,3 +634,131 @@ class TimeSeriesDataFrame(pd.DataFrame):
         df_view._cached_freq = freq
 
         return df_view
+
+    def to_regular_index(self, freq: str) -> "TimeSeriesDataFrame":
+        """Fill the gaps in an irregularly-sampled time series with NaNs.
+
+        Parameters
+        ----------
+        freq: str
+            Frequency string of the new time series data index.
+
+        Examples
+        --------
+        >>> print(ts_dataframe)
+                            target
+        item_id timestamp
+        0       2019-01-01     NaN
+                2019-01-03     1.0
+                2019-01-06     2.0
+                2019-01-07     NaN
+        1       2019-02-04     3.0
+                2019-02-07     4.0
+
+        >>> print(ts_dataframe.to_regular_index(freq="D"))
+                            target
+        item_id timestamp
+        0       2019-01-01     NaN
+                2019-01-02     NaN
+                2019-01-03     1.0
+                2019-01-04     NaN
+                2019-01-05     NaN
+                2019-01-06     2.0
+                2019-01-07     NaN
+        1       2019-02-04     3.0
+                2019-02-05     NaN
+                2019-02-06     NaN
+                2019-02-07     4.0
+
+        """
+        if self.freq is not None:
+            if self.freq != freq:
+                raise ValueError(
+                    f"TimeSeriesDataFrame already has a regular index with freq '{self.freq}' "
+                    f"that cannot be converted to the given freq '{freq}'"
+                )
+            else:
+                return self
+
+        filled_series = []
+        for item_id, time_series in self.groupby(level=ITEMID, sort=False):
+            time_series = time_series.droplevel(ITEMID)
+            timestamps = time_series.index
+            if not timestamps.is_monotonic_increasing:
+                raise ValueError(
+                    "Please make sure that the timestamps are sorted in increasing order for all time series."
+                )
+            start = timestamps[0]
+            end = timestamps[-1]
+            filled_timestamps = pd.date_range(start=start, end=end, freq=freq, name=TIMESTAMP)
+            if not timestamps.isin(filled_timestamps).all():
+                raise ValueError(
+                    f"Irregularly-sampled timestamps in this TimeSeriesDataFrame are not compatible "
+                    f"with the given frequency '{freq}'"
+                )
+            filled_series.append(pd.concat({item_id: time_series.reindex(filled_timestamps)}, names=[ITEMID]))
+
+        return TimeSeriesDataFrame(pd.concat(filled_series), static_features=self.static_features)
+
+    def fill_missing_values(self, method: str = "ffill") -> "TimeSeriesDataFrame":
+        """Fill missing values represented by NaN.
+
+        Missing values at the beginning of each time series are dropped. Remaining missing values (in the middle and
+        at the end) are filled using the chosen method.
+
+
+        Parameters
+        ----------
+        method : {"ffill", "interpolate"}, default = "ffill"
+            Method used to impute missing values.
+            "ffill" - propagate last valid observation forward.
+            "interpolate" - fill NaN values using linear interpolation.
+
+        Examples
+        --------
+        >>> print(ts_dataframe)
+                            target
+        item_id timestamp
+        0       2019-01-01     NaN
+                2019-01-02     NaN
+                2019-01-03     1.0
+                2019-01-04     NaN
+                2019-01-05     NaN
+                2019-01-06     2.0
+                2019-01-07     NaN
+        1       2019-02-04     3.0
+                2019-02-05     NaN
+                2019-02-06     NaN
+                2019-02-07     4.0
+
+        >>> print(ts_dataframe.fill_missing_values(method="ffill"))
+                            target
+        item_id timestamp
+        0       2019-01-03     1.0
+                2019-01-04     1.0
+                2019-01-05     1.0
+                2019-01-06     2.0
+                2019-01-07     2.0
+        1       2019-02-04     3.0
+                2019-02-05     3.0
+                2019-02-06     3.0
+                2019-02-07     4.0
+
+        """
+        if self.freq is None:
+            raise ValueError(
+                "Please make sure that all time series have a regular index before calling `fill_missing_values`"
+                "(for example, using the `to_regular_index` method)."
+            )
+
+        if method == "ffill":
+            fill_method = lambda ts: ts.fillna(method="ffill")
+        elif method == "interpolate":
+            fill_method = lambda ts: ts.interpolate()
+        else:
+            raise ValueError(f"Invalid fill method. Expecting one of {'ffill', 'interpolate'}. Got {method}")
+
+        filled_df = pd.DataFrame(self).groupby(level=ITEMID, sort=False).apply(fill_method)
+        # Drop leading NaNs (at the start of time series)
+        filled_df.dropna(inplace=True)
+        return TimeSeriesDataFrame(filled_df, static_features=self.static_features)
