@@ -1409,7 +1409,7 @@ class MultiModalPredictor:
                     standalone=standalone,
                     clean_ckpts=clean_ckpts,
                 )
-            self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"]
+            self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
 
