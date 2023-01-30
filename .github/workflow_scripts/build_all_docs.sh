@@ -53,17 +53,17 @@ else
     S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA/all  # We still write to BRANCH so copy_docs.sh knows where to find it
 fi
 
-mkdir -p docs/_build/html/tutorials/
-aws s3 cp $BUILD_DOCS_PATH docs/_build/html/tutorials/ --recursive
-
 setup_build_contrib_env
 install_all_no_tests
 
-shopt -s extglob
-rm -rf ./docs/tutorials/!(index.md)
-cd docs && sphinx-build -b html . _build/html
+# shopt -s extglob
+# rm -rf ./docs/tutorials/!(index.md)
+cd docs && sphinx-build -D nb_execution_mode=off -b html . _build/html
 # sphinx-autogen api/*.rst -t _templates/autosummary
 # find ./tutorials -name "index.md" -type f | xargs sphinx-build -b html . _build/html/
+
+# mkdir -p docs/_build/html/tutorials/
+aws s3 cp $BUILD_DOCS_PATH _build/html/tutorials/ --recursive
 
 COMMAND_EXIT_CODE=$?
 if [ $COMMAND_EXIT_CODE -ne 0 ]; then
