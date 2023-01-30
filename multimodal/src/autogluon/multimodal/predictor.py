@@ -80,11 +80,6 @@ from .constants import (
     SCORE,
     TEXT,
     TEXT_NER,
-<<<<<<< HEAD
-    TEXT_SIMILARITY,
-    TIMM_IMAGE,
-=======
->>>>>>> 95f573a10a379dfb8f49ca1d6e59936e406367a2
     UNIFORM_SOUP,
     Y_PRED,
     Y_PRED_PROB,
