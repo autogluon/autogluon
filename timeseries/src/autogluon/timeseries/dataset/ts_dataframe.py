@@ -758,7 +758,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         else:
             raise ValueError(f"Invalid fill method. Expecting one of {'ffill', 'interpolate'}. Got {method}")
 
-        filled_df = pd.DataFrame(self).groupby(level=ITEMID, sort=False).apply(fill_method)
+        filled_df = pd.DataFrame(self).groupby(level=ITEMID, sort=False, group_keys=False).apply(fill_method)
         # Drop leading NaNs (at the start of time series)
         filled_df.dropna(inplace=True)
         return TimeSeriesDataFrame(filled_df, static_features=self.static_features)
