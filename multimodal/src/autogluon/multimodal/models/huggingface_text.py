@@ -126,6 +126,10 @@ class HFAutoModelForTextPrediction(nn.Module):
         return f"{self.prefix}_{TEXT_VALID_LENGTH}"
 
     @property
+    def input_keys(self):
+        return [self.text_token_ids_key, self.text_segment_ids_key, self.text_valid_length_key]
+
+    @property
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
 
@@ -139,25 +143,32 @@ class HFAutoModelForTextPrediction(nn.Module):
 
     def forward(
         self,
-        batch: dict,
+        text_token_ids: torch.Tensor,
+        text_segment_ids: torch.Tensor,
+        text_valid_length: torch.Tensor,
+        text_column_names: Optional[List[str]] = None,
+        text_column_indices: Optional[List[torch.Tensor]] = None,
     ):
         """
         Parameters
         ----------
-        batch
-            A dictionary containing the input mini-batch data.
-            We need to use the keys with the model prefix to index required data.
+        text_token_ids : torch.Tensor
+            Indices of input sequence tokens in the vocabulary.
+        text_segment_ids : torch.Tensor
+            Indices of input sequence segments.
+        text_valid_length : torch.Tensor
+            Valid length of the input text sequence.
+        text_column_names : list of torch.Tensor, optional
+            Names of the text columns.
+        text_column_indices : list of torch.Tensor, optional
+            Start and stop indices of the text columns.
 
         Returns
         -------
-            A dictionary with logits and features.
+            A tuple that contains (pooled_features, logits, column_features, column_feature_masks)
         """
-        text_token_ids = batch[self.text_token_ids_key]
         if self.disable_seg_ids:
             text_segment_ids = None
-        else:
-            text_segment_ids = batch[self.text_segment_ids_key]
-        text_valid_length = batch[self.text_valid_length_key]
 
         steps = torch.arange(0, text_token_ids.shape[1]).type_as(text_valid_length)
         text_masks = (steps.reshape((1, -1)) < text_valid_length.reshape((-1, 1))).type_as(text_token_ids)
@@ -199,25 +210,42 @@ class HFAutoModelForTextPrediction(nn.Module):
             raise NotImplementedError(f"Pooling mode={self.pooling_mode} is not supported.")
 
         logits = self.head(pooled_features)
+        last_hidden_state = outputs.last_hidden_state
 
-        ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
+        batch = {
+            self.text_token_ids_key: text_token_ids,
+            self.text_segment_ids_key: text_segment_ids,
+            self.text_valid_length_key: text_valid_length,
+        }
+        if text_column_names:
+            assert len(text_column_names) == len(text_column_indices), "invalid text column inputs"
+            batch.update(**dict(zip(text_column_names, text_column_indices)))
         column_features, column_feature_masks = get_column_features(
             batch=batch,
             column_name_prefix=self.text_column_prefix,
-            features=outputs.last_hidden_state,
+            features=last_hidden_state,
             valid_lengths=text_valid_length,
             cls_feature=pooled_features,
         )
-        ret[COLUMN_FEATURES][FEATURES].update(column_features)
-        ret[COLUMN_FEATURES][MASKS].update(column_feature_masks)
 
-        ret.update(
-            {
-                LOGITS: logits,
-                FEATURES: pooled_features,
-            }
-        )
+        if column_features == {} or column_feature_masks == {}:
+            return pooled_features, logits
+        else:
+            return pooled_features, logits, column_features, column_feature_masks
 
+    def model_postprocess(
+        self,
+        pooled_features: torch.Tensor,
+        logits: torch.Tensor,
+        column_features: Optional[List[torch.Tensor]] = None,
+        column_feature_masks: Optional[List[torch.Tensor]] = None,
+    ):
+        ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
+        if column_features != None:
+            ret[COLUMN_FEATURES][FEATURES].update(column_features)
+            ret[COLUMN_FEATURES][MASKS].update(column_feature_masks)
+        ret[LOGITS] = logits
+        ret[FEATURES] = pooled_features
         return {self.prefix: ret}
 
     def get_layer_ids(self):

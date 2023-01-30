@@ -2443,9 +2443,13 @@ class MultiModalPredictor:
         """
         # TODO: Support CLIP
         # TODO: Add test
+        import torch.jit
+
+        from .models.huggingface_text import HFAutoModelForTextPrediction
         from .models.timm_image import TimmAutoModelForImagePrediction
 
-        if not isinstance(self._model, TimmAutoModelForImagePrediction):
+        supported_models = (TimmAutoModelForImagePrediction, HFAutoModelForTextPrediction)
+        if not isinstance(self._model, supported_models):
             raise NotImplementedError(f"export_onnx doesn't support model type {type(self._model)}")
         warnings.warn("Currently, the functionality of exporting to ONNX is experimental.")
 
@@ -2465,27 +2469,51 @@ class MultiModalPredictor:
 
         device_type = "cuda" if torch.cuda.is_available() else "cpu"
         device = torch.device(device_type)
-        self._model.to(device).eval()
-        batch = move_to_device(batch, device=device)
+        input_keys = self._model.input_keys
 
-        InputBatch = namedtuple("InputBatch", self._model.input_keys)
-        input_vec = InputBatch(**batch)
+        self._model.eval()
 
         strategy = "dp"  # default used in inference.
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
         precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False)
         precision_context = get_precision_context(precision=precision, device_type=device_type)
 
+        InputBatch = namedtuple("InputBatch", self._model.input_keys)
+
+        # Perform tracing on cpu, since we're facing an error when tracing with cuda device:
+        #     ERROR: Tensor-valued Constant nodes differed in value across invocations.
+        #     This often indicates that the tracer has encountered untraceable code.
+        #     Comparison exception:   The values for attribute 'shape' do not match: torch.Size([]) != torch.Size([384]).
+        #     from https://github.com/rwightman/pytorch-image-models/blob/3aa31f537d5fbf6be8f1aaf5a36f6bbb4a55a726/timm/models/swin_transformer.py#L112
+        device = "cpu"
+        num_gpus = 0
+        dtype = infer_precision(
+            num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False, as_torch=True
+        )
+        for key in input_keys:
+            inp = batch[key]
+            # support mixed precision on floating point inputs, and leave integer inputs (for language models) untouched.
+            if inp.dtype.is_floating_point:
+                batch[key] = inp.to(device, dtype=dtype)
+            else:
+                batch[key] = inp.to(device)
+        self._model.to(device)
+        input_vec = InputBatch(**batch)
+
         with precision_context, torch.no_grad():
-            torch.onnx.export(
-                self._model.eval(),
-                args=input_vec,
-                f=onnx_path,
-                opset_version=opset_version,
-                verbose=verbose,
-                input_names=valid_input,
-                dynamic_axes=dynamic_axes,
-            )
+            traced_model = torch.jit.trace(self._model, input_vec)
+        torch.jit.save(traced_model, "traced_model.pt")
+        traced_model = torch.jit.load("traced_model.pt")
+
+        torch.onnx.export(
+            traced_model,
+            args=input_vec,
+            f=onnx_path,
+            opset_version=opset_version,
+            verbose=verbose,
+            input_names=valid_input,
+            dynamic_axes=dynamic_axes,
+        )
 
     def get_processed_batch_for_deployment(
         self,
@@ -2944,11 +2972,13 @@ class AutoMMPredictor(MultiModalPredictor):
 
 
 class MultiModalOnnxPredictor:
-    def __init__(self, base_predictor, model):
+    def __init__(self, base_predictor, model, providers=None):
+        if providers == None:
+            providers = ["CPUExecutionProvider"]
         self._predictor = base_predictor
         import onnxruntime as ort
 
-        self.sess = ort.InferenceSession(model.SerializeToString(), providers=["CUDAExecutionProvider"])
+        self.sess = ort.InferenceSession(model.SerializeToString(), providers=providers)
 
     def predict(self, data: Union[pd.DataFrame, dict, list, str]):
         raise NotImplementedError()
@@ -2979,11 +3009,13 @@ class MultiModalOnnxPredictor:
         return onnx_proba
 
     @staticmethod
-    def load(path):
+    def load(path, providers=None):
         import onnx
 
+        if providers == None:
+            providers = ["CPUExecutionProvider"]
         base_predictor = MultiModalPredictor.load(path=path)
         onnx_path = os.path.join(path, "model.onnx")
         onnx_bytes = onnx.load(onnx_path)
 
-        return MultiModalOnnxPredictor(base_predictor=base_predictor, model=onnx_bytes)
+        return MultiModalOnnxPredictor(base_predictor=base_predictor, model=onnx_bytes, providers=providers)
