@@ -321,10 +321,6 @@ def test_target_analysis__classification(monkeypatch):
         [
             call("## Target variable analysis"),
             call("### Label Insights"),
-            call(
-                "### Target variable correlations\n"
-                " - absolute correlation greater than `0.5` found for target variable `class`"
-            ),
         ]
     )
     call_ds_render.assert_called_once()

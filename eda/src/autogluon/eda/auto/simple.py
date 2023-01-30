@@ -786,10 +786,6 @@ def _render_correlation_analysis(state, train_data, label, sample) -> AnalysisSt
             f" - ⚠️ no fields with absolute correlation greater than "  # type: ignore
             f"`{state.correlations_focus_field_threshold}` found for target variable `{label}`."
         )
-    else:
-        corr_info.append(
-            f" - absolute correlation greater than `{state.correlations_focus_field_threshold}` found for target variable `{label}`"  # type: ignore
-        )
     analyze(
         state=state,
         viz_facets=[
