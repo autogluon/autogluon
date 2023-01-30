@@ -5,9 +5,9 @@ import pytest
 
 from autogluon.timeseries.models.local import (
     ARIMAModel,
-    AutoARIMA,
-    AutoETS,
-    DynamicOptimizedTheta,
+    AutoARIMAModel,
+    AutoETSModel,
+    DynamicOptimizedThetaModel,
     ETSModel,
     NaiveModel,
     SeasonalNaiveModel,
@@ -22,9 +22,9 @@ from ..common import (
 )
 
 TESTABLE_MODELS = [
-    AutoARIMA,
-    AutoETS,
-    DynamicOptimizedTheta,
+    AutoARIMAModel,
+    AutoETSModel,
+    DynamicOptimizedThetaModel,
     ARIMAModel,
     ETSModel,
     ThetaModel,
