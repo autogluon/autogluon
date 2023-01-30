@@ -684,19 +684,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
         for item_id, time_series in self.groupby(level=ITEMID, sort=False):
             time_series = time_series.droplevel(ITEMID)
             timestamps = time_series.index
-            if not timestamps.is_monotonic_increasing:
-                raise ValueError(
-                    "Please make sure that the timestamps are sorted in increasing order for all time series."
-                )
-            start = timestamps[0]
-            end = timestamps[-1]
-            filled_timestamps = pd.date_range(start=start, end=end, freq=freq, name=TIMESTAMP)
-            if not timestamps.isin(filled_timestamps).all():
+            resampled_ts = time_series.resample(freq).asfreq()
+            if not timestamps.isin(resampled_ts.index).all():
                 raise ValueError(
                     f"Irregularly-sampled timestamps in this TimeSeriesDataFrame are not compatible "
                     f"with the given frequency '{freq}'"
                 )
-            filled_series.append(pd.concat({item_id: time_series.reindex(filled_timestamps)}, names=[ITEMID]))
+            filled_series.append(pd.concat({item_id: resampled_ts}, names=[ITEMID]))
 
         return TimeSeriesDataFrame(pd.concat(filled_series), static_features=self.static_features)
 

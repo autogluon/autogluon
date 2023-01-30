@@ -753,7 +753,7 @@ def test_when_path_is_given_to_constructor_then_tsdf_is_constructed_correctly():
 
 @pytest.mark.parametrize("freq", ["D", "W", "M", "Q", "A", "Y", "H", "T", "min", "S"])
 def test_given_index_is_irregular_when_to_regular_index_called_then_result_has_regular_index(freq):
-    df_original = get_data_frame_with_variable_lengths({"B": 15, "A": 20}, freq=freq)
+    df_original = get_data_frame_with_variable_lengths({"B": 15, "A": 20}, freq=freq, covariates_names=["Y", "X"])
 
     # Select random rows & reset cached freq
     df_irregular = df_original.iloc[[2, 5, 7, 10, 14, 15, 16, 33]]
