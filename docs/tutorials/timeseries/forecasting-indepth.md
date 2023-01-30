@@ -168,10 +168,8 @@ train_data.head()
 When creating the TimeSeriesPredictor, we specify that the column `"target"` is our prediction target, and the
 column `"weekend"` contains a covariate that will be known at prediction time.
 ```python
-prediction_length = 14
-
 predictor = TimeSeriesPredictor(
-    prediction_length=prediction_length,
+    prediction_length=14,
     target="target",
     known_covariates_names=["weekend"],
 ).fit(train_data)
@@ -191,6 +189,7 @@ Finally, to make predictions, we generate the known covariates for the forecast 
 ```{.python .input}
 # Time difference between consecutive timesteps
 offset = pd.tseries.frequencies.to_offset(train_data.freq)
+prediction_length = 14
 
 known_covariates_per_item = []
 for item_id in train_data.item_ids:
