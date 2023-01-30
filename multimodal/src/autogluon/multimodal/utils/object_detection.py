@@ -455,6 +455,7 @@ def from_coco(
         else:
             abs_path = os.path.join(root, entry["file_name"])
         if not os.path.exists(abs_path):
+            logger.warning(f"File skipped since not exists: {abs_path}.")
             continue
         rois, _ = _check_load_coco_bbox(
             coco,
