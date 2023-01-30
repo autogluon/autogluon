@@ -24,8 +24,9 @@ from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
 
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
 TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS + TABULAR_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS
-DUMMY_HYPERPARAMETERS = {"epochs": 1, "num_batches_per_epoch": 1, "maxiter": 1}
+DUMMY_HYPERPARAMETERS = {"epochs": 1, "num_batches_per_epoch": 1, "maxiter": 1, "n_jobs": 1}
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
+MODELS_WITHOUT_HPO = ["AutoGluonTabular", "AutoETS", "AutoARIMA", "DynamicOptimizedTheta"]
 
 
 @pytest.fixture(scope="module")
@@ -108,10 +109,12 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         quantile_levels=[0.1, 0.9],
         hyperparameters={
             "epochs": ag.Int(1, 3),
+            "num_epochs_per_batch": 1,
+            "maxiter": 1,
         },
     )
-    if model.name == "AutoGluonTabular":
-        pytest.skip("AutoGluonTabular model doesn't support HPO")
+    if model.name in MODELS_WITHOUT_HPO:
+        pytest.skip(f"{model.name} doesn't support HPO")
 
     num_trials = 2
 
@@ -130,9 +133,9 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
 def test_given_no_freq_argument_when_fit_called_with_freq_then_model_does_not_raise_error(
     model_class, temp_model_path
 ):
-    model = model_class(path=temp_model_path)
+    model = model_class(path=temp_model_path, hyperparameters=DUMMY_HYPERPARAMETERS)
     try:
-        model.fit(train_data=DUMMY_TS_DATAFRAME, time_limit=2, freq="H")
+        model.fit(train_data=DUMMY_TS_DATAFRAME, freq="H")
     except ValueError:
         pytest.fail("unexpected ValueError raised in fit")
 

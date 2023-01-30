@@ -271,23 +271,14 @@ def test_given_expected_known_covariates_missing_from_train_data_when_learner_fi
     temp_model_path,
 ):
     learner = TimeSeriesLearner(path_context=temp_model_path, known_covariates_names=["Y", "Z", "X"])
-    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["X", "Z"])
+    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["X", "Z"])
     with pytest.raises(ValueError, match="columns are missing from train_data: \\['Y'\\]"):
         learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
 
 
-def test_given_extra_covariates_are_present_in_dataframe_when_learner_fits_then_they_are_ignored(temp_model_path):
-    learner = TimeSeriesLearner(path_context=temp_model_path, known_covariates_names=["Y", "X"])
-    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["X", "Y", "Z"])
-    with mock.patch("autogluon.timeseries.trainer.auto_trainer.AutoTimeSeriesTrainer.fit") as mock_fit:
-        learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
-        passed_train = mock_fit.call_args[1]["train_data"]
-        assert len(passed_train.columns.symmetric_difference(["Y", "X", "target"])) == 0
-
-
 def test_given_known_covariates_have_non_numeric_dtypes_when_learner_fits_then_exception_is_raised(temp_model_path):
     learner = TimeSeriesLearner(path_context=temp_model_path, known_covariates_names=["Y", "Z", "X"])
-    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["X", "Z", "Y"])
+    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["X", "Z", "Y"])
     train_data["Y"] = np.random.choice(["foo", "bar", "baz"], size=len(train_data)).astype("O")
     with pytest.raises(ValueError, match="must all have numeric \(float or int\) dtypes"):
         learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
@@ -298,9 +289,11 @@ def test_given_expected_known_covariates_missing_from_data_when_learner_predicts
 ):
     prediction_length = 5
     learner = TimeSeriesLearner(
-        path_context=temp_model_path, known_covariates_names=["X", "Y"], prediction_length=prediction_length
+        path_context=temp_model_path,
+        known_covariates_names=["X", "Y"],
+        prediction_length=prediction_length,
     )
-    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Y", "X"])
+    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["Y", "X"])
     learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
 
     pred_data = train_data.slice_by_timestep(None, -prediction_length)
@@ -315,10 +308,10 @@ def test_given_extra_covariates_are_present_in_dataframe_when_learner_predicts_t
     learner = TimeSeriesLearner(
         path_context=temp_model_path, known_covariates_names=["Y", "X"], prediction_length=prediction_length
     )
-    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Y", "X"])
+    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["Y", "X"])
     learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
 
-    data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Z", "Y", "X"])
+    data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["Z", "Y", "X"])
     pred_data = data.slice_by_timestep(None, -prediction_length)
     known_covariates = data.slice_by_timestep(-prediction_length, None).drop("target", axis=1)
     with mock.patch("autogluon.timeseries.trainer.auto_trainer.AutoTimeSeriesTrainer.predict") as mock_predict:
@@ -337,17 +330,17 @@ def test_given_extra_items_and_timestamps_are_present_in_dataframe_when_learner_
     learner = TimeSeriesLearner(
         path_context=temp_model_path, known_covariates_names=["Y", "X"], prediction_length=prediction_length
     )
-    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Y", "X"])
+    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["Y", "X"])
     learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
 
-    data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Y", "X"])
+    data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["Y", "X"])
     pred_data = data.slice_by_timestep(None, -prediction_length)
 
     # known_covariates includes additional item_ids and additional timestamps
     extended_item_id_to_length = {"D": 25, "E": 37, "F": 14}
     for item_id, length in ITEM_ID_TO_LENGTH.items():
         extended_item_id_to_length[item_id] = length + 7
-    extended_data = get_data_frame_with_variable_lengths(extended_item_id_to_length, known_covariates_names=["Y", "X"])
+    extended_data = get_data_frame_with_variable_lengths(extended_item_id_to_length, covariates_names=["Y", "X"])
     known_covariates = extended_data.drop("target", axis=1)
 
     with mock.patch("autogluon.timeseries.trainer.auto_trainer.AutoTimeSeriesTrainer.predict") as mock_predict:
@@ -371,10 +364,10 @@ def test_given_ignore_index_is_true_and_covariates_too_short_when_learner_predic
         prediction_length=prediction_length,
         ignore_time_index=True,
     )
-    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Y", "X"])
+    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["Y", "X"])
     learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
     short_known_covariates = get_data_frame_with_variable_lengths(
-        {k: 4 for k in ITEM_ID_TO_LENGTH.keys()}, known_covariates_names=["X", "Y"]
+        {k: 4 for k in ITEM_ID_TO_LENGTH.keys()}, covariates_names=["X", "Y"]
     )
     with pytest.raises(ValueError, match=f"should include the values for prediction_length={prediction_length}"):
         learner.predict(train_data, known_covariates=short_known_covariates)
@@ -388,9 +381,9 @@ def test_when_ignore_index_is_true_and_known_covariates_available_then_learner_c
         prediction_length=prediction_length,
         ignore_time_index=True,
     )
-    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["Y", "X"])
+    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["Y", "X"])
     learner.fit(train_data=train_data, hyperparameters={"DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}})
-    known_covariates = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, known_covariates_names=["X", "Y"])
+    known_covariates = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["X", "Y"])
     preds = learner.predict(train_data, known_covariates=known_covariates)
     assert preds.item_ids.equals(train_data.item_ids)
 
@@ -398,26 +391,32 @@ def test_when_ignore_index_is_true_and_known_covariates_available_then_learner_c
 @pytest.mark.parametrize("pred_data_present", [True, False])
 @pytest.mark.parametrize("static_features_present", [True, False])
 @pytest.mark.parametrize("known_covariates_present", [True, False])
+@pytest.mark.parametrize("past_covariates_present", [True, False])
 def test_when_train_data_has_static_or_dynamic_feat_then_leaderboard_works(
-    temp_model_path, pred_data_present, static_features_present, known_covariates_present
+    temp_model_path, pred_data_present, static_features_present, known_covariates_present, past_covariates_present
 ):
     if static_features_present:
         static_features = get_static_features(["B", "A"], feature_names=["f1", "f2"])
     else:
         static_features = None
 
+    covariates_names = []
     if known_covariates_present:
         known_covariates_names = ["X", "Y"]
+        covariates_names.extend(known_covariates_names)
     else:
         known_covariates_names = None
 
+    if past_covariates_present:
+        covariates_names.extend(["A", "B", "C"])
+
     train_data = get_data_frame_with_variable_lengths(
-        {"B": 20, "A": 15}, static_features=static_features, known_covariates_names=known_covariates_names
+        {"B": 20, "A": 15}, static_features=static_features, covariates_names=covariates_names
     )
 
     if pred_data_present:
         pred_data = get_data_frame_with_variable_lengths(
-            {"B": 20, "A": 15}, static_features=static_features, known_covariates_names=known_covariates_names
+            {"B": 20, "A": 15}, static_features=static_features, covariates_names=covariates_names
         )
     else:
         pred_data = None

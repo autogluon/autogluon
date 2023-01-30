@@ -746,6 +746,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self,
         y_pred: Union[np.ndarray, dict],
         inverse_categorical: bool = True,
+        return_proba: bool = False,
     ) -> NDArray[(Any,), Any]:
         """
         Transform model's output logits/probability into class labels for classification
@@ -757,8 +758,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             The model's output logits/probability.
         inverse_categorical
             Whether to transform categorical value back to the original space, e.g., string values.
-        loss_func
-            The loss function of the model.
+        return_proba
+            Whether return the probability or not.
 
         Returns
         -------
@@ -781,11 +782,16 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             y_pred = np.nan_to_num(y_pred)
         elif self.label_type == NER_ANNOTATION:
             y_pred = self._label_generator.inverse_transform(y_pred)
-            if inverse_categorical:
-                # Return annotations and offsets
-                y_pred = y_pred[1]
+
+            if return_proba:
+                y_pred = y_pred[-1]
             else:
-                y_pred = y_pred[0]
+                if inverse_categorical:
+                    # Return annotations and offsets
+                    y_pred = y_pred[1]
+                else:
+                    y_pred = y_pred[0]
+
         else:
             raise NotImplementedError
 

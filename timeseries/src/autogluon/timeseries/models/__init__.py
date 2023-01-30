@@ -1,6 +1,15 @@
 from .autogluon_tabular import AutoGluonTabularModel
 from .gluonts import DeepARModel, SimpleFeedForwardModel
-from .local import ARIMAModel, ETSModel, NaiveModel, SeasonalNaiveModel, ThetaModel
+from .local import (
+    ARIMAModel,
+    AutoARIMA,
+    AutoETS,
+    DynamicOptimizedTheta,
+    ETSModel,
+    NaiveModel,
+    SeasonalNaiveModel,
+    ThetaModel,
+)
 
 __all__ = [
     "DeepARModel",
@@ -11,4 +20,7 @@ __all__ = [
     "AutoGluonTabularModel",
     "NaiveModel",
     "SeasonalNaiveModel",
+    "AutoETS",
+    "AutoARIMA",
+    "DynamicOptimizedTheta",
 ]
