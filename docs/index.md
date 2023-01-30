@@ -160,7 +160,7 @@ hidden:
 install
 tutorials/tabular/tabular_quick_start
 tutorials/multimodal/multimodal_quick_start
-Timeseries Quick Start <tutorials/timeseries/forecasting-quickstart>
+Time Series Quick Start <tutorials/timeseries/forecasting-quickstart>
 ```
 
 ```{toctree}
