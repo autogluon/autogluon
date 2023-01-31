@@ -793,10 +793,35 @@ def test_given_irregular_index_isnt_compatible_with_given_freq_then_exception_is
         df.to_regular_index(freq=freq)
 
 
-@pytest.mark.parametrize("method", ["auto", "ffill", "pad", "interpolate", "constant"])
-def test_when_fill_missing_values_called_then_missing_values_are_filled_and_index_is_unchanged(method):
+FILL_METHODS = ["auto", "ffill", "pad", "backfill", "bfill", "interpolate", "constant"]
+
+
+@pytest.mark.parametrize("method", FILL_METHODS)
+def test_when_fill_missing_values_called_then_gaps_are_filled_and_index_is_unchanged(method):
     df = get_data_frame_with_variable_lengths({"B": 15, "A": 20})
-    df.iloc[[1, 5, 10, 14, 22]] = np.nan
+    df.iloc[[1, 5, 10, 22]] = np.nan
+    df_filled = df.fill_missing_values(method=method)
+    assert not df_filled.isna().any().any()
+    assert df_filled.index.equals(df.index)
+
+
+@pytest.mark.parametrize("method", FILL_METHODS)
+def test_when_fill_missing_values_called_then_leading_nans_are_filled_and_index_is_unchanged(method):
+    if method in ["ffill", "pad", "interpolate"]:
+        pytest.skip(f"{method} doesn't fill leading NaNs")
+    df = get_data_frame_with_variable_lengths({"B": 15, "A": 20})
+    df.iloc[[0, 1, 2, 15, 16]] = np.nan
+    df_filled = df.fill_missing_values(method=method)
+    assert not df_filled.isna().any().any()
+    assert df_filled.index.equals(df.index)
+
+
+@pytest.mark.parametrize("method", FILL_METHODS)
+def test_when_fill_missing_values_called_then_trailing_nans_are_filled_and_index_is_unchanged(method):
+    if method in ["bfill", "backfill"]:
+        pytest.skip(f"{method} doesn't fill trailing NaNs")
+    df = get_data_frame_with_variable_lengths({"B": 15, "A": 20})
+    df.iloc[[13, 14, 34]] = np.nan
     df_filled = df.fill_missing_values(method=method)
     assert not df_filled.isna().any().any()
     assert df_filled.index.equals(df.index)
