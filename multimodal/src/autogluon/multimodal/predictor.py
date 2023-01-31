@@ -27,10 +27,7 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.multimodal.models.fusion import (
-    MultimodalFusionMLP,
-    MultimodalFusionTransformer,
-)
+from autogluon.multimodal.models.fusion import MultimodalFusionMLP, MultimodalFusionTransformer
 from autogluon.multimodal.models.huggingface_text import HFAutoModelForTextPrediction
 from autogluon.multimodal.models.mmdet_image import MMDetAutoModelForObjectDetection
 from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePrediction
@@ -1282,9 +1279,7 @@ class MultiModalPredictor:
             if use_ray_lightning:
                 from ray_lightning.tune import TuneReportCheckpointCallback
             else:
-                from ray.tune.integration.pytorch_lightning import (
-                    TuneReportCheckpointCallback,
-                )
+                from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
             tune_report_callback = TuneReportCheckpointCallback(
                 {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
                 filename=RAY_TUNE_CHECKPOINT,
