@@ -9,13 +9,19 @@ This section provides an overview of exploratory data analysis tools.
       :title: Automated Dataset Overview
       :link: eda-auto-dataset-overview.html
 
-      A tutorial showcasing automated dataset overview analysis
+      Tool to get a high-level understanding of datasets including basic statistical information and feature information
 
    .. card::
       :title: Automated Target Variable Analysis
       :link: eda-auto-target-analysis.html
 
-      A tutorial showcasing automated target variable analysis
+      Automatically analyze and summarize the variable we are trying to predict and it's relationship with other variables.
+
+   .. card::
+      :title: Quick Model Fit
+      :link: eda-auto-quick-fit.html
+
+      Automatically analyze and summarize the variable we are trying to predict and it's relationship with other variables.
 
 .. toctree::
    :maxdepth: 1
@@ -23,3 +29,4 @@ This section provides an overview of exploratory data analysis tools.
 
    eda-auto-dataset-overview
    eda-auto-target-analysis
+   eda-auto-quick-fit

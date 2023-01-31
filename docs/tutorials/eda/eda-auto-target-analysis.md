@@ -56,8 +56,6 @@ auto.target_analysis(train_data=df_train, label=target_col)
 In the previous section we tried a classification example. Let's try a regression. It has a few differences.
 
 ```{.python .input}
-import pandas as pd
-
 df_train = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/AmesHousingPriceRegression/train_data.csv')
 df_test = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/AmesHousingPriceRegression/test_data.csv')
 target_col = 'SalePrice'

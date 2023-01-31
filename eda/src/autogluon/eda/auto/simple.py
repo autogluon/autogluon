@@ -270,7 +270,7 @@ def quick_fit(
         - model leaderboard
         - feature importance
         - samples with the highest prediction error - candidates for inspection
-        - smaples with the least distance from the other class - candidates for labeling
+        - samples with the least distance from the other class - candidates for labeling
 
     Supported `fig_args`/`chart_args` keys:
         - confusion_matrix - confusion matrix chart for classification predictor
