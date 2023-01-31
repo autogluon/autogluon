@@ -38,6 +38,11 @@ function setup_torch_cpu_non_linux {
     pip3 install torch==1.13.1 torchvision==0.14.1
 }
 
+function setup_hf_model_mirror {
+    SUB_FOLDER="$1"
+    python3 setup_hf_model_mirror.py --model_list_file $(dirname "$0")/../../multimodal/tests/hf_model_list.yaml --sub_folder $SUB_FOLDER
+}
+
 function install_local_packages {
     while(($#)) ; do
         python3 -m pip install --upgrade -e $1
