@@ -14,6 +14,5 @@ source $(dirname "$0")/build_doc.sh
 
 setup_torch_cpu
 export CUDA_VISIBLE_DEVICES=0
-setup_hf_model_mirror docs
 
 build_doc text_prediction $BRANCH $GIT_REPO $COMMIT_SHA $PR_NUMBER
