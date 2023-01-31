@@ -4,6 +4,7 @@ import timm
 import transformers
 
 from autogluon.multimodal import MultiModalPredictor
+from autogluon.core.utils.loaders import load_zip
 from autogluon.multimodal.utils.misc import shopee_dataset
 
 from ..utils.unittest_datasets import AEDataset, PetFinderDataset
@@ -33,7 +34,7 @@ def test_dump_timm_image():
         time_limit=5,
         seed=42,
     )
-    predictor_1.dump_model(path=model_dump_path)
+    predictor_1.dump_model(save_path=model_dump_path)
     model = timm.create_model(
         model_name=base_model_name, checkpoint_path=f"{model_dump_path}/timm_image_1/pytorch_model.bin", num_classes=0
     )
@@ -70,7 +71,7 @@ def test_dump_hf_text():
         time_limit=5,
         seed=42,
     )
-    predictor_1.dump_model(path=model_dump_path)
+    predictor_1.dump_model(save_path=model_dump_path)
 
     model = transformers.AutoModel.from_pretrained(f"{model_dump_path}/hf_text")
     assert isinstance(model, transformers.models.bert.modeling_bert.BertModel)
@@ -107,7 +108,7 @@ def test_fusion_model_dump():
         time_limit=5,
         seed=42,
     )
-    predictor.dump_model(path=model_dump_path)
+    predictor.dump_model(save_path=model_dump_path)
     hf_text_dir = f"{model_dump_path}/hf_text"
     timm_image_dir = f"{model_dump_path}/timm_image"
     assert os.path.exists(hf_text_dir) and (len(os.listdir(hf_text_dir)) > 2) == True
@@ -115,7 +116,11 @@ def test_fusion_model_dump():
 
 
 def test_mmdet_object_detection_save_and_load():
-    data_dir = download_sample_dataset()
+    zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection_dataset/tiny_motorbike_coco.zip"
+    download_dir = "./tiny_motorbike_coco"
+
+    load_zip.unzip(zip_file, unzip_dir=download_dir)
+    data_dir = os.path.join(download_dir, "tiny_motorbike")
 
     test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
     # Init predictor
