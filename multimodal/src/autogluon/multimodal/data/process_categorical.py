@@ -22,8 +22,8 @@ class CategoricalProcessor:
         """
         Parameters
         ----------
-        prefix
-            The prefix connecting a processor to its corresponding model.
+        model
+            The model for which this processor would be created.
         requires_column_info
             Whether to require feature column information in dataloader.
         """

@@ -99,10 +99,8 @@ class TextProcessor:
         """
         Parameters
         ----------
-        prefix
-            The prefix connecting a processor to its corresponding model.
-        checkpoint_name
-            Name of the pretrained huggingface checkpoint, e.g., "microsoft/deberta-v3-small"
+        model
+            The model for which this processor would be created.
         tokenizer_name
             Name of the huggingface tokenizer type (default "hf_auto").
         max_len
