@@ -30,7 +30,7 @@ jobs:
           TWINE_USERNAME: ${{ secrets. PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets. PYPI_PASSWORD }}
         run: |
-          for v in common core features tabular multimodal vision timeseries autogluon eda
+          for v in common core features tabular multimodal timeseries autogluon eda
           do
             cd "$v"/
             python setup.py sdist bdist_wheel
