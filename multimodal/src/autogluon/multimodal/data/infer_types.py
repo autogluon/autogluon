@@ -237,11 +237,10 @@ def is_image_column(
         return False
 
 
-def is_document_column(
+def is_document_image_column(
     data: pd.Series,
     col_name: str,
     image_type: Optional[str] = IMAGE_PATH,
-    sample_n: Optional[int] = 500,
     sample_m: Optional[int] = 30,
     text_len_threshold: Optional[int] = 50,
 ) -> bool:
@@ -256,8 +255,6 @@ def is_document_column(
         Name of column.
     image_type
         The image type to check. Set to IMAGE_PATH by default.
-    sample_n
-        Number of sample images to open for sanity check.
     sample_m
         Number of sample images used to check if images are documents images.
     text_len_threshold
@@ -269,33 +266,25 @@ def is_document_column(
 
     # TODO: Add support for other types (e.g., pdf) of document.
 
-    if is_image_column(
-        data=data,
-        col_name=col_name,
-        image_type=image_type,
-        sample_n=sample_n,
-    ):
-        words_len = []
-        if len(data) > sample_m:
-            # Sample to speed-up type inference
-            data = data.sample(n=sample_m, random_state=0)
-        for images in data:
-            success = False
-            if not isinstance(images, list):
-                images = [images]
-            for per_image in images:
-                try:
-                    # convert images to string
-                    words = pytesseract.image_to_string(PIL.Image.open(per_image))
-                    words_len.append(len(words))
-                except Exception as e:
-                    logger.debug(f"Exception {e} found dealing with {per_image}.")
-                    return False
-        logger.debug(f"Average length of words of this dataset is {sum(words_len) / len(words_len)}.")
-        if sum(words_len) / len(words_len) > text_len_threshold:
-            return True
-        else:
-            return False
+    words_len = []
+    if len(data) > sample_m:
+        # Sample to speed-up type inference
+        data = data.sample(n=sample_m, random_state=0)
+    for images in data:
+        success = False
+        if not isinstance(images, list):
+            images = [images]
+        for per_image in images:
+            try:
+                # convert images to string
+                words = pytesseract.image_to_string(PIL.Image.open(per_image))
+                words_len.append(len(words))
+            except Exception as e:
+                logger.debug(f"Exception {e} found dealing with {per_image}.")
+                return False
+    logger.debug(f"Average length of words of this dataset is {sum(words_len) / len(words_len)}.")
+    if sum(words_len) / len(words_len) > text_len_threshold:
+        return True
     else:
         return False
 
@@ -499,10 +488,12 @@ def infer_column_types(
             column_types[col_name] = CATEGORICAL
         elif is_numerical_column(data[col_name], valid_data[col_name]):  # Infer numerical column
             column_types[col_name] = NUMERICAL
-        elif is_document_column(data[col_name], col_name=col_name):
-            column_types[col_name] = DOCUMENT
         elif is_image_column(data[col_name], col_name=col_name, image_type=IMAGE_PATH):  # Infer image-path column
-            column_types[col_name] = IMAGE_PATH
+            # Check if it is document image or not.
+            if is_document_image_column(data[col_name], col_name=col_name):
+                column_types[col_name] = DOCUMENT
+            else:
+                column_types[col_name] = IMAGE_PATH
         elif is_text_column(data[col_name]):  # Infer text column
             column_types[col_name] = TEXT
         elif is_image_column(

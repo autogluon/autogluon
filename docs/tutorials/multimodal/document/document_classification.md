@@ -47,7 +47,7 @@ print(test_data.head())
 ```
 
 Let's display one of the document. 
-As you can, this is a budget document consisting of account number, account name, budgeted fund, expenditures, and etc.
+As you can see, this is a budget document consisting of account number, account name, budgeted fund, expenditures, and etc.
 
 ```{.python .input}
 from IPython.display import Image, display
@@ -104,6 +104,7 @@ We can easily use the final model to predict the label,
 predictions = predictor.predict({DOC_PATH_COL: [doc_path]})
 print(predictions)
 ```
+The above output shows that the trained model correctly classifies the given document into the *budget* category.
 
 If probabilities of all categories are needed, you can call predict_proba:
 ```{.python .input}

@@ -531,8 +531,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         df: pd.DataFrame,
     ) -> Tuple[Dict[str, List[List[str]]], Dict[str, str]]:
         """
-        Preprocess document data by collecting their paths together. If one sample has multiple documents
-        in a document column, assume that their document paths are separated by ";".
+        Preprocess document data by collecting their paths together. The current version does not
+        support cases where one document column has multiple documents.
         This function needs to be called preceding the document processor in "process_document.py".
 
         Parameters

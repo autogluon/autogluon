@@ -65,6 +65,11 @@ class DocumentProcessor:
         """
         self.prefix = model.prefix
         self.model = model
+        self.text_token_ids_key = model.text_token_ids_key
+        self.text_attention_mask_key = model.text_attention_mask_key
+        self.text_bbox_key = model.text_bbox_key
+        self.text_segment_ids_key = model.text_segment_ids_key
+        self.document_pixel_value_key = model.document_pixel_value_key
 
         # For document image processing.
         self.size = size
@@ -81,6 +86,9 @@ class DocumentProcessor:
         # Whether only text is used (automatically detected).
         # If True, normal text foundation models (e.g., bert-base) can be used.
         self.is_text_only_flag = model.is_text_only_flag
+
+        self.pad_token_box = [0, 0, 0, 0]  # cls box token
+        self.sep_token_box = [1000, 1000, 1000, 1000]  # sep box token
 
         # For document text processing.
         self.tokenizer = model.tokenizer
@@ -116,17 +124,17 @@ class DocumentProcessor:
 
         fn.update(
             {
-                self.model.text_token_ids_key: PadCollator(pad_val=self.tokenizer.pad_token_id),
-                self.model.text_attention_mask_key: PadCollator(pad_val=0),
-                self.model.text_bbox_key: PadCollator(pad_val=0),
-                self.model.text_segment_ids_key: PadCollator(pad_val=0),
+                self.text_token_ids_key: PadCollator(pad_val=self.tokenizer.pad_token_id),
+                self.text_attention_mask_key: PadCollator(pad_val=0),
+                self.text_bbox_key: PadCollator(pad_val=0),
+                self.text_segment_ids_key: PadCollator(pad_val=0),
             }
         )
         # If not text only, document images will be used.
         if not self.is_text_only_flag:
             fn.update(
                 {
-                    self.model.document_pixel_value_key: PadCollator(pad_val=0),
+                    self.document_pixel_value_key: PadCollator(pad_val=0),
                 }
             )
         return fn
@@ -272,15 +280,14 @@ class DocumentProcessor:
                 )
 
                 # Truncation of token_boxes
-                pad_token_box = [0, 0, 0, 0]
-                special_tokens_count = 2
+                special_tokens_count = 2  # one cls token and one sep token
                 if len(token_boxes) > self.text_max_len - special_tokens_count:
                     token_boxes = token_boxes[: (self.text_max_len - special_tokens_count)]
                 # add bounding boxes of cls + sep tokens
-                token_boxes = [[0, 0, 0, 0]] + token_boxes + [[1000, 1000, 1000, 1000]]
+                token_boxes = [self.pad_token_box] + token_boxes + [self.sep_token_box]
 
                 padding_length = self.text_max_len - sum(encoding.attention_mask)
-                token_boxes += [pad_token_box] * padding_length
+                token_boxes += [self.pad_token_box] * padding_length
 
             else:
                 encoding = self.tokenizer(
@@ -294,14 +301,14 @@ class DocumentProcessor:
 
             ret.update(
                 {
-                    self.model.text_token_ids_key: np.array(encoding.input_ids, dtype=np.int32),
-                    self.model.text_attention_mask_key: encoding.attention_mask,
-                    self.model.text_bbox_key: np.array(token_boxes, dtype=np.int32),
-                    self.model.text_segment_ids_key: np.array(encoding.token_type_ids, dtype=np.int32),
+                    self.text_token_ids_key: np.array(encoding.input_ids, dtype=np.int32),
+                    self.text_attention_mask_key: encoding.attention_mask,
+                    self.text_bbox_key: np.array(token_boxes, dtype=np.int32),
+                    self.text_segment_ids_key: np.array(encoding.token_type_ids, dtype=np.int32),
                 }
             )
             if not self.is_text_only_flag:
-                ret.update({self.model.document_pixel_value_key: doc_image})
+                ret.update({self.document_pixel_value_key: doc_image})
 
         return ret
 
