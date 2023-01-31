@@ -27,6 +27,6 @@ def test_predictor_with_bart(checkpoint_name, efficient_finetune):
                       "optimization.top_k_average_method": "best",
                       "env.batch_size": 2,
                   },
-                  time_limit=60
+                  time_limit=20
     )
     predictor.predict(test_data)
