@@ -82,7 +82,7 @@ class ImageProcessor:
                 Normalize image by mean (0.48145466, 0.4578275, 0.40821073) and
                 std (0.26862954, 0.26130258, 0.27577711), used for CLIP.
         size
-            The width / height of a square image.
+            The provided width / height of a square image.
         max_img_num_per_col
             The maximum number of images one sample can have.
         missing_value_strategy
@@ -107,6 +107,7 @@ class ImageProcessor:
         self.std = None
 
         if model is not None:
+            print(model.config)
             self.size, self.mean, self.std = self.extract_default(model.config)
             print("Extracted size=", self.size, self.mean, self.std)
         if self.size is None:
