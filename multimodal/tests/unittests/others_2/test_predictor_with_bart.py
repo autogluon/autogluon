@@ -15,7 +15,7 @@ from datasets import load_dataset
 @pytest.mark.parametrize("checkpoint_name", ["facebook/bart-base"])
 @pytest.mark.parametrize("efficient_finetune", [None, IA3_LORA])
 def test_predictor_with_bart(checkpoint_name, efficient_finetune):
-    train_data = load_dataset("glue", 'mrpc')['train'].to_pandas().drop('idx', axis=1).sample(100)
+    train_data = load_dataset("glue", 'mrpc')['train'].to_pandas().drop('idx', axis=1).sample(500)
     test_data = load_dataset("glue", 'mrpc')['validation'].to_pandas().drop('idx', axis=1).sample(20)
     predictor = MultiModalPredictor(label='label')
     predictor.fit(train_data,
