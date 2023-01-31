@@ -66,8 +66,8 @@ class ImageProcessor:
         """
         Parameters
         ----------
-        prefix
-            The prefix connecting a processor to its corresponding model.
+        model
+            The model using this data processor.
         train_transform_types
             A list of image transforms used in training. Note that the transform order matters.
         val_transform_types
@@ -93,12 +93,6 @@ class ImageProcessor:
                 Use an image with zero pixels.
         requires_column_info
             Whether to require feature column information in dataloader.
-        trivial_augment_maxscale
-            Used in trivial augment as the maximum scale that can be random generated
-            A value of 0 means turn off trivial augment
-            https://arxiv.org/pdf/2103.10158.pdf
-        model
-            The model using this data processor.
         """
         self.train_transform_types = train_transform_types
         self.val_transform_types = val_transform_types
@@ -114,6 +108,7 @@ class ImageProcessor:
 
         if model is not None:
             self.size, self.mean, self.std = self.extract_default(model.config)
+            print("Extracted size=", self.size, self.mean, self.std)
         if self.size is None:
             if size is not None:
                 self.size = size
@@ -242,6 +237,7 @@ class ImageProcessor:
             std = None
         else:
             raise ValueError(f"Unknown image processor prefix: {self.prefix}")
+        print(image_size, mean, std)
         return image_size, mean, std
 
     def construct_processor(
