@@ -107,7 +107,7 @@ class ImageProcessor:
         self.std = None
 
         if model is not None:
-            print(model.config)
+            print(type(model), model.config)
             self.size, self.mean, self.std = self.extract_default(model.config)
             print("Extracted size=", self.size, self.mean, self.std)
         if self.size is None:
