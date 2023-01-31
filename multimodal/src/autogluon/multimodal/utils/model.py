@@ -141,8 +141,9 @@ def select_model(
 
     # clean up unused model configs
     model_keys = list(config.model.keys())
-    model_keys.remove("names")
     for model_name in model_keys:
+        if model_name == "names":
+            pass
         if model_name not in selected_model_names:
             delattr(config.model, model_name)
 
