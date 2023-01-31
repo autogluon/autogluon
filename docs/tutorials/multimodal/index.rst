@@ -241,8 +241,8 @@ FAQ
    text_prediction/index
    image_prediction/index
    object_detection/index
+   document/index
    matching/index
    multimodal_prediction/index
-   document/index
    advanced_topics/index
    advanced_topics/multimodal_faq.md
