@@ -694,19 +694,21 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         return TimeSeriesDataFrame(pd.concat(filled_series), static_features=self.static_features)
 
-    def fill_missing_values(self, method: str = "ffill") -> "TimeSeriesDataFrame":
+    def fill_missing_values(self, method: str = "auto", value: float = 0.0) -> "TimeSeriesDataFrame":
         """Fill missing values represented by NaN.
-
-        Missing values at the beginning of each time series are dropped. Remaining missing values (in the middle and
-        at the end) are filled using the chosen method.
-
 
         Parameters
         ----------
-        method : {"ffill", "interpolate"}, default = "ffill"
+        method : str, default = "auto"
             Method used to impute missing values.
-            "ffill" - propagate last valid observation forward.
-            "interpolate" - fill NaN values using linear interpolation.
+
+            - "auto" - first forward fill (to fill the in-between and trailing NaNs), then backward fill (to fill the leading NaNs)
+            - "ffill" or "pad" - propagate last valid observation forward. Note: missing values at the start of the time series are not filled.
+            - "bfill" or "backfill" - use next valid observation to fill gap. Note: this may result in information leakage; missing values at the end of the time series are not filled.
+            - "constant" - replace NaNs with the given constant ``value``.
+            - "interpolate" - fill NaN values using linear interpolation. Note: this may result in information leakage.
+        value : float, default = 0.0
+            Value used by the "constant" imputation method.
 
         Examples
         --------
@@ -720,15 +722,17 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 2019-01-05     NaN
                 2019-01-06     2.0
                 2019-01-07     NaN
-        1       2019-02-04     3.0
-                2019-02-05     NaN
+        1       2019-02-04     NaN
+                2019-02-05     3.0
                 2019-02-06     NaN
                 2019-02-07     4.0
 
-        >>> print(ts_dataframe.fill_missing_values(method="ffill"))
+        >>> print(ts_dataframe.fill_missing_values(method="auto"))
                             target
         item_id timestamp
-        0       2019-01-03     1.0
+        0       2019-01-01     1.0
+                2019-01-02     1.0
+                2019-01-03     1.0
                 2019-01-04     1.0
                 2019-01-05     1.0
                 2019-01-06     2.0
@@ -745,14 +749,36 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 "(for example, using the `to_regular_index` method)."
             )
 
-        if method == "ffill":
-            fill_method = lambda ts: ts.fillna(method="ffill")
+        grouped_df = pd.DataFrame(self).groupby(level=ITEMID, sort=False, group_keys=False)
+        if method == "auto":
+            filled_df = grouped_df.fillna(method="ffill").fillna(method="bfill")
+        elif method in ["ffill", "pad"]:
+            filled_df = grouped_df.fillna(method="ffill")
+        elif method in ["bfill", "backfill"]:
+            filled_df = grouped_df.fillna(method="bfill")
+        elif method == "constant":
+            filled_df = self.fillna(value=value)
         elif method == "interpolate":
-            fill_method = lambda ts: ts.interpolate()
+            filled_df = grouped_df.apply(lambda ts: ts.interpolate())
         else:
-            raise ValueError(f"Invalid fill method. Expecting one of {'ffill', 'interpolate'}. Got {method}")
-
-        filled_df = pd.DataFrame(self).groupby(level=ITEMID, sort=False, group_keys=False).apply(fill_method)
-        # Drop leading NaNs (at the start of time series)
-        filled_df.dropna(inplace=True)
+            raise ValueError(
+                "Invalid fill method. Expecting one of "
+                "{'auto', 'ffill', 'pad', 'bfill', 'backfill', 'constant', 'interpolate'}. "
+                f"Got {method}"
+            )
         return TimeSeriesDataFrame(filled_df, static_features=self.static_features)
+
+    def dropna(self, how: str = "any") -> "TimeSeriesDataFrame":
+        """Drop rows containing NaNs.
+
+        Parameters
+        ----------
+        how : {"any", "all"}, default = "any"
+            Determine if row or column is removed from TimeSeriesDataFrame, when we have at least one NaN or all NaN.
+            - "any" : If any NaN values are present, drop that row or column.
+            - "all" : If all values are NaN, drop that row or column.
+        """
+        # We need to cast to a DataFrame first. Calling self.dropna() results in an exception because self.T
+        # (used inside dropna) is not supported for TimeSeriesDataFrame
+        dropped_df = pd.DataFrame(self).dropna(how=how)
+        return TimeSeriesDataFrame(dropped_df, static_features=self.static_features)

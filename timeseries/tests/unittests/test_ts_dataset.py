@@ -751,7 +751,7 @@ def test_when_path_is_given_to_constructor_then_tsdf_is_constructed_correctly():
         assert len(ts_df) == len(SAMPLE_TS_DATAFRAME)
 
 
-@pytest.mark.parametrize("freq", ["D", "W", "M", "Q", "A", "Y", "H", "T", "min", "S"])
+@pytest.mark.parametrize("freq", ["D", "W", "M", "Q", "A", "Y", "H", "T", "min", "S", "30T", "2H", "17S"])
 def test_given_index_is_irregular_when_to_regular_index_called_then_result_has_regular_index(freq):
     df_original = get_data_frame_with_variable_lengths({"B": 15, "A": 20}, freq=freq, covariates_names=["Y", "X"])
 
@@ -793,18 +793,17 @@ def test_given_irregular_index_isnt_compatible_with_given_freq_then_exception_is
         df.to_regular_index(freq=freq)
 
 
-@pytest.mark.parametrize("freq", ["D", "W", "M", "Q", "A", "Y", "H", "T", "min", "S"])
-def test_when_missing_values_filled_then_leading_missing_values_are_removed(freq):
-    df = get_data_frame_with_variable_lengths({"B": 15, "A": 20}, freq=freq)
-    missing_index = [0, 1, 2, 15, 16]
-    df.iloc[missing_index] = np.nan
-    df_filled = df.fill_missing_values()
-    assert all(idx not in df_filled.index for idx in df.index[missing_index])
-
-
-@pytest.mark.parametrize("freq", ["D", "W", "M", "Q", "A", "Y", "H", "T", "min", "S"])
-def test_given_no_leading_nans_when_missing_values_filled_then_index_doesnt_change(freq):
-    df = get_data_frame_with_variable_lengths({"B": 15, "A": 20}, freq=freq)
-    df.iloc[[1, 5, 10, 22]] = np.nan
-    df_filled = df.fill_missing_values()
+@pytest.mark.parametrize("method", ["auto", "ffill", "pad", "interpolate", "constant"])
+def test_when_fill_missing_values_called_then_missing_values_are_filled_and_index_is_unchanged(method):
+    df = get_data_frame_with_variable_lengths({"B": 15, "A": 20})
+    df.iloc[[1, 5, 10, 14, 22]] = np.nan
+    df_filled = df.fill_missing_values(method=method)
+    assert not df_filled.isna().any().any()
     assert df_filled.index.equals(df.index)
+
+
+def test_when_dropna_called_then_missing_values_are_dropped():
+    df = get_data_frame_with_variable_lengths({"B": 15, "A": 20})
+    df.iloc[[1, 5, 10, 14, 22]] = np.nan
+    df_dropped = df.dropna()
+    assert not df_dropped.isna().any().any()
