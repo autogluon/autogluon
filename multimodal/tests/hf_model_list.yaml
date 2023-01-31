@@ -2,6 +2,7 @@
 - bert-base-chinese
 - bert-base-german-cased
 - bert-base-uncased
+- facebook/bart-base
 - distilbert-base-uncased
 - distilroberta-base
 - google/bert_uncased_L-6_H-768_A-12
