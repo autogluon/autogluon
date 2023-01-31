@@ -39,6 +39,7 @@ function setup_torch_cpu_non_linux {
 }
 
 function setup_hf_model_mirror {
+    pip3 install PyYAML
     SUB_FOLDER="$1"
     python3 $(dirname "$0")/setup_hf_model_mirror.py --model_list_file $(dirname "$0")/../../multimodal/tests/hf_model_list.yaml --sub_folder $SUB_FOLDER
 }
