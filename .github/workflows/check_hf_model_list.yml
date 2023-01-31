@@ -2,7 +2,7 @@ name: Check HF Model List
 
 on:
   pull_request:
-    types: [synchronize, opened]
+    types: [labeled, synchronize, opened]
     paths:
       - 'multimodal/tests/**'
       - 'docs/tutorials/multimodal/**'
@@ -11,8 +11,8 @@ jobs:
   model_list_check:
     runs-on: ubuntu-latest
     steps:
-      - name: Check PR Safe to Run
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'model list checked') == 'false' }}
+      - name: Check model list
+        if: contains(github.event.pull_request.labels.*.name, 'model list checked') == false
         run: |
-        echo It appears that you have modified multimodal unit tests/docs. Please make sure to update `multimodal/tests/hf_model_list.yaml` to include any model changes and tag this PR with `model list checked`.
-        exit 1
+          echo It appears that you have modified multimodal unit tests/docs. Please make sure to update \"multimodal/tests/hf_model_list.yaml\" to include any model changes and label this PR with \"model list checked\".
+          exit 1
