@@ -2817,8 +2817,8 @@ class MultiModalPredictor:
                         models[model_key].append(per_model)
         else:
             for model_key, model_type in supported_models.items():
-                if isinstance(per_model, model_type):
-                    models[model_key].append(per_model)
+                if isinstance(self._model, model_type):
+                    models[model_key].append(self._model)
 
         if not models:
             raise NotImplementedError(
