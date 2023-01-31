@@ -3,8 +3,8 @@ import os
 import timm
 import transformers
 
-from autogluon.multimodal import MultiModalPredictor
 from autogluon.core.utils.loaders import load_zip
+from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils.misc import shopee_dataset
 
 from ..utils.unittest_datasets import AEDataset, PetFinderDataset
