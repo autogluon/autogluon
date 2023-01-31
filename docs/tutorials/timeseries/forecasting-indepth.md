@@ -342,8 +342,6 @@ When we fit the predictor with `predictor.fit(train_data=train_data)`, under the
 Performance of different models on the validation set is evaluated using the `evaluate` method, just like described [above](#how-does-autogluon-evaluate-performance-of-time-series-models).
 The model that achieves the best validation score will be used for prediction in the end.
 
-<!-- **TODO: Multi-window backtesting as default in 0.6.0?** -->
-
 By default, the internal validation set uses the last `prediction_length` time steps of each time series (i.e., single-window backtesting).
 To use multi-window backtesting instead, set the `validation_splitter` argument to `"multi_window"`
 ```python
