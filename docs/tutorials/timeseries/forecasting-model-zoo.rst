@@ -152,49 +152,6 @@ If a GPU is available and MXNet version with CUDA is installed, all the MXNet mo
 Otherwise, the models will be trained on CPU.
 
 
-.. :hidden:`DeepARMXNetModel`
-.. ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. .. autoclass:: DeepARMXNetModel
-..    :members: init
-
-
-.. :hidden:`MQCNNMXNetModel`
-.. ~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. .. autoclass:: MQCNNMXNetModel
-..    :members: init
-
-
-.. :hidden:`MQRNNMXNetModel`
-.. ~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. .. autoclass:: MQRNNMXNetModel
-..    :members: init
-
-
-.. :hidden:`SimpleFeedForwardMXNetModel`
-.. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. .. autoclass:: SimpleFeedForwardMXNetModel
-..    :members: init
-
-
-.. :hidden:`TemporalFusionTransformerMXNetModel`
-.. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. .. autoclass:: TemporalFusionTransformerMXNetModel
-..    :members: init
-
-
-.. :hidden:`TransformerMXNetModel`
-.. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. .. autoclass:: TransformerMXNetModel
-..    :members: init
-
-
-
 Additional features
 -------------------
 Overview of the additional features and covariates supported by different models.
