@@ -130,7 +130,18 @@ Default models
 
 MXNet Models
 ------------
-Using the models listed below requires installing Apache MXNet v1.9. This can be done as follows::
+Following MXNet-based models from GluonTS are available in AutoGluon.
+
+- ``DeepARMXNetModel``
+- ``MQCNNMXNetModel``
+- ``MQRNNMXNetModel``
+- ``SimpleFeedForwardMXNetModel``
+- ``TemporalFusionTransformerMXNetModel``
+- ``TransformerMXNetModel``
+
+Documentation and hyperparameter settings for these models can be found `here <https://github.com/autogluon/autogluon/blob/master/timeseries/src/autogluon/timeseries/models/gluonts/mx/models.py>`_.
+
+Using the above models requires installing Apache MXNet v1.9. This can be done as follows::
 
    python -m pip install mxnet~=1.9
 
@@ -141,60 +152,46 @@ If a GPU is available and MXNet version with CUDA is installed, all the MXNet mo
 Otherwise, the models will be trained on CPU.
 
 
-.. automodule:: autogluon.timeseries.models.gluonts.mx
-.. currentmodule:: autogluon.timeseries.models.gluonts.mx
+.. :hidden:`DeepARMXNetModel`
+.. ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. .. autoclass:: DeepARMXNetModel
+..    :members: init
 
 
-.. autosummary::
-   :nosignatures:
+.. :hidden:`MQCNNMXNetModel`
+.. ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   DeepARMXNetModel
-   MQCNNMXNetModel
-   MQRNNMXNetModel
-   SimpleFeedForwardMXNetModel
-   TemporalFusionTransformerMXNetModel
-   TransformerMXNetModel
-
-:hidden:`DeepARMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: DeepARMXNetModel
-   :members: init
+.. .. autoclass:: MQCNNMXNetModel
+..    :members: init
 
 
-:hidden:`MQCNNMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~
+.. :hidden:`MQRNNMXNetModel`
+.. ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: MQCNNMXNetModel
-   :members: init
-
-
-:hidden:`MQRNNMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: MQRNNMXNetModel
-   :members: init
+.. .. autoclass:: MQRNNMXNetModel
+..    :members: init
 
 
-:hidden:`SimpleFeedForwardMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. :hidden:`SimpleFeedForwardMXNetModel`
+.. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: SimpleFeedForwardMXNetModel
-   :members: init
-
-
-:hidden:`TemporalFusionTransformerMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: TemporalFusionTransformerMXNetModel
-   :members: init
+.. .. autoclass:: SimpleFeedForwardMXNetModel
+..    :members: init
 
 
-:hidden:`TransformerMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. :hidden:`TemporalFusionTransformerMXNetModel`
+.. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: TransformerMXNetModel
-   :members: init
+.. .. autoclass:: TemporalFusionTransformerMXNetModel
+..    :members: init
+
+
+.. :hidden:`TransformerMXNetModel`
+.. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. .. autoclass:: TransformerMXNetModel
+..    :members: init
 
 
 
