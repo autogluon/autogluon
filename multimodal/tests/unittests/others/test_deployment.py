@@ -71,7 +71,7 @@ def test_onnx_export_hf_text(checkpoint_name):
         ("resnet18", 0),
     ],
 )
-def test_onnx_export_image_cls(checkpoint_name, num_gpus):
+def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     import numpy as np
     import torch
     from torch import FloatTensor
