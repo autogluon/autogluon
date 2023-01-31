@@ -2789,7 +2789,7 @@ class MultiModalPredictor:
 
         return predictor
 
-    def dump_model(self, path: Optional[str] = None):
+    def dump_model(self, save_path: Optional[str] = None):
         """
         Save model weights and config to local directory.
         Model weights are saved in file `pytorch_model.bin` (timm, hf) or '<ckpt_name>.pth' (mmdet);
@@ -2801,8 +2801,8 @@ class MultiModalPredictor:
             Path to directory where models and configs should be saved.
         """
 
-        if not path:
-            path = self._save_path
+        if not save_path:
+            save_path = self._save_path
 
         supported_models = {
             TIMM_IMAGE: TimmAutoModelForImagePrediction,
@@ -2812,7 +2812,7 @@ class MultiModalPredictor:
 
         models = defaultdict(list)
         # TODO: Add BaseMultimodalFusionModel class from which MultimodalFusionMLP and MultimodalFusionTransformer will inherit
-        # TODO: simplify the code (class variable?)
+        # TODO: simplify the code
         if isinstance(self._model, (MultimodalFusionMLP, MultimodalFusionTransformer)) and isinstance(
             self._model.model, torch.nn.modules.container.ModuleList
         ):
@@ -2838,9 +2838,11 @@ class MultiModalPredictor:
 
         for model_key in models:
             for per_model in models[model_key]:
-                subdir = os.path.join(path, per_model.prefix)
+                subdir = os.path.join(save_path, per_model.prefix)
                 os.makedirs(subdir, exist_ok=True)
                 per_model.save(save_path=subdir, tokenizers=tokenizers)
+
+        return save_path
 
     @property
     def class_labels(self):
