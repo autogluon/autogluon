@@ -2797,7 +2797,7 @@ class MultiModalPredictor:
         """
 
         if not save_path:
-            save_path = self._save_path
+            save_path = self._save_path if self._save_path else "./"
 
         supported_models = {
             TIMM_IMAGE: TimmAutoModelForImagePrediction,
