@@ -64,7 +64,6 @@ class DocumentProcessor:
             The max text length of tokenizer. Default: 512.
         """
         self.prefix = model.prefix
-        self.model = model
         self.text_token_ids_key = model.text_token_ids_key
         self.text_attention_mask_key = model.text_attention_mask_key
         self.text_bbox_key = model.text_bbox_key
