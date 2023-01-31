@@ -139,6 +139,13 @@ def select_model(
     for model_name in selected_model_names:
         logger.debug(f"model dtypes: {getattr(config.model, model_name).data_types}")
 
+    # clean up unused model configs
+    model_keys = list(config.model.keys())
+    model_keys.remove("names")
+    for model_name in model_keys:
+        if model_name not in selected_model_names:
+            delattr(config.model, model_name)
+
     return config
 
 
