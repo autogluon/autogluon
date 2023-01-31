@@ -23,7 +23,10 @@ def test_predictor_with_bart(checkpoint_name, efficient_finetune):
                       "model.hf_text.checkpoint_name": "yuchenlin/BART0",
                       "optimization.max_epochs": 1,
                       "optimization.efficient_finetune": efficient_finetune,
+                      "optimization.top_k": 1,
+                      "optimization.top_k_average_method": "best",
+                      "env.batch_size": 2,
                   },
-                  time_limit=180
+                  time_limit=60
     )
     predictor.predict(test_data)
