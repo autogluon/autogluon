@@ -662,7 +662,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     logger.debug(traceback.format_exc())
 
         if self.conformalizer_type is not None:
-            self.conformalize_model(model_name=self.get_model_best(), val_data=val_data)
+            self.calibrate_model(model_name=self.get_model_best(), val_data=val_data)
 
         logger.info(f"Training complete. Models trained: {model_names_trained}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
@@ -684,14 +684,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             ensemble_name = f"WeightedEnsemble_{increment}"
         return ensemble_name
 
-    def conformalize_model(self, model_name: str, val_data: TimeSeriesDataFrame):
-        logger.debug(f"Applying conformalization to model {model_name}")
+    def calibrate_model(self, model_name: str, val_data: TimeSeriesDataFrame):
         model = self.load_model(model_name)
         predictions = self.predict_for_scoring(data=val_data, model=model)
         conformalizer = self.conformalizer_type(
             prediction_length=self.prediction_length, quantile_levels=self.quantile_levels, target_column=self.target
         )
-        logger.info(f"Fitting {self.conformalizer_type} to {model_name}")
+        logger.debug(f"Calibrating model {model_name} using {conformalizer}")
         conformalizer.fit(data=val_data, predictions=predictions)
         self.model_to_conformalizer[model_name] = conformalizer
 

@@ -4,6 +4,7 @@ import pandas as pd
 
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID
 from .abstract_conformalizer import AbstractConformalizer
+from autogluon.timeseries.evaluator import in_sample_naive_1_error
 
 
 class ConformalizedQuantileRegression(AbstractConformalizer):
@@ -52,7 +53,7 @@ class ConformalizedQuantileRegression(AbstractConformalizer):
 
 class ScaledConformalizedQuantileRegression(ConformalizedQuantileRegression):
     def _compute_scale(self, data: TimeSeriesDataFrame, min_scale: float = 1e-5) -> pd.Series:
-        return data.groupby(level=ITEMID, sort=False)[self.target_column].std().clip(lower=min_scale)
+        return in_sample_naive_1_error(y_past=data[self.target_column]).clip(lower=min_scale)
 
     def fit(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame):
         # Avoid scaling the original data
