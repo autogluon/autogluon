@@ -661,6 +661,7 @@ def target_analysis(
     label: str,
     test_data: Optional[pd.DataFrame] = None,
     problem_type: str = "auto",
+    fit_distributions: Union[bool, str, List[str]] = True,
     sample: Union[None, int, float] = None,
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
@@ -684,6 +685,8 @@ def target_analysis(
     problem_type: str, default = 'auto'
         problem type to use. Valid problem_type values include ['auto', 'binary', 'multiclass', 'regression', 'quantile', 'softclass']
         auto means it will be Auto-detected using AutoGluon methods.
+    fit_distributions: Union[bool, str, List[str]], default = False,
+        If `True`, or list of distributions is provided, then fit distributions. Performed only if `y` and `hue` are not present.
     state: Union[None, dict, AnalysisState], default = None
         pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
     sample: Union[None, int, float], default = None
@@ -748,7 +751,7 @@ def target_analysis(
         x=label,
         state=state,
         return_state=True,
-        fit_distributions=True,
+        fit_distributions=fit_distributions,
     )
 
     state = _render_distribution_fit_information_if_available(state, label)

@@ -60,5 +60,8 @@ df_train = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/AmesHousingP
 df_test = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/AmesHousingPriceRegression/test_data.csv')
 target_col = 'SalePrice'
 
-auto.target_analysis(train_data=df_train, label=target_col)
+auto.target_analysis(
+    train_data=df_train, label=target_col, 
+    fit_distributions=['laplace_asymmetric', 'johnsonsu', 'exponnorm']  # Optional; default will try to fit all available distributions
+)
 ```
