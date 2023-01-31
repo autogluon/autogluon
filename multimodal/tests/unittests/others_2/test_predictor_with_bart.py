@@ -7,20 +7,22 @@ import pytest
 from torch import Tensor
 
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.constants import BIT_FIT, IA3, IA3_BIAS, IA3_LORA, LORA_BIAS, LORA_NORM, NORM_FIT
+from autogluon.multimodal.constants import IA3_LORA
 
 from datasets import load_dataset
 
 
 @pytest.mark.parametrize("checkpoint_name", ["facebook/bart-base"])
-def test_predictor_with_bart(checkpoint_name):
+@pytest.mark.parametrize("efficient_finetune", [None, IA3_LORA])
+def test_predictor_with_bart(checkpoint_name, efficient_finetune):
     train_data = load_dataset("glue", 'mrpc')['train'].to_pandas().drop('idx', axis=1)
     test_data = load_dataset("glue", 'mrpc')['validation'].to_pandas().drop('idx', axis=1)
     predictor = MultiModalPredictor(label='label')
     predictor.fit(train_data,
                   hyperparameters={
                       "model.hf_text.checkpoint_name": "yuchenlin/BART0",
-                      "optimization.max_epochs": 1
+                      "optimization.max_epochs": 1,
+                      "optimization.efficient_finetune": efficient_finetune,
                   },
                   time_limit=180
     )
