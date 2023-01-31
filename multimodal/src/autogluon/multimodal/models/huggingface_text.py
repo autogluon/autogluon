@@ -3,6 +3,7 @@ from typing import List, Optional, Tuple
 
 import torch
 from torch import nn
+from transformers import AutoTokenizer
 from transformers import logging as hf_logging
 from transformers.models.t5 import T5PreTrainedModel
 
@@ -80,10 +81,11 @@ class HFAutoModelForTextPrediction(nn.Module):
         self.config, self.model = get_hf_config_and_model(
             checkpoint_name=checkpoint_name, pretrained=pretrained, low_cpu_mem_usage=low_cpu_mem_usage
         )
+        self._hf_model_input_names = AutoTokenizer.from_pretrained(checkpoint_name).model_input_names
 
         if isinstance(self.model, T5PreTrainedModel):
             self.is_t5 = True
-            # Remove the decoder in T5
+            # Remove the decoder in T5. We will only use the T5 encoder for extracting the embeddings
             del self.model.decoder
         else:
             self.is_t5 = False
@@ -175,11 +177,17 @@ class HFAutoModelForTextPrediction(nn.Module):
                 attention_mask=text_masks,
             )
         else:
-            outputs = self.model(
-                input_ids=text_token_ids,
-                token_type_ids=text_segment_ids,
-                attention_mask=text_masks,
-            )
+            if "token_type_ids" in self._hf_model_input_names:
+                outputs = self.model(
+                    input_ids=text_token_ids,
+                    token_type_ids=text_segment_ids,
+                    attention_mask=text_masks,
+                )
+            else:
+                outputs = self.model(
+                    input_ids=text_token_ids,
+                    attention_mask=text_masks,
+                )
         if self.pooling_mode == "cls":
             pooled_features = outputs.last_hidden_state[:, 0, :]
         elif self.pooling_mode == "mean":
