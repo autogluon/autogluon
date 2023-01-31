@@ -160,7 +160,7 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
 
     new_predictor = MultiModalPredictor(
         hyperparameters={
-            "model.mmdet_image.checkpoint_name": model_save_dir,
+            "model.mmdet_image.checkpoint_name": model_save_subdir,
             "env.num_gpus": 1,
         },
         problem_type="object_detection",

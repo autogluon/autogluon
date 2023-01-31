@@ -112,3 +112,33 @@ def test_fusion_model_dump():
     timm_image_dir = f"{model_dump_path}/timm_image"
     assert os.path.exists(hf_text_dir) and (len(os.listdir(hf_text_dir)) > 2) == True
     assert os.path.exists(timm_image_dir) and (len(os.listdir(timm_image_dir)) == 2) == True
+
+
+def test_mmdet_object_detection_save_and_load():
+    data_dir = download_sample_dataset()
+
+    test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
+    # Init predictor
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
+            "env.num_gpus": 1,
+        },
+        problem_type="object_detection",
+    )
+
+    pred = predictor.predict(test_path)
+
+    model_save_dir = predictor.dump_model()
+    detection_model_save_subdir = os.path.join(model_save_dir, predictor._model.prefix)
+
+    new_predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": detection_model_save_subdir,
+            "env.num_gpus": 1,
+        },
+        problem_type="object_detection",
+    )
+    new_pred = new_predictor.predict(test_path)
+
+    assert abs(pred["bboxes"][0][0]["score"] - new_pred["bboxes"][0][0]["score"]) < 1e-4
