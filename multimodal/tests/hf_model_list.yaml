@@ -10,7 +10,6 @@ others:
 - facebook/bart-base
 - distilbert-base-uncased
 - distilroberta-base
-- facebook/bart-base
 - google/electra-base-discriminator
 - google/electra-small-discriminator
 - gpt2
