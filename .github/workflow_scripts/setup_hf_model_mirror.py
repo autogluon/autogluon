@@ -6,8 +6,8 @@ import yaml
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("--model_list_file", help="file containing list of models to download.", type=str)
-parser.add_argument("--sub_folder", help="which subfolder to download models for")
+parser.add_argument("--model_list_file", help="file containing list of models to download.", type=str, required=True)
+parser.add_argument("--sub_folder", help="which subfolder to download models for", required=True)
 parser.add_argument("--cache_dir", help="place to cache the downloaded models", default="~/.cache/huggingface/hub")
 
 args = parser.parse_args()

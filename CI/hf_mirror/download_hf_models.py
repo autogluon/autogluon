@@ -7,7 +7,7 @@ from huggingface_hub.utils import RepositoryNotFoundError
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument('--model_list_file', help='file containing list of models to download.', type=str)
+parser.add_argument('--model_list_file', help='file containing list of models to download.', type=str, required=True)
 
 args = parser.parse_args()
 
