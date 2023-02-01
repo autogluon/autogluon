@@ -110,7 +110,10 @@ class ImageProcessor:
         if model is not None:
             self.size, self.mean, self.std = self.extract_default(model.config)
             if isinstance(model, TimmAutoModelForImagePrediction):
-                print(model.config)
+                print(model.config, size,
+                      ("test_input_size" in model.config and
+                     model.config["test_input_size"] != model.config["input_size"]),
+                      type(model.model).__name__ in SUPPORT_VARIABLE_INPUT_SIZE_TIMM_CLASSES)
                 if (("test_input_size" in model.config and
                      model.config["test_input_size"] != model.config["input_size"]) or
                     type(model.model).__name__ in SUPPORT_VARIABLE_INPUT_SIZE_TIMM_CLASSES) and size is not None:
