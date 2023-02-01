@@ -7,11 +7,11 @@ import autogluon.timeseries as agts
 
 from . import (
     ARIMAModel,
-    AutoARIMA,
-    AutoETS,
+    AutoARIMAModel,
+    AutoETSModel,
     AutoGluonTabularModel,
     DeepARModel,
-    DynamicOptimizedTheta,
+    DynamicOptimizedThetaModel,
     ETSModel,
     NaiveModel,
     SeasonalNaiveModel,
@@ -33,9 +33,9 @@ MODEL_TYPES = dict(
     AutoGluonTabular=AutoGluonTabularModel,
     Naive=NaiveModel,
     SeasonalNaive=SeasonalNaiveModel,
-    AutoETS=AutoETS,
-    AutoARIMA=AutoARIMA,
-    DynamicOptimizedTheta=DynamicOptimizedTheta,
+    AutoETS=AutoETSModel,
+    AutoARIMA=AutoARIMAModel,
+    DynamicOptimizedTheta=DynamicOptimizedThetaModel,
 )
 if agts.MXNET_INSTALLED:
     from .gluonts.mx import (
