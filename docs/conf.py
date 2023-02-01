@@ -43,6 +43,7 @@ html_theme_options = {
     'light_logo': 'autogluon.png',
     'dark_logo': 'autogluon-w.png',
     'globaltoc_collapse': False,
+    'announcement': 'Welcome to AutoGluon\'s new documentation. For more details, check out the <a href="https://auto.gluon.ai/stable/index.html">stable docs</a>.',
     # 'google_analytics_account': 'UA-XXXXX', # set to enable google analytics
 }
 

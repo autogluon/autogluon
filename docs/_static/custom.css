@@ -9,6 +9,7 @@ div.cell div.cell_input, .highlight-bash .highlight {
 }
 
 div.cell_output table {
+    color: #2b8cee;
     font-size: 0.8rem;
 }
 
@@ -32,4 +33,11 @@ details.sd-dropdown summary {
 
 details.sd-dropdown .sd-summary-up, details.sd-dropdown .sd-summary-down {
     top: .5rem;
+}
+
+body[data-theme="dark"] {
+  --mystnb-source-bg-color: #202020;
+  --mystnb-stdout-bg-color: #202020;
+  --mystnb-stderr-bg-color: #ee0000;
+  --mystnb-traceback-bg-color: #202020;
 }
