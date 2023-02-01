@@ -232,7 +232,7 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
         (default: None, in which case context_length = prediction_length)
     hidden_dimensions: List[int], default = [20, 20]
         Size of hidden layers in the feedforward network
-    distr_output : gluonts.torch.distributions.DistributionOutput, default = NormalOutput()
+    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
         Distribution to fit.
     batch_normalization : bool, default = False
         Whether to use batch normalization
