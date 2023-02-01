@@ -178,9 +178,9 @@ maxdepth: 1
 hidden:
 ---
 
-api/_autogen/autogluon.tabular.TabularDataset
 api/_autogen/autogluon.tabular.TabularPredictor
+api/_autogen/autogluon.tabular.TabularDataset
+api/_autogen/autogluon.multimodal.MultiModalPredictor
 api/_autogen/autogluon.timeseries.TimeSeriesDataFrame
 api/_autogen/autogluon.timeseries.TimeSeriesPredictor
-api/_autogen/autogluon.multimodal.MultiModalPredictor
 ```
