@@ -61,7 +61,7 @@ install_requires = ag.get_dependency_version_ranges(install_requires)
 
 extras_require = {
     "tests": [
-        "black~=22.0,>=22.3",
+        "black>=22.3,<23.0",
         "isort>=5.10",
         "datasets>=2.3.2,<=2.3.2",
         "onnx>=1.13.0,<1.14.0",
