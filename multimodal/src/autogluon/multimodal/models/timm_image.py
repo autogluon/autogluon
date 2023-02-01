@@ -123,7 +123,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
         """Whether the TIMM image support images sizes that are different from the default used in the backbones"""
         if "test_input_size" in self.config and self.config["test_input_size"] != self.config["input_size"]:
             return True
-        cls_name = type(self.model).__class__.lower()
+        cls_name = type(self.model).__name__.lower()
         for k in SUPPORT_VARIABLE_INPUT_SIZE_TIMM_CLASSES:
             if cls_name in k:
                 return True
