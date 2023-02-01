@@ -31,6 +31,7 @@ others_2:
 - nlpaueb/legal-bert-small-uncased
 - sentence-transformers/all-MiniLM-L6-v2
 - t5-small
+- microsoft/layoutlmv3-base
 predictor:
 - CLTL/MedRoBERTa.nl
 - google/electra-small-discriminator
