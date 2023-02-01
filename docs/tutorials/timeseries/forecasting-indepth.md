@@ -47,7 +47,7 @@ predictor = TimeSeriesPredictor(quantile_levels=[0.05, 0.5, 0.95])
 
 ## Forecasting time series with additional information
 In real-world forecasting problems we often have access to additional information, beyond just the raw time series values.
-AutoGluon supports two types of such additional information: static features and known covariates.
+AutoGluon supports two types of such additional information: static features and time-varying covariates.
 
 ### Static features
 Static features are the time-independent attributes (metadata) of a time series.
@@ -63,7 +63,7 @@ In AutoGluon, static features are stored as an attribute of a `TimeSeriesDataFra
 As an example, let's have a look at the M4 Daily dataset.
 
 ```{.python .input}
-# Hide code 
+# Hide code
 import warnings
 warnings.filterwarnings(action="ignore")
 ```
@@ -73,85 +73,42 @@ import pandas as pd
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 ```
 
-We download a subset of 100 time series and the related metadata, similar to the Quickstart tutorial (click on the arrow to show the preprocessing code).
-
-.. raw:: html
-
-   <details>
-   <summary><a>Loader for M4 Daily dataset</a></summary>
-
+We download a subset of 100 time series as a TimeSeriesDataFrame
 ```{.python .input}
-pd.set_option('display.max_rows', 6)  # Save space when printing
-
-M4_INFO_URL = "https://github.com/Mcompetitions/M4-methods/raw/master/Dataset/M4-info.csv"
-M4_DAILY_URL = "https://github.com/Mcompetitions/M4-methods/raw/master/Dataset/Train/Daily-train.csv"
-
-def download_m4_daily_dataset(save_path, metadata_save_path=None, num_items_to_load=100):
-    metadata = pd.read_csv(M4_INFO_URL)
-    metadata = metadata[metadata["SP"] == "Daily"].set_index("M4id")
-    # Select a subset of time series for faster processing
-    metadata = metadata.sample(num_items_to_load, random_state=42)
-    if metadata_save_path is not None:
-        metadata["Domain"] = metadata["category"]
-        metadata[["Domain"]].to_csv(metadata_save_path)
-
-    data = pd.read_csv(M4_DAILY_URL, index_col="V1")
-    results = []
-    for item_id in metadata.index:
-        time_series = data.loc[item_id].dropna().values
-        start_time = pd.Timestamp(metadata.loc[item_id]["StartingDate"])
-        timestamps = pd.date_range(start_time, freq="D", periods=len(time_series))
-        results.append(pd.DataFrame({"M4id": [item_id] * len(time_series), "Date": timestamps, "Value": time_series}))
-    result = pd.concat(results, ignore_index=True)
-    result.to_csv(save_path, index=False)
-
-download_m4_daily_dataset(save_path="m4_daily.csv", metadata_save_path="m4_daily_metadata.csv")
-```
-
-.. raw:: html
-
-   </details>
-
-
-We load the individual time series into a `TimeSeriesDataFrame`:
-```{.python .input}
-ts_dataframe = TimeSeriesDataFrame.from_data_frame(
-    pd.read_csv("m4_daily.csv", parse_dates=["Date"]),
-    id_column="M4id",
-    timestamp_column="Date",
+train_data = TimeSeriesDataFrame.from_path(
+    "https://autogluon.s3.amazonaws.com/datasets/timeseries/m4_daily_subset/train.csv",
 )
-ts_dataframe
+train_data.head()
 ```
-AutoGluon expects static features as a pandas.DataFrame object, where the index column
-
-- is called `"item_id"`
-- includes all the `item_id`s present in the respective TimeSeriesDataFrame.
+AutoGluon expects static features as a pandas.DataFrame object, where the index column includes all the `item_id`s present in the respective TimeSeriesDataFrame.
 ```{.python .input}
-static_features = pd.read_csv("m4_daily_metadata.csv", index_col="M4id")
-static_features.index.rename("item_id", inplace=True)
-static_features
+static_features = pd.read_csv(
+    "https://autogluon.s3.amazonaws.com/datasets/timeseries/m4_daily_subset/metadata.csv",
+    index_col="item_id",
+)
+static_features.head()
 ```
 In the M4 Daily dataset, there is a single categorical static feature that denotes the domain of origin for each time series.
 
 We attach the static features to a TimeSeriesDataFrame as follows
 ```python
-ts_dataframe.static_features = static_features
+train_data.static_features = static_features
 ```
-If `static_features` doesn't contain some `item_id`s that are present in `ts_dataframe`, an exception will be raised.
+If `static_features` doesn't contain some `item_id`s that are present in `train_data`, an exception will be raised.
 
-Now, when we fit the predictor, all models that support static features will automatically use the static features included in `ts_dataframe`.
+Now, when we fit the predictor, all models that support static features will automatically use the static features included in `train_data`.
 ```python
-predictor = TimeSeriesPredictor(target="Value").fit(ts_dataframe)
+predictor = TimeSeriesPredictor(prediction_length=14).fit(train_data)
 ```
 During fitting, the predictor will log how each static feature was interpreted as follows:
 ```
 ...
 Following types of static features have been inferred:
-	categorical: ['Domain']
+	categorical: ['domain']
 	continuous (float): []
 ...
 ```
-This message confirms that columns `'Domain'` was interpreted as a categorical feature.
+This message confirms that column `'domain'` was interpreted as a categorical feature.
 In general, AutoGluon-TimeSeries supports two types of static features:
 
 - `categorical`: columns of dtype `object`, `string` and `category` are interpreted as discrete categories
@@ -161,91 +118,104 @@ In general, AutoGluon-TimeSeries supports two types of static features:
 To override this logic, we need to manually change the columns dtype.
 For example, suppose the static features data frame contained an integer-valued column `"store_id"`.
 ```python
-ts_dataframe.static_features["store_id"] = list(range(len(ts_dataframe)))
+train_data.static_features["store_id"] = list(range(len(train_data)))
 ```
 By default, this column will be interpreted as a continuous number.
 We can force AutoGluon to interpret it a a categorical feature by changing the dtype to `category`.
 ```python
-ts_dataframe.static_features["store_id"] = ts_dataframe.static_features["store_id"].astype("category")
+train_data.static_features["store_id"] = train_data.static_features["store_id"].astype("category")
 ```
-**Note:** If training data contained static features, the predictor will expect that data passed to `predictor.predict()`, `predictor.leaderboard()`, and `predictor.evaluate()` also includes static features with the exact same column names and data types.
+**Note:** If training data contained static features, the predictor will expect that data passed to `predictor.predict()`, `predictor.leaderboard()`, and `predictor.evaluate()` also includes static features with the same column names and data types.
 
 
-### Known covariates
+### Time-varying covariates
 Covariates are the time-varying features that may influence the target time series.
 They are sometimes also referred to as dynamic features, exogenous regressors, or related time series.
-AutoGluon currently supports covariates that are _known in advance_ for the forecast horizon.
-Examples of such covariates include:
+AutoGluon supports two types of covariates:
 
-- holidays
-- day of the week, month, year
-- promotions 
-- weather forecasts (available in the future via weather forecasts)
+- *known* covariates that are known for the entire forecast horizon, such as
+    - holidays
+    - day of the week, month, year
+    - promotions
 
-![Target time series with one known covariate.](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth4.png)
+- *past* covariates that are only known up to the start of the forecast horizon, such as
+    - sales of other products
+    - temperature, precipitation
+    - transformed target time series
+
+
+![Target time series with one past covariate and one known covariate.](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth5.png)
 :width:`800px`
 
-As an example, we will again use the M4 Daily dataset.
+In AutoGluon, both `known_covariates` and `past_covariates` are stored as additional columns in the `TimeSeriesDataFrame`.
+
+We will again use the M4 Daily dataset as an example and generate both types of covariates:
+
+- a `past_covariate` equal to the logarithm of the target time series:
+- a `known_covariate` that equals to 1 if a given day is a weekend, and 0 otherwise.
 
 ```{.python .input}
-prediction_length = 48
-ts_dataframe = TimeSeriesDataFrame.from_data_frame(
-    pd.read_csv("m4_daily.csv", parse_dates=["Date"]),
-    id_column="M4id",
-    timestamp_column="Date",
-)
-ts_dataframe
-```
-In this example, we will generate a known covariate `Weekend` that equals to 1 if a given day is a weekend, and 0 otherwise.
-First, we generate the covariate for the training set.
-```{.python .input}
+import numpy as np
+train_data["log_target"] = np.log(train_data["target"])
+
 WEEKEND_INDICES = [5, 6]
-timestamps = ts_dataframe.index.get_level_values("timestamp")
-ts_dataframe["Weekend"] = timestamps.weekday.isin(WEEKEND_INDICES).astype(float)
-ts_dataframe
+timestamps = train_data.index.get_level_values("timestamp")
+train_data["weekend"] = timestamps.weekday.isin(WEEKEND_INDICES).astype(float)
+
+train_data.head()
 ```
-When creating the TimeSeriesPredictor, we specify that the column `"Value"` is our prediction target, and the
-column `"Weekend"` contains a covariate that will be known at prediction time.
+
+When creating the TimeSeriesPredictor, we specify that the column `"target"` is our prediction target, and the
+column `"weekend"` contains a covariate that will be known at prediction time.
 ```python
 predictor = TimeSeriesPredictor(
-    prediction_length=prediction_length,
-    target="Value",
-    known_covariates_names=["Weekend"],
-)
-predictor.fit(ts_dataframe)
+    prediction_length=14,
+    target="target",
+    known_covariates_names=["weekend"],
+).fit(train_data)
 ```
-If the data frame contained additional columns (other than those specified in `target` and `known_covariates_names`), they would be ignored.
+Predictor will automatically interpret the remaining columns (except target and known covariates) as past covariates.
+This information is logged during fitting:
+```
+...
+Provided dataset contains following columns:
+	target:           'target'
+	known covariates: ['weekend']
+	past covariates:  ['log_target']
+...
+```
 
-Next, to make predictions, we generate the known covariates for the forecast horizon
+Finally, to make predictions, we generate the known covariates for the forecast horizon
 ```{.python .input}
 # Time difference between consecutive timesteps
-offset = pd.tseries.frequencies.to_offset(ts_dataframe.freq)
+offset = pd.tseries.frequencies.to_offset(train_data.freq)
+prediction_length = 14
 
 known_covariates_per_item = []
-for item_id in ts_dataframe.item_ids:
-    time_series = ts_dataframe.loc[item_id]
+for item_id in train_data.item_ids:
+    time_series = train_data.loc[item_id]
     last_day = time_series.index[-1]
     future_timestamps = pd.date_range(start=last_day + offset, freq=offset, periods=prediction_length)
     weekend = future_timestamps.weekday.isin(WEEKEND_INDICES).astype(float)
 
     index = pd.MultiIndex.from_product([[item_id], future_timestamps], names=["item_id", "timestamp"])
-    known_covariates_per_item.append(pd.DataFrame(weekend, index=index, columns=["Weekend"]))
+    known_covariates_per_item.append(pd.DataFrame(weekend, index=index, columns=["weekend"]))
 
 known_covariates = TimeSeriesDataFrame(pd.concat(known_covariates_per_item))
-known_covariates
+known_covariates.head()
 ```
 Note that `known_covariates` must satisfy the following conditions:
 
 - The columns must include all columns listed in ``predictor.known_covariates_names``
-- The ``item_id`` index must include all item ids present in ``ts_dataframe``
-- The ``timestamp`` index must include the values for ``prediction_length`` many time steps into the future from the end of each time series in ``ts_dataframe``
+- The ``item_id`` index must include all item ids present in ``train_data``
+- The ``timestamp`` index must include the values for ``prediction_length`` many time steps into the future from the end of each time series in ``train_data``
 
 If `known_covariates` contain more information than necessary (e.g., contain additional columns, item_ids, or timestamps),
 AutoGluon will automatically select the necessary rows and columns.
 
 Finally, we pass the `known_covariates` to the `predict` function to generate predictions
 ```python
-predictor.predict(ts_dataframe, known_covariates=known_covariates)
+predictor.predict(train_data, known_covariates=known_covariates)
 ```
 
 The list of models that support static features and covariates is available in :ref:`forecasting_zoo`.
@@ -272,7 +242,7 @@ These are neural-network algorithms (implemented in PyTorch or MXNet), such as:
 
 - `DeepAR`
 - `SimpleFeedForward`
-- `TemporalFusionTransformerMXNet`
+- `TemporalFusionTransformer`
 
 AutoGluon also offers a tree-based global model `AutoGluonTabular`.
 Under the hood, this model converts the forecasting task into a regression problem and uses a :class:`autogluon.tabular.TabularPredictor` to fit gradient-boosted tree algorithms like XGBoost, CatBoost, and LightGBM.
