@@ -18,5 +18,4 @@ Custom Metrics <tabular-custom-metric>
 Custom Models <tabular-custom-model>
 Deployment <tabular-deployment>
 Advanced <tabular-custom-model-advanced>
-FAQ <tabular-faq>
 ```

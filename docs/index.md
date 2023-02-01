@@ -173,6 +173,21 @@ tutorials/timeseries/index
 
 ```{toctree}
 ---
+caption: Resources
+maxdepth: 1
+hidden:
+---
+
+Cheat Sheets <cheatsheet.rst>
+Versions <versions.rst>
+Tabular FAQ <tutorials/tabular/tabular-faq.md>
+Multimodal FAQ <tutorials/multimodal/multimodal-faq.md>
+Time Series FAQ <tutorials/timeseries/forecasting-faq.md>
+```
+
+
+```{toctree}
+---
 caption: API
 maxdepth: 1
 hidden:
