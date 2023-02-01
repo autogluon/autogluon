@@ -534,7 +534,7 @@ def infer_label_column_type_by_problem_type(
     problem_type: Optional[str],
     data: Optional[pd.DataFrame] = None,
     valid_data: Optional[pd.DataFrame] = None,
-    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, NER_ANNOTATION, ROIS, DOCUMENT),
+    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, NER_ANNOTATION, ROIS),
     fallback_label_type: Optional[str] = CATEGORICAL,
 ):
     """
