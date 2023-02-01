@@ -24,9 +24,9 @@ To use `autogluon.timeseries`, we will only need the following two classes:
 - `TimeSeriesDataFrame` stores a dataset consisting of multiple time series.
 - `TimeSeriesPredictor` takes care of fitting, tuning and selecting the best forecasting models, as well as generating new forecasts.
 
-We load the M4 hourly dataset as a `pandas.DataFrame`
+We load a subset of the M4 hourly dataset as a `pandas.DataFrame`
 ```{.python .input}
-df = pd.read_csv("https://autogluon.s3.amazonaws.com/datasets/timeseries/m4_hourly/train.csv")
+df = pd.read_csv("https://autogluon.s3.amazonaws.com/datasets/timeseries/m4_hourly_subset/train.csv")
 df.head()
 ```
 
@@ -120,7 +120,7 @@ We plot the mean forecast, as well as the 10% and 90% quantiles to show the rang
 import matplotlib.pyplot as plt
 
 # TimeSeriesDataFrame can also be loaded directly from a file
-test_data = TimeSeriesDataFrame.from_path("https://autogluon.s3.amazonaws.com/datasets/timeseries/m4_hourly/test.csv")
+test_data = TimeSeriesDataFrame.from_path("https://autogluon.s3.amazonaws.com/datasets/timeseries/m4_hourly_subset/test.csv")
 
 plt.figure(figsize=(20, 3))
 
