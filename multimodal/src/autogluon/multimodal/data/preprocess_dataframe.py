@@ -16,6 +16,7 @@ from ..constants import (
     AUTOMM,
     CATEGORICAL,
     DOCUMENT,
+    DOCUMENT_IMAGE,
     IDENTIFIER,
     IMAGE,
     IMAGE_BYTEARRAY,
@@ -257,7 +258,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             return self._categorical_feature_names
         elif modality == NUMERICAL:
             return self._numerical_feature_names
-        elif modality == DOCUMENT:
+        elif modality.startswith(DOCUMENT):
             return self._document_feature_names
         elif modality == LABEL:
             return [self._label_column]  # as a list to be consistent with others

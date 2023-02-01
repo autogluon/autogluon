@@ -136,8 +136,9 @@ Image Data -- Object Detection
 
       How to evaluate the pretrained Faster R-CNN model on dataset in VOC format
 
+
 Document Data
---------------------------
+-------------
 .. container:: cards
 
    .. card::
@@ -241,7 +242,7 @@ FAQ
    text_prediction/index
    image_prediction/index
    object_detection/index
-   document/index
+   document/document_classification.md
    matching/index
    multimodal_prediction/index
    advanced_topics/index

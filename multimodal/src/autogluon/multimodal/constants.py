@@ -10,6 +10,7 @@ IMAGE_PATH = "image_path"
 IMAGE_BYTEARRAY = "image_bytearray"
 IDENTIFIER = "identifier"
 DOCUMENT = "document"
+DOCUMENT_IMAGE = "document_image"
 
 # Problem types
 CLASSIFICATION = "classification"

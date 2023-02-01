@@ -15,6 +15,7 @@ from ..constants import (
     CATEGORICAL,
     CLASSIFICATION,
     DOCUMENT,
+    DOCUMENT_IMAGE,
     ENTITY_GROUP,
     IDENTIFIER,
     IMAGE,
@@ -491,7 +492,7 @@ def infer_column_types(
         elif is_image_column(data[col_name], col_name=col_name, image_type=IMAGE_PATH):  # Infer image-path column
             # Check if it is document image or not.
             if is_document_image_column(data[col_name], col_name=col_name):
-                column_types[col_name] = DOCUMENT
+                column_types[col_name] = DOCUMENT_IMAGE
             else:
                 column_types[col_name] = IMAGE_PATH
         elif is_text_column(data[col_name]):  # Infer text column
