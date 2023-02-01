@@ -48,7 +48,7 @@ def test_load_old_checkpoint_text_only(cls):
 
 
 def test_v0_6_2_checkpoint_timm_image():
-    train_df, test_df = shopee_dataset('./ag_automm_tutorial_imgcls')
+    train_df, test_df = shopee_dataset("./ag_automm_tutorial_imgcls")
 
     file_path = "convnext_nano_shopee_0.6.2_backward_compatible_test.zip"
     save_path = os.path.join(get_home_dir(), "checkpoints_0.6.2_backward_compatible")

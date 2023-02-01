@@ -14,9 +14,8 @@ logger = logging.getLogger(AUTOMM)
 
 
 # Stores the
-SUPPORT_VARIABLE_INPUT_SIZE_TIMM_CLASSES = {
-    "convnext", "efficientnet", "mobilenetv3", "regnet", "resnet"
-}
+SUPPORT_VARIABLE_INPUT_SIZE_TIMM_CLASSES = {"convnext", "efficientnet", "mobilenetv3", "regnet", "resnet"}
+
 
 class TimmAutoModelForImagePrediction(nn.Module):
     """
