@@ -1,6 +1,3 @@
-.. seealso::
-   Welcome to AutoGluon's new documentation. For more details, check out the `stable docs <https://auto.gluon.ai/stable/index.html>`__.
-
 {{ objname | escape | underline}}
 
 .. currentmodule:: {{ module }}
