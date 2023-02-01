@@ -171,7 +171,8 @@ def test_dataset_overview(monkeypatch):
     call_md_render.assert_has_calls(
         [
             call("### Feature Distance"),
-            call("### Near duplicate group analysis: `education-num`, `near_duplicate` - distance `0.0000`"),
+            call("**Near duplicate group analysis: `education-num`, `near_duplicate` - distance `0.0000`**"),
+            call("Feature interaction between `education-num`/`near_duplicate`"),
         ]
     )
     call_ds_render.assert_called_once()
@@ -204,7 +205,7 @@ def test_covariate_shift_detection(monkeypatch):
     assert state.xshift_results.pvalue < 0.01
     assert state.xshift_results.feature_importance.iloc[0].name == "shift_col"
     call_fiv_render.assert_called_once()
-    call_md_render.assert_called_once_with("#### `shift_col` values distribution between datasets; p-value: `0.0000`")
+    call_md_render.assert_called_once_with("**`shift_col` values distribution between datasets; p-value: `0.0000`**")
 
 
 def test_get_empty_dict_if_none():

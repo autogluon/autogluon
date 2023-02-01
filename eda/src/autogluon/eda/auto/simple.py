@@ -507,15 +507,21 @@ def dataset_overview(
     if len(distance.near_duplicates) > 0:  # type: ignore # state is always present
         for group in distance.near_duplicates:
             nodes = group["nodes"]
+
+            interactions: List[AbstractVisualization] = []
+            for n in nodes[1:]:
+                interactions.append(MarkdownSectionComponent(f"Feature interaction between `{nodes[0]}`/`{n}`"))
+                interactions.append(FeatureInteractionVisualization(key=f"{nodes[0]}:{n}"))
+
             analyze(
                 train_data=train_data,
                 state=state,
                 anlz_facets=[FeatureInteraction(key=f"{nodes[0]}:{n}", x=nodes[0], y=n) for n in nodes[1:]],
                 viz_facets=[
                     MarkdownSectionComponent(
-                        f'### Near duplicate group analysis: `{"`, `".join(nodes)}` - distance `{group["distance"]:.4f}`'
+                        f'**Near duplicate group analysis: `{"`, `".join(nodes)}` - distance `{group["distance"]:.4f}`**'
                     ),
-                    *[FeatureInteractionVisualization(headers=True, key=f"{nodes[0]}:{n}") for n in nodes[1:]],
+                    *interactions,
                 ],
             )
 
@@ -620,7 +626,7 @@ def covariate_shift_detection(
                 analyze(
                     viz_facets=[
                         MarkdownSectionComponent(
-                            f"#### `{var}` values distribution between datasets; p-value: `{pvalue:.4f}`"
+                            f"**`{var}` values distribution between datasets; p-value: `{pvalue:.4f}`**"
                         )
                     ]
                 )
