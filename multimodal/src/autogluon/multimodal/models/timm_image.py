@@ -15,7 +15,7 @@ logger = logging.getLogger(AUTOMM)
 
 # Stores the
 SUPPORT_VARIABLE_INPUT_SIZE_TIMM_CLASSES = {
-    "ConvNeXt", "EfficientNet", "MobileNetV3", "RegNet"
+    "convnext", "efficientnet", "mobilenetv3", "regnet", "resnet"
 }
 
 class TimmAutoModelForImagePrediction(nn.Module):
@@ -118,6 +118,16 @@ class TimmAutoModelForImagePrediction(nn.Module):
     @property
     def image_feature_dim(self):
         return self.model.num_features
+
+    def support_variable_input_size(self):
+        """Whether the TIMM image support images sizes that are different from the default used in the backbones"""
+        if "test_input_size" in self.config and self.config["test_input_size"] != self.config["input_size"]:
+            return True
+        cls_name = type(self.model).__class__.lower()
+        for k in SUPPORT_VARIABLE_INPUT_SIZE_TIMM_CLASSES:
+            if cls_name in k:
+                return True
+        return False
 
     def forward(
         self,
