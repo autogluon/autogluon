@@ -252,6 +252,44 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
 
 
 class TemporalFusionTransformerModel(AbstractGluonTSPyTorchModel):
+    """TemporalFusionTransformer model from GluonTS.
+
+    The model combines an LSTM encoder, a transformer decoder, and directly predicts
+    the quantiles of future target values. As described in [Lim2021]_.
+
+    Based on `gluonts.torch.model.tft.TemporalFusionTransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.tft.html>`_.
+    See GluonTS documentation for additional hyperparameters.
+
+
+    References
+    ----------
+    .. [Lim2021] Lim, Bryan, et al.
+        "Temporal Fusion Transformers for Interpretable Multi-horizon Time Series Forecasting."
+        International Journal of Forecasting. 2021.
+
+
+    Other Parameters
+    ----------------
+    context_length : int, default = 64
+        Number of past values used for prediction.
+    hidden_dim : int, default = 32
+        Size of the LSTM & transformer hidden states.
+    variable_dim : int, default = 32
+        Size of the feature embeddings.
+    num_heads : int, default = 4
+        Number of attention heads in self-attention layer in the decoder.
+    dropout_rate : float, default = 0.1
+        Dropout regularization parameter
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 64
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
+    """
+
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = TemporalFusionTransformerEstimator
     supports_known_covariates = True
     supports_past_covariates = True
