@@ -124,7 +124,7 @@ test_data = TimeSeriesDataFrame.from_path("https://autogluon.s3.amazonaws.com/da
 
 plt.figure(figsize=(20, 3))
 
-item_id = "H3"
+item_id = "H1"
 y_past = train_data.loc[item_id]["target"]
 y_pred = predictions.loc[item_id]
 y_test = test_data.loc[item_id]["target"][-48:]
