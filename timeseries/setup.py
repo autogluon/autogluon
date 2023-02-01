@@ -40,7 +40,7 @@ install_requires = [
 ]
 
 extras_require = {
-    "tests": ["pytest", "flake8~=4.0", "flaky~=3.7", "pytest-timeout~=2.1", "isort>=5.10", "black~=22.0,>=22.3"],
+    "tests": ["pytest", "flake8~=4.0", "flaky~=3.7", "pytest-timeout~=2.1", "isort>=5.10", "black>=22.3,<23.0"],
     "sktime": ["sktime>=0.13.1,<0.14", "pmdarima~=1.8.2", "tbats~=1.1"],
 }
 
