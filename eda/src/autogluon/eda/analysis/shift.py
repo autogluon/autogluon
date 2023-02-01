@@ -179,7 +179,6 @@ class Classifier2ST:
         classifier_kwargs: Optional[Dict] = None,
         test_size_2st=0.3,
     ):
-
         if classifier_kwargs is None:
             classifier_kwargs = {}
         else:
