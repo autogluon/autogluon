@@ -66,7 +66,6 @@ class TabLayout(SimpleVerticalLinearLayout):
     """
 
     def __init__(self, facets: Dict[str, AbstractVisualization], namespace: Optional[str] = None, **kwargs) -> None:
-
         self.facet_tab_names = list(facets.keys())
         super().__init__(list(facets.values()), namespace, **kwargs)
 

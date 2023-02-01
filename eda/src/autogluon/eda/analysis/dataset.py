@@ -82,7 +82,7 @@ class Sampler(AbstractAnalysis):
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         if self.sample is not None:
             state.sample_size = self.sample
-            for (ds, df) in self.available_datasets(args):
+            for ds, df in self.available_datasets(args):
                 arg = "n"
                 if self.sample is not None and isinstance(self.sample, float):
                     arg = "frac"
@@ -235,7 +235,7 @@ class DatasetSummary(AbstractAnalysis):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         s = {}
-        for (ds, df) in self.available_datasets(args):
+        for ds, df in self.available_datasets(args):
             summary = df.describe(include="all").T
             summary = summary.join(pd.DataFrame({"dtypes": df.dtypes}))
             summary["unique"] = args[ds].nunique()
@@ -274,7 +274,7 @@ class RawTypesAnalysis(AbstractAnalysis):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         state.raw_type = {}
-        for (ds, df) in self.available_datasets(args):
+        for ds, df in self.available_datasets(args):
             state.raw_type[ds] = get_type_map_raw(df)
 
 
@@ -330,7 +330,7 @@ class VariableTypeAnalysis(AbstractAnalysis):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         state.variable_type = {}
-        for (ds, df) in self.available_datasets(args):
+        for ds, df in self.available_datasets(args):
             state.variable_type[ds] = {
                 c: self.map_raw_type_to_feature_type(c, t, df, self.numeric_as_categorical_threshold)
                 for c, t in state.raw_type[ds].items()
@@ -381,7 +381,7 @@ class SpecialTypesAnalysis(AbstractAnalysis):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         state.special_types = {}
-        for (ds, df) in self.available_datasets(args):
+        for ds, df in self.available_datasets(args):
             state.special_types[ds] = self.infer_special_types(df)
 
     @staticmethod
@@ -480,7 +480,6 @@ class LabelInsightsAnalysis(AbstractAnalysis):
         s: Dict[str, Any] = {}
 
         if state.problem_type in [BINARY, MULTICLASS]:
-
             label_counts = train_data[label].value_counts()
             minority_class = label_counts[label_counts == label_counts.min()].index.values[0]
             majority_class = label_counts[label_counts == label_counts.max()].index.values[0]
@@ -510,7 +509,6 @@ class LabelInsightsAnalysis(AbstractAnalysis):
                     missing_classes = test_labels.difference(train_labels)
                     s["not_present_in_train"] = missing_classes
         elif (state.problem_type in [REGRESSION]) and self._test_data_with_label_present(args, label):
-
             # Out-of-domain range detection
             test_data = args.test_data
             label_min, label_max = np.min(train_data[label]), np.max(train_data[label])
