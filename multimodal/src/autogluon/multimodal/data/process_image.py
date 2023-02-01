@@ -67,8 +67,8 @@ class ImageProcessor:
         """
         Parameters
         ----------
-        prefix
-            The prefix connecting a processor to its corresponding model.
+        model
+            The model for which this processor would be created.
         train_transform_types
             A list of image transforms used in training. Note that the transform order matters.
         val_transform_types

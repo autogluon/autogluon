@@ -38,8 +38,6 @@ class MMOcrProcessor(MMLabProcessor):
         ----------
         model
             The model using this data processor.
-        collate_func
-            The collate function to use for this processor
         max_img_num_per_col
             The maximum number of images one sample can have.
         missing_value_strategy

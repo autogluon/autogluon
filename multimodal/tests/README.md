@@ -14,7 +14,7 @@ To guarantee code quality and correctness, we do two kinds of testing:
 Before submitting a pull request, you can run `black` locally to format your code. First, install it:
 
 ```
-pip install "black>=22.3"
+pip install "black>=22.3,<23.0"
 ```
 
 Then run it:

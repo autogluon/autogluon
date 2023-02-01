@@ -89,6 +89,12 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
             npt.assert_equal(embeddings_default, embeddings_realtime)
 
 
+def verify_no_redundant_model_configs(predictor):
+    model_names = list(predictor._config.model.keys())
+    model_names.remove("names")
+    assert sorted(predictor._config.model.names) == sorted(model_names)
+
+
 @pytest.mark.parametrize(
     "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method,efficient_finetune,loss_function",
     [
@@ -253,7 +259,7 @@ def test_predictor(
         time_limit=20,
         save_path=save_path,
     )
-
+    verify_no_redundant_model_configs(predictor)
     score = predictor.evaluate(dataset.test_df)
     verify_predictor_save_load(predictor, dataset.test_df)
     verify_realtime_inference(predictor, dataset.test_df)
@@ -264,6 +270,7 @@ def test_predictor(
         hyperparameters=hyperparameters,
         time_limit=20,
     )
+    verify_no_redundant_model_configs(predictor)
     verify_predictor_save_load(predictor, dataset.test_df)
 
     # Saving to folder, loading the saved model and call fit again (continuous fit)

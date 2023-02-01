@@ -27,6 +27,8 @@ def test_existing_save_path_but_empty_folder(save_path):
     }
 
     abs_path = os.path.abspath(os.path.expanduser(save_path))
+    if os.path.exists(abs_path):
+        shutil.rmtree(abs_path)
     os.makedirs(abs_path, exist_ok=True)
     predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
@@ -77,6 +79,8 @@ def test_existing_save_path_with_content_inside(save_path):
     }
 
     abs_path = os.path.abspath(os.path.expanduser(save_path))
+    if os.path.exists(abs_path):
+        shutil.rmtree(abs_path)
     os.makedirs(abs_path, exist_ok=True)
     dummy_file_path = os.path.join(abs_path, "dummy.txt")
     with open(dummy_file_path, "w") as f:
