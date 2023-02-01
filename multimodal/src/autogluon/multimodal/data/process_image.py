@@ -372,7 +372,6 @@ class ImageProcessor:
                             image_feature = BytesIO(img_feature)
                         else:
                             image_feature = img_feature
-                        print("image_feature=", image_feature)
                         with PIL.Image.open(image_feature) as img:
                             img = img.convert(image_mode)
                     except Exception as e:
