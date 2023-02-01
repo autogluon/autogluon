@@ -2607,7 +2607,7 @@ class MultiModalPredictor:
             if hasattr(config, "timm_image"):
                 logger.warn("Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "
                             "Try to update the timm image size.")
-                config.timm_image.image_size = None
+                config.model.timm_image.image_size = None
 
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]

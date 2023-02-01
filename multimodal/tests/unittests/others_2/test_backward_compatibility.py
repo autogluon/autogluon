@@ -34,7 +34,7 @@ def test_load_old_checkpoint(cls):
         folder=save_path,
     )
     predictor = cls.load(checkpoint_path)
-    assert predictor._config.timm_image.image_size is None
+    assert predictor._config.model.timm_image.image_size is None
     verify_predictor_save_load(predictor, dataset.test_df.sample(4), cls=cls)
 
     # continuous training
