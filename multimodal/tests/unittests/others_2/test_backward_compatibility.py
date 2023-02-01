@@ -14,7 +14,7 @@ from ..utils.utils import get_home_dir, protected_zip_extraction
 
 
 @pytest.mark.parametrize("cls", [MultiModalPredictor])
-def test_load_old_checkpoint(cls):
+def test_load_old_checkpoint_text_only(cls):
     dataset = AmazonReviewSentimentCrossLingualDataset()
     sha1sum_id = "4ba096cdf6bd76c06386f2c27140db055e59c91b"
     checkpoint_name = "mdeberta-v3-base-checkpoint"
