@@ -73,4 +73,4 @@ def test_v0_6_2_checkpoint_timm_image():
         hyperparameters={"model.timm_image.image_size": 288},
         time_limit=10,
     )
-    assert predictor._config.timm_image.image_size == 288
+    assert predictor._config.model.timm_image.image_size == 288
