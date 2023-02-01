@@ -41,4 +41,3 @@ df_train = df_train.drop(columns='PassengerId')
 df_test = df_test.drop(columns='PassengerId')
 auto.covariate_shift_detection(train_data=df_train, test_data=df_test, label=target_col)
 ```
-

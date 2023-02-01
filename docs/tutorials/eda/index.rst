@@ -30,6 +30,13 @@ This section provides an overview of exploratory data analysis tools.
       Identify situations where the distribution of features in a dataset changes between the training
       and testing phases, which can lead to biased model performance.
 
+   .. card::
+      :title: Feature interaction charts
+      :link: eda-auto-analyze-interaction.html
+
+      Simple visualization tool to visualize 1/2/3-way relationships between features.
+      The tool automatically picks a chart type given each property type.
+
 .. toctree::
    :maxdepth: 1
    :hidden:
@@ -38,3 +45,4 @@ This section provides an overview of exploratory data analysis tools.
    eda-auto-target-analysis
    eda-auto-quick-fit
    eda-auto-covariate-shift
+   eda-auto-analyze-interaction
