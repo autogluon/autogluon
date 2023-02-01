@@ -16,8 +16,8 @@ from . import (
     NaiveModel,
     SeasonalNaiveModel,
     SimpleFeedForwardModel,
-    ThetaModel,
     TemporalFusionTransformerModel,
+    ThetaModel,
 )
 from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
 
