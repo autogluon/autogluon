@@ -111,7 +111,7 @@ def analyze(
 
     Returns
     -------
-        state after `fit` call if `return_state` is `True`; `None` otherwise
+    state after `fit` call if `return_state` is `True`; `None` otherwise
 
     """
 
@@ -707,14 +707,13 @@ def target_analysis(
 
     Returns
     -------
-        state after `fit` call if `return_state` is `True`; `None` otherwise
+    state after `fit` call if `return_state` is `True`; `None` otherwise
 
     Examples
     --------
     >>> import autogluon.eda.analysis as eda
     >>>
     >>> auto.target_analysis(train_data=..., label=...)
-
 
     """
 
@@ -839,9 +838,60 @@ def missing_values_analysis(
     sample: Union[None, int, float] = None,
     **chart_args,
 ):
-    # TODO: graph_type validation
-    # TODO: docstrings
-    # TODO: tests
+    """
+    Perform quick analysis of missing values across datasets.
+
+    Parameters
+    ----------
+    graph_type: str, default = 'matrix'
+        One of the following visualization types:
+        - matrix - nullity matrix is a data-dense display which lets you quickly visually pick out patterns in data completion
+            This visualization will comfortably accommodate up to 50 labelled variables.
+            Past that range labels begin to overlap or become unreadable, and by default large displays omit them.
+        - bar - visualizes how many rows are non-null vs null in the column. Logarithmic scale can by specifying `log=True` in `kwargs`
+        - heatmap - correlation heatmap measures nullity correlation: how strongly the presence or absence of one
+            variable affects the presence of another. Nullity correlation ranges from -1
+            (if one variable appears the other definitely does not) to 0 (variables appearing or not appearing have no effect on one another)
+            to 1 (if one variable appears the other definitely also does).
+            Entries marked <1 or >-1 have a correlation that is close to being exactingly negative or positive, but is still not quite perfectly so.
+        - dendrogram - the dendrogram allows to more fully correlate variable completion, revealing trends deeper than the pairwise ones
+            visible in the correlation heatmap. The dendrogram uses a hierarchical clustering algorithm (courtesy of scipy) to bin variables
+            against one another by their nullity correlation (measured in terms of binary distance).
+            At each step of the tree the variables are split up based on which combination minimizes the distance of the remaining clusters.
+            The more monotone the set of variables, the closer their total distance is to zero, and the closer their average distance (the y-axis) is to zero.
+    train_data: Optional[DataFrame]
+        training dataset
+    test_data: Optional[DataFrame], default = None
+        test dataset
+    val_data
+        validation dataset
+    state: Union[None, dict, AnalysisState], default = None
+        pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
+    return_state: bool, default = False
+        return state if `True`
+    sample: Union[None, int, float], default = None
+        sample size; if `int`, then row number is used;
+        `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
+        `None` means no sampling
+        See also :func:`autogluon.eda.analysis.dataset.Sampler`
+
+    Returns
+    -------
+    state after `fit` call if `return_state` is `True`; `None` otherwise
+
+    Examples
+    --------
+    >>> import autogluon.eda.auto as auto
+    >>>
+    >>> auto.missing_values_analysis(train_data=...)
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.missing.MissingValuesAnalysis`
+    :py:class:`~autogluon.eda.visualization.dataset.DatasetStatistics`
+    :py:class:`~autogluon.eda.visualization.missing.MissingValues`
+
+    """
     return analyze(
         train_data=train_data,
         test_data=test_data,
@@ -853,6 +903,7 @@ def missing_values_analysis(
             MissingValuesAnalysis(),
         ],
         viz_facets=[
+            MarkdownSectionComponent("### Missing Values Analysis"),
             DatasetStatistics(),
             MissingValues(graph_type=graph_type, **chart_args),
         ],

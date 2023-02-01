@@ -49,7 +49,7 @@ def test_CorrelationVisualization_phik(monkeypatch):
         state,
         heatmap_args,
         CorrelationVisualization,
-        "train_data - phik correlation matrix",
+        "**`train_data` - `phik` correlation matrix**",
         headers=True,
     )
 
@@ -71,7 +71,7 @@ def test_CorrelationVisualization_focus(monkeypatch):
         state,
         heatmap_args,
         CorrelationVisualization,
-        "train_data - spearman correlation matrix; focus: absolute correlation for c >= 0.6",
+        "**`train_data` - `spearman` correlation matrix; focus: absolute correlation for `c` >= `0.6`**",
         headers=True,
     )
 
@@ -127,10 +127,10 @@ def __test_internal(monkeypatch, render_key, state, heatmap_args, facet_cls, tex
     call_show = MagicMock()
     call_yticks = MagicMock()
     call_subplots = MagicMock(return_value=("fig", "ax"))
-    call_render_text = MagicMock()
+    call_render_markdown = MagicMock()
 
     analysis = facet_cls(fig_args=dict(some_arg=123), **kwargs)
-    analysis.render_text = call_render_text
+    analysis.render_markdown = call_render_markdown
 
     with monkeypatch.context() as m:
         m.setattr(sns, "heatmap", call_heatmap)
@@ -155,9 +155,9 @@ def __test_internal(monkeypatch, render_key, state, heatmap_args, facet_cls, tex
         **heatmap_args,
     )
     if text_render is not None:
-        call_render_text.assert_called_with(text_render, text_type="h3")
+        call_render_markdown.assert_called_with(text_render)
     else:
-        call_render_text.assert_not_called()
+        call_render_markdown.assert_not_called()
 
 
 def test_FeatureInteractionVisualization__happy_path(monkeypatch):
@@ -199,7 +199,7 @@ def test_FeatureInteractionVisualization__headers(monkeypatch, is_single, header
     call_subplots = MagicMock(return_value=("fig", "ax"))
 
     viz = FeatureInteractionVisualization(key="abc", numeric_as_categorical_threshold=2, headers=header)
-    viz.render_text = MagicMock()
+    viz.render_markdown = MagicMock()
 
     with monkeypatch.context() as m:
         m.setattr(plt, "subplots", call_subplots)
@@ -211,11 +211,11 @@ def test_FeatureInteractionVisualization__headers(monkeypatch, is_single, header
         auto.analyze(state=state, viz_facets=[viz])
 
     if not header:
-        viz.render_text.assert_not_called()
+        viz.render_markdown.assert_not_called()
     elif is_single:
-        viz.render_text.assert_called_with("a in train_data", text_type="h3")
+        viz.render_markdown.assert_called_with("**`a` in `train_data`**")
     else:
-        viz.render_text.assert_called_with("Feature interaction between a/b in train_data", text_type="h3")
+        viz.render_markdown.assert_called_with("**Feature interaction between `a`/`b` in `train_data`**")
 
 
 def test_FeatureInteractionVisualization__state_different_key(monkeypatch):
