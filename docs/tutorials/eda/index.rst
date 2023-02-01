@@ -23,6 +23,13 @@ This section provides an overview of exploratory data analysis tools.
 
       Automatically analyze and summarize the variable we are trying to predict and it's relationship with other variables.
 
+   .. card::
+      :title: Covariate Shift Detection
+      :link: eda-auto-covariate-shift.html
+
+      Identify situations where the distribution of features in a dataset changes between the training
+      and testing phases, which can lead to biased model performance.
+
 .. toctree::
    :maxdepth: 1
    :hidden:
@@ -30,3 +37,4 @@ This section provides an overview of exploratory data analysis tools.
    eda-auto-dataset-overview
    eda-auto-target-analysis
    eda-auto-quick-fit
+   eda-auto-covariate-shift
