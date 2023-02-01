@@ -125,6 +125,10 @@ class ImageProcessor:
                                         f"Detailed configuration of the backbone is in {model.config}. "
                                         f"You may like to double check your configuration.")
                         self.size = size
+            elif size is not None and size != self.size:
+                logger.warn(f"The model does not support using an image size that is different from the default size. "
+                            f"Provided image size={size}. Default size={self.size}. "
+                            f"Detailed model configuration={model.config}. We have ignored the provided image size.")
         if self.size is None:
             if size is not None:
                 self.size = size
@@ -381,7 +385,7 @@ class ImageProcessor:
                             is_zero_img = True
                         else:
                             raise e
-                print("Image size=", image.size)
+                print("Image size=", img.size)
                 if is_training:
                     img = self.train_processor(img)
                 else:
