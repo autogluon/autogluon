@@ -32,6 +32,7 @@ others_2:
 - sentence-transformers/all-MiniLM-L6-v2
 - t5-small
 - microsoft/layoutlmv3-base
+- microsoft/layoutlmv2-base-uncased
 predictor:
 - CLTL/MedRoBERTa.nl
 - google/electra-small-discriminator
