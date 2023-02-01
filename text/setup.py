@@ -25,7 +25,7 @@ install_requires = ag.get_dependency_version_ranges(install_requires)
 
 extras_require = {
     'tests': [
-            'black~=22.0,>=22.3',
+            'black>=22.3,<23.0',
         ]
 }
 
