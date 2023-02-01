@@ -13,6 +13,11 @@ from .utils import assign_layer_ids, get_column_features, get_model_head
 logger = logging.getLogger(AUTOMM)
 
 
+# Stores the
+SUPPORT_VARIABLE_INPUT_SIZE_TIMM_CLASSES = {
+    "ConvNeXt", "EfficientNet", "MobileNetV3", "RegNet"
+}
+
 class TimmAutoModelForImagePrediction(nn.Module):
     """
     Support TIMM image backbones.

@@ -41,6 +41,7 @@ from ..constants import (
 from .collator import PadCollator, StackCollator
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config, is_rois_input
+from ..models.timm_image import TimmAutoModelForImagePrediction, SUPPORT_VARIABLE_INPUT_SIZE_TIMM_CLASSES
 
 logger = logging.getLogger(AUTOMM)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -107,9 +108,19 @@ class ImageProcessor:
         self.std = None
 
         if model is not None:
-            print(type(model), model.config)
             self.size, self.mean, self.std = self.extract_default(model.config)
-            print("Extracted size=", self.size, self.mean, self.std)
+            if isinstance(model, TimmAutoModelForImagePrediction):
+                if (("test_input_size" in model.config and
+                     model.config["test_input_size"] != model.config["input_size"]) or
+                    type(model.model).__name__ in SUPPORT_VARIABLE_INPUT_SIZE_TIMM_CLASSES) and size is not None:
+                        # We have detected that the model supports using an image size that is
+                        # different from the pretrained model, e.g., ConvNets with global pooling
+                        if size < self.size:
+                            logger.warn(f"The provided image size={size} is smaller than the default size "
+                                        f"of the pretrained backbone, which is {self.size}. "
+                                        f"Detailed configuration of the backbone is in {model.config}. "
+                                        f"You may like to double check your configuration.")
+                        self.size = size
         if self.size is None:
             if size is not None:
                 self.size = size
