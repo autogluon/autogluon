@@ -54,7 +54,7 @@ def test_v0_6_2_checkpoint_timm_image():
     checkpoint_path = os.path.join(save_path, "convnext_nano_shopee")
     sha1_hash = "b0b36fd076b3e0ab599f917c9b2924aef84a02b6"
     download(
-        url=f"s3://automl-mm-bench/unit-tests/convnext_nano_shopee_0.6.2_backward_compatible_test.zip",
+        url="https://automl-mm-bench.s3.amazonaws.com/unit-tests/convnext_nano_shopee_0.6.2_backward_compatible_test.zip",
         path=file_path,
         sha1_hash=sha1_hash,
     )
