@@ -40,10 +40,11 @@ class XShiftSummary(AbstractVisualization, JupyterMixin):
         if "feature_importance" in state:
             fi = state["feature_importance"]
             fi = fi[fi.p_value <= state["pvalue_threshold"]]
-            self.render_markdown(
-                "**Feature importances**: The variables that are the most responsible for this shift are those with high feature importance:\n\n"
-            )
-            self.display_obj(fi)
+            if len(fi) > 0:
+                self.render_markdown(
+                    "**Feature importances**: The variables that are the most responsible for this shift are those with high feature importance:\n\n"
+                )
+                self.display_obj(fi)
 
     def can_handle(self, state: AnalysisState) -> bool:
         return self.at_least_one_key_must_be_present(state, "xshift_results")

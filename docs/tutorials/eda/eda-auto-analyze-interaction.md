@@ -22,23 +22,15 @@ target_col = 'Survived'
 Next we will look at missing data in the variable:
 
 ```{.python .input}
-import autogluon.eda.analysis as eda
-import autogluon.eda.visualization as viz
 import autogluon.eda.auto as auto
 
-df_all = pd.concat([df_train, df_test], ignore_index=True).drop(columns=target_col)
-auto.analyze(train_data=df_all, anlz_facets=[
-    eda.missing.MissingValuesAnalysis(),
-], viz_facets=[
-    viz.DatasetStatistics(),
-    viz.missing.MissingValues(graph_type='matrix', figsize=(12, 6)),
-])
+auto.missing_values_analysis(train_data=df_train)
 ```
 
 It looks like there are only two null values in the `Embarked` feature. Let's see what are those two null values:
 
 ```{.python .input}
-df_all[df_all.Embarked.isna()]
+df_train[df_train.Embarked.isna()]
 ```
 
 We may be able to fill these by looking at other independent variables. Both passengers paid a `Fare` of `$80`, are
@@ -46,7 +38,7 @@ of `Pclass` `1` and `female` `Sex`. Let's see how the `Fare` is distributed amon
 values:
 
 ```{.python .input}
-auto.analyze_interaction(train_data=df_all, x='Embarked', y='Fare', hue='Pclass')
+auto.analyze_interaction(train_data=df_train, x='Embarked', y='Fare', hue='Pclass')
 ```
 
 The average `Fare` closest to `$80` are in the `C` `Embarked` values where `Pclass` is `1`. Let's fill in the missing
@@ -75,16 +67,16 @@ The very left part of the distribution on this chart possibility hints that chil
 auto.analyze_interaction(x='Fare', y='Age', hue='Survived', train_data=df_train, test_data=df_test)
 ```
 
-This chart highlights three outliers with a Fare of over `\$500`. Let's take a look at these:
+This chart highlights three outliers with a Fare of over `$500`. Let's take a look at these:
 ```{.python .input}
-df_all[df_all.Fare > 400]
+df_train[df_train.Fare > 400]
 ```
 As you can see all 4 passengers share the same ticket. Per-person fare would be 1/4 of this value. Looks like we can 
 add a new feature to the dataset fare per person; also this allows us to see if some passengers travelled in larger 
 groups. Let's create two new features and take at the Fare-Age relationship once again.
 
 ```{.python .input}
-ticket_to_count = df_all.groupby(by='Ticket')['Embarked'].count().to_dict()
+ticket_to_count = df_train.groupby(by='Ticket')['Embarked'].count().to_dict()
 data = df_train.copy()
 data['GroupSize'] = data.Ticket.map(ticket_to_count)
 data['FarePerPerson'] = data.Fare / data.GroupSize

@@ -39,6 +39,7 @@ from ..visualization import (
     FeatureInteractionVisualization,
     LabelInsightsVisualization,
     MarkdownSectionComponent,
+    MissingValues,
     ModelLeaderboard,
     PropertyRendererComponent,
     RegressionEvaluation,
@@ -51,9 +52,10 @@ from ..visualization.layouts import SimpleVerticalLinearLayout
 __all__ = [
     "analyze",
     "analyze_interaction",
-    "quick_fit",
-    "dataset_overview",
     "covariate_shift_detection",
+    "dataset_overview",
+    "missing_values_analysis",
+    "quick_fit",
     "target_analysis",
 ]
 
@@ -825,3 +827,33 @@ def _render_distribution_fit_information_if_available(state, label) -> Optional[
             )
         analyze(viz_facets=[MarkdownSectionComponent("\n".join(dist_info))])
     return state
+
+
+def missing_values_analysis(
+    graph_type: str = "matrix",
+    train_data: Optional[pd.DataFrame] = None,
+    test_data: Optional[pd.DataFrame] = None,
+    val_data: Optional[pd.DataFrame] = None,
+    state: Union[None, dict, AnalysisState] = None,
+    return_state: bool = False,
+    sample: Union[None, int, float] = None,
+    **chart_args,
+):
+    # TODO: graph_type validation
+    # TODO: docstrings
+    # TODO: tests
+    return analyze(
+        train_data=train_data,
+        test_data=test_data,
+        val_data=val_data,
+        state=state,
+        return_state=return_state,
+        sample=sample,
+        anlz_facets=[
+            MissingValuesAnalysis(),
+        ],
+        viz_facets=[
+            DatasetStatistics(),
+            MissingValues(graph_type=graph_type, **chart_args),
+        ],
+    )
