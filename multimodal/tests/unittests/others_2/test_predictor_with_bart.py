@@ -20,7 +20,7 @@ def test_predictor_with_bart(checkpoint_name, efficient_finetune):
     predictor.fit(
         train_data,
         hyperparameters={
-            "model.hf_text.checkpoint_name": "yuchenlin/BART0",
+            "model.hf_text.checkpoint_name": checkpoint_name,
             "optimization.max_epochs": 1,
             "optimization.efficient_finetune": efficient_finetune,
             "optimization.top_k": 1,
