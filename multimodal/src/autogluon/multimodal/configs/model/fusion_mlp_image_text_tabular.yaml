@@ -117,7 +117,7 @@ model:
       - "resize_shorter_side"
       - "center_crop"
     image_norm: "imagenet"
-    image_size: 224
+    image_size: null
     max_img_num_per_col: 2
 
   mmdet_image:
