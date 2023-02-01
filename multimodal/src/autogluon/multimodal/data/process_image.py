@@ -253,7 +253,6 @@ class ImageProcessor:
             std = None
         else:
             raise ValueError(f"Unknown image processor prefix: {self.prefix}")
-        print(image_size, mean, std)
         return image_size, mean, std
 
     def construct_processor(
@@ -382,7 +381,7 @@ class ImageProcessor:
                             is_zero_img = True
                         else:
                             raise e
-
+                print("Image size=", image.size)
                 if is_training:
                     img = self.train_processor(img)
                 else:
