@@ -54,27 +54,20 @@ function install_multimodal {
     python3 -m pip install --upgrade mmocr
 }
 
-function install_vision {
-    python3 -m pip install --upgrade pytest-xdist  # launch different process for each test to avoid resource not being released by either mxnet or torch
-    install_local_packages "vision/"
-}
-
 function install_all {
     install_local_packages "common/[tests]" "core/[all]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
-    install_multimodal "[tests]" # multimodal must be install before vision and text
-    install_vision
-    install_local_packages "text/" "autogluon/"
+    install_multimodal "[tests]"
+    install_local_packages "autogluon/"
 }
 
 function install_all_no_tests {
     install_local_packages "common/" "core/[all]" "features/" "tabular/[all]" "timeseries/[all]" "eda/"
-    install_multimodal # multimodal must be installed before vision and text
-    install_vision
-    install_local_packages "text/" "autogluon/"
+    install_multimodal
+    install_local_packages "autogluon/"
 }
 
 function build_all {
-    for module in common core features tabular multimodal text vision timeseries autogluon
+    for module in common core features tabular multimodal timeseries autogluon
     do
         cd "$module"/
         python setup.py sdist bdist_wheel
