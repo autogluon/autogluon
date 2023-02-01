@@ -349,7 +349,7 @@ class MultimodalFusionNER(MultimodalFusionMLP):
         """
         multimodal_features = []
         output = {}
-        ner_output = self.ner_model(batch)
+        ner_output = run_model(self.ner_model, batch)
         for per_model, per_adapter in zip(self.other_models, self.adapter):
             per_output = run_model(per_model, batch)
             multimodal_features.append(per_adapter(per_output[per_model.prefix][FEATURES]))
