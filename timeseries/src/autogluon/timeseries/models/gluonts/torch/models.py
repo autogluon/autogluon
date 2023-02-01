@@ -272,6 +272,15 @@ class TemporalFusionTransformerModel(AbstractGluonTSPyTorchModel):
     ----------------
     context_length : int, default = 64
         Number of past values used for prediction.
+    disable_static_features : bool, default = False
+        If True, static features won't be used by the model even if they are present in the dataset.
+        If False, static features will be used by the model if they are present in the dataset.
+    disable_known_covariates : bool, default = False
+        If True, known covariates won't be used by the model even if they are present in the dataset.
+        If False, known covariates will be used by the model if they are present in the dataset.
+    disable_past_covariates : bool, default = False
+        If True, past covariates won't be used by the model even if they are present in the dataset.
+        If False, past covariates will be used by the model if they are present in the dataset.
     hidden_dim : int, default = 32
         Size of the LSTM & transformer hidden states.
     variable_dim : int, default = 32
