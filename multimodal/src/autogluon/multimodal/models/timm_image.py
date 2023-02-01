@@ -137,15 +137,6 @@ class TimmAutoModelForImagePrediction(nn.Module):
         -------
             A dictionary with logits and features.
         """
-        batch = {
-            self.image_key: images,
-            self.image_valid_num_key: image_valid_num,
-        }
-        if image_column_names:
-            assert len(image_column_names) == len(image_column_indices), "invalid image column inputs"
-            batch.update(**dict(zip(image_column_names, image_column_indices)))
-
-        ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
         if self.mix_choice == "all_images":  # mix inputs
             mixed_images = (
                 images.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None, None, None]
@@ -153,6 +144,11 @@ class TimmAutoModelForImagePrediction(nn.Module):
             features = self.model(mixed_images)
             if self.num_classes > 0:
                 logits = self.head(features)
+            else:
+                logits = features
+
+            column_features = {}
+            column_feature_masks = {}
 
         elif self.mix_choice == "all_logits":  # mix outputs
             b, n, c, h, w = images.shape
@@ -163,6 +159,14 @@ class TimmAutoModelForImagePrediction(nn.Module):
             image_masks = (steps.reshape((1, -1)) < image_valid_num.reshape((-1, 1))).type_as(features)  # (b, n)
             features = features.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_features)
 
+            batch = {
+                self.image_key: images,
+                self.image_valid_num_key: image_valid_num,
+            }
+            if image_column_names:
+                assert len(image_column_names) == len(image_column_indices), "invalid image column inputs"
+                batch.update(**dict(zip(image_column_names, image_column_indices)))
+
             # collect features by image column names
             column_features, column_feature_masks = get_column_features(
                 batch=batch,
@@ -170,16 +174,34 @@ class TimmAutoModelForImagePrediction(nn.Module):
                 features=features,
                 valid_lengths=image_valid_num,
             )
-            ret[COLUMN_FEATURES][FEATURES].update(column_features)
-            ret[COLUMN_FEATURES][MASKS].update(column_feature_masks)
 
             features = features.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None]  # (b, num_features)
             if self.num_classes > 0:
                 logits = logits.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_classes)
                 logits = logits.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None]  # (b, num_classes)
+            else:
+                logits = features
 
         else:
             raise ValueError(f"unknown mix_choice: {self.mix_choice}")
+
+        if column_features == {} or column_feature_masks == {}:
+            return features, logits
+        else:
+            return features, logits, column_features, column_feature_masks
+
+    def get_output_dict(
+        self,
+        features: torch.Tensor,
+        logits: torch.Tensor,
+        column_features: Optional[List[torch.Tensor]] = None,
+        column_feature_masks: Optional[List[torch.Tensor]] = None,
+    ):
+        ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
+
+        if column_features != None:
+            ret[COLUMN_FEATURES][FEATURES].update(column_features)
+            ret[COLUMN_FEATURES][MASKS].update(column_feature_masks)
 
         ret[FEATURES] = features
         if self.num_classes > 0:
