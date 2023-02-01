@@ -2603,7 +2603,7 @@ class MultiModalPredictor:
             data_processors = None
 
         # backward compatibility for variable image size.
-        if packaging.version.parse(assets["version"]) <= packaging.version.parse("0.6.2"):
+        if version.parse(assets["version"]) <= version.parse("0.6.2"):
             if hasattr(config, "timm_image"):
                 logger.warn("Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "
                             "Try to update the timm image size.")
