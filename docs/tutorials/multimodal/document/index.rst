@@ -1,5 +1,5 @@
 Document Data
----------------
+-------------
 .. container:: cards
 
    .. card::
@@ -14,4 +14,3 @@ Document Data
    :hidden:
 
    document_classification
-

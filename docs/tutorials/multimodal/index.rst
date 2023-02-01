@@ -242,7 +242,7 @@ FAQ
    text_prediction/index
    image_prediction/index
    object_detection/index
-   document/document_classification.md
+   document/index
    matching/index
    multimodal_prediction/index
    advanced_topics/index
