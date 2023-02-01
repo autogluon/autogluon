@@ -2469,7 +2469,6 @@ class MultiModalPredictor:
 
         device_type = "cuda" if torch.cuda.is_available() else "cpu"
         device = torch.device(device_type)
-        input_keys = self._model.input_keys
 
         self._model.eval()
 
@@ -2490,7 +2489,7 @@ class MultiModalPredictor:
         dtype = infer_precision(
             num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False, as_torch=True
         )
-        for key in input_keys:
+        for key in self._model.input_keys:
             inp = batch[key]
             # support mixed precision on floating point inputs, and leave integer inputs (for language models) untouched.
             if inp.dtype.is_floating_point:

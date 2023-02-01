@@ -703,7 +703,7 @@ def run_model(model: nn.Module, batch: dict):
         input_vec.append(column_names)
         input_vec.append(column_values)
         output_vec = model(*tuple(input_vec))
-        output = model.model_postprocess(*output_vec)
+        output = model.get_output_dict(*output_vec)
     else:
         output = model(batch)
     return output

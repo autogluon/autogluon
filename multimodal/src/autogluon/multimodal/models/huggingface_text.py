@@ -233,7 +233,7 @@ class HFAutoModelForTextPrediction(nn.Module):
         else:
             return pooled_features, logits, column_features, column_feature_masks
 
-    def model_postprocess(
+    def get_output_dict(
         self,
         pooled_features: torch.Tensor,
         logits: torch.Tensor,

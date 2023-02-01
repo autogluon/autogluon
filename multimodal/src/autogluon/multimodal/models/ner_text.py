@@ -203,7 +203,7 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
                 column_feature_masks,
             )
 
-    def model_postprocess(
+    def get_output_dict(
         self,
         sequence_output: torch.Tensor,
         logits: torch.Tensor,
