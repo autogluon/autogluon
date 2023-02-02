@@ -29,7 +29,7 @@ hide-toc: true
 
 AutoML for Image, Text, Time Series, and Tabular Data
 
-```{button-link} tutorials/tabular/tabular_quick_start.html
+```{button-link} tutorials/tabular/tabular-quick-start.html
 :outline:
 :color: white
 :class: sd-px-4 sd-fs-5
@@ -154,9 +154,9 @@ hidden:
 ---
 
 install
-tutorials/tabular/tabular_quick_start
 tutorials/multimodal/multimodal_quick_start
 Time Series Quick Start <tutorials/timeseries/forecasting-quickstart>
+Tabular Quick Start <tutorials/tabular/tabular-quick-start>
 ```
 
 ```{toctree}

@@ -2,20 +2,12 @@
 
 ```{toctree}
 ---
-maxdepth: 1
+maxdepth: 2
 ---
 
-Quick Start <tabular-quickstart>
+Essentials <tabular-essentials>
 In Depth <tabular-indepth>
-Multilabel <tabular-multilabel>
-Tabular + Text <tabular-multimodal-text-others>
-Tabular + Text + Images <tabular-multimodal>
 Feature Engineering <tabular-feature-engineering>
-Kaggle <tabular-kaggle>
-GPU <tabular-gpu>
-Interpretability <tabular-interpretability>
-Custom Metrics <tabular-custom-metric>
-Custom Models <tabular-custom-model>
-Deployment <tabular-deployment>
-Advanced <tabular-custom-model-advanced>
+Tabular + Text + Images <tabular-multimodal>
+Advanced <advanced/index>
 ```
