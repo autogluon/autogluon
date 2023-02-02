@@ -26,7 +26,7 @@ DEPENDENT_PACKAGES = {
     'psutil': '>=5.7.3,<6',
     'networkx': '>=2.3,<3.0',
     'tqdm': '>=4.38.0',
-    'Pillow': '>=9.3.0,<=9.4.0',
+    'Pillow': '>=9.3.0,<9.6.0',
     'timm': '>=0.5.4,<0.7.0',
 }
 if LITE_MODE:

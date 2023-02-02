@@ -20,12 +20,12 @@ version = ag.update_version(version)
 submodule = "multimodal"
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
-    "numpy",
-    "scipy",
-    "pandas",
-    "scikit-learn",
-    "Pillow",
-    "tqdm",
+    "numpy",  # version range defined in `core/_setup_utils.py`
+    "scipy",  # version range defined in `core/_setup_utils.py`
+    "pandas",  # version range defined in `core/_setup_utils.py`
+    "scikit-learn",  # version range defined in `core/_setup_utils.py`
+    "Pillow",  # version range defined in `core/_setup_utils.py`
+    "tqdm",  # version range defined in `core/_setup_utils.py`
     "boto3",
     "requests",
     "jsonschema<4.18",
