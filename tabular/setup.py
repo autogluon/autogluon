@@ -43,7 +43,7 @@ extras_require = {
         'xgboost>=1.6,<1.8',
     ],
     'fastai': [
-        'torch>=1.0,<1.13',
+        'torch>=1.9,<1.14',
         'fastai>=2.3.1,<2.8',
     ],
     'skex': [
