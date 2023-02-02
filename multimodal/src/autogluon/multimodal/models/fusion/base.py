@@ -1,4 +1,6 @@
 import logging
+from abc import ABC, abstractclassmethod, abstractmethod
+from typing import Optional
 
 from torch import nn
 
@@ -7,18 +9,29 @@ from ...constants import AUTOMM, LABEL
 logger = logging.getLogger(AUTOMM)
 
 
-class BaseMultimodalFusionModel(nn.Module):
+class BaseMultimodalFusionModel(ABC, nn.Module):
     """
     A base class to fuse different models' features (single-modal and multimodal).
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        prefix: str,
+        models: list,
+        loss_weight: Optional[float] = None,
+    ):
         super().__init__()
 
-    @property
-    def label_key(self):
-        return f"{self.prefix}_{LABEL}"
+        self.prefix = prefix
+        self.loss_weight = loss_weight
+        self.model = nn.ModuleList(models)
 
+    @property
+    @abstractmethod
+    def label_key(self):
+        pass
+
+    @abstractmethod
     def forward(self, *args, **kwargs):
         pass
 

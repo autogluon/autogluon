@@ -4,7 +4,7 @@ from typing import List, Optional
 import torch
 from torch import nn
 
-from ...constants import AUTOMM, FEATURES, LOGITS, WEIGHT
+from ...constants import AUTOMM, FEATURES, LABEL, LOGITS, WEIGHT
 from ..mlp import MLP
 from ..utils import init_weights, run_model
 from .base import BaseMultimodalFusionModel
@@ -65,12 +65,14 @@ class MultimodalFusionMLP(BaseMultimodalFusionModel):
             The loss will be computed as "loss = fusion_loss + loss_weight(vit_loss + clip_loss + bert_loss)".
             Basically, it supports adding an auxiliary loss for each individual model.
         """
-        super().__init__()
+        super().__init__(
+            prefix=prefix,
+            models=models,
+            loss_weight=loss_weight,
+        )
         logger.debug("initializing MultimodalFusionMLP")
         if loss_weight is not None:
             assert loss_weight > 0
-        self.loss_weight = loss_weight
-        self.model = nn.ModuleList(models)
         self.num_classes = num_classes
 
         raw_in_features = [per_model.out_features for per_model in models]
@@ -114,11 +116,12 @@ class MultimodalFusionMLP(BaseMultimodalFusionModel):
         self.head.apply(init_weights)
 
         self.out_features = in_features
-
-        self.prefix = prefix
-
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
+
+    @property
+    def label_key(self):
+        return f"{self.prefix}_{LABEL}"
 
     def forward(
         self,

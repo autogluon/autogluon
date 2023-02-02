@@ -64,13 +64,15 @@ class MultimodalFusionNER(BaseMultimodalFusionModel):
         loss_weight
             The weight of individual models.
         """
-        super().__init__()
+        super().__init__(
+            prefix=prefix,
+            models=models,
+            loss_weight=loss_weight,
+        )
         logger.debug("initializing MultimodalFusionNER")
 
         if loss_weight is not None:
             assert loss_weight > 0
-        self.loss_weight = loss_weight
-        self.model = nn.ModuleList(models)
         self.num_classes = num_classes
 
         self.ner_model = None
@@ -114,7 +116,6 @@ class MultimodalFusionNER(BaseMultimodalFusionModel):
         self.fusion_mlp = nn.Sequential(*fusion_mlp)
         self.head = nn.Linear(in_features + self.ner_model.out_features, num_classes)
         self.out_features = in_features
-        self.prefix = prefix
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 

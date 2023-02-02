@@ -4,7 +4,7 @@ from typing import Optional
 import torch
 from torch import nn
 
-from ...constants import AUTOMM, FEATURES, LOGITS, WEIGHT
+from ...constants import AUTOMM, FEATURES, LABEL, LOGITS, WEIGHT
 from ..ft_transformer import CLSToken, FT_Transformer
 from ..utils import init_weights, run_model
 from .base import BaseMultimodalFusionModel
@@ -108,13 +108,14 @@ class MultimodalFusionTransformer(BaseMultimodalFusionModel):
         share_qv_weights
             if 'true', then value and query transformation parameters are shared in additive attention.
         """
-        super().__init__()
+        super().__init__(
+            prefix=prefix,
+            models=models,
+            loss_weight=loss_weight,
+        )
         logger.debug("initializing MultimodalFusionTransformer")
         if loss_weight is not None:
             assert loss_weight > 0
-
-        self.loss_weight = loss_weight
-        self.model = nn.ModuleList(models)
 
         raw_in_features = [per_model.out_features for per_model in models]
 
@@ -175,11 +176,12 @@ class MultimodalFusionTransformer(BaseMultimodalFusionModel):
         # init weights
         self.adapter.apply(init_weights)
         self.head.apply(init_weights)
-
-        self.prefix = prefix
-
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
+
+    @property
+    def label_key(self):
+        return f"{self.prefix}_{LABEL}"
 
     def forward(
         self,
