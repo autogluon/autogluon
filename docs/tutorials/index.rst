@@ -91,46 +91,6 @@ Multimodal Prediction
       How MultiModalPredictor can be applied to multimodal data tables with a mix of text, numerical, and categorical columns.
 
 
-Image Prediction
-----------------
-.. container:: cards
-
-   .. card::
-      :title: Dataset Preparation for Image Predictor
-      :link: image_prediction/dataset.html
-
-      Quick dataset preparation guide for image prediction.
-
-   .. card::
-      :title: Quick Start Using FIT
-      :link: image_prediction/beginner.html
-
-      5 min tutorial on classifying images.
-
-   .. card::
-      :title: Customized Search and HPO
-      :link: image_prediction/hpo.html
-
-      Hyperparameter tuning to improve image classification accuracy.
-
-
-Object Detection
-----------------
-.. container:: cards
-
-   .. card::
-      :title: Dataset Preparation for Object Detector
-      :link: object_detection/dataset.html
-
-      Quick dataset preparation guide for object detection.
-
-   .. card::
-      :title: Quick Start Using FIT
-      :link: object_detection/beginner.html
-
-      5 min tutorial on detecting objects in images.
-
-
 Time Series Forecasting
 -----------------------
 .. container:: cards
@@ -195,8 +155,6 @@ Cloud Training and Deployment
    :maxdepth: 3
    :hidden:
 
-   image_prediction/index
-   object_detection/index
    tabular_prediction/index
    multimodal/index
    cloud_fit_deploy/index
