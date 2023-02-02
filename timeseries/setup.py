@@ -28,7 +28,7 @@ install_requires = [
     "scipy",
     "pandas",
     "statsmodels~=0.13.0",
-    "gluonts~=0.11.0",
+    "gluonts~=0.12.0",
     "torch>=1.9,<1.14",
     "pytorch-lightning>=1.7.4,<1.9.0",
     "networkx",

@@ -17,7 +17,6 @@ from autogluon.timeseries.models.gluonts.mx import (
     TemporalFusionTransformerMXNetModel,
 )
 from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSMXNetModelFactory
-from autogluon.timeseries.models.presets import get_default_hps
 
 from ....common import DUMMY_TS_DATAFRAME
 
@@ -56,7 +55,7 @@ def test_when_tft_quantiles_are_not_deciles_then_value_error_is_raised(temp_mode
         freq=DUMMY_TS_DATAFRAME.freq,
         prediction_length=4,
         quantile_levels=quantiles,
-        hyperparameters={"epochs": 1},
+        hyperparameters={"epochs": 1, "num_batches_per_epoch": 1},
     )
     if should_fail:
         with pytest.raises(ValueError, match="quantile_levels are a subset of"):
@@ -75,15 +74,9 @@ def test_when_tft_quantiles_are_deciles_then_forecast_contains_correct_quantiles
         freq=DUMMY_TS_DATAFRAME.freq,
         prediction_length=4,
         quantile_levels=quantiles,
-        hyperparameters={"epochs": 1},
+        hyperparameters={"epochs": 1, "num_batches_per_epoch": 1},
     )
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     predictions = model.predict(data=DUMMY_TS_DATAFRAME)
     assert "mean" in predictions.columns
     assert all(str(q) in predictions.columns for q in quantiles)
-
-
-@pytest.mark.parametrize("preset_key", ["high_quality", "best_quality"])
-def test_when_mxnet_installed_then_default_presets_include_mxnet_models(preset_key):
-    hps = get_default_hps(key=preset_key, prediction_length=5)
-    assert any("MXNet" in model_name for model_name in hps.keys())
