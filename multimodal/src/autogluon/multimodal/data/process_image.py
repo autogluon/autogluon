@@ -18,7 +18,7 @@ from torch import nn
 from torchvision import transforms
 
 from .randaug import RandAugment
-from .utils import construct_processor, mean_std
+from .utils import construct_image_processor, image_mean_std
 
 try:
     from torchvision.transforms import InterpolationMode
@@ -125,7 +125,7 @@ class ImageProcessor:
             logger.debug(f"using detected image size: {self.size}")
         if self.mean is None or self.std is None:
             if norm_type is not None:
-                self.mean, self.std = mean_std(norm_type)
+                self.mean, self.std = image_mean_std(norm_type)
                 logger.debug(f"using provided normalization: {norm_type}")
             else:
                 raise ValueError("image normalization mean and std are missing")
@@ -139,8 +139,8 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        self.train_processor = construct_processor(self.size, self.normalization, self.train_transform_types)
-        self.val_processor = construct_processor(self.size, self.normalization, self.val_transform_types)
+        self.train_processor = construct_image_processor(self.size, self.normalization, self.train_transform_types)
+        self.val_processor = construct_image_processor(self.size, self.normalization, self.val_transform_types)
 
     @property
     def image_key(self):
@@ -341,4 +341,4 @@ class ImageProcessor:
     def __setstate__(self, state):
         self.__dict__ = state
         if len(state["train_transform_types"]) > 0:
-            self.train_processor = construct_processor(self.size, self.normalization, self.train_transform_types)
+            self.train_processor = construct_image_processor(self.size, self.normalization, self.train_transform_types)

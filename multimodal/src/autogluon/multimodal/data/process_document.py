@@ -16,7 +16,7 @@ from transformers import AutoTokenizer
 
 from ..constants import AUTOMM, BBOX
 from .collator import PadCollator, StackCollator
-from .utils import construct_processor, mean_std
+from .utils import construct_image_processor, image_mean_std
 
 logger = logging.getLogger(AUTOMM)
 
@@ -74,10 +74,10 @@ class DocumentProcessor:
         self.size = size
         self.train_transform_types = train_transform_types
         self.val_transform_types = val_transform_types
-        self.mean, self.std = mean_std(norm_type)
+        self.mean, self.std = image_mean_std(norm_type)
         self.normalization = transforms.Normalize(self.mean, self.std)
-        self.train_processor = construct_processor(self.size, self.normalization, self.train_transform_types)
-        self.val_processor = construct_processor(self.size, self.normalization, self.val_transform_types)
+        self.train_processor = construct_image_processor(self.size, self.normalization, self.train_transform_types)
+        self.val_processor = construct_image_processor(self.size, self.normalization, self.val_transform_types)
 
         # Store OCR results
         self.documents = {}

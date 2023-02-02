@@ -445,7 +445,7 @@ def get_text_token_max_len(provided_max_len, config, tokenizer, checkpoint_name)
     return max_len
 
 
-def construct_processor(
+def construct_image_processor(
     size,
     normalization,
     transform_types: List[str],
@@ -516,7 +516,7 @@ def construct_processor(
     return transforms.Compose(processor)
 
 
-def mean_std(norm_type: str):
+def image_mean_std(norm_type: str):
     """
     Get image normalization mean and std by its name.
 

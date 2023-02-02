@@ -242,8 +242,8 @@ def is_document_image_column(
     data: pd.Series,
     col_name: str,
     image_type: Optional[str] = IMAGE_PATH,
-    sample_m: Optional[int] = 30,
-    text_len_threshold: Optional[int] = 50,
+    sample_m: Optional[int] = 10,
+    text_len_threshold: Optional[int] = 100,
 ) -> bool:
     """
     Identify if a column is a document image column.
