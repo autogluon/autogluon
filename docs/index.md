@@ -214,7 +214,7 @@ maxdepth: 1
 hidden:
 ---
 
-install
+Install <install>
 Tabular Quick Start <tutorials/tabular/tabular-quick-start>
 Multimodal Quick Start <tutorials/multimodal/multimodal-quick-start>
 Time Series Quick Start <tutorials/timeseries/forecasting-quick-start>
