@@ -68,7 +68,25 @@ def test_tabular():
     run_tabular_benchmark_toy(fit_args=fit_args)
 
 
+def _assert_predict_dict_identical_to_predict(predictor, data):
+    """Assert that predict_proba_dict and predict_dict are identical to looping calls to predict and predict_proba"""
+    predict_proba_dict = predictor.predict_proba_multi(data=data)
+    predict_dict = predictor.predict_multi(data=data)
+    assert set(predictor.get_model_names()) == set(predict_proba_dict.keys())
+    assert set(predictor.get_model_names()) == set(predict_dict.keys())
+    for m in predictor.get_model_names():
+        model_pred = predictor.predict(data, model=m)
+        model_pred_proba = predictor.predict_proba(data, model=m)
+        assert model_pred.equals(predict_dict[m])
+        assert model_pred_proba.equals(predict_proba_dict[m])
+
+
 def test_advanced_functionality():
+    """
+    Tests a bunch of advanced functionality, including when used in combination.
+    The idea is that if this test passes, we are in good shape.
+    Simpler to test all of this within one test as it avoids repeating redundant setup such as fitting a predictor.
+    """
     fast_benchmark = True
     dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
                       'name': 'AdultIncomeBinaryClassification',
@@ -91,6 +109,7 @@ def test_advanced_functionality():
     leaderboard = predictor.leaderboard(data=test_data)
     extra_metrics = ['accuracy', 'roc_auc', 'log_loss']
     leaderboard_extra = predictor.leaderboard(data=test_data, extra_info=True, extra_metrics=extra_metrics)
+    _assert_predict_dict_identical_to_predict(predictor=predictor, data=test_data)
     assert set(predictor.get_model_names()) == set(leaderboard['model'])
     assert set(predictor.get_model_names()) == set(leaderboard_extra['model'])
     assert set(leaderboard_extra.columns).issuperset(set(leaderboard.columns))
@@ -234,8 +253,15 @@ def test_advanced_functionality_bagging():
     expected_num_models = 2
     assert(len(predictor.get_model_names()) == expected_num_models)
 
+    _assert_predict_dict_identical_to_predict(predictor=predictor, data=test_data)
+
     oof_pred_proba = predictor.get_oof_pred_proba()
     assert(len(oof_pred_proba) == len(train_data))
+
+    predict_proba_dict_oof = predictor.predict_proba_multi()
+    for m in predictor.get_model_names():
+        predict_proba_oof = predictor.get_oof_pred_proba(model=m)
+        assert predict_proba_oof.equals(predict_proba_dict_oof[m])
 
     score_oof = predictor.evaluate_predictions(train_data[label], oof_pred_proba)
     model_best = predictor.get_model_best()
