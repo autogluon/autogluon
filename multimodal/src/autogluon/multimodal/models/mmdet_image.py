@@ -173,6 +173,14 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 "url": "https://automl-mm-bench.s3.amazonaws.com/object_detection/checkpoints/yolox/yolox_l_objects365_temp.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py"),
             },
+            "cbnetv2_bigdetection": {
+                "url": "https://big-detection.s3.us-west-2.amazonaws.com/bigdet_cpts/mmdetection_cpts/htc_cbv2_swin_base_giou_4conv1f_bigdet.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "cbnetv2", "htc_cbv2_swin_base_giou_4conv1f_adamw_bigdet.py"),
+            },
+            "yolov3_bigdetection": {
+                "url": "https://big-detection.s3.us-west-2.amazonaws.com/bigdet_cpts/mmdetection_cpts/yolov3_d53_bigdet_8x.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "yolov3", "yolov3_d53_mstrain-608_8x_bigdet.py"),
+            },
         }
 
         if os.path.isfile(checkpoint_name):
