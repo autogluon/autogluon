@@ -302,7 +302,7 @@ jobs:
           job-name: AutoGluon-BuildTimeseries
           command: chmod +x ./.github/workflow_scripts/build_timeseries_tutorial.sh && ./.github/workflow_scripts/build_timeseries_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_eda_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_text, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_vision, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
