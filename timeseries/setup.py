@@ -34,6 +34,7 @@ install_requires = [
     "networkx",
     "statsforecast==1.4.0",
     "tqdm",
+    "ujson",  # needed to silence GluonTS warning
     f"autogluon.core[raytune]=={version}",
     f"autogluon.common=={version}",
     f"autogluon.tabular[catboost,lightgbm,xgboost]=={version}",
