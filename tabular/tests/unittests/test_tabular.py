@@ -70,8 +70,8 @@ def test_tabular():
 
 def _assert_predict_dict_identical_to_predict(predictor, data):
     """Assert that predict_proba_dict and predict_dict are identical to looping calls to predict and predict_proba"""
-    predict_proba_dict = predictor.predict_proba_dict(data=data)
-    predict_dict = predictor.predict_dict(data=data)
+    predict_proba_dict = predictor.predict_proba_multi(data=data)
+    predict_dict = predictor.predict_multi(data=data)
     assert set(predictor.get_model_names()) == set(predict_proba_dict.keys())
     assert set(predictor.get_model_names()) == set(predict_dict.keys())
     for m in predictor.get_model_names():
@@ -258,7 +258,7 @@ def test_advanced_functionality_bagging():
     oof_pred_proba = predictor.get_oof_pred_proba()
     assert(len(oof_pred_proba) == len(train_data))
 
-    predict_proba_dict_oof = predictor.predict_proba_dict()
+    predict_proba_dict_oof = predictor.predict_proba_multi()
     for m in predictor.get_model_names():
         predict_proba_oof = predictor.get_oof_pred_proba(model=m)
         assert predict_proba_oof.equals(predict_proba_dict_oof[m])

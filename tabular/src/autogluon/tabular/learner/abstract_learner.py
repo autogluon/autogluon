@@ -195,14 +195,14 @@ class AbstractTabularLearner(AbstractLearner):
                 y_pred_proba = pd.Series(data=y_pred_proba, name=self.label, index=index)
         return y_pred_proba
 
-    def predict_proba_dict(self,
-                           X: DataFrame = None,
-                           models: List[str] = None,
-                           as_pandas=True,
-                           as_multiclass=True,
-                           transform_features=True,
-                           inverse_transform=True,
-                           ) -> dict:
+    def predict_proba_multi(self,
+                            X: DataFrame = None,
+                            models: List[str] = None,
+                            as_pandas: bool = True,
+                            as_multiclass: bool = True,
+                            transform_features: bool = True,
+                            inverse_transform: bool = True,
+                            ) -> dict:
         """
         Returns a dictionary of prediction probabilities where the key is
         the model name and the value is the model's prediction probabilities on the data.
@@ -270,20 +270,20 @@ class AbstractTabularLearner(AbstractLearner):
                                                                       inverse_transform=True)
         return predict_proba_dict
 
-    def predict_dict(self,
-                     X: DataFrame = None,
-                     models: List[str] = None,
-                     as_pandas=True,
-                     transform_features=True,
-                     inverse_transform=True) -> dict:
+    def predict_multi(self,
+                      X: DataFrame = None,
+                      models: List[str] = None,
+                      as_pandas: bool = True,
+                      transform_features: bool = True,
+                      inverse_transform: bool = True) -> dict:
         """
-        Identical to predict_proba_dict, except returns predictions instead of probabilities.
+        Identical to predict_proba_multi, except returns predictions instead of probabilities.
         """
-        predict_proba_dict = self.predict_proba_dict(X=X,
-                                                     models=models,
-                                                     as_pandas=as_pandas,
-                                                     transform_features=transform_features,
-                                                     inverse_transform=inverse_transform)
+        predict_proba_dict = self.predict_proba_multi(X=X,
+                                                      models=models,
+                                                      as_pandas=as_pandas,
+                                                      transform_features=transform_features,
+                                                      inverse_transform=inverse_transform)
         predict_dict = {}
         if as_pandas:
             for m in predict_proba_dict:
