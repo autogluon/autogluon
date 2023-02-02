@@ -1,6 +1,7 @@
 furo
 myst_nb
 sphinx
-sphinx_copybutton
-sphinx_design
-sphinx_togglebutton
+sphinx-copybutton
+sphinx-design
+sphinx-inline-tabs
+sphinx-togglebutton
