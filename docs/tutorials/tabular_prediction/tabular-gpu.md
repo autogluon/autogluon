@@ -40,37 +40,6 @@ hyperparameters = get_hyperparameter_config('multimodal')
 hyperparameters
 ```
 
-### Text models
-
-Text model preset to use can be set via:
-
-```{.python}
-hyperparameters['AG_TEXT_NN'] = ['<preset>']
-```
-
-Available text model presets:
-
-
-```{.python .input}
-from autogluon.text.text_prediction.presets import list_text_presets
-list_text_presets()
-```
-
-### Vision models
-
-Vision model preset to use can be set via:
-
-```{.python}
-hyperparameters['AG_IMAGE_NN'] = {'model': '<model>'}
-```
-
-The list of available text model presets is:
-
-```{.python .input}
-from autogluon.vision.predictor.predictor import _get_supported_models
-_get_supported_models()[:10]  # there're more, we just show a few
-```
-
 ## Enabling GPU for LightGBM
 
 The default installation of LightGBM does not support GPU training, however GPU support can be enabled via a special install. If `num_gpus` is set, the following warning will be displayed:
