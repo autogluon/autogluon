@@ -7,12 +7,15 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 import PIL
+import pytesseract
 
 from ..constants import (
     AUTOMM,
     BINARY,
     CATEGORICAL,
     CLASSIFICATION,
+    DOCUMENT,
+    DOCUMENT_IMAGE,
     ENTITY_GROUP,
     IDENTIFIER,
     IMAGE,
@@ -235,6 +238,58 @@ def is_image_column(
         return False
 
 
+def is_document_image_column(
+    data: pd.Series,
+    col_name: str,
+    image_type: Optional[str] = IMAGE_PATH,
+    sample_m: Optional[int] = 10,
+    text_len_threshold: Optional[int] = 100,
+) -> bool:
+    """
+    Identify if a column is a document image column.
+
+    Parameters
+    ----------
+    data
+        One column of a multimodal pd.DataFrame for training.
+    col_name
+        Name of column.
+    image_type
+        The image type to check. Set to IMAGE_PATH by default.
+    sample_m
+        Number of sample images used to check if images are documents images.
+    text_len_threshold
+        If the average text length is longer than text_len_threshold, the images will be considered as document images.
+    Returns
+    -------
+    Whether the column is a document image column.
+    """
+
+    # TODO: Add support for other types (e.g., pdf) of document.
+
+    words_len = []
+    if len(data) > sample_m:
+        # Sample to speed-up type inference
+        data = data.sample(n=sample_m, random_state=0)
+    for images in data:
+        success = False
+        if not isinstance(images, list):
+            images = [images]
+        for per_image in images:
+            try:
+                # convert images to string
+                words = pytesseract.image_to_string(PIL.Image.open(per_image))
+                words_len.append(len(words))
+            except Exception as e:
+                logger.debug(f"Exception {e} found dealing with {per_image}.")
+                return False
+    logger.debug(f"Average length of words of this dataset is {sum(words_len) / len(words_len)}.")
+    if sum(words_len) / len(words_len) > text_len_threshold:
+        return True
+    else:
+        return False
+
+
 def is_text_column(data: pd.Series) -> bool:
     """
     Identify if a column is one text column.
@@ -435,7 +490,11 @@ def infer_column_types(
         elif is_numerical_column(data[col_name], valid_data[col_name]):  # Infer numerical column
             column_types[col_name] = NUMERICAL
         elif is_image_column(data[col_name], col_name=col_name, image_type=IMAGE_PATH):  # Infer image-path column
-            column_types[col_name] = IMAGE_PATH
+            # Check if it is document image or not.
+            if is_document_image_column(data[col_name], col_name=col_name):
+                column_types[col_name] = DOCUMENT_IMAGE
+            else:
+                column_types[col_name] = IMAGE_PATH
         elif is_text_column(data[col_name]):  # Infer text column
             column_types[col_name] = TEXT
         elif is_image_column(

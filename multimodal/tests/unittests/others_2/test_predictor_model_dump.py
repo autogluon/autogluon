@@ -3,6 +3,7 @@ import os
 import timm
 import transformers
 
+from autogluon.core.utils.loaders import load_zip
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils.misc import shopee_dataset
 
@@ -33,7 +34,7 @@ def test_dump_timm_image():
         time_limit=5,
         seed=42,
     )
-    predictor_1.dump_timm_image(path=model_dump_path)
+    predictor_1.dump_model(save_path=model_dump_path)
     model = timm.create_model(
         model_name=base_model_name, checkpoint_path=f"{model_dump_path}/timm_image_1/pytorch_model.bin", num_classes=0
     )
@@ -70,7 +71,7 @@ def test_dump_hf_text():
         time_limit=5,
         seed=42,
     )
-    predictor_1.dump_hf_text(path=model_dump_path)
+    predictor_1.dump_model(save_path=model_dump_path)
 
     model = transformers.AutoModel.from_pretrained(f"{model_dump_path}/hf_text")
     assert isinstance(model, transformers.models.bert.modeling_bert.BertModel)
@@ -107,9 +108,42 @@ def test_fusion_model_dump():
         time_limit=5,
         seed=42,
     )
-    predictor.dump_hf_text(path=model_dump_path)
-    predictor.dump_timm_image(path=model_dump_path)
+    predictor.dump_model(save_path=model_dump_path)
     hf_text_dir = f"{model_dump_path}/hf_text"
     timm_image_dir = f"{model_dump_path}/timm_image"
     assert os.path.exists(hf_text_dir) and (len(os.listdir(hf_text_dir)) > 2) == True
     assert os.path.exists(timm_image_dir) and (len(os.listdir(timm_image_dir)) == 2) == True
+
+
+def test_mmdet_object_detection_save_and_load():
+    zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection_dataset/tiny_motorbike_coco.zip"
+    download_dir = "./tiny_motorbike_coco"
+
+    load_zip.unzip(zip_file, unzip_dir=download_dir)
+    data_dir = os.path.join(download_dir, "tiny_motorbike")
+
+    test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
+    # Init predictor
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
+            "env.num_gpus": 1,
+        },
+        problem_type="object_detection",
+    )
+
+    pred = predictor.predict(test_path)
+
+    model_save_dir = predictor.dump_model()
+    detection_model_save_subdir = os.path.join(model_save_dir, predictor._model.prefix)
+
+    new_predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": detection_model_save_subdir,
+            "env.num_gpus": 1,
+        },
+        problem_type="object_detection",
+    )
+    new_pred = new_predictor.predict(test_path)
+
+    assert abs(pred["bboxes"][0][0]["score"] - new_pred["bboxes"][0][0]["score"]) < 1e-4

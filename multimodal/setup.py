@@ -54,7 +54,9 @@ install_requires = [
     "openmim>0.1.5,<=0.2.1",
     "defusedxml>=0.7.1,<=0.7.1",
     "albumentations>=1.1.0,<=1.2.0",
+    "jinja2>=3.0.3,<3.1",
     "tensorboard",
+    "pytesseract<=0.3.10",
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)

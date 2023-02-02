@@ -687,11 +687,12 @@ def update_mmdet_config(key, value, config):
 
 
 def run_model(model: nn.Module, batch: dict):
+    from .document_transformer import DocumentTransformer
     from .huggingface_text import HFAutoModelForTextPrediction
     from .timm_image import TimmAutoModelForImagePrediction
 
     supported_models = (TimmAutoModelForImagePrediction, HFAutoModelForTextPrediction)
-    if isinstance(model, supported_models):
+    if (not isinstance(model, DocumentTransformer)) and isinstance(model, supported_models):
         input_vec = [batch[k] for k in model.input_keys]
         column_names, column_values = [], []
         for k in batch.keys():

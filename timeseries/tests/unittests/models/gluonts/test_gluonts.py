@@ -5,7 +5,7 @@ import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
 import autogluon.timeseries as agts
-from autogluon.timeseries.models.gluonts import DeepARModel, SimpleFeedForwardModel
+from autogluon.timeseries.models.gluonts import DeepARModel, SimpleFeedForwardModel, TemporalFusionTransformerModel
 from autogluon.timeseries.models.gluonts.torch.models import AbstractGluonTSPyTorchModel
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
@@ -22,12 +22,12 @@ else:
     TESTABLE_MX_MODELS_WITH_STATIC_FEATURES = []
     TESTABLE_MX_MODELS_WITH_KNOWN_COVARIATES = []
 
-MODELS_WITH_STATIC_FEATURES = [DeepARModel] + TESTABLE_MX_MODELS_WITH_STATIC_FEATURES
-MODELS_WITH_KNOWN_COVARIATES = [DeepARModel] + TESTABLE_MX_MODELS_WITH_KNOWN_COVARIATES
+MODELS_WITH_STATIC_FEATURES = [DeepARModel, TemporalFusionTransformerModel] + TESTABLE_MX_MODELS_WITH_STATIC_FEATURES
+MODELS_WITH_KNOWN_COVARIATES = [DeepARModel, TemporalFusionTransformerModel] + TESTABLE_MX_MODELS_WITH_KNOWN_COVARIATES
 MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES = [
     m for m in MODELS_WITH_STATIC_FEATURES if m in MODELS_WITH_KNOWN_COVARIATES
 ]
-TESTABLE_PYTORCH_MODELS = [DeepARModel, SimpleFeedForwardModel]
+TESTABLE_PYTORCH_MODELS = [DeepARModel, SimpleFeedForwardModel, TemporalFusionTransformerModel]
 TESTABLE_MODELS = TESTABLE_MX_MODELS + TESTABLE_PYTORCH_MODELS
 
 DUMMY_HYPERPARAMETERS = {"epochs": 1, "num_batches_per_epoch": 1}

@@ -15,6 +15,8 @@ from autogluon.features import CategoryFeatureGenerator
 from ..constants import (
     AUTOMM,
     CATEGORICAL,
+    DOCUMENT,
+    DOCUMENT_IMAGE,
     IDENTIFIER,
     IMAGE,
     IMAGE_BYTEARRAY,
@@ -88,7 +90,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
-            if col_type.startswith((TEXT, IMAGE, ROIS, TEXT_NER)) or col_type == NULL:
+            if col_type.startswith((TEXT, IMAGE, ROIS, TEXT_NER, DOCUMENT)) or col_type == NULL:
                 continue
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(
@@ -131,6 +133,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self._image_feature_names = []
         self._rois_feature_names = []
         self._ner_feature_names = []
+        self._document_feature_names = []
 
     @property
     def label_column(self):
@@ -170,6 +173,14 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     @property
     def numerical_feature_names(self):
         return self._numerical_feature_names
+
+    @property
+    def document_feature_names(self):
+        # Added for backward compatibility.
+        if hasattr(self, "_document_feature_names"):
+            return self._document_feature_names
+        else:
+            return []
 
     @property
     def ner_feature_names(self):
@@ -247,6 +258,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             return self._categorical_feature_names
         elif modality == NUMERICAL:
             return self._numerical_feature_names
+        elif modality.startswith(DOCUMENT):
+            return self._document_feature_names
         elif modality == LABEL:
             return [self._label_column]  # as a list to be consistent with others
         elif self.label_type == NER_ANNOTATION:
@@ -318,6 +331,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     self._numerical_feature_names.append(col_name)
             elif col_type.startswith(IMAGE):
                 self._image_feature_names.append(col_name)
+            elif col_type.startswith(DOCUMENT):
+                self._document_feature_names.append(col_name)
             elif col_type == ROIS:
                 self._rois_feature_names.append(col_name)
             else:
@@ -511,6 +526,43 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             image_types[col_name] = self._column_types[col_name]
 
         return image_features, image_types
+
+    def transform_document(
+        self,
+        df: pd.DataFrame,
+    ) -> Tuple[Dict[str, List[List[str]]], Dict[str, str]]:
+        """
+        Preprocess document data by collecting their paths together. The current version does not
+        support cases where one document column has multiple documents.
+        This function needs to be called preceding the document processor in "process_document.py".
+
+        Parameters
+        ----------
+        df
+            The multimodal pd.DataFrame.
+
+        Returns
+        -------
+        document_features
+            All the image data stored in a dictionary.
+        document_types
+            The column types of these document data.
+        """
+        assert (
+            self._fit_called or self._fit_x_called
+        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_document."
+        document_features = {}
+        document_types = {}
+        for col_name in self._document_feature_names:
+            col_value = df[col_name]
+            col_type = self._column_types[col_name]
+
+            processed_data = col_value.apply(lambda ele: str(ele).split(";")).tolist()
+
+            document_features[col_name] = processed_data
+            document_types[col_name] = self._column_types[col_name]
+
+        return document_features, document_types
 
     def transform_numerical(
         self,
