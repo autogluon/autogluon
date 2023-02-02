@@ -67,13 +67,6 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
 
    MultiModalPredictor
 
-.. automodule:: autogluon.vision
-.. autosummary::
-   :nosignatures:
-
-   ImagePredictor
-   ObjectDetector
-
 .. automodule:: autogluon.text
 .. autosummary::
    :nosignatures:
@@ -113,36 +106,6 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
     .. rubric:: Methods
 
     .. autoautosummary:: MultiModalPredictor
-        :methods:
-
-
-:hidden:`ImagePredictor`
-~~~~~~~~~~~~~~~~~~~~~~~~~
-.. automodule:: autogluon.vision
-
-.. autoclass:: ImagePredictor
-   :members:
-   :inherited-members:
-   :exclude-members: run_fit
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: ImagePredictor
-        :methods:
-
-
-:hidden:`ObjectDetector`
-~~~~~~~~~~~~~~~~~~~~~~~~
-.. automodule:: autogluon.vision
-
-.. autoclass:: ObjectDetector
-   :members:
-   :inherited-members:
-   :exclude-members: run_fit
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: ObjectDetector
         :methods:
 
 

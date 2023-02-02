@@ -1,6 +1,5 @@
 #!/bin/bash
 python3 -m pip uninstall -y autogluon
-python3 -m pip uninstall -y autogluon.vision
 python3 -m pip uninstall -y autogluon.text
 python3 -m pip uninstall -y autogluon.multimodal
 python3 -m pip uninstall -y autogluon.tabular
@@ -33,10 +32,6 @@ python3 -m pip install -e .
 cd ..
 
 cd text/
-python3 -m pip install -e .
-cd ..
-
-cd vision/
 python3 -m pip install -e .
 cd ..
 
