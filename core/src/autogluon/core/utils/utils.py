@@ -275,13 +275,16 @@ def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
     return y_pred
 
 
-def convert_pred_probas_to_df(pred_proba_list: list, columns: List[str], problem_type: str, index: pd.Index = None) -> DataFrame:
+def convert_pred_probas_to_df(pred_proba_list: List[np.typing.ArrayLike],
+                              columns: List[str],
+                              problem_type: str,
+                              index: pd.Index = None) -> DataFrame:
     """
     Converts a list of pred_proba model outputs to a DataFrame
 
     Parameters
     ----------
-    pred_proba_list : list
+    pred_proba_list : List[np.typing.ArrayLike]
         A list of prediction probabilities.
         Each element is a numpy array or ndarray of prediction probabilities for a given model.
     columns : List[str]

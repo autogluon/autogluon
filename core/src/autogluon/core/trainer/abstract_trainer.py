@@ -3,7 +3,7 @@ import logging
 import os
 import time
 from collections import defaultdict
-from typing import Dict, List, Union, Tuple
+from typing import Dict, List, Union, Tuple, Optional
 
 import networkx as nx
 import numpy as np
@@ -878,10 +878,7 @@ class AbstractTrainer:
         """
         Returns a dictionary of out-of-fold prediction probabilities, keyed by model name
         """
-        model_oof_dict = {}
-        for model in models:
-            model_oof_dict[model] = self.get_model_oof(model=model)
-        return model_oof_dict
+        return {model: self.get_model_oof(model) for model in models}
 
     def get_model_pred_dict(self,
                             X: pd.DataFrame,
@@ -960,7 +957,7 @@ class AbstractTrainer:
     def get_inputs_to_stacker(self,
                               X: pd.DataFrame,
                               base_models: List[str],
-                              model_pred_proba_dict: dict = None,
+                              model_pred_proba_dict: Optional[dict] = None,
                               fit: bool = False,
                               use_orig_features: bool = True,
                               use_val_cache: bool = False) -> pd.DataFrame:
@@ -994,7 +991,6 @@ class AbstractTrainer:
         """
         if not base_models:
             return X
-        pred_proba_list = []
         if fit:
             model_pred_proba_dict = self.get_model_oof_dict(models=base_models)
         else:
@@ -1002,8 +998,7 @@ class AbstractTrainer:
                                                                    models=base_models,
                                                                    model_pred_proba_dict=model_pred_proba_dict,
                                                                    use_val_cache=use_val_cache)
-        for model in base_models:
-            pred_proba_list.append(model_pred_proba_dict[model])
+        pred_proba_list = [model_pred_proba_dict[model] for model in base_models]
         stack_column_names, _ = self._get_stack_column_names(models=base_models)
         X_stacker = convert_pred_probas_to_df(pred_proba_list=pred_proba_list, problem_type=self.problem_type, columns=stack_column_names, index=X.index)
         if use_orig_features:
