@@ -154,9 +154,9 @@ hidden:
 ---
 
 install
-tutorials/multimodal/multimodal_quick_start
 Time Series Quick Start <tutorials/timeseries/forecasting-quickstart>
 Tabular Quick Start <tutorials/tabular/tabular-quick-start>
+Multimodal Quick Start <tutorials/multimodal/multimodal-quick-start>
 ```
 
 ```{toctree}
