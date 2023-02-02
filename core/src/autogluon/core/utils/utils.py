@@ -9,6 +9,7 @@ from typing import Callable, List, Tuple
 import numpy as np
 import pandas as pd
 import scipy.stats
+from numpy.typing import ArrayLike
 from pandas import DataFrame, Series
 from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold, LeaveOneGroupOut
 from sklearn.model_selection import train_test_split
@@ -275,7 +276,7 @@ def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
     return y_pred
 
 
-def convert_pred_probas_to_df(pred_proba_list: List[np.typing.ArrayLike],
+def convert_pred_probas_to_df(pred_proba_list: List[ArrayLike],
                               columns: List[str],
                               problem_type: str,
                               index: pd.Index = None) -> DataFrame:
@@ -284,7 +285,7 @@ def convert_pred_probas_to_df(pred_proba_list: List[np.typing.ArrayLike],
 
     Parameters
     ----------
-    pred_proba_list : List[np.typing.ArrayLike]
+    pred_proba_list : List[ArrayLike]
         A list of prediction probabilities.
         Each element is a numpy array or ndarray of prediction probabilities for a given model.
     columns : List[str]
