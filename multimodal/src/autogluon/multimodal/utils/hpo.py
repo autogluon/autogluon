@@ -1,11 +1,13 @@
 import logging
 import os
 import shutil
-from typing import Optional, Dict
+from typing import Optional, Dict, Union, List
+import warnings
+import copy
 
 import yaml
 
-from ..constants import AUTOMM, BEST_K_MODELS_FILE, RAY_TUNE_CHECKPOINT
+from ..constants import AUTOMM, BEST_K_MODELS_FILE, RAY_TUNE_CHECKPOINT, MODEL, DATA, VALID_CONFIG_KEYS
 from .matcher import create_siamese_model
 from .model import create_fusion_model
 from ..presets import get_automm_presets
@@ -244,12 +246,75 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
         return predictor
 
 
-def get_hp_tune_kwargs(
-    problem_type: Optional[str] = None,
-    presets: Optional[str] = None,
-    hyperparameter_tune_kwargs: Optional[Dict] = None,
+def filter_search_space(hyperparameters: Dict, keys_to_filter: Union[str, List[str]]):
+    """
+    Filter search space within hyperparameters without the given keys as prefixes.
+    Hyperparameters that are not search space will not be filtered.
+
+    Parameters
+    ----------
+    hyperparameters
+        A dictionary containing search space and overrides to config.
+    keys_to_filter
+        Keys that needs to be filtered out
+
+    Returns
+    -------
+        hyperparameters being filtered
+    """
+    if isinstance(keys_to_filter, str):
+        keys_to_filter = [keys_to_filter]
+
+    assert any(
+        key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter
+    ), f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
+
+    from ray.tune.search.sample import Domain
+    from autogluon.core.space import Space
+
+    hyperparameters = copy.deepcopy(hyperparameters)
+    for hyperparameter, value in hyperparameters.copy().items():
+        if not isinstance(value, (Space, Domain)):
+            continue
+        for key in keys_to_filter:
+            if hyperparameter.startswith(key):
+                del hyperparameters[hyperparameter]
+    return hyperparameters
+
+
+def prepare_for_hpo(
+    problem_type,
+    presets,
+    provided_hyperparameters,
+    provided_hyperparameter_tune_kwargs,
+    teacher_predictor: Optional[str] = None,
+    fit_called: Optional[bool] = False,
 ):
+    hyperparameters, hyperparameter_tune_kwargs = get_automm_presets(problem_type=problem_type, presets=presets)
+
+    if provided_hyperparameter_tune_kwargs:
+        hyperparameter_tune_kwargs = provided_hyperparameter_tune_kwargs
+
     if hyperparameter_tune_kwargs:
-        return hyperparameter_tune_kwargs
+        if provided_hyperparameters:
+            hyperparameters.update(provided_hyperparameters)
     else:
-        return get_automm_presets(problem_type=problem_type, presets=presets)[1]
+        hyperparameters = provided_hyperparameters
+
+    if hyperparameter_tune_kwargs:
+        assert isinstance(
+            hyperparameters, dict
+        ), "Please provide hyperparameters as a dictionary if you want to do HPO"
+        if teacher_predictor is not None:
+            assert isinstance(
+                teacher_predictor, str
+            ), "HPO with distillation only supports passing a path to the predictor"
+        if fit_called:
+            warnings.warn(
+                "HPO while continuous training."
+                "Hyperparameters related to Model and Data will NOT take effect."
+                "We will filter them out from the search space."
+            )
+            hyperparameters = filter_search_space(hyperparameters, [MODEL, DATA])
+
+    return hyperparameters, hyperparameter_tune_kwargs

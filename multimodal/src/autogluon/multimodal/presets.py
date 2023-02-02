@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+from ray import tune
+
 from .constants import (
     BEST_QUALITY,
     BINARY,
@@ -17,6 +19,15 @@ from .registry import Registry
 
 automm_presets = Registry("automm_presets")
 matcher_presets = Registry("matcher_presets")
+
+
+def parse_presets_str(presets: str):
+    use_hpo = False
+    if presets.endswith("_hpo"):
+        presets = presets[:-4]
+        use_hpo = True
+
+    return presets, use_hpo
 
 
 @automm_presets.register()
@@ -46,41 +57,83 @@ def default(presets: str = DEFAULT):
         ],
         "env.num_workers": 2,
     }
-    hyperparameter_tune_kwargs = None
+
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameter_tune_kwargs = {
+            "searcher": "bayes",
+            "scheduler": "ASHA",
+            "num_trials": 512,
+        },
+        # shared by all hpo presets
+        hyperparameters.update(
+            {
+                "optimization.learning_rate": tune.loguniform(1e-5, 1e-2),
+                "env.batch_size": tune.choice([32, 64, 128, 256]),
+            }
+        )
+    else:
+        hyperparameter_tune_kwargs = None
 
     if presets in [HIGH_QUALITY, DEFAULT]:
-        hyperparameters.update(
-            {
-                "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
-                "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-            }
-        )
+        if use_hpo:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": tune.choice(["google/electra-base-discriminator"]),
+                    "model.timm_image.checkpoint_name": tune.choice(["swin_base_patch4_window7_224"]),
+                }
+            )
+        else:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
+                    "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+                }
+            )
     elif presets == MEDIUM_QUALITY:
-        hyperparameters.update(
-            {
-                "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
-                "model.timm_image.checkpoint_name": "mobilenetv3_large_100",
-                "optimization.learning_rate": 4e-4,
-            }
-        )
+        if use_hpo:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": tune.choice(["google/electra-small-discriminator"]),
+                    "model.timm_image.checkpoint_name": tune.choice(["mobilenetv3_large_100"]),
+                }
+            )
+        else:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
+                    "model.timm_image.checkpoint_name": "mobilenetv3_large_100",
+                    "optimization.learning_rate": 4e-4,
+                }
+            )
     elif presets == BEST_QUALITY:
-        hyperparameters.update(
-            {
-                "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
-                "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
-                "env.per_gpu_batch_size": 1,
-            }
-        )
+        hyperparameters.update({"env.per_gpu_batch_size": 1})
+        if use_hpo:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": tune.choice(["microsoft/deberta-v3-base"]),
+                    "model.timm_image.checkpoint_name": tune.choice(["swin_large_patch4_window7_224"]),
+                }
+            )
+        else:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
+                    "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
+                }
+            )
     elif presets == "multilingual":
-        hyperparameters.update(
-            {
-                "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
-                "optimization.top_k": 1,
-                "env.precision": "bf16",
-                "env.per_gpu_batch_size": 4,
-            }
-        )
-        hyperparameters.pop("env.num_workers", None)
+        if use_hpo:
+            raise ValueError("Multilingual doesn't support using HPO for now.")
+        else:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
+                    "optimization.top_k": 1,
+                    "env.precision": "bf16",
+                    "env.per_gpu_batch_size": 4,
+                }
+            )
     else:
         raise ValueError(f"Unknown preset type: {presets}")
 

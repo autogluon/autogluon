@@ -3,7 +3,6 @@ from .checkpoint import AutoMMModelCheckpoint, AutoMMModelCheckpointIO, average_
 from .config import (
     apply_omegaconf_overrides,
     customize_model_names,
-    filter_search_space,
     get_config,
     get_local_pretrained_config_paths,
     get_pretrain_configs_dir,
@@ -36,7 +35,7 @@ from .environment import (
     is_interactive,
     move_to_device,
 )
-from .hpo import hyperparameter_tune, get_hp_tune_kwargs
+from .hpo import hyperparameter_tune, prepare_for_hpo
 from .inference import extract_from_output, infer_batch, predict, process_batch, use_realtime
 from .load import CustomUnpickler, load_text_tokenizers
 from .log import LogFilter, apply_log_filter, make_exp_dir

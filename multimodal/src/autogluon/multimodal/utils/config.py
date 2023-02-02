@@ -27,42 +27,6 @@ from ..presets import get_automm_presets, get_basic_automm_config
 logger = logging.getLogger(AUTOMM)
 
 
-def filter_search_space(hyperparameters: Dict, keys_to_filter: Union[str, List[str]]):
-    """
-    Filter search space within hyperparameters without the given keys as prefixes.
-    Hyperparameters that are not search space will not be filtered.
-
-    Parameters
-    ----------
-    hyperparameters
-        A dictionary containing search space and overrides to config.
-    keys_to_filter
-        Keys that needs to be filtered out
-
-    Returns
-    -------
-        hyperparameters being filtered
-    """
-    if isinstance(keys_to_filter, str):
-        keys_to_filter = [keys_to_filter]
-
-    assert any(
-        key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter
-    ), f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
-    from ray.tune.search.sample import Domain
-
-    from autogluon.core.space import Space
-
-    hyperparameters = copy.deepcopy(hyperparameters)
-    for hyperparameter, value in hyperparameters.copy().items():
-        if not isinstance(value, (Space, Domain)):
-            continue
-        for key in keys_to_filter:
-            if hyperparameter.startswith(key):
-                del hyperparameters[hyperparameter]
-    return hyperparameters
-
-
 def get_config(
     problem_type: Optional[str] = None,
     presets: Optional[str] = None,

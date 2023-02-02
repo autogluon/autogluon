@@ -78,9 +78,8 @@ from .utils import (
     customize_model_names,
     data_to_df,
     extract_from_output,
-    filter_search_space,
     get_config,
-    get_hp_tune_kwargs,
+    prepare_for_hpo,
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_stopping_threshold,
@@ -365,28 +364,6 @@ class MultiModalMatcher:
         fit_called = self._fit_called  # used in current function
         self._fit_called = True
 
-        if self._presets is not None:
-            presets = self._presets
-        else:
-            self._presets = presets
-
-        hyperparameter_tune_kwargs = get_hp_tune_kwargs(
-            problem_type=self._problem_type,
-            presets=presets,
-            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-        )
-        if hyperparameter_tune_kwargs is not None:
-            assert isinstance(
-                hyperparameters, dict
-            ), "Please provide hyperparameters as a dictionary if you want to do HPO"
-            if fit_called:
-                warnings.warn(
-                    "HPO while continuous training."
-                    "Hyperparameters related to Model and Data will NOT take effect."
-                    "We will filter them out from the search space."
-                )
-                hyperparameters = filter_search_space(hyperparameters, [MODEL, DATA])
-
         pl.seed_everything(seed, workers=True)
 
         self._save_path = setup_save_path(
@@ -467,12 +444,25 @@ class MultiModalMatcher:
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
 
+        if self._presets is not None:
+            presets = self._presets
+        else:
+            self._presets = presets
+
         # set attributes for saving and prediction
         self._problem_type = problem_type  # In case problem type isn't provided in __init__().
         self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
         self._output_shape = output_shape
         self._column_types = column_types
+
+        hyperparameters, hyperparameter_tune_kwargs = prepare_for_hpo(
+            problem_type=self._problem_type,
+            presets=self._presets,
+            provided_hyperparameters=hyperparameters,
+            provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            fit_called=fit_called,
+        )
 
         _fit_args = dict(
             train_df=train_data,

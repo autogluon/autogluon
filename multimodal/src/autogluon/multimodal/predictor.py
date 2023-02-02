@@ -126,11 +126,10 @@ from .utils import (
     data_to_df,
     evaluate_coco,
     extract_from_output,
-    filter_search_space,
     from_coco_or_voc,
     from_dict,
     get_config,
-    get_hp_tune_kwargs,
+    prepare_for_hpo,
     get_detection_classes,
     get_local_pretrained_config_paths,
     get_minmax_mode,
@@ -686,34 +685,6 @@ class MultiModalPredictor:
                             n=max_num_tuning_data, replace=False, random_state=seed
                         ).reset_index(drop=True)
 
-        if self._presets is not None:
-            presets = self._presets
-        else:
-            self._presets = presets
-
-        hyperparameter_tune_kwargs = get_hp_tune_kwargs(
-            problem_type=self._problem_type,
-            presets=presets,
-            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-        )
-        if hyperparameter_tune_kwargs is not None:
-            # TODO: can we support hyperparameters being the same format as regular training?
-            # currently the string format would make it very hard to get search space, which is an object
-            assert isinstance(
-                hyperparameters, dict
-            ), "Please provide hyperparameters as a dictionary if you want to do HPO"
-            if teacher_predictor is not None:
-                assert isinstance(
-                    teacher_predictor, str
-                ), "HPO with distillation only supports passing a path to the predictor"
-            if fit_called:
-                warnings.warn(
-                    "HPO while continuous training."
-                    "Hyperparameters related to Model and Data will NOT take effect."
-                    "We will filter them out from the search space."
-                )
-                hyperparameters = filter_search_space(hyperparameters, [MODEL, DATA])
-
         pl.seed_everything(seed, workers=True)
 
         self._save_path = setup_save_path(
@@ -759,6 +730,11 @@ class MultiModalPredictor:
         )
         if problem_type is not None:
             self._problem_type = problem_type  # In case problem type isn't provided in __init__().
+
+        if self._presets is not None:
+            presets = self._presets
+        else:
+            self._presets = presets
 
         # Determine data scarcity mode, i.e. a few-shot scenario
         scarcity_mode = infer_scarcity_mode_by_data_size(
@@ -807,6 +783,15 @@ class MultiModalPredictor:
         self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
         self._column_types = column_types
+
+        hyperparameters, hyperparameter_tune_kwargs = prepare_for_hpo(
+            problem_type=self._problem_type,
+            presets=self._presets,
+            provided_hyperparameters=hyperparameters,
+            provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            teacher_predictor=teacher_predictor,
+            fit_called=fit_called,
+        )
 
         _fit_args = dict(
             train_df=train_data,
