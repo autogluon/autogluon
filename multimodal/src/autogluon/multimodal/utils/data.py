@@ -20,6 +20,7 @@ from ..constants import (
     BINARY,
     CATEGORICAL,
     DEFAULT_SHOT,
+    DOCUMENT,
     FEW_SHOT,
     IMAGE,
     LABEL,
@@ -34,6 +35,7 @@ from ..constants import (
 )
 from ..data import (
     CategoricalProcessor,
+    DocumentProcessor,
     ImageProcessor,
     LabelProcessor,
     MixupModule,
@@ -169,6 +171,15 @@ def create_data_processor(
             max_img_num_per_col=model_config.max_img_num_per_col,
             missing_value_strategy=config.data.image.missing_value_strategy,
         )
+    elif data_type == DOCUMENT:
+        data_processor = DocumentProcessor(
+            model=model,
+            train_transform_types=model_config.train_transform_types,
+            val_transform_types=model_config.val_transform_types,
+            norm_type=model_config.image_norm,
+            size=model_config.image_size,
+            text_max_len=model_config.max_text_len,
+        )
     else:
         raise ValueError(f"unknown data type: {data_type}")
 
@@ -210,6 +221,7 @@ def create_fusion_data_processors(
         LABEL: [],
         ROIS: [],
         TEXT_NER: [],
+        DOCUMENT: [],
     }
 
     model_dict = {model.prefix: model}

@@ -42,6 +42,7 @@ def default(presets: str = DEFAULT):
             "numerical_mlp",
             "timm_image",
             "hf_text",
+            "document_transformer",
             "fusion_mlp",
         ],
         "env.num_workers": 2,
@@ -53,6 +54,7 @@ def default(presets: str = DEFAULT):
             {
                 "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
                 "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+                "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-base",
             }
         )
     elif presets == MEDIUM_QUALITY:
@@ -60,6 +62,7 @@ def default(presets: str = DEFAULT):
             {
                 "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
                 "model.timm_image.checkpoint_name": "mobilenetv3_large_100",
+                "model.document_transformer.checkpoint_name": "microsoft/layoutlmv2-base-uncased",
                 "optimization.learning_rate": 4e-4,
             }
         )
@@ -68,6 +71,7 @@ def default(presets: str = DEFAULT):
             {
                 "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
                 "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
+                "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-large",
                 "env.per_gpu_batch_size": 1,
             }
         )
