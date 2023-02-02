@@ -181,6 +181,10 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 "url": "https://big-detection.s3.us-west-2.amazonaws.com/bigdet_cpts/mmdetection_cpts/yolov3_d53_bigdet_8x.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "yolov3", "yolov3_d53_mstrain-608_8x_bigdet.py"),
             },
+            "ddetr_bigdetection": {
+                "url": "https://big-detection.s3.us-west-2.amazonaws.com/bigdet_cpts/mmdetection_cpts/deformable_detr_bigdet_8x.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "ddetr", "deformable_detr_r50_16x2_8x_bigdet.py"),
+            },
         }
 
         if os.path.isfile(checkpoint_name):
