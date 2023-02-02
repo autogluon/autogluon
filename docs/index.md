@@ -56,12 +56,12 @@ Customizable
 
 ## {octicon}`rocket` Quick Examples
 
-:::{dropdown} Tabular Prediction
+:::{dropdown} Tabular
 :animate: fade-in-slide-down
 :open:
 :color: primary
 
-Predict the `class` column on a data table:
+Predict the `class` column in a data table:
 
 ```python
 from autogluon.tabular import TabularDataset, TabularPredictor
@@ -76,12 +76,11 @@ predictions = predictor.predict(test_data)
 :::
 
 
-:::{dropdown} Text Classification
+::::{dropdown} Multimodal
 :animate: fade-in-slide-down
 :color: primary
 
-Predict sentiment of movie reviews:
-
+:::{tab} Text Classification
 ```python
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.core.utils.loaders import load_pd
@@ -95,11 +94,7 @@ predictions = predictor.predict(test_data)
 ```
 :::
 
-:::{dropdown} Image Classification
-:animate: fade-in-slide-down
-:color: primary
-
-Predict clothing article types:
+:::{tab} Image Classification
 
 ```python
 from autogluon.multimodal import MultiModalPredictor
@@ -113,8 +108,74 @@ predictions = predictor.predict(test_data)
 ```
 :::
 
+:::{tab} Named Entity Recognition
+```python
+from autogluon.multimodal import MultiModalPredictor
+from autogluon.core.utils.loaders import load_pd
 
-:::{dropdown} Time Series Forecasting
+data_root = 'https://automl-mm-bench.s3.amazonaws.com/ner/mit-movies/'
+train_data = load_pd.load(data_root + 'train.csv')
+test_data = load_pd.load(data_root + 'test.csv')
+
+predictor = MultiModalPredictor(problem_type="ner", label="entity_annotations")
+
+predictor.fit(train_data)
+predictor.evaluate(test_data)
+
+sentence = "Game of Thrones is an American fantasy drama television series created" +
+           "by David Benioff"
+prediction = predictor.predict({ 'text_snippet': [sentence]})
+```
+:::
+
+:::{tab} Object Detection
+```python
+# !mim install mmcv-full
+# !pip install mmdet
+from autogluon.multimodal import MultiModalPredictor
+
+data_zip = "https://automl-mm-bench.s3.amazonaws.com/object_detection_dataset/" +
+           "tiny_motorbike_coco.zip"
+# Unzip dataset
+
+train_path = "./Annotations/trainval_cocoformat.json"
+test_path = "./Annotations/test_cocoformat.json"
+
+predictor = MultiModalPredictor(
+  problem_type="object_detection",
+  sample_data_path=train_path
+)
+
+predictor.fit(train_path)
+predictor.evaluate(test_path)
+
+pred = predictor.predict({"image": [test_image]})
+```
+:::
+
+:::{tab} Matching
+```python
+from autogluon.multimodal import MultiModalPredictor, utils
+import ir_datasets
+import pandas as pd
+
+dataset = ir_datasets.load("beir/fiqa/dev")
+docs_df = pd.DataFrame(dataset.docs_iter()).set_index("doc_id")
+
+predictor = MultiModalPredictor(problem_type="text_similarity")
+
+doc_embedding = predictor.extract_embedding(docs_df)
+q_embedding = predictor.extract_embedding([
+  "what happened when the dot com bubble burst?"
+])
+
+similarity = utils.compute_semantic_similarity(q_embedding, doc_embedding)
+```
+:::
+::::
+
+
+:::{dropdown} Time Series
 :animate: fade-in-slide-down
 :color: primary
 

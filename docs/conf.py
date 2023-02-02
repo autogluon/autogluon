@@ -11,6 +11,7 @@ extensions = [
     'myst_nb',                # myst-nb.readthedocs.io
     'sphinx_copybutton',      # sphinx-copybutton.readthedocs.io
     'sphinx_design',          # github.com/executablebooks/sphinx-design
+    'sphinx_inline_tabs',     # sphinx-inline-tabs.readthedocs.io
     'sphinx_togglebutton',    # sphinx-togglebutton.readthedocs.io
     'sphinx.ext.autodoc',     # www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
     'sphinx.ext.autosummary', # www.sphinx-doc.org/en/master/usage/extensions/autosummary.html

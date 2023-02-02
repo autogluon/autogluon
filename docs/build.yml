@@ -13,3 +13,4 @@ dependencies:
   - sphinx-copybutton
   - myst-nb
   - sphinx-design
+  - sphinx-inline-tabs
