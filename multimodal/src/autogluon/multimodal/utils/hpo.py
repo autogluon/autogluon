@@ -1,12 +1,14 @@
 import logging
 import os
 import shutil
+from typing import Optional, Dict
 
 import yaml
 
 from ..constants import AUTOMM, BEST_K_MODELS_FILE, RAY_TUNE_CHECKPOINT
 from .matcher import create_siamese_model
 from .model import create_fusion_model
+from ..presets import get_automm_presets
 
 logger = logging.getLogger(AUTOMM)
 
@@ -240,3 +242,14 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
         shutil.rmtree(best_trial_path)
 
         return predictor
+
+
+def get_hp_tune_kwargs(
+    problem_type: Optional[str] = None,
+    presets: Optional[str] = None,
+    hyperparameter_tune_kwargs: Optional[Dict] = None,
+):
+    if hyperparameter_tune_kwargs:
+        return hyperparameter_tune_kwargs
+    else:
+        return get_automm_presets(problem_type=problem_type, presets=presets)[1]

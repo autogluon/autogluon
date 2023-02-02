@@ -130,6 +130,7 @@ from .utils import (
     from_coco_or_voc,
     from_dict,
     get_config,
+    get_hp_tune_kwargs,
     get_detection_classes,
     get_local_pretrained_config_paths,
     get_minmax_mode,
@@ -685,6 +686,16 @@ class MultiModalPredictor:
                             n=max_num_tuning_data, replace=False, random_state=seed
                         ).reset_index(drop=True)
 
+        if self._presets is not None:
+            presets = self._presets
+        else:
+            self._presets = presets
+
+        hyperparameter_tune_kwargs = get_hp_tune_kwargs(
+            problem_type=self._problem_type,
+            presets=presets,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        )
         if hyperparameter_tune_kwargs is not None:
             # TODO: can we support hyperparameters being the same format as regular training?
             # currently the string format would make it very hard to get search space, which is an object
@@ -736,10 +747,6 @@ class MultiModalPredictor:
             data=train_data,
             valid_data=tuning_data,
         )
-        if self._presets is not None:
-            presets = self._presets
-        else:
-            self._presets = presets
 
         if self._config is not None:  # continuous training
             config = self._config
