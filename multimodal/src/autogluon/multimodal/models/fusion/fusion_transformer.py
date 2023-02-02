@@ -7,12 +7,12 @@ from torch import nn
 from ...constants import AUTOMM, FEATURES, LABEL, LOGITS, WEIGHT
 from ..ft_transformer import CLSToken, FT_Transformer
 from ..utils import init_weights, run_model
-from .base import BaseMultimodalFusionModel
+from .base import AbstractMultimodalFusionModel
 
 logger = logging.getLogger(AUTOMM)
 
 
-class MultimodalFusionTransformer(BaseMultimodalFusionModel):
+class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
     """
     Use Transformer to fuse different models' features (single-modal and multimodal).
     Specifically, it adapts the features of each model to specified dimensions,

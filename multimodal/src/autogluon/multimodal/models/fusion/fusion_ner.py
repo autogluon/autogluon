@@ -8,12 +8,12 @@ from torch import nn
 from ...constants import AUTOMM, FEATURES, LABEL, LOGITS, NER_ANNOTATION, NER_TEXT, TOKEN_WORD_MAPPING, WORD_OFFSETS
 from ..mlp import MLP
 from ..utils import run_model
-from .base import BaseMultimodalFusionModel
+from .base import AbstractMultimodalFusionModel
 
 logger = logging.getLogger(AUTOMM)
 
 
-class MultimodalFusionNER(BaseMultimodalFusionModel):
+class MultimodalFusionNER(AbstractMultimodalFusionModel):
     """
     Use MLP to fuse different models' features (single-modal and multimodal) for NER.
     Specifically, it adapts the features of each model to specified dimensions,

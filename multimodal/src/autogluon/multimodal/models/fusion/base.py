@@ -9,9 +9,9 @@ from ...constants import AUTOMM, LABEL
 logger = logging.getLogger(AUTOMM)
 
 
-class BaseMultimodalFusionModel(ABC, nn.Module):
+class AbstractMultimodalFusionModel(ABC, nn.Module):
     """
-    A base class to fuse different models' features (single-modal and multimodal).
+    An abstract class to fuse different models' features (single-modal and multimodal).
     """
 
     def __init__(

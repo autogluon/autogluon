@@ -7,12 +7,12 @@ from torch import nn
 from ...constants import AUTOMM, FEATURES, LABEL, LOGITS, WEIGHT
 from ..mlp import MLP
 from ..utils import init_weights, run_model
-from .base import BaseMultimodalFusionModel
+from .base import AbstractMultimodalFusionModel
 
 logger = logging.getLogger(AUTOMM)
 
 
-class MultimodalFusionMLP(BaseMultimodalFusionModel):
+class MultimodalFusionMLP(AbstractMultimodalFusionModel):
     """
     Use MLP to fuse different models' features (single-modal and multimodal).
     Specifically, it adapts the features of each model to specified dimensions,
