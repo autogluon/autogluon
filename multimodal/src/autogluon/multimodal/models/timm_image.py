@@ -258,3 +258,41 @@ class TimmAutoModelForImagePrediction(nn.Module):
             name_to_id[n] = 0
 
         return name_to_id
+
+    def dump_config(
+        self,
+        config_path: str,
+    ):
+        """
+        Save TIMM image model configs to a local file.
+
+        Parameters
+        ----------
+        config_path:
+            A file to where the config is written to.
+        """
+        from ..utils import filter_timm_pretrained_cfg
+
+        config = {}
+        pretrained_cfg = filter_timm_pretrained_cfg(self.config, remove_source=True, remove_null=True)
+        # set some values at root config level
+        config["architecture"] = pretrained_cfg.pop("architecture")
+        config["num_classes"] = self.num_classes
+        config["num_features"] = self.out_features
+
+        global_pool_type = getattr(self, "global_pool", None)
+        if isinstance(global_pool_type, str) and global_pool_type:
+            config["global_pool"] = global_pool_type
+
+        config["pretrained_cfg"] = pretrained_cfg
+
+        with open(config_path, "w") as f:
+            json.dump(config, f, indent=2)
+            logger.info(f"Timm config saved to {config_path}.")
+
+    def save(self, save_path: str = "./", tokenizers: Optional[dict] = None):
+        weights_path = f"{save_path}/pytorch_model.bin"
+        torch.save(self.model.state_dict(), weights_path)
+        logger.info(f"Model {self.prefix} weights saved to {weights_path}.")
+        config_path = f"{save_path}/config.json"
+        self.dump_config(config_path)
