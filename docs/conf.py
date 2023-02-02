@@ -1,7 +1,5 @@
 import sys
 
-import nbformat
-
 sys.path = ['.', '..'] + sys.path
 
 project = 'AutoGluon'
@@ -37,7 +35,7 @@ math_number_all = True
 
 # suppress_warnings = ['misc.highlighting_failure']
 
-html_theme = 'furo'
+html_theme = 'furo' # furo.readthedocs.io
 html_theme_options = {
     'sidebar_hide_name': True,
     'light_logo': 'autogluon.png',
@@ -49,11 +47,11 @@ html_theme_options = {
 
 html_sidebars = {
     '**': [
-        'sidebar/scroll-start.html',
         'sidebar/brand.html',
         'sidebar/search.html',
+        'sidebar/scroll-start.html',
         'sidebar/navigation.html',
-        # 'sidebar/ethical-ads.html',
+        # 'sidebar/ethical-ads.html', # furo maintainer requests this is set if docs are hosted on readthedocs.io
         'sidebar/scroll-end.html',
         'sidebar/variant-selector.html'
     ]
@@ -63,9 +61,6 @@ html_static_path = ['_static']
 
 html_favicon = '_static/favicon.png'
 
-# html_logo = '_static/autogluon.png'
-
 html_css_files = [
-    'custom.css', 'https://at.alicdn.com/t/font_2371118_b27k2sys2hd.css'
+    'custom.css',
 ]
-
