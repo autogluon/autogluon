@@ -39,6 +39,7 @@ from ..constants import (
     IMAGE_VALID_NUM,
     TIMM_IMAGE,
 )
+from ..models.timm_image import TimmAutoModelForImagePrediction
 from .collator import PadCollator, StackCollator
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config, is_rois_input
@@ -83,7 +84,7 @@ class ImageProcessor:
                 Normalize image by mean (0.48145466, 0.4578275, 0.40821073) and
                 std (0.26862954, 0.26130258, 0.27577711), used for CLIP.
         size
-            The width / height of a square image.
+            The provided width / height of a square image.
         max_img_num_per_col
             The maximum number of images one sample can have.
         missing_value_strategy
@@ -94,12 +95,6 @@ class ImageProcessor:
                 Use an image with zero pixels.
         requires_column_info
             Whether to require feature column information in dataloader.
-        trivial_augment_maxscale
-            Used in trivial augment as the maximum scale that can be random generated
-            A value of 0 means turn off trivial augment
-            https://arxiv.org/pdf/2103.10158.pdf
-        model
-            The model using this data processor.
         """
         self.train_transform_types = train_transform_types
         self.val_transform_types = val_transform_types
@@ -115,6 +110,24 @@ class ImageProcessor:
 
         if model is not None:
             self.size, self.mean, self.std = self.extract_default(model.config)
+            if isinstance(model, TimmAutoModelForImagePrediction):
+                if model.support_variable_input_size() and size is not None:
+                    # We have detected that the model supports using an image size that is
+                    # different from the pretrained model, e.g., ConvNets with global pooling
+                    if size < self.size:
+                        logger.warn(
+                            f"The provided image size={size} is smaller than the default size "
+                            f"of the pretrained backbone, which is {self.size}. "
+                            f"Detailed configuration of the backbone is in {model.config}. "
+                            f"You may like to double check your configuration."
+                        )
+                    self.size = size
+            elif size is not None and size != self.size:
+                logger.warn(
+                    f"The model does not support using an image size that is different from the default size. "
+                    f"Provided image size={size}. Default size={self.size}. "
+                    f"Detailed model configuration={model.config}. We have ignored the provided image size."
+                )
         if self.size is None:
             if size is not None:
                 self.size = size
@@ -279,7 +292,6 @@ class ImageProcessor:
                             is_zero_img = True
                         else:
                             raise e
-
                 if is_training:
                     img = self.train_processor(img)
                 else:

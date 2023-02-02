@@ -53,6 +53,7 @@ Default models
    AutoGluonTabularModel
    DeepARModel
    SimpleFeedForwardModel
+   TemporalFusionTransformerModel
 
 
 :hidden:`NaiveModel`
@@ -127,6 +128,13 @@ Default models
    :members: init
 
 
+:hidden:`TemporalFusionTransformerModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TemporalFusionTransformerModel
+   :members: init
+
+
 
 MXNet Models
 ------------
@@ -178,6 +186,11 @@ Models not included in this table currently do not support any additional featur
      - ✓
      - ✓
      -
+   * - :class:`~autogluon.timeseries.models.TemporalFusionTransformerModel`
+     - ✓
+     - ✓
+     - ✓
+     - ✓
    * - :class:`~autogluon.timeseries.models.gluonts.mx.DeepARMXNetModel`
      - ✓
      - ✓

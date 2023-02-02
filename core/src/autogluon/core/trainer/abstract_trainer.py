@@ -873,6 +873,54 @@ class AbstractTrainer:
         else:
             return model_pred_proba_dict
 
+    def get_model_pred_dict(self,
+                            X: pd.DataFrame,
+                            models: List[str],
+                            record_pred_time: bool = False,
+                            **kwargs):
+        """
+        Optimally computes predictions for each model in `models`.
+        Will compute each necessary model only once and store predictions in a `model_pred_dict` dictionary.
+        Note: Mutates model_pred_proba_dict and model_pred_time_dict input if present to minimize memory usage.
+
+        Acts as a wrapper to `self.get_model_pred_proba_dict`, converting the output to predictions.
+
+        Parameters
+        ----------
+        X : pd.DataFrame
+            Input data to predict on.
+        models : List[str]
+            The list of models to predict with.
+            Note that if models have dependency models, their dependencies will also be predicted with and included in the output.
+        record_pred_time : bool, default = False
+            Whether to store marginal inference times of each model as an extra output `model_pred_time_dict`.
+        **kwargs : dict, optional
+            Refer to `self.get_model_pred_proba_dict` for documentation of remaining arguments.
+            This method shares identical arguments.
+
+        Returns
+        -------
+        If `record_pred_time==True`, outputs tuple of dicts (model_pred_dict, model_pred_time_dict), else output only model_pred_dict
+        """
+        model_pred_proba_dict = self.get_model_pred_proba_dict(X=X,
+                                                               models=models,
+                                                               record_pred_time=record_pred_time,
+                                                               **kwargs)
+        if record_pred_time:
+            model_pred_proba_dict, model_pred_time_dict = model_pred_proba_dict
+        else:
+            model_pred_time_dict = None
+
+        model_pred_dict = {}
+        for m in model_pred_proba_dict:
+            # Convert pred_proba to pred
+            model_pred_dict[m] = get_pred_from_proba(y_pred_proba=model_pred_proba_dict[m], problem_type=self.problem_type)
+
+        if record_pred_time:
+            return model_pred_dict, model_pred_time_dict
+        else:
+            return model_pred_dict
+
     def get_model_oof(self, model: str) -> np.ndarray:
         """Gets the out of fold prediction probabilities for a bagged ensemble model"""
         model_type = self.get_model_attribute(model=model, attribute='type')
