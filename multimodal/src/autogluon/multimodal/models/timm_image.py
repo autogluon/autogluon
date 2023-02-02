@@ -13,7 +13,7 @@ from .utils import assign_layer_ids, get_column_features, get_model_head
 logger = logging.getLogger(AUTOMM)
 
 
-# Stores the
+# Stores the class names of the timm backbones that support variable input size. You can add more backbones to the list.
 SUPPORT_VARIABLE_INPUT_SIZE_TIMM_CLASSES = {"convnext", "efficientnet", "mobilenetv3", "regnet", "resnet"}
 
 
