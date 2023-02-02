@@ -32,6 +32,9 @@ from ..constants import (
     HIT_RATE,
     IA3,
     IA3_BIAS,
+    IA3_LORA,
+    IA3_LORA_BIAS,
+    IA3_LORA_NORM,
     IA3_NORM,
     LOG_LOSS,
     LORA,
@@ -41,20 +44,24 @@ from ..constants import (
     MULTI_NEGATIVES_SOFTMAX_LOSS,
     MULTICLASS,
     NER,
+    NER_TOKEN_F1,
     NORM_FIT,
     OBJECT_DETECTION,
     OVERALL_ACCURACY,
+    OVERALL_F1,
     PAIR_MARGIN_MINER,
     PEARSONR,
+    PEFT_STRATEGIES,
     QUADRATIC_KAPPA,
     R2,
+    RECALL,
     REGRESSION,
     RMSE,
     ROC_AUC,
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
 )
-from ..utils import MeanAveragePrecision
+from ..utils.map import MeanAveragePrecision
 from .losses import MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
@@ -223,6 +230,7 @@ def compute_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
         for k in top_ks:
             hit_rate += (preds < k).float().mean()
 
+    hit_rate /= len(top_ks) * len(logits)
     return hit_rate
 
 
@@ -230,6 +238,7 @@ def get_metric(
     metric_name: str,
     num_classes: Optional[int] = None,
     pos_label: Optional[int] = None,
+    is_matching: Optional[bool] = False,
 ):
     """
     Obtain a torchmerics.Metric from its name.
@@ -243,6 +252,8 @@ def get_metric(
         Number of classes.
     pos_label
         The label (0 or 1) of binary classification's positive class, which is used in some metrics, e.g., AUROC.
+    is_matching
+        Whether is matching.
 
     Returns
     -------
@@ -254,6 +265,8 @@ def get_metric(
     metric_name = metric_name.lower()
     if metric_name in [ACC, ACCURACY, OVERALL_ACCURACY]:
         return torchmetrics.Accuracy(), None
+    elif metric_name == NER_TOKEN_F1:
+        return torchmetrics.F1Score(ignore_index=1), None
     elif metric_name in [RMSE, ROOT_MEAN_SQUARED_ERROR]:
         return torchmetrics.MeanSquaredError(squared=False), None
     elif metric_name == R2:
@@ -274,7 +287,10 @@ def get_metric(
     elif metric_name == PEARSONR:
         return torchmetrics.PearsonCorrCoef(), None
     elif metric_name == SPEARMANR:
-        return torchmetrics.SpearmanCorrCoef(), None
+        if is_matching:  # TODO: add support for matching.
+            raise ValueError("spearman relation is not supported for matching yet.")
+        else:
+            return torchmetrics.SpearmanCorrCoef(), None
     elif metric_name == F1:
         return CustomF1Score(num_classes=num_classes, pos_label=pos_label), None
     elif metric_name == MAP.lower():
@@ -287,8 +303,11 @@ def get_metric(
             torchmetrics.MeanMetric(nan_strategy="warn"),
             None,
         )  # This only works for detection where custom_metric is not required for BaseAggregator
-    elif metric_name == HIT_RATE:
-        return CustomHitRate(), None
+    elif metric_name in [RECALL, HIT_RATE]:
+        if is_matching:
+            return CustomHitRate(), None
+        else:  # TODO: support recall for general classification tasks.
+            raise ValueError("Recall is not supported yet.")
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 
@@ -619,12 +638,12 @@ def get_trainable_params_efficient_finetune(
     elif efficient_finetune == NORM_FIT:
         trainable_param_names.append(".*bias*.")
         trainable_param_names += norm_param_names
-    elif efficient_finetune in [LORA, IA3]:
+    elif efficient_finetune in [LORA, IA3, IA3_LORA]:
         trainable_param_names.append(".*lora_*.")
-    elif efficient_finetune in [LORA_BIAS, IA3_BIAS]:
+    elif efficient_finetune in [LORA_BIAS, IA3_BIAS, IA3_LORA_BIAS]:
         trainable_param_names.append(".*lora_*.")
         trainable_param_names.append(".*bias*.")
-    elif efficient_finetune in [LORA_NORM, IA3_NORM]:
+    elif efficient_finetune in [LORA_NORM, IA3_NORM, IA3_LORA_NORM]:
         trainable_param_names.append(".*lora_*.")
         trainable_param_names.append(".*bias*.")
         trainable_param_names += norm_param_names
@@ -632,7 +651,7 @@ def get_trainable_params_efficient_finetune(
         raise NotImplementedError(
             f"The efficient finetuning strategy '{efficient_finetune}'"
             f" is not supported. We only support"
-            f" '{BIT_FIT}', '{NORM_FIT}', '{LORA}', '{LORA_NORM}', '{LORA_BIAS}', '{IA3}', '{IA3_BIAS}', '{IA3_NORM}'."
+            f" {', '.join(PEFT_STRATEGIES)}."
         )
 
     return trainable_param_names
@@ -949,52 +968,17 @@ def generate_metric_learning_labels(
     -------
     The labels used in computing the metric learning loss.
     """
-    labels_1 = torch.arange(num_samples)
+    device = labels.device
+    labels_1 = torch.arange(num_samples, device=device)
 
     if match_label is not None:
-        labels_2 = torch.arange(num_samples, num_samples * 2)
+        labels_2 = torch.arange(num_samples, num_samples * 2, device=device)
         # users need to specify the match_label based on the raw label's semantic meaning.
         mask = labels == match_label
         labels_2[mask] = labels_1[mask]
     else:
-        labels_2 = torch.arange(num_samples)
+        labels_2 = torch.arange(num_samples, device=device)
 
     metric_learning_labels = torch.cat([labels_1, labels_2], dim=0)
 
     return metric_learning_labels
-
-
-def compute_probability(
-    logits: Optional[torch.Tensor] = None,
-    embeddings1: Optional[torch.Tensor] = None,
-    embeddings2: Optional[torch.Tensor] = None,
-    reverse_prob: Optional[bool] = False,
-):
-    """
-    Compute probabilities from logits or embedding pairs.
-
-    Parameters
-    ----------
-    logits
-        The output of a model's head layer.
-    embeddings1
-        Feature embeddings of one side in matching.
-    embeddings2
-        Feature embeddings 2 of the other side in matching.
-    reverse_prob
-        Whether to reverse the probability.
-
-    Returns
-    -------
-    Probabilities.
-    """
-    if logits is not None:
-        prob = F.softmax(logits.float(), dim=1)[:, 1]
-    else:
-        cosine_similarity = F.cosine_similarity(embeddings1, embeddings2)
-        prob = 0.5 * (cosine_similarity + 1)
-
-    if reverse_prob:
-        prob = 1 - prob
-
-    return prob

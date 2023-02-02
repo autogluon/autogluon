@@ -2,7 +2,7 @@ function setup_build_env {
     python3 -m pip install --upgrade pip
     python3 -m pip install tox
     python3 -m pip install flake8
-    python3 -m pip install black>=22.3
+    python3 -m pip install "black>=22.3,<23.0"
     python3 -m pip install isort>=5.10
     python3 -m pip install bandit
 }
@@ -16,95 +16,64 @@ function setup_build_contrib_env {
 }
 
 function setup_mxnet_gpu {
-    python3 -m pip install mxnet-cu112==1.9.*
+    python3 -m pip install mxnet-cu113==1.9.*
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 }
 
 function setup_torch_gpu {
-    python3 -m pip install torch==1.12.0+cu113 torchvision==0.13.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
+    # Security-patched torch.
+    python3 -m pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
 }
 
-function install_common {
-    python3 -m pip install --upgrade -e common/[tests]
+function setup_torch_cpu {
+    # Security-patched torch
+    python3 -m pip install torch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cpu
 }
 
-function install_core {
-    install_common
-    python3 -m pip install --upgrade -e core/
+function setup_torch_gpu_non_linux {
+    pip3 install torch==1.13.1+cu116 torchvision==0.14.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
 }
 
-function install_core_all {
-    install_common
-    python3 -m pip install --upgrade -e core/[all]
+function setup_torch_cpu_non_linux {
+    pip3 install torch==1.13.1 torchvision==0.14.1
 }
 
-function install_core_all_tests {
-    install_common
-    python3 -m pip install --upgrade -e core/[all,tests]
+function setup_hf_model_mirror {
+    pip3 install PyYAML
+    SUB_FOLDER="$1"
+    python3 $(dirname "$0")/setup_hf_model_mirror.py --model_list_file $(dirname "$0")/../../multimodal/tests/hf_model_list.yaml --sub_folder $SUB_FOLDER
 }
 
-function install_features {
-    python3 -m pip install --upgrade -e features/
-}
-
-function install_eda {
-    python3 -m pip install --upgrade -e eda/[tests]
-}
-
-function install_tabular {
-    python3 -m pip install --upgrade -e tabular/[tests]
-}
-
-function install_tabular_all {
-    python3 -m pip install --upgrade -e tabular/[all,tests]
+function install_local_packages {
+    while(($#)) ; do
+        python3 -m pip install --upgrade -e $1
+        shift
+    done
 }
 
 function install_multimodal {
     # launch different process for each test to make sure memory is released
     python3 -m pip install --upgrade pytest-xdist
-    python3 -m pip install --upgrade -e multimodal/[tests]
+    install_local_packages "multimodal/$1"
     mim install mmcv-full --timeout 60
     python3 -m pip install --upgrade mmdet
     python3 -m pip install --upgrade mmocr
 }
 
-function install_text {
-    python3 -m pip install --upgrade -e text/
-}
-
-function install_vision {
-    python3 -m pip install --upgrade pytest-xdist  # launch different process for each test to avoid resource not being released by either mxnet or torch
-    python3 -m pip install --upgrade -e vision/
-}
-
-function install_timeseries {
-    python3 -m pip install --upgrade -e timeseries/[all,tests]
-}
-
-function install_cloud {
-    python3 -m pip install --upgrade pytest-xdist # Enable running tests in parallel for speedup
-    python3 -m pip install --upgrade -e cloud/
-}
-
-function install_autogluon {
-    python3 -m pip install --upgrade -e autogluon/
-}
-
 function install_all {
-    install_common
-    install_core_all
-    install_features
-    install_tabular_all
+    install_local_packages "common/[tests]" "core/[all]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
+    install_multimodal "[tests]"
+    install_local_packages "autogluon/"
+}
+
+function install_all_no_tests {
+    install_local_packages "common/" "core/[all]" "features/" "tabular/[all]" "timeseries/[all]" "eda/"
     install_multimodal
-    install_text
-    install_vision
-    install_timeseries
-    install_eda
-    install_autogluon
+    install_local_packages "autogluon/"
 }
 
 function build_all {
-    for module in common core features tabular multimodal text vision timeseries autogluon
+    for module in common core features tabular multimodal timeseries autogluon
     do
         cd "$module"/
         python setup.py sdist bdist_wheel

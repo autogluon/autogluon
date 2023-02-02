@@ -2,10 +2,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from torch import nn
 
-from ..constants import LABEL, MMDET_IMAGE, NER, NER_ANNOTATION, TEXT
-from .collator import List as ColList
-from .collator import Stack
-from .utils import process_ner_annotations
+from ..constants import LABEL, MMDET_IMAGE
+from .collator import ListCollator, StackCollator
 
 
 class LabelProcessor:
@@ -22,12 +20,10 @@ class LabelProcessor:
         """
         Parameters
         ----------
-        prefix
-            The prefix connecting a processor to its corresponding model.
+        model
+            The model for which this processor would be created.
         """
         self.prefix = model.prefix
-        self.tokenizer = None
-        self.model = model
 
     @property
     def label_key(self):
@@ -43,9 +39,9 @@ class LabelProcessor:
         A dictionary containing one model's collator function for labels.
         """
         if self.prefix == MMDET_IMAGE:
-            fn = {self.label_key: ColList()}
+            fn = {self.label_key: ListCollator()}
         else:
-            fn = {self.label_key: Stack()}
+            fn = {self.label_key: StackCollator()}
         return fn
 
     def process_one_sample(

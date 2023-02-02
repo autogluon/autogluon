@@ -4,7 +4,7 @@ import logging
 from collections import defaultdict
 
 from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, AG_ARGS_ENSEMBLE, BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
-from autogluon.core.models import AbstractModel, GreedyWeightedEnsembleModel, StackerEnsembleModel, SimpleWeightedEnsembleModel
+from autogluon.core.models import AbstractModel, GreedyWeightedEnsembleModel, StackerEnsembleModel, SimpleWeightedEnsembleModel, DummyModel
 from autogluon.core.trainer.utils import process_hyperparameters
 
 from .presets_custom import get_preset_custom
@@ -61,7 +61,8 @@ DEFAULT_SOFTCLASS_PRIORITY = dict(
 
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
-DEFAULT_QUANTILE_MODEL = ['RF', 'XT', 'FASTAI', 'NN_TORCH', 'ENS_WEIGHTED']  # TODO: OTHERS will be added
+# FIXME: v0.7 : Remove this, it is a hack. Model classes should define what problem types they support instead of using this
+DEFAULT_QUANTILE_MODEL = ['DUMMY', 'RF', 'XT', 'FASTAI', 'NN_TORCH', 'ENS_WEIGHTED']  # TODO: OTHERS will be added
 
 MODEL_TYPES = dict(
     RF=RFModel,
@@ -89,7 +90,9 @@ MODEL_TYPES = dict(
     IM_FIGS=FigsModel,
     IM_HSTREE=HSTreeModel,
     IM_BOOSTEDRULES=BoostedRulesModel,
-    VW=VowpalWabbitModel
+    VW=VowpalWabbitModel,
+
+    DUMMY=DummyModel,
 )
 
 
@@ -185,7 +188,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
     model_cfg_priority_dict = defaultdict(list)
     model_type_list = list(hp_level.keys())
     if 'NN' in model_type_list:
-        # TODO: Remove in v0.6.0
+        # TODO: Remove in v0.7.0
         logger.log(30, '\tWARNING: "NN" model has been deprecated in v0.4.0 and renamed to "NN_MXNET". '
                        'Starting in v0.6.0, specifying "NN" or "NN_MXNET" will raise an exception. Consider instead specifying "NN_TORCH".')
     for model_type in model_type_list:

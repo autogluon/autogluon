@@ -12,15 +12,16 @@ from gluonts.dataset.field_names import FieldName
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
+from gluonts.torch.model.forecast import DistributionForecast
 from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.utils import warning_filter
 from autogluon.core.utils.savers import save_pkl
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.utils.features import get_categorical_and_continuous_features
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_root_logger
 
 logger = logging.getLogger(__name__)
@@ -38,18 +39,24 @@ class SimpleGluonTSDataset(GluonTSDataset):
     def __init__(
         self,
         target_df: TimeSeriesDataFrame,
+        target_column: str = "target",
         feat_static_cat: Optional[pd.DataFrame] = None,
         feat_static_real: Optional[pd.DataFrame] = None,
-        feat_dynamic_real: Optional[TimeSeriesDataFrame] = None,
+        feat_dynamic_real: Optional[pd.DataFrame] = None,
+        past_feat_dynamic_real: Optional[pd.DataFrame] = None,
         float_dtype: Type = np.float64,
         int_dtype: Type = np.int64,
     ):
         assert target_df is not None
         assert target_df.freq, "Initializing GluonTS data sets without freq is not allowed"
-        self.target_df = target_df
+        # Convert TimeSeriesDataFrame to pd.Series for faster processing
+        self.target_series = target_df[target_column]
+        self.item_ids = target_df.item_ids
+        self.freq_ = target_df.freq
         self.feat_static_cat = feat_static_cat
         self.feat_static_real = feat_static_real
         self.feat_dynamic_real = feat_dynamic_real
+        self.past_feat_dynamic_real = past_feat_dynamic_real
 
         self.int_dtype = int_dtype
         self.float_dtype = float_dtype
@@ -60,24 +67,23 @@ class SimpleGluonTSDataset(GluonTSDataset):
         # for feature generation. If the frequency string doesn't match or is not provided, it raises an exception.
         # Here we bypass this by issuing a default "yearly" frequency, tricking it into not producing
         # any lags or features.
-        freq_ = self.target_df.freq
-        pd_offset = to_offset(freq_)
+        pd_offset = to_offset(self.freq_)
 
         # normalize freq str to handle peculiarities such as W-SUN
         offset_base_alias = pd_offset.name.split("-")[0]
 
-        return "A" if offset_base_alias is None or offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS else freq_
+        return "A" if offset_base_alias is None or offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS else self.freq_
 
     def __len__(self):
-        return len(self.target_df.item_ids)  # noqa
+        return len(self.item_ids)  # noqa
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
-        for item_id in self.target_df.item_ids:  # noqa
-            df = self.target_df.loc[item_id]
+        for item_id in self.item_ids:  # noqa
+            ts = self.target_series.loc[item_id]
             time_series = {
                 FieldName.ITEM_ID: item_id,
-                FieldName.TARGET: df.squeeze().to_numpy(dtype=self.float_dtype),
-                FieldName.START: pd.Period(df.index[0], freq=self.freq),
+                FieldName.TARGET: ts.to_numpy(dtype=self.float_dtype).ravel(),
+                FieldName.START: pd.Period(ts.index[0], freq=self.freq),
             }
             if self.feat_static_cat is not None:
                 time_series[FieldName.FEAT_STATIC_CAT] = self.feat_static_cat.loc[item_id].to_numpy(
@@ -90,6 +96,10 @@ class SimpleGluonTSDataset(GluonTSDataset):
             if self.feat_dynamic_real is not None:
                 time_series[FieldName.FEAT_DYNAMIC_REAL] = (
                     self.feat_dynamic_real.loc[item_id].to_numpy(dtype=self.float_dtype).T
+                )
+            if self.past_feat_dynamic_real is not None:
+                time_series[FieldName.PAST_FEAT_DYNAMIC_REAL] = (
+                    self.past_feat_dynamic_real.loc[item_id].to_numpy(dtype=self.float_dtype).T
                 )
 
             yield time_series
@@ -126,6 +136,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     int_dtype: Type = np.int64
     # default number of samples for prediction
     default_num_samples: int = 1000
+    supports_known_covariates: bool = False
+    supports_past_covariates: bool = False
 
     def __init__(
         self,
@@ -152,6 +164,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self.num_feat_static_cat = 0
         self.num_feat_static_real = 0
         self.num_feat_dynamic_real = 0
+        self.num_past_feat_dynamic_real = 0
         self.feat_static_cat_cardinality: List[int] = []
 
     def save(self, path: str = None, **kwargs) -> str:
@@ -194,15 +207,18 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
             model_params = self._get_model_params()
             disable_static_features = model_params.get("disable_static_features", False)
+            if not disable_static_features:
+                self.num_feat_static_cat = len(self.metadata.static_features_cat)
+                self.num_feat_static_real = len(self.metadata.static_features_real)
+                if self.num_feat_static_cat > 0:
+                    feat_static_cat = ds.static_features[self.metadata.static_features_cat]
+                    self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
             disable_known_covariates = model_params.get("disable_known_covariates", False)
-            if not disable_static_features and ds.static_features is not None:
-                feat_static_cat, feat_static_real = get_categorical_and_continuous_features(ds.static_features)
-                self.num_feat_static_cat = len(feat_static_cat.columns)
-                self.num_feat_static_real = len(feat_static_real.columns)
-                self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
-            if not disable_known_covariates:
-                feat_dynamic_real = ds.drop(self.target, axis=1)
-                self.num_feat_dynamic_real = len(feat_dynamic_real.columns)
+            if not disable_known_covariates and self.supports_known_covariates:
+                self.num_feat_dynamic_real = len(self.metadata.known_covariates_real)
+            disable_past_covariates = model_params.get("disable_past_covariates", False)
+            if not disable_past_covariates and self.supports_past_covariates:
+                self.num_past_feat_dynamic_real = len(self.metadata.past_covariates_real)
 
         if "callbacks" in kwargs:
             self.callbacks += kwargs["callbacks"]
@@ -235,51 +251,44 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self, time_series_df: Optional[TimeSeriesDataFrame], known_covariates: Optional[TimeSeriesDataFrame] = None
     ) -> Optional[GluonTSDataset]:
         if time_series_df is not None:
-            feat_static_cat = None
-            feat_static_real = None
-            if time_series_df.static_features is not None and (self.num_feat_static_cat or self.num_feat_static_real):
-                feat_static_cat, feat_static_real = get_categorical_and_continuous_features(
-                    time_series_df.static_features
-                )
-                if self.num_feat_static_cat > 0:
-                    if len(feat_static_cat.columns) != self.num_feat_static_cat:
-                        raise ValueError(
-                            f"Static features must contain {self.num_feat_dynamic_real} columns of type 'category', "
-                            f"(got {len(feat_static_cat.columns)} columns of type 'category')."
-                        )
-                else:
-                    feat_static_cat = None
-                if self.num_feat_static_real > 0:
-                    if len(feat_static_real.columns) != self.num_feat_static_real:
-                        raise ValueError(
-                            f"Static features must contain {self.num_feat_dynamic_real} columns of type 'float', "
-                            f"(got {len(feat_static_real.columns)} columns of type 'float')."
-                        )
-                else:
-                    feat_static_real = None
+            if self.num_feat_static_cat > 0:
+                feat_static_cat = time_series_df.static_features[self.metadata.static_features_cat]
+            else:
+                feat_static_cat = None
 
-            feat_dynamic_real = time_series_df.drop(self.target, axis=1)
-            if known_covariates is not None:
-                feat_dynamic_real = pd.concat([feat_dynamic_real, known_covariates], axis=0)
-                if len(feat_dynamic_real) != len(time_series_df) + self.prediction_length * time_series_df.num_items:
-                    raise ValueError(
-                        f"known_covariates must contain values for the next prediction_length = "
-                        f"{self.prediction_length} time steps in each time series."
-                    )
+            if self.num_feat_static_real > 0:
+                feat_static_real = time_series_df.static_features[self.metadata.static_features_real]
+            else:
+                feat_static_real = None
+
             if self.num_feat_dynamic_real > 0:
-                if len(feat_dynamic_real.columns) != self.num_feat_dynamic_real:
-                    raise ValueError(
-                        f"Data must contain {self.num_feat_dynamic_real} columns with known covariates, "
-                        f"(received {len(feat_dynamic_real.columns)} columns with known covariates)."
-                    )
+                # Convert TSDF -> DF to avoid overhead / input validation
+                feat_dynamic_real = pd.DataFrame(time_series_df[self.metadata.known_covariates_real])
+                # Append future values of known covariates
+                if known_covariates is not None:
+                    feat_dynamic_real = pd.concat([feat_dynamic_real, known_covariates], axis=0)
+                    expected_length = len(time_series_df) + self.prediction_length * time_series_df.num_items
+                    if len(feat_dynamic_real) != expected_length:
+                        raise ValueError(
+                            f"known_covariates must contain values for the next prediction_length = "
+                            f"{self.prediction_length} time steps in each time series."
+                        )
             else:
                 feat_dynamic_real = None
 
+            if self.num_past_feat_dynamic_real > 0:
+                # Convert TSDF -> DF to avoid overhead / input validation
+                past_feat_dynamic_real = pd.DataFrame(time_series_df[self.metadata.past_covariates_real])
+            else:
+                past_feat_dynamic_real = None
+
             return SimpleGluonTSDataset(
-                target_df=time_series_df[[self.target]],
+                target_df=time_series_df,
+                target_column=self.target,
                 feat_static_cat=feat_static_cat,
                 feat_static_real=feat_static_real,
                 feat_dynamic_real=feat_dynamic_real,
+                past_feat_dynamic_real=past_feat_dynamic_real,
                 float_dtype=self.float_dtype,
                 int_dtype=self.int_dtype,
             )
@@ -337,8 +346,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             f"\tProvided data for prediction with {len(data)} rows, {data.num_items} items. "
             f"Average time series length is {len(data) / data.num_items}."
         )
-        input_index_type = type(data.index.levels[0][0])
-
         with warning_filter(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
             quantiles = quantile_levels or self.quantile_levels
             if not all(0 < q < 1 for q in quantiles):
@@ -349,19 +356,10 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
                 quantile_levels=quantile_levels or self.quantile_levels,
+                forecast_index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length),
             )
 
-            # if index type is different than the input data, cast it back
-            if len(df.index.levels[0]) > 0:
-                prediction_index_type = type(df.index.levels[0][0])
-                if prediction_index_type is not input_index_type:
-                    df.set_index(
-                        df.index.set_levels([input_index_type(i) for i in df.index.levels[0]], level=0),
-                        inplace=True,
-                    )
-
-        # Make sure the item_ids are sorted in the same order as in data
-        return df.loc[data.item_ids]
+        return df
 
     def _predict_gluonts_forecasts(
         self, data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame] = None, **kwargs
@@ -375,7 +373,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     @staticmethod
     def _sample_to_quantile_forecast(forecast: SampleForecast, quantile_levels: List[float]) -> QuantileForecast:
-        forecast_arrays = []
+        forecast_arrays = [forecast.mean]
 
         quantile_keys = [str(q) for q in quantile_levels]
         for q in quantile_keys:
@@ -384,47 +382,49 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         forecast_init_args = dict(
             forecast_arrays=np.array(forecast_arrays),
             start_date=forecast.start_date,
-            forecast_keys=quantile_keys,
-            item_id=forecast.item_id,
+            forecast_keys=["mean"] + quantile_keys,
+            item_id=str(forecast.item_id),
         )
         if isinstance(forecast.start_date, pd.Timestamp):  # GluonTS version is <0.10
             forecast_init_args.update({"freq": forecast.freq})
         return QuantileForecast(**forecast_init_args)
 
+    @staticmethod
+    def _distribution_to_quantile_forecast(forecast: SampleForecast, quantile_levels: List[float]) -> QuantileForecast:
+        raise NotImplementedError
+
     def _gluonts_forecasts_to_data_frame(
-        self, forecasts: List[Forecast], quantile_levels: List[float]
+        self,
+        forecasts: List[Forecast],
+        quantile_levels: List[float],
+        forecast_index: pd.MultiIndex,
     ) -> TimeSeriesDataFrame:
-        if not isinstance(forecasts[0], (QuantileForecast, SampleForecast)):
-            raise TypeError("DistributionForecast is not supported.")
-
-        forecast_means = [f.mean for f in forecasts]
-
         # if predictions are gluonts SampleForecasts, convert to quantile forecasts
         if isinstance(forecasts[0], SampleForecast):
             forecasts = [self._sample_to_quantile_forecast(f, quantile_levels) for f in forecasts]
+        elif isinstance(forecasts[0], DistributionForecast):
+            forecasts = [self._distribution_to_quantile_forecast(f, quantile_levels) for f in forecasts]
+        else:
+            assert isinstance(forecasts[0], QuantileForecast), f"Unrecognized forecast type {type(forecasts[0])}"
 
         # sanity check to ensure all quantiles are accounted for
         assert all(str(q) in forecasts[0].forecast_keys for q in quantile_levels), (
             "Some forecast quantiles are missing from GluonTS forecast outputs. Was"
             " the model trained to forecast all quantiles?"
         )
-
+        item_id_to_forecast = {str(f.item_id): f for f in forecasts}
         result_dfs = []
-        for i, forecast in enumerate(forecasts):
-            item_forecast_dict = dict(mean=forecast_means[i])
+        for item_id in forecast_index.unique(level=ITEMID):
+            # GluonTS always saves item_id as a string
+            forecast = item_id_to_forecast[str(item_id)]
+            item_forecast_dict = {"mean": forecast.mean}
             for quantile in quantile_levels:
                 item_forecast_dict[str(quantile)] = forecast.quantile(str(quantile))
+            result_dfs.append(pd.DataFrame(item_forecast_dict))
 
-            df = pd.DataFrame(item_forecast_dict)
-            df[ITEMID] = forecast.item_id
-            df[TIMESTAMP] = pd.date_range(
-                start=forecasts[i].start_date.to_timestamp(how="S"),
-                periods=self.prediction_length,
-                freq=self.freq,
-            )
-            result_dfs.append(df)
-
-        return TimeSeriesDataFrame.from_data_frame(pd.concat(result_dfs))
+        result = pd.concat(result_dfs)
+        result.index = forecast_index
+        return TimeSeriesDataFrame(result)
 
     def _get_hpo_backend(self):
         return RAY_BACKEND

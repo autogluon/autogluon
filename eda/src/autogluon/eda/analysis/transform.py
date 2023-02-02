@@ -4,9 +4,9 @@ from typing import List, Optional
 import pandas as pd
 
 from autogluon.features import AbstractFeatureGenerator, AutoMLPipelineFeatureGenerator
+
+from ..state import AnalysisState, StateCheckMixin
 from .base import AbstractAnalysis
-from ..state import AnalysisState
-from ..state import StateCheckMixin
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
         feature generator to use for the transformation. If `None` is provided then `AutoMLPipelineFeatureGenerator` is applied.
     parent: Optional[AbstractAnalysis], default = None
         parent Analysis
-    children: List[AbstractAnalysis], default []
+    children: Optional[List[AbstractAnalysis]], default None
         wrapped analyses; these will receive sampled `args` during `fit` call
     kwargs
 
@@ -68,6 +68,8 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
                 enable_text_ngram_features=False,
                 enable_raw_text_features=False,
                 enable_vision_features=False,
+                verbosity=0,
+                **kwargs,
             )
         self.feature_generator = feature_generator
 
@@ -75,10 +77,12 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
         return self.all_keys_must_be_present(args, "train_data", "label")
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
-        x = args.train_data.drop(columns=args.label)
+        x = args.train_data
+        if args.label is not None:
+            x = x.drop(columns=args.label)
         self.feature_generator.fit(x)
         self.args["feature_generator"] = True
-        for (ds, df) in self.available_datasets(args):
+        for ds, df in self.available_datasets(args):
             x = df
             y = None
             if args.label in df.columns:

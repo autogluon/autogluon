@@ -1,5 +1,5 @@
-Image Prediction
-----------------
+Image Data -- Classification / Regression
+-----------------------------------------
 .. container:: cards
 
    .. card::

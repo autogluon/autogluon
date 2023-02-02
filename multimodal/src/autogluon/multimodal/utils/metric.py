@@ -17,21 +17,22 @@ from ..constants import (
     BINARY,
     DIRECT_LOSS,
     F1,
-    HIT_RATE,
-    IMAGE_TEXT_SIMILARITY,
     MAP,
     METRIC_MODE_MAP,
     MULTICLASS,
     NDCG,
     NER,
+    NER_TOKEN_F1,
     OBJECT_DETECTION,
     OVERALL_ACCURACY,
+    OVERALL_F1,
     PRECISION,
     RECALL,
     REGRESSION,
+    RETRIEVAL_METRICS,
     RMSE,
     ROC_AUC,
-    TEXT_SIMILARITY,
+    SPEARMANR,
     VALID_METRICS,
     Y_PRED,
     Y_PRED_PROB,
@@ -45,7 +46,7 @@ def infer_metrics(
     problem_type: Optional[str] = None,
     eval_metric_name: Optional[str] = None,
     validation_metric_name: Optional[str] = None,
-    pipeline: Optional[str] = None,
+    is_matching: Optional[bool] = False,
 ):
     """
     Infer the validation metric and the evaluation metric if not provided.
@@ -60,8 +61,8 @@ def infer_metrics(
         Name of evaluation metric provided by users.
     validation_metric_name
         The provided validation metric name
-    pipeline
-        The pipeline is only used in matching. FIXME! This is a hack. We need to remove it in 0.7.
+    is_matching
+        Whether is matching.
 
     Returns
     -------
@@ -80,13 +81,12 @@ def infer_metrics(
             raise ValueError(f"Metric {eval_metric_name} is only supported for binary classification.")
 
         if eval_metric_name in VALID_METRICS:
-            if pipeline == IMAGE_TEXT_SIMILARITY:
-                validation_metric_name = HIT_RATE
-            else:
-                validation_metric_name = eval_metric_name
-            if validation_metric_name == NDCG:
-                # TODO(?) Currently NDCG is not supported. We may pick a better replacement of NDCG for validation in the future.
-                validation_metric_name = HIT_RATE
+            validation_metric_name = eval_metric_name
+            return validation_metric_name, eval_metric_name
+
+        # Currently only support recall as validation metric in retrieval tasks.
+        if is_matching and eval_metric_name in RETRIEVAL_METRICS:
+            validation_metric_name = RECALL
             return validation_metric_name, eval_metric_name
 
         warnings.warn(
@@ -97,13 +97,19 @@ def infer_metrics(
         )
 
     if problem_type == MULTICLASS:
-        eval_metric_name = ACCURACY
+        if is_matching:
+            eval_metric_name = SPEARMANR
+        else:
+            eval_metric_name = ACCURACY
     elif problem_type == NER:
-        eval_metric_name = OVERALL_ACCURACY
+        return NER_TOKEN_F1, OVERALL_F1
     elif problem_type == BINARY:
         eval_metric_name = ROC_AUC
     elif problem_type == REGRESSION:
-        eval_metric_name = RMSE
+        if is_matching:
+            eval_metric_name = SPEARMANR
+        else:
+            eval_metric_name = RMSE
     elif problem_type == OBJECT_DETECTION:
         if (not validation_metric_name) or validation_metric_name.lower() == DIRECT_LOSS:
             return DIRECT_LOSS, MAP
@@ -113,8 +119,8 @@ def infer_metrics(
             raise ValueError(
                 f"Problem type: {problem_type}, validation_metric_name: {validation_metric_name} is not supported!"
             )
-    elif pipeline == IMAGE_TEXT_SIMILARITY:
-        return HIT_RATE, NDCG
+    elif problem_type is None and is_matching:
+        return RECALL, NDCG
     else:
         raise NotImplementedError(f"Problem type: {problem_type} is not supported yet!")
 
@@ -147,6 +153,28 @@ def get_minmax_mode(
     return METRIC_MODE_MAP.get(metric_name)
 
 
+def get_stopping_threshold(metric_name: str):
+    """
+    Get the metric threshold for early stopping.
+
+    Parameters
+    ----------
+    metric_name
+        Name of validation metric.
+
+    Returns
+    -------
+    The stopping threshold.
+    """
+    try:
+        metric = get_metric(metric_name)
+        stopping_threshold = metric.optimum - metric._sign * 1e-7
+    except:
+        stopping_threshold = None
+
+    return stopping_threshold
+
+
 def compute_score(
     metric_data: dict,
     metric_name: str,
@@ -169,9 +197,15 @@ def compute_score(
     -------
     Computed score.
     """
-    if metric_name == OVERALL_ACCURACY:
+    if metric_name in [OVERALL_ACCURACY, OVERALL_F1]:
         metric = evaluate.load("seqeval")
         warnings.filterwarnings("ignore")
+        for p in metric_data[Y_TRUE]:
+            if "_" in p:
+                print(p)
+        for p in metric_data[Y_PRED]:
+            if "_" in p:
+                print(p)
         return metric.compute(references=metric_data[Y_TRUE], predictions=metric_data[Y_PRED])
 
     metric = get_metric(metric_name)

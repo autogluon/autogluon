@@ -1,35 +1,46 @@
 import logging
 import os
+import random
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import pandas as pd
+import PIL
 from omegaconf import DictConfig, OmegaConf
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
 from autogluon.core.utils.loaders import load_pd
+from autogluon.core.utils.utils import default_holdout_frac
 
 from ..constants import (
     AUTOMM,
     BINARY,
     CATEGORICAL,
     DEFAULT_SHOT,
+    DOCUMENT,
     FEW_SHOT,
     IMAGE,
     LABEL,
+    MMLAB_MODELS,
     NER,
     NER_ANNOTATION,
     NER_TEXT,
     NUMERICAL,
     ROIS,
     TEXT,
+    TEXT_NER,
 )
 from ..data import (
     CategoricalProcessor,
+    DocumentProcessor,
     ImageProcessor,
     LabelProcessor,
     MixupModule,
+    MMDetProcessor,
+    MMOcrProcessor,
     MultiModalFeaturePreprocessor,
     NerLabelEncoder,
     NerProcessor,
@@ -148,10 +159,26 @@ def create_data_processor(
         )
     elif data_type == LABEL:
         data_processor = LabelProcessor(model=model)
-    elif data_type == NER:
+    elif data_type == TEXT_NER:
         data_processor = NerProcessor(
             model=model,
             max_len=model_config.max_text_len,
+            config=config,
+        )
+    elif data_type == ROIS:
+        data_processor = MMDetProcessor(
+            model=model,
+            max_img_num_per_col=model_config.max_img_num_per_col,
+            missing_value_strategy=config.data.image.missing_value_strategy,
+        )
+    elif data_type == DOCUMENT:
+        data_processor = DocumentProcessor(
+            model=model,
+            train_transform_types=model_config.train_transform_types,
+            val_transform_types=model_config.val_transform_types,
+            norm_type=model_config.image_norm,
+            size=model_config.image_size,
+            text_max_len=model_config.max_text_len,
         )
     else:
         raise ValueError(f"unknown data type: {data_type}")
@@ -192,7 +219,9 @@ def create_fusion_data_processors(
         CATEGORICAL: [],
         NUMERICAL: [],
         LABEL: [],
-        NER: [],
+        ROIS: [],
+        TEXT_NER: [],
+        DOCUMENT: [],
     }
 
     model_dict = {model.prefix: model}
@@ -212,16 +241,27 @@ def create_fusion_data_processors(
 
         if per_name == NER_TEXT:
             # create a multimodal processor for NER.
-            data_processors[NER].append(
+            data_processors[TEXT_NER].append(
                 create_data_processor(
-                    data_type=NER,
+                    data_type=TEXT_NER,
                     config=config,
                     model=per_model,
                 )
             )
             requires_label = False
-            if data_types is not None and TEXT in data_types:
-                data_types.remove(TEXT)
+            if data_types is not None and TEXT_NER in data_types:
+                data_types.remove(TEXT_NER)
+        elif per_name.lower().startswith(MMLAB_MODELS):
+            # create a multimodal processor for NER.
+            data_processors[ROIS].append(
+                create_data_processor(
+                    data_type=ROIS,
+                    config=config,
+                    model=per_model,
+                )
+            )
+            if data_types is not None and IMAGE in data_types:
+                data_types.remove(IMAGE)
 
         if requires_label:
             # each model has its own label processor
@@ -243,6 +283,10 @@ def create_fusion_data_processors(
 
     # Only keep the modalities with non-empty processors.
     data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
+
+    if TEXT_NER in data_processors and LABEL in data_processors:
+        # LabelProcessor is not needed for NER tasks as annotations are handled in NerProcessor.
+        data_processors.pop(LABEL)
     return data_processors
 
 
@@ -266,7 +310,7 @@ def assign_feature_column_names(
     The data processors with feature column names added.
     """
     for per_modality in data_processors:
-        if per_modality == LABEL or per_modality == NER:
+        if per_modality == LABEL or per_modality == TEXT_NER:
             continue
         for per_model_processor in data_processors[per_modality]:
             # requires_column_info=True is used for feature column distillation.
@@ -427,12 +471,21 @@ def data_to_df(
     elif isinstance(data, dict):
         data = pd.DataFrame(data)
     elif isinstance(data, list):
-        if header is None:
-            data = pd.DataFrame(data)
+        assert len(data) > 0, f"Expected data to have length > 0, but got {data} of len {len(data)}"
+        if contains_valid_images(data):
+            data_dict = {"image": data}
+            data = pd.DataFrame(data_dict)
         else:
-            data = pd.DataFrame({header: data})
+            if header is None:
+                data = pd.DataFrame(data)
+            else:
+                data = pd.DataFrame({header: data})
     elif isinstance(data, str):
-        data = load_pd.load(data)
+        if contains_valid_images(data):
+            data_dict = {"image": [data]}
+            data = pd.DataFrame(data_dict)
+        else:
+            data = load_pd.load(data)
     else:
         raise NotImplementedError(
             f"The format of data is not understood. "
@@ -515,3 +568,80 @@ def infer_dtypes_by_model_names(model_config: DictConfig):
         fallback_dtype = list(allowable_dtypes)[0]
 
     return allowable_dtypes, fallback_dtype
+
+
+def contains_valid_images(data: Union[str, list], sample_n: Optional[int] = 50) -> bool:
+    """
+    Check if the data contains valid uncorrupted images. If data is a list of file paths, as long as there's 1 image
+    that can be opened with PIL, the data contains valid uncorrupted images.
+    Parameters
+    ----------
+    data
+        path to the file to be checked, or list of file paths
+    Returns
+    -------
+    whether the data contains valid uncorrupted images
+    """
+
+    if isinstance(data, str):
+        try:
+            with PIL.Image.open(data) as _:
+                return True
+        except:
+            return False
+    elif isinstance(data, list):
+        data_index = list(range(len(data)))
+        num_samples = min(len(data), sample_n)
+        subsample_index = random.sample(data_index, k=num_samples)
+        for i in subsample_index:
+            image_path = data[i]
+            try:
+                with PIL.Image.open(image_path) as _:
+                    return True
+            except:
+                continue
+        return False
+    else:
+        raise Exception(f"Expected data to be a list or a str, but got {type(data)}")
+
+
+def split_train_tuning_data(train_data, tuning_data, holdout_frac, is_classification, label_column, seed):
+    """
+    Split training and tuning data.
+
+    Parameters
+    ----------
+    train_data
+        Provided training data.
+    tuning_data
+        Provided tuning data.
+    holdout_frac
+        Fraction of train_data to holdout as tuning_data.
+    is_classification
+        Whether is a classification task.
+    label_column
+        Header of label column.
+    seed
+        Random seed.
+
+    Returns
+    -------
+    The splitted training and tuning data.
+    """
+    if tuning_data is None:
+        if is_classification:
+            stratify = train_data[label_column]
+        else:
+            stratify = None
+        if holdout_frac is None:
+            val_frac = default_holdout_frac(len(train_data), hyperparameter_tune=False)
+        else:
+            val_frac = holdout_frac
+        train_data, tuning_data = train_test_split(
+            train_data,
+            test_size=val_frac,
+            stratify=stratify,
+            random_state=np.random.RandomState(seed),
+        )
+
+    return train_data, tuning_data

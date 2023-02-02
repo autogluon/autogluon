@@ -3,17 +3,22 @@
 set -ex
 
 ADDITIONAL_TEST_ARGS=$1
+IS_PLATFORM_TEST=$2
 
 source $(dirname "$0")/env_setup.sh
 
 setup_build_env
-export CUDA_VISIBLE_DEVICES=0
-install_core_all_tests
-install_features
-install_tabular_all
-install_multimodal
-install_text
-install_vision
+
+if [ "$IS_PLATFORM_TEST" = "true" ]
+then
+    setup_torch_cpu_non_linux
+else
+    setup_torch_gpu
+    export CUDA_VISIBLE_DEVICES=0
+fi
+
+install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/[all,tests]"
+install_multimodal "[tests]"
 
 cd tabular/
 if [ -n "$ADDITIONAL_TEST_ARGS" ]

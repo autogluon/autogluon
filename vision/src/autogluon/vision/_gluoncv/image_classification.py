@@ -16,8 +16,8 @@ import numpy as np
 import pandas as pd
 import autogluon.core as ag
 from autocfg import dataclass
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import MULTICLASS
-from autogluon.core.utils import ResourceManager
 from autogluon.core.task.base import BaseTask
 from autogluon.core.searcher import DummySearcher
 
@@ -138,7 +138,7 @@ def _train_image_classification(args,
                        'WARNING: Using MXNet models in ImagePredictor is deprecated as of v0.4.0 and may contain various bugs and issues!\n'
                        'In v0.6.0, ImagePredictor will no longer support training MXNet models. Please consider switching to specifying Torch models instead.\n'
                        'Users should ensure they update their code that depends on ImagePredictor when upgrading to future AutoGluon releases.\n'
-                       'For more information, refer to this GitHub issue: https://github.com/awslabs/autogluon/issues/1560\n'
+                       'For more information, refer to this GitHub issue: https://github.com/autogluon/autogluon/issues/1560\n'
                        '=============================================================================\n')
 
     args['estimator'] = TorchImageClassificationEstimator if dispatcher=='torch' else ImageClassificationEstimator

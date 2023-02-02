@@ -2,24 +2,23 @@ Multimodal Prediction
 =====================
 
 For problems on multimodal data tables that contain image, text, and tabular data, AutoGluon provides `MultiModalPredictor` (abbreviated as `AutoMM`)
-that automatically selects, fuses, and tunes deep learning backbones from popular packages like `timm <https://github.com/rwightman/pytorch-image-models>`_,
+that automatically selects, fuses, and tunes foundation models from popular packages like `timm <https://github.com/rwightman/pytorch-image-models>`_,
 `huggingface/transformers <https://github.com/huggingface/transformers>`_,
-`CLIP <https://github.com/openai/CLIP>`_, `MMDetection <https://github.com/open-mmlab/mmdetection>`_ etc. You can use AutoMM to build models for
-multimodal problems that involve image, text, tabular features, object bounding boxes, named entities, etc.
+`CLIP <https://github.com/openai/CLIP>`_, `MMDetection <https://github.com/open-mmlab/mmdetection>`_ etc.
 
-In addition, being good at multimodal problems implies that the predictor will be good for **each specific modality**.
-Thus, you can also use `AutoMM` to solve standard NLP/Vision tasks like sentiment classification,
-intent detection, paraphrase detection, image classification. Moreover, `AutoMM` can be used as a basic model in the multi-layer
+You can not only use `AutoMM` to solve standard NLP/Vision tasks
+such as sentiment classification, intent detection, paraphrase detection, image classification, but also use it for multimodal problems that involve image,
+text, tabular features, object bounding boxes, named entities, etc. Moreover, `AutoMM` can be used as a basic model in the multi-layer
 stack-ensemble of `AutoGluon Tabular <https://auto.gluon.ai/stable/tutorials/tabular_prediction/index.html>`_, and is powering up the FT-Transformer in `TabularPredictor`.
 
 Here are some example use-cases of AutoMM:
 
 - Multilingual text classification :doc:`[Tutorial] <text_prediction/multilingual_text>`
-- Predicting pets' popularity based on their description, photo, and other metadata. :doc:`[Tutorial] <multimodal_prediction/beginner_multimodal>` `[Example] <https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_pawpularity>`_.
+- Predicting pets' popularity based on their description, photo, and other metadata. :doc:`[Tutorial] <multimodal_prediction/beginner_multimodal>` `[Example] <https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_pawpularity>`_.
 - Predicting the price of book. :doc:`[Tutorial] <multimodal_prediction/multimodal_text_tabular>`.
-- Scoring student's essays. `[Example] <https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_feedback_prize>`_.
+- Scoring student's essays. `[Example] <https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_feedback_prize>`_.
 - Image classification. :doc:`[Tutorial] <image_prediction/beginner_image_cls>`.
-- Object detection. :doc:`[Tutorial] <object_detection/quick_start/quick_start_coco>` `[Example] <https://github.com/awslabs/autogluon/tree/master/examples/automm/object_detection>`_.
+- Object detection. :doc:`[Tutorial] <object_detection/quick_start/quick_start_coco>` `[Example] <https://github.com/autogluon/autogluon/tree/master/examples/automm/object_detection>`_.
 - Extracting named entities. :doc:`[Tutorial] <text_prediction/ner>`.
 - Search for relevant text / image via text queries. :doc:`[Tutorial] <matching/index>`.
 
@@ -27,8 +26,8 @@ Here are some example use-cases of AutoMM:
 In the following, we decomposed the functionalities of AutoMM and prepared step-by-step guide for each functionality.
 
 
-Text Prediction and Entity Extraction
--------------------------------------
+Text Data
+---------
 .. container:: cards
 
    .. card::
@@ -50,8 +49,8 @@ Text Prediction and Entity Extraction
       How to use MultiModalPredictor for entity extraction.
 
 
-Image Prediction
-----------------
+Image Data -- Classification / Regression
+-----------------------------------------
 .. container:: cards
 
    .. card::
@@ -67,8 +66,8 @@ Image Prediction
       How to enable zero-shot image classification in AutoMM via pretrained CLIP model.
 
 
-Object Detection
-----------------
+Image Data -- Object Detection
+--------------------------
 .. container:: cards
 
    .. card::
@@ -114,24 +113,6 @@ Object Detection
       How to finetune a pretrained model on a dataset in COCO format with high performance.
 
    .. card::
-      :title: Inference using a pretrained model - Quick Start
-      :link: object_detection/inference/detection_inference_quick_start.html
-
-      How to inference with a pretrained model on a small dataset (COCO Format)
-
-   .. card::
-      :title: Inference using a pretrained model - COCO dataset
-      :link: object_detection/inference/detection_inference_coco.html
-
-      How to inference with a pretrained model on COCO dataset
-
-   .. card::
-      :title: Inference using a pretrained model - VOC dataset
-      :link: object_detection/inference/detection_inference_voc.html
-
-      How to inference with a pretrained model on VOC dataset
-
-   .. card::
       :title: Evaluate Pretrained YOLOv3 on COCO Format Dataset
       :link: object_detection/evaluation/detection_eval_yolov3_coco.html
 
@@ -154,6 +135,17 @@ Object Detection
       :link: object_detection/evaluation/detection_eval_fasterrcnn_voc.html
 
       How to evaluate the pretrained Faster R-CNN model on dataset in VOC format
+
+
+Document Data
+-------------
+.. container:: cards
+
+   .. card::
+      :title: AutoMM for Scanned Document Classification
+      :link: document/document_classification.html
+
+      How to use MultiModalPredictor to build a scanned document classifier.
 
 
 Matching
@@ -179,8 +171,8 @@ Matching
       How to use CLIP to extract embeddings for retrieval problem.
 
 
-Multimodal Classification / Regression
---------------------------------------
+Multimodal Data
+---------------
 .. container:: cards
 
    .. card::
@@ -195,6 +187,12 @@ Multimodal Classification / Regression
       :link: multimodal_prediction/beginner_multimodal.html
 
       How to use MultiModalPredictor to train a model that predicts the adoption speed of pets.
+
+   .. card::
+      :title: AutoMM for Entity Extraction with Text and Image - Quick Start
+      :link: multimodal_prediction/multimodal_ner.html
+
+      How to use MultiModalPredictor to train a model for multimodal named entity recognition.
 
 
 Advanced Topics
@@ -226,6 +224,16 @@ Advanced Topics
 
       How to customize AutoMM configurations.
 
+FAQ
+---
+.. container:: cards
+
+   .. card::
+      :title: Frequently Asked Questions
+      :link: advanced_topics/multimodal_faq.html
+
+      Frequently Asked Questions
+
 
 .. toctree::
    :maxdepth: 2
@@ -233,7 +241,9 @@ Advanced Topics
 
    text_prediction/index
    image_prediction/index
+   object_detection/index
+   document/index
    matching/index
    multimodal_prediction/index
-   object_detection/index
    advanced_topics/index
+   advanced_topics/multimodal_faq.md

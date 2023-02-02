@@ -3,6 +3,7 @@ import datetime
 import tempfile
 import traceback
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Iterable
 
 import numpy as np
@@ -602,9 +603,18 @@ def test_when_dataset_sliced_by_step_then_static_features_are_correct():
     assert dfv.static_features.equals(df.static_features)
 
 
-def test_when_dataset_subsequenced_then_static_features_are_correct():
+def test_when_static_features_index_has_wrong_name_then_its_renamed_to_item_id():
+    original_df = SAMPLE_TS_DATAFRAME.copy()
+    item_ids = original_df.item_ids
+    static_features = pd.DataFrame({"feat1": np.zeros_like(item_ids)}, index=item_ids.rename("wrong_index_name"))
+    original_df.static_features = static_features
+    assert static_features.index.name != ITEMID
+    assert original_df.static_features.index.name == ITEMID
+
+
+def test_when_dataset_sliced_by_time_then_static_features_are_correct():
     df = SAMPLE_TS_DATAFRAME_STATIC
-    dfv = df.subsequence(START_TIMESTAMP, START_TIMESTAMP + datetime.timedelta(days=1))
+    dfv = df.slice_by_time(START_TIMESTAMP, START_TIMESTAMP + datetime.timedelta(days=1))
 
     assert isinstance(dfv, TimeSeriesDataFrame)
     assert len(dfv) == 1 * len(dfv.item_ids)
@@ -659,7 +669,7 @@ def test_given_wrong_static_feature_index_when_constructing_data_frame_then_erro
         },
         index=static_feature_index,  # noqa
     )
-    with pytest.raises(ValueError, match="match item index"):
+    with pytest.raises(ValueError, match="are missing from the index of static_features"):
         TimeSeriesDataFrame(data=SAMPLE_DATAFRAME, static_features=static_features)
 
 
@@ -681,7 +691,7 @@ def test_when_dataframe_sliced_by_item_array_then_static_features_stay_consisten
 
 def test_when_dataframe_reindexed_view_called_then_static_features_stay_consistent():
     view = SAMPLE_TS_DATAFRAME_STATIC.get_reindexed_view()
-    assert view._static_features is SAMPLE_TS_DATAFRAME_STATIC._static_features
+    assert view._static_features.equals(SAMPLE_TS_DATAFRAME_STATIC._static_features)
 
 
 SAMPLE_DATAFRAME_WITH_MIXED_INDEX = pd.DataFrame(
@@ -711,3 +721,29 @@ def test_when_static_features_are_modified_on_shallow_copy_then_original_df_does
     new_df = old_df.copy(deep=False)
     new_df.static_features = None
     assert old_df.static_features is not None
+
+
+@pytest.mark.parametrize("timestamp_column", ["timestamp", None, "custom_ts_column"])
+def test_when_dataset_constructed_from_dataframe_then_timestamp_column_is_converted_to_datetime(timestamp_column):
+    timestamps = ["2020-01-01", "2020-01-02", "2020-01-03"]
+    df = pd.DataFrame(
+        {
+            "item_id": np.ones(len(timestamps), dtype=np.int64),
+            timestamp_column or "timestamp": timestamps,
+            "target": np.ones(len(timestamps)),
+        }
+    )
+    ts_df = TimeSeriesDataFrame.from_data_frame(df, timestamp_column=timestamp_column)
+    assert ts_df.index.get_level_values(level=TIMESTAMP).dtype == "datetime64[ns]"
+
+
+def test_when_path_is_given_to_constructor_then_tsdf_is_constructed_correctly():
+    df = SAMPLE_TS_DATAFRAME.reset_index()
+    with TemporaryDirectory() as temp_dir:
+        temp_file = str(Path(temp_dir) / f"temp.csv")
+        df.to_csv(temp_file)
+
+        ts_df = TimeSeriesDataFrame(temp_file)
+        assert isinstance(ts_df.index, pd.MultiIndex)
+        assert ts_df.index.names == [ITEMID, TIMESTAMP]
+        assert len(ts_df) == len(SAMPLE_TS_DATAFRAME)

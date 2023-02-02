@@ -197,7 +197,7 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
-          chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh "-m not gpu"
+          chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh "-m not gpu" "true"
 
   install:
     needs: setup

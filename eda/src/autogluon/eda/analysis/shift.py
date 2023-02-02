@@ -1,5 +1,5 @@
 import copy
-from typing import Union, List, Any, Optional, Dict
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -8,9 +8,10 @@ from autogluon.core.constants import BINARY
 from autogluon.core.metrics import BINARY_METRICS, roc_auc
 from autogluon.core.utils import generate_train_test_split
 from autogluon.tabular import TabularPredictor
-from .base import AbstractAnalysis
+
 from .. import AnalysisState
 from ..state import StateCheckMixin
+from .base import AbstractAnalysis
 
 __all__ = ["XShiftDetector"]
 
@@ -98,7 +99,7 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return self.all_keys_must_be_present(args, "train_data", "test_data")
 
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         """Fit method.  `args` can contain
         - 'train_data': pd.DataFrame, required
         - 'test_data': pd.DataFrame, required
@@ -123,9 +124,8 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
         else:
             fi_scores = None
         pvalue = self.C2ST.pvalue(num_permutations=self.num_permutations)
-        det_status = pvalue <= self.pvalue_thresh
         state.xshift_results = {
-            "detection_status": det_status,
+            "detection_status": bool(pvalue <= self.pvalue_thresh),  # numpy.bool_ -> bool
             "test_statistic": self.C2ST.test_stat,
             "pvalue": pvalue,
             "pvalue_threshold": self.pvalue_thresh,
@@ -179,7 +179,6 @@ class Classifier2ST:
         classifier_kwargs: Optional[Dict] = None,
         test_size_2st=0.3,
     ):
-
         if classifier_kwargs is None:
             classifier_kwargs = {}
         else:

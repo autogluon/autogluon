@@ -1,4 +1,4 @@
-from autogluon.core.utils import ResourceManager
+from autogluon.common.utils.resource_utils import ResourceManager
 
 
 def test_resources_mocking(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus):

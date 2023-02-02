@@ -46,7 +46,7 @@ class VWFeaturesConverter:
         """
         Based on the type of feature, preprocess/sanify these features so that it is in VW format
         Only use raw text, numeric integer, numeric decimals, and category
-        Ref: https://github.com/awslabs/autogluon/blob/master/common/src/autogluon/common/features/types.py
+        Ref: https://github.com/autogluon/autogluon/blob/master/common/src/autogluon/common/features/types.py
 
         :param input_series: A single feature as Pandas Series
         :param raw_feature: Raw feature Type

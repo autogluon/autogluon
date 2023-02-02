@@ -7,7 +7,15 @@ import platform
 import sys
 from typing import Dict, Any
 
+from ..version import __version__
+try:
+    from ..version import __lite__
+except ImportError:
+    __lite__ = False
+
 logger = logging.getLogger(__name__)
+
+LITE_MODE: bool = __lite__ is not None and __lite__
 
 
 def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None):
@@ -72,11 +80,10 @@ def get_package_versions() -> Dict[str, str]:
 
 
 def get_autogluon_metadata() -> Dict[str, Any]:
-    from ..version import __version__
-
     metadata = dict(
         system=platform.system(),
         version=f"{__version__}",
+        lite=__lite__,
         py_version=get_python_version(include_micro=False),
         py_version_micro=get_python_version(include_micro=True),
         packages=get_package_versions(),
@@ -124,3 +131,9 @@ def compare_autogluon_metadata(*, original: dict, current: dict, check_packages=
         logger.log(log[0], f"\t{log[1]}")
 
     return logs
+
+
+def bytes_to_mega_bytes(memory_amount: int) -> int:
+    """ Utility to convert a number of bytes (int) into a number of mega bytes (int)
+    """
+    return memory_amount >> 20

@@ -4,7 +4,7 @@ import numpy as np
 from torch import nn
 
 from ..constants import CATEGORICAL, COLUMN
-from .collator import Stack, Tuple
+from .collator import StackCollator, TupleCollator
 
 
 class CategoricalProcessor:
@@ -22,8 +22,8 @@ class CategoricalProcessor:
         """
         Parameters
         ----------
-        prefix
-            The prefix connecting a processor to its corresponding model.
+        model
+            The model for which this processor would be created.
         requires_column_info
             Whether to require feature column information in dataloader.
         """
@@ -51,9 +51,9 @@ class CategoricalProcessor:
         if self.requires_column_info:
             assert categorical_column_names, "Empty categorical column names."
             for col_name in categorical_column_names:
-                fn[f"{self.categorical_column_prefix}_{col_name}"] = Stack()
+                fn[f"{self.categorical_column_prefix}_{col_name}"] = StackCollator()
 
-        fn[self.categorical_key] = Tuple([Stack() for _ in range(len(categorical_column_names))])
+        fn[self.categorical_key] = TupleCollator([StackCollator() for _ in range(len(categorical_column_names))])
 
         return fn
 

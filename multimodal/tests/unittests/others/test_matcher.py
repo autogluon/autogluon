@@ -11,8 +11,8 @@ from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import BINARY, MULTICLASS, QUERY, RESPONSE, UNIFORM_SOUP
 from autogluon.multimodal.utils import convert_data_for_ranking, semantic_search
 
-from .unittest_datasets import Flickr30kDataset, IDChangeDetectionDataset
-from .utils import get_home_dir
+from ..utils.unittest_datasets import Flickr30kDataset, IDChangeDetectionDataset
+from ..utils.utils import get_home_dir
 
 ALL_DATASETS = {
     "id_change_detection": IDChangeDetectionDataset,
@@ -40,6 +40,25 @@ def verify_matcher_save_load(matcher, df, verify_embedding=True, cls=MultiModalP
             response_embeddings = matcher.extract_embedding(df, signature=RESPONSE)
             assert query_embeddings.shape[0] == len(df)
             assert response_embeddings.shape[0] == len(df)
+
+
+def verify_matcher_realtime_inference(matcher, df, verify_embedding=True):
+    for i in range(1, 3):
+        df_small = df.head(i)
+        predictions_default = matcher.predict(df_small, as_pandas=False, realtime=False)
+        predictions_realtime = matcher.predict(df_small, as_pandas=False, realtime=True)
+        npt.assert_equal(predictions_default, predictions_realtime)
+        if matcher._problem_type in [BINARY, MULTICLASS]:
+            predictions_prob_default = matcher.predict_proba(df_small, as_pandas=False, realtime=False)
+            predictions_prob_realtime = matcher.predict_proba(df_small, as_pandas=False, realtime=True)
+            npt.assert_equal(predictions_prob_default, predictions_prob_realtime)
+        if verify_embedding:
+            embeddings_default = matcher.extract_embedding(df_small, signature=QUERY, realtime=False)
+            embeddings_realtime = matcher.extract_embedding(df_small, signature=QUERY, realtime=True)
+            npt.assert_equal(embeddings_default, embeddings_realtime)
+            embeddings_default = matcher.extract_embedding(df_small, signature=RESPONSE, realtime=False)
+            embeddings_realtime = matcher.extract_embedding(df_small, signature=RESPONSE, realtime=True)
+            npt.assert_equal(embeddings_default, embeddings_realtime)
 
 
 def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, metric_name, symmetric=False):
@@ -188,6 +207,7 @@ def test_matcher(
     else:
         score = matcher.evaluate(dataset.test_df)
     verify_matcher_save_load(matcher, dataset.test_df, cls=MultiModalPredictor)
+    verify_matcher_realtime_inference(matcher, dataset.test_df)
 
     # Test for continuous fit
     matcher.fit(

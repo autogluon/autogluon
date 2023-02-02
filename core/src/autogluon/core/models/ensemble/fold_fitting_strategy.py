@@ -5,15 +5,15 @@ import os
 import time
 import pandas as pd
 import pickle
-import psutil
-
 from abc import abstractmethod
 
 from numpy import ndarray
 from pandas import DataFrame, Series
 from typing import Union
 
+from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.resource_utils import ResourceManager
 
 from ...ray.resources_calculator import ResourceCalculatorFactory
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NotEnoughCudaMemoryError
@@ -137,8 +137,18 @@ class LocalFoldFittingStrategy(AbstractFoldFittingStrategy):
         self.time_limit_fold_ratio = time_limit_fold_ratio
         self.num_cpus = num_cpus
         self.num_gpus = num_gpus
-        logger.debug(f'Bagging total_num_cpus, num_gpus {self.num_cpus} | {self.num_gpus}')
+        logger.debug(f'Upper level total_num_cpus, num_gpus {self.num_cpus} | {self.num_gpus}')
+        self._validate_user_specified_resources()
+
+    def schedule_fold_model_fit(self, fold_ctx):
+        raise NotImplementedError
+
+    def after_all_folds_scheduled(self):
+        raise NotImplementedError
+    
+    def _validate_user_specified_resources(self):
         # User specified value through ag_args_fit means they want this individual model to use this amount of resources
+        user_ensemble_resources = None
         user_resources_per_job = None
         # initialize the model base to get necessary info for estimating memory usage and getting resources
         self._initialized_model_base = copy.deepcopy(self.model_base)
@@ -152,6 +162,25 @@ class LocalFoldFittingStrategy(AbstractFoldFittingStrategy):
         minimum_model_num_gpus = minimum_model_resources.get('num_gpus', 0)
         logger.debug(f'minimum_model_resources: {minimum_model_resources}')
         logger.debug(f'user_cpu_per_job, user_gpu_per_job {user_cpu_per_job} | {user_gpu_per_job}')
+        user_ensemble_cpu = self.bagged_ensemble_model._user_params_aux.get('num_cpus', None)
+        user_ensemble_gpu = self.bagged_ensemble_model._user_params_aux.get('num_gpus', None)
+        logger.debug(f'user_ensemble_cpu, user_ensemble_gpu {user_ensemble_cpu} | {user_ensemble_gpu}')
+        if user_ensemble_cpu is not None or user_ensemble_gpu is not None:
+            user_ensemble_resources = dict()
+        if user_ensemble_cpu is not None:
+            assert user_ensemble_cpu <= self.num_cpus, \
+                f"Detected ensemble cpu requirement = {user_ensemble_cpu} > total cpu granted = {self.num_cpus}"
+            assert user_ensemble_cpu >= minimum_model_num_cpus, \
+                f"Detected ensenble cpu requirement = {user_ensemble_cpu} < minimum cpu required by the model = {minimum_model_num_cpus}"
+            user_ensemble_resources['num_cpus'] = user_ensemble_cpu
+            self.num_cpus = user_ensemble_cpu
+        if user_ensemble_gpu is not None:
+            assert user_ensemble_gpu <= self.num_gpus, \
+                f"Detected ensemble gpu requirement = {user_ensemble_gpu} > total gpu granted = {self.num_gpus}"
+            assert user_ensemble_gpu >= minimum_model_num_gpus, \
+                f"Detected ensenble gpu requirement = {user_ensemble_cpu} < minimum gpu required by the model = {minimum_model_num_gpus}"
+            user_ensemble_resources['num_gpus'] = user_ensemble_gpu
+            self.num_gpus = user_ensemble_gpu
         if user_cpu_per_job is not None or user_gpu_per_job is not None:
             user_resources_per_job = dict()
         if user_cpu_per_job is not None:
@@ -166,13 +195,8 @@ class LocalFoldFittingStrategy(AbstractFoldFittingStrategy):
             assert user_gpu_per_job >= minimum_model_num_gpus, \
                 f"Detected model level gpu requirement = {user_gpu_per_job} < minimum gpu required by the model = {minimum_model_num_gpus}"
             user_resources_per_job['num_gpus'] = user_gpu_per_job
+        self.user_ensemble_resources = user_ensemble_resources
         self.user_resources_per_job = user_resources_per_job
-
-    def schedule_fold_model_fit(self, fold_ctx):
-        raise NotImplementedError
-
-    def after_all_folds_scheduled(self):
-        raise NotImplementedError
 
     def _get_fold_time_limit(self, fold_ctx):
         _, folds_finished, folds_left, folds_to_fit, _, _ = self._get_fold_properties(fold_ctx)
@@ -243,6 +267,20 @@ class SequentialLocalFoldFittingStrategy(LocalFoldFittingStrategy):
     """
     This strategy fits the folds locally in a sequence.
     """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.user_ensemble_resources is None:
+            if self.user_resources_per_job is None:
+                self.num_cpus, self.num_gpus = self.model_base._get_default_resources()
+            else:
+                self.num_cpus = self.user_resources_per_job.get('num_cpus', self.num_cpus)
+                self.num_gpus = self.user_resources_per_job.get('num_gpus', self.num_gpus)
+        else:
+            if self.user_resources_per_job is not None:
+                self.num_cpus = self.user_resources_per_job.get('num_cpus', self.num_cpus)
+                self.num_gpus = self.user_resources_per_job.get('num_gpus', self.num_gpus)
+        self.resources = {'num_cpus': self.num_cpus, 'num_gpus': self.num_gpus}
+        
     def schedule_fold_model_fit(self, fold_ctx):
         self.jobs.append(fold_ctx)
 
@@ -415,13 +453,14 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
             user_resources_per_job=self.user_resources_per_job
         )
 
+    @disable_if_lite_mode(ret=True)
     def is_mem_sufficient(self):
         '''Check if the memory is sufficient to do parallel training'''
         model_mem_est = self._initialized_model_base.estimate_memory_usage(X=self.X)
         total_model_mem_est = self.num_parallel_jobs * model_mem_est
         data_mem_est = self._estimate_data_memory_usage()
         total_data_mem_est = self.num_parallel_jobs * data_mem_est
-        mem_available = psutil.virtual_memory().available
+        mem_available = ResourceManager.get_available_virtual_mem()
         return (mem_available * self.max_memory_usage_ratio) > (total_model_mem_est + total_data_mem_est)
 
     def _estimate_data_memory_usage(self):

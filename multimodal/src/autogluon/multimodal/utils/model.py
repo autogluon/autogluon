@@ -1,4 +1,5 @@
 import functools
+import json
 import logging
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -13,7 +14,10 @@ from ..constants import (
     CATEGORICAL_MLP,
     CATEGORICAL_TRANSFORMER,
     CLIP,
+    DOCUMENT,
+    DOCUMENT_TRANSFORMER,
     FUSION_MLP,
+    FUSION_NER,
     FUSION_TRANSFORMER,
     HF_TEXT,
     IMAGE,
@@ -27,6 +31,7 @@ from ..constants import (
     NUMERICAL_TRANSFORMER,
     T_FEW,
     TEXT,
+    TEXT_NER,
     TIMM_IMAGE,
 )
 from ..data import MultiModalFeaturePreprocessor
@@ -34,19 +39,21 @@ from ..models import (
     CategoricalMLP,
     CategoricalTransformer,
     CLIPForImageText,
+    DocumentTransformer,
     HFAutoModelForNER,
     HFAutoModelForTextPrediction,
     MMDetAutoModelForObjectDetection,
     MMOCRAutoModelForTextDetection,
     MMOCRAutoModelForTextRecognition,
     MultimodalFusionMLP,
+    MultimodalFusionNER,
     MultimodalFusionTransformer,
     NumericalMLP,
     NumericalTransformer,
     TFewModel,
     TimmAutoModelForImagePrediction,
 )
-from ..models.utils import inject_ia3_to_linear_layer, inject_lora_to_linear_layer
+from ..models.utils import inject_adaptation_to_linear_layer
 
 logger = logging.getLogger(AUTOMM)
 
@@ -91,6 +98,10 @@ def select_model(
         data_status[CATEGORICAL] = True
     if len(df_preprocessor.numerical_feature_names) > 0:
         data_status[NUMERICAL] = True
+    if len(df_preprocessor.ner_feature_names) > 0:
+        data_status[TEXT_NER] = True
+    if len(df_preprocessor.document_feature_names) > 0:
+        data_status[DOCUMENT] = True
 
     names = config.model.names
     if isinstance(names, str):
@@ -132,6 +143,12 @@ def select_model(
     logger.debug(f"selected models: {selected_model_names}")
     for model_name in selected_model_names:
         logger.debug(f"model dtypes: {getattr(config.model, model_name).data_types}")
+
+    # clean up unused model configs
+    model_keys = list(config.model.keys())
+    for model_name in model_keys:
+        if model_name not in selected_model_names + ["names"]:
+            delattr(config.model, model_name)
 
     return config
 
@@ -276,11 +293,21 @@ def create_model(
             additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
         )
+    elif model_name.lower().startswith(DOCUMENT_TRANSFORMER):
+        model = DocumentTransformer(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
+            gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            low_cpu_mem_usage=OmegaConf.select(model_config, "low_cpu_mem_usage", default=False),
+            pretrained=pretrained,
+        )
     elif model_name.lower().startswith(MMDET_IMAGE):
         model = MMDetAutoModelForObjectDetection(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
-            num_classes=num_classes,
+            config_file=OmegaConf.select(model_config, "config_file", default=None),
             classes=classes,
             pretrained=pretrained,
         )
@@ -306,6 +333,18 @@ def create_model(
     elif model_name.lower().startswith(FUSION_MLP):
         model = functools.partial(
             MultimodalFusionMLP,
+            prefix=model_name,
+            hidden_features=model_config.hidden_sizes,
+            num_classes=num_classes,
+            adapt_in_features=model_config.adapt_in_features,
+            activation=model_config.activation,
+            dropout_prob=model_config.drop_rate,
+            normalization=model_config.normalization,
+            loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
+        )
+    elif model_name.lower().startswith(FUSION_NER):
+        model = functools.partial(
+            MultimodalFusionNER,
             prefix=model_name,
             hidden_features=model_config.hidden_sizes,
             num_classes=num_classes,
@@ -406,7 +445,10 @@ def create_fusion_model(
                     f"More than one fusion models are detected in {names}. Only one fusion model is allowed."
                 )
         else:  # single model
-            if OmegaConf.select(config, "optimization.efficient_finetune"):
+            if (
+                OmegaConf.select(config, "optimization.efficient_finetune") is not None
+                and OmegaConf.select(config, "optimization.efficient_finetune") != "None"
+            ):
                 model = apply_model_adaptation(model, config)
             single_models.append(model)
 
@@ -434,21 +476,14 @@ def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
     config:
         A DictConfig object. The optimization config should be accessible by "config.optimization".
     """
-    if "lora" in OmegaConf.select(config, "optimization.efficient_finetune"):
-        model = inject_lora_to_linear_layer(
-            model=model,
-            lora_r=config.optimization.lora.r,
-            lora_alpha=config.optimization.lora.alpha,
-            module_filter=config.optimization.lora.module_filter,
-            filter=config.optimization.lora.filter,
-        )
-    elif "ia3" in OmegaConf.select(config, "optimization.efficient_finetune"):
-        model = inject_ia3_to_linear_layer(
-            model=model,
-            module_filter=config.optimization.lora.module_filter,
-            filter=config.optimization.lora.filter,
-        )
-
+    model = inject_adaptation_to_linear_layer(
+        model=model,
+        efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+        lora_r=config.optimization.lora.r,
+        lora_alpha=config.optimization.lora.alpha,
+        module_filter=config.optimization.lora.module_filter,
+        filter=config.optimization.lora.filter,
+    )
     model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.
 
     return model

@@ -8,12 +8,8 @@ from typing import Dict, List, Optional, Tuple, Union
 import torch
 from torch import nn
 
-try:
-    from mmcv.parallel import DataContainer
-except:
-    pass
-
-from ..constants import AUTOMM
+from ..constants import AUTOMM, OBJECT_DETECTION, OCR
+from .mmcv import DataContainer
 
 logger = logging.getLogger(AUTOMM)
 
@@ -155,7 +151,7 @@ def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List, Tuple], devic
         for v in obj:
             res.append(move_to_device(v, device))
         return res
-    elif isinstance(obj, DataContainer):
+    elif isinstance(obj, (int, float, str, DataContainer)):
         return obj
     else:
         raise TypeError(
@@ -240,3 +236,41 @@ def get_precision_context(precision: Union[int, str], device_type: Optional[str]
         return double_precision_context()
     else:
         raise ValueError(f"Unknown precision: {precision}")
+
+
+def check_if_packages_installed(problem_type: str):
+    """
+    Check if necessary packages are installed for some problem types.
+    Raise an error if an package can't be imported.
+
+    Parameters
+    ----------
+    problem_type
+        Problem type
+    """
+    if not problem_type:
+        return
+
+    problem_type = problem_type.lower()
+    if any(p in problem_type for p in [OBJECT_DETECTION, OCR]):
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                import mmcv
+        except ImportError as e:
+            raise ValueError(
+                f"Encountered error while importing mmcv: {e}. Try to install mmcv: mim install mmcv-full."
+            )
+
+        try:
+            import mmdet
+        except ImportError as e:
+            raise ValueError(f"Encountered error while importing mmdet: {e}. Try to install mmdet: pip install mmdet.")
+
+        if OCR in problem_type:
+            try:
+                import mmocr
+            except ImportError as e:
+                raise ValueError(
+                    f"Encountered error while importing mmocr: {e}. Try to install mmocr: pip install mmocr."
+                )

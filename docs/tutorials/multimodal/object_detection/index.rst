@@ -1,9 +1,9 @@
-Object Detection
-================
+Image Data -- Object Detection
+==============================
 
 Pre-requisite
 -------------
-All detection modules depend on ``mmcv-full`` and ``mmdet`` packages.
+All detection modules depend on ``mmcv-full``, ``mmdet`` and ``pycocotools`` packages.
 
 
 To install ``mmcv-full``, run:
@@ -14,10 +14,18 @@ To install ``mmdet``, run:
 
     ``pip install mmdet``
 
+To install ``pycocotools``, run:
+
+    ``pip install pycocotools``
+
+We suggest to install the version between ``pycocotools>=2.0.5,<2.0.7``.
+Note that Windows users should install ``pycocotools`` by: ``pip install pycocotools-windows``, but it only supports python 3.6/3.7/3.8.
+
 For additional support, please refer to official instructions for mmdet_ and mmcv-full_
 
 .. _mmdet: https://mmdetection.readthedocs.io/en/v2.2.1/install.html
 .. _mmcv-full: https://mmcv.readthedocs.io/en/latest/get_started/installation.html
+
 
 
 Quick Start
@@ -29,7 +37,6 @@ Quick Start
       :link: quick_start/quick_start_coco.html
 
       How to train high quality object detection model with MultiModalPredictor in under 5 minutes on COCO format dataset.
-
 
 Data Preparation
 ------------------
@@ -75,29 +82,6 @@ Finetune
       :link: finetune/detection_high_performance_finetune_coco.html
 
       How to finetune a pretrained model on a dataset in COCO format with high performance.
-
-
-Inference
-------------------
-.. container:: cards
-
-   .. card::
-      :title: Inference using a pretrained model - Quick Start
-      :link: inference/detection_inference_quick_start.html
-
-      How to inference with a pretrained model on a small dataset (COCO Format)
-
-   .. card::
-      :title: Inference using a pretrained model - COCO dataset
-      :link: inference/detection_inference_coco.html
-
-      How to inference with a pretrained model on COCO dataset
-
-   .. card::
-      :title: Inference using a pretrained model - VOC dataset
-      :link: inference/detection_inference_voc.html
-
-      How to inference with a pretrained model on VOC dataset
 
 
 Evaluation

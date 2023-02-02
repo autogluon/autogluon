@@ -1,4 +1,5 @@
 import copy
+import json
 import logging
 import os
 import warnings
@@ -10,6 +11,8 @@ from torch import nn
 from ..constants import (
     AUTOMM,
     CATEGORICAL_TRANSFORMER,
+    FUSION_MLP,
+    FUSION_NER,
     FUSION_TRANSFORMER,
     HF_MODELS,
     NER,
@@ -18,12 +21,13 @@ from ..constants import (
     REGRESSION,
     VALID_CONFIG_KEYS,
 )
+from ..models import TimmAutoModelForImagePrediction
 from ..presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
 
 
-def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[str]]):
+def filter_search_space(hyperparameters: Dict, keys_to_filter: Union[str, List[str]]):
     """
     Filter search space within hyperparameters without the given keys as prefixes.
     Hyperparameters that are not search space will not be filtered.
@@ -39,6 +43,9 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
     -------
         hyperparameters being filtered
     """
+    if isinstance(keys_to_filter, str):
+        keys_to_filter = [keys_to_filter]
+
     assert any(
         key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter
     ), f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
@@ -47,8 +54,6 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
     from autogluon.core.space import Space
 
     hyperparameters = copy.deepcopy(hyperparameters)
-    if isinstance(keys_to_filter, str):
-        keys_to_filter = [keys_to_filter]
     for hyperparameter, value in hyperparameters.copy().items():
         if not isinstance(value, (Space, Domain)):
             continue
@@ -59,6 +64,7 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
 
 
 def get_config(
+    problem_type: Optional[str] = None,
     presets: Optional[str] = None,
     config: Optional[Union[dict, DictConfig]] = None,
     overrides: Optional[Union[str, List[str], Dict]] = None,
@@ -70,11 +76,13 @@ def get_config(
 
     Parameters
     ----------
+    problem_type
+        Problem type.
     presets
-        Name of the presets.
+        Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
     config
         A dictionary including four keys: "model", "data", "optimization", and "environment".
-        If any key is not not given, we will fill in with the default value.
+        If any key is not given, we will fill in with the default value.
 
         The value of each key can be a string, yaml path, or DictConfig object. For example:
         config = {
@@ -132,7 +140,7 @@ def get_config(
         if presets is None:
             preset_overrides = None
         else:
-            preset_overrides = get_automm_presets(presets=presets)
+            preset_overrides, _ = get_automm_presets(problem_type=problem_type, presets=presets)
 
         for k, default_value in basic_config.items():
             if k not in config:
@@ -480,8 +488,7 @@ def update_config_by_rules(
                 "the loss_function automatically otherwise.",
                 UserWarning,
             )
-    if problem_type == NER:
-        config.model.names = [NER_TEXT]
+
     return config
 
 
@@ -544,3 +551,24 @@ def update_tabular_config_by_resources(
         )
 
     return config
+
+
+def get_pretrain_configs_dir(subfolder: Optional[str] = None):
+    import autogluon.multimodal
+
+    pretrain_config_dir = os.path.join(autogluon.multimodal.__path__[0], "configs", "pretrain")
+    if subfolder:
+        pretrain_config_dir = os.path.join(pretrain_config_dir, subfolder)
+    return pretrain_config_dir
+
+
+def filter_timm_pretrained_cfg(cfg, remove_source=False, remove_null=True):
+    filtered_cfg = {}
+    keep_null = {"pool_size", "first_conv", "classifier"}  # always keep these keys, even if none
+    for k, v in cfg.items():
+        if remove_source and k in {"url", "file", "hf_hub_id", "hf_hub_id", "hf_hub_filename", "source"}:
+            continue
+        if remove_null and v is None and k not in keep_null:
+            continue
+        filtered_cfg[k] = v
+    return filtered_cfg

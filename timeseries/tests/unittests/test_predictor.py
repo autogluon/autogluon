@@ -13,7 +13,7 @@ from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter
 
-from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME
+from .common import DUMMY_TS_DATAFRAME
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
@@ -503,3 +503,96 @@ def test_when_target_included_in_known_covariates_then_exception_is_raised(temp_
         predictor = TimeSeriesPredictor(
             path_context=temp_model_path, target=target_column, known_covariates_names=["Y", target_column, "X"]
         )
+
+
+@pytest.mark.parametrize(
+    "hyperparameters, num_models",
+    [
+        ({"Naive": {}}, 1),
+        ({"Naive": {}, "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}}, 3),  # + 1 for ensemble
+    ],
+)
+def test_when_fit_summary_is_called_then_all_keys_and_models_are_included(
+    temp_model_path, hyperparameters, num_models
+):
+    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
+    expected_keys = [
+        "model_types",
+        "model_performance",
+        "model_best",
+        "model_paths",
+        "model_fit_times",
+        "model_pred_times",
+        "model_hyperparams",
+        "leaderboard",
+    ]
+    fit_summary = predictor.fit_summary()
+    for key in expected_keys:
+        assert key in fit_summary
+        # All keys except model_best return a dict with results per model
+        if key != "model_best":
+            assert len(fit_summary[key]) == num_models
+
+
+@pytest.mark.parametrize(
+    "hyperparameters, num_models",
+    [
+        ({"Naive": {}}, 1),
+        ({"Naive": {}, "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}}, 3),  # + 1 for ensemble
+    ],
+)
+def test_when_info_is_called_then_all_keys_and_models_are_included(temp_model_path, hyperparameters, num_models):
+    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
+    expected_keys = [
+        "path",
+        "version",
+        "time_fit_training",
+        "time_limit",
+        "best_model",
+        "best_model_score_val",
+        "num_models_trained",
+        "model_info",
+    ]
+    info = predictor.info()
+    for key in expected_keys:
+        assert key in info
+
+    assert len(info["model_info"]) == num_models
+
+
+def test_when_train_data_contains_nans_then_exception_is_raised(temp_model_path):
+    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    df = DUMMY_TS_DATAFRAME.copy()
+    df.iloc[5] = np.nan
+    with pytest.raises(ValueError, match="missing values"):
+        predictor.fit(df)
+
+
+def test_when_prediction_data_contains_nans_then_exception_is_raised(temp_model_path):
+    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    df = DUMMY_TS_DATAFRAME.copy()
+    df.iloc[5] = np.nan
+    with pytest.raises(ValueError, match="missing values"):
+        predictor.predict(df)
+
+
+def test_given_data_is_in_dataframe_format_then_predictor_works(temp_model_path):
+    df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
+    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    predictor.fit(df, hyperparameters={"Naive": {}})
+    predictor.leaderboard(df)
+    predictor.score(df)
+    predictions = predictor.predict(df)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+
+
+@pytest.mark.parametrize("rename_columns", [{TIMESTAMP: "custom_timestamp"}, {ITEMID: "custom_item_id"}])
+def test_given_data_cannot_be_interpreted_as_tsdf_then_exception_raised(temp_model_path, rename_columns):
+    df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
+    df = df.rename(columns=rename_columns)
+    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    with pytest.raises(ValueError, match="cannot be automatically converted to a TimeSeriesDataFrame"):
+        predictor.fit(df, hyperparameters={"Naive": {}})

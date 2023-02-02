@@ -1,8 +1,8 @@
 from typing import Optional
 
+from .. import AnalysisState
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
-from .. import AnalysisState
 
 __all__ = ["XShiftSummary"]
 
@@ -29,17 +29,19 @@ class XShiftSummary(AbstractVisualization, JupyterMixin):
                 f"a type of distribution shift.\n"
                 f"\n"
                 f"**Test results**: "
-                f"We can predict whether a sample is in the test vs. training set with a {results['eval_metric']} of\n"
-                f"{results['test_statistic']:.4f} with a p-value of {results['pvalue']:.4f} "
-                f"(smaller than the threshold of {results['pvalue_threshold']:.4f}).\n"
+                f"We can predict whether a sample is in the test vs. training set with a `{results['eval_metric']}` of\n"
+                f"`{results['test_statistic']:.4f}` with a p-value of `{results['pvalue']:.4f}` "
+                f"(smaller than the threshold of `{results['pvalue_threshold']:.4f})`.\n"
                 f"\n"
             )
         if "feature_importance" in results:
+            fi = results["feature_importance"]
+            fi = fi[fi.p_value <= results["pvalue_threshold"]]
             fi_md = (
                 f"**Feature importances**: "
                 f"The variables that are the most responsible for this shift are those with high feature "
                 f"importance:\n\n"
-                f"{results['feature_importance'].to_markdown()}"
+                f"{fi.to_markdown()}"
             )
             return ret_md + fi_md
         return ret_md

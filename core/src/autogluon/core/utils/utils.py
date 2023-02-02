@@ -1,115 +1,27 @@
 import logging
-import multiprocessing
-import os
-import subprocess
 import math
 import pickle
 import time
 import random
 import sys
-from typing import Callable, List
+from typing import Callable, List, Tuple
 
 import numpy as np
 import pandas as pd
-import psutil
 import scipy.stats
 from pandas import DataFrame, Series
 from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold, LeaveOneGroupOut
 from sklearn.model_selection import train_test_split
 
+from autogluon.common.utils.resource_utils import ResourceManager
 from .miscs import warning_filter
-from ..constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS, QUANTILE
+from ..constants import (
+    BINARY, LARGE_DATA_THRESHOLD, MULTICLASS, MULTICLASS_UPPER_LIMIT, QUANTILE,
+    REGRESS_THRESHOLD_LARGE_DATA, REGRESS_THRESHOLD_SMALL_DATA, REGRESSION, SOFTCLASS
+)
 from ..metrics import accuracy, root_mean_squared_error, pinball_loss, Scorer
 
-
 logger = logging.getLogger(__name__)
-
-
-class ResourceManager():
-    """Manager that fetches system related info"""
-    
-    @staticmethod
-    def get_cpu_count():
-        return multiprocessing.cpu_count()
-    
-    @staticmethod
-    def get_cpu_count_psutil(logical=True):
-        return psutil.cpu_count(logical=logical)
-    
-    @staticmethod
-    def get_gpu_count_all():
-        num_gpus = ResourceManager._get_gpu_count_cuda()
-        if num_gpus == 0:
-            # Get num gpus from mxnet first because of https://github.com/awslabs/autogluon/issues/2042
-            # TODO: stop using mxnet to determine num gpus once mxnet is removed from AG
-            num_gpus = ResourceManager.get_gpu_count_mxnet()
-            if num_gpus == 0:
-                num_gpus = ResourceManager.get_gpu_count_torch()
-        return num_gpus
-
-    @staticmethod
-    def get_gpu_count_mxnet():
-        # TODO: Remove this once AG get rid off mxnet
-        try:
-            import mxnet
-            num_gpus = mxnet.context.num_gpus()
-        except Exception:
-            num_gpus = 0
-        return num_gpus
-    
-    @staticmethod
-    def get_gpu_count_torch():
-        try:
-            import torch
-            num_gpus = torch.cuda.device_count()
-        except Exception:
-            num_gpus = 0
-        return num_gpus
-    
-    @staticmethod
-    def get_gpu_free_memory():
-        """Grep gpu free memory from nvidia-smi tool.
-        This function can fail due to many reasons(driver, nvidia-smi tool, envs, etc) so please simply use
-        it as a suggestion, stay away with any rules bound to it.
-        E.g. for a 4-gpu machine, the result can be list of int
-        >>> print(get_gpu_free_memory)
-        >>> [13861, 13859, 13859, 13863]
-        """
-        _output_to_list = lambda x: x.decode('ascii').split('\n')[:-1]
-
-        try:
-            COMMAND = "nvidia-smi --query-gpu=memory.free --format=csv"
-            memory_free_info = _output_to_list(subprocess.check_output(COMMAND.split()))[1:]
-            memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
-        except:
-            memory_free_values = []
-        return memory_free_values
-    
-    @staticmethod
-    def get_memory_size():
-        return bytes_to_mega_bytes(psutil.virtual_memory().total)
-    
-    @staticmethod
-    def get_available_disk_size():
-        # FIXME: os.statvfs doesn't work on Windows... 
-        # Need to find another way to calculate disk on Windows.
-        # Return None for now
-        try:
-            statvfs = os.statvfs(".")
-            available_blocks = statvfs.f_frsize * statvfs.f_bavail
-            return bytes_to_mega_bytes(available_blocks)
-        except Exception:
-            return None
-    
-    @staticmethod
-    def _get_gpu_count_cuda():
-        # FIXME: Sometimes doesn't detect GPU on Windows
-        # FIXME: Doesn't ensure the GPUs are actually usable by the model (MXNet, PyTorch, etc.)
-        from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
-        if not cudaInit(): return 0
-        gpu_count = cudaDeviceGetCount()
-        cudaShutdown()
-        return gpu_count
 
 
 class CVSplitter:
@@ -348,7 +260,10 @@ def get_pred_from_proba_df(y_pred_proba, problem_type=BINARY):
 
 def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
     if problem_type == BINARY:
-        y_pred = [1 if pred >= 0.5 else 0 for pred in y_pred_proba]
+        # Using > instead of >= to align with Pandas `.idxmax` logic which picks the left-most column during ties.
+        # If this is not done, then predictions can be inconsistent when converting in binary classification from multiclass-form pred_proba and
+        # binary-form pred_proba when the pred_proba is 0.5 for positive and negative classes.
+        y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_proba]
     elif problem_type == REGRESSION:
         y_pred = y_pred_proba
     elif problem_type == QUANTILE:
@@ -436,8 +351,8 @@ def generate_train_test_split(X: DataFrame,
                               y: Series,
                               problem_type: str,
                               test_size: float = 0.1,
-                              random_state: int = 0,
-                              min_cls_count_train: int = 1) -> (DataFrame, DataFrame, Series, Series):
+                              random_state=0,
+                              min_cls_count_train=1) -> Tuple[DataFrame, DataFrame, Series, Series]:
     """
     Generate a train test split from input X, y.
     If you have a combined X, y DataFrame, refer to `generate_train_test_split_combined` instead.
@@ -471,6 +386,8 @@ def generate_train_test_split(X: DataFrame,
     """
     if (test_size <= 0.0) or (test_size >= 1.0):
         raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
+    valid_problem_types = [BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE]
+    assert problem_type in valid_problem_types, f'Unknown problem type "{problem_type}" | Valid problem types: {valid_problem_types}'
 
     X_split = X
     y_split = y
@@ -572,18 +489,19 @@ def infer_problem_type(y: Series, silent=False) -> str:
     """ Identifies which type of prediction problem we are interested in (if user has not specified).
         Ie. binary classification, multi-class classification, or regression.
     """
-    if len(y) == 0:
-        raise ValueError("provided labels cannot have length = 0")
-    y = y.dropna()  # Remove missing values from y (there should not be any though as they were removed in Learner.general_data_processing())
+    with pd.option_context('mode.use_inf_as_na', True): # treat None, NaN, INF, NINF as NA
+        y = y.dropna()
     num_rows = len(y)
+
+    if num_rows == 0:
+        raise ValueError("Label column cannot have 0 valid values")
 
     unique_values = y.unique()
 
-    MULTICLASS_LIMIT = 1000  # if numeric and class count would be above this amount, assume it is regression
-    if num_rows > 1000:
-        REGRESS_THRESHOLD = 0.05  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
+    if num_rows > LARGE_DATA_THRESHOLD:
+        regression_threshold = REGRESS_THRESHOLD_LARGE_DATA  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
     else:
-        REGRESS_THRESHOLD = 0.1
+        regression_threshold = REGRESS_THRESHOLD_SMALL_DATA
 
     unique_count = len(unique_values)
     if unique_count == 2:
@@ -594,7 +512,7 @@ def infer_problem_type(y: Series, silent=False) -> str:
         reason = f"dtype of label-column == {y.dtype.name}"
     elif np.issubdtype(y.dtype, np.floating):
         unique_ratio = unique_count / float(num_rows)
-        if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
+        if (unique_ratio <= regression_threshold) and (unique_count <= MULTICLASS_UPPER_LIMIT):
             try:
                 can_convert_to_int = np.array_equal(y, y.astype(int))
                 if can_convert_to_int:
@@ -611,7 +529,7 @@ def infer_problem_type(y: Series, silent=False) -> str:
             reason = "dtype of label-column == float and many unique label-values observed"
     elif np.issubdtype(y.dtype, np.integer):
         unique_ratio = unique_count / float(num_rows)
-        if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
+        if (unique_ratio <= regression_threshold) and (unique_count <= MULTICLASS_UPPER_LIMIT):
             problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression
             reason = "dtype of label-column == int, but few unique label-values observed"
         else:
@@ -999,7 +917,7 @@ def _get_safe_fi_batch_count(X, num_features, X_transformed=None, max_memory_rat
     X_size_bytes = sys.getsizeof(pickle.dumps(X, protocol=4))
     if X_transformed is not None:
         X_size_bytes += sys.getsizeof(pickle.dumps(X_transformed, protocol=4))
-    available_mem = psutil.virtual_memory().available
+    available_mem = ResourceManager.get_available_virtual_mem()
     X_memory_ratio = X_size_bytes / available_mem
 
     feature_batch_count_safe = math.floor(max_memory_ratio / X_memory_ratio)
@@ -1016,9 +934,3 @@ def unevaluated_fi_df_template(features: List[str]) -> pd.DataFrame:
         'n': 0
     }, index=features)
     return importance_df
-
-
-def bytes_to_mega_bytes(memory_amount: int) -> int:
-    """ Utility to convert a number of bytes (int) into a number of mega bytes (int)
-    """
-    return memory_amount >> 20

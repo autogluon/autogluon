@@ -1,9 +1,6 @@
-import ast
 import logging
 import os
 import warnings
-from copy import deepcopy
-from lib2to3.pgen2.token import OP
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
@@ -12,21 +9,8 @@ from omegaconf import DictConfig
 from torch import nn
 from transformers import AutoConfig, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 
-from ..constants import (
-    AUTOMM,
-    CHOICES_IDS,
-    LABEL,
-    NER,
-    NER_ANNOTATION,
-    NER_TEXT,
-    TEXT,
-    TEXT_SEGMENT_IDS,
-    TEXT_TOKEN_IDS,
-    TEXT_VALID_LENGTH,
-    TOKEN_WORD_MAPPING,
-    WORD_OFFSETS,
-)
-from .collator import Pad, Stack
+from ..constants import AUTOMM, NER_ANNOTATION, NER_TEXT, TEXT, TEXT_NER
+from .collator import PadCollator, StackCollator
 from .utils import process_ner_annotations, tokenize_ner_text
 
 logger = logging.getLogger(AUTOMM)
@@ -44,18 +28,30 @@ class NerProcessor:
         self,
         model: nn.Module,
         max_len: Optional[int] = None,
+        config: Optional[DictConfig] = None,
     ):
         """
         Parameters
         ----------
-        prefix
-            The prefix connecting a processor to its corresponding model.
+        model
+            The NER model.
+        max_len
+            The max length of the tokenizer.
+        config
+            Config dictionary.
         """
-        self.model = model
         self.prefix = model.prefix
+        self.text_token_ids_key = model.text_token_ids_key
+        self.text_valid_length_key = model.text_valid_length_key
+        self.text_segment_ids_key = model.text_segment_ids_key
+        self.text_token_word_mapping_key = model.text_token_word_mapping_key
+        self.text_word_offsets_key = model.text_word_offsets_key
+        self.label_key = model.label_key
+
         self.tokenizer = None
         self.tokenizer_name = model.prefix
         self.max_len = max_len
+        self.config = config
 
         if self.prefix == NER_TEXT:
             self.tokenizer = model.tokenizer
@@ -92,12 +88,12 @@ class NerProcessor:
         if self.prefix == NER_TEXT:
             fn.update(
                 {
-                    self.model.text_token_ids_key: Pad(pad_val=self.tokenizer.pad_token_id),
-                    self.model.text_valid_length_key: Stack(),
-                    self.model.text_segment_ids_key: Pad(pad_val=0),
-                    self.model.text_token_word_mapping_key: Pad(pad_val=0),
-                    self.model.text_word_offsets_key: Pad(pad_val=0),
-                    self.model.label_key: Stack(),
+                    self.text_token_ids_key: PadCollator(pad_val=self.tokenizer.pad_token_id),
+                    self.text_valid_length_key: StackCollator(),
+                    self.text_segment_ids_key: PadCollator(pad_val=0),
+                    self.text_token_word_mapping_key: PadCollator(pad_val=0),
+                    self.text_word_offsets_key: PadCollator(pad_val=0),
+                    self.label_key: StackCollator(),
                 }
             )
         return fn
@@ -129,7 +125,7 @@ class NerProcessor:
             self.tokenizer.model_max_length = self.max_len
         text_column, annotation_column = None, None
         for column_name, column_modality in feature_modalities.items():
-            if column_modality == TEXT:
+            if column_modality.startswith((TEXT_NER, TEXT)):
                 text_column = column_name
             if column_modality == NER_ANNOTATION:
                 annotation_column = column_name
@@ -138,20 +134,20 @@ class NerProcessor:
         if is_training or annotation_column is not None:
             ner_annotation = all_features[annotation_column]
             label, col_tokens, token_to_word_mappings, word_offsets = process_ner_annotations(
-                ner_annotation, ner_text, self.tokenizer
+                ner_annotation, ner_text, self.config.entity_map, self.tokenizer
             )
-            ret.update({self.model.label_key: label})
+            ret.update({self.label_key: label})
         else:
             col_tokens, token_to_word_mappings, word_offsets = tokenize_ner_text(ner_text, self.tokenizer)
-            ret.update({self.model.label_key: np.array([], dtype=np.int32)})
+            ret.update({self.label_key: np.array([], dtype=np.int32)})
 
         ret.update(
             {
-                self.model.text_token_ids_key: np.array(col_tokens.input_ids, dtype=np.int32),
-                self.model.text_valid_length_key: sum(col_tokens.attention_mask),
-                self.model.text_segment_ids_key: np.array(col_tokens.token_type_ids, dtype=np.int32),
-                self.model.text_token_word_mapping_key: token_to_word_mappings,
-                self.model.text_word_offsets_key: word_offsets,
+                self.text_token_ids_key: np.array(col_tokens.input_ids, dtype=np.int32),
+                self.text_valid_length_key: sum(col_tokens.attention_mask),
+                self.text_segment_ids_key: np.array(col_tokens.token_type_ids, dtype=np.int32),
+                self.text_token_word_mapping_key: token_to_word_mappings,
+                self.text_word_offsets_key: word_offsets,
             }
         )
 

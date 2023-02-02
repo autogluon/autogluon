@@ -1,20 +1,20 @@
 import logging
 import pprint
 import time
+import traceback
 import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, Union
 
 import pandas as pd
 
-from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
-from autogluon.timeseries.dataset import TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
 from autogluon.timeseries.splitter import AbstractTimeSeriesSplitter, LastWindowSplitter, MultiWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
@@ -22,10 +22,7 @@ from autogluon.timeseries.utils.random import set_random_seed
 
 logger = logging.getLogger(__name__)
 
-DEPRECATED_PRESETS_TO_FALLBACK = {
-    "low_quality": "fast_training",
-    "good_quality": "high_quality",
-}
+SUPPORTED_FREQUENCIES = {"D", "W", "M", "Q", "A", "Y", "H", "T", "min", "S"}
 
 
 class TimeSeriesPredictor:
@@ -197,14 +194,34 @@ class TimeSeriesPredictor:
     def validation_splitter(self) -> AbstractTimeSeriesSplitter:
         return self._learner.validation_splitter
 
-    def _check_and_prepare_data_frame(self, df: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+    def _check_and_prepare_data_frame(self, df: Union[TimeSeriesDataFrame, pd.DataFrame]) -> TimeSeriesDataFrame:
         """Ensure that TimeSeriesDataFrame has a frequency, or replace its time index with a dummy if
         ``self.ignore_time_index`` is True.
         """
         if df is None:
             return df
+        if not isinstance(df, TimeSeriesDataFrame):
+            if isinstance(df, pd.DataFrame):
+                try:
+                    df = TimeSeriesDataFrame(df)
+                except:
+                    raise ValueError(
+                        f"Provided data of type {type(df)} cannot be automatically converted to a TimeSeriesDataFrame."
+                    )
+            else:
+                raise ValueError(
+                    f"Please provide data in TimeSeriesDataFrame format (received an object of type {type(df)})."
+                )
         if self.ignore_time_index:
             df = df.get_reindexed_view(freq="S")
+        timestamps = df.reset_index(level=TIMESTAMP)[TIMESTAMP]
+        is_sorted = timestamps.groupby(level=ITEMID, sort=False).apply(lambda x: x.is_monotonic_increasing).all()
+        if not is_sorted:
+            warnings.warn(
+                "Provided data contains timestamps that are not sorted chronologically. "
+                "This will lead to TimeSeriesPredictor not working as intended. "
+                "Please make sure that the timestamps are sorted in increasing order for all time series."
+            )
         if df.freq is None:
             raise ValueError(
                 "Frequency not provided and cannot be inferred. This is often due to the "
@@ -212,13 +229,33 @@ class TimeSeriesPredictor:
                 "data set used has a uniform time index, or create the `TimeSeriesPredictor` "
                 "setting `ignore_time_index=True`."
             )
+        # Check if frequency is supported
+        offset = pd.tseries.frequencies.to_offset(df.freq)
+        norm_freq_str = offset.name.split("-")[0]
+        if norm_freq_str not in SUPPORTED_FREQUENCIES:
+            warnings.warn(
+                f"Detected frequency '{norm_freq_str}' is not supported by TimeSeriesPredictor. This may lead to some "
+                f"models not working as intended. "
+                f"Please convert the timestamps to one of the supported frequencies: {SUPPORTED_FREQUENCIES}. "
+                f"See https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases for details."
+            )
+        if df.isna().values.any():
+            raise ValueError(
+                "TimeSeriesPredictor does not yet support missing values. "
+                "Please make sure that the provided data contains no NaNs."
+            )
+        if (df.num_timesteps_per_item() <= 2).any():
+            warnings.warn(
+                "Detected time series with length <= 2 in data. "
+                "Please remove them from the dataset or TimeSeriesPredictor likely won't work as intended."
+            )
         return df
 
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)
     def fit(
         self,
-        train_data: TimeSeriesDataFrame,
-        tuning_data: Optional[TimeSeriesDataFrame] = None,
+        train_data: Union[TimeSeriesDataFrame, pd.DataFrame],
+        tuning_data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame]] = None,
         time_limit: Optional[int] = None,
         presets: Optional[str] = None,
         hyperparameters: Dict[Union[str, Type], Any] = None,
@@ -231,13 +268,16 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        train_data : TimeSeriesDataFrame
-            Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
+        train_data : Union[TimeSeriesDataFrame, pd.DataFrame]
+            Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format. For best performance, all
+            time series should have length ``> 2 * prediction_length``.
 
             If ``known_covariates_names`` were specified when creating the predictor, ``train_data`` must include the
             columns listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
-            The known covariates must have a numeric (float or integer) dtype. Columns of ``train_data`` except
-            ``target`` and those listed in ``known_covariates_names`` will be ignored.
+            The known covariates must have a numeric (float or integer) dtype.
+
+            Columns of ``train_data`` except ``target`` and those listed in ``known_covariates_names`` will be
+            interpreted as ``past_covariates`` - covariates that are known only in the past.
 
             If ``train_data`` has static features (i.e., ``train_data.static_features`` is a pandas DataFrame), the
             predictor will interpret columns with ``int`` and ``float`` dtypes as continuous (real-valued) features,
@@ -248,7 +288,10 @@ class TimeSeriesPredictor:
 
                 data.static_features["store_id"] = data.static_features["store_id"].astype("category")
 
-        tuning_data : TimeSeriesDataFrame, optional
+            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
+            to a ``TimeSeriesDataFrame``.
+
+        tuning_data : Union[TimeSeriesDataFrame, pd.DataFrame], optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
             time series are used for computing the validation score.
@@ -265,8 +308,12 @@ class TimeSeriesPredictor:
             the columns listed in ``known_covariates_names`` with the covariates values aligned with the target time
             series.
 
-            If ``train_data`` has static features, ``tuning_data`` must have also have static features with the same
-            column names and dtypes.
+            If ``train_data`` has past covariates or static features, ``tuning_data`` must have also include them (with
+            same columns names and dtypes).
+
+            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
+            to a ``TimeSeriesDataFrame``.
+
         time_limit : int, optional
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
             seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models
@@ -385,6 +432,13 @@ class TimeSeriesPredictor:
         train_data = self._check_and_prepare_data_frame(train_data)
         tuning_data = self._check_and_prepare_data_frame(tuning_data)
 
+        if (train_data.num_timesteps_per_item() <= 2 * self.prediction_length).any():
+            warnings.warn(
+                "Detected short time series in train_data. "
+                "For best performance, all training time series should have length >= 2 * prediction_length + 1"
+                f"(at least {2 * self.prediction_length + 1})."
+            )
+
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity)
 
@@ -402,14 +456,6 @@ class TimeSeriesPredictor:
         logger.info("================ TimeSeriesPredictor ================")
         logger.info("TimeSeriesPredictor.fit() called")
         if presets is not None:
-            if presets in DEPRECATED_PRESETS_TO_FALLBACK:
-                new_presets = DEPRECATED_PRESETS_TO_FALLBACK[presets]
-                warnings.warn(
-                    f"Presets {presets} are deprecated as of version 0.6.0. Please see the documentation for "
-                    f"TimeSeriesPredictor.fit for the list of available presets. "
-                    f"Falling back to presets='{new_presets}'."
-                )
-                presets = new_presets
             logger.info(f"Setting presets to: {presets}")
         logger.info("Fitting with arguments:")
         logger.info(f"{pprint.pformat(fit_args)}")
@@ -448,7 +494,7 @@ class TimeSeriesPredictor:
 
     def predict(
         self,
-        data: TimeSeriesDataFrame,
+        data: Union[TimeSeriesDataFrame, pd.DataFrame],
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[str] = None,
         random_seed: Optional[int] = 123,
@@ -458,14 +504,17 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        data : TimeSeriesDataFrame
+        data : Union[TimeSeriesDataFrame, pd.DataFrame]
             Time series data to forecast with.
 
             If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
             listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
 
-            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
-            static features that have the same columns and dtypes.
+            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
+            must also include them (with same column names and dtypes).
+
+            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
+            to a ``TimeSeriesDataFrame``.
         known_covariates : TimeSeriesDataFrame, optional
             If ``known_covariates_names`` were specified when creating the predictor, it is necessary to provide the
             values of the known covariates for each time series during the forecast horizon. That is:
@@ -512,32 +561,35 @@ class TimeSeriesPredictor:
         """
         if "quantile_levels" in kwargs:
             warnings.warn(
-                "Passing `quantile_levels` as a keyword argument to `TimeSeriesPredictor.predict` is deprecated and "
-                "will be removed in v0.7. This might also lead to some models not working properly. "
-                "Please specify the desired quantile levels when creating the predictor as "
-                "`TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
+                "Passing `quantile_levels` as a keyword argument to `TimeSeriesPredictor.predict` is deprecated as of "
+                "v0.7. This argument is ignored. Please specify the desired quantile levels when creating the "
+                "predictor as `TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
                 category=DeprecationWarning,
             )
+            kwargs.pop("quantile_levels")
         if random_seed is not None:
             set_random_seed(random_seed)
         data = self._check_and_prepare_data_frame(data)
         return self._learner.predict(data, known_covariates=known_covariates, model=model, **kwargs)
 
-    def evaluate(self, data: TimeSeriesDataFrame, **kwargs):
+    def evaluate(self, data: Union[TimeSeriesDataFrame, pd.DataFrame], **kwargs):
         """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``
         on the given data set, and with the same ``prediction_length`` used when training models.
 
         Parameters
         ----------
-        data : TimeSeriesDataFrame
+        data : Union[TimeSeriesDataFrame, pd.DataFrame]
             The data to evaluate the best model on. The last ``prediction_length`` time steps of the data set, for each
             item, will be held out for prediction and forecast accuracy will be calculated on these time steps.
 
             If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
             listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
 
-            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
-            static features that have the same columns and dtypes.
+            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
+            must also include them (with same column names and dtypes).
+
+            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
+            to a ``TimeSeriesDataFrame``.
 
         Other Parameters
         ----------------
@@ -556,7 +608,7 @@ class TimeSeriesPredictor:
         data = self._check_and_prepare_data_frame(data)
         return self._learner.score(data, **kwargs)
 
-    def score(self, data: TimeSeriesDataFrame, **kwargs):
+    def score(self, data: Union[TimeSeriesDataFrame, pd.DataFrame], **kwargs):
         """See, :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate`."""
         return self.evaluate(data, **kwargs)
 
@@ -602,7 +654,9 @@ class TimeSeriesPredictor:
         """Returns the name of the best model from trainer."""
         return self._trainer.get_model_best()
 
-    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, silent=False) -> pd.DataFrame:
+    def leaderboard(
+        self, data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame]] = None, silent=False
+    ) -> pd.DataFrame:
         """Return a leaderboard showing the performance of every trained model, the output is a
         pandas data frame with columns:
 
@@ -622,15 +676,18 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        data : TimeSeriesDataFrame, optional
+        data : Union[TimeSeriesDataFrame, pd.DataFrame], optional
             dataset used for additional evaluation. If not provided, the validation set used during training will be
             used.
 
             If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
             listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
 
-            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
-            static features that have the same columns and dtypes.
+            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
+            must also include them (with same column names and dtypes).
+
+            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
+            to a ``TimeSeriesDataFrame``.
 
         silent : bool, default = False
             If False, the leaderboard DataFrame will be printed.
@@ -673,10 +730,11 @@ class TimeSeriesPredictor:
         # all fit() information that is returned:
         results = {
             "model_types": model_typenames,  # dict with key = model-name, value = type of model (class-name)
-            "model_performance": self._trainer.get_models_attribute_dict("score"),
-            "model_best": self._trainer.model_best,  # the name of the best model (on validation data)
+            "model_performance": self._trainer.get_models_attribute_dict("val_score"),
+            "model_best": self._trainer.get_model_best(),  # the name of the best model (on validation data)
             "model_paths": self._trainer.get_models_attribute_dict("path"),
             "model_fit_times": self._trainer.get_models_attribute_dict("fit_time"),
+            "model_pred_times": self._trainer.get_models_attribute_dict("predict_time"),
         }
         # get dict mapping model name to final hyperparameter values for each model:
         model_hyperparams = {}

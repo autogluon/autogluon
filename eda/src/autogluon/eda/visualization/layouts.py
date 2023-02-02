@@ -1,12 +1,21 @@
-from typing import Union, List, Dict, Optional
+from typing import Callable, Dict, List, Optional, Union
 
-from IPython.display import display, Markdown
-from ipywidgets import HBox, Output, Layout, Tab
+from IPython.display import display
+from ipywidgets import HBox, Layout, Output, Tab
 
-from .base import AbstractVisualization
 from .. import AnalysisState
+from .base import AbstractVisualization
+from .jupyter import JupyterMixin
 
-__all__ = ["MarkdownSectionComponent", "SimpleVerticalLinearLayout", "SimpleHorizontalLayout", "TabLayout"]
+__all__ = [
+    "MarkdownSectionComponent",
+    "SimpleVerticalLinearLayout",
+    "SimpleHorizontalLayout",
+    "PropertyRendererComponent",
+    "TabLayout",
+]
+
+from ..state import is_key_present_in_state
 
 
 class SimpleVerticalLinearLayout(AbstractVisualization):
@@ -57,7 +66,6 @@ class TabLayout(SimpleVerticalLinearLayout):
     """
 
     def __init__(self, facets: Dict[str, AbstractVisualization], namespace: Optional[str] = None, **kwargs) -> None:
-
         self.facet_tab_names = list(facets.keys())
         super().__init__(list(facets.values()), namespace, **kwargs)
 
@@ -72,19 +80,75 @@ class TabLayout(SimpleVerticalLinearLayout):
                 facet.render(state)
 
 
-class MarkdownSectionComponent(AbstractVisualization):
+class MarkdownSectionComponent(AbstractVisualization, JupyterMixin):
     """
     Render provided string as a Markdown cell.
     See `Jupyter Markdown cell <https://jupyter-notebook.readthedocs.io/en/stable/examples/Notebook/Working%20With%20Markdown%20Cells.html>`_
     documentation for details.
+
+    Parameters
+    ----------
+    markdown: str
+        markdown text to render
+    condition_fn: Optional[Callable], default = None
+        if specified, call the provided function with `state` arg. The function expected to return bool value
+    namespace: Optional[str], default = None
+        namespace to use; can be nested like `ns_a.ns_b.ns_c`
+
     """
 
-    def __init__(self, markdown: str, namespace: Optional[str] = None, **kwargs) -> None:
+    def __init__(
+        self, markdown: str, condition_fn: Optional[Callable] = None, namespace: Optional[str] = None, **kwargs
+    ) -> None:
+        """
+
+        Parameters
+        ----------
+        markdown
+        condition_fn
+        namespace
+        kwargs
+        """
         super().__init__(namespace, **kwargs)
         self.markdown = markdown
+        self.condition_fn = condition_fn
 
     def can_handle(self, state: AnalysisState) -> bool:
-        return True
+        return True if self.condition_fn is None else self.condition_fn(state)
 
     def _render(self, state: AnalysisState) -> None:
-        display(Markdown(self.markdown))
+        self.render_markdown(self.markdown)
+
+
+class PropertyRendererComponent(AbstractVisualization, JupyterMixin):
+    """
+    Render component stored in `state`'s dot-separated path to property (i.e. `a.b` results in `state.a.b`)
+
+    Parameters
+    ----------
+    property: str
+        dot-separated path to property (i.e. `a.b` results in `state.a.b`)
+    transform_fn: Optional[Callable], default = None
+        if specified, call the provided function with the object extracted from `state`'s `property`.
+        Returned transformation is then passed into render function
+    namespace: Optional[str], default = None
+        namespace to use; can be nested like `ns_a.ns_b.ns_c`
+    """
+
+    def __init__(
+        self, property: str, transform_fn: Optional[Callable] = None, namespace: Optional[str] = None, **kwargs
+    ) -> None:
+        super().__init__(namespace, **kwargs)
+        self.property = property
+        self.transform_fn = transform_fn
+
+    def can_handle(self, state: AnalysisState) -> bool:
+        return is_key_present_in_state(state, self.property)
+
+    def _render(self, state: AnalysisState) -> None:
+        obj = state
+        for p in self.property.split("."):
+            obj = obj[p]
+        if self.transform_fn is not None:
+            obj = self.transform_fn(obj)
+        self.display_obj(obj)

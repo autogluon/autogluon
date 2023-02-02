@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Optional, Generator
+from typing import Generator, List, Optional, Tuple
 
 from pandas import DataFrame
 
@@ -19,7 +19,6 @@ class AbstractAnalysis(ABC, StateCheckMixin):
         state: Optional[AnalysisState] = None,
         **kwargs,
     ) -> None:
-
         self.parent = parent
         self.children: List[AbstractAnalysis] = [] if children is None else children
         self.state: Optional[AnalysisState] = state
@@ -142,7 +141,7 @@ class BaseAnalysis(AbstractAnalysis):
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return True
 
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         pass
 
 
@@ -166,7 +165,7 @@ class Namespace(AbstractAnalysis):
         ), "Namespace must be wrapped into other analysis. You can use BaseAnalysis of one is needed"
         return super().fit(**kwargs)
 
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         pass
 
     def _get_state_from_parent(self) -> AnalysisState:

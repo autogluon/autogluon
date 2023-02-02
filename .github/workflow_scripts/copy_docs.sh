@@ -12,7 +12,7 @@ source $(dirname "$0")/write_to_s3.sh
 
 if [[ -n $PR_NUMBER ]]; then BUILD_DOCS_PATH=s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA; else BUILD_DOCS_PATH=s3://autogluon-ci-push/build_docs/$BRANCH/$COMMIT_SHA; fi
 
-if [[ (-n $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
+if [[ (-n $PR_NUMBER) || ($GIT_REPO != autogluon/autogluon) ]]
 then
     bucket='autogluon-staging'
     if [[ -n $PR_NUMBER ]]; then path=$PR_NUMBER/$COMMIT_SHA; else path=$BRANCH/$COMMIT_SHA; fi
@@ -45,7 +45,7 @@ fi
 aws s3 sync ${flags} ${BUILD_DOCS_PATH}/all/ s3://${bucket}/${path} --acl public-read ${cacheControl}
 echo "Uploaded doc to http://${site}/index.html"
 
-if [[ ($BRANCH == 'master') && ($GIT_REPO == awslabs/autogluon) ]]
+if [[ ($BRANCH == 'master') && ($GIT_REPO == autogluon/autogluon) ]]
 then
     aws s3 cp ${BUILD_DOCS_PATH}/root_index.html s3://${bucket}/index.html --acl public-read ${cacheControl}
     echo "Uploaded root_index.html s3://${bucket}/index.html"

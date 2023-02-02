@@ -1,12 +1,13 @@
 import copy
 import os
-import pickle
 import shutil
 import tempfile
 import uuid
 
 import numpy.testing as npt
 import pytest
+import timm
+import transformers
 from omegaconf import OmegaConf
 from torch import nn
 
@@ -30,14 +31,17 @@ from autogluon.multimodal.constants import (
     UNIFORM_SOUP,
 )
 from autogluon.multimodal.utils import modify_duplicate_model_names
+from autogluon.multimodal.utils.misc import shopee_dataset
 
-from ..others.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
-from ..others.utils import get_home_dir
+from ..utils.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
+from ..utils.utils import get_home_dir
 
 ALL_DATASETS = {
-    "petfinder": PetFinderDataset,
-    "hateful_memes": HatefulMeMesDataset,
-    "ae": AEDataset,
+    "petfinder": PetFinderDataset(),
+    "petfinder_bytearray": PetFinderDataset(is_bytearray=True),
+    "hateful_memes": HatefulMeMesDataset(),
+    "hateful_memes_bytearray": HatefulMeMesDataset(is_bytearray=True),
+    "ae": AEDataset(),
 }
 
 
@@ -46,7 +50,13 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
     os.makedirs(root, exist_ok=True)
     predictor.save(root)
     predictions = predictor.predict(df, as_pandas=False)
+    # Test fit_summary()
+    predictor.fit_summary()
+
     loaded_predictor = cls.load(root)
+    # Test fit_summary()
+    loaded_predictor.fit_summary()
+
     predictions2 = loaded_predictor.predict(df, as_pandas=False)
     predictions2_df = loaded_predictor.predict(df, as_pandas=True)
     npt.assert_equal(predictions, predictions2)
@@ -79,13 +89,19 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
             npt.assert_equal(embeddings_default, embeddings_realtime)
 
 
+def verify_no_redundant_model_configs(predictor):
+    model_names = list(predictor._config.model.keys())
+    model_names.remove("names")
+    assert sorted(predictor._config.model.names) == sorted(model_names)
+
+
 @pytest.mark.parametrize(
     "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method,efficient_finetune,loss_function",
     [
         (
             "petfinder",
             ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
-            "prajjwal1/bert-tiny",
+            "nlpaueb/legal-bert-small-uncased",
             "swin_tiny_patch4_window7_224",
             GREEDY_SOUP,
             LORA,
@@ -110,7 +126,7 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
             "auto",
         ),
         (
-            "hateful_memes",
+            "hateful_memes_bytearray",
             ["timm_image", "hf_text", "clip", "fusion_mlp"],
             "monsoon-nlp/hindi-bert",
             "mobilenetv3_small_100",
@@ -119,7 +135,7 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
             "auto",
         ),
         (
-            "petfinder",
+            "petfinder_bytearray",
             ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
             None,
             "mobilenetv3_small_100",
@@ -130,7 +146,7 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
         (
             "petfinder",
             ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
-            "prajjwal1/bert-tiny",
+            "nlpaueb/legal-bert-small-uncased",
             None,
             UNIFORM_SOUP,
             None,
@@ -157,11 +173,20 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
         (
             "ae",
             ["hf_text"],
-            "prajjwal1/bert-tiny",
+            "nlpaueb/legal-bert-small-uncased",
             None,
             BEST,
             LORA_BIAS,
             "bcewithlogitsloss",
+        ),
+        (
+            "ae",
+            ["hf_text"],
+            "CLTL/MedRoBERTa.nl",
+            None,
+            BEST,
+            None,
+            "auto",
         ),
         (
             "hateful_memes",
@@ -183,7 +208,7 @@ def test_predictor(
     efficient_finetune,
     loss_function,
 ):
-    dataset = ALL_DATASETS[dataset_name]()
+    dataset = ALL_DATASETS[dataset_name]
     metric_name = dataset.metric
 
     predictor = MultiModalPredictor(
@@ -234,7 +259,7 @@ def test_predictor(
         time_limit=20,
         save_path=save_path,
     )
-
+    verify_no_redundant_model_configs(predictor)
     score = predictor.evaluate(dataset.test_df)
     verify_predictor_save_load(predictor, dataset.test_df)
     verify_realtime_inference(predictor, dataset.test_df)
@@ -245,6 +270,7 @@ def test_predictor(
         hyperparameters=hyperparameters,
         time_limit=20,
     )
+    verify_no_redundant_model_configs(predictor)
     verify_predictor_save_load(predictor, dataset.test_df)
 
     # Saving to folder, loading the saved model and call fit again (continuous fit)
@@ -268,12 +294,12 @@ def test_standalone():  # test standalone feature in MultiModalPredictor.save()
         mock.Mock(side_effect=RuntimeError("Please use the `responses` library to mock HTTP in your tests.")),
     )
 
-    dataset = PetFinderDataset()
+    dataset = ALL_DATASETS["petfinder"]
 
     hyperparameters = {
         "optimization.max_epochs": 1,
         "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp", "t_few"],
-        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
         "model.t_few.checkpoint_name": "t5-small",
         "env.num_workers": 0,
@@ -303,6 +329,9 @@ def test_standalone():  # test standalone feature in MultiModalPredictor.save()
         path=save_path_standalone,
         standalone=True,
     )
+
+    # make sure the dumping doesn't affect predictor loading
+    predictor.dump_model()
 
     del predictor
     torch.cuda.empty_cache()
@@ -336,13 +365,13 @@ def test_standalone():  # test standalone feature in MultiModalPredictor.save()
         {
             "model.names": ["hf_text_abc", "hf_text_def", "hf_text_xyz", "fusion_mlp_123"],
             "model.hf_text_def.checkpoint_name": "monsoon-nlp/hindi-bert",
-            "model.hf_text_xyz.checkpoint_name": "prajjwal1/bert-tiny",
+            "model.hf_text_xyz.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
             "model.hf_text_abc.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
         },
         {
             "model.names": ["timm_image_haha", "hf_text_hello", "numerical_mlp_456", "fusion_mlp"],
             "model.timm_image_haha.checkpoint_name": "swin_tiny_patch4_window7_224",
-            "model.hf_text_hello.checkpoint_name": "prajjwal1/bert-tiny",
+            "model.hf_text_hello.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
             "data.numerical.convert_to_text": False,
         },
     ],
@@ -350,7 +379,7 @@ def test_standalone():  # test standalone feature in MultiModalPredictor.save()
 def test_customizing_model_names(
     hyperparameters,
 ):
-    dataset = ALL_DATASETS["petfinder"]()
+    dataset = ALL_DATASETS["petfinder"]
     metric_name = dataset.metric
 
     predictor = MultiModalPredictor(
@@ -411,7 +440,7 @@ def test_customizing_model_names(
 
 
 def test_model_configs():
-    dataset = ALL_DATASETS["petfinder"]()
+    dataset = ALL_DATASETS["petfinder"]
     metric_name = dataset.metric
 
     predictor = MultiModalPredictor(
@@ -566,7 +595,7 @@ def test_model_configs():
 
 
 def test_modifying_duplicate_model_names():
-    dataset = ALL_DATASETS["petfinder"]()
+    dataset = ALL_DATASETS["petfinder"]
     metric_name = dataset.metric
 
     teacher_predictor = MultiModalPredictor(
@@ -578,7 +607,7 @@ def test_modifying_duplicate_model_names():
     hyperparameters = {
         "optimization.max_epochs": 1,
         "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "fusion_mlp"],
-        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
@@ -621,3 +650,53 @@ def test_modifying_duplicate_model_names():
     for per_modality_processors in teacher_predictor._data_processors.values():
         for per_processor in per_modality_processors:
             assert per_processor.prefix in teacher_predictor._config.model.names
+
+
+def test_image_bytearray():
+    download_dir = "./"
+    train_data_1, test_data_1 = shopee_dataset(download_dir=download_dir)
+    train_data_2, test_data_2 = shopee_dataset(download_dir=download_dir, is_bytearray=True)
+    predictor_1 = MultiModalPredictor(
+        label="label",
+    )
+    predictor_2 = MultiModalPredictor(
+        label="label",
+    )
+    model_names = ["timm_image"]
+    hyperparameters = {
+        "optimization.max_epochs": 2,
+        "model.names": model_names,
+        "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+    }
+    predictor_1.fit(
+        train_data=train_data_1,
+        hyperparameters=hyperparameters,
+        seed=42,
+    )
+    predictor_2.fit(
+        train_data=train_data_2,
+        hyperparameters=hyperparameters,
+        seed=42,
+    )
+
+    score_1 = predictor_1.evaluate(test_data_1)
+    score_2 = predictor_2.evaluate(test_data_2)
+    # train and predict using different image types
+    score_3 = predictor_1.evaluate(test_data_2)
+    score_4 = predictor_2.evaluate(test_data_1)
+
+    prediction_1 = predictor_1.predict(test_data_1, as_pandas=False)
+    prediction_2 = predictor_2.predict(test_data_2, as_pandas=False)
+    prediction_3 = predictor_1.predict(test_data_2, as_pandas=False)
+    prediction_4 = predictor_2.predict(test_data_1, as_pandas=False)
+
+    prediction_prob_1 = predictor_1.predict_proba(test_data_1, as_pandas=False)
+    prediction_prob_2 = predictor_2.predict_proba(test_data_2, as_pandas=False)
+    prediction_prob_3 = predictor_1.predict_proba(test_data_2, as_pandas=False)
+    prediction_prob_4 = predictor_1.predict_proba(test_data_1, as_pandas=False)
+
+    npt.assert_array_equal([score_1, score_2, score_3, score_4], [score_1] * 4)
+    npt.assert_array_equal([prediction_1, prediction_2, prediction_3, prediction_4], [prediction_1] * 4)
+    npt.assert_array_equal(
+        [prediction_prob_1, prediction_prob_2, prediction_prob_3, prediction_prob_4], [prediction_prob_1] * 4
+    )

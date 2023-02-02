@@ -4,7 +4,7 @@ import numpy as np
 from torch import nn
 
 from ..constants import COLUMN, NUMERICAL
-from .collator import Stack
+from .collator import StackCollator
 
 
 class NumericalProcessor:
@@ -23,8 +23,8 @@ class NumericalProcessor:
         """
         Parameters
         ----------
-        prefix
-            The prefix connecting a processor to its corresponding model.
+        model
+            The model for which this processor would be created.
         merge
             How to merge numerical features from multiple columns in a multimodal pd.DataFrame.
             Currently, it only supports one choice:
@@ -58,9 +58,9 @@ class NumericalProcessor:
         if self.requires_column_info:
             assert numerical_column_names, "Empty numerical column names."
             for col_name in numerical_column_names:
-                fn[f"{self.numerical_column_prefix}_{col_name}"] = Stack()
+                fn[f"{self.numerical_column_prefix}_{col_name}"] = StackCollator()
 
-        fn[self.numerical_key] = Stack()
+        fn[self.numerical_key] = StackCollator()
 
         return fn
 

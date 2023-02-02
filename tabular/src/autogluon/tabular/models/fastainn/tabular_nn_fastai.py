@@ -1,6 +1,5 @@
 import copy
 import logging
-import psutil
 import time
 from builtins import classmethod
 from pathlib import Path
@@ -10,10 +9,10 @@ import pandas as pd
 import sklearn
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.models import AbstractModel
-from autogluon.core.utils import ResourceManager
 from autogluon.core.utils import try_import_fastai
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
@@ -382,16 +381,7 @@ class NNFastAiTabularModel(AbstractModel):
             objective_func_name_to_monitor = monitor_obj_func[objective_func_name]
         return objective_func_name_to_monitor
 
-    # FIXME: torch.set_num_threads(self._num_cpus_infer) is required because XGBoost<=1.5 mutates global OpenMP thread limit
-    #  If this isn't here, inference speed is slowed down massively.
-    #  Remove once upgraded to XGBoost>=1.6
     def _predict_proba(self, X, **kwargs):
-        from .._utils.torch_utils import TorchThreadManager
-        with TorchThreadManager(num_threads=self._num_cpus_infer):
-            pred_proba = self._predict_proba_internal(X=X, **kwargs)
-        return pred_proba
-
-    def _predict_proba_internal(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
 
         single_row = len(X) == 1

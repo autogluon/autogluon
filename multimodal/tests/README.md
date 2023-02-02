@@ -14,7 +14,7 @@ To guarantee code quality and correctness, we do two kinds of testing:
 Before submitting a pull request, you can run `black` locally to format your code. First, install it:
 
 ```
-pip install "black>=22.3"
+pip install "black>=22.3,<23.0"
 ```
 
 Then run it:
@@ -23,7 +23,7 @@ Then run it:
 black source_file_or_directory --line-length 119
 ```
 
-We use line length 119 instead of the default. You can refer to the CI's [black configurations](https://github.com/awslabs/autogluon/blob/master/pyproject.toml).
+We use line length 119 instead of the default. You can refer to the CI's [black configurations](https://github.com/autogluon/autogluon/blob/master/pyproject.toml).
 
 Note that if using `black` as a plugin in your IDE, the plugin may not use the configuration file `pyproject.toml` in our project. So, you need to configure the IDE plugin separately by following [here](https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html#configuration-via-a-file).
 

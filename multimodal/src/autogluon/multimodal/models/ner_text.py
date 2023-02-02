@@ -69,8 +69,15 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
             Whether using the pretrained weights. If pretrained=True, download the pretrained model.
         """
         super().__init__(
-            prefix, checkpoint_name, num_classes, pooling_mode, gradient_checkpointing, low_cpu_mem_usage, pretrained
+            prefix=prefix,
+            checkpoint_name=checkpoint_name,
+            num_classes=num_classes,
+            pooling_mode=pooling_mode,
+            gradient_checkpointing=gradient_checkpointing,
+            low_cpu_mem_usage=low_cpu_mem_usage,
+            pretrained=pretrained,
         )
+
         logger.debug(f"initializing {checkpoint_name}")
 
         if self.config.model_type in {"gpt2", "roberta"}:
@@ -87,6 +94,16 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
             self.tokenizer.model_max_length = self.model.config.n_positions
 
     @property
+    def input_keys(self):
+        return [
+            self.text_token_ids_key,
+            self.text_segment_ids_key,
+            self.text_valid_length_key,
+            self.text_token_word_mapping_key,
+            self.text_word_offsets_key,
+        ]
+
+    @property
     def text_token_word_mapping_key(self):
         return f"{self.prefix}_{TOKEN_WORD_MAPPING}"
 
@@ -96,25 +113,38 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
 
     def forward(
         self,
-        batch: dict,
+        text_token_ids: torch.Tensor,
+        text_segment_ids: torch.Tensor,
+        text_valid_length: torch.Tensor,
+        token_word_mapping: torch.Tensor,
+        word_offsets: torch.Tensor,
+        text_column_names: Optional[List[str]] = None,
+        text_column_indices: Optional[List[torch.Tensor]] = None,
     ):
         """
         Parameters
         ----------
-        batch
-            A dictionary containing the input mini-batch data.
-            We need to use the keys with the model prefix to index required data.
+        text_token_ids : torch.Tensor
+            Indices of input sequence tokens in the vocabulary.
+        text_segment_ids : torch.Tensor
+            Indices of input sequence segments.
+        text_valid_length : torch.Tensor
+            Valid length of the input text sequence.
+        token_word_mapping : torch.Tensor
+            Mapping the named entities to task specific labels.
+        word_offsets : torch.Tensor
+            Locations of the named entities.
+        text_column_names : list of torch.Tensor, optional
+            Names of the text columns.
+        text_column_indices : list of torch.Tensor, optional
+            Start and stop indices of the text columns.
 
         Returns
         -------
-            A dictionary with logits and features.
+            A tuple that contains (sequence_output, logits, logits_label, token_word_mapping, word_offsets, column_features, column_feature_masks)
         """
-        text_token_ids = batch[self.text_token_ids_key]
         if self.disable_seg_ids:
             text_segment_ids = None
-        else:
-            text_segment_ids = batch[self.text_segment_ids_key]
-        text_valid_length = batch[self.text_valid_length_key]
         steps = torch.arange(0, text_token_ids.shape[1]).type_as(text_valid_length)
         text_masks = (steps.reshape((1, -1)) < text_valid_length.reshape((-1, 1))).type_as(text_token_ids)
 
@@ -144,7 +174,14 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
 
         logits_label = torch.argmax(F.log_softmax(logits, dim=-1), dim=-1)
 
-        ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
+        batch = {
+            self.text_token_ids_key: text_token_ids,
+            self.text_segment_ids_key: text_segment_ids,
+            self.text_valid_length_key: text_valid_length,
+        }
+        if text_column_names:
+            assert len(text_column_names) == len(text_column_indices), "invalid text column inputs"
+            batch.update(**dict(zip(text_column_names, text_column_indices)))
         column_features, column_feature_masks = get_column_features(
             batch=batch,
             column_name_prefix=self.text_column_prefix,
@@ -152,16 +189,42 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
             valid_lengths=text_valid_length,
             cls_feature=pooled_features,
         )
-        ret[COLUMN_FEATURES][FEATURES].update(column_features)
-        ret[COLUMN_FEATURES][MASKS].update(column_feature_masks)
+
+        if column_features == {} or column_feature_masks == {}:
+            return sequence_output, logits, logits_label, token_word_mapping, word_offsets
+        else:
+            return (
+                sequence_output,
+                logits,
+                logits_label,
+                token_word_mapping,
+                word_offsets,
+                column_features,
+                column_feature_masks,
+            )
+
+    def get_output_dict(
+        self,
+        sequence_output: torch.Tensor,
+        logits: torch.Tensor,
+        logits_label: torch.Tensor,
+        token_word_mapping: torch.Tensor,
+        word_offsets: torch.Tensor,
+        column_features: Optional[List[torch.Tensor]] = None,
+        column_feature_masks: Optional[List[torch.Tensor]] = None,
+    ):
+        ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
+        if column_features != None:
+            ret[COLUMN_FEATURES][FEATURES].update(column_features)
+            ret[COLUMN_FEATURES][MASKS].update(column_feature_masks)
 
         ret.update(
             {
                 LOGITS: logits,
-                FEATURES: pooled_features,
+                FEATURES: sequence_output,  # input of ner fusion model
                 NER_ANNOTATION: logits_label,
-                TOKEN_WORD_MAPPING: batch[self.text_token_word_mapping_key],
-                WORD_OFFSETS: batch[self.text_word_offsets_key],
+                TOKEN_WORD_MAPPING: token_word_mapping,
+                WORD_OFFSETS: word_offsets,
             }
         )
 

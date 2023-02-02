@@ -8,7 +8,7 @@ from torch.nn.modules.loss import _Loss
 from transformers import AutoConfig, AutoModel
 
 from ..constants import AUTOMM, LOGITS, REGRESSION
-from .adaptation_layers import IA3Linear, LoRALinear
+from .adaptation_layers import IA3Linear, IA3LoRALinear, LoRALinear
 
 logger = logging.getLogger(AUTOMM)
 
@@ -420,54 +420,58 @@ def get_column_features(
     return column_features, feature_masks
 
 
-def inject_ia3_to_linear_layer(
-    model: nn.Module,
-    filter: Optional[List[str]] = None,
-    module_filter: Optional[List[str]] = None,
-) -> nn.Module:
+def create_adaptation(efficient_finetune: str, layer: nn.Module, lora_r: int, lora_alpha: int):
     """
-    Injects trainable adapters that inihibit and amplify activations, called (IA)^3.
-    Used for efficient fine-tuning of large pre-trained models.
+    Creates a model adaptation module (IA3, LoRA, IA3_LoRA) given a linear layer.
 
     Parameters
     ----------
-    model
-        A PyTorch model.
+    efficient_finetune
+        Name of the adaptation module.
+    layer
+       The layer the adaptation module should be applied to.
+    lora_r
+        The rank r of the low-rank decomposition.
+    lora_alpha
+        The scaling factor. Can be set to same value as r in
+        most cases, as initialization is scaled already.
     filter
-        Apply (IA)^3 only to linear layers filtered by name.
-        If None, (IA)^3 is applied to all linear Layers in module.
+        Apply loRA only to linear layers filtered by name (e.g. "query.").
+        If None, loRA is applied to all linear Layers in module.
     module_filter
-        Apply (IA)^3 only to modules filtered by name (e.g. ".*EncDecAttention|.*DenseReluDense")
-        If None, (IA)^3 is considered for all modules
+        Apply loRA only to modules filtered by name (e.g. ".*EncDecAttention|.*DenseReluDense")
+        If None, loRA is considered for all modules
 
     Returns
     -------
-    Model with injected (IA)3 modules.
+    Model with injected LoRA modules.
     """
-    for m_name, module in dict(model.named_modules()).items():
-        if not module_filter or any(re.match(filter_module, m_name) for filter_module in module_filter):
-            for c_name, layer in dict(module.named_children()).items():
-                if not filter or any(re.match(filter_layer, c_name) for filter_layer in filter):
-                    assert isinstance(
-                        layer, nn.Linear
-                    ), f"(IA)3 can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
-                    lora_layer = IA3Linear(layer.in_features, layer.out_features)
-                    lora_layer.weight = layer.weight
-                    lora_layer.bias = layer.bias
-                    setattr(module, c_name, lora_layer)
+    if "ia3_lora" in efficient_finetune:
+        return IA3LoRALinear(
+            layer.in_features, layer.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
+        )
+    elif "ia3" in efficient_finetune:
+        return IA3Linear(layer.in_features, layer.out_features, merge_weights=False)
+    elif "lora" in efficient_finetune:
+        return LoRALinear(layer.in_features, layer.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False)
+    elif efficient_finetune is not None and efficient_finetune != "None":
+        raise NotImplementedError(
+            f"The efficient finetuning strategy '{efficient_finetune}'"
+            f" is not supported. We only support"
+            f" {', '.join(PEFT_STRATEGIES)}."
+        )
 
-    return model  # return model to enable method chaining
 
-
-def inject_lora_to_linear_layer(
+def inject_adaptation_to_linear_layer(
     model: nn.Module,
-    lora_r: int,
-    lora_alpha: int,
+    efficient_finetune: str,
+    lora_r: int = None,
+    lora_alpha: int = None,
     filter: Optional[List[str]] = None,
     module_filter: Optional[List[str]] = None,
 ) -> nn.Module:
     """
-    Injects trainable Low-Rank decomposition matrices (LoRA) into linear
+    Injects trainable adatio Low-Rank decomposition matrices (LoRA) into linear
     layers of a PyTorch model. Used for efficient fine-tuning of large
     pre-trained models.
 
@@ -475,6 +479,8 @@ def inject_lora_to_linear_layer(
     ----------
     model
         A PyTorch model.
+    efficient_finetune
+        Efficient finetuning method that should be applied.
     lora_r
         The rank r of the low-rank decomposition.
     lora_alpha
@@ -498,12 +504,10 @@ def inject_lora_to_linear_layer(
                     assert isinstance(
                         layer, nn.Linear
                     ), f"LoRA can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
-                    lora_layer = LoRALinear(
-                        layer.in_features, layer.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
-                    )
-                    lora_layer.weight = layer.weight
-                    lora_layer.bias = layer.bias
-                    setattr(module, c_name, lora_layer)
+                    adaptation_layer = create_adaptation(efficient_finetune, layer, lora_r, lora_alpha)
+                    adaptation_layer.weight = layer.weight
+                    adaptation_layer.bias = layer.bias
+                    setattr(module, c_name, adaptation_layer)
 
     return model  # return model to enable method chaining
 
@@ -544,7 +548,7 @@ def get_hf_config_and_model(
     Parameters
     ----------
     checkpoint_name
-        A model checkpoint name.
+        A model checkpoint name or a local path that saves a custom checkpoint.
     pretrained
          Whether using the pretrained weights. If pretrained=True, download the pretrained model.
     low_cpu_mem_usage
@@ -680,3 +684,27 @@ def update_mmdet_config(key, value, config):
             for subsubconfig in subconfig:
                 if isinstance(subsubconfig, dict):
                     update_mmdet_config(key, value, subsubconfig)
+
+
+def run_model(model: nn.Module, batch: dict):
+    from .document_transformer import DocumentTransformer
+    from .huggingface_text import HFAutoModelForTextPrediction
+    from .timm_image import TimmAutoModelForImagePrediction
+
+    supported_models = (TimmAutoModelForImagePrediction, HFAutoModelForTextPrediction)
+    if (not isinstance(model, DocumentTransformer)) and isinstance(model, supported_models):
+        input_vec = [batch[k] for k in model.input_keys]
+        column_names, column_values = [], []
+        for k in batch.keys():
+            if (isinstance(model, TimmAutoModelForImagePrediction) and k.startswith(model.image_column_prefix)) or (
+                isinstance(model, HFAutoModelForTextPrediction) and k.startswith(model.text_column_prefix)
+            ):
+                column_names.append(k)
+                column_values.append(batch[k])
+        input_vec.append(column_names)
+        input_vec.append(column_values)
+        output_vec = model(*tuple(input_vec))
+        output = model.get_output_dict(*output_vec)
+    else:
+        output = model(batch)
+    return output

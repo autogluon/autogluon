@@ -259,7 +259,7 @@ class _ThresholdScorer(Scorer):
             y_pred = np.array(y_pred)
         y_type = type_of_target(y_true)
         if y_type not in ("binary", "multilabel-indicator"):
-            raise ValueError("{0} format is not supported".format(y_type))
+            raise ValueError(f"{y_type} format is not supported in metric '{self.name}'")
 
         if y_type == "binary":
             pass

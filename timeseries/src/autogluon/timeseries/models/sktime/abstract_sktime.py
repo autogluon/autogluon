@@ -12,6 +12,7 @@ from statsmodels.tools.sm_exceptions import ConvergenceWarning
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
 from autogluon.timeseries.utils.seasonality import get_seasonality
 
@@ -66,6 +67,11 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
             eval_metric=eval_metric,
             hyperparameters=hyperparameters,
             **kwargs,
+        )
+        logger.warning(
+            f"Warning: Model {self.__class__.__name__} has been deprecated in v0.7.\n"
+            "\tStarting from v0.8, using this model will raise an exception.\n"
+            "\tConsider instead using other local models such as 'AutoETS', 'AutoARIMA' and 'ARIMA'.",
         )
         self.sktime_forecaster: Optional[BaseForecaster] = None
         self._fit_hash: Optional[pd.Series] = None
@@ -175,8 +181,5 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         predictions = pd.concat([mean_predictions, quantile_predictions], axis=1)
         predictions_df = self._to_time_series_data_frame(predictions, freq=data.freq)
         # Make sure item_id matches `data` (in case trainining and prediction data use different `item_id`s)
-        fit_item_id_to_pred_item_id = dict(zip(self._fit_hash.index, data_hash.index))
-        pred_item_id = predictions_df.index.get_level_values(ITEMID).map(fit_item_id_to_pred_item_id.get)
-        pred_timestamp = predictions_df.index.get_level_values(TIMESTAMP)
-        predictions_df.index = pd.MultiIndex.from_arrays([pred_item_id, pred_timestamp], names=(ITEMID, TIMESTAMP))
+        predictions_df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
         return predictions_df

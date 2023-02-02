@@ -5,17 +5,16 @@ import random
 import re
 import time
 import warnings
-import psutil
 
 import numpy as np
 from pandas import DataFrame, Series
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
-from autogluon.core.utils import ResourceManager
 from autogluon.core.utils import try_import_lightgbm
 
 from . import lgb_utils
@@ -221,16 +220,11 @@ class LGBModel(AbstractModel):
 
     def _predict_proba(self, X, num_cpus=0, **kwargs):
         X = self.preprocess(X, **kwargs)
-        # FIXME This is a HACK. Passing in value -1, 0, or None will only use 1 cores. Need to pass in a large number instead
-        if num_cpus == 0:
-            # TODO Avoid using psutil when lgb fixed the mem leak.
-            # logical=True is faster in inference
-            num_cpus = ResourceManager.get_cpu_count_psutil(logical=True)
-        if self.problem_type == REGRESSION:
-            return self.model.predict(X, num_threads=num_cpus)
 
         y_pred_proba = self.model.predict(X, num_threads=num_cpus)
-        if self.problem_type == BINARY:
+        if self.problem_type == REGRESSION:
+            return y_pred_proba
+        elif self.problem_type == BINARY:
             if len(y_pred_proba.shape) == 1:
                 return y_pred_proba
             elif y_pred_proba.shape[1] > 1:

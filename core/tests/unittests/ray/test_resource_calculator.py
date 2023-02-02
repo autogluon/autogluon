@@ -1,6 +1,6 @@
-import psutil
 import pytest
 
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.ray.resources_calculator import (
     ResourceCalculatorFactory,
     CpuResourceCalculator,
@@ -38,7 +38,7 @@ def test_cpu_calculator_no_bottleneck():
 def test_cpu_calculator_mem_bottleneck():
     num_cpus = 32
     num_jobs = 20
-    mem_available = psutil.virtual_memory().available
+    mem_available = ResourceManager.get_available_virtual_mem()
     model_estimate_memory_usage = mem_available // 2.5  # allows 2 jobs to run in parallel
     
     calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type='cpu')

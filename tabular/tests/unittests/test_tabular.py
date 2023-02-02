@@ -68,7 +68,25 @@ def test_tabular():
     run_tabular_benchmark_toy(fit_args=fit_args)
 
 
+def _assert_predict_dict_identical_to_predict(predictor, data):
+    """Assert that predict_proba_dict and predict_dict are identical to looping calls to predict and predict_proba"""
+    predict_proba_dict = predictor.predict_proba_multi(data=data)
+    predict_dict = predictor.predict_multi(data=data)
+    assert set(predictor.get_model_names()) == set(predict_proba_dict.keys())
+    assert set(predictor.get_model_names()) == set(predict_dict.keys())
+    for m in predictor.get_model_names():
+        model_pred = predictor.predict(data, model=m)
+        model_pred_proba = predictor.predict_proba(data, model=m)
+        assert model_pred.equals(predict_dict[m])
+        assert model_pred_proba.equals(predict_proba_dict[m])
+
+
 def test_advanced_functionality():
+    """
+    Tests a bunch of advanced functionality, including when used in combination.
+    The idea is that if this test passes, we are in good shape.
+    Simpler to test all of this within one test as it avoids repeating redundant setup such as fitting a predictor.
+    """
     fast_benchmark = True
     dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
                       'name': 'AdultIncomeBinaryClassification',
@@ -91,6 +109,7 @@ def test_advanced_functionality():
     leaderboard = predictor.leaderboard(data=test_data)
     extra_metrics = ['accuracy', 'roc_auc', 'log_loss']
     leaderboard_extra = predictor.leaderboard(data=test_data, extra_info=True, extra_metrics=extra_metrics)
+    _assert_predict_dict_identical_to_predict(predictor=predictor, data=test_data)
     assert set(predictor.get_model_names()) == set(leaderboard['model'])
     assert set(predictor.get_model_names()) == set(leaderboard_extra['model'])
     assert set(leaderboard_extra.columns).issuperset(set(leaderboard.columns))
@@ -234,8 +253,15 @@ def test_advanced_functionality_bagging():
     expected_num_models = 2
     assert(len(predictor.get_model_names()) == expected_num_models)
 
+    _assert_predict_dict_identical_to_predict(predictor=predictor, data=test_data)
+
     oof_pred_proba = predictor.get_oof_pred_proba()
     assert(len(oof_pred_proba) == len(train_data))
+
+    predict_proba_dict_oof = predictor.predict_proba_multi()
+    for m in predictor.get_model_names():
+        predict_proba_oof = predictor.get_oof_pred_proba(model=m)
+        assert predict_proba_oof.equals(predict_proba_dict_oof[m])
 
     score_oof = predictor.evaluate_predictions(train_data[label], oof_pred_proba)
     model_best = predictor.get_model_best()
@@ -293,6 +319,7 @@ def run_tabular_benchmark_toy(fit_args):
     savedir = directory + 'AutogluonOutput/'
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     predictor = TabularPredictor(label=dataset['label'], path=savedir).fit(train_data, **fit_args)
+    assert len(predictor._trainer._models_failed_to_train) == 0
     print(predictor.feature_metadata)
     print(predictor.feature_metadata.type_map_raw)
     print(predictor.feature_metadata.type_group_map_special)
@@ -379,6 +406,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                     # .sample instead of .head to increase diversity and test cases where data index is not monotonically increasing.
                     train_data = train_data.sample(n=subsample_size, random_state=seed_val)  # subsample for fast_benchmark
             predictor = TabularPredictor(label=label, path=savedir).fit(train_data, **fit_args)
+            assert len(predictor._trainer._models_failed_to_train) == 0
             results = predictor.fit_summary(verbosity=4)
             original_features = list(train_data)
             original_features.remove(label)
@@ -974,3 +1002,34 @@ def test_tabular_bagstack_use_bag_holdout():
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val=seed_val, fit_args=fit_args, run_distill=True, crash_in_oof=True)
+
+
+def test_tabular_raise_on_nonfinite_float_labels():
+    predictor = TabularPredictor(label='y')
+    nonfinite_values = [np.nan, np.inf, np.NINF]
+
+    for idx, nonfinite_value in enumerate(nonfinite_values):
+        train_data = TabularDataset({
+            'x': [0.0, 1.0, 2.0, 3.0, 4.0],
+            'y': [0.0, 1.0, 2.0, 3.0, 4.0]
+            })
+        train_data.loc[idx, 'y'] = nonfinite_value
+
+        with pytest.raises(ValueError) as ex_info:
+            predictor.fit(train_data)
+        assert str(ex_info.value).split()[-1] == str(idx)
+
+def test_tabular_raise_on_nonfinite_class_labels():
+    predictor = TabularPredictor(label='y')
+    nonfinite_values = [np.nan, np.inf, np.NINF]
+
+    for idx, nonfinite_value in enumerate(nonfinite_values):
+        train_data = TabularDataset({
+            'x': [0.0, 1.0, 2.0, 3.0, 4.0],
+            'y': ["a", "b", "c", "d", "e"]
+            })
+        train_data.loc[idx, 'y'] = nonfinite_value
+
+        with pytest.raises(ValueError) as ex_info:
+            predictor.fit(train_data)
+        assert str(ex_info.value).split()[-1] == str(idx)

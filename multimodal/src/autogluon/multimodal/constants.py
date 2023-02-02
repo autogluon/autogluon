@@ -1,10 +1,16 @@
+"""Storing the constants"""
+
 # Column/Label Types
 NULL = "null"
 CATEGORICAL = "categorical"
 TEXT = "text"
+TEXT_NER = "text_ner"  # Added for NER text column
 NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
+IMAGE_BYTEARRAY = "image_bytearray"
 IDENTIFIER = "identifier"
+DOCUMENT = "document"
+DOCUMENT_IMAGE = "document_image"
 
 # Problem types
 CLASSIFICATION = "classification"
@@ -17,13 +23,12 @@ DEFAULT_SHOT = "default_shot"
 DEPRECATED_ZERO_SHOT = "zero_shot"
 NER = "ner"
 NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
-
-# Pipelines
 FEATURE_EXTRACTION = "feature_extraction"
 ZERO_SHOT_IMAGE_CLASSIFICATION = "zero_shot_image_classification"
 OBJECT_DETECTION = "object_detection"
-OCR_TEXT_DETECTION = "ocr_text_detection"
-OCR_TEXT_RECOGNITION = "ocr_text_recognition"
+OCR = "ocr"
+OCR_TEXT_DETECTION = f"{OCR}_text_detection"
+OCR_TEXT_RECOGNITION = f"{OCR}_text_recognition"
 IMAGE_SIMILARITY = "image_similarity"
 TEXT_SIMILARITY = "text_similarity"
 IMAGE_TEXT_SIMILARITY = "image_text_similarity"
@@ -37,6 +42,10 @@ CHOICES_IDS = "choices_ids"
 TEXT_VALID_LENGTH = "text_valid_length"
 TEXT_SEGMENT_IDS = "text_segment_ids"
 COLUMN = "column"
+ATTENTION_MASK = "attention_mask"
+TOKEN_TYPE_IDS = "token_type_ids"
+PIXEL_VALUES = "pixel_values"
+INPUT_IDS = "input_ids"
 
 # Output keys
 LOGITS = "logits"
@@ -75,12 +84,15 @@ LOG_LOSS = "log_loss"
 CROSS_ENTROPY = "cross_entropy"
 COSINE_EMBEDDING_LOSS = "cosine_embedding_loss"
 F1 = "f1"
+OVERALL_F1 = "overall_f1"
+NER_TOKEN_F1 = "ner_token_f1"
 DIRECT_LOSS = "direct_loss"
 HIT_RATE = "hit_rate"
 NDCG = "ndcg"
 PRECISION = "precision"
 RECALL = "recall"
 MRR = "mrr"
+RETRIEVAL_METRICS = [NDCG, PRECISION, RECALL, MRR]
 METRIC_MODE_MAP = {
     ACC: MAX,
     ACCURACY: MAX,
@@ -97,12 +109,8 @@ METRIC_MODE_MAP = {
     F1: MAX,
     MAP: MAX,
     MEAN_AVERAGE_PRECISION: MAX,
-    OVERALL_ACCURACY: MAX,
-    HIT_RATE: MAX,
-    NDCG: MAX,
-    PRECISION: MAX,
+    NER_TOKEN_F1: MAX,
     RECALL: MAX,
-    MRR: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
@@ -119,7 +127,7 @@ MMDET = "mmdet"
 MMOCR = "mmocr"
 
 # Modality keys. may need to update here if new modality keys are added in above.
-ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL]
+ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER, DOCUMENT]
 
 # Keys to compute metrics
 Y_PRED = "y_pred"
@@ -162,6 +170,22 @@ LORA_NORM = "lora_norm"
 IA3 = "ia3"
 IA3_BIAS = "ia3_bias"
 IA3_NORM = "ia3_norm"
+IA3_LORA = "ia3_lora"
+IA3_LORA_BIAS = "ia3_lora_bias"
+IA3_LORA_NORM = "Ia3_lora_norm"
+PEFT_STRATEGIES = [
+    BIT_FIT,
+    NORM_FIT,
+    LORA,
+    LORA_BIAS,
+    LORA_NORM,
+    IA3,
+    IA3_BIAS,
+    IA3_NORM,
+    IA3_LORA,
+    IA3_LORA_BIAS,
+    IA3_LORA_NORM,
+]
 
 # DeepSpeed constants
 DEEPSPEED_OFFLOADING = "deepspeed_stage_3_offload"
@@ -181,11 +205,13 @@ CATEGORICAL_TRANSFORMER = "categorical_transformer"
 FUSION = "fusion"
 FUSION_MLP = f"{FUSION}_mlp"
 FUSION_TRANSFORMER = f"{FUSION}_transformer"
+FUSION_NER = f"{FUSION}_{NER}"
 MMDET_IMAGE = "mmdet_image"
 MMOCR_TEXT_DET = "mmocr_text_detection"
 MMOCR_TEXT_RECOG = "mmocr_text_recognition"
 NER_TEXT = "ner_text"
-HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT)
+DOCUMENT_TRANSFORMER = "document_transformer"
+HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT, DOCUMENT_TRANSFORMER)
 MMLAB_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
 
 # matcher loss type
@@ -224,3 +250,10 @@ RESPONSE = "response"
 QUERY_RESPONSE = f"{QUERY}_{RESPONSE}"
 PAIR = "pair"
 TRIPLET = "triplet"
+
+# presets
+DEFAULT = "default"
+HIGH_QUALITY = "high_quality"
+MEDIUM_QUALITY = "medium_quality"
+BEST_QUALITY = "best_quality"
+ALL_MODEL_QUALITIES = [HIGH_QUALITY, MEDIUM_QUALITY, BEST_QUALITY, DEFAULT]

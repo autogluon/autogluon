@@ -8,15 +8,14 @@ from unittest import mock
 
 import numpy as np
 import pytest
-from gluonts.model.prophet import PROPHET_IS_INSTALLED
 
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel, ETSModel
-from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesEnsembleWrapper
+from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
 from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
-from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
+from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
@@ -196,75 +195,6 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
     assert all(1 <= config["epochs"] <= 4 for config in config_history)
 
 
-@pytest.mark.skipif(not PROPHET_IS_INSTALLED, reason="Prophet is not installed.")
-@pytest.mark.parametrize("eval_metric", ["MAPE", None])
-@pytest.mark.parametrize(
-    "hyperparameters, expected_board_length",
-    [({"Prophet": {}, "DeepAR": {"epochs": 1}}, 2), ({"Prophet": {}}, 1)],
-)
-def test_given_hyperparameters_to_prophet_when_trainer_called_then_leaderboard_is_correct(
-    temp_model_path, eval_metric, hyperparameters, expected_board_length
-):
-    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric=eval_metric)
-    trainer.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
-    )
-    leaderboard = trainer.leaderboard()
-
-    expected_board_length += int(trainer.enable_ensemble)
-    assert len(leaderboard) == expected_board_length
-    assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
-
-
-@pytest.mark.skipif(not PROPHET_IS_INSTALLED, reason="Prophet is not installed.")
-@pytest.mark.parametrize(
-    "hyperparameters",
-    [
-        {"Prophet": {"n_changepoints": 4}, "SimpleFeedForward": {"epochs": 1}},
-        {"Prophet": {"mcmc_samples": 44}, "DeepAR": {"epochs": 3}},
-    ],
-)
-def test_given_hyperparameters_to_prophet_when_trainer_model_templates_called_then_hyperparameters_set_correctly(
-    temp_model_path, hyperparameters
-):
-    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE")
-    models = trainer.construct_model_templates(
-        hyperparameters=hyperparameters,
-    )
-
-    for model in models:
-        for k, v in hyperparameters[model.name].items():
-            assert model._user_params[k] == v
-
-
-@pytest.mark.skipif(not PROPHET_IS_INSTALLED, reason="Prophet is not installed.")
-def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_hpo_is_performed(
-    temp_model_path,
-):
-    hyperparameters = {"Prophet": {"n_changepoints": ag.Int(1, 4)}}
-    # mock the default hps factory to prevent preset hyperparameter configurations from
-    # creeping into the test case
-    with mock.patch("autogluon.timeseries.models.presets.get_default_hps") as default_hps_mock:
-        default_hps_mock.return_value = defaultdict(dict)
-        trainer = AutoTimeSeriesTrainer(path=temp_model_path)
-        trainer.fit(
-            train_data=DUMMY_TS_DATAFRAME,
-            hyperparameters=hyperparameters,
-            val_data=DUMMY_TS_DATAFRAME,
-            hyperparameter_tune_kwargs={
-                "num_trials": 2,
-                "searcher": "random",
-                "scheduler": "local",
-            },
-        )
-        leaderboard = trainer.leaderboard()
-
-    assert len(leaderboard) == 2 + 1  # include ensemble
-    assert all([1 <= v["params"]["epochs"] < 5 for k, v in trainer.model_graph.nodes.items()])
-
-
 @pytest.mark.parametrize("eval_metric", ["MAPE", None])
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
@@ -378,7 +308,7 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
 
     for m in model_names:
         loaded_model = loaded_trainer.load_model(m)
-        if isinstance(loaded_model, TimeSeriesEnsembleWrapper):
+        if isinstance(loaded_model, TimeSeriesGreedyEnsemble):
             continue
 
         predictions = loaded_model.predict(DUMMY_TS_DATAFRAME)
@@ -397,8 +327,10 @@ def test_given_base_model_fails_when_trainer_predicts_then_weighted_ensemble_can
 ):
     trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
     trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
-    ensemble = TimeSeriesEnsembleWrapper(weights={"Naive": 0.5, "SeasonalNaive": 0.5}, name="WeightedEnsemble")
+    ensemble = TimeSeriesGreedyEnsemble(name="WeightedEnsemble")
+    ensemble.model_to_weight = {"Naive": 0.5, "SeasonalNaive": 0.5}
     trainer._add_model(ensemble, base_models=["Naive", "SeasonalNaive"])
+    trainer.save_model(model=ensemble)
 
     with mock.patch(f"autogluon.timeseries.models.local.naive.{failing_model}.predict") as fail_predict:
         fail_predict.side_effect = RuntimeError("Numerical error")
@@ -411,11 +343,38 @@ def test_given_base_model_fails_when_trainer_predicts_then_weighted_ensemble_can
 def test_given_base_model_fails_when_trainer_scores_then_weighted_ensemble_can_score(temp_model_path, failing_model):
     trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
     trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
-    ensemble = TimeSeriesEnsembleWrapper(weights={"Naive": 0.5, "SeasonalNaive": 0.5}, name="WeightedEnsemble")
+    ensemble = TimeSeriesGreedyEnsemble(name="WeightedEnsemble")
+    ensemble.model_to_weight = {"Naive": 0.5, "SeasonalNaive": 0.5}
     trainer._add_model(ensemble, base_models=["Naive", "SeasonalNaive"])
+    trainer.save_model(model=ensemble)
 
     with mock.patch(f"autogluon.timeseries.models.local.naive.{failing_model}.predict") as fail_predict:
         fail_predict.side_effect = RuntimeError("Numerical error")
         score = trainer.score(DUMMY_TS_DATAFRAME, model="WeightedEnsemble")
         fail_predict.assert_called()
         assert isinstance(score, float)
+
+
+def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict(temp_model_path):
+    df = DATAFRAME_WITH_COVARIATES.copy()
+    prediction_length = 2
+    df_train = df.slice_by_timestep(None, -prediction_length)
+    df_future = df.slice_by_timestep(-prediction_length, None)
+    known_covariates = df_future.drop("target", axis=1)
+
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, prediction_length=prediction_length, enable_ensemble=False)
+    trainer.fit(df_train, hyperparameters={"ETS": {"maxiter": 1}, "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}})
+
+    # Manually add ensemble to ensure that both models have non-zero weight
+    ensemble = TimeSeriesGreedyEnsemble(name="WeightedEnsemble")
+    ensemble.model_to_weight = {"DeepAR": 0.5, "ETS": 0.5}
+    trainer._add_model(model=ensemble, base_models=["DeepAR", "ETS"])
+    trainer.save_model(model=ensemble)
+    with mock.patch(
+        "autogluon.timeseries.models.ensemble.greedy_ensemble.TimeSeriesGreedyEnsemble.predict"
+    ) as mock_predict:
+        trainer.predict(df_train, model="WeightedEnsemble", known_covariates=known_covariates)
+        inputs = mock_predict.call_args[0][0]
+        # No models failed during prediction
+        assert inputs["DeepAR"] is not None
+        assert inputs["ETS"] is not None

@@ -80,7 +80,7 @@ model:
     gradient_checkpointing: False
     low_cpu_mem_usage: False
     data_types:
-      - "text"
+      - "text_ner"
     tokenizer_name: "hf_auto"
     insert_sep: False
     text_segment_num: 2
@@ -88,6 +88,28 @@ model:
     special_tags: 
       - X # CLS, SEP, and non-first tokens of a word will be labelled as X
       - O # Outside of a named entity
+  document_transformer:
+    checkpoint_name: "microsoft/layoutlmv3-base" # document foundation models
+    gradient_checkpointing: False
+    pooling_mode: 'cls'  # The pooling mode, can be 'cls' or 'mean'
+    data_types:
+      - "document"
+    train_transform_types:
+      - "resize_shorter_side"
+      - "center_crop"
+    val_transform_types:
+      - "resize_shorter_side"
+      - "center_crop"
+    image_norm: "imagenet"
+    image_size: 224
+    tokenizer_name: "hf_auto"
+    max_text_len: 512  # If None or <=0, then use the max length of pretrained models.
+    insert_sep: True
+    low_cpu_mem_usage: False
+    text_segment_num: 2
+    stochastic_chunk: False
+    text_aug_detect_length: 10                # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
+    text_trivial_aug_maxscale: 0.0            # augmentation magnitude randomly drawn from [0, text_trivial_aug_maxscale]
   t_few:
     checkpoint_name: "t5-small" #"bigscience/T0_3B"
     gradient_checkpointing: False
@@ -117,23 +139,15 @@ model:
       - "resize_shorter_side"
       - "center_crop"
     image_norm: "imagenet"
-    image_size: 224
+    image_size: null
     max_img_num_per_col: 2
 
   mmdet_image:
     checkpoint_name: "yolov3_mobilenetv2_320_300e_coco"
+    config_file: ""
     data_types:
       - "image"
-    train_transform_types:
-      - "resize_shorter_side"
-      - "center_crop"
-      - "trivial_augment"
-    val_transform_types:
-      - "resize_shorter_side"
-      - "center_crop"
-    image_norm: "imagenet"
-    image_size: 224
-    max_img_num_per_col: 2
+    max_img_num_per_col: 1
 
   mmocr_text_detection:
     checkpoint_name: "TextSnake"
@@ -194,6 +208,15 @@ model:
       # - "insert_punc(0.05)"
   fusion_mlp:
     weight: 0.1
+    adapt_in_features: "max"
+    hidden_sizes:
+      - 128
+    activation: "leaky_relu"
+    drop_rate: 0.1
+    normalization: "layer_norm"
+    data_types:
+  fusion_ner:
+    weight:
     adapt_in_features: "max"
     hidden_sizes:
       - 128

@@ -13,17 +13,19 @@ import numpy as np
 import pandas as pd
 import torch
 from gluonts.core.component import from_hyperparameters
-from gluonts.torch.distributions import AffineTransformed, NormalOutput
+from gluonts.model.forecast import QuantileForecast
+from gluonts.torch.distributions import AffineTransformed
 from gluonts.torch.model.deepar import DeepAREstimator
 from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
-from gluonts.torch.model.forecast import DistributionForecast, Forecast
+from gluonts.torch.model.forecast import DistributionForecast
 from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPredictor
 from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
+from gluonts.torch.model.tft import TemporalFusionTransformerEstimator
 from pytorch_lightning.callbacks import Timer
 
 from autogluon.core.hpo.constants import CUSTOM_BACKEND
 from autogluon.core.utils.loaders import load_pkl
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from autogluon.timeseries.utils.warning_filters import torch_warning_filter
 
@@ -123,6 +125,32 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
             model.gts_predictor = GluonTSPyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
         return model
 
+    @staticmethod
+    def _distribution_to_quantile_forecast(
+        forecast: DistributionForecast, quantile_levels: List[float]
+    ) -> QuantileForecast:
+        forecast_arrays = [forecast.mean]
+
+        quantile_keys = [str(q) for q in quantile_levels]
+        if isinstance(forecast.distribution, AffineTransformed):
+            # FIXME: Fix a bug where distribution parameters aren't moved to CPU
+            affine_transform = forecast.distribution.transforms[-1]
+            affine_transform.scale = affine_transform.scale.cpu()
+            affine_transform.loc = affine_transform.loc.cpu()
+
+        q_transformed = [forecast.quantile(q) for q in quantile_keys]
+
+        forecast_arrays.extend(q_transformed)
+        forecast_init_args = dict(
+            forecast_arrays=np.array(forecast_arrays),
+            start_date=forecast.start_date,
+            forecast_keys=["mean"] + quantile_keys,
+            item_id=str(forecast.item_id),
+        )
+        if isinstance(forecast.start_date, pd.Timestamp):  # GluonTS version is <0.10
+            forecast_init_args.update({"freq": forecast.freq})
+        return QuantileForecast(**forecast_init_args)
+
 
 class DeepARModel(AbstractGluonTSPyTorchModel):
     """DeepAR model from GluonTS based on the PyTorch backend.
@@ -176,6 +204,7 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
 
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DeepAREstimator
     default_num_samples: int = 250
+    supports_known_covariates = True
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
@@ -203,7 +232,7 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
         (default: None, in which case context_length = prediction_length)
     hidden_dimensions: List[int], default = [20, 20]
         Size of hidden layers in the feedforward network
-    distr_output : gluonts.torch.distributions.DistributionOutput, default = NormalOutput()
+    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
         Distribution to fit.
     batch_normalization : bool, default = False
         Whether to use batch normalization
@@ -221,49 +250,68 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
 
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = SimpleFeedForwardEstimator
 
+
+class TemporalFusionTransformerModel(AbstractGluonTSPyTorchModel):
+    """TemporalFusionTransformer model from GluonTS.
+
+    The model combines an LSTM encoder, a transformer decoder, and directly predicts
+    the quantiles of future target values. As described in [Lim2021]_.
+
+    Based on `gluonts.torch.model.tft.TemporalFusionTransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.tft.html>`_.
+    See GluonTS documentation for additional hyperparameters.
+
+
+    References
+    ----------
+    .. [Lim2021] Lim, Bryan, et al.
+        "Temporal Fusion Transformers for Interpretable Multi-horizon Time Series Forecasting."
+        International Journal of Forecasting. 2021.
+
+
+    Other Parameters
+    ----------------
+    context_length : int, default = 64
+        Number of past values used for prediction.
+    disable_static_features : bool, default = False
+        If True, static features won't be used by the model even if they are present in the dataset.
+        If False, static features will be used by the model if they are present in the dataset.
+    disable_known_covariates : bool, default = False
+        If True, known covariates won't be used by the model even if they are present in the dataset.
+        If False, known covariates will be used by the model if they are present in the dataset.
+    disable_past_covariates : bool, default = False
+        If True, past covariates won't be used by the model even if they are present in the dataset.
+        If False, past covariates will be used by the model if they are present in the dataset.
+    hidden_dim : int, default = 32
+        Size of the LSTM & transformer hidden states.
+    variable_dim : int, default = 32
+        Size of the feature embeddings.
+    num_heads : int, default = 4
+        Number of attention heads in self-attention layer in the decoder.
+    dropout_rate : float, default = 0.1
+        Dropout regularization parameter
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 64
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
+    """
+
+    gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = TemporalFusionTransformerEstimator
+    supports_known_covariates = True
+    supports_past_covariates = True
+
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
-
-        # FIXME: PyTorch StudentT does not implement quantile functions
-        if "distr_output" in init_kwargs:
-            warnings.warn(
-                f"distr_output {init_kwargs['distr_output']} specified for SimpleFeedForward, however training"
-                "will default to the Gaussian distribution."
-            )
-        init_kwargs["distr_output"] = NormalOutput()
+        init_kwargs.setdefault("context_length", max(64, self.prediction_length))
+        if self.num_feat_dynamic_real > 0:
+            init_kwargs["dynamic_dims"] = [self.num_feat_dynamic_real]
+        if self.num_past_feat_dynamic_real > 0:
+            init_kwargs["past_dynamic_dims"] = [self.num_past_feat_dynamic_real]
+        if self.num_feat_static_real > 0:
+            init_kwargs["static_dims"] = [self.num_feat_static_real]
+        if len(self.feat_static_cat_cardinality):
+            init_kwargs["static_cardinalities"] = self.feat_static_cat_cardinality
         return init_kwargs
-
-    def _gluonts_forecasts_to_data_frame(
-        self, forecasts: List[Forecast], quantile_levels: List[float]
-    ) -> TimeSeriesDataFrame:
-        assert isinstance(forecasts[0], DistributionForecast)
-
-        result_dfs = []
-        for i, forecast in enumerate(forecasts):
-            item_forecast_dict = dict(mean=forecast.mean)
-            if isinstance(forecast.distribution, AffineTransformed):
-                # FIXME: this is a hack to get around GluonTS not implementing quantiles for
-                # torch AffineTransformed. We hence force PyTorch SFF to always use Gaussian error.
-                # However, this leads to a ~2x regression in error compared to MXNet SFF.
-                fdist = forecast.distribution
-                quantiles_tensor = torch.tensor(quantile_levels, device=fdist.scale.device).unsqueeze(1)
-                q_transformed = (
-                    (fdist.scale * fdist.base_dist.icdf(quantiles_tensor) + fdist.loc).cpu().numpy().tolist()
-                )
-                for ix, quantile in enumerate(quantile_levels):
-                    item_forecast_dict[str(quantile)] = q_transformed[ix]
-            else:
-                for quantile in quantile_levels:
-                    item_forecast_dict[str(quantile)] = forecast.quantile(str(quantile))
-
-            df = pd.DataFrame(item_forecast_dict)
-            df[ITEMID] = forecast.item_id
-            # TODO: replace with get_forecast_horizon_index_single_time_series
-            df[TIMESTAMP] = pd.date_range(
-                start=forecasts[i].start_date.to_timestamp(how="S"),
-                periods=self.prediction_length,
-                freq=self.freq,
-            )
-            result_dfs.append(df)
-
-        return TimeSeriesDataFrame.from_data_frame(pd.concat(result_dfs))

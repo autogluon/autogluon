@@ -28,8 +28,8 @@ from autogluon_contrib_nlp.utils.misc import grouper, \
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.utils import in_ipynb
-from autogluon.core.utils.utils import ResourceManager
 from autogluon.core.utils.loaders import load_pd
 from autogluon.core.task.base import compile_scheduler_options_v2
 from autogluon.core.metrics import get_metric

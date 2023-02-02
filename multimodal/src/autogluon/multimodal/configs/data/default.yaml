@@ -1,6 +1,6 @@
 data:
   image:
-    missing_value_strategy: "skip"  # How to deal with missing images. By default, we skip a sample with missing images. We also support choice "zero", i.e., using a zero image to replace a missing image.
+    missing_value_strategy: "zero"  # How to deal with missing images. By default, we use a zero image to replace a missing image. We also support "skip", i.e., skipping a sample with missing images.
   text:
     normalize_text: False  # Whether to normalize text
   categorical:

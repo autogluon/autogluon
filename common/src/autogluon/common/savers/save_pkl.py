@@ -1,5 +1,4 @@
 # TODO: Standardize / unify this code with ag.save()
-import boto3
 import logging
 import os
 import pickle
@@ -37,7 +36,10 @@ def save_with_fn(path, object, pickle_fn, format=None, verbose=True, compression
     if format == 's3':
         save_s3(path, object, pickle_fn, verbose=verbose)
     else:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        path_parent = os.path.dirname(path)
+        if path_parent == '':
+            path_parent = '.'  # Allows saving to working directory root without crashing
+        os.makedirs(path_parent, exist_ok=True)
 
         if compression_fn_kwargs is None:
             compression_fn_kwargs = {}
@@ -47,6 +49,7 @@ def save_with_fn(path, object, pickle_fn, format=None, verbose=True, compression
 
 
 def save_s3(path: str, obj, pickle_fn, verbose=True):
+    import boto3
     if verbose:
         logger.info(f'save object to {path}')
     with tempfile.TemporaryFile() as f:

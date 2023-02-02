@@ -2,7 +2,8 @@ from . import utils
 from .categorical_mlp import CategoricalMLP
 from .categorical_transformer import CategoricalTransformer
 from .clip import CLIPForImageText
-from .fusion import MultimodalFusionMLP, MultimodalFusionTransformer
+from .document_transformer import DocumentTransformer
+from .fusion import MultimodalFusionMLP, MultimodalFusionNER, MultimodalFusionTransformer
 from .huggingface_text import HFAutoModelForTextPrediction
 from .mmdet_image import MMDetAutoModelForObjectDetection
 from .mmocr_text_detection import MMOCRAutoModelForTextDetection

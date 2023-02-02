@@ -9,7 +9,7 @@ import os
 import pandas as pd
 import numpy as np
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.core.utils import ResourceManager
+from autogluon.common.utils.resource_utils import ResourceManager
 from .._gluoncv import ObjectDetection
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 
@@ -243,7 +243,7 @@ class ObjectDetector(object):
                        'In a future release ObjectDetector may be entirely reworked to use Torch as a backend.\n'
                        'This future change will likely be API breaking.'
                        'Users should ensure they update their code that depends on ObjectDetector when upgrading to future AutoGluon releases.\n'
-                       'For more information, refer to ObjectDetector refactor GitHub issue: https://github.com/awslabs/autogluon/issues/1559\n'
+                       'For more information, refer to ObjectDetector refactor GitHub issue: https://github.com/autogluon/autogluon/issues/1559\n'
                        '=============================================================================\n')
         if presets:
             if not isinstance(presets, list):

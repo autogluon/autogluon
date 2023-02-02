@@ -15,39 +15,34 @@ from autogluon.timeseries.utils.warning_filters import evaluator_warning_filter
 logger = logging.getLogger(__name__)
 
 
-def in_sample_naive_1_error(*, y_history: pd.Series) -> pd.Series:
+def in_sample_naive_1_error(*, y_past: pd.Series) -> pd.Series:
     """Compute the error of naive forecast (predict previous value) for each time series."""
-    diff = y_history.diff()
+    diff = y_past.diff()
     # We ignore the differences between the last value of prev item and the first value of the next item
-    length_per_item = y_history.groupby(ITEMID, sort=False).size()
+    length_per_item = y_past.groupby(level=ITEMID, sort=False).size()
     first_index_for_each_item = length_per_item.cumsum().values[:-1]
     diff.iloc[first_index_for_each_item] = np.nan
-    return diff.abs().groupby(ITEMID, sort=False).mean()
+    return diff.abs().groupby(level=ITEMID, sort=False).mean()
 
 
 def mse_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     """Compute Mean Squared Error for each item (time series)."""
-    return (y_true - y_pred).pow(2.0).groupby(ITEMID, sort=False).mean()
+    return (y_true - y_pred).pow(2.0).groupby(level=ITEMID, sort=False).mean()
 
 
 def mae_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     """Compute Mean Absolute Error for each item (time series)."""
-    return (y_true - y_pred).abs().groupby(ITEMID, sort=False).mean()
+    return (y_true - y_pred).abs().groupby(level=ITEMID, sort=False).mean()
 
 
 def mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     """Compute Mean Absolute Percentage Error for each item (time series)."""
-    return ((y_true - y_pred) / y_true).abs().groupby(ITEMID, sort=False).mean()
+    return ((y_true - y_pred) / y_true).abs().groupby(level=ITEMID, sort=False).mean()
 
 
 def symmetric_mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     """Compute symmetric Mean Absolute Percentage Error for each item (time series)."""
-    return (2 * (y_true - y_pred).abs() / (y_true.abs() + y_pred.abs())).groupby(ITEMID, sort=False).mean()
-
-
-def quantile_loss(*, y_true: pd.Series, y_pred: pd.Series, q: float) -> float:
-    """Compute total quantile loss across all timesteps of all time series."""
-    return 2 * ((y_true - y_pred) * ((y_true <= y_pred) - q)).abs().sum()
+    return (2 * (y_true - y_pred).abs() / (y_true.abs() + y_pred.abs())).groupby(level=ITEMID, sort=False).mean()
 
 
 class TimeSeriesEvaluator:
@@ -112,6 +107,7 @@ class TimeSeriesEvaluator:
         self.target_column = target_column
 
         self.metric_method = self.__getattribute__("_" + self.eval_metric.lower())
+        self._past_naive_1_error: Optional[pd.Series] = None
 
     @property
     def coefficient(self) -> int:
@@ -124,37 +120,36 @@ class TimeSeriesEvaluator:
     def _safemean(self, data: pd.Series) -> float:
         return data.replace([np.inf, -np.inf], np.nan).dropna().mean()
 
-    def _mse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, **kwargs) -> float:
+    def _mse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         y_pred = predictions["mean"]
         return self._safemean(mse_per_item(y_true=y_true, y_pred=y_pred))
 
-    def _rmse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, **kwargs) -> float:
+    def _rmse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         return np.sqrt(self._mse(y_true=y_true, predictions=predictions))
 
-    def _mase(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, y_history: pd.Series) -> float:
+    def _mase(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         y_pred = self._get_median_forecast(predictions)
         mae = mae_per_item(y_true=y_true, y_pred=y_pred)
-        naive_1_error = in_sample_naive_1_error(y_history=y_history)
-        return self._safemean(mae / naive_1_error)
+        return self._safemean(mae / self._past_naive_1_error)
 
-    def _mape(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, **kwargs) -> float:
+    def _mape(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         y_pred = self._get_median_forecast(predictions)
         return self._safemean(mape_per_item(y_true=y_true, y_pred=y_pred))
 
-    def _smape(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, **kwargs) -> float:
+    def _smape(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         y_pred = self._get_median_forecast(predictions)
         return self._safemean(symmetric_mape_per_item(y_true=y_true, y_pred=y_pred))
 
-    def _mean_wquantileloss(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, **kwargs) -> float:
-        loss_values = []
-        abs_target_sum = y_true.abs().sum()
-        for col in predictions.columns:
-            if col != "mean":
-                q = float(col)
-                assert 0 <= q <= 1
-                y_pred = predictions[col]
-                loss_values.append(quantile_loss(y_true=y_true, y_pred=y_pred, q=q) / abs_target_sum)
-        return np.mean(loss_values)
+    def _mean_wquantileloss(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
+        values_true = y_true.values[:, None]  # shape [N, 1]
+        quantile_pred_columns = [col for col in predictions.columns if col != "mean"]
+        values_pred = predictions[quantile_pred_columns].values  # shape [N, len(quantile_levels)]
+        quantile_levels = np.array([float(q) for q in quantile_pred_columns], dtype=float)
+
+        return 2 * np.mean(
+            np.abs((values_true - values_pred) * ((values_true <= values_pred) - quantile_levels)).sum(axis=0)
+            / np.abs(values_true).sum()
+        )
 
     def _get_median_forecast(self, predictions: TimeSeriesDataFrame) -> pd.Series:
         # TODO: Median forecast doesn't actually minimize the MAPE / sMAPE losses
@@ -195,11 +190,19 @@ class TimeSeriesEvaluator:
             return TimeSeriesEvaluator.DEFAULT_METRIC
         return metric
 
-    def __call__(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
+    def save_past_metrics(self, data_past: TimeSeriesDataFrame):
+        self._past_naive_1_error = in_sample_naive_1_error(y_past=data_past[self.target_column])
+
+    def score_with_saved_past_metrics(
+        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
+    ) -> float:
+        """Compute the metric assuming that the historic metrics have already been computed.
+
+        This method should be preferred to TimeSeriesEvaluator.__call__ if the metrics are computed multiple times, as
+        it doesn't require splitting the test data into past/future portions each time (e.g., when fitting ensembles).
+        """
         assert (predictions.num_timesteps_per_item() == self.prediction_length).all()
-        # Select entries in `data` that correspond to the forecast horizon
-        data_history = data.slice_by_timestep(None, -self.prediction_length)
-        data_future = data.slice_by_timestep(-self.prediction_length, None)
+        assert self._past_naive_1_error is not None, "Call save_past_metrics before score_with_saved_past_metrics"
         assert data_future.index.equals(predictions.index), "Prediction and data indices do not match."
 
         with evaluator_warning_filter(), warnings.catch_warnings():
@@ -209,5 +212,11 @@ class TimeSeriesEvaluator:
             return self.metric_method(
                 y_true=data_future[self.target_column],
                 predictions=predictions,
-                y_history=data_history[self.target_column],
             )
+
+    def __call__(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
+        # Select entries in `data` that correspond to the forecast horizon
+        data_past = data.slice_by_timestep(None, -self.prediction_length)
+        data_future = data.slice_by_timestep(-self.prediction_length, None)
+        self.save_past_metrics(data_past=data_past)
+        return self.score_with_saved_past_metrics(data_future=data_future, predictions=predictions)

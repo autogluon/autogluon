@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from torch import tensor
 
-from ..constants import AUTOMM, FEATURE_EXTRACTION
+from ..constants import AUTOMM, FEATURE_EXTRACTION, MULTICLASS
 
 logger = logging.getLogger(AUTOMM)
 
@@ -42,8 +42,8 @@ def get_onnx_input(pipeline: str, config: Optional[Dict] = None):
     if pipeline == FEATURE_EXTRACTION:
         valid_input = [
             "hf_text_text_token_ids",
-            "hf_text_text_valid_length",
             "hf_text_text_segment_ids",
+            "hf_text_text_valid_length",
         ]
         dynamic_axes = {
             "hf_text_text_token_ids": {
@@ -89,6 +89,16 @@ def get_onnx_input(pipeline: str, config: Optional[Dict] = None):
                 ],
             ),
         }
+    elif pipeline == MULTICLASS:
+        valid_input = ["timm_image_image", "timm_image_image_valid_num"]
+        dynamic_axes = {
+            "timm_image_image": {
+                0: "batch_size",
+            },
+            "timm_image_image_valid_num": {},
+        }
+        default_onnx_path = "./model.onnx"
+        default_batch = None
     else:
         raise ValueError(f"ONNX export is not supported in current pipeline {pipeline}")
 

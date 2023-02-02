@@ -6,7 +6,8 @@ import os
 import pprint
 import shutil
 import time
-from typing import Union, List
+from typing import Union, List, Tuple
+import warnings
 
 import networkx as nx
 import numpy as np
@@ -35,6 +36,7 @@ from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_dict, tabular_presets_alias
 from ..learner import AbstractTabularLearner, DefaultLearner
+from ..trainer.model_presets.presets import MODEL_TYPES
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
 
@@ -92,6 +94,12 @@ class TabularPredictor:
         Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
         If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
         where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
+        Verbosity levels:
+            0: Only log exceptions
+            1: Only log warnings + exceptions
+            2: Standard logging
+            3: Verbose logging (ex: log validation score every 50 iterations)
+            4: Maximally verbose logging (ex: log validation score every iteration)
     sample_weight : str, default = None
         If specified, this column-name indicates which column of the data should be treated as sample weights. This column will NOT be considered as a predictive feature.
         Sample weights should be non-negative (and cannot be nan), with larger values indicating which rows are more important than others.
@@ -392,13 +400,15 @@ class TabularPredictor:
                     'XT' (extremely randomized trees)
                     'KNN' (k-nearest neighbors)
                     'LR' (linear regression)
-                    'NN_MXNET' (neural network implemented in MXNet)
                     'NN_TORCH' (neural network implemented in Pytorch)
                     'FASTAI' (neural network with FastAI backend)
+                    'AG_AUTOMM' (`MultimodalPredictor` from `autogluon.multimodal`. Supports Tabular, Text, and Image modalities. GPU is required.)
                 Experimental model options include:
+                    'FT_TRANSFORMER' (Tabular Transformer, GPU is recommended. Does not scale well to >100 features.)
                     'FASTTEXT' (FastText)
-                    'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required)
-                    'TRANSF' (Tabular Transformer, GPU is recommended)
+                    'VW' (VowpalWabbit)
+                    'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
+                    'AG_IMAGE_NN' (Image model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
                 If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.
                 For example, set `hyperparameters = { 'NN_TORCH':{...} }` if say you only want to train (PyTorch) neural networks and no other types of models.
             Values = dict of hyperparameter settings for each model type, or list of dicts.
@@ -503,6 +513,11 @@ class TabularPredictor:
                             use_orig_features: (bool) Whether a stack model will use the original features along with the stack features to train (akin to skip-connections). If the model has no stack features (no base models), this value is ignored and the stack model will use the original features.
                             max_base_models: (int, default=25) Maximum number of base models whose predictions form the features input to this stacker model. If more than `max_base_models` base models are available, only the top `max_base_models` models with highest validation score are used.
                             max_base_models_per_type: (int, default=5) Similar to `max_base_models`. If more than `max_base_models_per_type` of any particular model type are available, only the top `max_base_models_per_type` of that type are used. This occurs before the `max_base_models` filter.
+                            num_folds: (int, default=None) If specified, the number of folds to fit in the bagged model.
+                                If specified, overrides any other value used to determine the number of folds such as predictor.fit `num_bag_folds` argument.
+                            max_sets: (int, default=None) If specified, the maximum sets to fit in the bagged model.
+                                The lesser of `max_sets` and the predictor.fit `num_bag_sets` argument will be used for the given model.
+                                Useful if a particular model is expensive relative to others and you want to avoid repeated bagging of the expensive model while still repeated bagging the cheaper models.
                             save_bag_folds: (bool, default=True)
                                 If True, bagged models will save their fold models (the models from each individual fold of bagging). This is required to use bagged models for prediction.
                                 If False, bagged models will not save their fold models. This means that bagged models will not be valid models during inference.
@@ -789,18 +804,9 @@ class TabularPredictor:
         # in case the hyperprams are large in memory
         self.fit_hyperparameters_ = hyperparameters
 
-        ###################################
-        # FIXME: v0.1 This section is a hack
         if 'enable_raw_text_features' not in feature_generator_init_kwargs:
-            if 'AG_TEXT_NN' in hyperparameters or 'VW' in hyperparameters:
+            if self._check_if_hyperparameters_handle_text(hyperparameters=hyperparameters):
                 feature_generator_init_kwargs['enable_raw_text_features'] = True
-            else:
-                for key in hyperparameters:
-                    if isinstance(key, int) or key == 'default':
-                        if 'AG_TEXT_NN' in hyperparameters[key] or 'VW' in hyperparameters[key]:
-                            feature_generator_init_kwargs['enable_raw_text_features'] = True
-                            break
-        ###################################
 
         if feature_metadata is not None and isinstance(feature_metadata, str) and feature_metadata == 'infer':
             feature_metadata = None
@@ -1371,6 +1377,7 @@ class TabularPredictor:
         data = self.__get_dataset(data)
         return self._learner.predict(X=data, model=model, as_pandas=as_pandas, transform_features=transform_features)
 
+    # TODO: v0.8: Error if called with self.problem_type='regression' or 'quantile'
     def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=True, transform_features=True):
         """
         Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
@@ -1408,6 +1415,12 @@ class TabularPredictor:
         """
         self._assert_is_fit('predict_proba')
         data = self.__get_dataset(data)
+        if self.problem_type in [REGRESSION, QUANTILE]:
+            warnings.warn(
+                f'Calling `predictor.predict_proba` when problem_type={self.problem_type} will raise an AssertionError starting in AutoGluon v0.8. '
+                'Please call `predictor.predict` instead.',
+                category=FutureWarning
+            )
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass, transform_features=transform_features)
 
     def evaluate(self, data, model=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
@@ -1478,7 +1491,13 @@ class TabularPredictor:
         return self._learner.evaluate_predictions(y_true=y_true, y_pred=y_pred, sample_weight=sample_weight, silent=silent,
                                                   auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
-    def leaderboard(self, data=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, skip_score=False, silent=False):
+    def leaderboard(self,
+                    data=None,
+                    extra_info: bool = False,
+                    extra_metrics: list = None,
+                    only_pareto_frontier: bool = False,
+                    skip_score: bool = False,
+                    silent: bool = False) -> pd.DataFrame:
         """
         Output summary of information about models produced during `fit()` as a :class:`pd.DataFrame`.
         Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
@@ -1602,9 +1621,125 @@ class TabularPredictor:
         :class:`pd.DataFrame` of model performance summary information.
         """
         self._assert_is_fit('leaderboard')
-        data = self.__get_dataset(data) if data is not None else data
+        data = self.__get_dataset(data, allow_nan=True)
         return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
                                          only_pareto_frontier=only_pareto_frontier, skip_score=skip_score, silent=silent)
+
+    def predict_proba_multi(self,
+                            data=None,
+                            models: List[str] = None,
+                            as_pandas: bool = True,
+                            as_multiclass: bool = True,
+                            transform_features: bool = True,
+                            inverse_transform: bool = True) -> dict:
+        """
+        Returns a dictionary of prediction probabilities where the key is
+        the model name and the value is the model's prediction probabilities on the data.
+
+        Equivalent output to:
+        ```
+        predict_proba_dict = {}
+        for m in models:
+            predict_proba_dict[m] = predictor.predict_proba(data, model=m)
+        ```
+
+        Note that this will generally be much faster than calling `self.predict_proba` separately for each model
+        because this method leverages the model dependency graph to avoid redundant computation.
+
+        Parameters
+        ----------
+        data : str or DataFrame, default = None
+            The data to predict on.
+            If None:
+                If self.trainer.has_val, the validation data is used.
+                Else, the out-of-fold prediction probabilities are used.
+        models : List[str], default = None
+            The list of models to get predictions for.
+            If None, all models that can infer are used.
+        as_pandas : bool, default = True
+            Whether to return the output of each model as a pandas object (True) or numpy array (False).
+            Pandas object is a DataFrame if this is a multiclass problem or `as_multiclass=True`, otherwise it is a Series.
+            If the output is a DataFrame, the column order will be equivalent to `predictor.class_labels`.
+        as_multiclass : bool, default = True
+            Whether to return binary classification probabilities as if they were for multiclass classification.
+                Output will contain two columns, and if `as_pandas=True`, the column names will correspond to the binary class labels.
+                The columns will be the same order as `predictor.class_labels`.
+            If False, output will contain only 1 column for the positive class (get positive_class name via `predictor.positive_class`).
+            Only impacts output for binary classification problems.
+        transform_features : bool, default = True
+            If True, preprocesses data before predicting with models.
+            If False, skips global feature preprocessing.
+                This is useful to save on inference time if you have already called `data = predictor.transform_features(data)`.
+        inverse_transform : bool, default = True
+            If True, will return prediction probabilities in the original format.
+            If False (advanced), will return prediction probabilities in AutoGluon's internal format.
+
+        Returns
+        -------
+        Dictionary with model names as keys and model prediction probabilities as values.
+        """
+        self._assert_is_fit('predict_proba_multi')
+        data = self.__get_dataset(data, allow_nan=True)
+        return self._learner.predict_proba_multi(X=data,
+                                                 models=models,
+                                                 as_pandas=as_pandas,
+                                                 as_multiclass=as_multiclass,
+                                                 transform_features=transform_features,
+                                                 inverse_transform=inverse_transform)
+
+    def predict_multi(self,
+                      data=None,
+                      models: List[str] = None,
+                      as_pandas: bool = True,
+                      transform_features: bool = True,
+                      inverse_transform: bool = True) -> dict:
+        """
+        Returns a dictionary of predictions where the key is
+        the model name and the value is the model's prediction probabilities on the data.
+
+        Equivalent output to:
+        ```
+        predict_dict = {}
+        for m in models:
+            predict_dict[m] = predictor.predict(data, model=m)
+        ```
+
+        Note that this will generally be much faster than calling `self.predict` separately for each model
+        because this method leverages the model dependency graph to avoid redundant computation.
+
+        Parameters
+        ----------
+        data : DataFrame, default = None
+            The data to predict on.
+            If None:
+                If self.trainer.has_val, the validation data is used.
+                Else, the out-of-fold prediction probabilities are used.
+        models : List[str], default = None
+            The list of models to get predictions for.
+            If None, all models that can infer are used.
+        as_pandas : bool, default = True
+            Whether to return the output of each model as a pandas object (True) or numpy array (False).
+            Pandas object is a DataFrame if this is a multiclass problem, otherwise it is a Series.
+            If the output is a DataFrame, the column order will be equivalent to `predictor.class_labels`.
+        transform_features : bool, default = True
+            If True, preprocesses data before predicting with models.
+            If False, skips global feature preprocessing.
+                This is useful to save on inference time if you have already called `data = predictor.transform_features(data)`.
+        inverse_transform : bool, default = True
+            If True, will return predictions in the original format.
+            If False (advanced), will return predictions in AutoGluon's internal format.
+
+        Returns
+        -------
+        Dictionary with model names as keys and model predictions as values.
+        """
+        self._assert_is_fit('predict_multi')
+        data = self.__get_dataset(data, allow_nan=True)
+        return self._learner.predict_multi(X=data,
+                                           models=models,
+                                           as_pandas=as_pandas,
+                                           transform_features=transform_features,
+                                           inverse_transform=inverse_transform)
 
     def fit_summary(self, verbosity=3, show_plot=False):
         """
@@ -1803,7 +1938,7 @@ class TabularPredictor:
 
         """
         self._assert_is_fit('transform_features')
-        data = self.__get_dataset(data) if data is not None else data
+        data = self.__get_dataset(data, allow_nan=True)
         return self._learner.get_inputs_to_stacker(dataset=data, model=model, base_models=base_models,
                                                    use_orig_features=return_original_features)
 
@@ -1943,7 +2078,7 @@ class TabularPredictor:
             'pXX_low': Lower end of XX% confidence interval for true feature importance score.
         """
         self._assert_is_fit('feature_importance')
-        data = self.__get_dataset(data) if data is not None else data
+        data = self.__get_dataset(data, allow_nan=True)
         if (data is None) and (not self._trainer.is_data_saved):
             raise AssertionError(
                 'No data was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPredictor` init `learner_kwargs` argument call to enable this functionality when data is not specified.')
@@ -2009,6 +2144,7 @@ class TabularPredictor:
                 compiler_configs = {
                     "RF": {"compiler": "onnx"},
                     "XT": {"compiler": "onnx"},
+                    "NN_TORCH": {"compiler": "onnx"},
                 }
             Otherwise, specify a compiler_configs dictionary manually. Keys can be exact model names or model types.
             Exact model names take priority over types if both are valid for a model.
@@ -2032,6 +2168,7 @@ class TabularPredictor:
                 compiler_configs = {
                     "RF": {"compiler": "onnx"},
                     "XT": {"compiler": "onnx"},
+                    "NN_TORCH": {"compiler": "onnx"},
                 }
             else:
                 raise ValueError(f'Unknown compiler_configs preset: "{compiler_configs}"')
@@ -2821,8 +2958,13 @@ class TabularPredictor:
             print(msg + ": " + str(results[key]))
 
     @staticmethod
-    def __get_dataset(data):
-        if isinstance(data, TabularDataset):
+    def __get_dataset(data, allow_nan: bool = False):
+        if data is None:
+            if allow_nan:
+                return data
+            else:
+                raise TypeError("data=None is invalid. data must be a TabularDataset or pandas.DataFrame or str file path to data")
+        elif isinstance(data, TabularDataset):
             return data
         elif isinstance(data, pd.DataFrame):
             return TabularDataset(data)
@@ -3265,7 +3407,7 @@ class TabularPredictor:
                                  f'\tYou can identify the indices which are duplicated via `{name}.index.duplicated(keep=False)`')
 
     @staticmethod
-    def _validate_infer_limit(infer_limit: float, infer_limit_batch_size: int) -> (float, int):
+    def _validate_infer_limit(infer_limit: float, infer_limit_batch_size: int) -> Tuple[float, int]:
         if infer_limit_batch_size is not None:
             if not isinstance(infer_limit_batch_size, int):
                 raise ValueError(f'infer_limit_batch_size must be type int, but was instead type {type(infer_limit_batch_size)}')
@@ -3492,6 +3634,39 @@ class TabularPredictor:
         predictor_clone.save_space()
         return predictor_clone if return_clone else predictor_clone.path
 
+    @staticmethod
+    def _check_if_hyperparameters_handle_text(hyperparameters: dict) -> bool:
+        """Check if hyperparameters contain a model that supports raw text features as input"""
+        models_in_hyperparameters = set()
+        is_advanced_hyperparameter_type = False
+        for key in hyperparameters:
+            if isinstance(key, int) or key == 'default':
+                is_advanced_hyperparameter_type = True
+                break
+        if is_advanced_hyperparameter_type:
+            for key in hyperparameters:
+                for m in hyperparameters[key]:
+                    models_in_hyperparameters.add(m)
+        else:
+            for key in hyperparameters:
+                models_in_hyperparameters.add(key)
+        models_in_hyperparameters_raw_text_compatible = []
+        for m in models_in_hyperparameters:
+            if isinstance(m, str):
+                # TODO: Technically the use of MODEL_TYPES here is a hack since we should derive valid types from trainer,
+                #  but this is required prior to trainer existing.
+                if m in MODEL_TYPES:
+                    m = MODEL_TYPES[m]
+                else:
+                    continue
+            if m._get_class_tags().get('handles_text', False):
+                models_in_hyperparameters_raw_text_compatible.append(m)
+
+        if models_in_hyperparameters_raw_text_compatible:
+            return True
+        else:
+            return False
+
     def _assert_is_fit(self, message_suffix: str = None):
         if not self._learner.is_fit:
             error_message = "Predictor is not fit. Call `.fit` before calling"
@@ -3500,6 +3675,7 @@ class TabularPredictor:
             else:
                 error_message = f"{error_message} `.{message_suffix}`."
             raise AssertionError(error_message)
+
 
 # Location to store WIP functionality that will be later added to TabularPredictor
 class _TabularPredictorExperimental(TabularPredictor):

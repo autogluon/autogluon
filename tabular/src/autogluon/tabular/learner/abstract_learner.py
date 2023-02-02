@@ -172,6 +172,128 @@ class AbstractTabularLearner(AbstractLearner):
                 y_pred = pd.DataFrame(data=y_pred, columns=self.quantile_levels, index=X_index)
         return y_pred
 
+    def _inverse_transform_proba(
+            self,
+            y_pred_proba,
+            as_pandas=True,
+            index=None,
+            as_multiclass=True,
+            inverse_transform=True):
+        """
+        Given internal prediction probabilities, convert them to external prediction probabilities.
+        """
+        if inverse_transform:
+            y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
+        if as_multiclass and (self.problem_type == BINARY):
+            y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
+        if as_pandas:
+            if self.problem_type == MULTICLASS or (as_multiclass and self.problem_type == BINARY):
+                y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.class_labels, index=index)
+            elif self.problem_type == QUANTILE:
+                y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.quantile_levels, index=index)
+            else:
+                y_pred_proba = pd.Series(data=y_pred_proba, name=self.label, index=index)
+        return y_pred_proba
+
+    def predict_proba_multi(self,
+                            X: DataFrame = None,
+                            models: List[str] = None,
+                            as_pandas: bool = True,
+                            as_multiclass: bool = True,
+                            transform_features: bool = True,
+                            inverse_transform: bool = True,
+                            ) -> dict:
+        """
+        Returns a dictionary of prediction probabilities where the key is
+        the model name and the value is the model's prediction probabilities on the data.
+
+        Note that this will generally be much faster than calling `self.predict_proba` separately for each model
+        because this method leverages the model dependency graph to avoid redundant computation.
+
+        Parameters
+        ----------
+        X : DataFrame, default = None
+            The data to predict on.
+            If None:
+                If self.trainer.has_val, the validation data is used.
+                Else, the out-of-fold prediction probabilities are used.
+        models : List[str], default = None
+            The list of models to get predictions for.
+            If None, all models that can infer are used.
+        as_pandas : bool, default = True
+            Whether to return the output of each model as a pandas object (True) or numpy array (False).
+            Pandas object is a DataFrame if this is a multiclass problem or `as_multiclass=True`, otherwise it is a Series.
+            If the output is a DataFrame, the column order will be equivalent to `predictor.class_labels`.
+        as_multiclass : bool, default = True
+            Whether to return binary classification probabilities as if they were for multiclass classification.
+                Output will contain two columns, and if `as_pandas=True`, the column names will correspond to the binary class labels.
+                The columns will be the same order as `predictor.class_labels`.
+            If False, output will contain only 1 column for the positive class (get positive_class name via `predictor.positive_class`).
+            Only impacts output for binary classification problems.
+        transform_features : bool, default = True
+            If True, preprocesses data before predicting with models.
+            If False, skips global feature preprocessing.
+                This is useful to save on inference time if you have already called `data = predictor.transform_features(data)`.
+        inverse_transform : bool, default = True
+            If True, will return prediction probabilities in the original format.
+            If False (advanced), will return prediction probabilities in AutoGluon's internal format.
+
+        Returns
+        -------
+        Dictionary with model names as keys and model prediction probabilities as values.
+        """
+        trainer = self.load_trainer()
+
+        if models is None:
+            models = trainer.get_model_names(can_infer=True)
+        if X is not None and transform_features:
+            X = self.transform_features(X)
+        if X is None:
+            if not trainer.has_val:
+                X = trainer.load_X()
+                predict_proba_dict = dict()
+                for m in models:
+                    predict_proba_dict[m] = trainer.get_model_oof(m)
+            else:
+                X = trainer.load_X_val()
+                predict_proba_dict = trainer.get_model_pred_proba_dict(X=X, models=models, use_val_cache=True)
+        else:
+            predict_proba_dict = trainer.get_model_pred_proba_dict(X=X, models=models)
+
+        if inverse_transform:
+            # Inverse Transform labels
+            for m, pred_proba in predict_proba_dict.items():
+                predict_proba_dict[m] = self._inverse_transform_proba(y_pred_proba=pred_proba,
+                                                                      as_pandas=as_pandas,
+                                                                      as_multiclass=as_multiclass,
+                                                                      index=X.index,
+                                                                      inverse_transform=True)
+        return predict_proba_dict
+
+    def predict_multi(self,
+                      X: DataFrame = None,
+                      models: List[str] = None,
+                      as_pandas: bool = True,
+                      transform_features: bool = True,
+                      inverse_transform: bool = True) -> dict:
+        """
+        Identical to predict_proba_multi, except returns predictions instead of probabilities.
+        """
+        predict_proba_dict = self.predict_proba_multi(X=X,
+                                                      models=models,
+                                                      as_pandas=as_pandas,
+                                                      transform_features=transform_features,
+                                                      inverse_transform=inverse_transform)
+        predict_dict = {}
+        if as_pandas:
+            for m in predict_proba_dict:
+                predict_dict[m] = get_pred_from_proba_df(predict_proba_dict[m], problem_type=self.problem_type)
+        else:
+            for m in predict_proba_dict:
+                predict_dict[m] = get_pred_from_proba(predict_proba_dict[m], problem_type=self.problem_type)
+        return predict_dict
+
+
     def _validate_fit_input(self, X: DataFrame, **kwargs):
         if self.label not in X.columns:
             raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")

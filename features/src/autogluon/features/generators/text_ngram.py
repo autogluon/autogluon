@@ -4,11 +4,11 @@ import traceback
 
 import numpy as np
 import pandas as pd
-import psutil
 from pandas import DataFrame, Series
 from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 
-from autogluon.common.features.types import S_IMAGE_PATH, S_TEXT, S_TEXT_NGRAM
+from autogluon.common.utils.lite import disable_if_lite_mode
+from autogluon.common.features.types import S_IMAGE_PATH, S_IMAGE_BYTEARRAY, S_TEXT, S_TEXT_NGRAM
 
 from .abstract import AbstractFeatureGenerator
 from ..vectorizers import get_ngram_freq, downscale_vectorizer, vectorizer_auto_ml_default
@@ -112,7 +112,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict(required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH])
+        return dict(required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY])
 
     def _fit_transform_ngrams(self, X):
         if not self.features_in:
@@ -230,16 +230,21 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
     # TODO: REMOVE NEED FOR text_data input!
     def _adjust_vectorizer_memory_usage(self, transform_matrix, text_data, vectorizer_fit, downsample_ratio: int = None):
-        # This assumes that the ngrams eventually turn into int32/float32 downstream
-        predicted_ngrams_memory_usage_bytes = len(text_data) * 4 * (transform_matrix.shape[1] + 1) + 80
-        mem_avail = psutil.virtual_memory().available
-        mem_rss = psutil.Process().memory_info().rss
-        predicted_rss = mem_rss + predicted_ngrams_memory_usage_bytes
-        predicted_percentage = predicted_rss / mem_avail
-        if downsample_ratio is None:
-            if self.max_memory_ratio is not None and predicted_percentage > self.max_memory_ratio:
-                downsample_ratio = self.max_memory_ratio / predicted_percentage
-                self._log(30, 'Warning: Due to memory constraints, ngram feature count is being reduced. Allocate more memory to maximize model quality.')
+        @disable_if_lite_mode(ret=downsample_ratio)
+        def _adjust_per_memory_constraints(downsample_ratio: int):
+            import psutil
+            # This assumes that the ngrams eventually turn into int32/float32 downstream
+            predicted_ngrams_memory_usage_bytes = len(text_data) * 4 * (transform_matrix.shape[1] + 1) + 80
+            mem_avail = psutil.virtual_memory().available
+            mem_rss = psutil.Process().memory_info().rss
+            predicted_rss = mem_rss + predicted_ngrams_memory_usage_bytes
+            predicted_percentage = predicted_rss / mem_avail
+            if downsample_ratio is None:
+                if self.max_memory_ratio is not None and predicted_percentage > self.max_memory_ratio:
+                    self._log(30, 'Warning: Due to memory constraints, ngram feature count is being reduced. Allocate more memory to maximize model quality.')
+                    return self.max_memory_ratio / predicted_percentage
+
+        downsample_ratio = _adjust_per_memory_constraints(downsample_ratio)
 
         if downsample_ratio is not None:
             if (downsample_ratio >= 1) or (downsample_ratio <= 0):

@@ -5,27 +5,36 @@
 import os
 
 AUTOGLUON = 'autogluon'
+PACKAGE_NAME = os.getenv('AUTOGLUON_PACKAGE_NAME', AUTOGLUON)
+# TODO: make it more explicit, maybe use another env variable
+LITE_MODE = 'lite' in PACKAGE_NAME
 
 AUTOGLUON_ROOT_PATH = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..')
 )
 
-PYTHON_REQUIRES = '>=3.7, <3.10'
+PYTHON_REQUIRES = '>=3.8, <3.11'
 
 
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
     # note: if python 3.7 is used, the open CVEs are present: CVE-2021-41496 | CVE-2021-34141; fixes are available in 1.22.x, but python 3.8 only
     'numpy': '>=1.21,<1.24',
-    'pandas': '>=1.2.5,!=1.4.0,<1.6',
+    'pandas': '>1.4.0,<1.6',
     'scikit-learn': '>=1.0.0,<1.2',
     'scipy': '>=1.5.4,<1.10.0',
     'psutil': '>=5.7.3,<6',
-    'gluoncv': '>=0.10.5,<0.10.6',
+    'networkx': '>=2.3,<3.0',
     'tqdm': '>=4.38.0',
-    'Pillow': '>=9.0.1,<9.1.0',
+    'Pillow': '>=9.3.0,<=9.4.0',
     'timm': '>=0.5.4,<0.7.0',
 }
+if LITE_MODE:
+    DEPENDENT_PACKAGES = {
+        package: version for package, version in DEPENDENT_PACKAGES.items()
+        if package not in ['psutil', 'gluoncv', 'Pillow', 'timm']
+    }
+
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
 # TODO: Use DOCS_PACKAGES and TEST_PACKAGES
 DOCS_PACKAGES = []
@@ -79,20 +88,21 @@ def create_version_file(*, version, submodule):
     with open(version_path, 'w') as f:
         f.write(f'"""This is the {AUTOGLUON} version file."""\n')
         f.write("__version__ = '{}'\n".format(version))
+        f.write("__lite__ = {}\n".format(LITE_MODE))
 
 
 def default_setup_args(*, version, submodule):
     from setuptools import find_packages
     long_description = open(os.path.join(AUTOGLUON_ROOT_PATH, 'README.md')).read()
     if submodule is None:
-        name = AUTOGLUON
+        name = PACKAGE_NAME
     else:
-        name = f'{AUTOGLUON}.{submodule}'
+        name = f'{PACKAGE_NAME}.{submodule}'
     setup_args = dict(
         name=name,
         version=version,
         author='AutoGluon Community',
-        url='https://github.com/awslabs/autogluon',
+        url='https://github.com/autogluon/autogluon',
         description='AutoML for Image, Text, and Tabular Data',
         long_description=long_description,
         long_description_content_type='text/markdown',
@@ -124,9 +134,9 @@ def default_setup_args(*, version, submodule):
             "Operating System :: POSIX",
             "Operating System :: Unix",
             'Programming Language :: Python :: 3',
-            "Programming Language :: Python :: 3.7",
             "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
+            "Programming Language :: Python :: 3.10",
             "Topic :: Software Development",
             "Topic :: Scientific/Engineering :: Artificial Intelligence",
             "Topic :: Scientific/Engineering :: Information Analysis",
@@ -134,9 +144,9 @@ def default_setup_args(*, version, submodule):
         ],
         project_urls={
             'Documentation': 'https://auto.gluon.ai',
-            'Bug Reports': 'https://github.com/awslabs/autogluon/issues',
-            'Source': 'https://github.com/awslabs/autogluon/',
-            'Contribute!': 'https://github.com/awslabs/autogluon/blob/master/CONTRIBUTING.md',
+            'Bug Reports': 'https://github.com/autogluon/autogluon/issues',
+            'Source': 'https://github.com/autogluon/autogluon/',
+            'Contribute!': 'https://github.com/autogluon/autogluon/blob/master/CONTRIBUTING.md',
         },
     )
     return setup_args

@@ -54,3 +54,26 @@ def test_ner(checkpoint_name, searcher, scheduler):
     test_predict = test_predict.head(2)
     predictions = predictor.predict(test_predict)
     embeddings = predictor.extract_embedding(test_predict)
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [("google/electra-small-discriminator")],
+)
+def test_multi_ner(checkpoint_name):
+    train_data = get_data()
+    train_data["add_text"] = train_data.text_snippet
+    label_col = "entity_annotations"
+    predictor = MultiModalPredictor(problem_type="ner", label=label_col)
+    predictor.fit(
+        train_data=train_data,
+        time_limit=40,
+        column_types={"text_snippet": "text_ner"},
+        hyperparameters={"model.ner_text.checkpoint_name": checkpoint_name},
+    )
+    scores = predictor.evaluate(train_data)
+    test_predict = train_data.drop(label_col, axis=1)
+    test_predict = test_predict.head(2)
+    predictions = predictor.predict(test_predict)
+    proba = predictor.predict_proba(test_predict)
+    embeddings = predictor.extract_embedding(test_predict)

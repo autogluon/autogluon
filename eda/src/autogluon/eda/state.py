@@ -85,3 +85,12 @@ class StateCheckMixin:
                 f'The following keys are missing: [{", ".join(keys_not_present)}]'
             )
         return can_handle
+
+
+def is_key_present_in_state(state, key):
+    path = state
+    for p in key.split("."):
+        if p not in path:
+            return False
+        path = path[p]
+    return True

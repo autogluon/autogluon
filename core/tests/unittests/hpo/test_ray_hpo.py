@@ -1,4 +1,3 @@
-import psutil
 import pytest
 import tempfile
 
@@ -9,7 +8,6 @@ from autogluon.core.hpo.ray_hpo import (
     AutommRayTuneLightningAdapter,
     run,
 )
-from autogluon.core.utils import ResourceManager
 from autogluon.core.hpo.ray_tune_constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
 from ray import tune
 

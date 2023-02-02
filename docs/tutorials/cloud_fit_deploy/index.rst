@@ -6,6 +6,18 @@ This section provides an overview on how AutoGluon can be trained and deployed o
 .. container:: cards
 
    .. card::
+      :title: AutoGluon-Tabular on Amazon SageMaker Autopilot
+      :link:  https://aws.amazon.com/blogs/machine-learning/amazon-sagemaker-autopilot-is-up-to-eight-times-faster-with-new-ensemble-training-mode-powered-by-autogluon/
+
+      Checkout managed AutoGluon experience on Amazon SageMaker Autopilot
+
+   .. card::
+      :title: AutoGluon Cloud
+      :link: autogluon-cloud.html
+
+      A tutorial on using AutoGluon Cloud module to train/deploy AutoGluon backed models on SageMaker.
+
+   .. card::
       :title: Cloud Training with AWS SageMaker
       :link: cloud-aws-sagemaker-training.html
 
@@ -27,6 +39,8 @@ This section provides an overview on how AutoGluon can be trained and deployed o
    :maxdepth: 1
    :hidden:
 
+   autopilot-autogluon
+   autogluon-cloud
    cloud-aws-sagemaker-training
    cloud-aws-sagemaker-deployment
    cloud-aws-lambda-deployment

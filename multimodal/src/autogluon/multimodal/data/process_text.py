@@ -11,21 +11,16 @@ from omegaconf import DictConfig
 from torch import nn
 from transformers import AutoConfig, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 
-from ..constants import (
-    AUTOMM,
-    CHOICES_IDS,
-    COLUMN,
-    TEXT,
-    TEXT_SEGMENT_IDS,
-    TEXT_TOKEN_IDS,
-    TEXT_VALID_LENGTH,
-    TOKEN_WORD_MAPPING,
-    WORD_OFFSETS,
-)
-from .collator import Pad, Stack
+from ..constants import AUTOMM, CHOICES_IDS, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH
+from .collator import PadCollator, StackCollator
 from .template_engine import TemplateEngine
 from .trivial_augmenter import TrivialAugment
-from .utils import extract_value_from_config, normalize_txt, register_encoding_decoding_error_handlers
+from .utils import (
+    extract_value_from_config,
+    get_text_token_max_len,
+    normalize_txt,
+    register_encoding_decoding_error_handlers,
+)
 
 logger = logging.getLogger(AUTOMM)
 
@@ -104,10 +99,8 @@ class TextProcessor:
         """
         Parameters
         ----------
-        prefix
-            The prefix connecting a processor to its corresponding model.
-        checkpoint_name
-            Name of the pretrained huggingface checkpoint, e.g., "microsoft/deberta-v3-small"
+        model
+            The model for which this processor would be created.
         tokenizer_name
             Name of the huggingface tokenizer type (default "hf_auto").
         max_len
@@ -131,7 +124,7 @@ class TextProcessor:
         normalize_text
             Whether to normalize text to resolve encoding problems.
             Examples of normalized texts can be found at
-            https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_feedback_prize#15-a-few-examples-of-normalized-texts
+            https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_feedback_prize#15-a-few-examples-of-normalized-texts
         """
         self.prefix = model.prefix
         self.tokenizer_name = tokenizer_name
@@ -150,19 +143,13 @@ class TextProcessor:
             self.tokenizer.deprecation_warnings["sequence-length-is-longer-than-the-specified-maximum"] = True
 
         self.cls_token_id, self.sep_token_id, self.eos_token_id = self.get_special_tokens(tokenizer=self.tokenizer)
-        if max_len is None or max_len <= 0:
-            self.max_len = self.tokenizer.model_max_length
-        else:
-            if max_len < self.tokenizer.model_max_length:
-                # TODO, Consider to fix the logic
-                if self.tokenizer.model_max_length < 10**6:
-                    warnings.warn(
-                        f"provided max length: {max_len} "
-                        f"is smaller than {model.checkpoint_name}'s default: {self.tokenizer.model_max_length}"
-                    )
-            self.max_len = min(max_len, self.tokenizer.model_max_length)
+        self.max_len = get_text_token_max_len(
+            provided_max_len=max_len,
+            config=model.config,
+            tokenizer=self.tokenizer,
+            checkpoint_name=model.checkpoint_name,
+        )
         logger.debug(f"text max length: {self.max_len}")
-
         self.insert_sep = insert_sep
         self.eos_only = self.cls_token_id == self.sep_token_id == self.eos_token_id
 
@@ -233,14 +220,14 @@ class TextProcessor:
         if self.requires_column_info:
             assert text_column_names, "Empty text column names."
             for col_name in text_column_names:
-                fn[f"{self.text_column_prefix}_{col_name}"] = Stack()
+                fn[f"{self.text_column_prefix}_{col_name}"] = StackCollator()
 
         fn.update(
             {
-                self.text_token_ids_key: Pad(pad_val=self.tokenizer.pad_token_id),
-                self.text_valid_length_key: Stack(),
-                self.text_segment_ids_key: Pad(pad_val=0),
-                self.choices_ids_key: Pad(pad_val=0),
+                self.text_token_ids_key: PadCollator(pad_val=self.tokenizer.pad_token_id),
+                self.text_valid_length_key: StackCollator(),
+                self.text_segment_ids_key: PadCollator(pad_val=0),
+                self.choices_ids_key: PadCollator(pad_val=0),
             }
         )
 
@@ -373,7 +360,7 @@ class TextProcessor:
                 answer_ids = self.tokenizer(
                     col_text,
                     padding="max_length",
-                    max_length=20,  # TODO: Currently hardcoded max_length for textual choices.
+                    max_length=self.template_engine.get_max_choice_length(self.tokenizer),
                 )["input_ids"]
                 tokens[col_name] = answer_ids
                 continue
@@ -435,8 +422,20 @@ class TextProcessor:
         -------
         A tokenizer instance.
         """
-        tokenizer_class = ALL_TOKENIZERS[tokenizer_name]
-        return tokenizer_class.from_pretrained(checkpoint_name)
+        try:
+            tokenizer_class = ALL_TOKENIZERS[tokenizer_name]
+            return tokenizer_class.from_pretrained(checkpoint_name)
+        except TypeError as e:
+            try:
+                tokenizer_class = ALL_TOKENIZERS["bert"]
+                tokenizer = tokenizer_class.from_pretrained(checkpoint_name)
+                logger.warning(
+                    f"Current checkpoint {checkpoint_name} does not support AutoTokenizer. "
+                    "Switch to BertTokenizer instead."
+                )
+                return tokenizer
+            except:
+                raise e
 
     @staticmethod
     def get_trimmed_lengths(
