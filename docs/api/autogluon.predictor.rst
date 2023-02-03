@@ -168,5 +168,5 @@ Additional Time Series APIs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TimeSeriesDataFrame
-    :members: freq, from_iterable_dataset, from_data_frame, from_pickle,
-              split_by_time, slice_by_timestep, slice_by_time
+    :members: freq, fill_missing_values, from_iterable_dataset, from_data_frame, from_pickle,
+              split_by_time, slice_by_timestep, slice_by_time, to_regular_index
