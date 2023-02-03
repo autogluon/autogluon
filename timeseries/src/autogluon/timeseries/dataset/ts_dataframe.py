@@ -634,3 +634,151 @@ class TimeSeriesDataFrame(pd.DataFrame):
         df_view._cached_freq = freq
 
         return df_view
+
+    def to_regular_index(self, freq: str) -> "TimeSeriesDataFrame":
+        """Fill the gaps in an irregularly-sampled time series with NaNs.
+
+        Parameters
+        ----------
+        freq: str
+            Frequency string of the new time series data index.
+
+        Examples
+        --------
+        >>> print(ts_dataframe)
+                            target
+        item_id timestamp
+        0       2019-01-01     NaN
+                2019-01-03     1.0
+                2019-01-06     2.0
+                2019-01-07     NaN
+        1       2019-02-04     3.0
+                2019-02-07     4.0
+
+        >>> print(ts_dataframe.to_regular_index(freq="D"))
+                            target
+        item_id timestamp
+        0       2019-01-01     NaN
+                2019-01-02     NaN
+                2019-01-03     1.0
+                2019-01-04     NaN
+                2019-01-05     NaN
+                2019-01-06     2.0
+                2019-01-07     NaN
+        1       2019-02-04     3.0
+                2019-02-05     NaN
+                2019-02-06     NaN
+                2019-02-07     4.0
+
+        """
+        if self.freq is not None:
+            if self.freq != freq:
+                raise ValueError(
+                    f"TimeSeriesDataFrame already has a regular index with freq '{self.freq}' "
+                    f"that cannot be converted to the given freq '{freq}'"
+                )
+            else:
+                return self
+
+        filled_series = []
+        for item_id, time_series in self.groupby(level=ITEMID, sort=False):
+            time_series = time_series.droplevel(ITEMID)
+            timestamps = time_series.index
+            resampled_ts = time_series.resample(freq).asfreq()
+            if not timestamps.isin(resampled_ts.index).all():
+                raise ValueError(
+                    f"Irregularly-sampled timestamps in this TimeSeriesDataFrame are not compatible "
+                    f"with the given frequency '{freq}'"
+                )
+            filled_series.append(pd.concat({item_id: resampled_ts}, names=[ITEMID]))
+
+        return TimeSeriesDataFrame(pd.concat(filled_series), static_features=self.static_features)
+
+    def fill_missing_values(self, method: str = "auto", value: float = 0.0) -> "TimeSeriesDataFrame":
+        """Fill missing values represented by NaN.
+
+        Parameters
+        ----------
+        method : str, default = "auto"
+            Method used to impute missing values.
+
+            - "auto" - first forward fill (to fill the in-between and trailing NaNs), then backward fill (to fill the leading NaNs)
+            - "ffill" or "pad" - propagate last valid observation forward. Note: missing values at the start of the time series are not filled.
+            - "bfill" or "backfill" - use next valid observation to fill gap. Note: this may result in information leakage; missing values at the end of the time series are not filled.
+            - "constant" - replace NaNs with the given constant ``value``.
+            - "interpolate" - fill NaN values using linear interpolation. Note: this may result in information leakage.
+        value : float, default = 0.0
+            Value used by the "constant" imputation method.
+
+        Examples
+        --------
+        >>> print(ts_dataframe)
+                            target
+        item_id timestamp
+        0       2019-01-01     NaN
+                2019-01-02     NaN
+                2019-01-03     1.0
+                2019-01-04     NaN
+                2019-01-05     NaN
+                2019-01-06     2.0
+                2019-01-07     NaN
+        1       2019-02-04     NaN
+                2019-02-05     3.0
+                2019-02-06     NaN
+                2019-02-07     4.0
+
+        >>> print(ts_dataframe.fill_missing_values(method="auto"))
+                            target
+        item_id timestamp
+        0       2019-01-01     1.0
+                2019-01-02     1.0
+                2019-01-03     1.0
+                2019-01-04     1.0
+                2019-01-05     1.0
+                2019-01-06     2.0
+                2019-01-07     2.0
+        1       2019-02-04     3.0
+                2019-02-05     3.0
+                2019-02-06     3.0
+                2019-02-07     4.0
+
+        """
+        if self.freq is None:
+            raise ValueError(
+                "Please make sure that all time series have a regular index before calling `fill_missing_values`"
+                "(for example, using the `to_regular_index` method)."
+            )
+
+        grouped_df = pd.DataFrame(self).groupby(level=ITEMID, sort=False, group_keys=False)
+        if method == "auto":
+            filled_df = grouped_df.fillna(method="ffill").fillna(method="bfill")
+        elif method in ["ffill", "pad"]:
+            filled_df = grouped_df.fillna(method="ffill")
+        elif method in ["bfill", "backfill"]:
+            filled_df = grouped_df.fillna(method="bfill")
+        elif method == "constant":
+            filled_df = self.fillna(value=value)
+        elif method == "interpolate":
+            filled_df = grouped_df.apply(lambda ts: ts.interpolate())
+        else:
+            raise ValueError(
+                "Invalid fill method. Expecting one of "
+                "{'auto', 'ffill', 'pad', 'bfill', 'backfill', 'constant', 'interpolate'}. "
+                f"Got {method}"
+            )
+        return TimeSeriesDataFrame(filled_df, static_features=self.static_features)
+
+    def dropna(self, how: str = "any") -> "TimeSeriesDataFrame":
+        """Drop rows containing NaNs.
+
+        Parameters
+        ----------
+        how : {"any", "all"}, default = "any"
+            Determine if row or column is removed from TimeSeriesDataFrame, when we have at least one NaN or all NaN.
+            - "any" : If any NaN values are present, drop that row or column.
+            - "all" : If all values are NaN, drop that row or column.
+        """
+        # We need to cast to a DataFrame first. Calling self.dropna() results in an exception because self.T
+        # (used inside dropna) is not supported for TimeSeriesDataFrame
+        dropped_df = pd.DataFrame(self).dropna(how=how)
+        return TimeSeriesDataFrame(dropped_df, static_features=self.static_features)
