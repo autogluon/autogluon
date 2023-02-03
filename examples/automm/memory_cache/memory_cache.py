@@ -85,7 +85,7 @@ class AutoMMMemoryCache(nn.Module):
         clip_weights
             The encoded label-text prompts which is only used in type "clip".
         """
-        super(AutoMMCacheAdapter, self).__init__()
+        super(AutoMMMemoryCache, self).__init__()
         self.cache_keys = cache_keys
         self.cache_values = cache_values
         self.adapter = nn.Linear(cache_keys.shape[0], cache_keys.shape[1], bias=False)
