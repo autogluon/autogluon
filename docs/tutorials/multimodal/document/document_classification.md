@@ -67,7 +67,7 @@ Model customization is also quite simple, you can specify the underline foundati
 as well as pure text models like [bert](https://huggingface.co/bert-base-uncased), [deberta](https://huggingface.co/microsoft/deberta-v3-base), just to name a few.
 
 Here, `label` is the name of the column that contains the target variable to predict, e.g., it is “label” in our example. 
-We set the training time limit to 180 seconds for demonstration purposes.
+We set the training time limit to 120 seconds for demonstration purposes.
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
@@ -75,8 +75,8 @@ from autogluon.multimodal import MultiModalPredictor
 predictor = MultiModalPredictor(label="label")
 predictor.fit(
     train_data=train_data,
-    hyperparameters={"model.document_transformer.checkpoint_name":"microsoft/layoutlmv2-base-uncased"},
-    time_limit=180,
+    hyperparameters={"model.document_transformer.checkpoint_name":"microsoft/layoutlm-base-uncased"},
+    time_limit=120,
 )
 ```
 
