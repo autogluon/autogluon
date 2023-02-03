@@ -75,7 +75,9 @@ from autogluon.multimodal import MultiModalPredictor
 predictor = MultiModalPredictor(label="label")
 predictor.fit(
     train_data=train_data,
-    hyperparameters={"model.document_transformer.checkpoint_name":"microsoft/layoutlm-base-uncased"},
+    hyperparameters={"model.document_transformer.checkpoint_name":"microsoft/layoutlm-base-uncased",
+    "optimization.top_k_average_method":"best",
+    },
     time_limit=120,
 )
 ```

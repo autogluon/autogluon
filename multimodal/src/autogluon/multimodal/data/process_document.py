@@ -39,6 +39,7 @@ class DocumentProcessor:
         norm_type: Optional[str] = None,
         size: Optional[int] = None,
         text_max_len: Optional[int] = 512,
+        missing_value_strategy: Optional[str] = "zero",
     ):
         """
         Parameters
@@ -62,6 +63,12 @@ class DocumentProcessor:
             The width / height of a square image.
         text_max_len
             The max text length of tokenizer. Default: 512.
+        missing_value_strategy
+            How to deal with a missing document. We now support:
+            - skip
+                Skip this sample
+            -zero
+                Use a document image with zero pixels.
         """
         self.prefix = model.prefix
         self.text_token_ids_key = model.text_token_ids_key
@@ -78,6 +85,8 @@ class DocumentProcessor:
         self.normalization = transforms.Normalize(self.mean, self.std)
         self.train_processor = construct_image_processor(self.size, self.normalization, self.train_transform_types)
         self.val_processor = construct_image_processor(self.size, self.normalization, self.val_transform_types)
+
+        self.missing_value_strategy = missing_value_strategy
 
         # Store OCR results
         self.documents = {}
@@ -241,21 +250,25 @@ class DocumentProcessor:
         for per_col_name, per_col_image_features in document_features.items():
             # Open the document image.
             try:
-                doc_image = PIL.Image.open(per_col_image_features[0])
+                with PIL.Image.open(per_col_image_features[0]) as doc_image:
+                    # The OCR process is time-consuming, so apply OCR on each image only once.
+                    if per_col_image_features[0] not in self.documents:
+                        ocr_res = self.apply_ocr(doc_image)
+                        # store the ocr results.
+                        self.documents.update({per_col_image_features[0]: ocr_res})
+                    else:
+                        # reuse the ocr results.
+                        ocr_res = self.documents[per_col_image_features[0]]
+
+                    words = ocr_res["words"]
+                    doc_image = doc_image.convert(image_mode)
             except Exception as e:
-                raise e
-
-            # The OCR process is time-consuming, so apply OCR on each image only once.
-            if per_col_image_features[0] not in self.documents:
-                ocr_res = self.apply_ocr(doc_image)
-                # store the ocr results.
-                self.documents.update({per_col_image_features[0]: ocr_res})
-            else:
-                # reuse the ocr results.
-                ocr_res = self.documents[per_col_image_features[0]]
-
-            words = ocr_res["words"]
-            doc_image = doc_image.convert(image_mode)
+                if self.missing_value_strategy.lower() == "zero":
+                    logger.debug(f"Using a zero image due to '{e}'")
+                    doc_image = PIL.Image.new(image_mode, (self.size, self.size), color=0)
+                    words = ""  # empty words
+                else:
+                    raise e
 
             if is_training:
                 doc_image = self.train_processor(doc_image)
