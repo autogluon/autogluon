@@ -3,33 +3,28 @@ import numpy as np
 
 from .learner import MultiModalLearner
 
-from ..constants import (
-COLUMN_FEATURES,
-Y_PRED,
-Y_TRUE
-)
+from ..constants import COLUMN_FEATURES, Y_PRED, Y_TRUE
 
 from ..utils import (
-predict,
-extract_from_output,
-turn_on_off_feature_column_info,
-compute_score,
-try_to_infer_pos_label,
-init_pretrained
+    compute_score,
+    extract_from_output,
+    predict,
+    try_to_infer_pos_label,
+    turn_on_off_feature_column_info,
 )
 
 
-from sklearn.metrics import f1_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
-from typing import List, Optional, Union, Dict
+from typing import List, Optional, Union
+
 
 class FusionSVMClassificationLearner(MultiModalLearner):
     def __init__(
-            self,
-            predictor,
+        self,
+        predictor,
     ):
         super().__init__()
         self.clf = make_pipeline(StandardScaler(), SVC(gamma="auto"))
@@ -48,11 +43,11 @@ class FusionSVMClassificationLearner(MultiModalLearner):
         self.clf.fit(features, labels)
 
     def extract_embedding(
-            self,
-            data: Union[pd.DataFrame, dict, list],
-            # as_tensor: Optional[bool] = False,
-            # as_pandas: Optional[bool] = False,
-            realtime: Optional[bool] = None,
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        # as_tensor: Optional[bool] = False,
+        # as_pandas: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ):
         self.predictor.__verify_inference_ready()
         turn_on_off_feature_column_info(
@@ -94,11 +89,11 @@ class FusionSVMClassificationLearner(MultiModalLearner):
         return preds
 
     def evaluate(
-            self,
-            data: Union[pd.DataFrame, dict, list],
-            metrics: Optional[Union[str, List[str]]] = None,
-            return_pred: Optional[bool] = False,
-            realtime: Optional[bool] = None,
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        metrics: Optional[Union[str, List[str]]] = None,
+        return_pred: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ):
         self.predictor.__verify_inference_ready()
         features = self.extract_embedding(data)
