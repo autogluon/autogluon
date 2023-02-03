@@ -79,7 +79,8 @@ from .utils import (
     data_to_df,
     extract_from_output,
     get_config,
-    prepare_for_hpo,
+    update_hyperparameters,
+    filter_hyperparameters,
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_stopping_threshold,
@@ -456,13 +457,20 @@ class MultiModalMatcher:
         self._output_shape = output_shape
         self._column_types = column_types
 
-        hyperparameters, hyperparameter_tune_kwargs = prepare_for_hpo(
+        hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
             problem_type=self._problem_type,
-            presets=self._presets,
+            presets=presets,
             provided_hyperparameters=hyperparameters,
             provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-            fit_called=fit_called,
         )
+
+        if hyperparameter_tune_kwargs:
+            hyperparameters = filter_hyperparameters(
+                hyperparameters=hyperparameters,
+                column_types=column_types,
+                config=self._config,
+                fit_called=fit_called,
+            )
 
         _fit_args = dict(
             train_df=train_data,

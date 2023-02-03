@@ -129,7 +129,8 @@ from .utils import (
     from_coco_or_voc,
     from_dict,
     get_config,
-    prepare_for_hpo,
+    update_hyperparameters,
+    filter_hyperparameters,
     get_detection_classes,
     get_local_pretrained_config_paths,
     get_minmax_mode,
@@ -784,15 +785,25 @@ class MultiModalPredictor:
         self._validation_metric_name = validation_metric_name
         self._column_types = column_types
 
-        hyperparameters, hyperparameter_tune_kwargs = prepare_for_hpo(
+        hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
             problem_type=self._problem_type,
-            presets=self._presets,
+            presets=presets,
             provided_hyperparameters=hyperparameters,
             provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             teacher_predictor=teacher_predictor,
-            fit_called=fit_called,
         )
-
+        print(f"column_types: {column_types}")
+        print(f"config: {config}")
+        if hyperparameter_tune_kwargs:
+            hyperparameters = filter_hyperparameters(
+                hyperparameters=hyperparameters,
+                column_types=column_types,
+                config=config,
+                fit_called=fit_called,
+            )
+        print(f"hyperparameters: {hyperparameters}")
+        print(f"hyperparameter_tune_kwargs: {hyperparameter_tune_kwargs}")
+        # exit()
         _fit_args = dict(
             train_df=train_data,
             val_df=tuning_data,
@@ -812,7 +823,7 @@ class MultiModalPredictor:
             clean_ckpts=clean_ckpts,
         )
 
-        if hyperparameter_tune_kwargs is not None:
+        if hyperparameter_tune_kwargs:
             # TODO: allow custom gpu
             assert self._resume is False, "You can not resume training with HPO"
             resources = dict(num_gpus=torch.cuda.device_count())

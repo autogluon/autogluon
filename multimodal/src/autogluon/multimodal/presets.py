@@ -73,7 +73,7 @@ def default(presets: str = DEFAULT):
             }
         )
     else:
-        hyperparameter_tune_kwargs = None
+        hyperparameter_tune_kwargs = {}
 
     if presets in [HIGH_QUALITY, DEFAULT]:
         if use_hpo:
@@ -179,7 +179,7 @@ def few_shot_text_classification(presets: str = DEFAULT):
         "data.templates.turn_on": True,
         "env.eval_batch_size_ratio": 2,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
 
     return hyperparameters, hyperparameter_tune_kwargs
 
@@ -206,7 +206,7 @@ def zero_shot_image_classification(presets: str = DEFAULT):
         "model.clip.max_text_len": 0,
         "env.num_workers": 2,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
 
     if presets in [DEFAULT, BEST_QUALITY]:
         hyperparameters.update(
@@ -266,7 +266,7 @@ def object_detection(presets: str = DEFAULT):
         "optimization.patience": 10,
         "env.num_workers": 2,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
 
     if presets in [DEFAULT, MEDIUM_QUALITY]:
         hyperparameters.update(
@@ -325,7 +325,7 @@ def ocr_text_detection(presets: str = DEFAULT):
         "env.num_gpus": 1,
         "env.precision": 32,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
 
     return hyperparameters, hyperparameter_tune_kwargs
 
@@ -354,7 +354,7 @@ def ocr_text_recognition(presets: str = DEFAULT):
         "env.num_gpus": 1,
         "env.precision": 32,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
 
     return hyperparameters, hyperparameter_tune_kwargs
 
@@ -382,7 +382,7 @@ def feature_extraction(presets: str = DEFAULT):  # TODO: rename the problem type
         "model.hf_text.pooling_mode": "mean",
         "env.eval_batch_size_ratio": 1,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
 
     return hyperparameters, hyperparameter_tune_kwargs
 
@@ -409,7 +409,7 @@ def image_similarity(presets: str = DEFAULT):
         "model.names": ["timm_image"],
         "env.num_workers": 2,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
 
     if presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
@@ -459,7 +459,7 @@ def text_similarity(presets: str = DEFAULT):
         "data.categorical.convert_to_text": True,
         "data.numerical.convert_to_text": True,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
 
     if presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
@@ -509,7 +509,7 @@ def image_text_similarity(presets: str = DEFAULT):
         "optimization.learning_rate": 1e-5,
         "env.num_workers": 2,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
 
     if presets in [DEFAULT, MEDIUM_QUALITY]:
         hyperparameters.update(
@@ -564,7 +564,7 @@ def ner(presets: str = DEFAULT):
             "fusion_ner",
         ],
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
 
     if presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
@@ -653,6 +653,8 @@ def get_automm_presets(problem_type: str, presets: str):
     hyperparameter_tune_kwargs
         Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
     """
+    if not presets:
+        presets = DEFAULT
     presets = presets.lower()
     if problem_type in [
         BINARY,

@@ -11,6 +11,8 @@ from .config import (
     save_timm_config,
     update_config_by_rules,
     update_tabular_config_by_resources,
+    update_hyperparameters,
+    filter_hyperparameters,
 )
 from .data import (
     assign_feature_column_names,
@@ -35,7 +37,7 @@ from .environment import (
     is_interactive,
     move_to_device,
 )
-from .hpo import hyperparameter_tune, prepare_for_hpo
+from .hpo import hyperparameter_tune
 from .inference import extract_from_output, infer_batch, predict, process_batch, use_realtime
 from .load import CustomUnpickler, load_text_tokenizers
 from .log import LogFilter, apply_log_filter, make_exp_dir
