@@ -24,16 +24,16 @@ submodule = "timeseries"
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
     "joblib~=1.1",
-    "numpy",
-    "scipy",
-    "pandas",
+    "numpy",  # version range defined in `core/_setup_utils.py`
+    "scipy",  # version range defined in `core/_setup_utils.py`
+    "pandas",  # version range defined in `core/_setup_utils.py`
     "statsmodels~=0.13.0",
     "gluonts~=0.12.0",
     "torch>=1.9,<1.14",
     "pytorch-lightning>=1.7.4,<1.9.0",
-    "networkx",
+    "networkx",  # version range defined in `core/_setup_utils.py`
     "statsforecast==1.4.0",
-    "tqdm",
+    "tqdm",  # version range defined in `core/_setup_utils.py`
     "ujson",  # needed to silence GluonTS warning
     f"autogluon.core[raytune]=={version}",
     f"autogluon.common=={version}",
