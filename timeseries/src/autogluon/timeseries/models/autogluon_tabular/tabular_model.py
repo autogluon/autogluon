@@ -201,7 +201,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             remainder = len(time_series) - num_windows * self.prediction_length
             num_hidden = np.concatenate([np.zeros(remainder), np.tile(np.arange(self.prediction_length), num_windows)])
             target_lags = apply_mask(target_lags, num_hidden=num_hidden, lag_indices=self._target_lag_indices)
-            feature_dfs = [target_lags]
+            feature_dfs = [target_lags, time_series[[self.target]]]
 
             if self.metadata.past_covariates_real:
                 past_covariates_lags = get_lags(
@@ -221,13 +221,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
                 )
                 feature_dfs.append(known_covariates_lags)
 
-            if len(feature_dfs) > 1:
-                features = pd.concat(feature_dfs, axis=1)
-            else:
-                features = target_lags
-
-            # Prediction target
-            features[self.target] = time_series[self.target]
+            features = pd.concat(feature_dfs, axis=1)
             return features
 
         df = pd.DataFrame(data).reset_index(level=TIMESTAMP)
