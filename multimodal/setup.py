@@ -26,8 +26,8 @@ install_requires = [
     "scikit-learn",  # version range defined in `core/_setup_utils.py`
     "Pillow",  # version range defined in `core/_setup_utils.py`
     "tqdm",  # version range defined in `core/_setup_utils.py`
-    "boto3",
-    "requests",
+    "boto3",  # version range defined in `core/_setup_utils.py`
+    "requests>=2.21,<3",
     "jsonschema<4.18",
     "seqeval<1.3.0",
     "evaluate<0.4.0",
