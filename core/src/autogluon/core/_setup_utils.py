@@ -32,7 +32,7 @@ DEPENDENT_PACKAGES = {
 if LITE_MODE:
     DEPENDENT_PACKAGES = {
         package: version for package, version in DEPENDENT_PACKAGES.items()
-        if package not in ['psutil', 'gluoncv', 'Pillow', 'timm']
+        if package not in ['psutil', 'Pillow', 'timm']
     }
 
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
