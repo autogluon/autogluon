@@ -175,7 +175,9 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             },
             "cbnetv2_bigdetection": {
                 "url": "https://big-detection.s3.us-west-2.amazonaws.com/bigdet_cpts/mmdetection_cpts/htc_cbv2_swin_base_giou_4conv1f_bigdet.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "cbnetv2", "htc_cbv2_swin_base_giou_4conv1f_adamw_bigdet.py"),
+                "config_file": os.path.join(
+                    mmdet_configs_dir, "cbnetv2", "htc_cbv2_swin_base_giou_4conv1f_adamw_bigdet.py"
+                ),
             },
             "yolov3_bigdetection": {
                 "url": "https://big-detection.s3.us-west-2.amazonaws.com/bigdet_cpts/mmdetection_cpts/yolov3_d53_bigdet_8x.pth",
