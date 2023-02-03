@@ -18,7 +18,6 @@ autogluon_extras_dict = {
     'autogluon.timeseries': (),
     'autogluon.tabular': ('all',),
     'autogluon.text': (),
-    'autogluon.vision': (),
 }
 
 # This is needed because some module are different in its import name and pip install name
