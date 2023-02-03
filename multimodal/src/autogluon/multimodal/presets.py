@@ -20,6 +20,17 @@ from .registry import Registry
 automm_presets = Registry("automm_presets")
 matcher_presets = Registry("matcher_presets")
 
+default_hyperparameter_tune_kwargs = {
+            "searcher": "bayes",
+            "scheduler": "ASHA",
+            "num_trials": 512,
+        }
+
+default_tunable_hyperparameters = {
+        "optimization.learning_rate": tune.loguniform(1e-5, 1e-2),
+        "env.batch_size": tune.choice([32, 64, 128, 256]),
+    }
+
 
 def parse_presets_str(presets: str):
     use_hpo = False
@@ -57,23 +68,12 @@ def default(presets: str = DEFAULT):
         ],
         "env.num_workers": 2,
     }
+    hyperparameter_tune_kwargs = {}
 
     presets, use_hpo = parse_presets_str(presets)
     if use_hpo:
-        hyperparameter_tune_kwargs = {
-            "searcher": "bayes",
-            "scheduler": "ASHA",
-            "num_trials": 512,
-        },
-        # shared by all hpo presets
-        hyperparameters.update(
-            {
-                "optimization.learning_rate": tune.loguniform(1e-5, 1e-2),
-                "env.batch_size": tune.choice([32, 64, 128, 256]),
-            }
-        )
-    else:
-        hyperparameter_tune_kwargs = {}
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_tunable_hyperparameters)
 
     if presets in [HIGH_QUALITY, DEFAULT]:
         if use_hpo:
@@ -411,24 +411,50 @@ def image_similarity(presets: str = DEFAULT):
     }
     hyperparameter_tune_kwargs = {}
 
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_tunable_hyperparameters)
+
     if presets in [DEFAULT, HIGH_QUALITY]:
-        hyperparameters.update(
-            {
-                "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-            }
-        )
+        if use_hpo:
+            hyperparameters.update(
+                {
+                    "model.timm_image.checkpoint_name": tune.choice(["swin_base_patch4_window7_224"]),
+                }
+            )
+        else:
+            hyperparameters.update(
+                {
+                    "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+                }
+            )
     elif presets == MEDIUM_QUALITY:
-        hyperparameters.update(
-            {
-                "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
-            }
-        )
+        if use_hpo:
+            hyperparameters.update(
+                {
+                    "model.timm_image.checkpoint_name": tune.choice(["swin_small_patch4_window7_224"]),
+                }
+            )
+        else:
+            hyperparameters.update(
+                {
+                    "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+                }
+            )
     elif presets == BEST_QUALITY:
-        hyperparameters.update(
-            {
-                "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
-            }
-        )
+        if use_hpo:
+            hyperparameters.update(
+                {
+                    "model.timm_image.checkpoint_name": tune.choice(["swin_large_patch4_window7_224"]),
+                }
+            )
+        else:
+            hyperparameters.update(
+                {
+                    "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
+                }
+            )
     else:
         raise ValueError(f"Unknown preset type: {presets}")
 

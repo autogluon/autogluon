@@ -458,12 +458,14 @@ class MultiModalMatcher:
         self._column_types = column_types
 
         hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
-            problem_type=self._problem_type,
+            problem_type=self._pipeline,
             presets=presets,
             provided_hyperparameters=hyperparameters,
             provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         )
-
+        hpo_mode = True if hyperparameter_tune_kwargs else False
+        print(f"column_types: {column_types}")
+        print(f"config: {self._config}")
         if hyperparameter_tune_kwargs:
             hyperparameters = filter_hyperparameters(
                 hyperparameters=hyperparameters,
@@ -471,6 +473,9 @@ class MultiModalMatcher:
                 config=self._config,
                 fit_called=fit_called,
             )
+        print(f"hyperparameters: {hyperparameters}")
+        print(f"hyperparameter_tune_kwargs: {hyperparameter_tune_kwargs}")
+        # exit()
 
         _fit_args = dict(
             train_df=train_data,
@@ -480,15 +485,15 @@ class MultiModalMatcher:
             minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=self._save_path,
-            ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
-            resume=False if hyperparameter_tune_kwargs is not None else self._resume,
-            enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
+            ckpt_path=None if hpo_mode else self._ckpt_path,
+            resume=False if hpo_mode else self._resume,
+            enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
             presets=presets,
             hyperparameters=hyperparameters,
-            hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
+            hpo_mode=hpo_mode,  # skip average checkpoint if in hpo mode
         )
 
-        if hyperparameter_tune_kwargs is not None:
+        if hpo_mode:
             # TODO: allow custom gpu
             assert self._resume is False, "You can not resume training with HPO"
             resources = dict(num_gpus=torch.cuda.device_count())

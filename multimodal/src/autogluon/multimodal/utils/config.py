@@ -597,7 +597,7 @@ def update_hyperparameters(
     if hyperparameter_tune_kwargs:
         if provided_hyperparameters:
             hyperparameters.update(provided_hyperparameters)
-    else:
+    else:  # use the provided hyperparameters if no hpo.
         hyperparameters = provided_hyperparameters
 
     if hyperparameter_tune_kwargs:
@@ -615,31 +615,38 @@ def update_hyperparameters(
 def filter_hyperparameters(hyperparameters: Dict, column_types: Dict, config: Union[Dict, DictConfig], fit_called: bool):
     model_names_key = f"{MODEL}.names"
     keys_to_filter = []
-    # Filter models that are not in model.names
-    # Avoid key not in config error.
+
     if model_names_key in hyperparameters:
+        # If continuous training or config is provided, make sure models are in config.model.
+        config = get_default_config(config)
+        selected_model_names = []
+        config_model_names = list(config.model.keys())
+        config_model_names.remove("names")
+        for name in hyperparameters[model_names_key]:
+            if name in config_model_names:
+                selected_model_names.append(name)
+        hyperparameters[model_names_key] = selected_model_names
+        assert len(selected_model_names) > 0, f"hyperparameters['model.names'] {hyperparameters[model_names_key]} doesn't match any config model names {config_model_names}."
+
+        # Filter models that are not in hyperparameters[model_names_key]
+        # Avoid key not in config error when applying the overrides later.
         model_keys = [k for k in hyperparameters.keys() if k.startswith(MODEL)]
-        model_keys.remove(model_names_key)
-        for k in model_keys:
-            if k.split(".")[1] not in hyperparameters[model_names_key] and k not in keys_to_filter:
-                keys_to_filter.append(k)
+        if model_keys and model_names_key in model_keys:
+            model_keys.remove(model_names_key)
+            for k in model_keys:
+                if k.split(".")[1] not in hyperparameters[model_names_key] and k not in keys_to_filter:
+                    keys_to_filter.append(k)
 
-    config = get_default_config(config)
-    valid_names = []
-    for model_name in hyperparameters[model_names_key]:
-        if hasattr(config.model, model_name):
-            valid_names.append(model_name)
-    hyperparameters[model_names_key] = valid_names
-
-    # Filter models whose data types are not detected.
-    # Avoid sampling unused checkpoints to run jobs, which wastes resources and time.
-    detected_data_types = get_detected_data_types(column_types)
-    for model_name in hyperparameters[model_names_key]:
-        model_config = config.model[model_name]
-        if model_config.data_types:  # skip fusion model
-            model_data_status = [d_type in detected_data_types for d_type in model_config.data_types]
-            if not all(model_data_status):
-                keys_to_filter.append(f"{MODEL}.{model_name}")
+        # Filter models whose data types are not detected.
+        # Avoid sampling unused checkpoints, e.g., hf_text models for image classification, to run jobs,
+        # which wastes resources and time.
+        detected_data_types = get_detected_data_types(column_types)
+        for model_name in hyperparameters[model_names_key]:
+            model_config = config.model[model_name]
+            if model_config.data_types:  # skip fusion model
+                model_data_status = [d_type in detected_data_types for d_type in model_config.data_types]
+                if not all(model_data_status):
+                    keys_to_filter.append(f"{MODEL}.{model_name}")
 
     # Filter keys for continuous training.
     # Model and data processors would be reused.

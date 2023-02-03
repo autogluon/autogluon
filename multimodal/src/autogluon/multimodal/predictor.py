@@ -792,9 +792,10 @@ class MultiModalPredictor:
             provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             teacher_predictor=teacher_predictor,
         )
+        hpo_mode = True if hyperparameter_tune_kwargs else False
         print(f"column_types: {column_types}")
         print(f"config: {config}")
-        if hyperparameter_tune_kwargs:
+        if hpo_mode:
             hyperparameters = filter_hyperparameters(
                 hyperparameters=hyperparameters,
                 column_types=column_types,
@@ -811,15 +812,15 @@ class MultiModalPredictor:
             minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=self._save_path,
-            ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
-            resume=False if hyperparameter_tune_kwargs is not None else self._resume,
-            enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
+            ckpt_path=None if hpo_mode else self._ckpt_path,
+            resume=False if hpo_mode else self._resume,
+            enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
             presets=presets,
             config=config,
             hyperparameters=hyperparameters,
             teacher_predictor=teacher_predictor,
             standalone=standalone,
-            hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
+            hpo_mode=hpo_mode,  # skip average checkpoint if in hpo mode
             clean_ckpts=clean_ckpts,
         )
 
