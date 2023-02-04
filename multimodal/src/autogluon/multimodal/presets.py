@@ -111,6 +111,7 @@ def few_shot_svm_text_classification(presets: str = DEFAULT):
     hyperparameters = {
         "model.names": ["hf_text"],
         "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",
+        "model.hf_text.pooling_mode": "mean",
         "env.per_gpu_batch_size": 32,
         "env.eval_batch_size_ratio": 4,
     }
@@ -141,6 +142,7 @@ def few_shot_svm_image_classification(presets: str = DEFAULT):
         "model.clip.max_text_len": 0,
         "env.num_workers": 2,
         "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+        "model.hf_text.pooling_mode": "mean",
         "env.eval_batch_size_ratio": 1,
     }
     hyperparameter_tune_kwargs = None
