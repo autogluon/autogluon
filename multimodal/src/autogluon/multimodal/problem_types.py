@@ -8,6 +8,8 @@ from .constants import (
     CATEGORICAL,
     CLASSIFICATION,
     FEATURE_EXTRACTION,
+    FEW_SHOT_SVM_IMAGE_CLASSIFICATION,
+    FEW_SHOT_SVM_TEXT_CLASSIFICATION,
     FEW_SHOT_TEXT_CLASSIFICATION,
     IMAGE,
     IMAGE_BYTEARRAY,
@@ -191,6 +193,33 @@ PROBLEM_TYPES_REG.register(
         name=FEW_SHOT_TEXT_CLASSIFICATION,
         support_fit=True,
         support_zero_shot=False,
+        experimental=True,
+        supported_modality_type={TEXT},
+        force_exist_modality={TEXT},
+    ),
+)
+
+# Few-shot SVM classification for text.
+# TODO: For few-shot problems, the init_pretrained only supports one model.
+#  Therefore we'd have to separate svm for image and for text
+PROBLEM_TYPES_REG.register(
+    FEW_SHOT_SVM_TEXT_CLASSIFICATION,
+    ProblemTypeProperty(
+        name=FEW_SHOT_SVM_TEXT_CLASSIFICATION,
+        support_fit=True,
+        support_zero_shot=True,
+        experimental=True,
+        supported_modality_type={TEXT},
+        force_exist_modality={TEXT},
+    ),
+)
+
+PROBLEM_TYPES_REG.register(
+    FEW_SHOT_SVM_IMAGE_CLASSIFICATION,
+    ProblemTypeProperty(
+        name=FEW_SHOT_SVM_IMAGE_CLASSIFICATION,
+        support_fit=True,
+        support_zero_shot=True,
         experimental=True,
         supported_modality_type={TEXT},
         force_exist_modality={TEXT},

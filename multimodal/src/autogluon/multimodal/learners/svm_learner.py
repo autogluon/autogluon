@@ -1,8 +1,10 @@
+import functools
+import warnings
+
 import pandas as pd
 import numpy as np
 
-from .learner import MultiModalLearner
-
+from .base import BaseLearner
 from ..constants import COLUMN_FEATURES, Y_PRED, Y_TRUE
 
 from ..utils import (
@@ -21,7 +23,7 @@ from sklearn.svm import SVC
 from typing import List, Optional, Union
 
 
-class FusionSVMClassificationLearner(MultiModalLearner):
+class FusionSVMClassificationLearner(BaseLearner):
     def __init__(
         self,
         predictor,
@@ -30,6 +32,7 @@ class FusionSVMClassificationLearner(MultiModalLearner):
         self.clf = make_pipeline(StandardScaler(), SVC(gamma="auto"))
 
         self.predictor = predictor
+        self._fit_called = False
 
     def fit(self, train_data: Union[pd.DataFrame, dict, list]):
         """
@@ -41,6 +44,7 @@ class FusionSVMClassificationLearner(MultiModalLearner):
         features = self.extract_embedding(data=train_data)
         labels = np.array(train_data[self.predictor._label_column])
         self.clf.fit(features, labels)
+        self._fit_called = True
 
     def extract_embedding(
         self,
@@ -49,7 +53,7 @@ class FusionSVMClassificationLearner(MultiModalLearner):
         # as_pandas: Optional[bool] = False,
         realtime: Optional[bool] = None,
     ):
-        self.predictor.__verify_inference_ready()
+        self.predictor._verify_inference_ready()
         turn_on_off_feature_column_info(
             data_processors=self.predictor._data_processors,
             flag=True,
@@ -62,6 +66,10 @@ class FusionSVMClassificationLearner(MultiModalLearner):
         )
 
         features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=True)
+
+        assert len(features.keys()) == 1, "Currently SVM only supports single column feature input"
+        features_key = list(features.keys())[0]
+        features = features[features_key]
         # if as_pandas:
         #     features = pd.DataFrame(features, index=data.index)
 
@@ -78,14 +86,24 @@ class FusionSVMClassificationLearner(MultiModalLearner):
         #         masks = pd.DataFrame(masks, index=data.index)
         return features
 
-    def predict(self, data: Union[pd.DataFrame, dict, list]):
-        features = self.extract_embedding(data)
+    def predict(self, data: Union[pd.DataFrame, dict, list],
+                as_pandas: bool = False,
+                realtime: bool = False):
+        assert self._fit_called, ".fit() is not invoked. Please consider calling .fit() before .predict()"
+        features = self.extract_embedding(data, realtime=realtime)
+
         preds = self.clf.predict(features)
+        if as_pandas:
+            preds = self.predictor._as_pandas(data=data, to_be_converted=preds)
         return preds
 
-    def predict_proba(self, data: Union[pd.DataFrame, dict, list]):
-        features = self.extract_embedding(data)
+    def predict_proba(self, data: Union[pd.DataFrame, dict, list],
+                      as_pandas: bool = False,
+                      realtime: bool = False):
+        features = self.extract_embedding(data, realtime=realtime)
         preds = self.clf.predict_proba(features)
+        if as_pandas:
+            preds = self.predictor._as_pandas(data=data, to_be_converted=preds)
         return preds
 
     def evaluate(
@@ -94,8 +112,9 @@ class FusionSVMClassificationLearner(MultiModalLearner):
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
+        extra_metrics: Optional[dict] = None
     ):
-        self.predictor.__verify_inference_ready()
+        assert self._fit_called, ".fit() is not invoked. Please consider calling .fit() before .evaluate()"
         features = self.extract_embedding(data)
         preds = self.clf.predict(features)
         labels = np.array(data[self.predictor._label_column])
@@ -137,5 +156,19 @@ class FusionSVMClassificationLearner(MultiModalLearner):
             results[per_metric] = score
 
         if return_pred:
-            return results, preds
+            return results, self.predictor._as_pandas(data=data, to_be_converted=preds)
         return results
+
+    def save(self):
+        if not self._fit_called:
+            warnings.warn(".fit() is not called. Only saving initial parameters!")
+        params = self.clf.get_params()
+        # TODO:
+        pass
+
+    def load(self):
+        pass
+
+    def macro_f1_metric(self, metric_data: dict):
+        preds = metric_data[Y_PRED]
+        labels = metric_data[Y_TRUE]

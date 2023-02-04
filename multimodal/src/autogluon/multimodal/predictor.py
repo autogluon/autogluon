@@ -52,6 +52,8 @@ from .constants import (
     FEATURE_EXTRACTION,
     FEATURES,
     FEW_SHOT,
+    FEW_SHOT_SVM_IMAGE_CLASSIFICATION,
+    FEW_SHOT_SVM_TEXT_CLASSIFICATION,
     FEW_SHOT_TEXT_CLASSIFICATION,
     GREEDY_SOUP,
     HF_TEXT,
@@ -99,6 +101,7 @@ from .data.infer_types import (
     is_image_column,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
+from .learners import FusionSVMClassificationLearner
 from .matcher import MultiModalMatcher
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
@@ -405,6 +408,7 @@ class MultiModalPredictor:
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._matcher = None
         self._save_path = path
+        self._svm_learner = None
 
         # Summary statistics used in fit summary. TODO: wrap it in a class.
         self._total_train_time = None
@@ -447,6 +451,14 @@ class MultiModalPredictor:
                 self._validation_metric_name = self._config["optimization"][
                     "val_metric"
                 ]  # TODO: only object detection is using this
+                logger.info("pretrianed model initialized")
+                logger.info(self._model)
+                # import ipdb
+                # ipdb.set_trace()
+                # TODO: ADD Flag to instantiate Learners
+                if self._problem_type == FEW_SHOT_SVM_TEXT_CLASSIFICATION:
+                    self._svm_learner = FusionSVMClassificationLearner(predictor=self)
+                    logger.info("svm_learner created")
 
     @property
     def path(self):
@@ -653,6 +665,12 @@ class MultiModalPredictor:
         -------
         An "MultiModalPredictor" object (itself).
         """
+
+        # Branch out for svm
+        if self._problem_type == FEW_SHOT_SVM_TEXT_CLASSIFICATION and self._svm_learner is not None:
+            self._svm_learner.fit(train_data=train_data)
+            return self
+
         fit_called = self._fit_called  # used in current function
         self._fit_called = True
 
@@ -1843,6 +1861,13 @@ class MultiModalPredictor:
         Optionally return a dataframe of prediction results.
         """
         self._verify_inference_ready()
+        if self._problem_type == FEW_SHOT_SVM_TEXT_CLASSIFICATION and self._svm_learner is not None:
+            return self._svm_learner.evaluate(
+                data=data,
+                metrics=metrics,
+                return_pred=return_pred,
+                realtime=realtime
+            )
         if self._matcher:
             return self._matcher.evaluate(
                 data=data,
@@ -2031,6 +2056,9 @@ class MultiModalPredictor:
         Array of predictions, one corresponding to each row in given dataset.
         """
         self._verify_inference_ready()
+
+        if self._problem_type == FEW_SHOT_SVM_TEXT_CLASSIFICATION and self._svm_learner is not None:
+            return self._svm_learner.predict(data=data, as_pandas=as_pandas, realtime=realtime)
 
         if self._matcher:
             return self._matcher.predict(

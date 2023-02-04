@@ -90,6 +90,62 @@ def default(presets: str = DEFAULT):
 
     return hyperparameters, hyperparameter_tune_kwargs
 
+@automm_presets.register()
+def few_shot_svm_text_classification(presets: str = DEFAULT):
+    """
+    Register the presets for few_shot_svm_text_classification.
+    This is the framework that uses feature_extraction + svm.
+
+    Parameters
+    ----------
+    presets
+        The preset name.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
+    hyperparameters = {
+        "model.names": ["hf_text"],
+        "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",
+        "env.per_gpu_batch_size": 32,
+        "env.eval_batch_size_ratio": 4,
+    }
+    hyperparameter_tune_kwargs = None
+
+    return hyperparameters, hyperparameter_tune_kwargs
+
+@automm_presets.register()
+def few_shot_svm_image_classification(presets: str = DEFAULT):
+    """
+    Register the presets for few_shot_svm_image_classification.
+    This is the framework that uses feature_extraction + svm.
+
+    Parameters
+    ----------
+    presets
+        The preset name.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
+    hyperparameters = {
+        "model.names": ["clip"],
+        "model.clip.max_text_len": 0,
+        "env.num_workers": 2,
+        "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+        "env.eval_batch_size_ratio": 1,
+    }
+    hyperparameter_tune_kwargs = None
+    return hyperparameters, hyperparameter_tune_kwargs
+
 
 @automm_presets.register()
 def few_shot_text_classification(presets: str = DEFAULT):
