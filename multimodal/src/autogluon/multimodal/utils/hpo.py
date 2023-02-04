@@ -240,4 +240,3 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
         shutil.rmtree(best_trial_path)
 
         return predictor
-

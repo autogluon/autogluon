@@ -727,6 +727,11 @@ class MultiModalPredictor:
             valid_data=tuning_data,
         )
 
+        if self._presets is not None:
+            presets = self._presets
+        else:
+            self._presets = presets
+
         if self._config is not None:  # continuous training
             config = self._config
 
@@ -738,11 +743,6 @@ class MultiModalPredictor:
         )
         if problem_type is not None:
             self._problem_type = problem_type  # In case problem type isn't provided in __init__().
-
-        if self._presets is not None:
-            presets = self._presets
-        else:
-            self._presets = presets
 
         # Determine data scarcity mode, i.e. a few-shot scenario
         scarcity_mode = infer_scarcity_mode_by_data_size(

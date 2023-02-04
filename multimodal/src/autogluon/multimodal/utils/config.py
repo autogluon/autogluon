@@ -29,12 +29,14 @@ def filter_search_space(hyperparameters: Dict, keys_to_filter: Union[str, List[s
     """
     Filter search space within hyperparameters without the given keys as prefixes.
     Hyperparameters that are not search space will not be filtered.
+
     Parameters
     ----------
     hyperparameters
         A dictionary containing search space and overrides to config.
     keys_to_filter
         Keys that needs to be filtered out
+
     Returns
     -------
         hyperparameters being filtered
@@ -59,8 +61,22 @@ def filter_search_space(hyperparameters: Dict, keys_to_filter: Union[str, List[s
     return hyperparameters
 
 
-def get_default_config(config, extra: Optional[List[str]] = None):
+def get_default_config(config: Optional[Union[Dict, DictConfig]] = None, extra: Optional[List[str]] = None):
+    """
+    Get the default config.
 
+    Parameters
+    ----------
+    config
+        A dictionary including four keys: "model", "data", "optimization", and "environment".
+        If any key is not given, we will fill in with the default value.
+    extra
+        A list of extra config keys.
+
+    Returns
+    -------
+    The default config.
+    """
     if isinstance(config, DictConfig):
         return config
 
@@ -98,7 +114,7 @@ def get_default_config(config, extra: Optional[List[str]] = None):
 def get_config(
     problem_type: Optional[str] = None,
     presets: Optional[str] = None,
-    config: Optional[Union[dict, DictConfig]] = None,
+    config: Optional[Union[Dict, DictConfig]] = None,
     overrides: Optional[Union[str, List[str], Dict]] = None,
     extra: Optional[List[str]] = None,
 ):
@@ -190,7 +206,6 @@ def get_config(
         # remove `model.names` from overrides since it's already applied.
         overrides.pop("model.names", None)
         # apply the user-provided overrides
-        # raise ValueError(f"config: {OmegaConf.to_yaml(config)} \n overrides: {overrides}")
         config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
     verify_model_names(config.model)
     return config
