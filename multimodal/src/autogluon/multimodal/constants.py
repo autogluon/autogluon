@@ -76,7 +76,7 @@ MAR_10 = "mar_10"
 MAR_100 = "mar_100"
 MAR_SMALL = "mar_small"
 MAR_MEDIUM = "mar_medium"
-MAR_LARGE = "mar_large"
+MAR_LARGE = "mar_large" 
 
 # Metric
 MEAN_AVERAGE_PRECISION = "mean_average_precision"
