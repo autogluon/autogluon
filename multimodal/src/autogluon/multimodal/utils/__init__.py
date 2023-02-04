@@ -4,6 +4,7 @@ from .config import (
     apply_omegaconf_overrides,
     customize_model_names,
     filter_hyperparameters,
+    filter_search_space,
     filter_timm_pretrained_cfg,
     get_config,
     get_local_pretrained_config_paths,

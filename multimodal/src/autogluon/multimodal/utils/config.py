@@ -17,8 +17,8 @@ from ..constants import (
     MODEL,
     NUMERICAL_TRANSFORMER,
     REGRESSION,
+    VALID_CONFIG_KEYS,
 )
-from ..models import TimmAutoModelForImagePrediction
 from ..presets import get_automm_presets, get_basic_automm_config
 from .data import get_detected_data_types
 
