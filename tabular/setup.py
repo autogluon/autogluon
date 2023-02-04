@@ -20,11 +20,11 @@ version = ag.update_version(version)
 submodule = 'tabular'
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
-    'numpy',
-    'scipy',
-    'pandas',
-    'scikit-learn',
-    'networkx',
+    'numpy',  # version range defined in `core/_setup_utils.py`
+    'scipy',  # version range defined in `core/_setup_utils.py`
+    'pandas',  # version range defined in `core/_setup_utils.py`
+    'scikit-learn',  # version range defined in `core/_setup_utils.py`
+    'networkx',  # version range defined in `core/_setup_utils.py`
     f'{ag.PACKAGE_NAME}.core=={version}',
     f'{ag.PACKAGE_NAME}.features=={version}',
 ]
@@ -43,8 +43,11 @@ extras_require = {
         'xgboost>=1.6,<1.8',
     ],
     'fastai': [
-        'torch>=1.0,<1.13',
+        'torch>=1.9,<1.14',
         'fastai>=2.3.1,<2.8',
+    ],
+    'ray': [
+        f'{ag.PACKAGE_NAME}.core[all]=={version}',
     ],
     'skex': [
         'scikit-learn-intelex>=2021.6,<2021.8',
@@ -67,7 +70,7 @@ extras_require = {
 
 all_requires = []
 # TODO: Consider adding 'skex' to 'all'
-for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai']:
+for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai', 'ray']:
     all_requires += extras_require[extra_package]
 all_requires = list(set(all_requires))
 extras_require['all'] = all_requires

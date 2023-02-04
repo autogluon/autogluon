@@ -1,12 +1,10 @@
-import copy
 import logging
 import os
 import shutil
-from typing import Dict, List, Optional, Union
 
 import yaml
 
-from ..constants import AUTOMM, BEST_K_MODELS_FILE, RAY_TUNE_CHECKPOINT, VALID_CONFIG_KEYS
+from ..constants import AUTOMM, BEST_K_MODELS_FILE, RAY_TUNE_CHECKPOINT
 from .matcher import create_siamese_model
 from .model import create_fusion_model
 
@@ -243,39 +241,3 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
 
         return predictor
 
-
-def filter_search_space(hyperparameters: Dict, keys_to_filter: Union[str, List[str]]):
-    """
-    Filter search space within hyperparameters without the given keys as prefixes.
-    Hyperparameters that are not search space will not be filtered.
-
-    Parameters
-    ----------
-    hyperparameters
-        A dictionary containing search space and overrides to config.
-    keys_to_filter
-        Keys that needs to be filtered out
-
-    Returns
-    -------
-        hyperparameters being filtered
-    """
-    if isinstance(keys_to_filter, str):
-        keys_to_filter = [keys_to_filter]
-
-    assert any(
-        key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter
-    ), f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
-
-    from ray.tune.search.sample import Domain
-
-    from autogluon.core.space import Space
-
-    hyperparameters = copy.deepcopy(hyperparameters)
-    for hyperparameter, value in hyperparameters.copy().items():
-        if not isinstance(value, (Space, Domain)):
-            continue
-        for key in keys_to_filter:
-            if hyperparameter.startswith(key):
-                del hyperparameters[hyperparameter]
-    return hyperparameters

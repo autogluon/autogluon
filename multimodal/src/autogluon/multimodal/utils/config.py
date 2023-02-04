@@ -25,6 +25,40 @@ from .data import get_detected_data_types
 logger = logging.getLogger(AUTOMM)
 
 
+def filter_search_space(hyperparameters: Dict, keys_to_filter: Union[str, List[str]]):
+    """
+    Filter search space within hyperparameters without the given keys as prefixes.
+    Hyperparameters that are not search space will not be filtered.
+    Parameters
+    ----------
+    hyperparameters
+        A dictionary containing search space and overrides to config.
+    keys_to_filter
+        Keys that needs to be filtered out
+    Returns
+    -------
+        hyperparameters being filtered
+    """
+    if isinstance(keys_to_filter, str):
+        keys_to_filter = [keys_to_filter]
+
+    assert any(
+        key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter
+    ), f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
+    from ray.tune.search.sample import Domain
+
+    from autogluon.core.space import Space
+
+    hyperparameters = copy.deepcopy(hyperparameters)
+    for hyperparameter, value in hyperparameters.copy().items():
+        if not isinstance(value, (Space, Domain)):
+            continue
+        for key in keys_to_filter:
+            if hyperparameter.startswith(key):
+                del hyperparameters[hyperparameter]
+    return hyperparameters
+
+
 def get_default_config(config, extra: Optional[List[str]] = None):
 
     if isinstance(config, DictConfig):
@@ -536,7 +570,7 @@ def get_pretrain_configs_dir(subfolder: Optional[str] = None):
     return pretrain_config_dir
 
 
-def _filter_timm_pretrained_cfg(cfg, remove_source=False, remove_null=True):
+def filter_timm_pretrained_cfg(cfg, remove_source=False, remove_null=True):
     filtered_cfg = {}
     keep_null = {"pool_size", "first_conv", "classifier"}  # always keep these keys, even if none
     for k, v in cfg.items():
@@ -546,38 +580,6 @@ def _filter_timm_pretrained_cfg(cfg, remove_source=False, remove_null=True):
             continue
         filtered_cfg[k] = v
     return filtered_cfg
-
-
-def save_timm_config(
-    model: TimmAutoModelForImagePrediction,
-    config_path: str,
-):
-    """
-    Save TIMM image model configs to a local file.
-
-    Parameters
-    ----------
-    model
-        A TimmAutoModelForImagePrediction model object.
-    config_path:
-        A file to where the config is written to.
-    """
-    config = {}
-    pretrained_cfg = _filter_timm_pretrained_cfg(model.config, remove_source=True, remove_null=True)
-    # set some values at root config level
-    config["architecture"] = pretrained_cfg.pop("architecture")
-    config["num_classes"] = model.num_classes
-    config["num_features"] = model.out_features
-
-    global_pool_type = getattr(model, "global_pool", None)
-    if isinstance(global_pool_type, str) and global_pool_type:
-        config["global_pool"] = global_pool_type
-
-    config["pretrained_cfg"] = pretrained_cfg
-
-    with open(config_path, "w") as f:
-        json.dump(config, f, indent=2)
-        logger.info(f"Timm config saved to {config_path}.")
 
 
 def update_hyperparameters(

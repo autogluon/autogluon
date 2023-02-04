@@ -12,7 +12,7 @@ import shutil
 import sys
 import time
 import warnings
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from datetime import timedelta
 from typing import Dict, List, Optional, Union
 
@@ -27,8 +27,9 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.multimodal.models.fusion import MultimodalFusionMLP, MultimodalFusionTransformer
+from autogluon.multimodal.models.fusion import AbstractMultimodalFusionModel
 from autogluon.multimodal.models.huggingface_text import HFAutoModelForTextPrediction
+from autogluon.multimodal.models.mmdet_image import MMDetAutoModelForObjectDetection
 from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePrediction
 from autogluon.multimodal.utils import save_result_df
 
@@ -53,6 +54,7 @@ from .constants import (
     FEW_SHOT,
     FEW_SHOT_TEXT_CLASSIFICATION,
     GREEDY_SOUP,
+    HF_TEXT,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
     LABEL,
@@ -62,6 +64,7 @@ from .constants import (
     MASKS,
     MAX,
     MIN,
+    MMDET_IMAGE,
     MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
@@ -80,6 +83,7 @@ from .constants import (
     SCORE,
     TEXT,
     TEXT_NER,
+    TIMM_IMAGE,
     UNIFORM_SOUP,
     Y_PRED,
     Y_PRED_PROB,
@@ -154,7 +158,6 @@ from .utils import (
     process_batch,
     save_pretrained_model_configs,
     save_text_tokenizers,
-    save_timm_config,
     select_model,
     setup_save_path,
     split_train_tuning_data,
@@ -337,7 +340,10 @@ class MultiModalPredictor:
             )
             problem_prop = PROBLEM_TYPES_REG.get(problem_type)
             if problem_prop.experimental:
-                warnings.warn(f"problem_type='{problem_type}' is currently experimental.", UserWarning)
+                warnings.warn(
+                    f"problem_type='{problem_type}' is currently experimental.",
+                    UserWarning,
+                )
             problem_type = problem_prop.name
 
         check_if_packages_installed(problem_type=problem_type)
@@ -1047,7 +1053,8 @@ class MultiModalPredictor:
         norm_param_names = get_norm_layer_param_names(model)
 
         trainable_param_names = get_trainable_params_efficient_finetune(
-            norm_param_names, efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune")
+            norm_param_names,
+            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
         )
 
         if self._data_processors is None:
@@ -1286,7 +1293,8 @@ class MultiModalPredictor:
             ]
 
         custom_checkpoint_plugin = AutoMMModelCheckpointIO(
-            trainable_param_names=trainable_param_names, model_name_to_id=model.name_to_id
+            trainable_param_names=trainable_param_names,
+            model_name_to_id=model.name_to_id,
         )
 
         tb_logger = pl.loggers.TensorBoardLogger(
@@ -1588,7 +1596,8 @@ class MultiModalPredictor:
             )
             norm_param_names = get_norm_layer_param_names(self._model)
             trainable_param_names = get_trainable_params_efficient_finetune(
-                norm_param_names, efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune")
+                norm_param_names,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
             )
 
             optimization_kwargs = dict(
@@ -1712,7 +1721,9 @@ class MultiModalPredictor:
         if self._column_types is None:
             allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
             column_types = infer_column_types(
-                data=data, allowable_column_types=allowable_dtypes, fallback_column_type=fallback_dtype
+                data=data,
+                allowable_column_types=allowable_dtypes,
+                fallback_column_type=fallback_dtype,
             )
             if self._label_column and self._label_column in data.columns:
                 column_types = infer_label_column_type_by_problem_type(
@@ -1733,7 +1744,11 @@ class MultiModalPredictor:
                 if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
                     if is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_PATH):
                         image_type = IMAGE_PATH
-                    elif is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_BYTEARRAY):
+                    elif is_image_column(
+                        data=data[col_name],
+                        col_name=col_name,
+                        image_type=IMAGE_BYTEARRAY,
+                    ):
                         image_type = IMAGE_BYTEARRAY
                     else:
                         image_type = col_type
@@ -2462,7 +2477,10 @@ class MultiModalPredictor:
             batch_size = 2  # batch_size should be a dynamic_axis, so we could use a small value for faster export
         if data is not None:
             batch = self.get_processed_batch_for_deployment(
-                data=data, valid_input=valid_input, onnx_tracing=True, batch_size=batch_size
+                data=data,
+                valid_input=valid_input,
+                onnx_tracing=True,
+                batch_size=batch_size,
             )
 
         if not onnx_path:
@@ -2475,7 +2493,11 @@ class MultiModalPredictor:
 
         strategy = "dp"  # default used in inference.
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
-        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False)
+        precision = infer_precision(
+            num_gpus=num_gpus,
+            precision=self._config.env.precision,
+            cpu_only_warning=False,
+        )
         precision_context = get_precision_context(precision=precision, device_type=device_type)
 
         InputBatch = namedtuple("InputBatch", self._model.input_keys)
@@ -2606,7 +2628,11 @@ class MultiModalPredictor:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
                 data_processors = CustomUnpickler(fp).load()
             # Load text tokenizers after loading data processors.
-            for modality in [TEXT, TEXT_NER, NER]:  # NER is included for backward compatibility
+            for modality in [
+                TEXT,
+                TEXT_NER,
+                NER,
+            ]:  # NER is included for backward compatibility
                 if modality in data_processors:
                     data_processors[modality] = load_text_tokenizers(
                         text_processors=data_processors[modality],
@@ -2629,6 +2655,16 @@ class MultiModalPredictor:
             "pipeline" in assets and assets["pipeline"] == OBJECT_DETECTION
         ):
             data_processors = None
+
+        # backward compatibility for variable image size.
+        if version.parse(assets["version"]) <= version.parse("0.6.2"):
+            print("hasattr model.timm_image", hasattr(config, "model.timm_image"))
+            if OmegaConf.select(config, "model.timm_image") is not None:
+                logger.warn(
+                    "Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "
+                    "Try to update the timm image size."
+                )
+                config.model.timm_image.image_size = None
 
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]
@@ -2783,84 +2819,59 @@ class MultiModalPredictor:
 
         return predictor
 
-    def dump_timm_image(
-        self,
-        path: str,
-    ):
+    def dump_model(self, save_path: Optional[str] = None):
         """
-        Save TIMM image model weights and config to local directory.
-        Model weights are saved in file `pytorch_model.bin`;
-        Configs are saved in file `config.json`
+        Save model weights and config to local directory.
+        Model weights are saved in file `pytorch_model.bin` (timm, hf) or '<ckpt_name>.pth' (mmdet);
+        Configs are saved in file `config.json` (timm, hf) or  '<ckpt_name>.py' (mmdet).
 
         Parameters
         ----------
         path : str
             Path to directory where models and configs should be saved.
         """
-        models = []
-        # TODO: Add BaseMultimodalFusionModel class from which MultimodalFusionMLP and MultimodalFusionTransformer will inherit
-        if isinstance(self._model, (MultimodalFusionMLP, MultimodalFusionTransformer)) and isinstance(
+
+        if not save_path:
+            save_path = self._save_path if self._save_path else "./"
+
+        supported_models = {
+            TIMM_IMAGE: TimmAutoModelForImagePrediction,
+            HF_TEXT: HFAutoModelForTextPrediction,
+            MMDET_IMAGE: MMDetAutoModelForObjectDetection,
+        }
+
+        models = defaultdict(list)
+        # TODO: simplify the code
+        if isinstance(self._model, AbstractMultimodalFusionModel) and isinstance(
             self._model.model, torch.nn.modules.container.ModuleList
         ):
             for per_model in self._model.model:
-                if isinstance(per_model, TimmAutoModelForImagePrediction):
-                    models.append(per_model)
-        elif isinstance(self._model, TimmAutoModelForImagePrediction):
-            models.append(self._model)
+                for model_key, model_type in supported_models.items():
+                    if isinstance(per_model, model_type):
+                        models[model_key].append(per_model)
+        else:
+            for model_key, model_type in supported_models.items():
+                if isinstance(self._model, model_type):
+                    models[model_key].append(self._model)
 
         if not models:
-            raise NotImplementedError("No TIMM models available for dump.")
+            raise NotImplementedError(
+                f"No models available for dump. Current supported models are: {supported_models.keys()}"
+            )
 
-        for model in models:
-            subdir = path + "/" + model.prefix
-            os.makedirs(subdir, exist_ok=True)
-            weights_path = f"{subdir}/pytorch_model.bin"
-            torch.save(model.model.state_dict(), weights_path)
-            logger.info(f"Model {model.prefix} weights saved to {weights_path}.")
-            config_path = f"{subdir}/config.json"
-            save_timm_config(model, config_path)
-
-    def dump_hf_text(
-        self,
-        path: str,
-    ):
-        """
-        Save HuggingFace Text model weights, config and tokenizers to local directory.
-        Model weights are saved in file `pytorch_model.bin`;
-        Configs are saved in file `config.json`
-
-        Parameters
-        ----------
-        path : str
-            Path to directory where models and configs should be saved.
-        """
-        models = []
-        if isinstance(self._model, (MultimodalFusionMLP, MultimodalFusionTransformer)) and isinstance(
-            self._model.model, torch.nn.modules.container.ModuleList
-        ):
-            for per_model in self._model.model:
-                if isinstance(per_model, HFAutoModelForTextPrediction):
-                    models.append(per_model)
-        elif isinstance(self._model, HFAutoModelForTextPrediction):
-            models.append(self._model)
-
-        if not models:
-            raise NotImplementedError("No HuggingFace text models available for dump.")
-
+        # get tokenizers for hf_text
         text_processors = self._data_processors.get(TEXT, {})
         tokenizers = {}
         for per_processor in text_processors:
             tokenizers[per_processor.prefix] = per_processor.tokenizer
 
-        for model in models:
-            prefix = model.prefix
-            subdir = path + "/" + prefix
-            os.makedirs(subdir, exist_ok=True)
-            model.model.save_pretrained(subdir)
-            logger.info(f"Model weights for {prefix} are saved to {subdir}.")
-            if prefix in tokenizers.keys():
-                tokenizers[prefix].save_pretrained(subdir)
-                logger.info(f"Tokenizer {prefix} saved to {subdir}.")
+        for model_key in models:
+            for per_model in models[model_key]:
+                subdir = os.path.join(save_path, per_model.prefix)
+                os.makedirs(subdir, exist_ok=True)
+                per_model.save(save_path=subdir, tokenizers=tokenizers)
+
+        return save_path
 
     @property
     def class_labels(self):
@@ -2936,7 +2947,10 @@ class MultiModalPredictor:
                 f" '{self._validation_metric_name}'. "
                 f"The total training time is {timedelta(seconds=self._total_train_time)}"
             )
-        results = {f"val_{self._validation_metric_name}": self._best_score, "training_time": self._total_train_time}
+        results = {
+            f"val_{self._validation_metric_name}": self._best_score,
+            "training_time": self._total_train_time,
+        }
         return results
 
     def list_supported_models(self, pretrained=True):

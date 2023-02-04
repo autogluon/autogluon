@@ -4,6 +4,7 @@ docs:
 - hfl/chinese-lert-small
 - sentence-transformers/all-MiniLM-L6-v2
 - google/bert_uncased_L-6_H-768_A-12
+- microsoft/layoutlm-base-uncased
 others:
 - bert-base-chinese
 - bert-base-uncased
@@ -31,6 +32,8 @@ others_2:
 - nlpaueb/legal-bert-small-uncased
 - sentence-transformers/all-MiniLM-L6-v2
 - t5-small
+- microsoft/layoutlmv3-base
+- microsoft/layoutlmv2-base-uncased
 predictor:
 - CLTL/MedRoBERTa.nl
 - google/electra-small-discriminator

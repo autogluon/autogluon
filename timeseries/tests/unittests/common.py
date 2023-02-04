@@ -59,10 +59,11 @@ def get_data_frame_with_variable_lengths(
     item_id_to_length: Dict[str, int],
     static_features: Optional[pd.DataFrame] = None,
     covariates_names: Optional[List[str]] = None,
+    freq: str = "D",
 ):
     tuples = []
     for item_id, length in item_id_to_length.items():
-        for ts in pd.date_range(pd.Timestamp("2022-01-01"), periods=length, freq="D"):
+        for ts in pd.date_range(pd.Timestamp("2022-01-01"), periods=length, freq=freq):
             tuples.append((item_id, ts))
     index = pd.MultiIndex.from_tuples(tuples, names=[ITEMID, TIMESTAMP])
     df = TimeSeriesDataFrame(

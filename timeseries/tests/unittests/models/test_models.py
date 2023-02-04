@@ -109,7 +109,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         quantile_levels=[0.1, 0.9],
         hyperparameters={
             "epochs": ag.Int(1, 3),
-            "num_epochs_per_batch": 1,
+            "num_batches_per_epoch": 1,
             "maxiter": 1,
         },
     )
@@ -175,7 +175,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         hyperparameters=DUMMY_HYPERPARAMETERS,
     )
     # TFT cannot handle arbitrary quantiles
-    if "TemporalFusionTransformer" in model.name:
+    if "TemporalFusionTransformerMXNet" in model.name:
         return
 
     model.fit(train_data=DUMMY_TS_DATAFRAME)
