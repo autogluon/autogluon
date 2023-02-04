@@ -91,6 +91,12 @@ Tutorials
 
       How to train time series models for forecasting.
 
+   .. card::
+      :title: Exploratory Data Analysis
+      :link: tutorials/eda/index.html
+
+      Tools to explore and visualize data.
+
 
 Managed Solutions Featuring AutoGluon
 -------------------------------------
@@ -112,6 +118,7 @@ Launch Tutorial Notebooks
    tutorials/multimodal/index
    tutorials/timeseries/index
    tutorials/cloud_fit_deploy/index
+   tutorials/eda/index
    cheatsheet.rst
    api/autogluon.predictor
    api/autogluon.features
