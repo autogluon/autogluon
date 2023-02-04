@@ -29,13 +29,13 @@ df_test['Fare_duplicate'] = df_test['Fare']
 ```
 
 The report consists of multiple parts: statistical information overview enriched with feature types detection and
-missing values counts.
+missing value counts.
 
 The last chart is a feature distance. It measures the similarity between features in a dataset. For example, if two
 variables are almost identical, their feature distance will be small. Understanding feature distance is useful in feature
-selection, where it can be used to identify which variables are redundant and should be considered for removal.
+selection, where it can be used to identify which variables are redundant and should be considered for removal. To
+perform the analysis, we need just one line:
 
-To perform the analysis, we need just one line:
 ```{.python .input}
 import autogluon.eda.auto as auto
 

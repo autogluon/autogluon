@@ -9,7 +9,7 @@ task.
 
 ## Using Interaction Charts for Missing Values Filling
 
-Let's load titanic dataset:
+Let's load the titanic dataset:
 
 ```{.python .input}
 import pandas as pd
@@ -19,7 +19,7 @@ df_test = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/titanic/test.
 target_col = 'Survived'
 ```
 
-Next we will look at missing data in the variable:
+Next we will look at missing data in the variables:
 
 ```{.python .input}
 import autogluon.eda.auto as auto
@@ -27,7 +27,7 @@ import autogluon.eda.auto as auto
 auto.missing_values_analysis(train_data=df_train)
 ```
 
-It looks like there are only two null values in the `Embarked` feature. Let's see what are those two null values:
+It looks like there are only two null values in the `Embarked` feature. Let's see what those two null values are:
 
 ```{.python .input}
 df_train[df_train.Embarked.isna()]
@@ -50,8 +50,8 @@ values as `C`.
 auto.analyze_interaction(x='Pclass', y='Survived', train_data=df_train, test_data=df_test)
 ```
 
-It looks like `63%` first class passengers survived; `48%` second class and only `24%` third class passenger survived.
-Similar information is visible via `Fare` variable:
+It looks like `63%` of first class passengers survived, while; `48%` of second class and only `24%` of third class 
+passengers survived. Similar information is visible via `Fare` variable:
 
 ```{.python .input}
 auto.analyze_interaction(x='Fare', hue='Survived', train_data=df_train, test_data=df_test, chart_args=dict(fill=True))
@@ -61,7 +61,7 @@ auto.analyze_interaction(x='Fare', hue='Survived', train_data=df_train, test_dat
 auto.analyze_interaction(x='Age', hue='Survived', train_data=df_train, test_data=df_test)
 ```
 
-The very left part of the distribution on this chart possibility hints that children and infants were the priority.
+The very left part of the distribution on this chart possibly hints that children and infants were the priority.
 
 ```{.python .input}
 auto.analyze_interaction(x='Fare', y='Age', hue='Survived', train_data=df_train, test_data=df_test)

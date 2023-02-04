@@ -30,7 +30,7 @@ class MissingValues(AbstractVisualization, JupyterMixin):
             variable affects the presence of another. Nullity correlation ranges from -1
             (if one variable appears the other definitely does not) to 0 (variables appearing or not appearing have no effect on one another)
             to 1 (if one variable appears the other definitely also does).
-            Entries marked <1 or >-1 have a correlation that is close to being exactingly negative or positive, but is still not quite perfectly so.
+            Entries marked <1 or >-1 have a correlation that is close to being exactingly negative or positive but is still not quite perfectly so.
         - dendrogram - the dendrogram allows to more fully correlate variable completion, revealing trends deeper than the pairwise ones
             visible in the correlation heatmap. The dendrogram uses a hierarchical clustering algorithm (courtesy of scipy) to bin variables
             against one another by their nullity correlation (measured in terms of binary distance).

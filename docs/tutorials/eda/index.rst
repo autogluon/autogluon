@@ -9,7 +9,7 @@ This section provides an overview of exploratory data analysis tools.
       :title: Automated Dataset Overview
       :link: eda-auto-dataset-overview.html
 
-      Tool to get a high-level understanding of datasets including basic statistical information and feature information
+      Tool to get a high-level understanding of datasets including basic statistical information and feature information.
 
    .. card::
       :title: Automated Target Variable Analysis

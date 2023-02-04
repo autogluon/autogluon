@@ -12,7 +12,7 @@ trained and tested on similar data distributions, so that the model is generaliz
 
 ## Example
 
-Let's load titanic dataset:
+Let's load the titanic dataset:
 
 ```{.python .input}
 import pandas as pd
@@ -31,10 +31,10 @@ auto.covariate_shift_detection(train_data=df_train, test_data=df_test, label=tar
 ```
 
 The detector found that `Name` and `PassengerId` with a very high certainty (`roc_auc` is `1`) can distinguish if the
-row came from a train or test parts of the dataset. We'll ignore `Name` for now - it's importance is relatively low and
-first look at `PassengerId`. The graph shows that the feature is uniformly distributed across different ranges between
-train and test datasets. In this specific case it is just a monotonically increasing ID, which carries no practical
-value for this task. Let's drop it and try the run again:
+row came from a train or test parts of the dataset. We'll ignore `Name` for now - it's importance is relatively low, 
+and instead we'll look first at `PassengerId`. The graph shows that the feature is uniformly distributed across 
+different ranges between train and test datasets. In this specific case it is just a monotonically increasing ID, 
+which carries no practical value for this task. Let's drop it and try the run again:
 
 ```{.python .input}
 df_train = df_train.drop(columns='PassengerId')

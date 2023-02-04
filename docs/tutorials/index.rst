@@ -159,7 +159,7 @@ Exploratory Data Analysis
       :title: Automated Dataset Overview
       :link: eda/eda-auto-dataset-overview.html
 
-      Tool to get a high-level understanding of datasets including basic statistical information and feature information
+      Tool to get a high-level understanding of datasets including basic statistical information and feature information.
 
    .. card::
       :title: Automated Target Variable Analysis
