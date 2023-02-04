@@ -73,7 +73,7 @@ function install_all_no_tests {
 }
 
 function build_all {
-    for module in common core features tabular multimodal timeseries autogluon
+    for module in common core features tabular multimodal timeseries autogluon eda
     do
         cd "$module"/
         python setup.py sdist bdist_wheel
