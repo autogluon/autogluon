@@ -11,12 +11,12 @@ from torch import nn
 from ..constants import (
     AUTOMM,
     CATEGORICAL_TRANSFORMER,
+    DATA,
     FUSION_TRANSFORMER,
     HF_MODELS,
+    MODEL,
     NUMERICAL_TRANSFORMER,
     REGRESSION,
-    MODEL,
-    DATA,
 )
 from ..models import TimmAutoModelForImagePrediction
 from ..presets import get_automm_presets, get_basic_automm_config
@@ -587,6 +587,26 @@ def update_hyperparameters(
     provided_hyperparameter_tune_kwargs,
     teacher_predictor: Optional[str] = None,
 ):
+    """
+    Update preset hyperparameters hyperparameter_tune_kwargs by the provided.
+
+    Parameters
+    ----------
+    problem_type
+        Problem type.
+    presets
+        A preset string regarding modality quality or hpo.
+    provided_hyperparameters
+        The hyperparameters provided by users.
+    provided_hyperparameter_tune_kwargs
+        The hyperparameter_tune_kwargs provided by users.
+    teacher_predictor
+        The path of a saved teacher predictor, used for distillation HPO.
+
+    Returns
+    -------
+    The updated hyperparameters and hyperparameter_tune_kwargs.
+    """
     hyperparameters, hyperparameter_tune_kwargs = get_automm_presets(problem_type=problem_type, presets=presets)
 
     if hyperparameter_tune_kwargs and provided_hyperparameter_tune_kwargs:
@@ -612,7 +632,30 @@ def update_hyperparameters(
     return hyperparameters, hyperparameter_tune_kwargs
 
 
-def filter_hyperparameters(hyperparameters: Dict, column_types: Dict, config: Union[Dict, DictConfig], fit_called: bool):
+def filter_hyperparameters(
+    hyperparameters: Dict,
+    column_types: Dict,
+    config: Union[Dict, DictConfig],
+    fit_called: bool,
+):
+    """
+    Filter out the hyperparameters that have no effect for HPO.
+
+    Parameters
+    ----------
+    hyperparameters
+        The hyperparameters to override the default config.
+    column_types
+        Dataframe's column types.
+    config
+        A config provided by users or from the previous training.
+    fit_called
+        Whether fit() has been called.
+
+    Returns
+    -------
+    The filtered hyperparameters.
+    """
     model_names_key = f"{MODEL}.names"
     keys_to_filter = []
 
@@ -626,7 +669,9 @@ def filter_hyperparameters(hyperparameters: Dict, column_types: Dict, config: Un
             if name in config_model_names:
                 selected_model_names.append(name)
         hyperparameters[model_names_key] = selected_model_names
-        assert len(selected_model_names) > 0, f"hyperparameters['model.names'] {hyperparameters[model_names_key]} doesn't match any config model names {config_model_names}."
+        assert (
+            len(selected_model_names) > 0
+        ), f"hyperparameters['model.names'] {hyperparameters[model_names_key]} doesn't match any config model names {config_model_names}."
 
         # Filter models that are not in hyperparameters[model_names_key]
         # Avoid key not in config error when applying the overrides later.
@@ -659,6 +704,6 @@ def filter_hyperparameters(hyperparameters: Dict, column_types: Dict, config: Un
         keys_to_filter.extend([MODEL, DATA])
 
     for key in keys_to_filter:
-        hyperparameters = {k:v for k, v in hyperparameters.items() if not k.startswith(key)}
+        hyperparameters = {k: v for k, v in hyperparameters.items() if not k.startswith(key)}
 
     return hyperparameters

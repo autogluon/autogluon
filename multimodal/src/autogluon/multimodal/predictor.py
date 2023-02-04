@@ -126,11 +126,10 @@ from .utils import (
     data_to_df,
     evaluate_coco,
     extract_from_output,
+    filter_hyperparameters,
     from_coco_or_voc,
     from_dict,
     get_config,
-    update_hyperparameters,
-    filter_hyperparameters,
     get_detection_classes,
     get_local_pretrained_config_paths,
     get_minmax_mode,
@@ -163,6 +162,7 @@ from .utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
+    update_hyperparameters,
     update_tabular_config_by_resources,
 )
 
@@ -431,6 +431,7 @@ class MultiModalPredictor:
         if self._problem_type is not None:
             if self.problem_property.support_zero_shot:
                 # Load pretrained model via the provided hyperparameters and presets
+                # TODO: do not create pretrained model for HPO presets.
                 self._config, self._model, self._data_processors = init_pretrained(
                     problem_type=self._problem_type,
                     presets=self._presets,
@@ -793,8 +794,6 @@ class MultiModalPredictor:
             teacher_predictor=teacher_predictor,
         )
         hpo_mode = True if hyperparameter_tune_kwargs else False
-        print(f"column_types: {column_types}")
-        print(f"config: {config}")
         if hpo_mode:
             hyperparameters = filter_hyperparameters(
                 hyperparameters=hyperparameters,
@@ -802,9 +801,7 @@ class MultiModalPredictor:
                 config=config,
                 fit_called=fit_called,
             )
-        print(f"hyperparameters: {hyperparameters}")
-        print(f"hyperparameter_tune_kwargs: {hyperparameter_tune_kwargs}")
-        # exit()
+
         _fit_args = dict(
             train_df=train_data,
             val_df=tuning_data,
@@ -824,7 +821,7 @@ class MultiModalPredictor:
             clean_ckpts=clean_ckpts,
         )
 
-        if hyperparameter_tune_kwargs:
+        if hpo_mode:
             # TODO: allow custom gpu
             assert self._resume is False, "You can not resume training with HPO"
             resources = dict(num_gpus=torch.cuda.device_count())

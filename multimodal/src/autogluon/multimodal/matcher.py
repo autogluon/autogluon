@@ -78,9 +78,8 @@ from .utils import (
     customize_model_names,
     data_to_df,
     extract_from_output,
-    get_config,
-    update_hyperparameters,
     filter_hyperparameters,
+    get_config,
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_stopping_threshold,
@@ -98,6 +97,7 @@ from .utils import (
     setup_save_path,
     split_train_tuning_data,
     try_to_infer_pos_label,
+    update_hyperparameters,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -223,7 +223,7 @@ class MultiModalMatcher:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
-        if self._pipeline is not None:
+        if self._pipeline is not None:  # TODO: do not create pretrained model for HPO presets.
             (
                 self._config,
                 self._query_config,
@@ -464,18 +464,13 @@ class MultiModalMatcher:
             provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         )
         hpo_mode = True if hyperparameter_tune_kwargs else False
-        print(f"column_types: {column_types}")
-        print(f"config: {self._config}")
-        if hyperparameter_tune_kwargs:
+        if hpo_mode:
             hyperparameters = filter_hyperparameters(
                 hyperparameters=hyperparameters,
                 column_types=column_types,
                 config=self._config,
                 fit_called=fit_called,
             )
-        print(f"hyperparameters: {hyperparameters}")
-        print(f"hyperparameter_tune_kwargs: {hyperparameter_tune_kwargs}")
-        # exit()
 
         _fit_args = dict(
             train_df=train_data,

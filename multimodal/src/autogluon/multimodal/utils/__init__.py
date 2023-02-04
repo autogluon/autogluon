@@ -3,6 +3,7 @@ from .checkpoint import AutoMMModelCheckpoint, AutoMMModelCheckpointIO, average_
 from .config import (
     apply_omegaconf_overrides,
     customize_model_names,
+    filter_hyperparameters,
     get_config,
     get_local_pretrained_config_paths,
     get_pretrain_configs_dir,
@@ -10,9 +11,8 @@ from .config import (
     save_pretrained_model_configs,
     save_timm_config,
     update_config_by_rules,
-    update_tabular_config_by_resources,
     update_hyperparameters,
-    filter_hyperparameters,
+    update_tabular_config_by_resources,
 )
 from .data import (
     assign_feature_column_names,

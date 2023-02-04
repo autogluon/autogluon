@@ -21,15 +21,16 @@ automm_presets = Registry("automm_presets")
 matcher_presets = Registry("matcher_presets")
 
 default_hyperparameter_tune_kwargs = {
-            "searcher": "bayes",
-            "scheduler": "ASHA",
-            "num_trials": 512,
-        }
+    "searcher": "bayes",
+    "scheduler": "ASHA",
+    "num_trials": 512,
+}
 
 default_tunable_hyperparameters = {
-        "optimization.learning_rate": tune.loguniform(1e-5, 1e-2),
-        "env.batch_size": tune.choice([32, 64, 128, 256]),
-    }
+    "optimization.learning_rate": tune.loguniform(1e-5, 1e-2),
+    "optimization.max_epochs": tune.choice(list(range(5, 21))),
+    "env.batch_size": tune.choice([32, 64, 128, 256]),
+}
 
 
 def parse_presets_str(presets: str):
@@ -73,7 +74,7 @@ def default(presets: str = DEFAULT):
     presets, use_hpo = parse_presets_str(presets)
     if use_hpo:
         hyperparameters.update(default_tunable_hyperparameters)
-        hyperparameter_tune_kwargs.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     if presets in [HIGH_QUALITY, DEFAULT]:
         if use_hpo:
@@ -181,6 +182,11 @@ def few_shot_text_classification(presets: str = DEFAULT):
     }
     hyperparameter_tune_kwargs = {}
 
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
+
     return hyperparameters, hyperparameter_tune_kwargs
 
 
@@ -268,6 +274,11 @@ def object_detection(presets: str = DEFAULT):
     }
     hyperparameter_tune_kwargs = {}
 
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
+
     if presets in [DEFAULT, MEDIUM_QUALITY]:
         hyperparameters.update(
             {
@@ -327,6 +338,11 @@ def ocr_text_detection(presets: str = DEFAULT):
     }
     hyperparameter_tune_kwargs = {}
 
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
+
     return hyperparameters, hyperparameter_tune_kwargs
 
 
@@ -355,6 +371,10 @@ def ocr_text_recognition(presets: str = DEFAULT):
         "env.precision": 32,
     }
     hyperparameter_tune_kwargs = {}
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     return hyperparameters, hyperparameter_tune_kwargs
 
@@ -414,47 +434,26 @@ def image_similarity(presets: str = DEFAULT):
     presets, use_hpo = parse_presets_str(presets)
     if use_hpo:
         hyperparameters.update(default_tunable_hyperparameters)
-        hyperparameter_tune_kwargs.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     if presets in [DEFAULT, HIGH_QUALITY]:
-        if use_hpo:
-            hyperparameters.update(
-                {
-                    "model.timm_image.checkpoint_name": tune.choice(["swin_base_patch4_window7_224"]),
-                }
-            )
-        else:
-            hyperparameters.update(
-                {
-                    "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-                }
-            )
+        hyperparameters.update(
+            {
+                "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+            }
+        )
     elif presets == MEDIUM_QUALITY:
-        if use_hpo:
-            hyperparameters.update(
-                {
-                    "model.timm_image.checkpoint_name": tune.choice(["swin_small_patch4_window7_224"]),
-                }
-            )
-        else:
-            hyperparameters.update(
-                {
-                    "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
-                }
-            )
+        hyperparameters.update(
+            {
+                "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+            }
+        )
     elif presets == BEST_QUALITY:
-        if use_hpo:
-            hyperparameters.update(
-                {
-                    "model.timm_image.checkpoint_name": tune.choice(["swin_large_patch4_window7_224"]),
-                }
-            )
-        else:
-            hyperparameters.update(
-                {
-                    "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
-                }
-            )
+        hyperparameters.update(
+            {
+                "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
+            }
+        )
     else:
         raise ValueError(f"Unknown preset type: {presets}")
 
@@ -486,6 +485,11 @@ def text_similarity(presets: str = DEFAULT):
         "data.numerical.convert_to_text": True,
     }
     hyperparameter_tune_kwargs = {}
+
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     if presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
@@ -536,6 +540,11 @@ def image_text_similarity(presets: str = DEFAULT):
         "env.num_workers": 2,
     }
     hyperparameter_tune_kwargs = {}
+
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     if presets in [DEFAULT, MEDIUM_QUALITY]:
         hyperparameters.update(
@@ -591,6 +600,11 @@ def ner(presets: str = DEFAULT):
         ],
     }
     hyperparameter_tune_kwargs = {}
+
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     if presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
@@ -681,6 +695,8 @@ def get_automm_presets(problem_type: str, presets: str):
     """
     if not presets:
         presets = DEFAULT
+    if presets == "hpo":
+        presets = f"{DEFAULT}_{presets}"
     presets = presets.lower()
     if problem_type in [
         BINARY,
