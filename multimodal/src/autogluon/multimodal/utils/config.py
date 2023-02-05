@@ -652,8 +652,8 @@ def update_hyperparameters(
 def filter_hyperparameters(
     hyperparameters: Dict,
     column_types: Dict,
-    config: Union[Dict, DictConfig],
-    fit_called: bool,
+    config: Optional[Union[Dict, DictConfig]] = None,
+    fit_called: Optional[bool] = False,
 ):
     """
     Filter out the hyperparameters that have no effect for HPO.
@@ -703,12 +703,21 @@ def filter_hyperparameters(
         # Avoid sampling unused checkpoints, e.g., hf_text models for image classification, to run jobs,
         # which wastes resources and time.
         detected_data_types = get_detected_data_types(column_types)
+        selected_model_names = []
         for model_name in hyperparameters[model_names_key]:
             model_config = config.model[model_name]
-            if model_config.data_types:  # skip fusion model
+            if model_config.data_types:
                 model_data_status = [d_type in detected_data_types for d_type in model_config.data_types]
                 if not all(model_data_status):
                     keys_to_filter.append(f"{MODEL}.{model_name}")
+                else:
+                    selected_model_names.append(model_name)
+            else:  # keep the fusion model, which will be handled by select_model().
+                selected_model_names.append(model_name)
+        hyperparameters[model_names_key] = selected_model_names
+        assert (
+            len(selected_model_names) > 0
+        ), f"Model {hyperparameters[model_names_key]} can't handle the data with column types {column_types}"
 
     # Filter keys for continuous training.
     # Model and data processors would be reused.

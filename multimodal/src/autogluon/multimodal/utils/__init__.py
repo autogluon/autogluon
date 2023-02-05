@@ -7,6 +7,7 @@ from .config import (
     filter_search_space,
     filter_timm_pretrained_cfg,
     get_config,
+    get_default_config,
     get_local_pretrained_config_paths,
     get_pretrain_configs_dir,
     parse_dotlist_conf,
