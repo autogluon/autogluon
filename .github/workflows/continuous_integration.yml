@@ -301,8 +301,22 @@ jobs:
           job-type: CI-GPU
           job-name: AutoGluon-BuildTimeseries
           command: chmod +x ./.github/workflow_scripts/build_timeseries_tutorial.sh && ./.github/workflow_scripts/build_timeseries_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
+  build_eda_tutorial:
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
+      - name: Build Timeseries Tutorial on AWS Batch
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-GPU
+          job-name: AutoGluon-BuildEda
+          command: chmod +x ./.github/workflow_scripts/build_eda_tutorial.sh && ./.github/workflow_scripts/build_eda_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_all_docs:
-    needs: [build_tabular_prediction_tutorial, build_multimodal_tutorial, build_cloud_fit_deploy_tutorial, build_timeseries_tutorial]
+    needs: [build_tabular_prediction_tutorial, build_multimodal_tutorial, build_cloud_fit_deploy_tutorial, build_timeseries_tutorial, build_eda_tutorial]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
