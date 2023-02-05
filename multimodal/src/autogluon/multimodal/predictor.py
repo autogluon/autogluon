@@ -800,7 +800,7 @@ class MultiModalPredictor:
             teacher_predictor=teacher_predictor,
         )
         hpo_mode = True if hyperparameter_tune_kwargs else False
-        if hpo_mode:
+        if hpo_mode and self._problem_type != NER:  # TODO: support ner.
             hyperparameters = filter_hyperparameters(
                 hyperparameters=hyperparameters,
                 column_types=column_types,
