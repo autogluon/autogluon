@@ -22,6 +22,7 @@ from ..constants import (
     MAR_LARGE,
     MAR_MEDIUM,
     MAR_SMALL,
+    MEAN_AVERAGE_PRECISION,
     OBJECT_DETECTION,
 )
 from .download import download, is_url
@@ -688,6 +689,7 @@ def parse_detection_result(
     if isinstance(result, np.ndarray):
         return {
             MAP: result[0],
+            MEAN_AVERAGE_PRECISION: result[0],
             MAP_50: result[1],
             MAP_75: result[2],
             MAP_SMALL: result[3],
@@ -701,7 +703,7 @@ def parse_detection_result(
             MAR_LARGE: result[11],
         }
     else:
-        return result
+        result[MEAN_AVERAGE_PRECISION] = result[MAP]
 
 
 def cocoeval(
