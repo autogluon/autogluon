@@ -3,13 +3,10 @@ from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
-
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
-
 from ..constants import COLUMN_FEATURES, Y_PRED, Y_TRUE
-
 from ..utils import (
     compute_score,
     extract_from_output,
@@ -17,7 +14,6 @@ from ..utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
 )
-
 from .base import BaseLearner
 
 
