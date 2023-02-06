@@ -26,8 +26,8 @@ install_requires = [
     "scikit-learn",  # version range defined in `core/_setup_utils.py`
     "Pillow",  # version range defined in `core/_setup_utils.py`
     "tqdm",  # version range defined in `core/_setup_utils.py`
-    "boto3",
-    "requests",
+    "boto3",  # version range defined in `core/_setup_utils.py`
+    "requests>=2.21,<3",
     "jsonschema<4.18",
     "seqeval<1.3.0",
     "evaluate<0.4.0",
@@ -37,7 +37,7 @@ install_requires = [
     "torchvision<0.15.0",
     "fairscale>=0.4.5,<0.4.14",
     "scikit-image>=0.19.1,<0.20.0",
-    "pytorch_lightning>=1.8.0,<1.10.0",
+    "pytorch-lightning>=1.8.0,<1.10.0",
     "text-unidecode<1.4",
     "torchmetrics>=0.8.0,<0.9.0",
     "transformers>=4.23.0,<4.27.0",

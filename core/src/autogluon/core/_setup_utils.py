@@ -19,6 +19,7 @@ PYTHON_REQUIRES = '>=3.8, <3.11'
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
     # note: if python 3.7 is used, the open CVEs are present: CVE-2021-41496 | CVE-2021-34141; fixes are available in 1.22.x, but python 3.8 only
+    'boto3': '>=1.10,<2',  # <2 because unlikely to introduce breaking changes in minor releases. >=1.10 because 1.10 is 3 years old, no need to support older
     'numpy': '>=1.21,<1.24',
     'pandas': '>1.4.0,<1.6',
     'scikit-learn': '>=1.0.0,<1.2',
