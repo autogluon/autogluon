@@ -30,7 +30,7 @@ default_tunable_hyperparameters = {
     "optimization.learning_rate": tune.loguniform(1e-5, 1e-2),
     "optimization.optim_type": tune.choice(["adamw", "sgd"]),
     "optimization.max_epochs": tune.choice(list(range(5, 31))),
-    "env.batch_size": tune.choice([32, 64, 128, 256]),
+    "env.batch_size": tune.choice([16, 32, 64, 128, 256]),
 }
 
 
@@ -83,7 +83,13 @@ def default(presets: str = DEFAULT):
             hyperparameters.update(
                 {
                     "model.hf_text.checkpoint_name": tune.choice(
-                        ["google/electra-base-discriminator", "bert-base-uncased", "roberta-base", "albert-xlarge-v2"]
+                        [
+                            "google/electra-base-discriminator",
+                            "google/flan-t5-base",
+                            "microsoft/deberta-v3-small",
+                            "roberta-base",
+                            "albert-xlarge-v2",
+                        ]
                     ),
                     "model.timm_image.checkpoint_name": tune.choice(
                         [
@@ -108,7 +114,13 @@ def default(presets: str = DEFAULT):
             hyperparameters.update(
                 {
                     "model.hf_text.checkpoint_name": tune.choice(
-                        ["google/electra-small-discriminator", "prajjwal1/bert-small", "albert-base-v2"]
+                        [
+                            "google/electra-small-discriminator",
+                            "google/flan-t5-small",
+                            "microsoft/deberta-v3-xsmall",
+                            "albert-base-v2",
+                            "microsoft/MiniLM-L12-H384-uncased",
+                        ]
                     ),
                     "model.timm_image.checkpoint_name": tune.choice(
                         ["mobilenetv3_large_100", "gluon_resnet18_v1b", "maxvit_rmlp_pico_rw_256.sw_in1k"]
@@ -131,7 +143,12 @@ def default(presets: str = DEFAULT):
             hyperparameters.update(
                 {
                     "model.hf_text.checkpoint_name": tune.choice(
-                        ["microsoft/deberta-v3-base", "google/electra-large-discriminator", "roberta-large"]
+                        [
+                            "microsoft/deberta-v3-base",
+                            "google/flan-t5-large",
+                            "google/electra-large-discriminator",
+                            "roberta-large",
+                        ]
                     ),
                     "model.timm_image.checkpoint_name": tune.choice(
                         [
