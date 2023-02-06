@@ -136,7 +136,7 @@ tabular/src/autogluon/tabular/version.py
 text/src/autogluon/text/version.py
 multimodal/src/autogluon/multimodal/version.py
 eda/src/autogluon/eda/version.py
-
+experiments/
 AutogluonModels
 lightning_logs
 VERSION.minor
