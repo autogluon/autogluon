@@ -309,7 +309,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Setup Env Vars
         uses: ./.github/actions/setup-env-vars
-      - name: Build Timeseries Tutorial on AWS Batch
+      - name: Build EDA Tutorial on AWS Batch
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
