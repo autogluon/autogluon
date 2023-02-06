@@ -1,3 +1,4 @@
+import os
 import sys
 
 sys.path = ['.', '..'] + sys.path
@@ -23,8 +24,19 @@ myst_enable_extensions = ['colon_fence', 'deflist', 'substitution', 'html_image'
 
 nb_execution_mode = 'force'
 nb_execution_timeout = 1200
-nb_execution_excludepatterns = ['jupyter_execute']
 nb_merge_streams = True
+
+nb_execution_excludepatterns = ['jupyter_execute']
+
+nb_dirs_to_exec = [os.path.join('tutorials', tag) for tag in tags if os.path.isdir(os.path.join('tutorials', tag))]
+
+if len(nb_dirs_to_exec) > 0:
+    nb_dirs_to_exclude = [dirpath for dirpath, _, filenames in os.walk('tutorials')
+                            if any(map(lambda x: x.endswith('.ipynb'), filenames))
+                               and not dirpath.startswith(tuple(nb_dirs_to_exec))]
+
+    for nb_dir in nb_dirs_to_exclude:
+        nb_execution_excludepatterns.append(os.path.join(nb_dir, '*.ipynb'))
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'README.md', 'ReleaseInstructions.md']
