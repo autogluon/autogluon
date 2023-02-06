@@ -385,9 +385,9 @@ def test_target_analysis__regression(monkeypatch):
                 " - [skewnorm](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.skewnorm.html)",
                 "   - p-value: 0.963",
                 "   - Parameters: (a: 3.xx, loc: 78497.xx, scale: 150470.xx)",
-                " - [genlogistic](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.genlogistic.html)",
-                "   - p-value: 0.962",
-                "   - Parameters: (c: 129.xx, loc: -233264.xx, scale: 78753.xx)",
+                " - [weibull_min](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.weibull_min.html)",
+                "   - p-value: 0.963",
+                "   - Parameters: (c: 1.xx, loc: 16324.xx, scale: 200669.xx)",
             ]
         ),
         "### Target variable correlations\n - ⚠️ no fields with absolute correlation greater than `0.5` found for target variable `fnlwgt`.",
@@ -422,5 +422,5 @@ def test_target_analysis__regression(monkeypatch):
         "gumbel_r",
         "nakagami",
         "skewnorm",
-        "genlogistic",
+        "weibull_min",
     ]

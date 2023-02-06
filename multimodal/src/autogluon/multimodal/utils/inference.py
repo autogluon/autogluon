@@ -152,6 +152,8 @@ def infer_batch(
     device_type = "cuda" if torch.cuda.is_available() else "cpu"
     device = torch.device(device_type)
     batch_size = len(batch[next(iter(batch))])
+    if 1 < num_gpus <= batch_size:
+        logger.warning("Not able to benefit from multi-gpu in realtime prediction.")
     model.to(device).eval()
     batch = move_to_device(batch, device=device)
     precision_context = get_precision_context(precision=precision, device_type=device_type)
