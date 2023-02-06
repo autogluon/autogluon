@@ -27,7 +27,7 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.multimodal.models.fusion import MultimodalFusionMLP, MultimodalFusionTransformer
+from autogluon.multimodal.models.fusion import AbstractMultimodalFusionModel
 from autogluon.multimodal.models.huggingface_text import HFAutoModelForTextPrediction
 from autogluon.multimodal.models.mmdet_image import MMDetAutoModelForObjectDetection
 from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePrediction
@@ -2840,9 +2840,8 @@ class MultiModalPredictor:
         }
 
         models = defaultdict(list)
-        # TODO: Add BaseMultimodalFusionModel class from which MultimodalFusionMLP and MultimodalFusionTransformer will inherit
         # TODO: simplify the code
-        if isinstance(self._model, (MultimodalFusionMLP, MultimodalFusionTransformer)) and isinstance(
+        if isinstance(self._model, AbstractMultimodalFusionModel) and isinstance(
             self._model.model, torch.nn.modules.container.ModuleList
         ):
             for per_model in self._model.model:

@@ -43,10 +43,10 @@ class _AbstractCorrelationChart(AbstractVisualization, JupyterMixin, ABC):
                 fig_args["figsize"] = (cells_num, cells_num)
 
             if state.correlations_focus_field is not None:
-                focus_field_header = f"; focus: absolute correlation for {state.correlations_focus_field} >= {state.correlations_focus_field_threshold}"
+                focus_field_header = f"; focus: absolute correlation for `{state.correlations_focus_field}` >= `{state.correlations_focus_field_threshold}`"
             else:
                 focus_field_header = ""
-            self.render_header_if_needed(state, f"{ds} - {state.correlations_method} {header}{focus_field_header}")
+            self.render_header_if_needed(state, f"`{ds}` - `{state.correlations_method}` {header}{focus_field_header}")
 
             fig, ax = plt.subplots(**fig_args)
             sns.heatmap(
@@ -257,11 +257,13 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             hue, hue_type = self._get_value_and_type(ds, df, state, interaction_features, "hue")
 
             # Don't render high-cardinality category variables
-            features = "/".join([interaction_features[k] for k in ["x", "y", "hue"] if k in interaction_features])
+            features = "/".join(
+                [f"`{interaction_features[k]}`" for k in ["x", "y", "hue"] if k in interaction_features]
+            )
             for f, t in [(x, x_type), (y, y_type), (hue, hue_type)]:
                 if t == "category" and df[f].nunique() > self.max_categories_to_consider_render:
                     self.render_markdown(
-                        f"Interaction `{features}` is not rendered due to `{f}` "
+                        f"Interaction {features} is not rendered due to `{f}` "
                         f"having too many categories (`{df[f].nunique()}` > `{self.max_categories_to_consider_render}`) "
                         f"for comfortable read."
                     )
@@ -281,7 +283,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
 
             if self.headers:
                 prefix = "" if is_single_var else "Feature interaction between "
-                self.render_header_if_needed(state, f"{prefix}{features} in {ds}")
+                self.render_header_if_needed(state, f"{prefix}{features} in `{ds}`")
 
             fig_args = self.fig_args.copy()
             if "figsize" not in fig_args:

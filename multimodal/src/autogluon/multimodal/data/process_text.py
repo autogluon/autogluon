@@ -235,7 +235,7 @@ class TextProcessor:
 
     def build_one_token_sequence(
         self,
-        text_tokens: Dict[str, NDArray[(Any,), np.int32]],
+        text_tokens: Dict[str, NDArray],
     ) -> Dict:
         """
         Construct one token sequence based on multiple token sequences coming from different

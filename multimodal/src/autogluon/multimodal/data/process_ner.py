@@ -155,8 +155,8 @@ class NerProcessor:
 
     def __call__(
         self,
-        all_features: Dict[str, Union[NDArray[(Any,), Any], list]],
-        feature_modalities: Dict[str, Union[NDArray[(Any,), Any], list]],
+        all_features: Dict[str, Union[NDArray, list]],
+        feature_modalities: Dict[str, Union[NDArray, list]],
         is_training: bool,
     ) -> Dict:
         """
