@@ -90,6 +90,7 @@ def default(presets: str = DEFAULT):
 
     return hyperparameters, hyperparameter_tune_kwargs
 
+
 @automm_presets.register()
 def few_shot_svm_text_classification(presets: str = DEFAULT):
     """
@@ -118,6 +119,7 @@ def few_shot_svm_text_classification(presets: str = DEFAULT):
     hyperparameter_tune_kwargs = None
 
     return hyperparameters, hyperparameter_tune_kwargs
+
 
 @automm_presets.register()
 def few_shot_svm_image_classification(presets: str = DEFAULT):

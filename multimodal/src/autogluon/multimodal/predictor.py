@@ -1862,12 +1862,7 @@ class MultiModalPredictor:
         """
         self._verify_inference_ready()
         if self._problem_type == FEW_SHOT_SVM_TEXT_CLASSIFICATION and self._svm_learner is not None:
-            return self._svm_learner.evaluate(
-                data=data,
-                metrics=metrics,
-                return_pred=return_pred,
-                realtime=realtime
-            )
+            return self._svm_learner.evaluate(data=data, metrics=metrics, return_pred=return_pred, realtime=realtime)
         if self._matcher:
             return self._matcher.evaluate(
                 data=data,

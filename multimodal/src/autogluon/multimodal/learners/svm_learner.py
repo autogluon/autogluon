@@ -1,4 +1,3 @@
-import functools
 import warnings
 
 import pandas as pd
@@ -49,8 +48,6 @@ class FusionSVMClassificationLearner(BaseLearner):
     def extract_embedding(
         self,
         data: Union[pd.DataFrame, dict, list],
-        # as_tensor: Optional[bool] = False,
-        # as_pandas: Optional[bool] = False,
         realtime: Optional[bool] = None,
     ):
         self.predictor._verify_inference_ready()
@@ -70,25 +67,9 @@ class FusionSVMClassificationLearner(BaseLearner):
         assert len(features.keys()) == 1, "Currently SVM only supports single column feature input"
         features_key = list(features.keys())[0]
         features = features[features_key]
-        # if as_pandas:
-        #     features = pd.DataFrame(features, index=data.index)
-
-        # if self._problem_type in [FEATURE_EXTRACTION, ZERO_SHOT_IMAGE_CLASSIFICATION]:
-        #     features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=as_tensor is False)
-        #     if return_masks:
-        #         masks = extract_from_output(outputs=outputs, ret_type=MASKS, as_ndarray=as_tensor is False)
-        # else:
-        #     features = extract_from_output(outputs=outputs, ret_type=FEATURES, as_ndarray=as_tensor is False)
-
-        # if as_pandas:
-        #     features = pd.DataFrame(features, index=data.index)
-        #     if return_masks:
-        #         masks = pd.DataFrame(masks, index=data.index)
         return features
 
-    def predict(self, data: Union[pd.DataFrame, dict, list],
-                as_pandas: bool = False,
-                realtime: bool = False):
+    def predict(self, data: Union[pd.DataFrame, dict, list], as_pandas: bool = False, realtime: bool = False):
         assert self._fit_called, ".fit() is not invoked. Please consider calling .fit() before .predict()"
         features = self.extract_embedding(data, realtime=realtime)
 
@@ -97,9 +78,7 @@ class FusionSVMClassificationLearner(BaseLearner):
             preds = self.predictor._as_pandas(data=data, to_be_converted=preds)
         return preds
 
-    def predict_proba(self, data: Union[pd.DataFrame, dict, list],
-                      as_pandas: bool = False,
-                      realtime: bool = False):
+    def predict_proba(self, data: Union[pd.DataFrame, dict, list], as_pandas: bool = False, realtime: bool = False):
         features = self.extract_embedding(data, realtime=realtime)
         preds = self.clf.predict_proba(features)
         if as_pandas:
@@ -112,7 +91,6 @@ class FusionSVMClassificationLearner(BaseLearner):
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
-        extra_metrics: Optional[dict] = None
     ):
         assert self._fit_called, ".fit() is not invoked. Please consider calling .fit() before .evaluate()"
         features = self.extract_embedding(data)
@@ -163,7 +141,6 @@ class FusionSVMClassificationLearner(BaseLearner):
         if not self._fit_called:
             warnings.warn(".fit() is not called. Only saving initial parameters!")
         params = self.clf.get_params()
-        # TODO:
         pass
 
     def load(self):

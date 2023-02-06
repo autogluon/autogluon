@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-class BaseLearner(ABC):
 
+class BaseLearner(ABC):
     @abstractmethod
     def predict(self, *args, **kwargs):
         pass
