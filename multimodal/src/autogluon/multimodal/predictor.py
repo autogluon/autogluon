@@ -2899,7 +2899,7 @@ class MultiModalPredictor:
 
         It is useful for computing metrics such as F1 which require a positive and negative class.
         You may refer to https://en.wikipedia.org/wiki/F-score for more details.
-        In binary classification, :class:`TextPredictor.predict_proba(as_multiclass=False)`
+        In binary classification, :class:`MultiModalPredictor.predict_proba(as_multiclass=False)`
         returns the estimated probability that each row belongs to the positive class.
         Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
 
