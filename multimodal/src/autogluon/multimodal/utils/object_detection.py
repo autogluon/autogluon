@@ -704,6 +704,7 @@ def parse_detection_result(
         }
     else:
         result[MEAN_AVERAGE_PRECISION] = result[MAP]
+        return result
 
 
 def cocoeval(
