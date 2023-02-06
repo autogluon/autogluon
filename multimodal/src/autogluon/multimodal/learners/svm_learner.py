@@ -6,6 +6,7 @@ import pandas as pd
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
+
 from ..constants import COLUMN_FEATURES, Y_PRED, Y_TRUE
 from ..utils import (
     compute_score,
