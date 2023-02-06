@@ -20,16 +20,15 @@ version = ag.update_version(version, use_file_if_exists=False, create_file=True)
 submodule = 'eda'
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
-    'numpy',
-    'scipy',
-    'scikit-learn',
-    'pandas',
-    'matplotlib>3.3',
+    'numpy',  # version range defined in `core/_setup_utils.py`
+    'scipy',  # version range defined in `core/_setup_utils.py`
+    'scikit-learn',  # version range defined in `core/_setup_utils.py`
+    'pandas',  # version range defined in `core/_setup_utils.py`
+    'matplotlib>3.3,<3.7',
     'missingno>=0.5.1,<0.6',
     'phik>=0.12.2,<0.13',
     'seaborn>=0.12.0,<0.13',
-    'ipython>=7.34,<9.0',
-    'ipywidgets>=8.0,<9.0',
+    'ipywidgets>=7.7.1,<9.0',  # min versions guidance: 7.7.1 collab/kaggle
     f'autogluon.core=={version}',
     f'autogluon.common=={version}',
     f'autogluon.features=={version}',
