@@ -262,11 +262,13 @@ class DocumentProcessor:
 
                     words = ocr_res["words"]
                     doc_image = doc_image.convert(image_mode)
+                    normalized_word_boxes = ocr_res[BBOX]
             except Exception as e:
                 if self.missing_value_strategy.lower() == "zero":
                     logger.debug(f"Using a zero image due to '{e}'")
                     doc_image = PIL.Image.new(image_mode, (self.size, self.size), color=0)
                     words = ""  # empty words
+                    normalized_word_boxes = [self.pad_token_box]
                 else:
                     raise e
 
@@ -274,8 +276,6 @@ class DocumentProcessor:
                 doc_image = self.train_processor(doc_image)
             else:
                 doc_image = self.val_processor(doc_image)
-
-            normalized_word_boxes = ocr_res[BBOX]
 
             if self.is_text_only_flag:
                 # Padding of token_boxes up the bounding boxes to the sequence length.
