@@ -1,9 +1,13 @@
 import warnings
+from typing import List, Optional, Union
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-from .base import BaseLearner
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+
 from ..constants import COLUMN_FEATURES, Y_PRED, Y_TRUE
 
 from ..utils import (
@@ -14,12 +18,7 @@ from ..utils import (
     turn_on_off_feature_column_info,
 )
 
-
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.svm import SVC
-
-from typing import List, Optional, Union
+from .base import BaseLearner
 
 
 class FusionSVMClassificationLearner(BaseLearner):
