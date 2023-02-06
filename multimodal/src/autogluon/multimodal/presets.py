@@ -28,7 +28,8 @@ default_hyperparameter_tune_kwargs = {
 
 default_tunable_hyperparameters = {
     "optimization.learning_rate": tune.loguniform(1e-5, 1e-2),
-    "optimization.max_epochs": tune.choice(list(range(5, 21))),
+    "optimization.optim_type": tune.choice(["adamw", "sgd"]),
+    "optimization.max_epochs": tune.choice(list(range(5, 31))),
     "env.batch_size": tune.choice([32, 64, 128, 256]),
 }
 
@@ -81,9 +82,17 @@ def default(presets: str = DEFAULT):
         if use_hpo:
             hyperparameters.update(
                 {
-                    "model.hf_text.checkpoint_name": tune.choice(["google/electra-base-discriminator"]),
-                    "model.timm_image.checkpoint_name": tune.choice(["swin_base_patch4_window7_224"]),
-                    "model.document_transformer.checkpoint_name": tune.choice(["microsoft/layoutlmv3-base"]),
+                    "model.hf_text.checkpoint_name": tune.choice(
+                        ["google/electra-base-discriminator", "bert-base-uncased", "roberta-base", "albert-xlarge-v2"]
+                    ),
+                    "model.timm_image.checkpoint_name": tune.choice(
+                        [
+                            "swin_base_patch4_window7_224",
+                            "convnext_base_in22ft1k",
+                            "vit_base_patch16_clip_224.laion2b_ft_in12k_in1k",
+                        ]
+                    ),
+                    "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-base",
                 }
             )
         else:
@@ -98,9 +107,13 @@ def default(presets: str = DEFAULT):
         if use_hpo:
             hyperparameters.update(
                 {
-                    "model.hf_text.checkpoint_name": tune.choice(["google/electra-small-discriminator"]),
-                    "model.timm_image.checkpoint_name": tune.choice(["mobilenetv3_large_100"]),
-                    "model.document_transformer.checkpoint_name": tune.choice(["microsoft/layoutlmv2-base-uncased"]),
+                    "model.hf_text.checkpoint_name": tune.choice(
+                        ["google/electra-small-discriminator", "prajjwal1/bert-small", "albert-base-v2"]
+                    ),
+                    "model.timm_image.checkpoint_name": tune.choice(
+                        ["mobilenetv3_large_100", "gluon_resnet18_v1b", "maxvit_rmlp_pico_rw_256.sw_in1k"]
+                    ),
+                    "model.document_transformer.checkpoint_name": "microsoft/layoutlmv2-base-uncased",
                 }
             )
         else:
@@ -117,9 +130,17 @@ def default(presets: str = DEFAULT):
         if use_hpo:
             hyperparameters.update(
                 {
-                    "model.hf_text.checkpoint_name": tune.choice(["microsoft/deberta-v3-base"]),
-                    "model.timm_image.checkpoint_name": tune.choice(["swin_large_patch4_window7_224"]),
-                    "model.document_transformer.checkpoint_name": tune.choice(["microsoft/layoutlmv3-large"]),
+                    "model.hf_text.checkpoint_name": tune.choice(
+                        ["microsoft/deberta-v3-base", "google/electra-large-discriminator", "roberta-large"]
+                    ),
+                    "model.timm_image.checkpoint_name": tune.choice(
+                        [
+                            "swin_large_patch4_window7_224",
+                            "eva_large_patch14_336.in22k_ft_in22k_in1k",
+                            "vit_large_patch14_clip_336.openai_ft_in12k_in1k",
+                        ]
+                    ),
+                    "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-large",
                 }
             )
         else:
