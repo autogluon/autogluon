@@ -182,10 +182,7 @@ class TextProcessor:
         self.text_trivial_aug_maxscale = text_trivial_aug_maxscale
         self.train_augmenter = construct_text_augmenter(self.text_trivial_aug_maxscale, self.train_augment_types)
         self.template_config = template_config
-        if self.template_config.turn_on:
-            self.template_engine = TemplateEngine(self.template_config)
-        else:
-            self.template_engine = None
+        self.template_engine = TemplateEngine(self.template_config)
 
         if self.normalize_text:
             register_encoding_decoding_error_handlers()
