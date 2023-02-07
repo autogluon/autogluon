@@ -10,6 +10,8 @@ from .base import AbstractAnalysis
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["ApplyFeatureGenerator"]
+
 
 class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
     """

@@ -46,3 +46,11 @@ This section provides an overview of exploratory data analysis tools.
    eda-auto-quick-fit
    eda-auto-covariate-shift
    eda-auto-analyze-interaction
+   autogluon.eda.base-apis
+   autogluon.eda.auto
+   autogluon.eda.dataset
+   autogluon.eda.interaction
+   autogluon.eda.missing
+   autogluon.eda.model
+   autogluon.eda.shift
+   autogluon.eda.transform

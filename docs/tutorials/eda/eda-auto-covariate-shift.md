@@ -1,4 +1,4 @@
-# EDA: Covariate Shift Analysis
+# Covariate Shift Analysis
 
 Covariate shift is a phenomenon in machine learning where the distribution of the independent variables in the training
 and testing data is different. This can occur when the training data and testing data come from different sources,
