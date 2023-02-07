@@ -78,7 +78,7 @@ from .utils import (
     customize_model_names,
     data_to_df,
     extract_from_output,
-    filter_search_space,
+    filter_hyperparameters,
     get_config,
     get_local_pretrained_config_paths,
     get_minmax_mode,
@@ -97,6 +97,7 @@ from .utils import (
     setup_save_path,
     split_train_tuning_data,
     try_to_infer_pos_label,
+    update_hyperparameters,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -222,7 +223,7 @@ class MultiModalMatcher:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
-        if self._pipeline is not None:
+        if self._pipeline is not None:  # TODO: do not create pretrained model for HPO presets.
             (
                 self._config,
                 self._query_config,
@@ -364,18 +365,6 @@ class MultiModalMatcher:
         fit_called = self._fit_called  # used in current function
         self._fit_called = True
 
-        if hyperparameter_tune_kwargs is not None:
-            assert isinstance(
-                hyperparameters, dict
-            ), "Please provide hyperparameters as a dictionary if you want to do HPO"
-            if fit_called:
-                warnings.warn(
-                    "HPO while continuous training."
-                    "Hyperparameters related to Model and Data will NOT take effect."
-                    "We will filter them out from the search space."
-                )
-                hyperparameters = filter_search_space(hyperparameters, [MODEL, DATA])
-
         pl.seed_everything(seed, workers=True)
 
         self._save_path = setup_save_path(
@@ -468,6 +457,21 @@ class MultiModalMatcher:
         self._output_shape = output_shape
         self._column_types = column_types
 
+        hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
+            problem_type=self._pipeline,
+            presets=presets,
+            provided_hyperparameters=hyperparameters,
+            provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        )
+        hpo_mode = True if hyperparameter_tune_kwargs else False
+        if hpo_mode:
+            hyperparameters = filter_hyperparameters(
+                hyperparameters=hyperparameters,
+                column_types=column_types,
+                config=self._config,
+                fit_called=fit_called,
+            )
+
         _fit_args = dict(
             train_df=train_data,
             val_df=tuning_data,
@@ -476,15 +480,15 @@ class MultiModalMatcher:
             minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=self._save_path,
-            ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
-            resume=False if hyperparameter_tune_kwargs is not None else self._resume,
-            enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
+            ckpt_path=None if hpo_mode else self._ckpt_path,
+            resume=False if hpo_mode else self._resume,
+            enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
             presets=presets,
             hyperparameters=hyperparameters,
-            hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
+            hpo_mode=hpo_mode,  # skip average checkpoint if in hpo mode
         )
 
-        if hyperparameter_tune_kwargs is not None:
+        if hpo_mode:
             # TODO: allow custom gpu
             assert self._resume is False, "You can not resume training with HPO"
             resources = dict(num_gpus=torch.cuda.device_count())

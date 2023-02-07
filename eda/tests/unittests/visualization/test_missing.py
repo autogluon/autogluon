@@ -39,12 +39,12 @@ def test_MissingValues__no_headers():
     state = __prepare_test_data()
     viz = MissingValues(headers=False)
     viz._internal_render = MagicMock()
-    viz.render_text = MagicMock()
+    viz.render_markdown = MagicMock()
 
     viz.render(state)
 
     assert viz._internal_render.call_count == 2
-    assert viz.render_text.call_count == 0
+    assert viz.render_markdown.call_count == 0
 
 
 @pytest.mark.parametrize(
