@@ -199,7 +199,7 @@ class RFModel(AbstractModel):
                     model = model_cls(**params)
             model = model.fit(X, y, sample_weight=sample_weight)
             if (i == 0) and (len(n_estimator_increments) > 1):
-                time_elapsed = time.time() - time_train_start
+                time_elapsed = min(time.time() - time_train_start, 0.001)  # avoid it being too small and being truncated to 0
                 model_size_bytes = 0
                 for estimator in model.estimators_:  # Uses far less memory than pickling the entire forest at once
                     model_size_bytes += sys.getsizeof(pickle.dumps(estimator))
