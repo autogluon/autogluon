@@ -12,11 +12,7 @@ def test_classification_str_list_input():
     predictor = MultiModalPredictor(
         label="label",
         path=model_path,
-        hyperparameters={
-            "env.num_gpus": 1,
-            "optimization.max_epochs": 1,
-            "optimization.top_k": 1
-        },
+        hyperparameters={"env.num_gpus": 1, "optimization.max_epochs": 1, "optimization.top_k": 1},
     )
     predictor.fit(
         train_data=train_data,
