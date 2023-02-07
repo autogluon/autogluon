@@ -37,8 +37,8 @@ or [M6 instances](https://aws.amazon.com/ec2/instance-types/m6i/) for CPU traini
 
 ## Issues not addressed here
 
-First search if your issue is addressed in the [tutorials](index.html),
-[documentation](../../api/autogluon.predictor.html), or [Github issues](https://github.com/autogluon/autogluon/issues)
+First search if your issue is addressed in the [tutorials](index.md),
+[documentation](../../api/_autogen/autogluon.timeseries.TimeSeriesPredictor.rst), or [Github issues](https://github.com/autogluon/autogluon/issues)
 (search both Closed and Open issues).
 If it is not there, please open a [new Github Issue](https://github.com/autogluon/autogluon/issues/new) and
 clearly state your issue and clarify how it relates to the module.
