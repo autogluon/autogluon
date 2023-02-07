@@ -141,8 +141,8 @@ def apply_log_filter(log_filter):
 def get_fit_start_message(save_path, validation_metric_name):
     return f"""AutoMM starts to create your model!
 
-- ✅ The model will be saved to "{save_path}".
-- ✅ The validation metric is "{validation_metric_name}".
+- The model will be saved to "{save_path}".
+- The validation metric is "{validation_metric_name}".
 
 - To track the learning progress, you can launch Tensorboard via the following command:
 
@@ -155,7 +155,7 @@ def get_fit_start_message(save_path, validation_metric_name):
 def get_fit_complete_message(save_path):
     return f"""AutoMM has created your model 🎉🎉🎉!
     
-- ✅ Model files and training logs are saved to "{save_path}". 
+- Model files and training logs are saved to "{save_path}". 
 
 - To load the model, use the following code 
 
