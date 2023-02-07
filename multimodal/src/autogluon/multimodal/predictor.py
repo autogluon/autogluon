@@ -26,11 +26,6 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.multimodal.utils import save_result_df
-from autogluon.multimodal.models.fusion import AbstractMultimodalFusionModel
-from autogluon.multimodal.models.huggingface_text import HFAutoModelForTextPrediction
-from autogluon.multimodal.models.mmdet_image import MMDetAutoModelForObjectDetection
-from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePrediction
 from autogluon.multimodal.utils import object_detection_data_to_df, save_result_df, setup_detection_train_tuning_data
 
 from . import version as ag_version
