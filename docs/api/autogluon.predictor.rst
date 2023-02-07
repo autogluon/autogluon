@@ -67,12 +67,6 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
 
    MultiModalPredictor
 
-.. automodule:: autogluon.text
-.. autosummary::
-   :nosignatures:
-
-   TextPredictor
-
 .. automodule:: autogluon.timeseries
 .. autosummary::
    :nosignatures:
@@ -106,20 +100,6 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
     .. rubric:: Methods
 
     .. autoautosummary:: MultiModalPredictor
-        :methods:
-
-
-:hidden:`TextPredictor`
-~~~~~~~~~~~~~~~~~~~~~~~~
-.. automodule:: autogluon.text
-
-.. autoclass:: TextPredictor
-   :members:
-   :inherited-members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: TextPredictor
         :methods:
 
 

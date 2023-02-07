@@ -196,7 +196,7 @@ class LitModule(pl.LightningModule):
         elif isinstance(metric, BaseAggregator):
             metric.update(custom_metric_func(logits, label))
         else:
-            metric.update(logits.squeeze(dim=1), label)
+            metric.update(logits.squeeze(dim=1).float(), label)
 
     def _shared_step(
         self,

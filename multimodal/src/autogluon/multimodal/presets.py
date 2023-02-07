@@ -69,7 +69,6 @@ def default(presets: str = DEFAULT):
             "document_transformer",
             "fusion_mlp",
         ],
-        "env.num_workers": 2,
     }
     hyperparameter_tune_kwargs = {}
 
@@ -252,7 +251,6 @@ def zero_shot_image_classification(presets: str = DEFAULT):
     hyperparameters = {
         "model.names": ["clip"],
         "model.clip.max_text_len": 0,
-        "env.num_workers": 2,
     }
     hyperparameter_tune_kwargs = {}
 
@@ -312,7 +310,6 @@ def object_detection(presets: str = DEFAULT):
         "optimization.top_k_average_method": "best",
         "optimization.warmup_steps": 0.0,
         "optimization.patience": 10,
-        "env.num_workers": 2,
     }
     hyperparameter_tune_kwargs = {}
 
@@ -469,7 +466,6 @@ def image_similarity(presets: str = DEFAULT):
     """
     hyperparameters = {
         "model.names": ["timm_image"],
-        "env.num_workers": 2,
     }
     hyperparameter_tune_kwargs = {}
 
@@ -579,7 +575,6 @@ def image_text_similarity(presets: str = DEFAULT):
         "model.names": ["clip"],
         "matcher.loss.type": "multi_negatives_softmax_loss",
         "optimization.learning_rate": 1e-5,
-        "env.num_workers": 2,
     }
     hyperparameter_tune_kwargs = {}
 
