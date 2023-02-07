@@ -1741,15 +1741,15 @@ class MultiModalPredictor:
             column_types_copy = copy.deepcopy(column_types)
             for col_name, col_type in column_types.items():
                 if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
-                    if col_name not in list(data.columns):
-                        # For tasks related to images ONLY!!!
-                        # Found a column name mismatch after .fit() or .load() is called
-                        # Infer column titles for data if not matching with self._column_types
-                        logger.info(
-                            f"Column name {col_name} not found in data. Inferring the column types for data..."
-                        )
-                        data_column_names = self._infer_data_column_names(data)
-                        data.columns = data_column_names
+                    # if col_name not in list(data.columns):
+                    #     # For tasks related to classification ONLY!!!
+                    #     # Found a column name mismatch after .fit() or .load() is called
+                    #     # Infer column titles for data if not matching with self._column_types
+                    #     logger.info(
+                    #         f"Column name {col_name} not found in data. Inferring the column types for data..."
+                    #     )
+                    #     data_column_names = self._infer_data_column_names(data)
+                    #     data.columns = data_column_names
                     # if is_imagepath_column(data=data[col_name], col_name=col_name, sample_n=1):
                     if is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_PATH):
                         image_type = IMAGE_PATH

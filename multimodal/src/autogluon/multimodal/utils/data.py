@@ -47,7 +47,7 @@ from ..data import (
     NumericalProcessor,
     TextProcessor,
 )
-from ..data.infer_types import is_imagepath_column
+
 
 logger = logging.getLogger(AUTOMM)
 
@@ -625,36 +625,3 @@ def split_train_tuning_data(train_data, tuning_data, holdout_frac, is_classifica
         )
 
     return train_data, tuning_data
-
-
-def check_if_imagepath_and_add_column_title(data: pd.DataFrame) -> pd.DataFrame:
-    """
-    Check to see if the data frame is a single column data frame which contains image paths.
-    If so add the column name "image" if applicable. i.e.
-        IF the columns of data is not labeled, for example:
-          image
-        0   123
-        1   234
-        2   345
-        but is labeled by pd.RangeIndex, for example:
-             0
-        0  123
-        1  234
-        2  345
-        AND IF the column is an imagepath column
-        THEN we add the column title "image"
-        OTHERWISE do nothing
-    Parameters
-    ----------
-    data
-        pd.DataFrame containing some strings
-    Returns
-    -------
-    A pd.DataFrame containing the column name modifications
-    """
-    if 0 in data.columns:
-        # MARK: col_name seems to take no effect in determining if the column is an imagepath column
-        is_image_column = is_imagepath_column(data.iloc[:, 0], col_name="")
-        if is_image_column:
-            data.columns = ["image"]
-    return data
