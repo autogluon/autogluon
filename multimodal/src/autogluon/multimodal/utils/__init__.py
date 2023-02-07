@@ -3,14 +3,17 @@ from .checkpoint import AutoMMModelCheckpoint, AutoMMModelCheckpointIO, average_
 from .config import (
     apply_omegaconf_overrides,
     customize_model_names,
+    filter_hyperparameters,
     filter_search_space,
     filter_timm_pretrained_cfg,
     get_config,
+    get_default_config,
     get_local_pretrained_config_paths,
     get_pretrain_configs_dir,
     parse_dotlist_conf,
     save_pretrained_model_configs,
     update_config_by_rules,
+    update_hyperparameters,
     update_tabular_config_by_resources,
 )
 from .data import (
@@ -36,6 +39,7 @@ from .environment import (
     is_interactive,
     move_to_device,
 )
+from .export import ExportMixin
 from .hpo import hyperparameter_tune
 from .inference import extract_from_output, infer_batch, predict, process_batch, use_realtime
 from .load import CustomUnpickler, load_text_tokenizers
