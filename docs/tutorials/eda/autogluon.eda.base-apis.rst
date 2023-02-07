@@ -6,7 +6,7 @@ Reference: Base APIs
 
 This section highlights the base APIs used by the EDA framework. The processing consists of the following parts:
 
-1. Analysis graph construction - in this part the user constructs nested graph of analyses.
+1. Analysis graph construction - in this part a nested graph of analyses is constructed.
 
 .. code-block:: python3
 
@@ -29,7 +29,10 @@ This section highlights the base APIs used by the EDA framework. The processing 
         ],
     )
 
-2. **.fit()** call to produce **State**, which is a nested dictionary that can be passed either for further processing
+2. **.fit()** call. This call will execute operations in the graph and produce a **state**. The state is a nested
+dictionary without any prescribed structure. All components are sharing the same namespace. If multiple components
+are fitted with different parameters, they can be put into separate sub-spaces wia **Namespace** component
+that can be passed either for further processing
 via next analysis or be rendered.
 
 .. code-block:: python3
@@ -51,9 +54,10 @@ then pass **State** generated previously as an input argument into **render()** 
     )
     viz.render(state)
 
-Please note: it is possible that 1) components may depend on each other's output. There are two way they can do in analysis:
-1) share values via state; 2) share values/shadow arguments (i.e. Sample component modifies train_data, test_data and val_data
-arguments in the scope of calling children's fit().
+Please note: it is possible that the components may depend on each other's output; all the pre-requisites to **fit()**
+the component must be checked in **can_handle()**. There are two ways how the components can share the information:
+1) using **state**; 2) share values/shadow arguments (i.e., sample component modifies **train_data**, **test_data**
+and **val_data** arguments in the scope of calling children's **fit()**.
 
 autogluon.eda.analysis.base
 ---------------------------
@@ -65,6 +69,7 @@ autogluon.eda.analysis.base
    :nosignatures:
 
    AbstractAnalysis
+   Namespace
 
 :hidden:`AbstractAnalysis`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -72,6 +77,12 @@ autogluon.eda.analysis.base
 .. autoclass:: AbstractAnalysis
    :members:
    :inherited-members:
+
+:hidden:`Namespace`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: Namespace
+   :members: init
 
 autogluon.eda.visualization.base
 --------------------------------

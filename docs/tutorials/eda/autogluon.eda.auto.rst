@@ -4,7 +4,7 @@
 Reference: Auto components
 ==========================
 
-This section is a reference for high-level composite recipes showcased in sections above.
+This section is a reference for high-level composite components showcased in sections above.
 
 autogluon.eda.analysis.auto
 ---------------------------

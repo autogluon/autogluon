@@ -1,7 +1,7 @@
 Exploratory Data Analysis Tools
 ===============================
 
-This section provides an overview of exploratory data analysis tools.
+This section contains a high-level overview and showcases for exploratory data analysis tools.
 
 .. container:: cards
 
@@ -36,6 +36,68 @@ This section provides an overview of exploratory data analysis tools.
 
       Simple visualization tool to visualize 1/2/3-way relationships between features.
       The tool automatically picks a chart type given each property type.
+
+Main API Reference
+------------------
+
+The section contains a reference of base constructs and composite components.
+
+.. container:: cards
+
+   .. card::
+      :title: Auto: high-level composite components
+      :link: autogluon.eda.auto.html
+
+      Reference for high-level composite components.
+
+   .. card::
+      :title: Base APIs
+      :link: autogluon.eda.base-apis.html
+
+      Components building blocks APIs.
+
+Low-level components API reference
+----------------------------------
+
+The section contains a reference for low-level components.
+
+.. container:: cards
+
+   .. card::
+      :title: autogluon.eda.dataset
+      :link: autogluon.eda.dataset.html
+
+      Dataset-level APIs
+
+   .. card::
+      :title: autogluon.eda.interaction
+      :link: autogluon.eda.interaction.html
+
+      Feature-level interactions APIs
+
+   .. card::
+      :title: autogluon.eda.missing
+      :link: autogluon.eda.missing.html
+
+      Missing data APIs
+
+   .. card::
+      :title: autogluon.eda.model
+      :link: autogluon.eda.model.html
+
+      Model level APIs
+
+   .. card::
+      :title: autogluon.eda.shift
+      :link: autogluon.eda.shift.html
+
+      Distribution shift APIs
+
+   .. card::
+      :title: autogluon.eda.transform
+      :link: autogluon.eda.transform.html
+
+      Transformations APIs
 
 .. toctree::
    :maxdepth: 1
