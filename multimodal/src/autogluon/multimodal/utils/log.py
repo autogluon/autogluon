@@ -138,7 +138,7 @@ def apply_log_filter(log_filter):
         remove_log_filter(logging.getLogger("pytorch_lightning"), log_filter)
 
 
-def get_fit_initial_message(save_path, validation_metric_name):
+def get_fit_start_message(save_path, validation_metric_name):
     return f"""AutoMM starts to create your model!
 
 - ✅ The model will be saved to "{save_path}".
