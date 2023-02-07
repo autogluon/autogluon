@@ -32,7 +32,7 @@ from autogluon.multimodal.models.huggingface_text import HFAutoModelForTextPredi
 from autogluon.multimodal.models.mmdet_image import MMDetAutoModelForObjectDetection
 from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePrediction
 from autogluon.multimodal.utils import save_result_df
-from autogluon.multimodal.utils.log import get_fit_start_message, get_fit_complete_message
+from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from . import version as ag_version
 from .constants import (
