@@ -681,16 +681,31 @@ class MultiModalPredictor:
             return self
 
         if self._problem_type == OBJECT_DETECTION:
-            self._detection_anno_train = train_data
-            train_data = from_coco_or_voc(train_data, "train")
-            if tuning_data is not None:
-                self.detection_anno_train = tuning_data
-                tuning_data = from_coco_or_voc(tuning_data, "val")
-                if max_num_tuning_data is not None:
-                    if len(tuning_data) > max_num_tuning_data:
-                        tuning_data = tuning_data.sample(
-                            n=max_num_tuning_data, replace=False, random_state=seed
-                        ).reset_index(drop=True)
+            if isinstance(train_data, str):
+                self._detection_anno_train = train_data
+                train_data = from_coco_or_voc(train_data, "train")  # TODO: Refactor to use convert_data_to_df
+                if tuning_data is not None:
+                    self.detection_anno_train = tuning_data
+                    tuning_data = from_coco_or_voc(tuning_data, "val")  # TODO: Refactor to use convert_data_to_df
+                    if max_num_tuning_data is not None:
+                        if len(tuning_data) > max_num_tuning_data:
+                            tuning_data = tuning_data.sample(
+                                n=max_num_tuning_data, replace=False, random_state=seed
+                            ).reset_index(drop=True)
+            elif isinstance(train_data, pd.DataFrame):
+                self.detection_anno_train = None
+                # sanity check dataframe columns
+                train_data = autogluon.multimodal.utils.object_detection.convert_data_to_df(train_data)
+                if tuning_data is not None:
+                    self.detection_anno_train = tuning_data
+                    tuning_data = autogluon.multimodal.utils.object_detection.convert_data_to_df(tuning_data)
+                    if max_num_tuning_data is not None:
+                        if len(tuning_data) > max_num_tuning_data:
+                            tuning_data = tuning_data.sample(
+                                n=max_num_tuning_data, replace=False, random_state=seed
+                            ).reset_index(drop=True)
+            else:
+                raise TypeError(f"Expected train_data to have type str or pd.DataFrame, but got type: {type(train_data)}")
 
         if hyperparameter_tune_kwargs is not None:
             # TODO: can we support hyperparameters being the same format as regular training?
@@ -1863,14 +1878,25 @@ class MultiModalPredictor:
                 return NotImplementedError(
                     f"Current problem type {self._problem_type} does not support realtime predict."
                 )
-            return evaluate_coco(
-                predictor=self,
-                anno_file_or_df=data,
-                metrics=metrics,
-                return_pred=return_pred,
-                seed=seed,
-                eval_tool=eval_tool,
-            )
+            if isinstance(data, str):
+                return evaluate_coco(
+                    predictor=self,
+                    anno_file_or_df=data,
+                    metrics=metrics,
+                    return_pred=return_pred,
+                    seed=seed,
+                    eval_tool=eval_tool,
+                )
+            else:
+                data = autogluon.multimodal.utils.object_detection.convert_data_to_df(data)
+                return evaluate_coco(
+                    predictor=self,
+                    anno_file_or_df=data,
+                    metrics=metrics,
+                    return_pred=return_pred,
+                    seed=seed,
+                    eval_tool="torchmetrics",
+                )
 
         if self._problem_type == NER:
             ret_type = NER_RET
@@ -2041,14 +2067,7 @@ class MultiModalPredictor:
                 realtime=realtime,
             )
         if self._problem_type == OBJECT_DETECTION:
-            if isinstance(data, (str, dict, list)):
-                data = autogluon.multimodal.utils.object_detection.convert_data_to_df(data)
-            else:
-                assert isinstance(
-                    data, pd.DataFrame
-                ), "TypeError: Expected data type to be of type dict, list, or str, but got {} of type {}".format(
-                    data, type(data)
-                )
+            data = autogluon.multimodal.utils.object_detection.convert_data_to_df(data)
 
             if self._label_column not in data:
                 self._label_column = None

@@ -16,7 +16,7 @@ from .save import setup_save_path
 logger = logging.getLogger(AUTOMM)
 
 
-def convert_data_to_df(data: Union[Dict, List[str], str]) -> pd.DataFrame:
+def convert_data_to_df(data: Union[pd.DataFrame, dict, list, str]) -> pd.DataFrame:
     """
     Construct a dataframe from a data dictionary, json file path (for COCO), folder path (for VOC),
     image path (for single image), list of image paths (for multiple images)
@@ -36,10 +36,33 @@ def convert_data_to_df(data: Union[Dict, List[str], str]) -> pd.DataFrame:
         if os.path.isdir(data) or data.endswith(".json"):
             return from_coco_or_voc(data)
         return from_str(data)
+    if isinstance(data, pd.DataFrame):
+        sanity_check_dataframe(data)
+        return data
 
     raise TypeError(
-        "Expected data to be an instance of dict, list or str, but got {} of type {}".format(data, type(data))
+        "Expected data to be an instance of dict, list, str or pd.DataFrame, but got {} of type {}".format(data, type(data))
     )
+
+
+def sanity_check_dataframe(data: pd.DataFrame):
+    """
+    Checking if the dataframe contains valid headers and values
+    Parameters
+    ----------
+    data
+        dataframe holding the data for object detection
+    Returns
+    -------
+
+    """
+    if "image" not in data:
+        raise ValueError(f"column 'image' not found in data column names: {data.columns.to_list()}")
+    if "rois" not in data:
+        raise ValueError(f"column 'rois' not found in data column names: {data.columns.to_list()}")
+    if "label" not in data:
+        raise ValueError(f"column 'label' not found in data column names: {data.columns.to_list()}")
+    assert data.shape[0] > 0, "data frame is empty"
 
 
 def from_str(data: str) -> pd.DataFrame:
