@@ -15,7 +15,7 @@ from sklearn.svm import SVC
 
 from ..constants import AUTOMM, FEATURE_EXTRACTION, Y_PRED, Y_TRUE
 
-from ..utils import compute_score, try_to_infer_pos_label, setup_save_path
+from ..utils import compute_score, try_to_infer_pos_label, setup_save_path, CustomUnpickler
 
 logger = logging.getLogger(AUTOMM)
 
@@ -163,18 +163,19 @@ class FewShotSVMPredictor:
         )
         params = self.clf.get_params()
         logger.info(f"Saving into {os.path.join(self._save_path, 'svm_model.pkl')}")
-        pickle.dump(params, open(os.path.join(self._save_path, "svm_model.pkl"), "wb"))
+        with open(os.path.join(self._save_path, "svm_model.pkl"), "wb") as fp:
+            pickle.dump(params, fp)
         return self._save_path
 
     def load(self, path: Optional[str] = None):
         if path is not None:
             logger.info(f"Loading from {os.path.join(path, 'svm_model.pkl')}")
-            params = pickle.load(open(os.path.join(path, "svm_model.pkl"), "rb"))
+            with open(os.path.join(path, "svm_model.pkl"), "rb") as fp:
+                params = CustomUnpickler(fp).load()
         else:
             logger.info(f"Loading from {os.path.join(self._save_path, 'svm_model.pkl')}")
-            assert (
-                self._save_path is not None
-            ), "Expect at least one of path and self._save_path to be not None."
-            params = pickle.load(open(os.path.join(self._save_path, "svm_model.pkl"), "rb"))
+            assert self._save_path is not None, "Expect at least one of path and self._save_path to be not None."
+            with open(os.path.join(self._save_path, "svm_model.pkl"), "rb") as fp:
+                params = CustomUnpickler(fp).load()
         self.clf.set_params(**params)
         self._model_loaded = True
