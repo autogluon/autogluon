@@ -166,9 +166,6 @@ def get_fit_complete_message(save_path):
     from autogluon.multimodal import MultiModalPredictor
     
     predictor = MultiModalPredictor.load("{save_path}")
-    
-    # Get the predictions by uncommenting the following line
-    # predictions = predictor.predict(YOUR_DATA_FRAME)
     ```
 
 - You can open a terminal and launch Tensorboard to visualize the training log:
