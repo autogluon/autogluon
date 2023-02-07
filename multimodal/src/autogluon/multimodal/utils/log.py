@@ -151,7 +151,7 @@ def get_fit_start_message(save_path, validation_metric_name):
     tensorboard --logdir {save_path}
     ```
 
-Enjoy the coffee, and let AutoMM do the job ☕☕☕ Learn more at https://auto.gluon.ai.
+Enjoy the coffee, and let AutoMM do the job ☕☕☕ Learn more at https://auto.gluon.ai
 """
 
 

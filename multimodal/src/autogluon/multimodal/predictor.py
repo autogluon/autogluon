@@ -848,6 +848,8 @@ class MultiModalPredictor:
         self._fit(**_fit_args)
         training_end = time.time()
         self._total_train_time = training_end - training_start
+
+        # TODO(?) We should have a separate "_post_training_event()" for logging messages.
         logger.info(get_fit_complete_message(self._save_path))
 
         return self
@@ -1006,6 +1008,7 @@ class MultiModalPredictor:
         clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
+        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
         logger.info(get_fit_start_message(save_path, validation_metric_name))
         config = get_config(
             problem_type=self._problem_type,
