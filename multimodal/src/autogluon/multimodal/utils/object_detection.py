@@ -8,7 +8,23 @@ import defusedxml.ElementTree as ET
 import numpy as np
 import pandas as pd
 
-from ..constants import AUTOMM, MAP, OBJECT_DETECTION
+from ..constants import (
+    AUTOMM,
+    MAP,
+    MAP_50,
+    MAP_75,
+    MAP_LARGE,
+    MAP_MEDIUM,
+    MAP_SMALL,
+    MAR_1,
+    MAR_10,
+    MAR_100,
+    MAR_LARGE,
+    MAR_MEDIUM,
+    MAR_SMALL,
+    MEAN_AVERAGE_PRECISION,
+    OBJECT_DETECTION,
+)
 from .download import download, is_url
 from .inference import predict
 from .save import setup_save_path
@@ -617,7 +633,10 @@ def cocoeval_torchmetrics(outputs: List):
 
 
 def cocoeval_pycocotools(
-    outputs: List, data: pd.DataFrame, anno_file: str, cache_path: str, metrics: Optional[Union[str, List]]
+    outputs: List,
+    data: pd.DataFrame,
+    anno_file: str,
+    cache_path: str,
 ):
     """
     Evaluate predictor's output using pycocotool's mAP implementation: https://github.com/cocodataset/cocoapi
@@ -634,8 +653,6 @@ def cocoeval_pycocotools(
         The path to COCO format json annotation file.
     cache_path
         The cache path to store prediction result in COCO format.
-    metrics
-        The name of metrics to be reported.
 
     Returns
     -------
@@ -663,13 +680,31 @@ def cocoeval_pycocotools(
     cocoEval.accumulate()
     cocoEval.summarize()
 
-    # TODO: support assigning metrics
-    if isinstance(metrics, list):
-        metrics = metrics[0]
-    elif metrics is None:
-        metrics = MAP
+    return cocoEval.stats
 
-    return {metrics: cocoEval.stats[0]}
+
+def parse_detection_result(
+    result: Optional[Union[Dict, np.ndarray]],
+):
+    if isinstance(result, np.ndarray):
+        return {
+            MAP: result[0],
+            MEAN_AVERAGE_PRECISION: result[0],
+            MAP_50: result[1],
+            MAP_75: result[2],
+            MAP_SMALL: result[3],
+            MAP_MEDIUM: result[4],
+            MAP_LARGE: result[5],
+            MAR_1: result[6],
+            MAR_10: result[7],
+            MAR_100: result[8],
+            MAR_SMALL: result[9],
+            MAR_MEDIUM: result[10],
+            MAR_LARGE: result[11],
+        }
+    else:
+        result[MEAN_AVERAGE_PRECISION] = result[MAP]
+        return result
 
 
 def cocoeval(
@@ -703,9 +738,21 @@ def cocoeval(
     The mAP result.
     """
     if (not tool) or tool == "pycocotools":
-        return cocoeval_pycocotools(outputs, data, anno_file, cache_path, metrics)
+        result = cocoeval_pycocotools(outputs, data, anno_file, cache_path)
     elif tool == "torchmetrics":
-        return cocoeval_torchmetrics(outputs)
+        result = cocoeval_torchmetrics(outputs)
+    else:
+        raise ValueError(f"Unsupported eval_tool: {tool}")
+
+    result = parse_detection_result(result)
+
+    if metrics:
+        if isinstance(metrics, str) and metrics.lower() in result:
+            return {metrics.lower(): result[metrics.lower()]}
+        elif isinstance(metrics, list):
+            return {metric.lower(): result[metric.lower()] for metric in metrics}
+
+    return result
 
 
 def dump_voc_classes(voc_annotation_path: str, voc_class_names_output_path: str = None) -> [str]:
