@@ -1,3 +1,7 @@
+# How to perform a new release
+
+Refer to `docs/ReleaseInstructions.md`
+
 # How to locally build AutoGluon docs
 
 Instructions apply to Linux and Mac. Windows has not been tested for doc builds.

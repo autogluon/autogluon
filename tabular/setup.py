@@ -20,11 +20,11 @@ version = ag.update_version(version)
 submodule = 'tabular'
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
-    'numpy',
-    'scipy',
-    'pandas',
-    'scikit-learn',
-    'networkx',
+    'numpy',  # version range defined in `core/_setup_utils.py`
+    'scipy',  # version range defined in `core/_setup_utils.py`
+    'pandas',  # version range defined in `core/_setup_utils.py`
+    'scikit-learn',  # version range defined in `core/_setup_utils.py`
+    'networkx',  # version range defined in `core/_setup_utils.py`
     f'{ag.PACKAGE_NAME}.core=={version}',
     f'{ag.PACKAGE_NAME}.features=={version}',
 ]
