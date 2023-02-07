@@ -4,12 +4,12 @@ import contextlib
 import gc
 import logging
 import os
-import psutil
 import tempfile
 
 import numpy as np
 import pandas as pd
 
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.features.types import S_TEXT
 from autogluon.core.constants import BINARY, MULTICLASS
 from autogluon.core.models import AbstractModel
@@ -98,13 +98,13 @@ class FastTextModel(AbstractModel):
             for label, text in zip(y.iloc[idxs], (X[i] for i in idxs)):
                 f.write(f"{self._label_map[label]} {text}\n")
             f.flush()
-            mem_start = psutil.Process().memory_info().rss
+            mem_start = ResourceManager.get_memory_rss()
             logger.debug("train FastText model")
             self.model = fasttext.train_supervised(f.name, **params)
             if quantize_model:
                 self.model.quantize(input=f.name, retrain=True)
             gc.collect()
-            mem_curr = psutil.Process().memory_info().rss
+            mem_curr = ResourceManager.get_memory_rss()
             self._model_size_estimate = max(mem_curr - mem_start, 100000000 if quantize_model else 800000000)
             logger.debug("finish training FastText model")
 

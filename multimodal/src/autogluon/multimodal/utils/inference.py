@@ -5,6 +5,7 @@ import pandas as pd
 import pytorch_lightning as pl
 import torch
 from omegaconf import OmegaConf
+from scipy.special import softmax
 from torch import nn
 
 from ..constants import (
@@ -92,19 +93,21 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         as_ndarray = False
         for ele in outputs:
             logits_label = ele[NER_ANNOTATION].detach().cpu().numpy()
+            logits = softmax(ele[LOGITS].detach().cpu().numpy(), axis=-1)
             token_word_mapping = ele[TOKEN_WORD_MAPPING].detach().cpu().numpy()
             word_offsets = ele[WORD_OFFSETS].detach().cpu().numpy()
-            for token_preds, mappings, offsets in zip(logits_label, token_word_mapping, word_offsets):
-                pred_one_sentence, word_offset = [], []
+            for token_preds, logit, mappings, offsets in zip(logits_label, logits, token_word_mapping, word_offsets):
+                pred_one_sentence, word_offset, pred_proba = [], [], []
                 counter = 0
                 temp = set()
-                for token_pred, mapping in zip(token_preds, mappings):
+                for token_pred, mapping, lt in zip(token_preds, mappings, logit):
                     if mapping != -1 and mapping not in temp:
                         temp.add(mapping)
                         word_offset.append(list(offsets[counter]))
                         pred_one_sentence.append(token_pred)
+                        pred_proba.append(lt)
                         counter += 1
-                ner_pred.append((pred_one_sentence, word_offset))
+                ner_pred.append((pred_one_sentence, word_offset, pred_proba))
         return ner_pred
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
@@ -150,7 +153,7 @@ def infer_batch(
     device = torch.device(device_type)
     batch_size = len(batch[next(iter(batch))])
     if 1 < num_gpus <= batch_size:
-        model = nn.DataParallel(model)
+        logger.warning("Not able to benefit from multi-gpu in realtime prediction.")
     model.to(device).eval()
     batch = move_to_device(batch, device=device)
     precision_context = get_precision_context(precision=precision, device_type=device_type)
@@ -159,10 +162,6 @@ def infer_batch(
         if model_postprocess_fn:
             output = model_postprocess_fn(output)
 
-    if isinstance(model, nn.DataParallel):
-        model = model.module
-    else:
-        model = model
     output = move_to_device(output, device=torch.device("cpu"))
     return output[model.prefix]
 

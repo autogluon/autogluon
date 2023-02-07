@@ -18,10 +18,16 @@ version = ag.update_version(version)
 submodule = 'features'
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
-    'numpy',
-    'pandas',
-    'scikit-learn',
+    'numpy',  # version range defined in `core/_setup_utils.py`
+    'pandas',  # version range defined in `core/_setup_utils.py`
+    'scikit-learn',  # version range defined in `core/_setup_utils.py`
     f'autogluon.common=={version}',
+] if not ag.LITE_MODE else [
+    # version ranges added in ag.get_dependency_version_ranges()
+    'numpy',  # version range defined in `core/_setup_utils.py`
+    'pandas',  # version range defined in `core/_setup_utils.py`
+    'scikit-learn',  # version range defined in `core/_setup_utils.py`
+    f'{ag.PACKAGE_NAME}.common=={version}',
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)

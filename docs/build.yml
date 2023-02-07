@@ -1,8 +1,8 @@
 name: autogluon_py3
 dependencies:
-- python=3.9
+- python=3.10
 - pip
 - pip:
   - flake8
-  - black>=22.3
+  - black>=22.3,<23.0
   - isort>=5.10

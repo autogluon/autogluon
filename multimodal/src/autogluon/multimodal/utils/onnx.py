@@ -42,8 +42,8 @@ def get_onnx_input(pipeline: str, config: Optional[Dict] = None):
     if pipeline == FEATURE_EXTRACTION:
         valid_input = [
             "hf_text_text_token_ids",
-            "hf_text_text_valid_length",
             "hf_text_text_segment_ids",
+            "hf_text_text_valid_length",
         ]
         dynamic_axes = {
             "hf_text_text_token_ids": {

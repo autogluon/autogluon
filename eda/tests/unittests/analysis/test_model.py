@@ -81,6 +81,7 @@ def test_AutoGluonModelQuickFit(save_model_to_state):
             label=target_col,
             return_state=True,
             anlz_facets=[
+                eda.dataset.ProblemTypeControl(),
                 eda.dataset.TrainValidationSplit(
                     children=[
                         eda.model.AutoGluonModelQuickFit(
@@ -97,7 +98,7 @@ def test_AutoGluonModelQuickFit(save_model_to_state):
                             children=[eda.model.AutoGluonModelEvaluator()],
                         )
                     ]
-                )
+                ),
             ],
         )
 

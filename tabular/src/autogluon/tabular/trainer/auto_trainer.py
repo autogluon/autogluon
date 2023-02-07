@@ -56,6 +56,12 @@ class AutoTrainer(AbstractTrainer):
         for key in kwargs:
             logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.fit()`. Argument: {key}')
 
+        if use_bag_holdout:
+            if self.bagged_mode:
+                logger.log(20, f'use_bag_holdout={use_bag_holdout}, will use tuning_data as holdout (will not be used for early stopping).')
+            else:
+                logger.warning(f'Warning: use_bag_holdout={use_bag_holdout}, but bagged mode is not enabled. use_bag_holdout will be ignored.')
+
         if (y_val is None) or (X_val is None):
             if not self.bagged_mode or use_bag_holdout:
                 if groups is not None:
@@ -81,9 +87,13 @@ class AutoTrainer(AbstractTrainer):
                 #  This error message is necessary because when calculating out-of-fold predictions for user, we want to return them in the form given in train_data,
                 #  but if we merge train and val here, it becomes very confusing from a users perspective, especially because we reset index, making it impossible to match
                 #  the original train_data to the out-of-fold predictions from `predictor.get_oof_pred_proba()`.
-                raise AssertionError('X_val, y_val is not None, but bagged mode was specified. If calling from `TabularPredictor.fit()`, `tuning_data` must be None.\n'
-                                     'Bagged mode does not use tuning data / validation data. Instead, all data (`train_data` and `tuning_data`) should be combined and specified as `train_data`.\n'
-                                     'Bagging/Stacking with a held-out validation set (blend stacking) is not yet supported.')
+                raise AssertionError('X_val, y_val is not None, but bagged mode was specified. '
+                                     'If calling from `TabularPredictor.fit()`, `tuning_data` should be None.\n'
+                                     'Default bagged mode does not use tuning data / validation data. '
+                                     'Instead, all data (`train_data` and `tuning_data`) should be combined and specified as `train_data`.\n'
+                                     'To avoid this error and use `tuning_data` as holdout data in bagged mode, '
+                                     'specify the following:\n'
+                                     '\tpredictor.fit(..., tuning_data=tuning_data, use_bag_holdout=True)')
 
         self._train_multi_and_ensemble(X=X,
                                        y=y,

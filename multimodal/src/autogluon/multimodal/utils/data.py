@@ -4,19 +4,23 @@ import random
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import pandas as pd
 import PIL
 from omegaconf import DictConfig, OmegaConf
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
 from autogluon.core.utils.loaders import load_pd
+from autogluon.core.utils.utils import default_holdout_frac
 
 from ..constants import (
     AUTOMM,
     BINARY,
     CATEGORICAL,
     DEFAULT_SHOT,
+    DOCUMENT,
     FEW_SHOT,
     IMAGE,
     LABEL,
@@ -31,6 +35,7 @@ from ..constants import (
 )
 from ..data import (
     CategoricalProcessor,
+    DocumentProcessor,
     ImageProcessor,
     LabelProcessor,
     MixupModule,
@@ -158,12 +163,22 @@ def create_data_processor(
         data_processor = NerProcessor(
             model=model,
             max_len=model_config.max_text_len,
+            config=config,
         )
     elif data_type == ROIS:
         data_processor = MMDetProcessor(
             model=model,
             max_img_num_per_col=model_config.max_img_num_per_col,
             missing_value_strategy=config.data.image.missing_value_strategy,
+        )
+    elif data_type == DOCUMENT:
+        data_processor = DocumentProcessor(
+            model=model,
+            train_transform_types=model_config.train_transform_types,
+            val_transform_types=model_config.val_transform_types,
+            norm_type=model_config.image_norm,
+            size=model_config.image_size,
+            text_max_len=model_config.max_text_len,
         )
     else:
         raise ValueError(f"unknown data type: {data_type}")
@@ -206,6 +221,7 @@ def create_fusion_data_processors(
         LABEL: [],
         ROIS: [],
         TEXT_NER: [],
+        DOCUMENT: [],
     }
 
     model_dict = {model.prefix: model}
@@ -587,3 +603,45 @@ def contains_valid_images(data: Union[str, list], sample_n: Optional[int] = 50) 
         return False
     else:
         raise Exception(f"Expected data to be a list or a str, but got {type(data)}")
+
+
+def split_train_tuning_data(train_data, tuning_data, holdout_frac, is_classification, label_column, seed):
+    """
+    Split training and tuning data.
+
+    Parameters
+    ----------
+    train_data
+        Provided training data.
+    tuning_data
+        Provided tuning data.
+    holdout_frac
+        Fraction of train_data to holdout as tuning_data.
+    is_classification
+        Whether is a classification task.
+    label_column
+        Header of label column.
+    seed
+        Random seed.
+
+    Returns
+    -------
+    The splitted training and tuning data.
+    """
+    if tuning_data is None:
+        if is_classification:
+            stratify = train_data[label_column]
+        else:
+            stratify = None
+        if holdout_frac is None:
+            val_frac = default_holdout_frac(len(train_data), hyperparameter_tune=False)
+        else:
+            val_frac = holdout_frac
+        train_data, tuning_data = train_test_split(
+            train_data,
+            test_size=val_frac,
+            stratify=stratify,
+            random_state=np.random.RandomState(seed),
+        )
+
+    return train_data, tuning_data

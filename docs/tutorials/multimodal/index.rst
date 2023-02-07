@@ -137,6 +137,17 @@ Image Data -- Object Detection
       How to evaluate the pretrained Faster R-CNN model on dataset in VOC format
 
 
+Document Data
+-------------
+.. container:: cards
+
+   .. card::
+      :title: AutoMM for Scanned Document Classification
+      :link: document/document_classification.html
+
+      How to use MultiModalPredictor to build a scanned document classifier.
+
+
 Matching
 --------
 .. container:: cards
@@ -231,6 +242,7 @@ FAQ
    text_prediction/index
    image_prediction/index
    object_detection/index
+   document/index
    matching/index
    multimodal_prediction/index
    advanced_topics/index

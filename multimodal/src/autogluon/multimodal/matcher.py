@@ -17,12 +17,9 @@ import pytorch_lightning as pl
 import torch
 import yaml
 from omegaconf import DictConfig, OmegaConf
-from sklearn.model_selection import train_test_split
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.common.utils.utils import setup_outputdir
-from autogluon.core.utils.utils import default_holdout_frac
 
 from . import version as ag_version
 from .constants import (
@@ -49,7 +46,6 @@ from .constants import (
     RAY_TUNE_CHECKPOINT,
     RESPONSE,
     TEXT,
-    TRIPLET,
     UNIFORM_SOUP,
     Y_PRED,
     Y_PRED_PROB,
@@ -72,7 +68,6 @@ from .utils import (
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
-    compute_inference_batch_size,
     compute_num_gpus,
     compute_ranking_score,
     compute_score,
@@ -100,6 +95,7 @@ from .utils import (
     save_text_tokenizers,
     select_model,
     setup_save_path,
+    split_train_tuning_data,
     try_to_infer_pos_label,
 )
 
@@ -151,7 +147,7 @@ class MultiModalMatcher:
             If `problem_type = None`, the prediction problem type is inferred
             based on the label-values in provided dataset.
         presets
-            Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+            Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
@@ -317,7 +313,7 @@ class MultiModalMatcher:
              Id-to-content mappings. The contents can be text, image, etc.
              This is used when the dataframe contains the query/response identifiers instead of their contents.
         presets
-            Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+            Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         tuning_data
             A dataframe containing validation data, which should have the same columns as the train_data.
             If `tuning_data = None`, `fit()` will automatically
@@ -391,22 +387,14 @@ class MultiModalMatcher:
             fit_called=fit_called,
         )
 
-        # Generate general info that's not config specific
-        if tuning_data is None:
-            if self._problem_type in [BINARY, MULTICLASS, CLASSIFICATION]:
-                stratify = train_data[self._label_column]
-            else:
-                stratify = None
-            if holdout_frac is None:
-                val_frac = default_holdout_frac(len(train_data), hyperparameter_tune=False)
-            else:
-                val_frac = holdout_frac
-            train_data, tuning_data = train_test_split(
-                train_data,
-                test_size=val_frac,
-                stratify=stratify,
-                random_state=np.random.RandomState(seed),
-            )
+        train_data, tuning_data = split_train_tuning_data(
+            train_data=train_data,
+            tuning_data=tuning_data,
+            holdout_frac=holdout_frac,
+            is_classification=self._problem_type in [BINARY, MULTICLASS, CLASSIFICATION],
+            label_column=self._label_column,
+            seed=seed,
+        )
 
         column_types = infer_column_types(
             data=train_data,
@@ -467,6 +455,11 @@ class MultiModalMatcher:
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
+
+        if self._presets is not None:
+            presets = self._presets
+        else:
+            self._presets = presets
 
         # set attributes for saving and prediction
         self._problem_type = problem_type  # In case problem type isn't provided in __init__().
@@ -624,39 +617,33 @@ class MultiModalMatcher:
         hpo_mode: bool = False,
         **hpo_kwargs,
     ):
-        if presets is None:
-            presets = "siamese_network"
+        config = self._config
+        config = get_config(
+            problem_type=self._pipeline,
+            presets=presets,
+            config=config,
+            overrides=hyperparameters,
+            extra=["matcher"],
+        )
 
-        if presets == "siamese_network":
-            config = self._config
-            config = get_config(
-                problem_type=self._pipeline,
-                presets=presets,
-                config=config,
-                overrides=hyperparameters,
-                extra=["matcher"],
+        if self._query_config is None:
+            query_config = copy.deepcopy(config)
+            # customize config model names to make them consistent with model prefixes.
+            query_config.model = customize_model_names(
+                config=query_config.model, customized_names=[f"{n}_{QUERY}" for n in query_config.model.names]
             )
-
-            if self._query_config is None:
-                query_config = copy.deepcopy(config)
-                # customize config model names to make them consistent with model prefixes.
-                query_config.model = customize_model_names(
-                    config=query_config.model, customized_names=[f"{n}_{QUERY}" for n in query_config.model.names]
-                )
-            else:
-                query_config = self._query_config
-
-            if self._response_config is None:
-                response_config = copy.deepcopy(config)
-                # customize config model names to make them consistent with model prefixes.
-                response_config.model = customize_model_names(
-                    config=response_config.model,
-                    customized_names=[f"{n}_{RESPONSE}" for n in response_config.model.names],
-                )
-            else:
-                response_config = self._response_config
         else:
-            raise ValueError("Currently only support presets: siamese_network.")
+            query_config = self._query_config
+
+        if self._response_config is None:
+            response_config = copy.deepcopy(config)
+            # customize config model names to make them consistent with model prefixes.
+            response_config.model = customize_model_names(
+                config=response_config.model,
+                customized_names=[f"{n}_{RESPONSE}" for n in response_config.model.names],
+            )
+        else:
+            response_config = self._response_config
 
         query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._get_matcher_df_preprocessor(
             data=train_df,
@@ -671,13 +658,10 @@ class MultiModalMatcher:
         response_config = select_model(config=response_config, df_preprocessor=response_df_preprocessor, strict=False)
 
         if self._query_model is None or self._response_model is None:
-            if presets == "siamese_network":
-                query_model, response_model = create_siamese_model(
-                    query_config=query_config,
-                    response_config=response_config,
-                )
-            else:
-                raise ValueError("Only support preset `siamese_network` currently.")
+            query_model, response_model = create_siamese_model(
+                query_config=query_config,
+                response_config=response_config,
+            )
         else:  # continuing training
             query_model = self._query_model
             response_model = self._response_model

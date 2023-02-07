@@ -45,11 +45,6 @@ def symmetric_mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Serie
     return (2 * (y_true - y_pred).abs() / (y_true.abs() + y_pred.abs())).groupby(level=ITEMID, sort=False).mean()
 
 
-def quantile_loss(*, y_true: pd.Series, y_pred: pd.Series, q: float) -> float:
-    """Compute total quantile loss across all timesteps of all time series."""
-    return 2 * ((y_true - y_pred) * ((y_true <= y_pred) - q)).abs().sum()
-
-
 class TimeSeriesEvaluator:
     """Contains functions for computing forecast accuracy metrics.
 
@@ -146,15 +141,15 @@ class TimeSeriesEvaluator:
         return self._safemean(symmetric_mape_per_item(y_true=y_true, y_pred=y_pred))
 
     def _mean_wquantileloss(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
-        loss_values = []
-        abs_target_sum = y_true.abs().sum()
-        for col in predictions.columns:
-            if col != "mean":
-                q = float(col)
-                assert 0 <= q <= 1
-                y_pred = predictions[col]
-                loss_values.append(quantile_loss(y_true=y_true, y_pred=y_pred, q=q) / abs_target_sum)
-        return np.mean(loss_values)
+        values_true = y_true.values[:, None]  # shape [N, 1]
+        quantile_pred_columns = [col for col in predictions.columns if col != "mean"]
+        values_pred = predictions[quantile_pred_columns].values  # shape [N, len(quantile_levels)]
+        quantile_levels = np.array([float(q) for q in quantile_pred_columns], dtype=float)
+
+        return 2 * np.mean(
+            np.abs((values_true - values_pred) * ((values_true <= values_pred) - quantile_levels)).sum(axis=0)
+            / np.abs(values_true).sum()
+        )
 
     def _get_median_forecast(self, predictions: TimeSeriesDataFrame) -> pd.Series:
         # TODO: Median forecast doesn't actually minimize the MAPE / sMAPE losses

@@ -5,10 +5,10 @@ from typing import Dict, List, Optional
 import numpy as np
 
 import autogluon.core as ag
-from autogluon.core.models.greedy_ensemble.ensemble_selection import AbstractWeightedEnsemble, EnsembleSelection
+from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.evaluator import TimeSeriesEvaluator
-from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
 
     def _fit(
         self,
-        predictions: TimeSeriesDataFrame,
+        predictions: List[TimeSeriesDataFrame],
         labels: TimeSeriesDataFrame,
         time_limit: Optional[int] = None,
         sample_weight=None,
@@ -65,70 +65,68 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         return -score
 
 
-class SimpleTimeSeriesWeightedEnsemble(AbstractWeightedEnsemble):
-    """Predefined user-weights ensemble"""
+class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
+    """Constructs a weighted ensemble using the greedy Ensemble Selection algorithm."""
 
-    def __init__(self, weights: List[float], **kwargs):
-        self.weights_ = weights
-        self.problem_type = ag.constants.QUANTILE
-
-    @property
-    def ensemble_size(self):
-        return len(self.weights_)
-
-    def weight_pred_probas(
-        self,
-        preds: List[TimeSeriesDataFrame],
-        weights: List[float],
-    ) -> TimeSeriesDataFrame:
-        if all(p is None for p in preds):
-            raise RuntimeError("All input models failed during prediction, WeightedEnsemble cannot predict.")
-        assert len(set(p.shape for p in preds if p is not None)) == 1
-
-        weights = np.array(weights)
-        for idx, p in enumerate(preds):
-            if p is None:
-                weights[idx] = 0
-        weights = weights / np.sum(weights)
-
-        return sum(p * w for p, w in zip(preds, weights) if p is not None)
-
-
-class TimeSeriesEnsembleWrapper(AbstractTimeSeriesModel):
-    """AbstractTimeSeriesModel wrapper for simple weighted ensemble selection
-    models.
-
-    Parameters
-    ----------
-    weights : Dict[str, float]
-        Dictionary mapping model names to weights in the ensemble
-    name : str
-        Name of the model. Usually like ``"WeightedEnsemble"``.
-    """
-
-    def __init__(self, weights: Dict[str, float], name: str, **kwargs):
+    def __init__(self, name: str, ensemble_size: int = 100, **kwargs):
         super().__init__(name=name, **kwargs)
-        self.model_names, model_weights = zip(*weights.items())
-        self.weighted_ensemble = SimpleTimeSeriesWeightedEnsemble(weights=model_weights)
+        self.ensemble_size = ensemble_size
+        self.model_to_weight: Dict[str, float] = {}
 
-    def _fit(self, *args, **kwargs) -> None:
-        raise NotImplementedError
+    def _fit_ensemble(
+        self,
+        predictions: Dict[str, TimeSeriesDataFrame],
+        data: TimeSeriesDataFrame,
+        time_limit: Optional[int] = None,
+        **kwargs,
+    ):
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=self.eval_metric,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
+        )
+        ensemble_selection = TimeSeriesEnsembleSelection(ensemble_size=self.ensemble_size, metric=evaluator)
+        ensemble_selection.fit(
+            predictions=list(predictions.values()),
+            labels=data,
+            time_limit=time_limit,
+        )
+        self.model_to_weight = {}
+        for model_name, weight in zip(predictions.keys(), ensemble_selection.weights_):
+            if weight != 0:
+                self.model_to_weight[model_name] = weight
 
     @property
-    def weights(self):
-        return self.weighted_ensemble.weights_
+    def model_names(self) -> List[str]:
+        return list(self.model_to_weight.keys())
 
-    def predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs):
+    @property
+    def model_weights(self) -> np.ndarray:
+        return np.array(list(self.model_to_weight.values()), dtype=np.float64)
+
+    def predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
         if set(data.keys()) != set(self.model_names):
             raise ValueError(
-                "Set of models given for prediction in the weighted ensemble differ from those "
-                "provided during initialization."
+                f"Set of models given for prediction in {self.name} differ from those provided during initialization."
             )
-        failed_models = [model_name for (model_name, model_preds) in data.items() if model_preds is None]
+        failed_models = [model_name for (model_name, model_pred) in data.items() if model_pred is None]
+        if len(failed_models) == len(data):
+            raise RuntimeError(f"All input models failed during prediction, {self.name} cannot predict.")
         if len(failed_models) > 0:
             logger.warning(
                 f"Following models failed during prediction: {failed_models}. "
                 f"{self.name} will set the weight of these models to zero and re-normalize the weights when predicting."
             )
 
-        return self.weighted_ensemble.predict([data[k] for k in self.model_names])
+        # Make sure that all predictions have same shape
+        assert len(set(pred.shape for pred in data.values() if pred is not None)) == 1
+
+        model_preds = [data[model_name] for model_name in self.model_names]
+        weights = self.model_weights
+
+        for idx, pred in enumerate(model_preds):
+            if pred is None:
+                weights[idx] = 0
+        weights = weights / np.sum(weights)
+
+        return sum(pred * w for pred, w in zip(model_preds, weights) if pred is not None)

@@ -21,29 +21,33 @@ install_requires = [
     'numpy',
     'scipy',
     'scikit-learn',
-    'psutil',
     'networkx',
     'pandas',
     'tqdm',
 
     'requests',
     'matplotlib',
-    # dask and distributed==2021.12.0 will cause ray(1.7.0 - 1.9.0) to fail
-    # error:
-    # https://ci.gluon.ai/blue/organizations/jenkins/autogluon/detail/master/702/pipeline/16
-    'dask>=2021.09.1,<=2021.11.2',
-    'distributed>=2021.09.1, <=2021.11.2',
     'boto3',
 
     f'autogluon.common=={version}',
+] if not ag.LITE_MODE else [
+    # version ranges added in ag.get_dependency_version_ranges()
+    'numpy',
+    'scipy',
+    'scikit-learn',
+    'pandas',
+    'tqdm',
+    'matplotlib',
+
+    f'{ag.PACKAGE_NAME}.common=={version}',
 ]
 
 extras_require = {
     'ray': [
-        "ray>=2.0,<2.1",
+        "ray>=2.2,<2.3",
     ],
     'raytune': [
-        'ray[tune]>=2.0,<2.1',
+        'ray[tune]>=2.2,<2.3',
         'hyperopt>=0.2.7,<0.2.8',
         # 'GPy>=1.10.0,<1.11.0'  # TODO: Enable this once PBT/PB2 are supported by ray lightning
     ]

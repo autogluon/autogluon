@@ -37,20 +37,28 @@ def test_ConfusionMatrix(monkeypatch, confusion_matrix_normalized, expected_fmt)
     call_plt_subplots = MagicMock(return_value=("fig", "ax"))
     call_plt_show = MagicMock()
     call_sns_heatmap = MagicMock()
-    call_render_text = MagicMock()
+    call_render_markdown = MagicMock()
     with monkeypatch.context() as m:
         m.setattr(plt, "subplots", call_plt_subplots)
         m.setattr(plt, "show", call_plt_show)
         m.setattr(sns, "heatmap", call_sns_heatmap)
         viz = ConfusionMatrix(fig_args=dict(a=1, b=2), headers=True, some_kwarg=123)
-        viz.render_text = call_render_text
+        viz.render_markdown = call_render_markdown
         viz.render(state)
-    call_plt_subplots.assert_called_with(a=1, b=2)
+    call_plt_subplots.assert_called_with(a=1, b=2, figsize=(2, 2))
     call_plt_show.assert_called_with("fig")
     call_sns_heatmap.assert_called_with(
-        ANY, ax="ax", cmap="Blues", annot=True, fmt=expected_fmt, cbar=False, some_kwarg=123
+        ANY,
+        ax="ax",
+        cmap="Blues",
+        annot=True,
+        linewidths=0.5,
+        linecolor="lightgrey",
+        fmt=expected_fmt,
+        cbar=False,
+        some_kwarg=123,
     )
-    call_render_text.assert_called_with("Confusion Matrix", text_type="h3")
+    call_render_markdown.assert_called_with("**Confusion Matrix**")
 
 
 def test_ConfusionMatrix__can_handle():
@@ -73,18 +81,18 @@ def test_RegressionEvaluation(monkeypatch):
     call_plt_subplots = MagicMock(return_value=("fig", "ax"))
     call_plt_show = MagicMock()
     call_sns_regplot = MagicMock()
-    call_render_text = MagicMock()
+    call_render_markdown = MagicMock()
     with monkeypatch.context() as m:
         m.setattr(plt, "subplots", call_plt_subplots)
         m.setattr(plt, "show", call_plt_show)
         m.setattr(sns, "regplot", call_sns_regplot)
         viz = RegressionEvaluation(headers=True, fig_args=dict(a=1, b=2), some_kwarg=123)
-        viz.render_text = call_render_text
+        viz.render_markdown = call_render_markdown
         viz.render(state)
     call_plt_subplots.assert_called_with(a=1, b=2)
     call_plt_show.assert_called_with("fig")
     call_sns_regplot.assert_called_with(ax="ax", data=ANY, x="y_true", y="y_pred", some_kwarg=123)
-    call_render_text.assert_called_with("Prediction vs Target", text_type="h3")
+    call_render_markdown.assert_called_with("**Prediction vs Target**")
 
 
 def test_RegressionEvaluation__can_handle():
@@ -171,19 +179,19 @@ def test_FeatureImportance(monkeypatch, show_barplots):
     call_plt_show = MagicMock()
     call_sns_barplot = MagicMock()
     call_display_obj = MagicMock()
-    call_render_text = MagicMock()
+    call_render_markdown = MagicMock()
     with monkeypatch.context() as m:
         m.setattr(plt, "subplots", call_plt_subplots)
         m.setattr(plt, "show", call_plt_show)
         m.setattr(sns, "barplot", call_sns_barplot)
         viz = FeatureImportance(headers=True, show_barplots=show_barplots, fig_args=dict(a=1, b=2), some_kwarg=123)
         viz.display_obj = call_display_obj
-        viz.render_text = call_render_text
+        viz.render_markdown = call_render_markdown
         viz.render(state)
     call_display_obj.assert_called_once()
-    call_render_text.assert_called_with("Feature Importance", text_type="h3")
+    call_render_markdown.assert_called_with("**Feature Importance**")
     if show_barplots:
-        call_plt_subplots.assert_called_with(a=1, b=2)
+        call_plt_subplots.assert_called_with(a=1, b=2, figsize=(12, 0.75))
         call_plt_show.assert_called_with("fig")
         call_sns_barplot.assert_called_with(ax="ax", data=ANY, y="index", x="importance", some_kwarg=123)
     else:
@@ -200,8 +208,8 @@ def test_ModelLeaderboard():
     viz = ModelLeaderboard(headers=True)
     assert viz.can_handle(state=state) is True
 
-    viz.render_text = MagicMock()
+    viz.render_markdown = MagicMock()
     viz.display_obj = MagicMock()
     viz.render(state)
-    viz.render_text.assert_called_with("Model Leaderboard", text_type="h3")
+    viz.render_markdown.assert_called_with("**Model Leaderboard**")
     viz.display_obj.assert_called_with("some_leaderboard")

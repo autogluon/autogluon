@@ -47,9 +47,13 @@ Default models
    ARIMAModel
    ETSModel
    ThetaModel
+   AutoETSModel
+   AutoARIMAModel
+   DynamicOptimizedThetaModel
    AutoGluonTabularModel
    DeepARModel
    SimpleFeedForwardModel
+   TemporalFusionTransformerModel
 
 
 :hidden:`NaiveModel`
@@ -85,6 +89,24 @@ Default models
 .. autoclass:: ThetaModel
    :members: init
 
+:hidden:`AutoETSModel`
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: AutoETSModel
+   :members: init
+
+:hidden:`AutoARIMAModel`
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: AutoARIMAModel
+   :members: init
+
+:hidden:`DynamicOptimizedThetaModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: DynamicOptimizedThetaModel
+   :members: init
+
 :hidden:`AutoGluonTabularModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -106,10 +128,28 @@ Default models
    :members: init
 
 
+:hidden:`TemporalFusionTransformerModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TemporalFusionTransformerModel
+   :members: init
+
+
 
 MXNet Models
 ------------
-Using the models listed below requires installing Apache MXNet v1.9. This can be done as follows::
+Following MXNet-based models from GluonTS are available in AutoGluon.
+
+- ``DeepARMXNetModel``
+- ``MQCNNMXNetModel``
+- ``MQRNNMXNetModel``
+- ``SimpleFeedForwardMXNetModel``
+- ``TemporalFusionTransformerMXNetModel``
+- ``TransformerMXNetModel``
+
+Documentation and hyperparameter settings for these models can be found `here <https://github.com/autogluon/autogluon/blob/master/timeseries/src/autogluon/timeseries/models/gluonts/mx/models.py>`_.
+
+Using the above models requires installing Apache MXNet v1.9. This can be done as follows::
 
    python -m pip install mxnet~=1.9
 
@@ -118,63 +158,6 @@ MXNet `documentation <https://mxnet.apache.org/versions/1.9.1/get_started?>`_ fo
 
 If a GPU is available and MXNet version with CUDA is installed, all the MXNet models will be trained using the GPU.
 Otherwise, the models will be trained on CPU.
-
-
-.. automodule:: autogluon.timeseries.models.gluonts.mx
-.. currentmodule:: autogluon.timeseries.models.gluonts.mx
-
-
-.. autosummary::
-   :nosignatures:
-
-   DeepARMXNetModel
-   MQCNNMXNetModel
-   MQRNNMXNetModel
-   SimpleFeedForwardMXNetModel
-   TemporalFusionTransformerMXNetModel
-   TransformerMXNetModel
-
-:hidden:`DeepARMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: DeepARMXNetModel
-   :members: init
-
-
-:hidden:`MQCNNMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: MQCNNMXNetModel
-   :members: init
-
-
-:hidden:`MQRNNMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: MQRNNMXNetModel
-   :members: init
-
-
-:hidden:`SimpleFeedForwardMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: SimpleFeedForwardMXNetModel
-   :members: init
-
-
-:hidden:`TemporalFusionTransformerMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: TemporalFusionTransformerMXNetModel
-   :members: init
-
-
-:hidden:`TransformerMXNetModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: TransformerMXNetModel
-   :members: init
-
 
 
 Additional features
@@ -186,17 +169,25 @@ Models not included in this table currently do not support any additional featur
    :header-rows: 1
    :stub-columns: 1
    :align: center
-   :widths: 40 20 20 20
+   :widths: 40 15 15 15 15
 
    * - Model
      - Static features (continuous)
      - Static features (categorical)
      - Known covariates (continuous)
+     - Past covariates (continuous)
    * - :class:`~autogluon.timeseries.models.AutoGluonTabularModel`
      - ✓
      - ✓
-     -
+     - ✓
+     - ✓
    * - :class:`~autogluon.timeseries.models.DeepARModel`
+     - ✓
+     - ✓
+     - ✓
+     -
+   * - :class:`~autogluon.timeseries.models.TemporalFusionTransformerModel`
+     - ✓
      - ✓
      - ✓
      - ✓
@@ -204,7 +195,9 @@ Models not included in this table currently do not support any additional featur
      - ✓
      - ✓
      - ✓
+     -
    * - :class:`~autogluon.timeseries.models.gluonts.mx.MQCNNMXNetModel`
+     - ✓
      - ✓
      - ✓
      - ✓
@@ -212,3 +205,4 @@ Models not included in this table currently do not support any additional featur
      - ✓
      -
      - ✓
+     -

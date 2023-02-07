@@ -3,6 +3,7 @@ from omegaconf import OmegaConf
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import (
+    ALL_MODEL_QUALITIES,
     DATA,
     DISTILLER,
     ENVIRONMENT,
@@ -20,27 +21,31 @@ from autogluon.multimodal.utils import get_config
 
 
 def test_presets():
-    all_presets = list_automm_presets()
-    for preset in all_presets:
-        overrides = get_automm_presets(preset)
+    problem_types = list_automm_presets()
+    for per_type in problem_types:
+        for model_quality in ALL_MODEL_QUALITIES:
+            hyperparameters, hyperparameter_tune_kwargs = get_automm_presets(per_type, model_quality)
 
     # test non-existing types
     non_exist_types = ["hello", "haha"]
     for per_type in non_exist_types:
-        with pytest.raises(ValueError):
-            overrides = get_automm_presets(per_type)
+        for model_quality in ALL_MODEL_QUALITIES:
+            with pytest.raises(ValueError):
+                hyperparameters, hyperparameter_tune_kwargs = get_automm_presets(per_type, model_quality)
 
 
 def test_preset_to_config():
-    all_presets = list_automm_presets()
-    for preset in all_presets:
-        overrides = get_automm_presets(preset)
-        config = get_config(
-            presets=preset,
-            extra=["matcher", "distiller"],
-        )
-        for k, v in overrides.items():
-            assert OmegaConf.select(config, k) == v
+    problem_types = list_automm_presets()
+    for per_type in problem_types:
+        for model_quality in ALL_MODEL_QUALITIES:
+            hyperparameters, _ = get_automm_presets(per_type, model_quality)
+            config = get_config(
+                problem_type=per_type,
+                presets=model_quality,
+                extra=["matcher", "distiller"],
+            )
+            for k, v in hyperparameters.items():
+                assert OmegaConf.select(config, k) == v
 
 
 def test_basic_config():
@@ -52,7 +57,7 @@ def test_basic_config():
 
 
 @pytest.mark.parametrize("problem_type", list(PROBLEM_TYPES_REG.list_keys()))
-@pytest.mark.parametrize("presets", ["medium_quality_faster_inference", "high_quality_fast_inference", "best_quality"])
+@pytest.mark.parametrize("presets", ALL_MODEL_QUALITIES)
 def test_preset_in_init(problem_type, presets):
     if problem_type in [
         OCR_TEXT_DETECTION,

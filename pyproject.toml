@@ -1,6 +1,6 @@
 [tool.black]
 line-length = 119
-target-version = ['py37', 'py38', 'py39']
+target-version = ['py38', 'py39', 'py310']
 
 [tool.isort]
 known_first_party = "autogluon"

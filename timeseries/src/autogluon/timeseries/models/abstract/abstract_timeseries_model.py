@@ -11,7 +11,7 @@ from autogluon.core.hpo.executors import HpoExecutor
 from autogluon.core.models import AbstractModel
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.evaluator import TimeSeriesEvaluator
-from autogluon.timeseries.utils.metadata import get_prototype_metadata_dict
+from autogluon.timeseries.utils.features import CovariateMetadata
 
 from .model_trial import model_trial, skip_hpo
 
@@ -36,8 +36,8 @@ class AbstractTimeSeriesModel(AbstractModel):
         Name of the subdirectory inside path where model will be saved.
         The final model directory will be path+name+os.path.sep()
         If None, defaults to the model's class name: self.__class__.__name__
-    metadata: MetadataDict
-        A dictionary mapping different feature types known to autogluon.timeseries to column names
+    metadata: CovariateMetadata
+        A mapping of different covariate types known to autogluon.timeseries to column names
         in the data set.
     eval_metric : str, default
         Metric by which predictions will be ultimately evaluated on test data.
@@ -68,14 +68,13 @@ class AbstractTimeSeriesModel(AbstractModel):
     _preprocess_nonadaptive = None
     _preprocess_set_features = None
 
-    # TODO: handle static features in the models and Dataset API
     def __init__(
         self,
         freq: Optional[str] = None,
         prediction_length: int = 1,
         path: Optional[str] = None,
         name: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[CovariateMetadata] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Dict[str, Union[int, float, str, ag.Space]] = None,
         **kwargs,
@@ -92,8 +91,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         self.problem_type = "timeseries"
         self.conformalize = False
         self.target: str = kwargs.get("target", "target")
-        self.metadata = metadata or get_prototype_metadata_dict()
-        self.metadata.update({"target": self.target})
+        self.metadata = metadata or CovariateMetadata()
 
         self.freq: str = freq
         self.prediction_length: int = prediction_length
@@ -294,8 +292,9 @@ class AbstractTimeSeriesModel(AbstractModel):
             of input items.
         """
         past_data = data.slice_by_timestep(None, -self.prediction_length)
-        if len(data.columns) > 1:
-            known_covariates = data.slice_by_timestep(-self.prediction_length, None).drop(self.target, axis=1)
+        if len(self.metadata.known_covariates_real) > 0:
+            future_data = data.slice_by_timestep(-self.prediction_length, None)
+            known_covariates = future_data[self.metadata.known_covariates_real]
         else:
             known_covariates = None
         return self.predict(past_data, known_covariates=known_covariates, **kwargs)

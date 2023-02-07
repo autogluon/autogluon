@@ -29,20 +29,22 @@ class XShiftSummary(AbstractVisualization, JupyterMixin):
                 f"a type of distribution shift.\n"
                 f"\n"
                 f"**Test results**: "
-                f"We can predict whether a sample is in the test vs. training set with a {results['eval_metric']} of\n"
-                f"{results['test_statistic']:.4f} with a p-value of {results['pvalue']:.4f} "
-                f"(smaller than the threshold of {results['pvalue_threshold']:.4f}).\n"
+                f"We can predict whether a sample is in the test vs. training set with a `{results['eval_metric']}` of\n"
+                f"`{results['test_statistic']:.4f}` with a p-value of `{results['pvalue']:.4f}` "
+                f"(smaller than the threshold of `{results['pvalue_threshold']:.4f})`.\n"
                 f"\n"
             )
-        if "feature_importance" in results:
-            fi_md = (
-                f"**Feature importances**: "
-                f"The variables that are the most responsible for this shift are those with high feature "
-                f"importance:\n\n"
-                f"{results['feature_importance'].to_markdown()}"
-            )
-            return ret_md + fi_md
         return ret_md
+
+    def _render_feature_importance_if_needed(self, state):
+        if "feature_importance" in state:
+            fi = state["feature_importance"]
+            fi = fi[fi.p_value <= state["pvalue_threshold"]]
+            if len(fi) > 0:
+                self.render_markdown(
+                    "**Feature importances**: The variables that are the most responsible for this shift are those with high feature importance:\n\n"
+                )
+                self.display_obj(fi)
 
     def can_handle(self, state: AnalysisState) -> bool:
         return self.at_least_one_key_must_be_present(state, "xshift_results")
@@ -52,3 +54,4 @@ class XShiftSummary(AbstractVisualization, JupyterMixin):
         header_text = "Detecting distribution shift"
         self.render_header_if_needed(state, header_text)
         self.render_markdown(res_md)
+        self._render_feature_importance_if_needed(state.xshift_results)

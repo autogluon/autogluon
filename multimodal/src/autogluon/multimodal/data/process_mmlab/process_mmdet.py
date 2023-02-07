@@ -30,7 +30,7 @@ class MMDetProcessor(MMLabProcessor):
         self,
         model: nn.Module,
         max_img_num_per_col: Optional[int] = 1,
-        missing_value_strategy: Optional[str] = "skip",
+        missing_value_strategy: Optional[str] = "zero",
         requires_column_info: bool = False,
     ):
         """
@@ -38,8 +38,6 @@ class MMDetProcessor(MMLabProcessor):
         ----------
         model
             The model using this data processor.
-        collate_func
-            The collate function to use for this processor
         max_img_num_per_col
             The maximum number of images one sample can have.
         missing_value_strategy
