@@ -100,7 +100,7 @@ Additionally, you can explain particular AutoGluon predictions using [Shapely va
 The Tabular Dataset API works with pandas DataFrames, which supports chunking data into sizes that fit in memory.
 Here's an example of one such chunk-based inference:
 
-```{.python .input}
+```python
 from autogluon.tabular import TabularDataset, TabularPredictor
 import pandas as pd
 import requests
