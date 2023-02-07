@@ -1001,7 +1001,7 @@ class MultiModalPredictor:
         clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
-        logger.info(
+        print(
 f"""Start to train the model (resume={resume}, distillation={teacher_predictor is not None}).
 The model file will be saved to {save_path}.
 The validation metric is "{validation_metric_name}".
