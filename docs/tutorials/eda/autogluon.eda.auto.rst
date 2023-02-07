@@ -13,13 +13,15 @@ autogluon.eda.analysis.auto
 .. currentmodule:: autogluon.eda.auto.simple
 
 .. autosummary::
-   dataset_overview
-   target_analysis
-   quick_fit
-   missing_values_analysis
-   covariate_shift_detection
-   analyze_interaction
-   analyze
+    :nosignatures:
+
+    dataset_overview
+    target_analysis
+    quick_fit
+    missing_values_analysis
+    covariate_shift_detection
+    analyze_interaction
+    analyze
 
 :hidden:`dataset_overview`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
