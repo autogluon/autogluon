@@ -1,4 +1,5 @@
 import copy
+import json
 import logging
 import os
 import warnings
@@ -20,7 +21,8 @@ from ..constants import (
     REGRESSION,
     VALID_CONFIG_KEYS,
 )
-from ..presets import get_automm_presets, get_basic_automm_config, get_preset_str
+from ..models import TimmAutoModelForImagePrediction
+from ..presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
 
@@ -77,7 +79,7 @@ def get_config(
     problem_type
         Problem type.
     presets
-        Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+        Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
     config
         A dictionary including four keys: "model", "data", "optimization", and "environment".
         If any key is not given, we will fill in with the default value.
@@ -127,8 +129,6 @@ def get_config(
     -------
     Configurations as a DictConfig object
     """
-    presets = get_preset_str(problem_type=problem_type, presets=presets)
-
     if config is None:
         config = {}
 
@@ -140,7 +140,7 @@ def get_config(
         if presets is None:
             preset_overrides = None
         else:
-            preset_overrides = get_automm_presets(presets=presets)
+            preset_overrides, _ = get_automm_presets(problem_type=problem_type, presets=presets)
 
         for k, default_value in basic_config.items():
             if k not in config:
@@ -551,3 +551,24 @@ def update_tabular_config_by_resources(
         )
 
     return config
+
+
+def get_pretrain_configs_dir(subfolder: Optional[str] = None):
+    import autogluon.multimodal
+
+    pretrain_config_dir = os.path.join(autogluon.multimodal.__path__[0], "configs", "pretrain")
+    if subfolder:
+        pretrain_config_dir = os.path.join(pretrain_config_dir, subfolder)
+    return pretrain_config_dir
+
+
+def filter_timm_pretrained_cfg(cfg, remove_source=False, remove_null=True):
+    filtered_cfg = {}
+    keep_null = {"pool_size", "first_conv", "classifier"}  # always keep these keys, even if none
+    for k, v in cfg.items():
+        if remove_source and k in {"url", "file", "hf_hub_id", "hf_hub_id", "hf_hub_filename", "source"}:
+            continue
+        if remove_null and v is None and k not in keep_null:
+            continue
+        filtered_cfg[k] = v
+    return filtered_cfg

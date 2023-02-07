@@ -1,9 +1,10 @@
 import time
-import psutil
 import logging
 
 from xgboost.callback import EarlyStopping
 
+from autogluon.common.utils.lite import disable_if_lite_mode
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.utils.early_stopping import SimpleES
 
 logger = logging.getLogger(__name__)
@@ -36,11 +37,12 @@ class EarlyStoppingCustom(EarlyStopping):
         self._mem_status = None
         self._mem_init_rss = None
 
+    @disable_if_lite_mode(ret=lambda self, model: super().before_training(model=model))
     def before_training(self, model):
         model = super().before_training(model=model)
         if self.start_time is None:
             self.start_time = time.time()
-        self._mem_status = psutil.Process()
+        self._mem_status = ResourceManager.get_process()
         self._mem_init_rss = self._mem_status.memory_info().rss
         return model
 
@@ -68,8 +70,9 @@ class EarlyStoppingCustom(EarlyStopping):
                 return True
         return False
 
+    @disable_if_lite_mode(ret=False)
     def _memory_check(self, model):
-        available = psutil.virtual_memory().available
+        available = ResourceManager.get_available_virtual_mem()
         cur_rss = self._mem_status.memory_info().rss
         if cur_rss < self._mem_init_rss:
             self._mem_init_rss = cur_rss

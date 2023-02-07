@@ -23,10 +23,9 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             quantiles=quantile_levels,
             invalid_model_names=self._get_banned_model_names(),
             target=self.target,
+            metadata=self.metadata,
         )
 
-    # todo: implement cross-validation / holdout strategy
-    # todo: including CVSplitter logic
     def fit(
         self,
         train_data: TimeSeriesDataFrame,

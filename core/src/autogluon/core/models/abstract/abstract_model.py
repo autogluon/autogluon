@@ -6,7 +6,6 @@ import math
 import os
 import pickle
 from autogluon.core.utils import try_import
-import psutil
 import sys
 import time
 from typing import Dict, Optional, Union
@@ -18,6 +17,7 @@ import scipy
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir
+from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
 from autogluon.common.utils.resource_utils import ResourceManager
 
@@ -1441,10 +1441,11 @@ class AbstractModel:
         """
         return 4 * get_approximate_df_mem_usage(X).sum()
 
+    @disable_if_lite_mode()
     def _validate_fit_memory_usage(self, **kwargs):
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         approx_mem_size_req = self.estimate_memory_usage(**kwargs)
-        available_mem = psutil.virtual_memory().available
+        available_mem = ResourceManager.get_available_virtual_mem()
         ratio = approx_mem_size_req / available_mem
         if ratio > (0.9 * max_memory_usage_ratio):
             logger.warning('\tWarning: Not enough memory to safely train model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))

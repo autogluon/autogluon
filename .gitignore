@@ -134,7 +134,6 @@ mxnet/src/autogluon/mxnet/version.py
 extra/src/autogluon/extra/version.py
 tabular/src/autogluon/tabular/version.py
 text/src/autogluon/text/version.py
-vision/src/autogluon/vision/version.py
 multimodal/src/autogluon/multimodal/version.py
 eda/src/autogluon/eda/version.py
 

@@ -20,48 +20,48 @@ version = ag.update_version(version)
 submodule = "multimodal"
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
-    "numpy",
-    "scipy",
-    "pandas",
-    "scikit-learn",
-    "Pillow",
-    "tqdm",
-    "boto3",
-    "requests",
-    "jsonschema<=4.8.0",
-    "seqeval<=1.2.2",
-    "evaluate<=0.3.0",
-    "accelerate>=0.9,<0.14",
+    "numpy",  # version range defined in `core/_setup_utils.py`
+    "scipy",  # version range defined in `core/_setup_utils.py`
+    "pandas",  # version range defined in `core/_setup_utils.py`
+    "scikit-learn",  # version range defined in `core/_setup_utils.py`
+    "Pillow",  # version range defined in `core/_setup_utils.py`
+    "tqdm",  # version range defined in `core/_setup_utils.py`
+    "boto3",  # version range defined in `core/_setup_utils.py`
+    "requests>=2.21,<3",
+    "jsonschema<4.18",
+    "seqeval<1.3.0",
+    "evaluate<0.4.0",
+    "accelerate>=0.9,<0.17",
     "timm<0.7.0",
-    "torch>=1.9,<1.13",
-    "torchvision<0.14.0",
-    "torchtext<0.14.0",
-    "fairscale>=0.4.5,<=0.4.6",
+    "torch>=1.9,<1.14",
+    "torchvision<0.15.0",
+    "fairscale>=0.4.5,<0.4.14",
     "scikit-image>=0.19.1,<0.20.0",
-    "smart_open>=5.2.1,<5.3.0",
-    "pytorch_lightning>=1.7.4,<1.8.0",
-    "text-unidecode<=1.3",
+    "pytorch-lightning>=1.8.0,<1.10.0",
+    "text-unidecode<1.4",
     "torchmetrics>=0.8.0,<0.9.0",
-    "transformers>=4.23.0,<4.24.0",
-    "nptyping>=1.4.4,<1.5.0",
-    "omegaconf>=2.1.1,<2.2.0",
+    "transformers>=4.23.0,<4.27.0",
+    "nptyping>=1.4.4,<2.5.0",
+    "omegaconf>=2.1.1,<2.3.0",
     "sentencepiece>=0.1.95,<0.2.0",
     f"autogluon.core[raytune]=={version}",
     f"autogluon.features=={version}",
     f"autogluon.common=={version}",
-    "pytorch-metric-learning>=1.3.0,<1.4.0",
-    "nlpaug>=1.1.10,<=1.1.10",
+    "pytorch-metric-learning>=1.3.0,<2.0",
+    "nlpaug>=1.1.10,<1.2.0",
     "nltk>=3.4.5,<4.0.0",
-    "openmim>0.1.5,<=0.2.1",
-    "defusedxml>=0.7.1,<=0.7.1",
-    "albumentations>=1.1.0,<=1.2.0",
+    "openmim>0.1.5,<0.4.0",
+    "defusedxml>=0.7.1,<0.7.2",
+    "jinja2>=3.0.3,<3.2",
+    "tensorboard",
+    "pytesseract<0.3.11",
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 extras_require = {
     "tests": [
-        "black~=22.0,>=22.3",
+        "black>=22.3,<23.0",
         "isort>=5.10",
         "datasets>=2.3.2,<=2.3.2",
         "onnx>=1.13.0,<1.14.0",

@@ -8,8 +8,10 @@ import defusedxml.ElementTree as ET
 import numpy as np
 import pandas as pd
 
-from ..constants import AUTOMM, MAP
+from ..constants import AUTOMM, MAP, OBJECT_DETECTION
 from .download import download, is_url
+from .inference import predict
+from .save import setup_save_path
 
 logger = logging.getLogger(AUTOMM)
 
@@ -453,7 +455,8 @@ def from_coco(
         else:
             abs_path = os.path.join(root, entry["file_name"])
         if not os.path.exists(abs_path):
-            raise IOError("Image: {} not exists.".format(abs_path))
+            logger.warning(f"File skipped since not exists: {abs_path}.")
+            continue
         rois, _ = _check_load_coco_bbox(
             coco,
             entry,
@@ -1209,3 +1212,68 @@ def save_result_voc_format(pred, result_path):
     result_path = result_name + ".npy"
     np.save(result_path, pred)
     logger.info(25, f"Saved detection result to {result_path}")
+
+
+def evaluate_coco(
+    predictor,
+    anno_file_or_df: str,
+    metrics: str,
+    return_pred: Optional[bool] = False,
+    seed: Optional[int] = 123,
+    eval_tool: Optional[str] = None,
+):
+    """
+    Evaluate object detection model on a test dataset in COCO format.
+
+    Parameters
+    ----------
+    predictor
+        A predictor object.
+    anno_file
+        The annotation file in COCO format
+    return_pred
+        Whether to return the prediction result of each row.
+    eval_tool
+        The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
+    """
+    assert predictor._problem_type == OBJECT_DETECTION, (
+        f"predictor.evaluate_coco() is only supported when problem_type is {OBJECT_DETECTION}. "
+        f"Received problem_type={predictor._problem_type}."
+    )
+    if isinstance(anno_file_or_df, str):
+        anno_file = anno_file_or_df
+        data = from_coco_or_voc(anno_file, "test")  # TODO: maybe remove default splits hardcoding (only used in VOC)
+        if os.path.isdir(anno_file):
+            eval_tool = "torchmetrics"  # we can only use torchmetrics for VOC format evaluation.
+    else:
+        # during validation, it will call evaluate with df as input
+        anno_file = predictor._detection_anno_train
+        data = anno_file_or_df
+
+    outputs = predict(
+        predictor=predictor,
+        data=data,
+        requires_label=True,
+        seed=seed,
+    )  # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
+
+    # Cache prediction results as COCO format # TODO: refactor this
+    predictor._save_path = setup_save_path(
+        old_save_path=predictor._save_path,
+        warn_if_exist=False,
+    )
+    cocoeval_cache_path = os.path.join(predictor._save_path, "object_detection_result_cache.json")
+
+    eval_results = cocoeval(
+        outputs=outputs,
+        data=data,
+        anno_file=anno_file,
+        cache_path=cocoeval_cache_path,
+        metrics=metrics,
+        tool=eval_tool,
+    )
+
+    if return_pred:
+        return eval_results, outputs
+    else:
+        return eval_results

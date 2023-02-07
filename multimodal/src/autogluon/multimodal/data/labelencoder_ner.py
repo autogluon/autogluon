@@ -6,10 +6,9 @@ from typing import Any, Dict, List, Optional, Union
 import jsonschema
 import numpy as np
 import pandas as pd
-from nptyping import NDArray
 from omegaconf import DictConfig, OmegaConf
 
-from ..constants import AUTOMM, END_OFFSET, ENTITY_GROUP, NER_ANNOTATION, START_OFFSET
+from ..constants import AUTOMM, END_OFFSET, ENTITY_GROUP, NER_ANNOTATION, PROBABILITY, START_OFFSET
 from .utils import process_ner_annotations
 
 logger = logging.getLogger(AUTOMM)
@@ -22,6 +21,7 @@ class NerLabelEncoder:
 
     def __init__(self, config: DictConfig, entity_map: Optional[dict] = None):
         self.entity_map = entity_map
+        self.config = config
         model_config = config.model.ner_text
         self.ner_special_tags = OmegaConf.to_object(model_config.special_tags)
         self.prefix = config.model.names[0]
@@ -35,6 +35,7 @@ class NerLabelEncoder:
         _, entity_groups = self.extract_ner_annotations(y)
         self.unique_entity_groups = self.ner_special_tags + entity_groups
         self.entity_map = {entity: index for index, entity in enumerate(self.unique_entity_groups)}
+        self.config.entity_map = self.entity_map
         self.inverse_entity_map = {index: entity for index, entity in enumerate(self.unique_entity_groups)}
         logger.debug(f"Unique entity groups in the data: {entity_groups}")
 
@@ -71,8 +72,8 @@ class NerLabelEncoder:
         }
         all_annotations = []
         all_entity_groups = []
-        for ner_annotations in y.items():
-            json_ner_annotations = json.loads(ner_annotations[-1])  # load the json annotations
+        for _, ner_annotations in y.items():
+            json_ner_annotations = json.loads(ner_annotations)  # load the json annotations
             try:
                 jsonschema.validate(json_ner_annotations, schema)  # verify the json schema
             except jsonschema.ValidationError as e:
@@ -81,22 +82,20 @@ class NerLabelEncoder:
             sentence_annotations = []
             for annot in json_ner_annotations:
                 entity_group = annot[ENTITY_GROUP]
-                all_entity_groups.append(entity_group)
-                if self.entity_map is not None:
-                    if entity_group in self.entity_map:
-                        sentence_annotations.append(
-                            (
-                                (annot[START_OFFSET], annot[END_OFFSET]),
-                                self.entity_map[entity_group],
-                            )
-                        )
+                if not (
+                    re.match(self.b_prefix, entity_group, re.IGNORECASE)
+                    or re.match(self.i_prefix, entity_group, re.IGNORECASE)
+                ):
+                    all_entity_groups.append(self.b_prefix + entity_group)
+                    all_entity_groups.append(self.i_prefix + entity_group)
                 else:
-                    sentence_annotations.append(
-                        (
-                            (annot[START_OFFSET], annot[END_OFFSET]),
-                            entity_group,
-                        )
+                    all_entity_groups.append(entity_group)
+                sentence_annotations.append(
+                    (
+                        (annot[START_OFFSET], annot[END_OFFSET]),
+                        entity_group,
                     )
+                )
             all_annotations.append(sentence_annotations)
         unique_entity_groups = list(set(all_entity_groups))
         return all_annotations, unique_entity_groups
@@ -141,15 +140,12 @@ class NerLabelEncoder:
         all_annotations, _ = self.extract_ner_annotations(y)
         transformed_y = []
         for annotation, text_snippet in zip(all_annotations, x.items()):
-            word_label, _, _, _ = process_ner_annotations(annotation, text_snippet[-1], tokenizer, is_eval=True)
+            word_label, _, _, _ = process_ner_annotations(
+                annotation, text_snippet[-1], self.entity_map, tokenizer, is_eval=True
+            )
             word_label_invers = []
             for l in word_label:
                 entity_group = self.inverse_entity_map[l]
-                if (
-                    not (entity_group.startswith(self.b_prefix) or entity_group.startswith(self.i_prefix))
-                    and entity_group is not self.ner_special_tags[-1]
-                ):
-                    entity_group = self.b_prefix + entity_group
                 word_label_invers.append(entity_group)
             transformed_y.append(word_label_invers)
         return transformed_y
@@ -171,13 +167,21 @@ class NerLabelEncoder:
         pred_with_offset
             Predictions with both labels and the position (character offset) of the corresponding words.
         """
-        pred_label_only, pred_with_offset = [], []
-        for token_preds, offsets in y:
-            temp_pred, temp_offset = [], []
-            for token_pred, offset in zip(token_preds, offsets):
+        pred_label_only, pred_with_offset, pred_with_proba = [], [], []
+        for token_preds, offsets, pred_proba in y:
+            temp_pred, temp_offset, temp_proba = [], [], []
+            for token_pred, offset, probability in zip(token_preds, offsets, pred_proba):
                 inverse_pred_label = self.inverse_entity_map[token_pred]
                 temp_pred.append(inverse_pred_label)
-                if inverse_pred_label != self.ner_special_tags[-1]:
+                temp_proba.append(
+                    {
+                        ENTITY_GROUP: inverse_pred_label,
+                        START_OFFSET: offset[0],
+                        END_OFFSET: offset[1],
+                        PROBABILITY: {e: p for e, p in zip(list(self.entity_map.keys())[1:], probability[1:])},
+                    }
+                )
+                if inverse_pred_label not in self.ner_special_tags:
                     temp_offset.append(
                         {
                             ENTITY_GROUP: inverse_pred_label,
@@ -187,4 +191,5 @@ class NerLabelEncoder:
                     )
             pred_label_only.append(temp_pred)
             pred_with_offset.append(temp_offset)
-        return pred_label_only, pred_with_offset
+            pred_with_proba.append(temp_proba)
+        return pred_label_only, pred_with_offset, pred_with_proba

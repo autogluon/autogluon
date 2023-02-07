@@ -7,12 +7,10 @@ Code is partially adapted from its official implementation https://github.com/au
 import logging
 import random
 
-import nlpaug.augmenter.word as naw
 import nltk
 from PIL import Image, ImageEnhance, ImageOps
 
 from ..constants import AUTOMM, IMAGE, TEXT
-from .utils import InsertPunctuation
 
 logger = logging.getLogger(AUTOMM)
 
@@ -288,7 +286,13 @@ class TrivialAugment:
 
         if op == "identity":
             return data
-        elif op == "syn_replacement":
+
+        # lazy import of nlpaug due to the speed issue. See more in https://github.com/autogluon/autogluon/issues/2706
+        import nlpaug.augmenter.word as naw
+
+        from ..utils.nlpaug import InsertPunctuation
+
+        if op == "syn_replacement":
             op = naw.SynonymAug(aug_src="wordnet", aug_p=scale, aug_max=None)
         elif op == "random_swap":
             op = naw.RandomWordAug(action="swap", aug_p=scale, aug_max=None)

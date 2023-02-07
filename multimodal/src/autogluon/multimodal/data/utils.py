@@ -1,17 +1,34 @@
+import ast
 import codecs
 import random
+import re
 import warnings
 from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from nlpaug import Augmenter
-from nlpaug.util import Method
 from text_unidecode import unidecode
+from timm.data.constants import (
+    IMAGENET_DEFAULT_MEAN,
+    IMAGENET_DEFAULT_STD,
+    IMAGENET_INCEPTION_MEAN,
+    IMAGENET_INCEPTION_STD,
+)
+from torchvision import transforms
 
-from ..constants import IDENTIFIER, MMLAB_MODELS
+from ..constants import CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, IDENTIFIER, IMAGE, MMLAB_MODELS
 from .collator import DictCollator
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
+
+try:
+    from torchvision.transforms import InterpolationMode
+
+    BICUBIC = InterpolationMode.BICUBIC
+except ImportError:
+    BICUBIC = PIL.Image.BICUBIC
+
+from .randaug import RandAugment
+from .trivial_augmenter import TrivialAugment
 
 
 def extract_value_from_config(
@@ -42,90 +59,6 @@ def extract_value_from_config(
             pass
 
     return result
-
-
-class InsertPunctuation(Augmenter):
-    """
-    Inherit nlpaug basic augmenter to support insert random punction at random location https://arxiv.org/pdf/2108.13230.pdf
-
-    example:
-    a healthy ,clean , sweet little girl in Mantin . send me message if you can give her a nice home
-    ? a ! healthy ,clean , sweet little : girl , in Mantin . send me message . if you ; can give her ? a nice home
-    """
-
-    def __init__(
-        self,
-        name="Insert_Punc",
-        aug_min=1,
-        aug_max=50,
-        aug_p=0.3,
-    ):
-        """
-        Parameters
-        ----------
-        name
-            name used when print out augmentation function
-        aug_min
-            minimum number of punctuation to insert
-        aug_max
-            maximum number of punctuation to insert
-        aug_p
-            how many punctuation to insert calculated as aug_p * sentence length
-        """
-        super().__init__(
-            name=name,
-            method=Method.WORD,
-            action="insert",
-            aug_min=aug_min,
-            aug_max=aug_max,
-            aug_p=aug_p,
-            device="cpu",
-            include_detail=False,
-            verbose=0,
-        )
-        self.punc_list = [".", ",", "!", "?", ";", ":"]
-
-    def insert(self, data):
-        """
-        Random insert random punctuation at random location https://arxiv.org/pdf/2108.13230.pdf
-
-        Parameters
-        --------
-        data: text
-
-
-        Returns
-        --------
-        The augmented text
-
-        """
-        words = data.split(" ")
-        cnt = random.randint(1, int(self.aug_p * len(words)))
-        loc = random.sample(range(0, len(words)), cnt)
-        new = []
-
-        for i, word in enumerate(words):
-            if i in loc:
-                new.append(self.punc_list[random.randint(0, len(self.punc_list) - 1)])
-                new.append(word)
-            else:
-                new.append(word)
-
-        new = " ".join(new)
-        return new
-
-    @classmethod
-    def clean(cls, data):
-        if isinstance(data, list):
-            return [d.strip() if d else d for d in data]
-        return data.strip()
-
-    @classmethod
-    def is_duplicate(cls, dataset, data):
-        for d in dataset:
-            if d == data:
-                return True
-        return False
 
 
 def get_collate_fn(
@@ -313,7 +246,7 @@ def normalize_txt(text: str) -> str:
     return text
 
 
-def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False):
+def process_ner_annotations(ner_annotations, ner_text, entity_map, tokenizer, is_eval=False):
     """
     Generate token-level/word-level labels with given text and NER annotations.
 
@@ -323,6 +256,8 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
         The NER annotations.
     ner_text
         The corresponding raw text.
+    entity_map
+        The map between tags and tag indexes. e.g., {"PER":2, "LOC":3}.
     tokenizer
         The tokenizer to be used.
     is_eval
@@ -336,13 +271,27 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
     num_words = len(set(token_to_word_mappings)) - 1
     word_label = [1] * num_words
     # TODO: Potentially optimize word label generation via binary search
-    for idx, word_offset in enumerate(word_offsets[:num_words, :]):
-        for annot in ner_annotations:
-            custom_offset = annot[0]
-            custom_label = annot[1]
+    b_prefix = "B-"
+    i_prefix = "I-"
+    for annot in ner_annotations:
+        custom_offset = annot[0]
+        custom_label = annot[1]
+        is_start_word = True
+        for idx, word_offset in enumerate(word_offsets[:num_words, :]):
             # support multiple words in an annotated offset range.
-            if word_offset[0] >= custom_offset[0] and word_offset[1] <= custom_offset[1]:
-                word_label[idx] = custom_label
+            # Allow partial overlapping between custom annotations and pretokenized words.
+            if (word_offset[0] < custom_offset[1]) and (custom_offset[0] < word_offset[1]):
+                if not (
+                    re.match(b_prefix, custom_label, re.IGNORECASE) or re.match(i_prefix, custom_label, re.IGNORECASE)
+                ):
+                    if is_start_word and b_prefix + custom_label in entity_map:
+                        word_label[idx] = entity_map[b_prefix + custom_label]
+                        is_start_word = False
+                    elif i_prefix + custom_label in entity_map:
+                        word_label[idx] = entity_map[i_prefix + custom_label]
+                else:
+                    if custom_label in entity_map:
+                        word_label[idx] = entity_map[custom_label]
 
     token_label = [0] * len(col_tokens.input_ids)
     temp = set()
@@ -378,7 +327,7 @@ def tokenize_ner_text(text, tokenizer):
     """
     # pre-tokenization is required for NER token-level label generation.
     words_with_offsets = tokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-    words_with_offsets = is_space_counted(words_with_offsets)
+    words_with_offsets = is_space_counted(words_with_offsets) if len(words_with_offsets) > 1 else words_with_offsets
     words = [word for word, offset in words_with_offsets]
     word_offsets = np.array([[offset[0], offset[1]] for word, offset in words_with_offsets], dtype=np.int32)
     col_tokens = tokenizer(
@@ -390,12 +339,21 @@ def tokenize_ner_text(text, tokenizer):
         max_length=tokenizer.model_max_length,
         return_token_type_ids=True,
     )
-    # token to word mappings: it will tell us which token belongs to which word.
-    token_to_word_mappings = [i if i != None else -1 for i in col_tokens.word_ids()]
-    if len(set(token_to_word_mappings)) != len(words) + 1:
-        warnings.warn(f"The token to word mappings are incorrect!")
     offset_mapping = np.array(col_tokens.offset_mapping, dtype=np.int32)
-    word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
+    if len(words_with_offsets) > 1:
+        word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
+        # token to word mappings: it will tell us which token belongs to which word.
+        token_to_word_mappings = [i if i != None else -1 for i in col_tokens.word_ids()]
+        if len(set(token_to_word_mappings)) != len(words) + 1:
+            warnings.warn(f"The token to word mappings are incorrect!")
+    else:
+        # If pre_tokenizer does not give word offsets, use word_ids and offset_mappings instead.
+        word_offsets = np.append(offset_mapping[1:], [[0, 0]], axis=0)
+        word_idx = np.arange(len(col_tokens.word_ids()) - col_tokens.word_ids().count(None))
+        token_to_word_mappings = [
+            val + word_idx[idx - 1] if val != None else -1 for idx, val in enumerate(col_tokens.word_ids())
+        ]
+
     return col_tokens, token_to_word_mappings, word_offsets
 
 
@@ -443,3 +401,139 @@ def is_rois_input(sample):
     bool, whether a sample is rois for object detection
     """
     return isinstance(sample, list) and len(sample) and isinstance(sample[0], list) and len(sample[0]) == 5
+
+
+def get_text_token_max_len(provided_max_len, config, tokenizer, checkpoint_name):
+    """
+    Compute the allowable max length of token sequences.
+
+    Parameters
+    ----------
+    provided_max_len
+        The provided max length.
+    config
+        Model config.
+    tokenizer
+        Text tokenizer.
+    checkpoint_name
+        Name of checkpoint.
+
+    Returns
+    -------
+    Token sequence max length.
+    """
+    if hasattr(config, "relative_attention") and config.relative_attention:
+        default_max_len = tokenizer.model_max_length
+    elif hasattr(config, "position_embedding_type") and "relative" in config.position_embedding_type:
+        default_max_len = tokenizer.model_max_length
+    elif hasattr(config, "max_position_embeddings"):
+        default_max_len = config.max_position_embeddings
+    else:
+        default_max_len = tokenizer.model_max_length
+
+    if provided_max_len is None or provided_max_len <= 0:
+        max_len = default_max_len
+    else:
+        if provided_max_len < default_max_len:
+            if default_max_len < 10**6:  # Larger than this value usually means infinite.
+                warnings.warn(
+                    f"provided max length: {provided_max_len} "
+                    f"is smaller than {checkpoint_name}'s default: {default_max_len}"
+                )
+        max_len = min(provided_max_len, default_max_len)
+
+    return max_len
+
+
+def construct_image_processor(
+    size,
+    normalization,
+    transform_types: List[str],
+) -> transforms.Compose:
+    """
+    Build up an image processor from the provided list of transform types.
+
+    Parameters
+    ----------
+    transform_types
+        A list of image transform types.
+
+    Returns
+    -------
+    A torchvision transform.
+    """
+    processor = []
+    for trans_type in transform_types:
+        args = None
+        kargs = None
+        if "(" in trans_type:
+            trans_mode = trans_type[0 : trans_type.find("(")]
+            if "{" in trans_type:
+                kargs = ast.literal_eval(trans_type[trans_type.find("{") : trans_type.rfind(")")])
+            else:
+                args = ast.literal_eval(trans_type[trans_type.find("(") :])
+        else:
+            trans_mode = trans_type
+
+        if trans_mode == "resize_to_square":
+            processor.append(transforms.Resize((size, size), interpolation=BICUBIC))
+        elif trans_mode == "resize_shorter_side":
+            processor.append(transforms.Resize(size, interpolation=BICUBIC))
+        elif trans_mode == "center_crop":
+            processor.append(transforms.CenterCrop(size))
+        elif trans_mode == "horizontal_flip":
+            processor.append(transforms.RandomHorizontalFlip())
+        elif trans_mode == "vertical_flip":
+            processor.append(transforms.RandomVerticalFlip())
+        elif trans_mode == "color_jitter":
+            if kargs is not None:
+                processor.append(transforms.ColorJitter(**kargs))
+            elif args is not None:
+                processor.append(transforms.ColorJitter(*args))
+            else:
+                processor.append(transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1))
+        elif trans_mode == "affine":
+            if kargs is not None:
+                processor.append(transforms.RandomAffine(**kargs))
+            elif args is not None:
+                processor.append(transforms.RandomAffine(*args))
+            else:
+                processor.append(transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)))
+        elif trans_mode == "randaug":
+            if kargs is not None:
+                processor.append(RandAugment(**kargs))
+            elif args is not None:
+                processor.append(RandAugment(*args))
+            else:
+                processor.append(RandAugment(2, 9))
+        elif trans_mode == "trivial_augment":
+            processor.append(TrivialAugment(IMAGE, 30))
+        else:
+            raise ValueError(f"unknown transform type: {trans_mode}")
+
+    processor.append(transforms.ToTensor())
+    processor.append(normalization)
+    return transforms.Compose(processor)
+
+
+def image_mean_std(norm_type: str):
+    """
+    Get image normalization mean and std by its name.
+
+    Parameters
+    ----------
+    norm_type
+        Name of image normalization.
+
+    Returns
+    -------
+    Normalization mean and std.
+    """
+    if norm_type == "inception":
+        return IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
+    elif norm_type == "imagenet":
+        return IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+    elif norm_type == "clip":
+        return CLIP_IMAGE_MEAN, CLIP_IMAGE_STD
+    else:
+        raise ValueError(f"unknown image normalization: {norm_type}")

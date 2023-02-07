@@ -8,8 +8,8 @@ from typing import Callable, List, Tuple
 
 import numpy as np
 import pandas as pd
-import psutil
 import scipy.stats
+from numpy.typing import ArrayLike
 from pandas import DataFrame, Series
 from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold, LeaveOneGroupOut
 from sklearn.model_selection import train_test_split
@@ -261,7 +261,10 @@ def get_pred_from_proba_df(y_pred_proba, problem_type=BINARY):
 
 def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
     if problem_type == BINARY:
-        y_pred = [1 if pred >= 0.5 else 0 for pred in y_pred_proba]
+        # Using > instead of >= to align with Pandas `.idxmax` logic which picks the left-most column during ties.
+        # If this is not done, then predictions can be inconsistent when converting in binary classification from multiclass-form pred_proba and
+        # binary-form pred_proba when the pred_proba is 0.5 for positive and negative classes.
+        y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_proba]
     elif problem_type == REGRESSION:
         y_pred = y_pred_proba
     elif problem_type == QUANTILE:
@@ -271,6 +274,39 @@ def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
         if not len(y_pred_proba) == 0:
             y_pred = np.argmax(y_pred_proba, axis=1)
     return y_pred
+
+
+def convert_pred_probas_to_df(pred_proba_list: List[ArrayLike],
+                              columns: List[str],
+                              problem_type: str,
+                              index: pd.Index = None) -> DataFrame:
+    """
+    Converts a list of pred_proba model outputs to a DataFrame
+
+    Parameters
+    ----------
+    pred_proba_list : List[ArrayLike]
+        A list of prediction probabilities.
+        Each element is a numpy array or ndarray of prediction probabilities for a given model.
+    columns : List[str]
+        The column names for the output DataFrame
+    problem_type : str
+        The problem type. This informs the way in which the DataFrame is constructed.
+    index : pd.Index, default = None
+        If specified, sets the output DataFrame's index.
+
+    Returns
+    -------
+    DataFrame
+    """
+    if problem_type in [MULTICLASS, SOFTCLASS, QUANTILE]:
+        pred_proba_list = np.concatenate(pred_proba_list, axis=1)
+        pred_proba_df = pd.DataFrame(data=pred_proba_list, columns=columns)
+    else:
+        pred_proba_df = pd.DataFrame(data=np.asarray(pred_proba_list).T, columns=columns)
+    if index is not None:
+        pred_proba_df.set_index(index, inplace=True)
+    return pred_proba_df
 
 
 def extract_label(data: DataFrame, label: str) -> (DataFrame, Series):
@@ -915,7 +951,7 @@ def _get_safe_fi_batch_count(X, num_features, X_transformed=None, max_memory_rat
     X_size_bytes = sys.getsizeof(pickle.dumps(X, protocol=4))
     if X_transformed is not None:
         X_size_bytes += sys.getsizeof(pickle.dumps(X_transformed, protocol=4))
-    available_mem = psutil.virtual_memory().available
+    available_mem = ResourceManager.get_available_virtual_mem()
     X_memory_ratio = X_size_bytes / available_mem
 
     feature_batch_count_safe = math.floor(max_memory_ratio / X_memory_ratio)

@@ -19,7 +19,6 @@ class AbstractAnalysis(ABC, StateCheckMixin):
         state: Optional[AnalysisState] = None,
         **kwargs,
     ) -> None:
-
         self.parent = parent
         self.children: List[AbstractAnalysis] = [] if children is None else children
         self.state: Optional[AnalysisState] = state

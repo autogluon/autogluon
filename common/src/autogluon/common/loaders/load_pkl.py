@@ -1,4 +1,3 @@
-import boto3
 import io
 import logging
 import pickle
@@ -23,6 +22,7 @@ def load(path, format=None, verbose=True, **kwargs):
             raise RecursionError('content_path == path! : ' + str(path))
         return load(path=content_path)
     elif format == 's3':
+        import boto3
         if verbose:
             logger.log(15, 'Loading: %s' % path)
         s3_bucket, s3_prefix = s3_utils.s3_path_to_bucket_prefix(s3_path=path)
@@ -60,6 +60,7 @@ def load_with_fn(path, pickle_fn, format=None, verbose=True):
             raise RecursionError('content_path == path! : ' + str(path))
         return load_with_fn(content_path, pickle_fn)
     elif format == 's3':
+        import boto3
         if verbose:
             logger.log(15, 'Loading: %s' % path)
         s3_bucket, s3_prefix = s3_utils.s3_path_to_bucket_prefix(s3_path=path)

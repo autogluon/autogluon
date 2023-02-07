@@ -7,6 +7,7 @@ import pprint
 import shutil
 import time
 from typing import Union, List, Tuple
+import warnings
 
 import networkx as nx
 import numpy as np
@@ -93,6 +94,12 @@ class TabularPredictor:
         Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
         If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
         where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
+        Verbosity levels:
+            0: Only log exceptions
+            1: Only log warnings + exceptions
+            2: Standard logging
+            3: Verbose logging (ex: log validation score every 50 iterations)
+            4: Maximally verbose logging (ex: log validation score every iteration)
     sample_weight : str, default = None
         If specified, this column-name indicates which column of the data should be treated as sample weights. This column will NOT be considered as a predictive feature.
         Sample weights should be non-negative (and cannot be nan), with larger values indicating which rows are more important than others.
@@ -1370,6 +1377,7 @@ class TabularPredictor:
         data = self.__get_dataset(data)
         return self._learner.predict(X=data, model=model, as_pandas=as_pandas, transform_features=transform_features)
 
+    # TODO: v0.8: Error if called with self.problem_type='regression' or 'quantile'
     def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=True, transform_features=True):
         """
         Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
@@ -1407,6 +1415,12 @@ class TabularPredictor:
         """
         self._assert_is_fit('predict_proba')
         data = self.__get_dataset(data)
+        if self.problem_type in [REGRESSION, QUANTILE]:
+            warnings.warn(
+                f'Calling `predictor.predict_proba` when problem_type={self.problem_type} will raise an AssertionError starting in AutoGluon v0.8. '
+                'Please call `predictor.predict` instead.',
+                category=FutureWarning
+            )
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass, transform_features=transform_features)
 
     def evaluate(self, data, model=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
@@ -1477,7 +1491,13 @@ class TabularPredictor:
         return self._learner.evaluate_predictions(y_true=y_true, y_pred=y_pred, sample_weight=sample_weight, silent=silent,
                                                   auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
-    def leaderboard(self, data=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, skip_score=False, silent=False):
+    def leaderboard(self,
+                    data=None,
+                    extra_info: bool = False,
+                    extra_metrics: list = None,
+                    only_pareto_frontier: bool = False,
+                    skip_score: bool = False,
+                    silent: bool = False) -> pd.DataFrame:
         """
         Output summary of information about models produced during `fit()` as a :class:`pd.DataFrame`.
         Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
@@ -1601,9 +1621,125 @@ class TabularPredictor:
         :class:`pd.DataFrame` of model performance summary information.
         """
         self._assert_is_fit('leaderboard')
-        data = self.__get_dataset(data) if data is not None else data
+        data = self.__get_dataset(data, allow_nan=True)
         return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
                                          only_pareto_frontier=only_pareto_frontier, skip_score=skip_score, silent=silent)
+
+    def predict_proba_multi(self,
+                            data=None,
+                            models: List[str] = None,
+                            as_pandas: bool = True,
+                            as_multiclass: bool = True,
+                            transform_features: bool = True,
+                            inverse_transform: bool = True) -> dict:
+        """
+        Returns a dictionary of prediction probabilities where the key is
+        the model name and the value is the model's prediction probabilities on the data.
+
+        Equivalent output to:
+        ```
+        predict_proba_dict = {}
+        for m in models:
+            predict_proba_dict[m] = predictor.predict_proba(data, model=m)
+        ```
+
+        Note that this will generally be much faster than calling `self.predict_proba` separately for each model
+        because this method leverages the model dependency graph to avoid redundant computation.
+
+        Parameters
+        ----------
+        data : str or DataFrame, default = None
+            The data to predict on.
+            If None:
+                If self.trainer.has_val, the validation data is used.
+                Else, the out-of-fold prediction probabilities are used.
+        models : List[str], default = None
+            The list of models to get predictions for.
+            If None, all models that can infer are used.
+        as_pandas : bool, default = True
+            Whether to return the output of each model as a pandas object (True) or numpy array (False).
+            Pandas object is a DataFrame if this is a multiclass problem or `as_multiclass=True`, otherwise it is a Series.
+            If the output is a DataFrame, the column order will be equivalent to `predictor.class_labels`.
+        as_multiclass : bool, default = True
+            Whether to return binary classification probabilities as if they were for multiclass classification.
+                Output will contain two columns, and if `as_pandas=True`, the column names will correspond to the binary class labels.
+                The columns will be the same order as `predictor.class_labels`.
+            If False, output will contain only 1 column for the positive class (get positive_class name via `predictor.positive_class`).
+            Only impacts output for binary classification problems.
+        transform_features : bool, default = True
+            If True, preprocesses data before predicting with models.
+            If False, skips global feature preprocessing.
+                This is useful to save on inference time if you have already called `data = predictor.transform_features(data)`.
+        inverse_transform : bool, default = True
+            If True, will return prediction probabilities in the original format.
+            If False (advanced), will return prediction probabilities in AutoGluon's internal format.
+
+        Returns
+        -------
+        Dictionary with model names as keys and model prediction probabilities as values.
+        """
+        self._assert_is_fit('predict_proba_multi')
+        data = self.__get_dataset(data, allow_nan=True)
+        return self._learner.predict_proba_multi(X=data,
+                                                 models=models,
+                                                 as_pandas=as_pandas,
+                                                 as_multiclass=as_multiclass,
+                                                 transform_features=transform_features,
+                                                 inverse_transform=inverse_transform)
+
+    def predict_multi(self,
+                      data=None,
+                      models: List[str] = None,
+                      as_pandas: bool = True,
+                      transform_features: bool = True,
+                      inverse_transform: bool = True) -> dict:
+        """
+        Returns a dictionary of predictions where the key is
+        the model name and the value is the model's prediction probabilities on the data.
+
+        Equivalent output to:
+        ```
+        predict_dict = {}
+        for m in models:
+            predict_dict[m] = predictor.predict(data, model=m)
+        ```
+
+        Note that this will generally be much faster than calling `self.predict` separately for each model
+        because this method leverages the model dependency graph to avoid redundant computation.
+
+        Parameters
+        ----------
+        data : DataFrame, default = None
+            The data to predict on.
+            If None:
+                If self.trainer.has_val, the validation data is used.
+                Else, the out-of-fold prediction probabilities are used.
+        models : List[str], default = None
+            The list of models to get predictions for.
+            If None, all models that can infer are used.
+        as_pandas : bool, default = True
+            Whether to return the output of each model as a pandas object (True) or numpy array (False).
+            Pandas object is a DataFrame if this is a multiclass problem, otherwise it is a Series.
+            If the output is a DataFrame, the column order will be equivalent to `predictor.class_labels`.
+        transform_features : bool, default = True
+            If True, preprocesses data before predicting with models.
+            If False, skips global feature preprocessing.
+                This is useful to save on inference time if you have already called `data = predictor.transform_features(data)`.
+        inverse_transform : bool, default = True
+            If True, will return predictions in the original format.
+            If False (advanced), will return predictions in AutoGluon's internal format.
+
+        Returns
+        -------
+        Dictionary with model names as keys and model predictions as values.
+        """
+        self._assert_is_fit('predict_multi')
+        data = self.__get_dataset(data, allow_nan=True)
+        return self._learner.predict_multi(X=data,
+                                           models=models,
+                                           as_pandas=as_pandas,
+                                           transform_features=transform_features,
+                                           inverse_transform=inverse_transform)
 
     def fit_summary(self, verbosity=3, show_plot=False):
         """
@@ -1802,7 +1938,7 @@ class TabularPredictor:
 
         """
         self._assert_is_fit('transform_features')
-        data = self.__get_dataset(data) if data is not None else data
+        data = self.__get_dataset(data, allow_nan=True)
         return self._learner.get_inputs_to_stacker(dataset=data, model=model, base_models=base_models,
                                                    use_orig_features=return_original_features)
 
@@ -1942,7 +2078,7 @@ class TabularPredictor:
             'pXX_low': Lower end of XX% confidence interval for true feature importance score.
         """
         self._assert_is_fit('feature_importance')
-        data = self.__get_dataset(data) if data is not None else data
+        data = self.__get_dataset(data, allow_nan=True)
         if (data is None) and (not self._trainer.is_data_saved):
             raise AssertionError(
                 'No data was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPredictor` init `learner_kwargs` argument call to enable this functionality when data is not specified.')
@@ -2822,8 +2958,13 @@ class TabularPredictor:
             print(msg + ": " + str(results[key]))
 
     @staticmethod
-    def __get_dataset(data):
-        if isinstance(data, TabularDataset):
+    def __get_dataset(data, allow_nan: bool = False):
+        if data is None:
+            if allow_nan:
+                return data
+            else:
+                raise TypeError("data=None is invalid. data must be a TabularDataset or pandas.DataFrame or str file path to data")
+        elif isinstance(data, TabularDataset):
             return data
         elif isinstance(data, pd.DataFrame):
             return TabularDataset(data)

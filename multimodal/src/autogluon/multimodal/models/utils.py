@@ -548,7 +548,7 @@ def get_hf_config_and_model(
     Parameters
     ----------
     checkpoint_name
-        A model checkpoint name.
+        A model checkpoint name or a local path that saves a custom checkpoint.
     pretrained
          Whether using the pretrained weights. If pretrained=True, download the pretrained model.
     low_cpu_mem_usage
@@ -687,18 +687,24 @@ def update_mmdet_config(key, value, config):
 
 
 def run_model(model: nn.Module, batch: dict):
+    from .document_transformer import DocumentTransformer
+    from .huggingface_text import HFAutoModelForTextPrediction
     from .timm_image import TimmAutoModelForImagePrediction
 
-    if isinstance(model, TimmAutoModelForImagePrediction):
+    supported_models = (TimmAutoModelForImagePrediction, HFAutoModelForTextPrediction)
+    if (not isinstance(model, DocumentTransformer)) and isinstance(model, supported_models):
         input_vec = [batch[k] for k in model.input_keys]
         column_names, column_values = [], []
         for k in batch.keys():
-            if k.startswith(model.image_column_prefix):
+            if (isinstance(model, TimmAutoModelForImagePrediction) and k.startswith(model.image_column_prefix)) or (
+                isinstance(model, HFAutoModelForTextPrediction) and k.startswith(model.text_column_prefix)
+            ):
                 column_names.append(k)
                 column_values.append(batch[k])
         input_vec.append(column_names)
         input_vec.append(column_values)
-        output = model(*tuple(input_vec))
+        output_vec = model(*tuple(input_vec))
+        output = model.get_output_dict(*output_vec)
     else:
         output = model(batch)
     return output

@@ -289,20 +289,23 @@ def test_DistributionFit__happy_path():
         ],
     )
     assert state.distributions_fit.train_data.a == {
-        "dweibull": {
-            "param": (1.9212313611673846, 3.5000360875942134, 1.6939405342565321),
-            "statistic": 0.12094344045455918,
-            "pvalue": 0.9998695812922455,
-        },
         "dgamma": {
             "param": (2.7071122240167984, 3.4999828973430622, 0.5541010748597517),
-            "statistic": 0.12375823666401586,
             "pvalue": 0.9997989026208239,
+            "shapes": ["a", "loc", "scale"],
+            "statistic": 0.12375823666401586,
+        },
+        "dweibull": {
+            "param": (1.9212313611673846, 3.5000360875942134, 1.6939405342565321),
+            "pvalue": 0.9998695812922455,
+            "shapes": ["c", "loc", "scale"],
+            "statistic": 0.12094344045455918,
         },
         "logistic": {
             "param": (3.5, 1.0421523470240495),
-            "statistic": 0.14168404087671216,
             "pvalue": 0.9981811820582718,
+            "shapes": ["loc", "scale"],
+            "statistic": 0.14168404087671216,
         },
     }
 
@@ -312,7 +315,6 @@ def test_DistributionFit__happy_path():
         pvalue_min=0.9,
         distributions_to_fit=["dweibull", "dgamma", "logistic", "lognorm"],
     )
-    a.logger.warning = MagicMock()
 
     state = auto.analyze(
         train_data=df,
@@ -320,9 +322,6 @@ def test_DistributionFit__happy_path():
         anlz_facets=[a],
     )
     assert state.distributions_fit.train_data.e is None
-    a.logger.warning.assert_called_with(
-        "e: none of the distributions were able to fit to satisfy specified pvalue_min: 0.9"
-    )
 
 
 def test_DistributionFit__constructor_defaults():

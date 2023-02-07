@@ -1,5 +1,6 @@
 #!/bin/bash
 python3 -m pip uninstall -y autogluon
+python3 -m pip uninstall -y autogluon.eda
 python3 -m pip uninstall -y autogluon.vision
 python3 -m pip uninstall -y autogluon.text
 python3 -m pip uninstall -y autogluon.multimodal
@@ -36,12 +37,14 @@ cd text/
 python3 -m pip install -e .
 cd ..
 
-cd vision/
-python3 -m pip install -e .
-cd ..
-
 cd timeseries/
 python3 -m pip install -e .[all,tests]
+cd ..
+
+cd eda/
+python3 -m pip install -e .[tests]
+# Resolve awscli and tox conflict
+python3 -m pip install "colorama<0.4.5,>=0.2.5"
 cd ..
 
 cd autogluon/

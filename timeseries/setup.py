@@ -24,22 +24,24 @@ submodule = "timeseries"
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
     "joblib~=1.1",
-    "numpy",
-    "scipy",
-    "pandas",
+    "numpy",  # version range defined in `core/_setup_utils.py`
+    "scipy",  # version range defined in `core/_setup_utils.py`
+    "pandas",  # version range defined in `core/_setup_utils.py`
     "statsmodels~=0.13.0",
-    "gluonts~=0.11.0",
-    "torch>=1.9,<1.13",
-    "pytorch-lightning>=1.7.4,<1.8.0",
-    "networkx",
-    "tqdm",
+    "gluonts~=0.12.0",
+    "torch>=1.9,<1.14",
+    "pytorch-lightning>=1.7.4,<1.9.0",
+    "networkx",  # version range defined in `core/_setup_utils.py`
+    "statsforecast==1.4.0",
+    "tqdm",  # version range defined in `core/_setup_utils.py`
+    "ujson",  # needed to silence GluonTS warning
     f"autogluon.core[raytune]=={version}",
     f"autogluon.common=={version}",
     f"autogluon.tabular[catboost,lightgbm,xgboost]=={version}",
 ]
 
 extras_require = {
-    "tests": ["pytest", "flake8~=4.0", "flaky~=3.7", "pytest-timeout~=2.1", "isort>=5.10", "black~=22.0,>=22.3"],
+    "tests": ["pytest", "flake8~=4.0", "flaky~=3.7", "pytest-timeout~=2.1", "isort>=5.10", "black>=22.3,<23.0"],
     "sktime": ["sktime>=0.13.1,<0.14", "pmdarima~=1.8.2", "tbats~=1.1"],
 }
 

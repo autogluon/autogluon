@@ -22,11 +22,6 @@ from autogluon.timeseries.utils.random import set_random_seed
 
 logger = logging.getLogger(__name__)
 
-DEPRECATED_PRESETS_TO_FALLBACK = {
-    "low_quality": "fast_training",
-    "good_quality": "high_quality",
-}
-
 SUPPORTED_FREQUENCIES = {"D", "W", "M", "Q", "A", "Y", "H", "T", "min", "S"}
 
 
@@ -279,8 +274,10 @@ class TimeSeriesPredictor:
 
             If ``known_covariates_names`` were specified when creating the predictor, ``train_data`` must include the
             columns listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
-            The known covariates must have a numeric (float or integer) dtype. Columns of ``train_data`` except
-            ``target`` and those listed in ``known_covariates_names`` will be ignored.
+            The known covariates must have a numeric (float or integer) dtype.
+
+            Columns of ``train_data`` except ``target`` and those listed in ``known_covariates_names`` will be
+            interpreted as ``past_covariates`` - covariates that are known only in the past.
 
             If ``train_data`` has static features (i.e., ``train_data.static_features`` is a pandas DataFrame), the
             predictor will interpret columns with ``int`` and ``float`` dtypes as continuous (real-valued) features,
@@ -311,8 +308,8 @@ class TimeSeriesPredictor:
             the columns listed in ``known_covariates_names`` with the covariates values aligned with the target time
             series.
 
-            If ``train_data`` has static features, ``tuning_data`` must have also have static features with the same
-            column names and dtypes.
+            If ``train_data`` has past covariates or static features, ``tuning_data`` must have also include them (with
+            same columns names and dtypes).
 
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.
@@ -459,14 +456,6 @@ class TimeSeriesPredictor:
         logger.info("================ TimeSeriesPredictor ================")
         logger.info("TimeSeriesPredictor.fit() called")
         if presets is not None:
-            if presets in DEPRECATED_PRESETS_TO_FALLBACK:
-                new_presets = DEPRECATED_PRESETS_TO_FALLBACK[presets]
-                warnings.warn(
-                    f"Presets {presets} are deprecated as of version 0.6.0. Please see the documentation for "
-                    f"TimeSeriesPredictor.fit for the list of available presets. "
-                    f"Falling back to presets='{new_presets}'."
-                )
-                presets = new_presets
             logger.info(f"Setting presets to: {presets}")
         logger.info("Fitting with arguments:")
         logger.info(f"{pprint.pformat(fit_args)}")
@@ -521,8 +510,8 @@ class TimeSeriesPredictor:
             If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
             listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
 
-            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
-            static features that have the same columns and dtypes.
+            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
+            must also include them (with same column names and dtypes).
 
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.
@@ -572,12 +561,12 @@ class TimeSeriesPredictor:
         """
         if "quantile_levels" in kwargs:
             warnings.warn(
-                "Passing `quantile_levels` as a keyword argument to `TimeSeriesPredictor.predict` is deprecated and "
-                "will be removed in v0.7. This might also lead to some models not working properly. "
-                "Please specify the desired quantile levels when creating the predictor as "
-                "`TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
+                "Passing `quantile_levels` as a keyword argument to `TimeSeriesPredictor.predict` is deprecated as of "
+                "v0.7. This argument is ignored. Please specify the desired quantile levels when creating the "
+                "predictor as `TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
                 category=DeprecationWarning,
             )
+            kwargs.pop("quantile_levels")
         if random_seed is not None:
             set_random_seed(random_seed)
         data = self._check_and_prepare_data_frame(data)
@@ -596,8 +585,8 @@ class TimeSeriesPredictor:
             If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
             listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
 
-            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
-            static features that have the same columns and dtypes.
+            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
+            must also include them (with same column names and dtypes).
 
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.
@@ -694,8 +683,8 @@ class TimeSeriesPredictor:
             If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
             listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
 
-            If ``train_data`` used to train the predictor contained static features, then ``data`` must also contain
-            static features that have the same columns and dtypes.
+            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
+            must also include them (with same column names and dtypes).
 
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.

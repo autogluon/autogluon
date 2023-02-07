@@ -1,4 +1,5 @@
 import functools
+import json
 import logging
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -13,6 +14,8 @@ from ..constants import (
     CATEGORICAL_MLP,
     CATEGORICAL_TRANSFORMER,
     CLIP,
+    DOCUMENT,
+    DOCUMENT_TRANSFORMER,
     FUSION_MLP,
     FUSION_NER,
     FUSION_TRANSFORMER,
@@ -36,6 +39,7 @@ from ..models import (
     CategoricalMLP,
     CategoricalTransformer,
     CLIPForImageText,
+    DocumentTransformer,
     HFAutoModelForNER,
     HFAutoModelForTextPrediction,
     MMDetAutoModelForObjectDetection,
@@ -96,6 +100,8 @@ def select_model(
         data_status[NUMERICAL] = True
     if len(df_preprocessor.ner_feature_names) > 0:
         data_status[TEXT_NER] = True
+    if len(df_preprocessor.document_feature_names) > 0:
+        data_status[DOCUMENT] = True
 
     names = config.model.names
     if isinstance(names, str):
@@ -137,6 +143,12 @@ def select_model(
     logger.debug(f"selected models: {selected_model_names}")
     for model_name in selected_model_names:
         logger.debug(f"model dtypes: {getattr(config.model, model_name).data_types}")
+
+    # clean up unused model configs
+    model_keys = list(config.model.keys())
+    for model_name in model_keys:
+        if model_name not in selected_model_names + ["names"]:
+            delattr(config.model, model_name)
 
     return config
 
@@ -281,11 +293,21 @@ def create_model(
             additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
         )
+    elif model_name.lower().startswith(DOCUMENT_TRANSFORMER):
+        model = DocumentTransformer(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
+            gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            low_cpu_mem_usage=OmegaConf.select(model_config, "low_cpu_mem_usage", default=False),
+            pretrained=pretrained,
+        )
     elif model_name.lower().startswith(MMDET_IMAGE):
         model = MMDetAutoModelForObjectDetection(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
-            num_classes=num_classes,
+            config_file=OmegaConf.select(model_config, "config_file", default=None),
             classes=classes,
             pretrained=pretrained,
         )

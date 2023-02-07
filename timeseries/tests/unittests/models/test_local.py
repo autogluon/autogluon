@@ -3,7 +3,16 @@ import logging
 import pandas as pd
 import pytest
 
-from autogluon.timeseries.models.local import ARIMAModel, ETSModel, NaiveModel, SeasonalNaiveModel, ThetaModel
+from autogluon.timeseries.models.local import (
+    ARIMAModel,
+    AutoARIMAModel,
+    AutoETSModel,
+    DynamicOptimizedThetaModel,
+    ETSModel,
+    NaiveModel,
+    SeasonalNaiveModel,
+    ThetaModel,
+)
 
 from ..common import (
     DUMMY_TS_DATAFRAME,
@@ -13,6 +22,9 @@ from ..common import (
 )
 
 TESTABLE_MODELS = [
+    AutoARIMAModel,
+    AutoETSModel,
+    DynamicOptimizedThetaModel,
     ARIMAModel,
     ETSModel,
     ThetaModel,
@@ -21,9 +33,13 @@ TESTABLE_MODELS = [
 ]
 
 
+# Restrict to single core for faster training on small datasets
+DEFAULT_HYPERPARAMETERS = {"n_jobs": 1}
+
+
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_local_model_saved_then_cached_predictions_can_be_loaded(model_class, temp_model_path):
-    model = model_class(path=temp_model_path)
+    model = model_class(path=temp_model_path, hyperparameters=DEFAULT_HYPERPARAMETERS)
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model.save()
 
@@ -35,21 +51,11 @@ def test_when_local_model_saved_then_cached_predictions_can_be_loaded(model_clas
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_local_model_is_saved_and_loaded_then_model_can_predict(model_class, temp_model_path):
-    model = model_class(path=temp_model_path)
+    model = model_class(path=temp_model_path, hyperparameters=DEFAULT_HYPERPARAMETERS)
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model.save()
     loaded_model = model.__class__.load(path=model.path)
     loaded_model.predict(data=DUMMY_TS_DATAFRAME)
-
-
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-@pytest.mark.parametrize("n_jobs", [0.5, 3])
-def test_when_local_model_saved_then_n_jobs_is_saved(model_class, n_jobs, temp_model_path):
-    model = model_class(path=temp_model_path, hyperparameters={"n_jobs": n_jobs})
-    model.save()
-
-    loaded_model = model.__class__.load(path=model.path)
-    assert model.n_jobs == loaded_model.n_jobs
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -69,7 +75,9 @@ def test_when_local_model_saved_then_local_model_args_are_saved(model_class, hyp
 @pytest.mark.parametrize("prediction_length", [1, 3, 10])
 def test_when_local_model_predicts_then_time_index_is_correct(model_class, prediction_length, temp_model_path):
     data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
-    model = model_class(path=temp_model_path, prediction_length=prediction_length)
+    model = model_class(
+        path=temp_model_path, prediction_length=prediction_length, hyperparameters=DEFAULT_HYPERPARAMETERS
+    )
     model.fit(train_data=data)
     predictions = model.predict(data=data)
     for item_id in data.item_ids:
@@ -86,12 +94,14 @@ def get_seasonal_period_from_fitted_local_model(model):
         return model._local_model_args["seasonal_periods"]
     elif model.name == "Theta":
         return model._local_model_args["period"]
+    elif model.name in ["AutoETS", "AutoARIMA", "DynamicOptimizedTheta"]:
+        return model._local_model_args["season_length"]
     else:
         return model._local_model_args["seasonal_period"]
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-@pytest.mark.parametrize("hyperparameters", [{"seasonal_period": None}, {}])
+@pytest.mark.parametrize("hyperparameters", [{"seasonal_period": None, "n_jobs": 1}, {"n_jobs": 1}])
 @pytest.mark.parametrize(
     "freqstr, ts_length, expected_seasonal_period",
     [
@@ -137,7 +147,9 @@ def test_when_seasonal_period_is_provided_then_inferred_period_is_overriden(
 ):
     train_data = get_data_frame_with_item_index(["A", "B", "C"], data_length=ts_length, freq=freqstr)
     model = model_class(
-        path=temp_model_path, prediction_length=3, hyperparameters={"seasonal_period": provided_seasonal_period}
+        path=temp_model_path,
+        prediction_length=3,
+        hyperparameters={"seasonal_period": provided_seasonal_period, "n_jobs": 1},
     )
 
     model.fit(train_data=train_data)
@@ -149,7 +161,7 @@ def test_when_invalid_model_arguments_provided_then_model_ignores_them(model_cla
     model = model_class(
         path=temp_model_path,
         prediction_length=3,
-        hyperparameters={"bad_argument": 33},
+        hyperparameters={"bad_argument": 33, "n_jobs": 1},
     )
     with caplog.at_level(logging.WARNING):
         model.fit(train_data=DUMMY_TS_DATAFRAME)
@@ -161,6 +173,7 @@ def test_when_train_and_test_data_have_different_freq_then_exception_is_raised(m
     model = model_class(
         path=temp_model_path,
         prediction_length=3,
+        hyperparameters=DEFAULT_HYPERPARAMETERS,
     )
     train_data = get_data_frame_with_item_index([1, 2, 3], freq="H")
     test_data = get_data_frame_with_item_index([1, 2, 3], freq="D")
@@ -168,3 +181,13 @@ def test_when_train_and_test_data_have_different_freq_then_exception_is_raised(m
     model.fit(train_data=train_data)
     with pytest.raises(RuntimeError, match="doesn't match the frequency"):
         model.predict(test_data)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("n_jobs", [0.5, 3])
+def test_when_local_model_saved_then_n_jobs_is_saved(model_class, n_jobs, temp_model_path):
+    model = model_class(path=temp_model_path, hyperparameters={"n_jobs": n_jobs})
+    model.save()
+
+    loaded_model = model.__class__.load(path=model.path)
+    assert model.n_jobs == loaded_model.n_jobs

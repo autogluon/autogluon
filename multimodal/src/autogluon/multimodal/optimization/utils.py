@@ -968,15 +968,16 @@ def generate_metric_learning_labels(
     -------
     The labels used in computing the metric learning loss.
     """
-    labels_1 = torch.arange(num_samples)
+    device = labels.device
+    labels_1 = torch.arange(num_samples, device=device)
 
     if match_label is not None:
-        labels_2 = torch.arange(num_samples, num_samples * 2)
+        labels_2 = torch.arange(num_samples, num_samples * 2, device=device)
         # users need to specify the match_label based on the raw label's semantic meaning.
         mask = labels == match_label
         labels_2[mask] = labels_1[mask]
     else:
-        labels_2 = torch.arange(num_samples)
+        labels_2 = torch.arange(num_samples, device=device)
 
     metric_learning_labels = torch.cat([labels_1, labels_2], dim=0)
 

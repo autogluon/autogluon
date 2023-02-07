@@ -2,7 +2,7 @@ function setup_build_env {
     python3 -m pip install --upgrade pip
     python3 -m pip install tox
     python3 -m pip install flake8
-    python3 -m pip install black>=22.3
+    python3 -m pip install "black>=22.3,<23.0"
     python3 -m pip install isort>=5.10
     python3 -m pip install bandit
 }
@@ -21,27 +21,27 @@ function setup_mxnet_gpu {
 }
 
 function setup_torch_gpu {
-    # Security-patched torch
-    TORCH_URL=https://aws-pytorch-unified-cicd-binaries.s3.us-west-2.amazonaws.com/r1.12.1_sm/20221201-232940/bbd58c88fe74811ebc2c7225a308eeadfa42a7b9/torch-1.12.1%2Bcu113-cp38-cp38-linux_x86_64.whl
-    TORCHVISION_URL=https://download.pytorch.org/whl/cu113/torchvision-0.13.1%2Bcu113-cp38-cp38-linux_x86_64.whl
-    python3 -m pip uninstall -y torch torchvision torchaudio torchdata
-    python3 -m pip install --no-cache-dir -U ${TORCH_URL} ${TORCHVISION_URL}
+    # Security-patched torch.
+    python3 -m pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
 }
 
 function setup_torch_cpu {
     # Security-patched torch
-    TORCH_URL=https://aws-pytorch-unified-cicd-binaries.s3.us-west-2.amazonaws.com/r1.12.1_sm/20221130-175350/98e79c6834c193ed3751a155c5309d441bf904e3/torch-1.12.1%2Bcpu-cp38-cp38-linux_x86_64.whl
-    TORCHVISION_URL=https://download.pytorch.org/whl/cpu/torchvision-0.13.1%2Bcpu-cp38-cp38-linux_x86_64.whl
-    python3 -m pip uninstall -y torch torchvision torchaudio torchdata
-    python3 -m pip install --no-cache-dir -U ${TORCH_URL} ${TORCHVISION_URL}
+    python3 -m pip install torch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cpu
 }
 
 function setup_torch_gpu_non_linux {
-    pip3 install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchtext==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu113
+    pip3 install torch==1.13.1+cu116 torchvision==0.14.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
 }
 
 function setup_torch_cpu_non_linux {
-    pip3 install torch==1.12.1 torchvision==0.13.1 torchtext==0.13.1
+    pip3 install torch==1.13.1 torchvision==0.14.1
+}
+
+function setup_hf_model_mirror {
+    pip3 install PyYAML
+    SUB_FOLDER="$1"
+    python3 $(dirname "$0")/setup_hf_model_mirror.py --model_list_file $(dirname "$0")/../../multimodal/tests/hf_model_list.yaml --sub_folder $SUB_FOLDER
 }
 
 function install_local_packages {
@@ -60,27 +60,20 @@ function install_multimodal {
     python3 -m pip install --upgrade mmocr
 }
 
-function install_vision {
-    python3 -m pip install --upgrade pytest-xdist  # launch different process for each test to avoid resource not being released by either mxnet or torch
-    install_local_packages "vision/"
-}
-
 function install_all {
     install_local_packages "common/[tests]" "core/[all]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
-    install_multimodal "[tests]" # multimodal must be install before vision and text
-    install_vision
-    install_local_packages "text/" "autogluon/"
+    install_multimodal "[tests]"
+    install_local_packages "autogluon/"
 }
 
 function install_all_no_tests {
     install_local_packages "common/" "core/[all]" "features/" "tabular/[all]" "timeseries/[all]" "eda/"
-    install_multimodal # multimodal must be installed before vision and text
-    install_vision
-    install_local_packages "text/" "autogluon/"
+    install_multimodal
+    install_local_packages "autogluon/"
 }
 
 function build_all {
-    for module in common core features tabular multimodal text vision timeseries autogluon
+    for module in common core features tabular multimodal timeseries autogluon eda
     do
         cd "$module"/
         python setup.py sdist bdist_wheel

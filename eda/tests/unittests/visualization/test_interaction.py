@@ -49,7 +49,7 @@ def test_CorrelationVisualization_phik(monkeypatch):
         state,
         heatmap_args,
         CorrelationVisualization,
-        "train_data - phik correlation matrix",
+        "**`train_data` - `phik` correlation matrix**",
         headers=True,
     )
 
@@ -71,7 +71,7 @@ def test_CorrelationVisualization_focus(monkeypatch):
         state,
         heatmap_args,
         CorrelationVisualization,
-        "train_data - spearman correlation matrix; focus: absolute correlation for c >= 0.6",
+        "**`train_data` - `spearman` correlation matrix; focus: absolute correlation for `c` >= `0.6`**",
         headers=True,
     )
 
@@ -127,10 +127,10 @@ def __test_internal(monkeypatch, render_key, state, heatmap_args, facet_cls, tex
     call_show = MagicMock()
     call_yticks = MagicMock()
     call_subplots = MagicMock(return_value=("fig", "ax"))
-    call_render_text = MagicMock()
+    call_render_markdown = MagicMock()
 
     analysis = facet_cls(fig_args=dict(some_arg=123), **kwargs)
-    analysis.render_text = call_render_text
+    analysis.render_markdown = call_render_markdown
 
     with monkeypatch.context() as m:
         m.setattr(sns, "heatmap", call_heatmap)
@@ -140,24 +140,24 @@ def __test_internal(monkeypatch, render_key, state, heatmap_args, facet_cls, tex
         auto.analyze(state=state, viz_facets=[analysis])
 
     call_yticks.assert_called_with(rotation=0)
-    call_subplots.assert_called_with(some_arg=123)
+    call_subplots.assert_called_with(some_arg=123, figsize=(4, 4))
     call_show.assert_called_with("fig")
 
     call_heatmap.assert_called_with(
         state[render_key].train_data,
         annot=True,
         ax="ax",
-        linewidths=0.9,
-        linecolor="white",
+        linewidths=0.5,
+        linecolor="lightgrey",
         fmt=".2f",
         square=True,
         cbar_kws={"shrink": 0.5},
         **heatmap_args,
     )
     if text_render is not None:
-        call_render_text.assert_called_with(text_render, text_type="h3")
+        call_render_markdown.assert_called_with(text_render)
     else:
-        call_render_text.assert_not_called()
+        call_render_markdown.assert_not_called()
 
 
 def test_FeatureInteractionVisualization__happy_path(monkeypatch):
@@ -186,7 +186,7 @@ def test_FeatureInteractionVisualization__happy_path(monkeypatch):
         dict(x="a", y="b", some_chart_arg=123),
     )
     call_show.assert_called_with("fig")
-    call_subplots.assert_called_with(key="value")
+    call_subplots.assert_called_with(key="value", figsize=(12, 6))
 
 
 @pytest.mark.parametrize("is_single, header", [(True, True), (False, True), (True, False), (False, False)])
@@ -199,7 +199,7 @@ def test_FeatureInteractionVisualization__headers(monkeypatch, is_single, header
     call_subplots = MagicMock(return_value=("fig", "ax"))
 
     viz = FeatureInteractionVisualization(key="abc", numeric_as_categorical_threshold=2, headers=header)
-    viz.render_text = MagicMock()
+    viz.render_markdown = MagicMock()
 
     with monkeypatch.context() as m:
         m.setattr(plt, "subplots", call_subplots)
@@ -211,11 +211,11 @@ def test_FeatureInteractionVisualization__headers(monkeypatch, is_single, header
         auto.analyze(state=state, viz_facets=[viz])
 
     if not header:
-        viz.render_text.assert_not_called()
+        viz.render_markdown.assert_not_called()
     elif is_single:
-        viz.render_text.assert_called_with("a in train_data", text_type="h3")
+        viz.render_markdown.assert_called_with("**`a` in `train_data`**")
     else:
-        viz.render_text.assert_called_with("Feature interaction between a/b in train_data", text_type="h3")
+        viz.render_markdown.assert_called_with("**Feature interaction between `a`/`b` in `train_data`**")
 
 
 def test_FeatureInteractionVisualization__state_different_key(monkeypatch):
@@ -531,11 +531,11 @@ def test_FeatureDistanceAnalysisVisualization__happy_path(monkeypatch, has_near_
         auto.analyze(state=state, viz_facets=[viz])
 
     call_dendrogram.assert_called_with(
-        ax=ax, Z=ANY, labels=state.feature_distance.columns, orientation="left", some_chart_arg=123
+        ax=ax, Z=ANY, labels=state.feature_distance.columns, leaf_font_size=10, orientation="left", some_chart_arg=123
     )
     np.testing.assert_array_equal(call_dendrogram.call_args[1]["Z"], state.feature_distance.linkage)
     call_show.assert_called_with("fig")
-    call_subplots.assert_called_with(key="value")
+    call_subplots.assert_called_with(key="value", figsize=(12, 3.5))
     if has_near_duplicates:
         call_render_markdown.assert_called_with(
             "**The following feature groups are considered as near-duplicates**:\n\nDistance threshold: <= `0.85`. "
