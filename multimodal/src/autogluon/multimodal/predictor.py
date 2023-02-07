@@ -849,7 +849,7 @@ class MultiModalPredictor:
         self._fit(**_fit_args)
         training_end = time.time()
         self._total_train_time = training_end - training_start
-        logger.info(get_fit_complete_message())
+        logger.info(get_fit_complete_message(self._save_path))
 
         return self
 
@@ -1007,7 +1007,7 @@ class MultiModalPredictor:
         clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
-        logger.info(get_fit_start_message())
+        logger.info(get_fit_start_message(save_path, validation_metric_name))
         config = get_config(
             problem_type=self._problem_type,
             presets=presets,
