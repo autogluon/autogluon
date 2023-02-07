@@ -142,14 +142,16 @@ def get_fit_start_message(save_path, validation_metric_name):
     return f"""AutoMM starts to create the model. ✨
 
 - Model will be saved to "{save_path}".
+
 - Validation metric is "{validation_metric_name}".
+
 - To track the learning progress, you can open a terminal and launch Tensorboard:
 
     ```shell
     tensorboard --logdir {save_path}
     ```
 
-Enjoy the coffee, and let AutoMM do the job ☕☕☕ Learn more about [AutoMM](https://auto.gluon.ai/stable/tutorials/multimodal/index.html).
+Enjoy the coffee, and let AutoMM do the job ☕☕☕ Learn more at https://auto.gluon.ai.
 """
 
 
@@ -157,7 +159,9 @@ def get_fit_complete_message(save_path):
     return f"""Training finished. AutoMM has created your model 🎉🎉🎉
     
 - Model files and training logs are saved to "{save_path}". 
+
 - To load the model, use the following code 
+
     ```python
     from autogluon.multimodal import MultiModalPredictor
     
@@ -168,9 +172,11 @@ def get_fit_complete_message(save_path):
     ```
 
 - You can open a terminal and launch Tensorboard to visualize the training log:
+
     ```shell
     tensorboard --logdir {save_path}
     ```
+
 - If you are not satisfied with the model, try to increase the training time, adjust the [hyperparameters](https://auto.gluon.ai/stable/tutorials/multimodal/advanced_topics/customization.html), \
 or post issues on [Github](https://github.com/autogluon/autogluon).
 
