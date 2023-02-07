@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional, Union
 import jsonschema
 import numpy as np
 import pandas as pd
-from nptyping import NDArray
 from omegaconf import DictConfig, OmegaConf
 
 from ..constants import AUTOMM, END_OFFSET, ENTITY_GROUP, NER_ANNOTATION, PROBABILITY, START_OFFSET

@@ -3,6 +3,35 @@
 ### Prior to release: 1 week out
 
 * Ensure the version specified in `docs/config.ini`, `VERSION`, `docs/index.rst`, and `docs/badges.rst` align with the intended release version.
+* Check all dependency version ranges.
+  * Ensure all dependencies are not capped by major version, unless the reason is documented inline.
+    * Example of major version cap: `scikit-learn<2`
+  * Ensure all dependencies have an upper cap, unless the reason is documented inline.
+    * Example of no upper cap: `scikit-learn>=1.0`
+  * Ensure no dependency is pinned to an exact version unless the reason is documented inline.
+    * Example: `scikit-learn==1.1.3`. This is very fragile and overly strict.
+  * Ensure all dependencies are capped by minor version and not micro version unless the reason is documented inline.
+    * Minor version capping would be `<x.y`. Micro version capping would be `<x.y.z`.
+    * Avoid capping to `<x.y.0`, instead do the cleaner identical cap: `<x.y`.
+  * Ensure all dependencies are lower bound capped to a reasonable version.
+    * Example: `scikit-learn<1.2` is not reasonable because it is almost certain that `scikit-learn==0.0.1` is not supported.
+      * A better range: `scikit-learn>=1.0,<1.2`
+  * Ensure dependencies shared across multiple AutoGluon modules have the same version range in each module, unless the reason is documented inline.
+    * If the same version range is used in multiple modules, ensure the version range is defined only once by defining it in `core/_setup_utils.py`
+  * Ensure all upper caps are using `<` and not `<=`.
+  * Ensure all dependencies whose ranges are obtained via `core/_setup_utils.py` have the following inline comment:
+    * """# version range defined in `core/_setup_utils.py`"""
+* Try upgrading all dependency version range upper caps to include the latest stable release.
+  * Note: For micro releases such as AutoGluon 0.6.2, this is optional.
+  * If increasing the range causes an error, either:
+    1. Fix the error.
+    2. Avoid the range change and add an inline comment in setup.py that an error occurred and why we didn't fix.
+  * If increasing the range causes a warning, either:
+    1. Fix the warning.
+    2. Suppress the warning for the user + provide justification and appropriate TODOs.
+    3. Avoid the range change and add an inline comment in setup.py that a warning occurred and why we didn't fix.
+  * Ensure CI passes, potentially benchmark to catch performance regressions / more complex bugs.
+  * Note: To truly catch potential errors, you will need to use the latest supported Python version, since some packages may only support the newer Python version in their latest releases.
 * Make final call for which in-progress PRs are release critical.
 * Communicate with in-progress PR owners that code freeze is in effect, no PRs will be merged that are not release critical.
 * Wait 1 day after code-freeze for pre-release to be published.
@@ -54,6 +83,11 @@
   * Click 'Publish release' and the release will go live.
 * Wait ~10 minutes and then locally test that the PyPi package is available and working with the latest release version, ask team members to also independently verify.
 
+### Conda-Forge Release
+
+After GitHub & PyPi release, conduct release on Conda-Forge
+* [TODO] Add Conda-Forge release steps.
+
 ### Release Cheatsheet
 
 * If intending to create a new cheatsheet for the release, refer to [autogluon-doc-utils README.md](https://github.com/Innixma/autogluon-doc-utils) for instructions on creating a new cheatsheet.
@@ -75,3 +109,9 @@ After release is published, on the mainline branch:
 
 * Send release update to internal and external slack channels and mailing lists
 * Publish any blogs / talks planned for release to generate interest.
+
+### Post Release Conda-Forge Patching
+
+Conda-Forge releases are mutable and can be changed post-release to fix breaking bugs without releasing a new version.
+
+* [TODO] Add Conda-Forge post-release patching guidelines.

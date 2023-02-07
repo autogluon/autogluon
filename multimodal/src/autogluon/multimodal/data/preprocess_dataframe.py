@@ -567,7 +567,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def transform_numerical(
         self,
         df: pd.DataFrame,
-    ) -> Tuple[Dict[str, NDArray[(Any,), np.float32]], None]:
+    ) -> Tuple[Dict[str, NDArray], None]:
         """
         Preprocess numerical data by using SimpleImputer to fill possible missing values
         and StandardScaler to standardize the values (z = (x - mean) / std).
@@ -600,7 +600,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def transform_categorical(
         self,
         df: pd.DataFrame,
-    ) -> Tuple[Dict[str, NDArray[(Any,), np.int32]], None]:
+    ) -> Tuple[Dict[str, NDArray], None]:
         """
         Preprocess categorical data by using CategoryFeatureGenerator to generate
         categorical encodings, i.e., integers. This function needs to be called
@@ -637,7 +637,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def transform_label(
         self,
         df: pd.DataFrame,
-    ) -> Tuple[Dict[str, NDArray[(Any,), Any]], Dict[str, str]]:
+    ) -> Tuple[Dict[str, NDArray], Dict[str, str]]:
         """
         Preprocess ground-truth labels by using LabelEncoder to generate class labels for
         classification tasks or using StandardScaler to standardize numerical values
@@ -677,7 +677,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def transform_text_ner(
         self,
         df: pd.DataFrame,
-    ) -> Tuple[Dict[str, NDArray[(Any,), Any]], Dict[str, str]]:
+    ) -> Tuple[Dict[str, NDArray], Dict[str, str]]:
         assert (
             self._fit_called or self._fit_x_called
         ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_ner."
@@ -710,7 +710,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self,
         df: pd.DataFrame,
         tokenizer: Optional[Any] = None,
-    ) -> NDArray[(Any,), Any]:
+    ) -> NDArray:
         """
         Prepare ground-truth labels to compute metric scores in evaluation. Note that
         numerical values are not normalized since we want to evaluate the model performance
@@ -748,7 +748,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         y_pred: Union[np.ndarray, dict],
         inverse_categorical: bool = True,
         return_proba: bool = False,
-    ) -> NDArray[(Any,), Any]:
+    ) -> NDArray:
         """
         Transform model's output logits/probability into class labels for classification
         or raw numerical values for regression.

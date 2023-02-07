@@ -4,6 +4,7 @@ docs:
 - hfl/chinese-lert-small
 - sentence-transformers/all-MiniLM-L6-v2
 - google/bert_uncased_L-6_H-768_A-12
+- microsoft/layoutlm-base-uncased
 others:
 - bert-base-chinese
 - bert-base-uncased

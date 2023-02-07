@@ -3,7 +3,12 @@ from .categorical_mlp import CategoricalMLP
 from .categorical_transformer import CategoricalTransformer
 from .clip import CLIPForImageText
 from .document_transformer import DocumentTransformer
-from .fusion import MultimodalFusionMLP, MultimodalFusionNER, MultimodalFusionTransformer
+from .fusion import (
+    AbstractMultimodalFusionModel,
+    MultimodalFusionMLP,
+    MultimodalFusionNER,
+    MultimodalFusionTransformer,
+)
 from .huggingface_text import HFAutoModelForTextPrediction
 from .mmdet_image import MMDetAutoModelForObjectDetection
 from .mmocr_text_detection import MMOCRAutoModelForTextDetection
