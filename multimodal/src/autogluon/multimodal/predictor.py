@@ -131,7 +131,7 @@ from .utils import (
     data_to_df,
     evaluate_coco,
     extract_from_output,
-    filter_search_space,
+    filter_hyperparameters,
     from_coco_or_voc,
     from_dict,
     get_config,
@@ -166,6 +166,7 @@ from .utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
+    update_hyperparameters,
     update_tabular_config_by_resources,
 )
 
@@ -437,6 +438,7 @@ class MultiModalPredictor:
         if self._problem_type is not None:
             if self.problem_property.support_zero_shot:
                 # Load pretrained model via the provided hyperparameters and presets
+                # TODO: do not create pretrained model for HPO presets.
                 self._config, self._model, self._data_processors = init_pretrained(
                     problem_type=self._problem_type,
                     presets=self._presets,
@@ -707,24 +709,6 @@ class MultiModalPredictor:
             else:
                 raise TypeError(f"Expected train_data to have type str or pd.DataFrame, but got type: {type(train_data)}")
 
-        if hyperparameter_tune_kwargs is not None:
-            # TODO: can we support hyperparameters being the same format as regular training?
-            # currently the string format would make it very hard to get search space, which is an object
-            assert isinstance(
-                hyperparameters, dict
-            ), "Please provide hyperparameters as a dictionary if you want to do HPO"
-            if teacher_predictor is not None:
-                assert isinstance(
-                    teacher_predictor, str
-                ), "HPO with distillation only supports passing a path to the predictor"
-            if fit_called:
-                warnings.warn(
-                    "HPO while continuous training."
-                    "Hyperparameters related to Model and Data will NOT take effect."
-                    "We will filter them out from the search space."
-                )
-                hyperparameters = filter_search_space(hyperparameters, [MODEL, DATA])
-
         pl.seed_everything(seed, workers=True)
 
         self._save_path = setup_save_path(
@@ -758,6 +742,7 @@ class MultiModalPredictor:
             data=train_data,
             valid_data=tuning_data,
         )
+
         if self._presets is not None:
             presets = self._presets
         else:
@@ -823,6 +808,22 @@ class MultiModalPredictor:
         self._validation_metric_name = validation_metric_name
         self._column_types = column_types
 
+        hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
+            problem_type=self._problem_type,
+            presets=presets,
+            provided_hyperparameters=hyperparameters,
+            provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            teacher_predictor=teacher_predictor,
+        )
+        hpo_mode = True if hyperparameter_tune_kwargs else False
+        if hpo_mode and self._problem_type != NER:  # TODO: support ner.
+            hyperparameters = filter_hyperparameters(
+                hyperparameters=hyperparameters,
+                column_types=column_types,
+                config=config,
+                fit_called=fit_called,
+            )
+
         _fit_args = dict(
             train_df=train_data,
             val_df=tuning_data,
@@ -830,19 +831,19 @@ class MultiModalPredictor:
             minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=self._save_path,
-            ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
-            resume=False if hyperparameter_tune_kwargs is not None else self._resume,
-            enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
+            ckpt_path=None if hpo_mode else self._ckpt_path,
+            resume=False if hpo_mode else self._resume,
+            enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
             presets=presets,
             config=config,
             hyperparameters=hyperparameters,
             teacher_predictor=teacher_predictor,
             standalone=standalone,
-            hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
+            hpo_mode=hpo_mode,  # skip average checkpoint if in hpo mode
             clean_ckpts=clean_ckpts,
         )
 
-        if hyperparameter_tune_kwargs is not None:
+        if hpo_mode:
             # TODO: allow custom gpu
             assert self._resume is False, "You can not resume training with HPO"
             resources = dict(num_gpus=torch.cuda.device_count())
