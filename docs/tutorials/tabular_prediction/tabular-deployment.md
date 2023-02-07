@@ -179,11 +179,13 @@ Optimized:
 predictor_clone_opt.get_size_disk_per_file()
 ```
 
+## Compile models for maximized inference speed
+
 In order to further improve inference efficiency, we can call `.compile_models()` to automatically
 convert sklearn function calls into their ONNX equivalents.
 Note that this is currently an experimental feature, which only improves RandomForest and TabularNeuralNetwork models.
 The compilation and inference speed acceleration require installation of `skl2onnx` and `onnxruntime` packages.
-To install supported verisons of these packages automatically, you can call `pip install autogluon.tabular[skl2onnx]`
+To install supported verisons of these packages automatically, we can call `pip install autogluon.tabular[skl2onnx]`
 on top of an existing AutoGluon installation, or `pip install autogluon.tabular[all,skl2onnx]` on a new AutoGluon installation.
 
 It is important to make sure the predictor is cloned, because once the models are compiled, it won't support fitting.
