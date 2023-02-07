@@ -624,3 +624,36 @@ def split_train_tuning_data(train_data, tuning_data, holdout_frac, is_classifica
         )
 
     return train_data, tuning_data
+
+
+def get_detected_data_types(column_types: Dict):
+    """
+    Extract data types from column types.
+
+    Parameters
+    ----------
+    column_types
+        A dataframe's column types.
+
+    Returns
+    -------
+    A list of detected data types.
+    """
+    data_types = []
+    for col_type in column_types.values():
+        if col_type.startswith(IMAGE) and IMAGE not in data_types:
+            data_types.append(IMAGE)
+        elif col_type.startswith(TEXT_NER) and TEXT_NER not in data_types:
+            data_types.append(TEXT_NER)
+        elif col_type.startswith(TEXT) and TEXT not in data_types:
+            data_types.append(TEXT)
+        elif col_type.startswith(DOCUMENT) and DOCUMENT not in data_types:
+            data_types.append(DOCUMENT)
+        elif col_type.startswith(NUMERICAL) and NUMERICAL not in data_types:
+            data_types.append(NUMERICAL)
+        elif col_type.startswith(CATEGORICAL) and CATEGORICAL not in data_types:
+            data_types.append(CATEGORICAL)
+        elif col_type.startswith(ROIS) and ROIS not in data_types:
+            data_types.append(ROIS)
+
+    return data_types
