@@ -197,7 +197,9 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
             multimodal_features.append(multimodal_feature)
 
             if self.loss_weight is not None:
-                per_output[per_model.prefix].update({WEIGHT: self.loss_weight})
+                per_output[per_model.prefix].update(
+                    {WEIGHT: torch.tensor(self.loss_weight).to(multimodal_features[0])}
+                )
                 output.update(per_output)
 
         multimodal_features = torch.cat(multimodal_features, dim=1)
@@ -212,7 +214,7 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
             }
         }
         if self.loss_weight is not None:
-            fusion_output[self.prefix].update({WEIGHT: 1})
+            fusion_output[self.prefix].update({WEIGHT: torch.tensor(1.0).to(logits)})
             output.update(fusion_output)
             return output
         else:
