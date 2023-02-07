@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utilities related to data saving/loading."""
+"""
+Copied from
+https://github.com/Lightning-AI/lightning/blob/master/src/lightning/fabric/utilities/cloud_io.py
+to address warnings:
+LightningDeprecationWarning: pytorch_lightning.utilities.cloud_io.atomic_save has been 
+deprecated in v1.8.0 and will be removed in v1.10.0. This function is internal but you 
+can copy over its implementation.
+"""
 
 import io
 from pathlib import Path
