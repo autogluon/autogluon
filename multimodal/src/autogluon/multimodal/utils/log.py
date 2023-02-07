@@ -139,7 +139,7 @@ def apply_log_filter(log_filter):
 
 
 def get_fit_start_message(save_path, validation_metric_name):
-    return f"""AutoMM starts to create your model!
+    return f"""AutoMM starts to create your model. ✨
 
 - The model will be saved to "{save_path}".
 - The validation metric is "{validation_metric_name}".
@@ -149,11 +149,13 @@ def get_fit_start_message(save_path, validation_metric_name):
     ```shell
     tensorboard --logdir {save_path}
     ```
+
+Wait for a while, enjoy the coffee and let AutoMM do the job ☕☕☕
 """
 
 
 def get_fit_complete_message(save_path):
-    return f"""AutoMM has created your model 🎉🎉🎉!
+    return f"""Training finished. AutoMM has created your model 🎉🎉🎉
     
 - Model files and training logs are saved to "{save_path}". 
 
