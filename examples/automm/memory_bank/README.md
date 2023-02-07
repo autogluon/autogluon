@@ -1,6 +1,6 @@
-# Use MultiModal Feature Extraction to Create a Few-shot Memory Cache Model
+# Use MultiModal Feature Extraction to Create a Few-shot Memory Bank Model
 
-[memory_cache.py](./memory_cache.py): This example provides a simple and clear way to implement a few-shot memory cache model with AutoGluon MultiModal Feature Extraction according to [Tip-Adapter](https://github.com/gaopengcuhk/Tip-Adapter) [1]. 
+[memory_bank.py](./memory_bank.py): This example provides a simple and clear way to implement a few-shot memory bank model with AutoGluon MultiModal Feature Extraction according to [Tip-Adapter](https://github.com/gaopengcuhk/Tip-Adapter) [1]. 
 
 ### 1. Run Example
 
@@ -10,7 +10,7 @@ For text datasets, datasets in Hugging Face are supported. We recommend datasets
 
 After preparing the datasets, run the example:
 
-    python memory_cache.py --type clip --dataset food101 --shots 16
+    python memory_bank.py --type clip --dataset food101 --shots 16
 
 - `type` is the type of few-shot learning. You choose from `clip`, `text`, `image` for different backbone methods.
 - `backbone` is the backbone model of MultiModal Predictor.
@@ -19,30 +19,30 @@ After preparing the datasets, run the example:
 - `column_names` is the names of the data columns.
 - `label_column` is the name of the label column.
 - `shots` is the shots for each class in training set.
-- `aug_epochs` is the epochs to create the cache.
+- `aug_epochs` is the epochs to create the bank.
 - `lr` is the learning rate for training the model head.
-- `lr_F` is the learning rate for finetuing the memory cache.
+- `lr_F` is the learning rate for finetuing the memory bank.
 - `train_epoch` is the training epochs for training the model head.
-- `train_epoch_F` is the training epochs for fine-tuning the memory cache.
-- `init_alpha` is initial values of hyper-parameters in memory cache. `alpha` adjusts the weight of probability between the classifier and memory cache.
-- `init_beta` is initial values of hyper-parameters in memory cache. `beta` modulates the sharpness when converting the similarities into non-negative values.
+- `train_epoch_F` is the training epochs for fine-tuning the memory bank.
+- `init_alpha` is initial values of hyper-parameters in memory bank. `alpha` adjusts the weight of probability between the classifier and memory bank.
+- `init_beta` is initial values of hyper-parameters in memory bank. `beta` modulates the sharpness when converting the similarities into non-negative values.
 - `search_scale` is the search scale of alpha and beta.
 - `search_step` is the steps of searching hyper-parameters alpha and beta.
 
 ### 2. Method
 
-Memory cache follows the excellent design of [Tip-Adapter](https://arxiv.org/pdf/2207.09519.pdf) which stores the image features of few-shot training set to improve the performance of zero-shot CLIP through feature similarity. The stored features can also serve as the initialization of a trainable classifier. This ProtoNet-like design makes full use of few-shot training information and leads to good performance [3]. We believe that the effectiveness of this design is not limited to CLIP, and can be widely applied to few-shot classification tasks of images and texts. 
+Memory bank follows the excellent design of [Tip-Adapter](https://arxiv.org/pdf/2207.09519.pdf) which stores the image features of few-shot training set to improve the performance of zero-shot CLIP through feature similarity. The stored features can also serve as the initialization of a trainable classifier. This ProtoNet-like design makes full use of few-shot training information and leads to good performance [3]. We believe that the effectiveness of this design is not limited to CLIP, and can be widely applied to few-shot classification tasks of images and texts. 
 
-Memory cache which is the derivative application of Tip-Adapter obtains diversified multi-modal features through MultiModal Feature Extraction. In this example, we first trained a linear classifier based on multi-modal features to generate baseline accuracy. Then, the similarity result between features and memory cache is introduced to baseline predict probability. Finally, an additional linear adapter which is initialized with memory cache is trained to help few-shot classification.
+Memory bank which is the derivative application of Tip-Adapter obtains diversified multi-modal features through MultiModal Feature Extraction. In this example, we first trained a linear classifier based on multi-modal features to generate baseline accuracy. Then, the similarity result between features and memory bank is introduced to baseline predict probability. Finally, an additional linear adapter which is initialized with memory bank is trained to help few-shot classification.
 
-Hyper-parameters `alpha` and `beta` which adjust the memory cache are modified through grid search on validation set to attain the superior performance.
+Hyper-parameters `alpha` and `beta` which adjust the memory bank are modified through grid search on validation set to attain the superior performance.
 
 ### 3. Training Results
 
-The training results of memory cache can be seen in the followed table. `Acc` is the few-shot classification accuracy of method. `Memory Cache ACC` and `Finetuned Memory Cache ACC` show the classification results after introducing and fine-tuning the memory cache, respectively.
+The training results of memory bank can be seen in the followed table. `Acc w/o memory bank` is the few-shot classification accuracy of method. `ACC w. memory bank` and `ACC w. memory bank (+finetune)` show the classification results after introducing and fine-tuning the memory bank, respectively.
 
-| Datasets | Method | BackBone | Shots | lr | lr_F | Acc | Memory Cache Acc | Fine-tuned Memory Cache Acc| 
-|----------|--------|----------|-------|----|------|-----|-------------------|-----------------------------| 
+| Datasets | Method | BackBone | Shots | lr | lr_F | Acc w/o memory bank| Acc w. memory bank | Acc w. memory bank (+finetune) | 
+|----------|--------|----------|-------|----|------|--------------------|--------------------|--------------------------------| 
 | Food-101 | CLIP | openai/clip-vit-large-patch14-336 | 16 | NaN | 1e-3 | 91.90 | 92.42 | 92.80 | 
 | Food-101 | CLIP | openai/clip-vit-large-patch14-336 | 1 | NaN | 1e-3 | 91.90 | 91.99 | 91.97 | 
 | Food-101 | CLIP | openai/clip-vit-large-patch14-336 | 64 | NaN | 1e-3 | 91.90 | 92.43 | 93.10 | 

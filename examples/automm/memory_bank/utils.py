@@ -81,24 +81,24 @@ def generate_clip_weights(args, classnames, template, predictor):
     return clip_weights
 
 
-def generate_cache_model(args, train_df, predictor):
-    cache_keys = []
-    cache_values = []
+def generate_bank_model(args, train_df, predictor):
+    bank_keys = []
+    bank_values = []
     with torch.no_grad():
         for augment_idx in range(args.aug_epochs):
             print('Augment Epoch: {:} / {:}'.format(augment_idx, args.aug_epochs))
             train_features = extract_embedding(args, train_df, predictor, args.column_names)
-            cache_keys.append(train_features.unsqueeze(0))
+            bank_keys.append(train_features.unsqueeze(0))
         
         for index, per_data in train_df.iterrows():
-            cache_values.append(per_data[args.label_column])
+            bank_values.append(per_data[args.label_column])
             
-        cache_keys = torch.cat(cache_keys, dim=0).mean(dim=0)
-        cache_keys /= cache_keys.norm(dim=-1, keepdim=True)
-        cache_keys = cache_keys.permute(1, 0)
-        cache_values = F.one_hot(torch.tensor(cache_values).cuda()).float()
+        bank_keys = torch.cat(bank_keys, dim=0).mean(dim=0)
+        bank_keys /= bank_keys.norm(dim=-1, keepdim=True)
+        bank_keys = bank_keys.permute(1, 0)
+        bank_values = F.one_hot(torch.tensor(bank_values).cuda()).float()
     
-    return cache_keys, cache_values
+    return bank_keys, bank_values
 
 
 def extract_val_test(args, predictor, val_df, test_df):
@@ -114,7 +114,7 @@ def search_hp(
     args, 
     features, 
     labels, 
-    memory_cache_model, 
+    memory_bank_model, 
     logits_type=None,
 ):
     """
@@ -126,8 +126,8 @@ def search_hp(
         The args of searching scales and steps.
     features, labels
         The preprocessed features and labels of validation set.
-    memory_cache_model
-        The AutoMMCacheAdapter to generate logits and logits with memory cache.
+    memory_bank_model
+        The AutoMMMemoryBank to generate logits and logits with memory bank.
     logits_type
         The target logits of searching corresponding to "pure_logits", "logits_with_adapter", "logits_with_finetuned_adapter".
     
@@ -144,7 +144,7 @@ def search_hp(
     for beta in beta_list:
         for alpha in alpha_list:
             with torch.no_grad():
-                logits = memory_cache_model(features, alpha, beta)
+                logits = memory_bank_model(features, alpha, beta)
             acc = cls_acc(logits[logits_type], labels)
             
             if acc > best_acc:
