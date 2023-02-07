@@ -26,13 +26,12 @@ from omegaconf import DictConfig, OmegaConf
 from packaging import version
 from torch import nn
 
-import autogluon.multimodal.utils.object_detection
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.multimodal.models.fusion import AbstractMultimodalFusionModel
 from autogluon.multimodal.models.huggingface_text import HFAutoModelForTextPrediction
 from autogluon.multimodal.models.mmdet_image import MMDetAutoModelForObjectDetection
 from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePrediction
-from autogluon.multimodal.utils import save_result_df
+from autogluon.multimodal.utils import object_detection_data_to_df, save_result_df, setup_detection_train_tuning_data
 
 from . import version as ag_version
 from .constants import (
@@ -683,33 +682,9 @@ class MultiModalPredictor:
             return self
 
         if self._problem_type == OBJECT_DETECTION:
-            if isinstance(train_data, str):
-                self._detection_anno_train = train_data
-                train_data = from_coco_or_voc(train_data, "train")  # TODO: Refactor to use convert_data_to_df
-                if tuning_data is not None:
-                    self.detection_anno_train = tuning_data
-                    tuning_data = from_coco_or_voc(tuning_data, "val")  # TODO: Refactor to use convert_data_to_df
-                    if max_num_tuning_data is not None:
-                        if len(tuning_data) > max_num_tuning_data:
-                            tuning_data = tuning_data.sample(
-                                n=max_num_tuning_data, replace=False, random_state=seed
-                            ).reset_index(drop=True)
-            elif isinstance(train_data, pd.DataFrame):
-                self._detection_anno_train = None
-                # sanity check dataframe columns
-                train_data = autogluon.multimodal.utils.object_detection.convert_data_to_df(train_data)
-                if tuning_data is not None:
-                    self.detection_anno_train = tuning_data
-                    tuning_data = autogluon.multimodal.utils.object_detection.convert_data_to_df(tuning_data)
-                    if max_num_tuning_data is not None:
-                        if len(tuning_data) > max_num_tuning_data:
-                            tuning_data = tuning_data.sample(
-                                n=max_num_tuning_data, replace=False, random_state=seed
-                            ).reset_index(drop=True)
-            else:
-                raise TypeError(
-                    f"Expected train_data to have type str or pd.DataFrame, but got type: {type(train_data)}"
-                )
+            train_data, tuning_data = setup_detection_train_tuning_data(
+                self, max_num_tuning_data, seed, train_data, tuning_data
+            )
 
         pl.seed_everything(seed, workers=True)
 
@@ -1891,7 +1866,7 @@ class MultiModalPredictor:
                     eval_tool=eval_tool,
                 )
             else:
-                data = autogluon.multimodal.utils.object_detection.convert_data_to_df(data)
+                data = object_detection_data_to_df(data)
                 return evaluate_coco(
                     predictor=self,
                     anno_file_or_df=data,
@@ -2070,7 +2045,7 @@ class MultiModalPredictor:
                 realtime=realtime,
             )
         if self._problem_type == OBJECT_DETECTION:
-            data = autogluon.multimodal.utils.object_detection.convert_data_to_df(data)
+            data = object_detection_data_to_df(data)
 
             if self._label_column not in data:
                 self._label_column = None

@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import warnings
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Union
 
@@ -16,7 +17,7 @@ from .save import setup_save_path
 logger = logging.getLogger(AUTOMM)
 
 
-def convert_data_to_df(data: Union[pd.DataFrame, dict, list, str]) -> pd.DataFrame:
+def object_detection_data_to_df(data: Union[pd.DataFrame, dict, list, str]) -> pd.DataFrame:
     """
     Construct a dataframe from a data dictionary, json file path (for COCO), folder path (for VOC),
     image path (for single image), list of image paths (for multiple images)
@@ -60,10 +61,19 @@ def sanity_check_dataframe(data: pd.DataFrame):
     """
     if "image" not in data:
         raise ValueError(f"column 'image' not found in data column names: {data.columns.to_list()}")
-    if "rois" not in data:
-        raise ValueError(f"column 'rois' not found in data column names: {data.columns.to_list()}")
-    if "label" not in data:
-        raise ValueError(f"column 'label' not found in data column names: {data.columns.to_list()}")
+    if "rois" not in data and "label" not in data:
+        raise ValueError(f"Both column 'rois' and 'label' not found in data column names: {data.columns.to_list()}")
+    else:
+        if "rois" not in data:
+            warnings.warn(
+                f"column 'rois' not found in data column names: {data.columns.to_list()}. Copying from 'label' column..."
+            )
+            data["rois"] = data["label"]
+        if "label" not in data:
+            warnings.warn(
+                f"column 'label' not found in data column names: {data.columns.to_list()}. Copying from 'rois' column..."
+            )
+            data["label"] = data["rois"]
     assert data.shape[0] > 0, "data frame is empty"
 
 
@@ -1369,3 +1379,32 @@ def evaluate_coco(
         return eval_results, outputs
     else:
         return eval_results
+
+
+def setup_detection_train_tuning_data(predictor, max_num_tuning_data, seed, train_data, tuning_data):
+    if isinstance(train_data, str):
+        predictor._detection_anno_train = train_data
+        train_data = from_coco_or_voc(train_data, "train")  # TODO: Refactor to use convert_data_to_df
+        if tuning_data is not None:
+            predictor.detection_anno_train = tuning_data
+            tuning_data = from_coco_or_voc(tuning_data, "val")  # TODO: Refactor to use convert_data_to_df
+            if max_num_tuning_data is not None:
+                if len(tuning_data) > max_num_tuning_data:
+                    tuning_data = tuning_data.sample(
+                        n=max_num_tuning_data, replace=False, random_state=seed
+                    ).reset_index(drop=True)
+    elif isinstance(train_data, pd.DataFrame):
+        predictor._detection_anno_train = None
+        # sanity check dataframe columns
+        train_data = object_detection_data_to_df(train_data)
+        if tuning_data is not None:
+            predictor.detection_anno_train = tuning_data
+            tuning_data = object_detection_data_to_df(tuning_data)
+            if max_num_tuning_data is not None:
+                if len(tuning_data) > max_num_tuning_data:
+                    tuning_data = tuning_data.sample(
+                        n=max_num_tuning_data, replace=False, random_state=seed
+                    ).reset_index(drop=True)
+    else:
+        raise TypeError(f"Expected train_data to have type str or pd.DataFrame, but got type: {type(train_data)}")
+    return train_data, tuning_data
