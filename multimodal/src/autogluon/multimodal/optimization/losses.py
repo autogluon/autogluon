@@ -1,10 +1,9 @@
 import logging
-from typing import Optional, Sequence
+from typing import Optional
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch import Tensor
 
 try:
     import torch.distributed.nn
@@ -19,9 +18,9 @@ try:
 except ImportError:
     hvd = None
 
-# from ..constants import AUTOMM
-#
-# logger = logging.getLogger(AUTOMM)
+from ..constants import AUTOMM
+
+logger = logging.getLogger(AUTOMM)
 
 
 class RKDLoss(nn.Module):
@@ -282,8 +281,14 @@ class FocalLoss(nn.Module):
     References:
         [1] https://arxiv.org/abs/1708.02002
     """
-    def __init__(self, alpha: Optional[torch.Tensor] = None, gamma: Optional[float] = 2.0, reduction: Optional[str] = "mean",
-                 eps: Optional[float] = 1e-6):
+
+    def __init__(
+        self,
+        alpha: Optional[torch.Tensor] = None,
+        gamma: Optional[float] = 2.0,
+        reduction: Optional[str] = "mean",
+        eps: Optional[float] = 1e-6,
+    ):
         """
 
         Parameters
@@ -307,8 +312,7 @@ class FocalLoss(nn.Module):
 
     def forward(self, input: torch.Tensor, target: torch.Tensor):
         if not torch.is_tensor(input):
-            raise TypeError("input type is not a torch.Tensor. Got {}"
-                            .format(type(input)))
+            raise TypeError("input type is not a torch.Tensor. Got {}".format(type(input)))
         if input.ndim > 2:
             # (N, C, d1, d2, ..., dK) --> (N * d1 * ... * dK, C)
             num_class = input.shape[1]

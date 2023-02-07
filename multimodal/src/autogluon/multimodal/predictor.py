@@ -27,7 +27,6 @@ from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.multimodal.utils import save_result_df
-
 from . import version as ag_version
 from .constants import (
     AUTOMM,
@@ -37,7 +36,6 @@ from .constants import (
     BEST_K_MODELS_FILE,
     BINARY,
     COLUMN_FEATURES,
-    DATA,
     DEEPSPEED_MIN_PL_VERSION,
     DEEPSPEED_MODULE,
     DEEPSPEED_OFFLOADING,
@@ -57,7 +55,6 @@ from .constants import (
     MASKS,
     MAX,
     MIN,
-    MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
     NER,
@@ -67,7 +64,6 @@ from .constants import (
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
     OVERALL_F1,
-    PROBABILITY,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
     ROIS,
@@ -1085,7 +1081,7 @@ class MultiModalPredictor(ExportMixin):
             problem_type=self._problem_type,
             mixup_active=mixup_active,
             loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
-            loss_config=config
+            loss_config=config,
         )
 
         model_postprocess_fn = get_model_postprocess_fn(
@@ -1402,7 +1398,8 @@ class MultiModalPredictor(ExportMixin):
                     val_df=val_df,
                     validation_metric_name=validation_metric_name,
                     strategy=strategy,
-                    strict_loading=not trainable_param_names,  # Not strict loading if using parameter-efficient finetuning
+                    strict_loading=not trainable_param_names,
+                    # Not strict loading if using parameter-efficient finetuning
                     standalone=standalone,
                     clean_ckpts=clean_ckpts,
                 )
@@ -2634,7 +2631,7 @@ class MultiModalPredictor(ExportMixin):
             problem_type=predictor._problem_type,
             mixup_active=False,
             loss_func_name=OmegaConf.select(predictor._config, "optimization.loss_function"),
-            loss_config=predictor._config
+            loss_config=predictor._config,
         )
 
         model_postprocess_fn = get_model_postprocess_fn(

@@ -1,10 +1,8 @@
 import functools
 import logging
 import re
-import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import numpy as np
 import torch
 import torchmetrics
 from omegaconf import DictConfig, OmegaConf
@@ -14,6 +12,12 @@ from torch.nn import functional as F
 from transformers import Adafactor
 from transformers.trainer_pt_utils import get_parameter_names
 
+from .losses import MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy, FocalLoss
+from .lr_scheduler import (
+    get_cosine_schedule_with_warmup,
+    get_linear_schedule_with_warmup,
+    get_polynomial_decay_schedule_with_warmup,
+)
 from ..constants import (
     ACC,
     ACCURACY,
@@ -48,7 +52,6 @@ from ..constants import (
     NORM_FIT,
     OBJECT_DETECTION,
     OVERALL_ACCURACY,
-    OVERALL_F1,
     PAIR_MARGIN_MINER,
     PEARSONR,
     PEFT_STRATEGIES,
@@ -62,12 +65,6 @@ from ..constants import (
     SPEARMANR,
 )
 from ..utils.map import MeanAveragePrecision
-from .losses import MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy, FocalLoss
-from .lr_scheduler import (
-    get_cosine_schedule_with_warmup,
-    get_linear_schedule_with_warmup,
-    get_polynomial_decay_schedule_with_warmup,
-)
 
 logger = logging.getLogger(AUTOMM)
 
@@ -76,7 +73,7 @@ def get_loss_func(
     problem_type: str,
     mixup_active: bool,
     loss_func_name: Optional[str] = None,
-    loss_config: Optional[DictConfig] = None
+    loss_config: Optional[DictConfig] = None,
 ):
     """
     Choose a suitable Pytorch loss module based on the provided problem type.

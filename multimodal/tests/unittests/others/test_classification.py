@@ -36,11 +36,7 @@ def test_focal_loss_multiclass(checkpoint_name):
 
     model_path = f"./tmp/{uuid.uuid4().hex}-automm_shopee"
 
-    predictor = MultiModalPredictor(
-        label="label",
-        problem_type="multiclass",
-        path=model_path
-    )
+    predictor = MultiModalPredictor(label="label", problem_type="multiclass", path=model_path)
 
     predictor.fit(
         hyperparameters={
@@ -61,7 +57,3 @@ def test_focal_loss_multiclass(checkpoint_name):
     predictions_str = predictor.predict(image_path)
     predictions_list1 = predictor.predict([image_path])
     predictions_list10 = predictor.predict([image_path] * 10)
-
-
-if __name__ == "__main__":
-    test_focal_loss_multiclass("swin_base_patch4_window7_224")
