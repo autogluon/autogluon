@@ -1093,7 +1093,8 @@ class MultiModalPredictor:
                 "The per_gpu_batch_size should be >1 and even for reasonable operation",
                 UserWarning,
             )
-
+        import ipdb
+        ipdb.set_trace()
         loss_func = get_loss_func(
             problem_type=self._problem_type,
             mixup_active=mixup_active,

@@ -62,7 +62,7 @@ from ..constants import (
     SPEARMANR,
 )
 from ..utils.map import MeanAveragePrecision
-from .losses import MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
+from .losses import MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy, FocalLoss
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
@@ -76,6 +76,7 @@ def get_loss_func(
     problem_type: str,
     mixup_active: bool,
     loss_func_name: Optional[str] = None,
+    loss_config: Optional[DictConfig] = None
 ):
     """
     Choose a suitable Pytorch loss module based on the provided problem type.
@@ -94,10 +95,31 @@ def get_loss_func(
     A Pytorch loss module.
     """
     if problem_type in [BINARY, MULTICLASS]:
+        import ipdb
+        ipdb.set_trace()
         if mixup_active:
             loss_func = SoftTargetCrossEntropy()
         else:
-            loss_func = nn.CrossEntropyLoss()
+            if loss_func_name.lower() == "focalloss":
+                if hasattr(loss_config, "optimization.focalloss.alpha"):
+                    alpha = torch.tensor(OmegaConf.select(loss_config, "aoptimization.focalloss.alpha"))
+                else:
+                    alpha = None
+
+                if hasattr(loss_config, "optimization.focalloss.gamma"):
+                    gamma = torch.tensor(OmegaConf.select(loss_config, "aoptimization.focalloss.gamma"))
+                else:
+                    gamma = 2.0
+
+                if hasattr(loss_config, "optimization.focalloss.reduction"):
+                    reduction = torch.tensor(OmegaConf.select(loss_config, "aoptimization.focalloss.reduction"))
+                else:
+                    reduction = "mean"
+                import ipdb
+                ipdb.set_trace()
+                loss_func = FocalLoss(alpha=alpha, gamma=gamma, reduction=reduction)
+            else:
+                loss_func = nn.CrossEntropyLoss()
     elif problem_type == REGRESSION:
         if loss_func_name is not None:
             if "bcewithlogitsloss" in loss_func_name.lower():

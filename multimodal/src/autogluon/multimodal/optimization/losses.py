@@ -1,9 +1,10 @@
 import logging
-from typing import Optional
+from typing import Optional, Sequence
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
 
 try:
     import torch.distributed.nn
@@ -18,9 +19,9 @@ try:
 except ImportError:
     hvd = None
 
-from ..constants import AUTOMM
-
-logger = logging.getLogger(AUTOMM)
+# from ..constants import AUTOMM
+#
+# logger = logging.getLogger(AUTOMM)
 
 
 class RKDLoss(nn.Module):
@@ -272,3 +273,66 @@ class MultiNegativesSoftmaxLoss(nn.Module):
 
         total_loss = (F.cross_entropy(logits_per_a, labels) + F.cross_entropy(logits_per_b, labels)) / 2
         return total_loss
+
+
+class FocalLoss(nn.Module):
+    """
+    Focal loss based on https://github.com/AdeelH/pytorch-multi-class-focal-loss/blob/master/focal_loss.py
+
+    References:
+        [1] https://arxiv.org/abs/1708.02002
+    """
+    def __init__(self, alpha: Optional[torch.Tensor] = None, gamma: Optional[float] = 2.0, reduction: Optional[str] = "mean",
+                 eps: Optional[float] = 1e-6):
+        """
+
+        Parameters
+        ----------
+        alpha
+            weighting factor for each class. Should be of shape (num_classes)
+        gamma
+            the focal parameter for calculating weights on easy/hard samples
+        reduction
+            the reduction to apply to the final loss output. Default: "mean". Options:
+                "mean", "sum", "none"
+        eps
+            epsilon for numerical stability
+        """
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+        self.eps = eps
+        self.NLLLoss = nn.NLLLoss(weight=alpha, reduction="none")
+
+    def forward(self, outputs: torch.Tensor, target: torch.Tensor):
+        if not torch.is_tensor(outputs):
+            raise TypeError("Outputs type is not a torch.Tensor. Got {}"
+                            .format(type(outputs)))
+        if outputs.ndim > 2:
+            # (N, C, d1, d2, ..., dK) --> (N * d1 * ... * dK, C)
+            num_class = outputs.shape[1]
+            outputs = outputs.permute(0, *range(2, outputs.ndim), 1).reshape(-1, num_class)
+            # (N, d1, d2, ..., dK) --> (N * d1 * ... * dK,)
+            target = target.view(-1)
+
+        pt = F.softmax(outputs, dim=-1) + self.eps
+
+        # -alpha_t * log(pt) term
+        log_p = torch.log(pt)
+        ce = self.NLLLoss(log_p, target)
+
+        # (1 - pt)^gamma term
+        all_rows = torch.arange(outputs.shape[0])
+        pt = pt[all_rows, target]
+        focal_term = (1 - pt) ** self.gamma
+
+        loss = focal_term * ce
+
+        if self.reduction == "mean":
+            loss = loss.mean()
+
+        elif self.reduction == "sum":
+            loss = loss.sum()
+
+        return loss
