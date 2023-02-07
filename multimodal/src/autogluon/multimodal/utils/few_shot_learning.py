@@ -1,21 +1,20 @@
-import warnings
-
-from autogluon.multimodal.predictor import MultiModalPredictor
-from typing import List, Optional, Union
-
 import logging
 import os
 import pickle
-import pandas as pd
+import warnings
+from typing import List, Optional, Union
+
 import numpy as np
+import pandas as pd
 from sklearn.metrics import f1_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
-from ..constants import AUTOMM, FEATURE_EXTRACTION, Y_PRED, Y_TRUE
+from autogluon.multimodal.predictor import MultiModalPredictor
 
-from ..utils import compute_score, try_to_infer_pos_label, setup_save_path, CustomUnpickler
+from ..constants import AUTOMM, FEATURE_EXTRACTION, Y_PRED, Y_TRUE
+from ..utils import CustomUnpickler, compute_score, setup_save_path, try_to_infer_pos_label
 
 logger = logging.getLogger(AUTOMM)
 
