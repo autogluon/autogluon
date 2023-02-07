@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+from ray import tune
+
 from .constants import (
     BEST_QUALITY,
     BINARY,
@@ -17,6 +19,28 @@ from .registry import Registry
 
 automm_presets = Registry("automm_presets")
 matcher_presets = Registry("matcher_presets")
+
+default_hyperparameter_tune_kwargs = {
+    "searcher": "bayes",
+    "scheduler": "ASHA",
+    "num_trials": 512,
+}
+
+default_tunable_hyperparameters = {
+    "optimization.learning_rate": tune.loguniform(1e-5, 1e-2),
+    "optimization.optim_type": tune.choice(["adamw", "sgd"]),
+    "optimization.max_epochs": tune.choice(list(range(5, 31))),
+    "env.batch_size": tune.choice([16, 32, 64, 128, 256]),
+}
+
+
+def parse_presets_str(presets: str):
+    use_hpo = False
+    if presets.endswith("_hpo"):
+        presets = presets[:-4]
+        use_hpo = True
+
+    return presets, use_hpo
 
 
 @automm_presets.register()
@@ -47,34 +71,103 @@ def default(presets: str = DEFAULT):
         ],
         "env.num_workers": 2,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
+
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     if presets in [HIGH_QUALITY, DEFAULT]:
-        hyperparameters.update(
-            {
-                "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
-                "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-                "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-base",
-            }
-        )
+        if use_hpo:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": tune.choice(
+                        [
+                            "google/electra-base-discriminator",
+                            "google/flan-t5-base",
+                            "microsoft/deberta-v3-small",
+                            "roberta-base",
+                            "albert-xlarge-v2",
+                        ]
+                    ),
+                    "model.timm_image.checkpoint_name": tune.choice(
+                        [
+                            "swin_base_patch4_window7_224",
+                            "convnext_base_in22ft1k",
+                            "vit_base_patch16_clip_224.laion2b_ft_in12k_in1k",
+                        ]
+                    ),
+                    "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-base",
+                }
+            )
+        else:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
+                    "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+                    "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-base",
+                }
+            )
     elif presets == MEDIUM_QUALITY:
-        hyperparameters.update(
-            {
-                "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
-                "model.timm_image.checkpoint_name": "mobilenetv3_large_100",
-                "model.document_transformer.checkpoint_name": "microsoft/layoutlmv2-base-uncased",
-                "optimization.learning_rate": 4e-4,
-            }
-        )
+        if use_hpo:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": tune.choice(
+                        [
+                            "google/electra-small-discriminator",
+                            "google/flan-t5-small",
+                            "microsoft/deberta-v3-xsmall",
+                            "albert-base-v2",
+                            "microsoft/MiniLM-L12-H384-uncased",
+                        ]
+                    ),
+                    "model.timm_image.checkpoint_name": tune.choice(
+                        ["mobilenetv3_large_100", "gluon_resnet18_v1b", "maxvit_rmlp_pico_rw_256.sw_in1k"]
+                    ),
+                    "model.document_transformer.checkpoint_name": "microsoft/layoutlmv2-base-uncased",
+                }
+            )
+        else:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
+                    "model.timm_image.checkpoint_name": "mobilenetv3_large_100",
+                    "model.document_transformer.checkpoint_name": "microsoft/layoutlmv2-base-uncased",
+                    "optimization.learning_rate": 4e-4,
+                }
+            )
     elif presets == BEST_QUALITY:
-        hyperparameters.update(
-            {
-                "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
-                "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
-                "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-large",
-                "env.per_gpu_batch_size": 1,
-            }
-        )
+        hyperparameters.update({"env.per_gpu_batch_size": 1})
+        if use_hpo:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": tune.choice(
+                        [
+                            "microsoft/deberta-v3-base",
+                            "google/flan-t5-large",
+                            "google/electra-large-discriminator",
+                            "roberta-large",
+                        ]
+                    ),
+                    "model.timm_image.checkpoint_name": tune.choice(
+                        [
+                            "swin_large_patch4_window7_224",
+                            "eva_large_patch14_336.in22k_ft_in22k_in1k",
+                            "vit_large_patch14_clip_336.openai_ft_in12k_in1k",
+                        ]
+                    ),
+                    "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-large",
+                }
+            )
+        else:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
+                    "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
+                    "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-large",
+                }
+            )
     elif presets == "multilingual":
         hyperparameters.update(
             {
@@ -84,7 +177,6 @@ def default(presets: str = DEFAULT):
                 "env.per_gpu_batch_size": 4,
             }
         )
-        hyperparameters.pop("env.num_workers", None)
     else:
         raise ValueError(f"Unknown preset type: {presets}")
 
@@ -130,7 +222,12 @@ def few_shot_text_classification(presets: str = DEFAULT):
         "data.templates.turn_on": True,
         "env.eval_batch_size_ratio": 2,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
+
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     return hyperparameters, hyperparameter_tune_kwargs
 
@@ -157,7 +254,7 @@ def zero_shot_image_classification(presets: str = DEFAULT):
         "model.clip.max_text_len": 0,
         "env.num_workers": 2,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
 
     if presets in [DEFAULT, BEST_QUALITY]:
         hyperparameters.update(
@@ -217,7 +314,12 @@ def object_detection(presets: str = DEFAULT):
         "optimization.patience": 10,
         "env.num_workers": 2,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
+
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     if presets in [DEFAULT, MEDIUM_QUALITY]:
         hyperparameters.update(
@@ -276,7 +378,12 @@ def ocr_text_detection(presets: str = DEFAULT):
         "env.num_gpus": 1,
         "env.precision": 32,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
+
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     return hyperparameters, hyperparameter_tune_kwargs
 
@@ -305,7 +412,11 @@ def ocr_text_recognition(presets: str = DEFAULT):
         "env.num_gpus": 1,
         "env.precision": 32,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     return hyperparameters, hyperparameter_tune_kwargs
 
@@ -333,7 +444,7 @@ def feature_extraction(presets: str = DEFAULT):  # TODO: rename the problem type
         "model.hf_text.pooling_mode": "mean",
         "env.eval_batch_size_ratio": 1,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
 
     return hyperparameters, hyperparameter_tune_kwargs
 
@@ -360,7 +471,12 @@ def image_similarity(presets: str = DEFAULT):
         "model.names": ["timm_image"],
         "env.num_workers": 2,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
+
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     if presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
@@ -410,7 +526,12 @@ def text_similarity(presets: str = DEFAULT):
         "data.categorical.convert_to_text": True,
         "data.numerical.convert_to_text": True,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
+
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     if presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
@@ -460,7 +581,12 @@ def image_text_similarity(presets: str = DEFAULT):
         "optimization.learning_rate": 1e-5,
         "env.num_workers": 2,
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
+
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     if presets in [DEFAULT, MEDIUM_QUALITY]:
         hyperparameters.update(
@@ -515,7 +641,12 @@ def ner(presets: str = DEFAULT):
             "fusion_ner",
         ],
     }
-    hyperparameter_tune_kwargs = None
+    hyperparameter_tune_kwargs = {}
+
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     if presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
@@ -604,6 +735,10 @@ def get_automm_presets(problem_type: str, presets: str):
     hyperparameter_tune_kwargs
         Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
     """
+    if not presets:
+        presets = DEFAULT
+    if presets == "hpo":
+        presets = f"{DEFAULT}_{presets}"
     presets = presets.lower()
     if problem_type in [
         BINARY,
