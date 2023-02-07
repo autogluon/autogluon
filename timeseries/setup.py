@@ -30,7 +30,7 @@ install_requires = [
     "statsmodels~=0.13.0",
     "gluonts~=0.12.0",
     "torch>=1.9,<1.14",
-    "pytorch-lightning>=1.7.4,<1.9.0",
+    "pytorch-lightning>=1.7.4,<1.10.0",
     "networkx",  # version range defined in `core/_setup_utils.py`
     "statsforecast==1.4.0",
     "tqdm",  # version range defined in `core/_setup_utils.py`
