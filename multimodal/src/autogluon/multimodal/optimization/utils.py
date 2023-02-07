@@ -95,28 +95,11 @@ def get_loss_func(
     A Pytorch loss module.
     """
     if problem_type in [BINARY, MULTICLASS]:
-        import ipdb
-        ipdb.set_trace()
         if mixup_active:
             loss_func = SoftTargetCrossEntropy()
         else:
-            if loss_func_name.lower() == "focalloss":
-                if hasattr(loss_config, "optimization.focalloss.alpha"):
-                    alpha = torch.tensor(OmegaConf.select(loss_config, "aoptimization.focalloss.alpha"))
-                else:
-                    alpha = None
-
-                if hasattr(loss_config, "optimization.focalloss.gamma"):
-                    gamma = torch.tensor(OmegaConf.select(loss_config, "aoptimization.focalloss.gamma"))
-                else:
-                    gamma = 2.0
-
-                if hasattr(loss_config, "optimization.focalloss.reduction"):
-                    reduction = torch.tensor(OmegaConf.select(loss_config, "aoptimization.focalloss.reduction"))
-                else:
-                    reduction = "mean"
-                import ipdb
-                ipdb.set_trace()
+            if loss_func_name.lower() == "focal_loss":
+                alpha, gamma, reduction = get_focal_loss_params(loss_config)
                 loss_func = FocalLoss(alpha=alpha, gamma=gamma, reduction=reduction)
             else:
                 loss_func = nn.CrossEntropyLoss()
@@ -138,6 +121,31 @@ def get_loss_func(
         raise NotImplementedError
 
     return loss_func
+
+
+def get_focal_loss_params(loss_config: DictConfig):
+    if hasattr(loss_config, "optimization") and hasattr(loss_config.optimization, "focal_loss"):
+        focal_loss_config = loss_config.optimization.focal_loss
+
+        if hasattr(focal_loss_config, "alpha"):
+            alpha = torch.tensor(OmegaConf.select(focal_loss_config, "alpha"))
+        else:
+            alpha = None
+
+        if hasattr(focal_loss_config, "gamma"):
+            gamma = OmegaConf.select(focal_loss_config, "gamma")
+        else:
+            gamma = 2.0
+
+        if hasattr(focal_loss_config, "reduction"):
+            reduction = OmegaConf.select(focal_loss_config, "reduction")
+        else:
+            reduction = "mean"
+    else:
+        alpha = None
+        gamma = 2.0
+        reduction = "mean"
+    return alpha, gamma, reduction
 
 
 class CustomF1Score(torchmetrics.F1Score):

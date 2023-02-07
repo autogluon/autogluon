@@ -294,7 +294,7 @@ class FocalLoss(nn.Module):
             the focal parameter for calculating weights on easy/hard samples
         reduction
             the reduction to apply to the final loss output. Default: "mean". Options:
-                "mean", "sum", "none"
+                "mean", "sum"
         eps
             epsilon for numerical stability
         """
@@ -305,25 +305,25 @@ class FocalLoss(nn.Module):
         self.eps = eps
         self.NLLLoss = nn.NLLLoss(weight=alpha, reduction="none")
 
-    def forward(self, outputs: torch.Tensor, target: torch.Tensor):
-        if not torch.is_tensor(outputs):
-            raise TypeError("Outputs type is not a torch.Tensor. Got {}"
-                            .format(type(outputs)))
-        if outputs.ndim > 2:
+    def forward(self, input: torch.Tensor, target: torch.Tensor):
+        if not torch.is_tensor(input):
+            raise TypeError("input type is not a torch.Tensor. Got {}"
+                            .format(type(input)))
+        if input.ndim > 2:
             # (N, C, d1, d2, ..., dK) --> (N * d1 * ... * dK, C)
-            num_class = outputs.shape[1]
-            outputs = outputs.permute(0, *range(2, outputs.ndim), 1).reshape(-1, num_class)
+            num_class = input.shape[1]
+            input = input.permute(0, *range(2, input.ndim), 1).reshape(-1, num_class)
             # (N, d1, d2, ..., dK) --> (N * d1 * ... * dK,)
             target = target.view(-1)
 
-        pt = F.softmax(outputs, dim=-1) + self.eps
+        pt = F.softmax(input, dim=-1) + self.eps
 
         # -alpha_t * log(pt) term
         log_p = torch.log(pt)
         ce = self.NLLLoss(log_p, target)
 
         # (1 - pt)^gamma term
-        all_rows = torch.arange(outputs.shape[0])
+        all_rows = torch.arange(input.shape[0])
         pt = pt[all_rows, target]
         focal_term = (1 - pt) ** self.gamma
 

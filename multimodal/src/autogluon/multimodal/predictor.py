@@ -1081,12 +1081,11 @@ class MultiModalPredictor(ExportMixin):
                 "The per_gpu_batch_size should be >1 and even for reasonable operation",
                 UserWarning,
             )
-        import ipdb
-        ipdb.set_trace()
         loss_func = get_loss_func(
             problem_type=self._problem_type,
             mixup_active=mixup_active,
             loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
+            loss_config=config
         )
 
         model_postprocess_fn = get_model_postprocess_fn(
@@ -2635,6 +2634,7 @@ class MultiModalPredictor(ExportMixin):
             problem_type=predictor._problem_type,
             mixup_active=False,
             loss_func_name=OmegaConf.select(predictor._config, "optimization.loss_function"),
+            loss_config=predictor._config
         )
 
         model_postprocess_fn = get_model_postprocess_fn(
