@@ -380,6 +380,7 @@ class MultiModalPredictor:
             transformers.logging.disable_progress_bar()
 
         if verbosity is not None:
+            print("verbosity=", verbosity)
             set_logger_verbosity(verbosity, logger=logger)
 
         self._label_column = label
@@ -1001,11 +1002,10 @@ class MultiModalPredictor:
         clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
-        print(
-f"""Start to train the model (resume={resume}, distillation={teacher_predictor is not None}).
-The model file will be saved to {save_path}.
+        logger.info(
+f"""Start training. The model file will be saved to {save_path}.
 The validation metric is "{validation_metric_name}".
-To visualize the inspect the learning process, you can launch a tensorboard environment via the following command:
+To inspect the learning process, you can launch a tensorboard environment via the following command:
 
 ```shell
 tensorboard --logdir {save_path}
@@ -2669,7 +2669,6 @@ tensorboard --logdir {save_path}
 
         # backward compatibility for variable image size.
         if version.parse(assets["version"]) <= version.parse("0.6.2"):
-            print("hasattr model.timm_image", hasattr(config, "model.timm_image"))
             if OmegaConf.select(config, "model.timm_image") is not None:
                 logger.warn(
                     "Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "
