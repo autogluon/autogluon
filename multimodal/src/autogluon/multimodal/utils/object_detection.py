@@ -41,7 +41,9 @@ def convert_data_to_df(data: Union[pd.DataFrame, dict, list, str]) -> pd.DataFra
         return data
 
     raise TypeError(
-        "Expected data to be an instance of dict, list, str or pd.DataFrame, but got {} of type {}".format(data, type(data))
+        "Expected data to be an instance of dict, list, str or pd.DataFrame, but got {} of type {}".format(
+            data, type(data)
+        )
     )
 
 

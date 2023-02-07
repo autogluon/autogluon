@@ -707,7 +707,9 @@ class MultiModalPredictor:
                                 n=max_num_tuning_data, replace=False, random_state=seed
                             ).reset_index(drop=True)
             else:
-                raise TypeError(f"Expected train_data to have type str or pd.DataFrame, but got type: {type(train_data)}")
+                raise TypeError(
+                    f"Expected train_data to have type str or pd.DataFrame, but got type: {type(train_data)}"
+                )
 
         pl.seed_everything(seed, workers=True)
 
