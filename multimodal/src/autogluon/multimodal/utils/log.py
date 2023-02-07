@@ -157,8 +157,6 @@ Enjoy the coffee, and let AutoMM do the job ☕☕☕ Learn more at https://auto
 
 def get_fit_complete_message(save_path):
     return f"""Training finished. AutoMM has created your model 🎉🎉🎉
-    
-- Model files and training logs are saved to "{save_path}". 
 
 - To load the model, use the following code 
 
