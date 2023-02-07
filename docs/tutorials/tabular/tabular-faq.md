@@ -3,7 +3,7 @@
 
 ## How can I get the most accurate predictions?
 
-See ["Maximizing predictive performance" in the Quick Start Tutorial](tabular-quickstart.html#maximizing-predictive-performance).
+See ["Maximizing predictive performance" in the Tabular Essentials tutorial](tabular-essentials.ipynb#maximizing-predictive-performance).
 
 
 ## Can I run AutoGluon Tabular on Mac/Windows?
@@ -14,9 +14,9 @@ Yes!
 
 Yes! Most of the models used by AutoGluon support GPU training, including LightGBM, CatBoost, XGBoost, MXNet Neural Network, and FastAI Neural Network.
 
-To enable GPU training, specify in [predictor.fit](../../api/autogluon.predictor.html#autogluon.tabular.TabularPredictor.fit) the argument `num_gpus=SOME_VALUE`. This will enable GPU training for all models that support it. Multi-GPU training is still experimental.
+To enable GPU training, specify in [predictor.fit](../../api/_autogen/autogluon.tabular.TabularPredictor.rst#autogluon.tabular.TabularPredictor.fit) the argument `num_gpus=SOME_VALUE`. This will enable GPU training for all models that support it. Multi-GPU training is still experimental.
 
-For most of these models, CUDA will have to be installed and some models may need special installations such as LightGBM and MXNet to be compatible with GPU training. Refer to [installation instructions](../../install.html) for more details.
+For most of these models, CUDA will have to be installed and some models may need special installations such as LightGBM and MXNet to be compatible with GPU training. Refer to [installation instructions](../../install.md) for more details.
 
 
 ## What machine is best for running AutoGluon Tabular?
@@ -26,24 +26,24 @@ As an open-source library, AutoGluon can be run on any machine including your la
 
 ## How can I resolve memory issues?
 
-See ["If you encounter memory issues" in the In Depth Tutorial](tabular-indepth.html#if-you-encounter-memory-issues).
+See ["If you encounter memory issues" in the In Depth Tutorial](tabular-indepth.ipynb#if-you-encounter-memory-issues).
 
 
 ## How can I resolve disk space issues?
 
-See ["If you encounter disk space issues" in the In Depth Tutorial](tabular-indepth.html#if-you-encounter-disk-space-issues).
+See ["If you encounter disk space issues" in the In Depth Tutorial](tabular-indepth.ipynb#if-you-encounter-disk-space-issues).
 
 
 ## How can I reduce the time required for training?
 
-Specify the `time_limit` argument in [predictor.fit](../../api/autogluon.predictor.html#autogluon.tabular.TabularPredictor.fit) to the number of seconds you are willing to wait (longer time limits generally result in superior predictive performance). You may also try other settings of the `presets` argument in [predictor.fit](../../api/autogluon.predictor.html#autogluon.tabular.TabularPredictor.fit), and can also subsample your data for a quick trial run via `train_data.sample(n=SUBSAMPLE_SIZE)`. If a particular type of model is taking much longer to train on your data than the other types of models, you can tell AutoGluon not to train any models of this particular type by specifying its short-name in the `excluded_model_types` argument of `fit()`.
+Specify the `time_limit` argument in [predictor.fit](../../api/_autogen/autogluon.tabular.TabularPredictor.rst#autogluon.tabular.TabularPredictor.fit) to the number of seconds you are willing to wait (longer time limits generally result in superior predictive performance). You may also try other settings of the `presets` argument in [predictor.fit](../../api/_autogen/autogluon.tabular.TabularPredictor.rst#autogluon.tabular.TabularPredictor.fit), and can also subsample your data for a quick trial run via `train_data.sample(n=SUBSAMPLE_SIZE)`. If a particular type of model is taking much longer to train on your data than the other types of models, you can tell AutoGluon not to train any models of this particular type by specifying its short-name in the `excluded_model_types` argument of `fit()`.
 
-Since many of the strategies to reduce memory usage also reduce training times, also check out: ["If you encounter memory issues" in the In Depth Tutorial](tabular-indepth.html#if-you-encounter-memory-issues).
+Since many of the strategies to reduce memory usage also reduce training times, also check out: ["If you encounter memory issues" in the In Depth Tutorial](tabular-indepth.ipynb#if-you-encounter-memory-issues).
 
 
 ## How can I reduce the time required for prediction?
 
-See ["Accelerating inference" in the In Depth Tutorial](tabular-indepth.html#accelerating-inference).
+See ["Accelerating inference" in the In Depth Tutorial](tabular-indepth.ipynb#accelerating-inference).
 
 
 ## How does AutoGluon Tabular work internally?
@@ -60,7 +60,7 @@ Specify the argument `verbosity = 4` in `fit()`.
 
 ## What model is AutoGluon using for prediction?
 
-See ["Prediction options" in the In Depth Tutorial](tabular-indepth.html#prediction-options-inference).
+See ["Prediction options" in the In Depth Tutorial](tabular-indepth.ipynb#prediction-options-inference).
 
 
 ## Which classes do predicted probabilities correspond to?
@@ -90,7 +90,7 @@ The positive class can also be retrieved via `predictor.class_labels[-1]`. The o
 
 ## How can I use AutoGluon for interpretability?
 
-See ["Interpretability (feature importance)" in the In Depth Tutorial](tabular-indepth.html#interpretability-feature-importance), which allows you to quantify how much each feature contributes to AutoGluon's predictive accuracy.
+See ["Interpretability (feature importance)" in the In Depth Tutorial](tabular-indepth.ipynb#interpretability-feature-importance), which allows you to quantify how much each feature contributes to AutoGluon's predictive accuracy.
 
 Additionally, you can explain particular AutoGluon predictions using [Shapely values](https://github.com/slundberg/shap/). Notebooks demonstrating this are provided at: [https://github.com/autogluon/autogluon/tree/master/examples/tabular/interpret](https://github.com/autogluon/autogluon/tree/master/examples/tabular/interpret). We recommend starting with the notebook "SHAP with AutoGluon-Tabular" contained in this folder, which demonstrates handling of multiclass classification tasks and data with categorical features.
 
@@ -167,7 +167,7 @@ To solely use custom data preprocessing and automatically apply your custom tran
 
 ## How can I differently weight the importance of training examples?
 
-You can specify the `sample_weight` and `weight_evaluation` [arguments](../../api/autogluon.predictor.html#autogluon.tabular.TabularPredictor) when initializing a `TabularPredictor`.
+You can specify the `sample_weight` and `weight_evaluation` [arguments](../../api/_autogen/autogluon.tabular.TabularPredictor.rst#autogluon.tabular.TabularPredictor) when initializing a `TabularPredictor`.
 
 ## How does missing value imputation work in AutoGluon?
 
@@ -201,7 +201,7 @@ predictor = TabularPredictor(...).fit(..., hyperparameters= {'CAT': {'ag_args_fi
 ```
 
 ## My custom metric is raising `_pickle.PicklingError: Can't pickle` errors
-See ["Ensuring Metric is Serializable" in Custom Metric Tutorial](tabular-custom-metric.html#ensuring-metric-is-serializable).
+See ["Ensuring Metric is Serializable" in Custom Metric Tutorial](advanced/tabular-custom-metric.ipynb#ensuring-metric-is-serializable).
 
 ## I know AutoGluon uses ray underneath. What's the best practice for me?
 It is generally recommended to not have your custom usage of ray resources, i.e. init ray cluster, along with AutoGluon in a same script.
@@ -214,4 +214,4 @@ To address it, either cleanup your workspace, or 1) shutdown your Notebook insta
 
 ## Issues not addressed here
 
-First search if your issue is addressed in the [tutorials](index.html), [examples](https://github.com/autogluon/autogluon/tree/master/examples/tabular), [documentation](../../api/autogluon.predictor.html), or [Github issues](https://github.com/autogluon/autogluon/issues) (search both Closed and Open issues). If it is not there, please open a [new Github Issue](https://github.com/autogluon/autogluon/issues/new) and clearly state your issue. If you have a bug, please include: your code (call `fit(..., verbosity=4)` which will print more details), the output printed during the code execution, and information about your operating system, Python version, and installed packages (output of `pip freeze`).
+First search if your issue is addressed in the [tutorials](index.md), [examples](https://github.com/autogluon/autogluon/tree/master/examples/tabular), [documentation](../../api/_autogen/autogluon.tabular.TabularPredictor.rst), or [Github issues](https://github.com/autogluon/autogluon/issues) (search both Closed and Open issues). If it is not there, please open a [new Github Issue](https://github.com/autogluon/autogluon/issues/new) and clearly state your issue. If you have a bug, please include: your code (call `fit(..., verbosity=4)` which will print more details), the output printed during the code execution, and information about your operating system, Python version, and installed packages (output of `pip freeze`).
