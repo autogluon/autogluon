@@ -692,11 +692,8 @@ def run_model(model: nn.Module, batch: dict):
     from .timm_image import TimmAutoModelForImagePrediction
 
     supported_models = (TimmAutoModelForImagePrediction, HFAutoModelForTextPrediction)
-
-    is_dp = True if isinstance(model, nn.DataParallel) else False
-
-    pure_model = model.module if is_dp else model
-    if (not isinstance(model, DocumentTransformer)) and isinstance(pure_model, supported_models):
+    pure_model = model.module if isinstance(model, nn.DataParallel) else model
+    if (not isinstance(pure_model, DocumentTransformer)) and isinstance(pure_model, supported_models):
         input_vec = [batch[k] for k in pure_model.input_keys]
         column_names, column_values = [], []
         for k in batch.keys():
