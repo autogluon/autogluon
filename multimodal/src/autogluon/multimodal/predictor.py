@@ -27,6 +27,7 @@ from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.multimodal.utils import save_result_df
+
 from . import version as ag_version
 from .constants import (
     AUTOMM,

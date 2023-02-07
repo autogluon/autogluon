@@ -12,12 +12,6 @@ from torch.nn import functional as F
 from transformers import Adafactor
 from transformers.trainer_pt_utils import get_parameter_names
 
-from .losses import MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy, FocalLoss
-from .lr_scheduler import (
-    get_cosine_schedule_with_warmup,
-    get_linear_schedule_with_warmup,
-    get_polynomial_decay_schedule_with_warmup,
-)
 from ..constants import (
     ACC,
     ACCURACY,
@@ -65,6 +59,13 @@ from ..constants import (
     SPEARMANR,
 )
 from ..utils.map import MeanAveragePrecision
+from .losses import MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy, FocalLoss
+from .lr_scheduler import (
+    get_cosine_schedule_with_warmup,
+    get_linear_schedule_with_warmup,
+    get_polynomial_decay_schedule_with_warmup,
+)
+
 
 logger = logging.getLogger(AUTOMM)
 
