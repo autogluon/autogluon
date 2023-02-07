@@ -59,13 +59,12 @@ from ..constants import (
     SPEARMANR,
 )
 from ..utils.map import MeanAveragePrecision
-from .losses import MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy, FocalLoss
+from .losses import FocalLoss, MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
     get_polynomial_decay_schedule_with_warmup,
 )
-
 
 logger = logging.getLogger(AUTOMM)
 
