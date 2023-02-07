@@ -656,6 +656,9 @@ class MultiModalPredictor:
         -------
         An "MultiModalPredictor" object (itself).
         """
+        print("verbosity is", self._verbosity)
+        print("logger:", logger)
+        logger.info("Test message")
         fit_called = self._fit_called  # used in current function
         self._fit_called = True
 
