@@ -848,7 +848,24 @@ class MultiModalPredictor:
         self._fit(**_fit_args)
         training_end = time.time()
         self._total_train_time = training_end - training_start
-        logger.info(f"Models and intermediate outputs are saved to {self._save_path} ")
+        logger.info(
+f""""Models and intermediate outputs are saved to {self._save_path}. 
+
+To load the trained predictor, use the following code 
+
+```shell
+from autogluon.multimodal import MultiModalPredictor
+
+predictor = MultiModalPredictor.load("{self._save_path}")
+```
+
+To track the training process, you can launch a tensorboard
+
+```shell
+tensorboard --logdir {self._save_path}
+```
+""")
+
         return self
 
     def _verify_inference_ready(self):
@@ -1006,8 +1023,7 @@ class MultiModalPredictor:
         **hpo_kwargs,
     ):
         logger.info(
-f"""Start training. The model file will be saved to {save_path}.
-The validation metric is "{validation_metric_name}".
+f"""Start training!! The model file will be saved to {save_path}. The validation metric is "{validation_metric_name}". \
 To inspect the learning process, you can launch a tensorboard environment via the following command:
 
 ```shell

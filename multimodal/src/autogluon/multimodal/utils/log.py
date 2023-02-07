@@ -136,3 +136,5 @@ def apply_log_filter(log_filter):
     finally:
         remove_log_filter(logging.getLogger(), log_filter)
         remove_log_filter(logging.getLogger("pytorch_lightning"), log_filter)
+
+def get_fit_initial_logging_message():
