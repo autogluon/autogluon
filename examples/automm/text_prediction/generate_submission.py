@@ -1,5 +1,5 @@
 import pandas as pd
-from autogluon.text import TextPredictor
+from autogluon.multimodal import MultiModalPredictor
 import argparse
 import os
 import numpy as np
@@ -43,7 +43,7 @@ def main(args):
             # For AX, we need to load the mnli-m checkpoint and run inference
             test_df = pd.read_csv(test_file_path, sep='\t', header=0)
             test_index = test_df['index']
-            predictor = TextPredictor.load(f'{args.prefix}_mnli_m')
+            predictor = MultiModalPredictor.load(f'{args.prefix}_mnli_m')
             label_column = predictor.label
             predictions = predictor.predict(test_df)
         else:
