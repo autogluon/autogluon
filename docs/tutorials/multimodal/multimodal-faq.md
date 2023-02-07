@@ -26,7 +26,7 @@ feeding in the dataframe to AutoGluon Multimodal.
 
 ## Is it possible to customize AutoGluon Multimodal?
 
-Yes, check our tutorial at :ref:`sec_automm_customization`. 
+Yes, check out the [Multimodal Customization](advanced_topics/customization.ipynb) tutorial.
 
 ## Can I use AutoGluon Multimodal in Kaggle Competitions?
 
