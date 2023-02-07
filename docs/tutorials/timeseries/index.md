@@ -5,6 +5,6 @@
 maxdepth: 1
 ---
 
-Quick Start <forecasting-quickstart>
+Quick Start <forecasting-quick-start>
 In Depth <forecasting-indepth>
 ```
