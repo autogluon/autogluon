@@ -375,7 +375,6 @@ class MultiModalPredictor:
                     )
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
-            verbosity = 1  # don't use 3, which doesn't suppress logger.info() in .load().
             enable_progress_bar = False
             # Also disable progress bar of transformers package
             transformers.logging.disable_progress_bar()
