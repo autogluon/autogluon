@@ -48,7 +48,6 @@ from ..data import (
     TextProcessor,
 )
 
-
 logger = logging.getLogger(AUTOMM)
 
 
