@@ -1,6 +1,7 @@
 import os
 import re
 import tempfile
+from sys import platform
 from unittest.mock import MagicMock, call
 
 import numpy as np
@@ -137,6 +138,7 @@ def test_quick_fit(monkeypatch):
         m.setattr(ModelLeaderboard, "render", call_ldr_render)
         m.setattr(FeatureImportance, "render", call_fi_render)
         m.setattr(PropertyRendererComponent, "render", call_prc_render)
+        _force_using_rf_if_on_mac(m)
 
         with tempfile.TemporaryDirectory() as path:
             quick_fit(path=path, train_data=df_train, label="class")
@@ -171,7 +173,8 @@ def test_dataset_overview(monkeypatch):
     call_md_render.assert_has_calls(
         [
             call("### Feature Distance"),
-            call("### Near duplicate group analysis: `education-num`, `near_duplicate` - distance `0.0000`"),
+            call("**Near duplicate group analysis: `education-num`, `near_duplicate` - distance `0.0000`**"),
+            call("Feature interaction between `education-num`/`near_duplicate`"),
         ]
     )
     call_ds_render.assert_called_once()
@@ -190,6 +193,7 @@ def test_covariate_shift_detection(monkeypatch):
     call_md_render = MagicMock()
     call_fiv_render = MagicMock()
     with monkeypatch.context() as m:
+        _force_using_rf_if_on_mac(m)
         with tempfile.TemporaryDirectory() as path:
             m.setattr(XShiftSummary, "render", call_xss_render)
             m.setattr(MarkdownSectionComponent, "render_markdown", call_md_render)
@@ -204,7 +208,14 @@ def test_covariate_shift_detection(monkeypatch):
     assert state.xshift_results.pvalue < 0.01
     assert state.xshift_results.feature_importance.iloc[0].name == "shift_col"
     call_fiv_render.assert_called_once()
-    call_md_render.assert_called_once_with("#### `shift_col` values distribution between datasets; p-value: `0.0000`")
+    call_md_render.assert_called_once_with("**`shift_col` values distribution between datasets; p-value: `0.0000`**")
+
+
+def _force_using_rf_if_on_mac(m):
+    if platform == "darwin":
+        # Stability - use RF instead of LightGBM can on mac for tests
+        call_is_lightgbm_available = MagicMock(return_value=False)
+        m.setattr(eda.auto.simple, "_is_lightgbm_available", call_is_lightgbm_available)
 
 
 def test_get_empty_dict_if_none():
@@ -321,10 +332,6 @@ def test_target_analysis__classification(monkeypatch):
         [
             call("## Target variable analysis"),
             call("### Label Insights"),
-            call(
-                "### Target variable correlations\n"
-                " - absolute correlation greater than `0.5` found for target variable `class`"
-            ),
         ]
     )
     call_ds_render.assert_called_once()
@@ -388,9 +395,9 @@ def test_target_analysis__regression(monkeypatch):
                 " - [skewnorm](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.skewnorm.html)",
                 "   - p-value: 0.963",
                 "   - Parameters: (a: 3.xx, loc: 78497.xx, scale: 150470.xx)",
-                " - [genlogistic](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.genlogistic.html)",
-                "   - p-value: 0.962",
-                "   - Parameters: (c: 129.xx, loc: -233264.xx, scale: 78753.xx)",
+                " - [weibull_min](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.weibull_min.html)",
+                "   - p-value: 0.963",
+                "   - Parameters: (c: 1.xx, loc: 16324.xx, scale: 200669.xx)",
             ]
         ),
         "### Target variable correlations\n - ⚠️ no fields with absolute correlation greater than `0.5` found for target variable `fnlwgt`.",
@@ -425,5 +432,5 @@ def test_target_analysis__regression(monkeypatch):
         "gumbel_r",
         "nakagami",
         "skewnorm",
-        "genlogistic",
+        "weibull_min",
     ]

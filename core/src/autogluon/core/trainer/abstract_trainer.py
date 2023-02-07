@@ -3,7 +3,7 @@ import logging
 import os
 import time
 from collections import defaultdict
-from typing import Dict, List, Union, Tuple
+from typing import Dict, List, Union, Tuple, Optional
 
 import networkx as nx
 import numpy as np
@@ -20,10 +20,11 @@ from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
 from ..calibrate.conformity_score import compute_conformity_score
 from ..calibrate.temperature_scaling import tune_temperature_scaling
-from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from ..data.label_cleaner import LabelCleanerMulticlassToBinary
 from ..models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel
-from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
+from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, \
+    extract_column, compute_weighted_metric, convert_pred_probas_to_df
 from ..utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError, NotEnoughCudaMemoryError
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
@@ -873,6 +874,12 @@ class AbstractTrainer:
         else:
             return model_pred_proba_dict
 
+    def get_model_oof_dict(self, models: List[str]) -> dict:
+        """
+        Returns a dictionary of out-of-fold prediction probabilities, keyed by model name
+        """
+        return {model: self.get_model_oof(model) for model in models}
+
     def get_model_pred_dict(self,
                             X: pd.DataFrame,
                             models: List[str],
@@ -947,66 +954,74 @@ class AbstractTrainer:
         model_set = model_set.difference(set(model_pred_proba_dict.keys()))
         return model_set, model_pred_proba_dict
 
-    # TODO: Remove _get_inputs_to_stacker_legacy eventually, move logic internally into this function instead
-    def get_inputs_to_stacker(self, X, base_models, model_pred_proba_dict=None, fit=False, use_orig_features=True, use_val_cache=False):
-        if base_models is None:
-            base_models = []
-        if not fit:
+    def get_inputs_to_stacker(self,
+                              X: pd.DataFrame,
+                              base_models: List[str],
+                              model_pred_proba_dict: Optional[dict] = None,
+                              fit: bool = False,
+                              use_orig_features: bool = True,
+                              use_val_cache: bool = False) -> pd.DataFrame:
+        """
+        Returns the valid X input for a stacker model with base models equal to `base_models`.
+
+        Parameters
+        ----------
+        X : pd.DataFrame
+            Input data to augment.
+        base_models : List[str]
+            The list of base models to augment X with.
+            Base models will add their prediction probabilities as extra features to X.
+        model_pred_proba_dict : dict, optional
+            A dict of predict_probas that could have been computed by a prior call to `get_model_pred_proba_dict` to avoid redundant computations.
+            Models already present in model_pred_proba_dict will not be predicted on.
+            Note: Mutated in-place to minimize memory usage
+        fit : bool, default = False
+            If True, X represents the training data and the models will return their out-of-fold prediction probabilities.
+            If False, X represents validation or test data and the models will predict directly on X to generate their prediction probabilities.
+        use_orig_features : bool, default = True
+            If True, the output DataFrame will include X's original features in addition to the new stack features.
+            If False, the output DataFrame will only contain the new stack features.
+        use_val_cache : bool, default = False
+            Whether to fetch cached val prediction probabilities for models instead of predicting on the data.
+            Only set to True if X is equal to the validation data and you want to skip live predictions.
+
+        Returns
+        -------
+        X : DataFrame, an updated DataFrame with the additional stack features from `base_models`.
+        """
+        if not base_models:
+            return X
+        if fit:
+            model_pred_proba_dict = self.get_model_oof_dict(models=base_models)
+        else:
             model_pred_proba_dict = self.get_model_pred_proba_dict(X=X,
                                                                    models=base_models,
                                                                    model_pred_proba_dict=model_pred_proba_dict,
                                                                    use_val_cache=use_val_cache)
-            model_pred_proba_list = [model_pred_proba_dict[model] for model in base_models]
+        pred_proba_list = [model_pred_proba_dict[model] for model in base_models]
+        stack_column_names, _ = self._get_stack_column_names(models=base_models)
+        X_stacker = convert_pred_probas_to_df(pred_proba_list=pred_proba_list, problem_type=self.problem_type, columns=stack_column_names, index=X.index)
+        if use_orig_features:
+            X = pd.concat([X_stacker, X], axis=1)
         else:
-            # TODO: After _get_inputs_to_stacker_legacy is removed, this if/else is not necessary, instead pass fit param to get_model_pred_proba_dict()
-            model_pred_proba_list = None
-
-        X_stacker_input = self._get_inputs_to_stacker_legacy(X=X, level_start=1, level_end=2, model_levels={1: base_models}, y_pred_probas=model_pred_proba_list, fit=fit)
-        if not use_orig_features:
-            X_stacker_input = X_stacker_input.drop(columns=X.columns)
-        return X_stacker_input
-
-    # TODO: Legacy code, still used during training because it is technically slightly faster and more memory efficient than get_model_pred_proba_dict()
-    #  Remove in future as it limits flexibility in stacker inputs during training
-    def _get_inputs_to_stacker_legacy(self, X, level_start, level_end, model_levels, y_pred_probas=None, fit=False):
-        if level_start > level_end:
-            raise AssertionError(f'level_start cannot be greater than level end: ({level_start}, {level_end})')
-        if (level_start == 1) and (level_end == 1):
-            return X
-        if fit:
-            if level_start > 1:
-                dummy_stacker_start = self._get_dummy_stacker(level=level_start, model_levels=model_levels, use_orig_features=True)
-                cols_to_drop = dummy_stacker_start.stack_columns
-                X = X.drop(cols_to_drop, axis=1)
-            dummy_stacker = self._get_dummy_stacker(level=level_end, model_levels=model_levels, use_orig_features=True)
-            X = dummy_stacker.preprocess(X=X, preprocess_nonadaptive=False, fit=True, compute_base_preds=True)
-        elif y_pred_probas is not None:
-            if y_pred_probas == []:
-                return X
-            dummy_stacker = self._get_dummy_stacker(level=level_end, model_levels=model_levels, use_orig_features=True)
-            X_stacker = dummy_stacker.pred_probas_to_df(pred_proba=y_pred_probas, index=X.index)
-            if dummy_stacker.params['use_orig_features']:
-                if level_start > 1:
-                    dummy_stacker_start = self._get_dummy_stacker(level=level_start, model_levels=model_levels, use_orig_features=True)
-                    cols_to_drop = dummy_stacker_start.stack_columns
-                    X = X.drop(cols_to_drop, axis=1)
-                X = pd.concat([X_stacker, X], axis=1)
-            else:
-                X = X_stacker
-        else:
-            dummy_stackers = {}
-            for level in range(level_start, level_end+1):
-                if level > 1:
-                    dummy_stackers[level] = self._get_dummy_stacker(level=level, model_levels=model_levels, use_orig_features=True)
-            for level in range(level_start, level_end):
-                if level > 1:
-                    cols_to_drop = dummy_stackers[level].stack_columns
-                else:
-                    cols_to_drop = []
-                X = dummy_stackers[level+1].preprocess(X=X, preprocess_nonadaptive=False, fit=False, compute_base_preds=True)
-                if len(cols_to_drop) > 0:
-                    X = X.drop(cols_to_drop, axis=1)
+            X = X_stacker
         return X
+
+    def _get_stack_column_names(self, models: List[str]) -> Tuple[List[str], int]:
+        """
+        Get the stack column names generated when the provided models are used as base models in a stack ensemble.
+        Additionally output the number of columns per model as an int.
+        """
+        if self.problem_type in [MULTICLASS, SOFTCLASS]:
+            stack_column_names = [stack_column_prefix + '_' + str(cls) for stack_column_prefix in models for cls in range(self.num_classes)]
+            num_columns_per_model = self.num_classes
+        elif self.problem_type == QUANTILE:
+            stack_column_names = [stack_column_prefix + '_' + str(q) for stack_column_prefix in models for q in self.quantile_levels]
+            num_columns_per_model = len(self.quantile_levels)
+        else:
+            stack_column_names = models
+            num_columns_per_model = 1
+        return stack_column_names, num_columns_per_model
 
     # You must have previously called fit() with cache_data=True
     # Fits _FULL versions of specified models, but does NOT link them (_FULL stackers will still use normal models as input)
@@ -2045,37 +2060,6 @@ class AbstractTrainer:
 
     def _predict_proba_model(self, X, model, model_pred_proba_dict=None, cascade=False):
         return self.get_pred_proba_from_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, cascade=cascade)
-
-    def _get_dummy_stacker(self, level: int, model_levels: dict, use_orig_features=True) -> StackerEnsembleModel:
-        model_names = model_levels[level - 1]
-        base_models_dict = {}
-        for model_name in model_names:
-            if model_name in self.models.keys():
-                base_models_dict[model_name] = self.models[model_name]
-        hyperparameters = dict(
-            use_orig_features=use_orig_features,
-            max_base_models_per_type=0,
-            max_base_models=0,
-        )
-        dummy_stacker = StackerEnsembleModel(
-            path='',
-            name='',
-            model_base=AbstractModel(
-                path='',
-                name='',
-                problem_type=self.problem_type,
-                eval_metric=self.eval_metric,
-                hyperparameters={'ag_args_fit': {'quantile_levels': self.quantile_levels}}
-            ),
-            base_model_names=model_names,
-            base_models_dict=base_models_dict,
-            base_model_paths_dict=self.get_models_attribute_dict(attribute='path', models=model_names),
-            base_model_types_dict=self.get_models_attribute_dict(attribute='type', models=model_names),
-            hyperparameters=hyperparameters,
-            random_state=level+self.random_state
-        )
-        dummy_stacker.initialize(num_classes=self.num_classes)
-        return dummy_stacker
 
     def _proxy_model_feature_prune(self, model_fit_kwargs: dict, time_limit: float, layer_fit_time: float, level: int, features: List[str], **feature_prune_kwargs: dict) -> List[str]:
         """
