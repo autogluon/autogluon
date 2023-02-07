@@ -1,6 +1,7 @@
 import os
 import re
 import tempfile
+from sys import platform
 from unittest.mock import MagicMock, call
 
 import numpy as np
@@ -137,6 +138,7 @@ def test_quick_fit(monkeypatch):
         m.setattr(ModelLeaderboard, "render", call_ldr_render)
         m.setattr(FeatureImportance, "render", call_fi_render)
         m.setattr(PropertyRendererComponent, "render", call_prc_render)
+        _force_using_rf_if_on_mac(m)
 
         with tempfile.TemporaryDirectory() as path:
             quick_fit(path=path, train_data=df_train, label="class")
@@ -191,6 +193,7 @@ def test_covariate_shift_detection(monkeypatch):
     call_md_render = MagicMock()
     call_fiv_render = MagicMock()
     with monkeypatch.context() as m:
+        _force_using_rf_if_on_mac(m)
         with tempfile.TemporaryDirectory() as path:
             m.setattr(XShiftSummary, "render", call_xss_render)
             m.setattr(MarkdownSectionComponent, "render_markdown", call_md_render)
@@ -206,6 +209,13 @@ def test_covariate_shift_detection(monkeypatch):
     assert state.xshift_results.feature_importance.iloc[0].name == "shift_col"
     call_fiv_render.assert_called_once()
     call_md_render.assert_called_once_with("**`shift_col` values distribution between datasets; p-value: `0.0000`**")
+
+
+def _force_using_rf_if_on_mac(m):
+    if platform == "darwin":
+        # Stability - use RF instead of LightGBM can on mac for tests
+        call_is_lightgbm_available = MagicMock(return_value=False)
+        m.setattr(eda.auto.simple, "_is_lightgbm_available", call_is_lightgbm_available)
 
 
 def test_get_empty_dict_if_none():
