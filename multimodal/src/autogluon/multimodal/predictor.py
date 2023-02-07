@@ -383,6 +383,8 @@ class MultiModalPredictor:
             print("verbosity=", verbosity)
             set_logger_verbosity(verbosity, logger=logger)
 
+        logger.addHandler(logging.StreamHandler(sys.stdout))
+
         self._label_column = label
         self._problem_type = problem_type
         self._presets = presets.lower() if presets else None
