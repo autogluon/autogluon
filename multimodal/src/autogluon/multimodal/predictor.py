@@ -695,7 +695,7 @@ class MultiModalPredictor:
                                 n=max_num_tuning_data, replace=False, random_state=seed
                             ).reset_index(drop=True)
             elif isinstance(train_data, pd.DataFrame):
-                self.detection_anno_train = None
+                self._detection_anno_train = None
                 # sanity check dataframe columns
                 train_data = autogluon.multimodal.utils.object_detection.convert_data_to_df(train_data)
                 if tuning_data is not None:
