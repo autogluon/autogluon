@@ -149,7 +149,7 @@ tensorboard --logdir {save_path}
 
 
 def get_fit_complete_message(save_path):
-    return f""""Training finished!! Models and intermediate outputs are saved to {save_path}. 
+    return f"""Training finished!! Models and intermediate outputs are saved to {save_path}. 
 
 To load the trained predictor, use the following code 
 
