@@ -382,6 +382,7 @@ class MultiModalPredictor:
         if verbosity is not None:
             set_logger_verbosity(verbosity, logger=logger)
 
+        # Add handler to logger
         if not len(logger.handlers):
             logger.addHandler(logging.StreamHandler(sys.stdout))
 
