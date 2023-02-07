@@ -32,6 +32,7 @@ from autogluon.multimodal.models.huggingface_text import HFAutoModelForTextPredi
 from autogluon.multimodal.models.mmdet_image import MMDetAutoModelForObjectDetection
 from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePrediction
 from autogluon.multimodal.utils import save_result_df
+from autogluon.multimodal.utils.log import get_fit_start_message, get_fit_complete_message
 
 from . import version as ag_version
 from .constants import (
@@ -848,23 +849,7 @@ class MultiModalPredictor:
         self._fit(**_fit_args)
         training_end = time.time()
         self._total_train_time = training_end - training_start
-        logger.info(
-f""""Models and intermediate outputs are saved to {self._save_path}. 
-
-To load the trained predictor, use the following code 
-
-```shell
-from autogluon.multimodal import MultiModalPredictor
-
-predictor = MultiModalPredictor.load("{self._save_path}")
-```
-
-To track the training process, you can launch a tensorboard
-
-```shell
-tensorboard --logdir {self._save_path}
-```
-""")
+        logger.info(get_fit_complete_message())
 
         return self
 
@@ -1022,16 +1007,7 @@ tensorboard --logdir {self._save_path}
         clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
-        logger.info(
-f"""Start training!! The model file will be saved to {save_path}. The validation metric is "{validation_metric_name}". \
-To inspect the learning process, you can launch a tensorboard environment via the following command:
-
-```shell
-tensorboard --logdir {save_path}
-```
-
-"""
-)
+        logger.info(get_fit_start_message())
         config = get_config(
             problem_type=self._problem_type,
             presets=presets,

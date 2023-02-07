@@ -137,4 +137,29 @@ def apply_log_filter(log_filter):
         remove_log_filter(logging.getLogger(), log_filter)
         remove_log_filter(logging.getLogger("pytorch_lightning"), log_filter)
 
-def get_fit_initial_logging_message():
+def get_fit_start_message(save_path, validation_metric_name):
+    return f"""Start training!! The model file will be saved to {save_path}. The validation metric is "{validation_metric_name}". \
+To inspect the learning process, you can launch a tensorboard environment via the following command:
+
+```shell
+tensorboard --logdir {save_path}
+```
+"""
+
+def get_fit_complete_message(save_path):
+    return f""""Training finished!! Models and intermediate outputs are saved to {save_path}. 
+
+To load the trained predictor, use the following code 
+
+```python
+from autogluon.multimodal import MultiModalPredictor
+
+predictor = MultiModalPredictor.load("{save_path}")
+```
+
+To track the training process, you can launch a tensorboard
+
+```shell
+tensorboard --logdir {save_path}
+```
+"""
