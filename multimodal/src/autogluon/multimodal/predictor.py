@@ -380,7 +380,6 @@ class MultiModalPredictor:
             transformers.logging.disable_progress_bar()
 
         if verbosity is not None:
-            print("verbosity=", verbosity)
             set_logger_verbosity(verbosity, logger=logger)
 
         if not len(logger.handlers):
@@ -659,9 +658,6 @@ class MultiModalPredictor:
         -------
         An "MultiModalPredictor" object (itself).
         """
-        print("verbosity is", self._verbosity)
-        print("logger:", logger)
-        logger.info("Test message")
         fit_called = self._fit_called  # used in current function
         self._fit_called = True
 
