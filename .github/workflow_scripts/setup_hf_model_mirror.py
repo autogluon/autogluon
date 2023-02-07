@@ -31,4 +31,4 @@ for model in sub_folder_models:
     model_path = os.path.join(cache_dir, model_name)
     os.makedirs(model_path, exist_ok=True)
     s3_path = bucket + "/" + model_name
-    subprocess.run(["aws", "s3", "cp", s3_path, model_path, '--recursive'])
+    subprocess.run(["aws", "s3", "cp", s3_path, model_path, "--recursive", "--quiet"])
