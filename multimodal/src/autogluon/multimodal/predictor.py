@@ -26,7 +26,6 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.multimodal.utils import object_detection_data_to_df, save_result_df, setup_detection_train_tuning_data
 
 from . import version as ag_version
 from .constants import (
@@ -122,8 +121,6 @@ from .utils import (
     evaluate_coco,
     extract_from_output,
     filter_hyperparameters,
-    from_coco_or_voc,
-    from_dict,
     get_config,
     get_detection_classes,
     get_local_pretrained_config_paths,
@@ -142,11 +139,14 @@ from .utils import (
     logits_to_prob,
     merge_bio_format,
     modify_duplicate_model_names,
+    object_detection_data_to_df,
     predict,
     process_batch,
     save_pretrained_model_configs,
+    save_result_df,
     save_text_tokenizers,
     select_model,
+    setup_detection_train_tuning_data,
     setup_save_path,
     split_train_tuning_data,
     tensor_to_ndarray,
@@ -1697,9 +1697,8 @@ class MultiModalPredictor(ExportMixin):
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
     ):
-        data = data_to_df(data=data)
-
         if self._column_types is None:
+            data = data_to_df(data=data)
             allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
             column_types = infer_column_types(
                 data=data,
@@ -1719,6 +1718,14 @@ class MultiModalPredictor(ExportMixin):
                     data=data,
                 )
         else:  # called .fit() or .load()
+            column_names = list(self._column_types.keys())
+            # remove label column since it's not required in inference.
+            column_names.remove(self._label_column)
+            data = data_to_df(
+                data=data,
+                required_columns=self._df_preprocessor.required_feature_names,
+                all_columns=column_names,
+            )
             column_types = self._column_types
             column_types_copy = copy.deepcopy(column_types)
             for col_name, col_type in column_types.items():

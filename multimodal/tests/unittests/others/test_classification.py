@@ -4,7 +4,7 @@ from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils.misc import shopee_dataset
 
 
-def test_classification_str_list_input():
+def test_predict_image_str_or_list():
     download_dir = "./ag_automm_tutorial_imgcls"
     train_data, test_data = shopee_dataset(download_dir)
 
@@ -12,7 +12,7 @@ def test_classification_str_list_input():
     predictor = MultiModalPredictor(label="label", path=model_path)
     predictor.fit(
         train_data=train_data,
-        time_limit=30,  # seconds
+        time_limit=0,  # seconds
     )  # you can trust the default config, e.g., we use a `swin_base_patch4_window7_224` model
 
     image_path = test_data.iloc[0]["image"]
