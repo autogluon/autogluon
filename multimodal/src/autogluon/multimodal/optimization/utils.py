@@ -97,7 +97,7 @@ def get_loss_func(
         if mixup_active:
             loss_func = SoftTargetCrossEntropy()
         else:
-            if loss_func_name.lower() == "focal_loss":
+            if loss_func_name is not None and loss_func_name.lower() == "focal_loss":
                 alpha, gamma, reduction = get_focal_loss_params(loss_config)
                 loss_func = FocalLoss(alpha=alpha, gamma=gamma, reduction=reduction)
             else:
