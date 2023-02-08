@@ -5,12 +5,12 @@ import pandas as pd
 import numpy as np
 import random
 from autogluon.tabular import TabularPredictor
-from autogluon.text import TextPredictor
+from autogluon.multimodal import MultiModalPredictor
 from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
 
 
 def get_parser():
-    parser = argparse.ArgumentParser(description='The Basic Example of AutoML '
+    parser = argparse.ArgumentParser(description='The Basic Example of using AutoGluon Multimodal '
                                                  'for Text Prediction.')
     parser.add_argument('--train_file', type=str,
                         help='The training CSV file.',
@@ -177,10 +177,10 @@ def run(args):
                       hyperparameters=hyperparameters)
     elif args.mode == 'single':
         # When no embedding is used,
-        # we will just use TextPredictor that will train a single model internally.
-        predictor = TextPredictor(label=label_column,
-                                  eval_metric=args.eval_metric,
-                                  path=args.exp_dir)
+        # we will just use MultiModalPredictor that will train a single model internally.
+        predictor = MultiModalPredictor(label=label_column,
+                                        eval_metric=args.eval_metric,
+                                        path=args.exp_dir)
         predictor.fit(train_data=train_df,
                       presets=args.preset,
                       seed=args.seed)

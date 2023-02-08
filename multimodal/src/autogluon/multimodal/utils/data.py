@@ -179,6 +179,7 @@ def create_data_processor(
             norm_type=model_config.image_norm,
             size=model_config.image_size,
             text_max_len=model_config.max_text_len,
+            missing_value_strategy=config.data.document.missing_value_strategy,
         )
     else:
         raise ValueError(f"unknown data type: {data_type}")
