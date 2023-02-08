@@ -308,7 +308,7 @@ class FocalLoss(nn.Module):
         self.gamma = gamma
         self.reduction = reduction
         self.eps = eps
-        self.NLLLoss = nn.NLLLoss(weight=alpha, reduction="none")
+        self.nll_loss = nn.NLLLoss(weight=alpha, reduction="none")
 
     def forward(self, input: torch.Tensor, target: torch.Tensor):
         if not torch.is_tensor(input):
@@ -324,7 +324,7 @@ class FocalLoss(nn.Module):
 
         # -alpha_t * log(pt) term
         log_p = torch.log(pt)
-        ce = self.NLLLoss(log_p, target)
+        ce = self.nll_loss(log_p, target)
 
         # (1 - pt)^gamma term
         all_rows = torch.arange(input.shape[0])
