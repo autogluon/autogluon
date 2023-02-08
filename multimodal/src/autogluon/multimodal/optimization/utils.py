@@ -1,6 +1,7 @@
 import functools
 import logging
 import re
+import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
@@ -75,7 +76,7 @@ def get_loss_func(
     problem_type: str,
     mixup_active: bool,
     loss_func_name: Optional[str] = None,
-    loss_config: Optional[DictConfig] = None,
+    config: Optional[DictConfig] = None,
 ):
     """
     Choose a suitable Pytorch loss module based on the provided problem type.
@@ -88,7 +89,10 @@ def get_loss_func(
         The activation determining whether to use mixup.
     loss_func_name
         The name of the function the user wants to use.
-
+    config
+        The optimization configs containing values such as i.e. optimization.loss_function
+        An example purpose of this config here is to pass through the parameters for focal loss, i.e.:
+            alpha = optimization.focal_loss.alpha
     Returns
     -------
     A Pytorch loss module.
@@ -98,7 +102,21 @@ def get_loss_func(
             loss_func = SoftTargetCrossEntropy()
         else:
             if loss_func_name is not None and loss_func_name.lower() == "focal_loss":
-                alpha, gamma, reduction = get_focal_loss_params(loss_config)
+                if OmegaConf.select(config, "focal_loss.alpha"):
+                    alpha = torch.tensor(OmegaConf.select(config, "focal_loss.alpha"))
+                else:
+                    alpha = None
+
+                if OmegaConf.select(config, "focal_loss.gamma"):
+                    gamma = OmegaConf.select(config, "focal_loss.gamma")
+                else:
+                    gamma = 2.0
+
+                if OmegaConf.select(config, "focal_loss.reduction"):
+                    reduction = OmegaConf.select(config, "focal_loss.reduction")
+                else:
+                    reduction = "mean"
+
                 loss_func = FocalLoss(alpha=alpha, gamma=gamma, reduction=reduction)
             else:
                 loss_func = nn.CrossEntropyLoss()
@@ -120,31 +138,6 @@ def get_loss_func(
         raise NotImplementedError
 
     return loss_func
-
-
-def get_focal_loss_params(loss_config: DictConfig):
-    if hasattr(loss_config, "optimization") and hasattr(loss_config.optimization, "focal_loss"):
-        focal_loss_config = loss_config.optimization.focal_loss
-
-        if hasattr(focal_loss_config, "alpha"):
-            alpha = torch.tensor(OmegaConf.select(focal_loss_config, "alpha"))
-        else:
-            alpha = None
-
-        if hasattr(focal_loss_config, "gamma"):
-            gamma = OmegaConf.select(focal_loss_config, "gamma")
-        else:
-            gamma = 2.0
-
-        if hasattr(focal_loss_config, "reduction"):
-            reduction = OmegaConf.select(focal_loss_config, "reduction")
-        else:
-            reduction = "mean"
-    else:
-        alpha = None
-        gamma = 2.0
-        reduction = "mean"
-    return alpha, gamma, reduction
 
 
 class CustomF1Score(torchmetrics.F1Score):

@@ -1082,7 +1082,7 @@ class MultiModalPredictor(ExportMixin):
             problem_type=self._problem_type,
             mixup_active=mixup_active,
             loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
-            loss_config=config,
+            config=OmegaConf.select(config, "optimization"),
         )
 
         model_postprocess_fn = get_model_postprocess_fn(
@@ -2632,7 +2632,7 @@ class MultiModalPredictor(ExportMixin):
             problem_type=predictor._problem_type,
             mixup_active=False,
             loss_func_name=OmegaConf.select(predictor._config, "optimization.loss_function"),
-            loss_config=predictor._config,
+            config=OmegaConf.select(predictor._config, "optimization"),
         )
 
         model_postprocess_fn = get_model_postprocess_fn(
