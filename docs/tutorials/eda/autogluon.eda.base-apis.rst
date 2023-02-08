@@ -30,8 +30,8 @@ This section highlights the base APIs used by the EDA framework. The processing 
     )
 
 2. **.fit()** call. This call will execute operations in the graph and produce a **state**. The state is a nested
-dictionary without any prescribed structure. All components are sharing the same namespace. If multiple components
-are fitted with different parameters, they can be put into separate sub-spaces wia **Namespace** component
+dictionary without any prescribed structure. All components share the same namespace. If multiple components
+are fitted with different parameters, they can be put into separate sub-spaces via **Namespace** component
 that can be passed either for further processing
 via next analysis or be rendered.
 
@@ -55,7 +55,7 @@ then pass **State** generated previously as an input argument into **render()** 
     viz.render(state)
 
 Please note: it is possible that the components may depend on each other's output; all the pre-requisites to **fit()**
-the component must be checked in **can_handle()**. There are two ways how the components can share the information:
+the component must be checked in **can_handle()**. There are two ways the components can share the information:
 1) using **state**; 2) share values/shadow arguments (i.e., sample component modifies **train_data**, **test_data**
 and **val_data** arguments in the scope of calling children's **fit()**.
 

@@ -148,7 +148,7 @@ class BaseAnalysis(AbstractAnalysis):
 class Namespace(AbstractAnalysis):
     """
     Creates a nested namespace in state. All the components within `children` will have relative root of the state moved into this subspace.
-    To instruct a visualization facets to use a specific subspace, please use `namespace` argument (see the example).
+    To instruct visualization facets to use a specific subspace, please use `namespace` argument (see the example).
 
     Parameters
     ----------
