@@ -182,7 +182,7 @@ AutoMM has created your model 🎉🎉🎉
     ```
 
 - If you are not satisfied with the model, try to increase the training time, 
-adjust the [hyperparameters](https://auto.gluon.ai/stable/tutorials/multimodal/advanced_topics/customization.html),
-or post issues on [GitHub](https://github.com/autogluon/autogluon).
+adjust the hyperparameters (https://auto.gluon.ai/stable/tutorials/multimodal/advanced_topics/customization.html),
+or post issues on GitHub: https://github.com/autogluon/autogluon
 
 """
