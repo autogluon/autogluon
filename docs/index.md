@@ -230,6 +230,7 @@ hidden:
 tutorials/tabular/index
 tutorials/multimodal/index
 tutorials/timeseries/index
+tutorials/cloud_fit_deploy/index
 ```
 
 ```{toctree}
