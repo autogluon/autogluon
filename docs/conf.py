@@ -39,7 +39,7 @@ if len(nb_dirs_to_exec) > 0:
         nb_execution_excludepatterns.append(os.path.join(nb_dir, '*.ipynb'))
 
 templates_path = ['_templates']
-exclude_patterns = ['_build', 'README.md', 'ReleaseInstructions.md']
+exclude_patterns = ['_build', 'README.md', 'ReleaseInstructions.md', 'jupyter_execute']
 master_doc = 'index'
 numfig = True
 numfig_secnum_depth = 2
