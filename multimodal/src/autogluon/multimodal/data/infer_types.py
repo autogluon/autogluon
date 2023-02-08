@@ -265,15 +265,19 @@ def is_document_pdf_column(
         # Sample to speed-up type inference
         data = data.sample(n=sample_m, random_state=0)
     is_all_pdf = []
+
     for docs in data:
-        if not isinstance(docs, list):
-            docs = [docs]
-        for per_doc in docs:
-            if per_doc.endswith(".pdf"):
-                is_all_pdf.append(True)
-            else:
-                is_all_pdf.append(False)
-    if all(element for element in is_all_pdf):
+        try:
+            if not isinstance(docs, list):
+                docs = [docs]
+            for per_doc in docs:
+                if per_doc.endswith(".pdf"):
+                    is_all_pdf.append(True)
+                else:
+                    is_all_pdf.append(False)
+        except:
+            return False
+    if is_all_pdf and all(element for element in is_all_pdf):
         return True
     else:
         return False
