@@ -13,7 +13,6 @@ else:
 
     import torch
     from torch import Tensor
-
     from torchmetrics.metric import Metric
     from torchmetrics.utilities.imports import (
         _PYCOCOTOOLS_AVAILABLE,
