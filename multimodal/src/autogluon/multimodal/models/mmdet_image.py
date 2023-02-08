@@ -169,6 +169,10 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_l_8x8_300e_coco/yolox_l_8x8_300e_coco_20211126_140236-d3bd2b23.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py"),
             },
+            "yolox_x_8x8_300e_coco": {
+                "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_x_8x8_300e_coco/yolox_x_8x8_300e_coco_20211126_140254-1ef88d67.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_x_8x8_300e_coco.py"),
+            },
             "yolox_l_objects365": {  # TODO: update with better pretrained weights
                 "url": "https://automl-mm-bench.s3.amazonaws.com/object_detection/checkpoints/yolox/yolox_l_objects365_temp.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py"),

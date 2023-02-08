@@ -204,46 +204,60 @@ def object_detection(presets: str = DEFAULT):
     """
     hyperparameters = {
         "model.names": ["mmdet_image"],
+        "model.mmdet_image.checkpoint_name": "yolox_s_8x8_300e_coco",
         "env.eval_batch_size_ratio": 1,
         "env.precision": 32,
         "env.strategy": "ddp",
         "env.auto_select_gpus": False,  # Have to turn off for detection!
-        "optimization.lr_decay": 0.95,
+        "env.num_gpus": -1,
+        "env.per_gpu_batch_size": 16,  # Works on GPU >= 24G
+        "env.num_workers": 2,
+        "optimization.learning_rate": 1e-4,
+        "optimization.lr_decay": 0.90,
         "optimization.lr_mult": 100,
         "optimization.lr_choice": "two_stages",
         "optimization.top_k": 1,
         "optimization.top_k_average_method": "best",
         "optimization.warmup_steps": 0.0,
         "optimization.patience": 10,
-        "env.num_workers": 2,
+        "optimization.val_metric": "map",
+        "optimization.val_check_interval": 0.5,
+        "optimization.check_val_every_n_epoch": 1,
     }
     hyperparameter_tune_kwargs = None
 
     if presets in [DEFAULT, MEDIUM_QUALITY]:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
-                "optimization.learning_rate": 1e-4,
-                "optimization.max_epochs": 10,
-                "optimization.val_metric": "direct_loss",
+                "optimization.max_epochs": 30,
+                "optimization.lr_decay": 0.95,
+                "optimization.patience": 3,
+                "optimization.val_check_interval": 1.0,
+                "optimization.check_val_every_n_epoch": 3,
             }
         )
     elif presets == HIGH_QUALITY:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "yolov3_d53_mstrain-416_273e_coco",
-                "optimization.learning_rate": 1e-5,
-                "optimization.max_epochs": 20,
-                "optimization.val_metric": "map",
+                "model.mmdet_image.checkpoint_name": "yolox_l_8x8_300e_coco",
+                "env.per_gpu_batch_size": 6,  # Works on GPU >= 24G
+                "optimization.learning_rate": 5e-5,
+                "optimization.lr_decay": 0.95,
+                "optimization.patience": 3,
+                "optimization.max_epochs": 30,
+                "optimization.val_check_interval": 1.0,
+                "optimization.check_val_every_n_epoch": 3,
             }
         )
     elif presets == BEST_QUALITY:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco",
+                "model.mmdet_image.checkpoint_name": "yolox_x_8x8_300e_coco",
+                "env.per_gpu_batch_size": 3,  # Works on GPU >= 24G
                 "optimization.learning_rate": 1e-5,
-                "optimization.max_epochs": 30,
-                "optimization.val_metric": "map",
+                "optimization.lr_decay": 0.95,
+                "optimization.patience": 20,
+                "optimization.max_epochs": 50,
             }
         )
     else:
