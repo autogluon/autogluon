@@ -48,3 +48,14 @@
     By explicitly using `pip3`, we guard against this issue.
     Further, if Python 4 releases, the install instructions for Python 3 versions of AutoGluon will continue to work even if `pip` begins referring to `pip4`.
     For more information, refer to https://techwithtech.com/python-pip-vs-pip3/
+
+* How to upgrade python version in Kaggle to install AutoGluon 0.7 and later? 
+
+   AutoGluon will drop python 3.7 support in release v0.7 and afterwards. However, the python version is still 3.7 in Kaggle default container, 
+   which will lead to installation issue. To upgrade the python version to 3.8 or higher, here is a quick solution following 
+   https://www.kaggle.com/code/amareltaylor/how-to-install-alternative-python-version-hack
+
+   .. code-block::
+      !conda create -n newPython -c cctbx202208 -y
+      !source /opt/conda/bin/activate newPython && conda install -c cctbx202208 python -y
+      !/opt/conda/envs/newPython/bin/python3 -m pip install autogluon
