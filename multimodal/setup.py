@@ -55,6 +55,7 @@ install_requires = [
     "jinja2>=3.0.3,<3.2",
     "tensorboard",
     "pytesseract<0.3.11",
+    "PyMuPDF<=1.21.1",
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)

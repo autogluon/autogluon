@@ -16,6 +16,7 @@ from ..constants import (
     CLASSIFICATION,
     DOCUMENT,
     DOCUMENT_IMAGE,
+    DOCUMENT_PDF,
     ENTITY_GROUP,
     IDENTIFIER,
     IMAGE,
@@ -233,6 +234,43 @@ def is_image_column(
                 "which uses a zero image to replace any missing image.",
                 UserWarning,
             )
+        return True
+    else:
+        return False
+
+
+def is_document_pdf_column(
+    data: pd.Series,
+    col_name: str,
+    sample_m: Optional[int] = 500,
+) -> bool:
+    """
+    Identify if a column is a pdf document column.
+
+    Parameters
+    ----------
+    data
+        One column of a multimodal pd.DataFrame for training.
+    col_name
+        Name of column.
+    sample_m
+        Number of sample images used to check if images are documents images.
+
+    Returns
+    -------
+    Whether the column is a pdf document column.
+    """
+
+    if len(data) > sample_m:
+        # Sample to speed-up type inference
+        data = data.sample(n=sample_m, random_state=0)
+    is_all_pdf = []
+    for per_doc in data:
+        if per_doc.endswith(".pdf"):
+            is_all_pdf.append(True)
+        else:
+            is_all_pdf.append(False)
+    if all(element for element in is_all_pdf):
         return True
     else:
         return False
@@ -506,6 +544,8 @@ def infer_column_types(
                 column_types[col_name] = DOCUMENT_IMAGE
             else:
                 column_types[col_name] = IMAGE_PATH
+        elif is_document_pdf_column(data[col_name], col_name=col_name):
+            column_types[col_name] = DOCUMENT_PDF
         elif is_text_column(data[col_name]):  # Infer text column
             column_types[col_name] = TEXT
         elif is_image_column(
