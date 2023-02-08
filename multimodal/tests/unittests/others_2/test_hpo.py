@@ -99,7 +99,7 @@ def matcher_hpo(searcher, scheduler, presets=None):
     matcher = matcher.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=60,
+        time_limit=90,
         save_path=save_path,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
@@ -111,7 +111,7 @@ def matcher_hpo(searcher, scheduler, presets=None):
     predictor = matcher.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=60,
+        time_limit=90,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
 
