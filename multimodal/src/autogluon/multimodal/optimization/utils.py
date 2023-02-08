@@ -24,6 +24,7 @@ from ..constants import (
     COSINE_EMBEDDING_LOSS,
     COSINE_SIMILARITY,
     CROSS_ENTROPY,
+    DETECTION_METRICS,
     DIRECT_LOSS,
     F1,
     FEATURES,
@@ -39,6 +40,7 @@ from ..constants import (
     LORA_BIAS,
     LORA_NORM,
     MAP,
+    MEAN_AVERAGE_PRECISION,
     MULTI_NEGATIVES_SOFTMAX_LOSS,
     MULTICLASS,
     NER,
@@ -320,7 +322,7 @@ def get_metric(
             return torchmetrics.SpearmanCorrCoef(), None
     elif metric_name == F1:
         return CustomF1Score(num_classes=num_classes, pos_label=pos_label), None
-    elif metric_name == MAP.lower():
+    elif metric_name in DETECTION_METRICS:
         return (
             MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False),
             None,

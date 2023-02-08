@@ -5,7 +5,7 @@ import numpy as np
 import random
 import pandas as pd
 import copy
-from autogluon.text import TextPredictor
+from autogluon.multimodal import MultiModalPredictor
 from autogluon.tabular import TabularPredictor
 from autogluon.core.utils.loaders import load_pd
 from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
@@ -115,10 +115,10 @@ def train(args):
                       hyperparameters=hyperparameters)
     elif args.mode == 'single':
         # When no embedding is used,
-        # we will just use TextPredictor that will train a single model internally.
-        predictor = TextPredictor(label=label_column,
-                                  eval_metric=eval_metric,
-                                  path=args.exp_dir)
+        # we will just use MultiModalPredictor that will train a single model internally.
+        predictor = MultiModalPredictor(label=label_column,
+                                        eval_metric=eval_metric,
+                                        path=args.exp_dir)
         predictor.fit(train_data=real_train_df,
                       tuning_data=real_dev_df,
                       presets=args.preset,
@@ -138,7 +138,7 @@ def predict(args):
     if args.use_tabular:
         predictor = TabularPredictor.load(args.model_dir)
     else:
-        predictor = TextPredictor.load(args.model_dir)
+        predictor = MultiModalPredictor.load(args.model_dir)
     test_prediction = predictor.predict(args.test_file, as_pandas=True)
     if args.exp_dir is None:
         args.exp_dir = '.'
