@@ -1,4 +1,4 @@
-from .dataset import DatasetStatistics, DatasetTypeMismatch
+from .dataset import DatasetStatistics, DatasetTypeMismatch, LabelInsightsVisualization
 from .interaction import (
     CorrelationSignificanceVisualization,
     CorrelationVisualization,

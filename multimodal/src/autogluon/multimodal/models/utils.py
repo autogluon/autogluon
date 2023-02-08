@@ -687,18 +687,28 @@ def update_mmdet_config(key, value, config):
 
 
 def run_model(model: nn.Module, batch: dict):
+    from .document_transformer import DocumentTransformer
+    from .huggingface_text import HFAutoModelForTextPrediction
     from .timm_image import TimmAutoModelForImagePrediction
 
-    if isinstance(model, TimmAutoModelForImagePrediction):
-        input_vec = [batch[k] for k in model.input_keys]
+    supported_models = (TimmAutoModelForImagePrediction, HFAutoModelForTextPrediction)
+    pure_model = model.module if isinstance(model, nn.DataParallel) else model
+    if (not isinstance(pure_model, DocumentTransformer)) and isinstance(pure_model, supported_models):
+        input_vec = [batch[k] for k in pure_model.input_keys]
         column_names, column_values = [], []
         for k in batch.keys():
-            if k.startswith(model.image_column_prefix):
+            if (
+                isinstance(pure_model, TimmAutoModelForImagePrediction)
+                and k.startswith(pure_model.image_column_prefix)
+            ) or (
+                isinstance(pure_model, HFAutoModelForTextPrediction) and k.startswith(pure_model.text_column_prefix)
+            ):
                 column_names.append(k)
                 column_values.append(batch[k])
         input_vec.append(column_names)
         input_vec.append(column_values)
-        output = model(*tuple(input_vec))
+        output_vec = model(*tuple(input_vec))
+        output = pure_model.get_output_dict(*output_vec)
     else:
         output = model(batch)
     return output

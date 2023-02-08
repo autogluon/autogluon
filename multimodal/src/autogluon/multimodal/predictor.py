@@ -12,8 +12,6 @@ import shutil
 import sys
 import time
 import warnings
-from collections import namedtuple
-from dataclasses import dataclass
 from datetime import timedelta
 from typing import Dict, List, Optional, Union
 
@@ -23,15 +21,12 @@ import pytorch_lightning as pl
 import torch
 import transformers
 import yaml
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import OmegaConf
 from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.multimodal.models.fusion import MultimodalFusionMLP, MultimodalFusionTransformer
-from autogluon.multimodal.models.huggingface_text import HFAutoModelForTextPrediction
-from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePrediction
-from autogluon.multimodal.utils import save_result_df
+from autogluon.multimodal.utils import object_detection_data_to_df, save_result_df, setup_detection_train_tuning_data
 
 from . import version as ag_version
 from .constants import (
@@ -41,7 +36,6 @@ from .constants import (
     BEST,
     BEST_K_MODELS_FILE,
     BINARY,
-    CLASSIFICATION,
     COLUMN_FEATURES,
     DATA,
     DEEPSPEED_MIN_PL_VERSION,
@@ -54,11 +48,8 @@ from .constants import (
     FEW_SHOT,
     FEW_SHOT_TEXT_CLASSIFICATION,
     GREEDY_SOUP,
-    HF_TEXT,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
-    IMAGE_SIMILARITY,
-    IMAGE_TEXT_SIMILARITY,
     LABEL,
     LAST_CHECKPOINT,
     LOGITS,
@@ -69,7 +60,6 @@ from .constants import (
     MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
-    NAMED_ENTITY_RECOGNITION,
     NER,
     NER_RET,
     NUMERICAL,
@@ -84,7 +74,6 @@ from .constants import (
     SCORE,
     TEXT,
     TEXT_NER,
-    TEXT_SIMILARITY,
     UNIFORM_SOUP,
     Y_PRED,
     Y_PRED_PROB,
@@ -100,7 +89,6 @@ from .data.infer_types import (
     is_image_column,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
 from .matcher import MultiModalMatcher
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
@@ -120,6 +108,7 @@ from .utils import (
     AutoMMModelCheckpointIO,
     CustomUnpickler,
     DDPCacheWriter,
+    ExportMixin,
     LogFilter,
     apply_log_filter,
     assign_feature_column_names,
@@ -132,7 +121,7 @@ from .utils import (
     data_to_df,
     evaluate_coco,
     extract_from_output,
-    filter_search_space,
+    filter_hyperparameters,
     from_coco_or_voc,
     from_dict,
     get_config,
@@ -140,11 +129,8 @@ from .utils import (
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_mixup,
-    get_onnx_input,
-    get_precision_context,
     get_stopping_threshold,
     hyperparameter_tune,
-    infer_batch,
     infer_dtypes_by_model_names,
     infer_metrics,
     infer_precision,
@@ -156,12 +142,10 @@ from .utils import (
     logits_to_prob,
     merge_bio_format,
     modify_duplicate_model_names,
-    move_to_device,
     predict,
     process_batch,
     save_pretrained_model_configs,
     save_text_tokenizers,
-    save_timm_config,
     select_model,
     setup_save_path,
     split_train_tuning_data,
@@ -169,13 +153,14 @@ from .utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
+    update_hyperparameters,
     update_tabular_config_by_resources,
 )
 
 logger = logging.getLogger(AUTOMM)
 
 
-class MultiModalPredictor:
+class MultiModalPredictor(ExportMixin):
     """
     MultiModalPredictor is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that
     are suitable for multimodal datasets. You will only need to preprocess the data in the multimodal dataframe format
@@ -260,7 +245,7 @@ class MultiModalPredictor:
         pipeline
             Pipeline has been deprecated and merged in problem_type.
         presets
-            Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+            Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
@@ -343,7 +328,10 @@ class MultiModalPredictor:
             )
             problem_prop = PROBLEM_TYPES_REG.get(problem_type)
             if problem_prop.experimental:
-                warnings.warn(f"problem_type='{problem_type}' is currently experimental.", UserWarning)
+                warnings.warn(
+                    f"problem_type='{problem_type}' is currently experimental.",
+                    UserWarning,
+                )
             problem_type = problem_prop.name
 
         check_if_packages_installed(problem_type=problem_type)
@@ -437,6 +425,7 @@ class MultiModalPredictor:
         if self._problem_type is not None:
             if self.problem_property.support_zero_shot:
                 # Load pretrained model via the provided hyperparameters and presets
+                # TODO: do not create pretrained model for HPO presets.
                 self._config, self._model, self._data_processors = init_pretrained(
                     problem_type=self._problem_type,
                     presets=self._presets,
@@ -553,7 +542,7 @@ class MultiModalPredictor:
         train_data
             A dataframe containing training data.
         presets
-            Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+            Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         config
             A dictionary with four keys "model", "data", "optimization", and "environment".
             Each key's value can be a string, yaml file path, or OmegaConf's DictConfig.
@@ -681,34 +670,9 @@ class MultiModalPredictor:
             return self
 
         if self._problem_type == OBJECT_DETECTION:
-            self._detection_anno_train = train_data
-            train_data = from_coco_or_voc(train_data, "train")
-            if tuning_data is not None:
-                self.detection_anno_train = tuning_data
-                tuning_data = from_coco_or_voc(tuning_data, "val")
-                if max_num_tuning_data is not None:
-                    if len(tuning_data) > max_num_tuning_data:
-                        tuning_data = tuning_data.sample(
-                            n=max_num_tuning_data, replace=False, random_state=seed
-                        ).reset_index(drop=True)
-
-        if hyperparameter_tune_kwargs is not None:
-            # TODO: can we support hyperparameters being the same format as regular training?
-            # currently the string format would make it very hard to get search space, which is an object
-            assert isinstance(
-                hyperparameters, dict
-            ), "Please provide hyperparameters as a dictionary if you want to do HPO"
-            if teacher_predictor is not None:
-                assert isinstance(
-                    teacher_predictor, str
-                ), "HPO with distillation only supports passing a path to the predictor"
-            if fit_called:
-                warnings.warn(
-                    "HPO while continuous training."
-                    "Hyperparameters related to Model and Data will NOT take effect."
-                    "We will filter them out from the search space."
-                )
-                hyperparameters = filter_search_space(hyperparameters, [MODEL, DATA])
+            train_data, tuning_data = setup_detection_train_tuning_data(
+                self, max_num_tuning_data, seed, train_data, tuning_data
+            )
 
         pl.seed_everything(seed, workers=True)
 
@@ -743,6 +707,7 @@ class MultiModalPredictor:
             data=train_data,
             valid_data=tuning_data,
         )
+
         if self._presets is not None:
             presets = self._presets
         else:
@@ -808,6 +773,22 @@ class MultiModalPredictor:
         self._validation_metric_name = validation_metric_name
         self._column_types = column_types
 
+        hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
+            problem_type=self._problem_type,
+            presets=presets,
+            provided_hyperparameters=hyperparameters,
+            provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            teacher_predictor=teacher_predictor,
+        )
+        hpo_mode = True if hyperparameter_tune_kwargs else False
+        if hpo_mode and self._problem_type != NER:  # TODO: support ner.
+            hyperparameters = filter_hyperparameters(
+                hyperparameters=hyperparameters,
+                column_types=column_types,
+                config=config,
+                fit_called=fit_called,
+            )
+
         _fit_args = dict(
             train_df=train_data,
             val_df=tuning_data,
@@ -815,19 +796,19 @@ class MultiModalPredictor:
             minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=self._save_path,
-            ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
-            resume=False if hyperparameter_tune_kwargs is not None else self._resume,
-            enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
+            ckpt_path=None if hpo_mode else self._ckpt_path,
+            resume=False if hpo_mode else self._resume,
+            enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
             presets=presets,
             config=config,
             hyperparameters=hyperparameters,
             teacher_predictor=teacher_predictor,
             standalone=standalone,
-            hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
+            hpo_mode=hpo_mode,  # skip average checkpoint if in hpo mode
             clean_ckpts=clean_ckpts,
         )
 
-        if hyperparameter_tune_kwargs is not None:
+        if hpo_mode:
             # TODO: allow custom gpu
             assert self._resume is False, "You can not resume training with HPO"
             resources = dict(num_gpus=torch.cuda.device_count())
@@ -1053,7 +1034,8 @@ class MultiModalPredictor:
         norm_param_names = get_norm_layer_param_names(model)
 
         trainable_param_names = get_trainable_params_efficient_finetune(
-            norm_param_names, efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune")
+            norm_param_names,
+            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
         )
 
         if self._data_processors is None:
@@ -1292,7 +1274,8 @@ class MultiModalPredictor:
             ]
 
         custom_checkpoint_plugin = AutoMMModelCheckpointIO(
-            trainable_param_names=trainable_param_names, model_name_to_id=model.name_to_id
+            trainable_param_names=trainable_param_names,
+            model_name_to_id=model.name_to_id,
         )
 
         tb_logger = pl.loggers.TensorBoardLogger(
@@ -1382,7 +1365,6 @@ class MultiModalPredictor:
                 check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
                 if hasattr(config.optimization, "check_val_every_n_epoch")
                 else 1,
-                reload_dataloaders_every_n_epochs=1,
                 plugins=[custom_checkpoint_plugin],
             )
 
@@ -1417,6 +1399,7 @@ class MultiModalPredictor:
                     standalone=standalone,
                     clean_ckpts=clean_ckpts,
                 )
+            self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
 
@@ -1533,9 +1516,6 @@ class MultiModalPredictor:
             strict=strict_loading,
         )
 
-        if self._problem_type != OBJECT_DETECTION:  # TODO: update detection's evaluation to support this
-            self._best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
-
         if is_distill:
             avg_state_dict = self._replace_model_name_prefix(
                 state_dict=avg_state_dict,
@@ -1597,7 +1577,8 @@ class MultiModalPredictor:
             )
             norm_param_names = get_norm_layer_param_names(self._model)
             trainable_param_names = get_trainable_params_efficient_finetune(
-                norm_param_names, efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune")
+                norm_param_names,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
             )
 
             optimization_kwargs = dict(
@@ -1701,20 +1682,13 @@ class MultiModalPredictor:
                         outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
                 elif self._problem_type == OBJECT_DETECTION:
                     # reformat single gpu output for object detection
-                    # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
+                    # outputs shape: num_batch, 1(["bbox"]), batch_size, 80, n, 5
                     # output LABEL if exists for evaluations
-                    if len(outputs[0][BBOX][0]) == 2:  # additional axis for mask_rcnn, TODO: remove hardcode here
-                        outputs = [
-                            {BBOX: bbox[0], LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox[0]}
-                            for ele in outputs
-                            for i, bbox in enumerate(ele[BBOX])
-                        ]
-                    else:
-                        outputs = [
-                            {BBOX: bbox, LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox}
-                            for ele in outputs
-                            for i, bbox in enumerate(ele[BBOX])
-                        ]
+                    outputs = [
+                        {BBOX: bbox, LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox}
+                        for ele in outputs
+                        for i, bbox in enumerate(ele[BBOX])
+                    ]
 
         return outputs
 
@@ -1728,7 +1702,9 @@ class MultiModalPredictor:
         if self._column_types is None:
             allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
             column_types = infer_column_types(
-                data=data, allowable_column_types=allowable_dtypes, fallback_column_type=fallback_dtype
+                data=data,
+                allowable_column_types=allowable_dtypes,
+                fallback_column_type=fallback_dtype,
             )
             if self._label_column and self._label_column in data.columns:
                 column_types = infer_label_column_type_by_problem_type(
@@ -1749,10 +1725,14 @@ class MultiModalPredictor:
                 if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
                     if is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_PATH):
                         image_type = IMAGE_PATH
-                    elif is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_BYTEARRAY):
+                    elif is_image_column(
+                        data=data[col_name],
+                        col_name=col_name,
+                        image_type=IMAGE_BYTEARRAY,
+                    ):
                         image_type = IMAGE_BYTEARRAY
                     else:
-                        raise ValueError(f"Image type in column {col_name} is not supported!")
+                        image_type = col_type
                     if col_type != image_type:
                         column_types_copy[col_name] = image_type
             self._df_preprocessor._column_types = column_types_copy
@@ -1768,7 +1748,7 @@ class MultiModalPredictor:
         else:  # called .fit() or .load()
             df_preprocessor = self._df_preprocessor
 
-        data_processors = copy.deepcopy(self._data_processors)
+        data_processors = copy.copy(self._data_processors)
         # For prediction data with no labels provided.
         if not requires_label:
             data_processors.pop(LABEL, None)
@@ -1864,14 +1844,25 @@ class MultiModalPredictor:
                 return NotImplementedError(
                     f"Current problem type {self._problem_type} does not support realtime predict."
                 )
-            return evaluate_coco(
-                predictor=self,
-                anno_file_or_df=data,
-                metrics=metrics,
-                return_pred=return_pred,
-                seed=seed,
-                eval_tool=eval_tool,
-            )
+            if isinstance(data, str):
+                return evaluate_coco(
+                    predictor=self,
+                    anno_file_or_df=data,
+                    metrics=metrics,
+                    return_pred=return_pred,
+                    seed=seed,
+                    eval_tool=eval_tool,
+                )
+            else:
+                data = object_detection_data_to_df(data)
+                return evaluate_coco(
+                    predictor=self,
+                    anno_file_or_df=data,
+                    metrics=metrics,
+                    return_pred=return_pred,
+                    seed=seed,
+                    eval_tool="torchmetrics",
+                )
 
         if self._problem_type == NER:
             ret_type = NER_RET
@@ -2042,14 +2033,7 @@ class MultiModalPredictor:
                 realtime=realtime,
             )
         if self._problem_type == OBJECT_DETECTION:
-            if isinstance(data, str):
-                data = from_coco_or_voc(data, "test")
-            elif isinstance(data, dict):
-                data = from_dict(data)
-            else:
-                assert isinstance(
-                    data, pd.DataFrame
-                ), "TypeError: Expected data type to be a filepath, a folder or a dictionary, but got {}".format(data)
+            data = object_detection_data_to_df(data)
 
             if self._label_column not in data:
                 self._label_column = None
@@ -2187,7 +2171,6 @@ class MultiModalPredictor:
 
         assert self._problem_type not in [
             REGRESSION,
-            NAMED_ENTITY_RECOGNITION,
         ], f"Problem {self._problem_type} has no probability output."
 
         if candidate_data:
@@ -2204,9 +2187,16 @@ class MultiModalPredictor:
                 realtime=realtime,
                 seed=seed,
             )
-            logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
 
-            prob = logits_to_prob(logits)
+            if self._problem_type == NER:
+                ner_outputs = extract_from_output(outputs=outputs, ret_type=NER_RET)
+                prob = self._df_preprocessor.transform_prediction(
+                    y_pred=ner_outputs,
+                    return_proba=True,
+                )
+            else:
+                logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
+                prob = logits_to_prob(logits)
 
         if not as_multiclass:
             if self._problem_type == BINARY:
@@ -2426,135 +2416,6 @@ class MultiModalPredictor:
                     f"removed."
                 )
 
-    def export_onnx(
-        self,
-        data: Optional[pd.DataFrame] = None,
-        onnx_path: Optional[str] = None,
-        batch_size: Optional[int] = None,
-        verbose: Optional[bool] = False,
-        opset_version: Optional[int] = 16,
-    ):
-        """
-        Export this predictor's model to ONNX file.
-
-        Parameters
-        ----------
-        onnx_path
-            The export path of onnx model.
-        data
-            Raw data used to trace and export the model.
-            If this is None, will check if a processed batch is provided.
-        batch_size
-            The batch_size of export model's input.
-            Normally the batch_size is a dynamic axis, so we could use a small value for faster export.
-        verbose
-            verbose flag in torch.onnx.export.
-        opset_version
-            opset_version flag in torch.onnx.export.
-        """
-        # TODO: Support CLIP
-        # TODO: Add test
-        from .models.timm_image import TimmAutoModelForImagePrediction
-
-        if not isinstance(self._model, TimmAutoModelForImagePrediction):
-            raise NotImplementedError(f"export_onnx doesn't support model type {type(self._model)}")
-        warnings.warn("Currently, the functionality of exporting to ONNX is experimental.")
-
-        valid_input, dynamic_axes, default_onnx_path, batch = get_onnx_input(
-            pipeline=self._problem_type, config=self._config
-        )
-
-        if not batch_size:
-            batch_size = 2  # batch_size should be a dynamic_axis, so we could use a small value for faster export
-        if data is not None:
-            batch = self.get_processed_batch_for_deployment(
-                data=data, valid_input=valid_input, onnx_tracing=True, batch_size=batch_size
-            )
-
-        if not onnx_path:
-            onnx_path = os.path.join(self.path, default_onnx_path)
-
-        device_type = "cuda" if torch.cuda.is_available() else "cpu"
-        device = torch.device(device_type)
-        self._model.to(device).eval()
-        batch = move_to_device(batch, device=device)
-
-        InputBatch = namedtuple("InputBatch", self._model.input_keys)
-        input_vec = InputBatch(**batch)
-
-        strategy = "dp"  # default used in inference.
-        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
-        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False)
-        precision_context = get_precision_context(precision=precision, device_type=device_type)
-
-        with precision_context, torch.no_grad():
-            torch.onnx.export(
-                self._model.eval(),
-                args=input_vec,
-                f=onnx_path,
-                opset_version=opset_version,
-                verbose=verbose,
-                input_names=valid_input,
-                dynamic_axes=dynamic_axes,
-            )
-
-    def get_processed_batch_for_deployment(
-        self,
-        data: Union[pd.DataFrame, dict],
-        valid_input: Optional[List] = None,
-        onnx_tracing: bool = False,
-        batch_size: int = None,
-        to_numpy: bool = True,
-        requires_label: bool = False,
-    ):
-        """
-        Get the processed batch of raw data given.
-
-        Parameters
-        ----------
-        data
-            The raw data to process
-        valid_input
-            Used to filter valid data. No filter happens if it is empty.
-        onnx_tracing
-            If the output is used for onnx tracing.
-        batch_size
-            The batch_size of output batch.
-            If onnx_tracing, it will only output one mini-batch, and all int tensor values will be converted to long.
-        to_numpy
-            Output numpy array if True. Only valid if not onnx_tracing.
-
-        Returns
-        -------
-        Tensor or numpy array.
-        The output processed batch could be used for export/evaluate deployed model.
-        """
-        data, df_preprocessor, data_processors = self._on_predict_start(
-            data=data,
-            requires_label=requires_label,
-        )
-
-        batch = process_batch(
-            data=data,
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-        )
-
-        ret = {}
-        for k in batch:
-            if valid_input and k not in valid_input:
-                continue
-            if onnx_tracing:
-                ret[k] = batch[k].long() if isinstance(batch[k], torch.IntTensor) else batch[k]
-            elif to_numpy:
-                ret[k] = batch[k].cpu().detach().numpy().astype(int)
-            else:
-                ret[k] = batch[k]
-        if not onnx_tracing:
-            if batch_size:
-                raise NotImplementedError("We should split the batch here.")  # TODO
-        return ret
-
     @staticmethod
     def _load_metadata(
         predictor: MultiModalPredictor,
@@ -2589,7 +2450,11 @@ class MultiModalPredictor:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
                 data_processors = CustomUnpickler(fp).load()
             # Load text tokenizers after loading data processors.
-            for modality in [TEXT, TEXT_NER, NER]:  # NER is included for backward compatibility
+            for modality in [
+                TEXT,
+                TEXT_NER,
+                NER,
+            ]:  # NER is included for backward compatibility
                 if modality in data_processors:
                     data_processors[modality] = load_text_tokenizers(
                         text_processors=data_processors[modality],
@@ -2612,6 +2477,16 @@ class MultiModalPredictor:
             "pipeline" in assets and assets["pipeline"] == OBJECT_DETECTION
         ):
             data_processors = None
+
+        # backward compatibility for variable image size.
+        if version.parse(assets["version"]) <= version.parse("0.6.2"):
+            print("hasattr model.timm_image", hasattr(config, "model.timm_image"))
+            if OmegaConf.select(config, "model.timm_image") is not None:
+                logger.warn(
+                    "Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "
+                    "Try to update the timm image size."
+                )
+                config.model.timm_image.image_size = None
 
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]
@@ -2766,85 +2641,6 @@ class MultiModalPredictor:
 
         return predictor
 
-    def dump_timm_image(
-        self,
-        path: str,
-    ):
-        """
-        Save TIMM image model weights and config to local directory.
-        Model weights are saved in file `pytorch_model.bin`;
-        Configs are saved in file `config.json`
-
-        Parameters
-        ----------
-        path : str
-            Path to directory where models and configs should be saved.
-        """
-        models = []
-        # TODO: Add BaseMultimodalFusionModel class from which MultimodalFusionMLP and MultimodalFusionTransformer will inherit
-        if isinstance(self._model, (MultimodalFusionMLP, MultimodalFusionTransformer)) and isinstance(
-            self._model.model, torch.nn.modules.container.ModuleList
-        ):
-            for per_model in self._model.model:
-                if isinstance(per_model, TimmAutoModelForImagePrediction):
-                    models.append(per_model)
-        elif isinstance(self._model, TimmAutoModelForImagePrediction):
-            models.append(self._model)
-
-        if not models:
-            raise NotImplementedError("No TIMM models available for dump.")
-
-        for model in models:
-            subdir = path + "/" + model.prefix
-            os.makedirs(subdir, exist_ok=True)
-            weights_path = f"{subdir}/pytorch_model.bin"
-            torch.save(model.model.state_dict(), weights_path)
-            logger.info(f"Model {model.prefix} weights saved to {weights_path}.")
-            config_path = f"{subdir}/config.json"
-            save_timm_config(model, config_path)
-
-    def dump_hf_text(
-        self,
-        path: str,
-    ):
-        """
-        Save HuggingFace Text model weights, config and tokenizers to local directory.
-        Model weights are saved in file `pytorch_model.bin`;
-        Configs are saved in file `config.json`
-
-        Parameters
-        ----------
-        path : str
-            Path to directory where models and configs should be saved.
-        """
-        models = []
-        if isinstance(self._model, (MultimodalFusionMLP, MultimodalFusionTransformer)) and isinstance(
-            self._model.model, torch.nn.modules.container.ModuleList
-        ):
-            for per_model in self._model.model:
-                if isinstance(per_model, HFAutoModelForTextPrediction):
-                    models.append(per_model)
-        elif isinstance(self._model, HFAutoModelForTextPrediction):
-            models.append(self._model)
-
-        if not models:
-            raise NotImplementedError("No HuggingFace text models available for dump.")
-
-        text_processors = self._data_processors.get(TEXT, {})
-        tokenizers = {}
-        for per_processor in text_processors:
-            tokenizers[per_processor.prefix] = per_processor.tokenizer
-
-        for model in models:
-            prefix = model.prefix
-            subdir = path + "/" + prefix
-            os.makedirs(subdir, exist_ok=True)
-            model.model.save_pretrained(subdir)
-            logger.info(f"Model weights for {prefix} are saved to {subdir}.")
-            if prefix in tokenizers.keys():
-                tokenizers[prefix].save_pretrained(subdir)
-                logger.info(f"Tokenizer {prefix} saved to {subdir}.")
-
     @property
     def class_labels(self):
         """
@@ -2872,7 +2668,7 @@ class MultiModalPredictor:
 
         It is useful for computing metrics such as F1 which require a positive and negative class.
         You may refer to https://en.wikipedia.org/wiki/F-score for more details.
-        In binary classification, :class:`TextPredictor.predict_proba(as_multiclass=False)`
+        In binary classification, :class:`MultiModalPredictor.predict_proba(as_multiclass=False)`
         returns the estimated probability that each row belongs to the positive class.
         Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
 
@@ -2919,7 +2715,10 @@ class MultiModalPredictor:
                 f" '{self._validation_metric_name}'. "
                 f"The total training time is {timedelta(seconds=self._total_train_time)}"
             )
-        results = {f"val_{self._validation_metric_name}": self._best_score, "training_time": self._total_train_time}
+        results = {
+            f"val_{self._validation_metric_name}": self._best_score,
+            "training_time": self._total_train_time,
+        }
         return results
 
     def list_supported_models(self, pretrained=True):
@@ -2955,11 +2754,13 @@ class AutoMMPredictor(MultiModalPredictor):
 
 
 class MultiModalOnnxPredictor:
-    def __init__(self, base_predictor, model):
+    def __init__(self, base_predictor, model, providers=None):
+        if providers == None:
+            providers = ["CPUExecutionProvider"]
         self._predictor = base_predictor
         import onnxruntime as ort
 
-        self.sess = ort.InferenceSession(model.SerializeToString(), providers=["CUDAExecutionProvider"])
+        self.sess = ort.InferenceSession(model.SerializeToString(), providers=providers)
 
     def predict(self, data: Union[pd.DataFrame, dict, list, str]):
         raise NotImplementedError()
@@ -2990,11 +2791,13 @@ class MultiModalOnnxPredictor:
         return onnx_proba
 
     @staticmethod
-    def load(path):
+    def load(path, providers=None):
         import onnx
 
+        if providers == None:
+            providers = ["CPUExecutionProvider"]
         base_predictor = MultiModalPredictor.load(path=path)
         onnx_path = os.path.join(path, "model.onnx")
         onnx_bytes = onnx.load(onnx_path)
 
-        return MultiModalOnnxPredictor(base_predictor=base_predictor, model=onnx_bytes)
+        return MultiModalOnnxPredictor(base_predictor=base_predictor, model=onnx_bytes, providers=providers)

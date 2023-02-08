@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 import warnings
 from typing import Optional
 
@@ -41,7 +42,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self,
         prefix: str,
         checkpoint_name: str,
-        num_classes: Optional[int] = None,
+        config_file: Optional[str] = None,
         classes: Optional[list] = None,
         pretrained: Optional[bool] = True,
     ):
@@ -54,119 +55,171 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             The prefix of the MMdetAutoModelForObjectDetection model.
         checkpoint_name
             Name of the mmdet checkpoint.
-        num_classes
-            The number of classes.
         classes
             All classes in this dataset.
         pretrained
             Whether using the pretrained mmdet models. If pretrained=True, download the pretrained model.
         """
         super().__init__()
-        logger.debug(f"initializing {checkpoint_name}")
-        self.checkpoint_name = checkpoint_name
+        self.prefix = prefix
         self.pretrained = pretrained
-        self.num_classes = num_classes
-        self.classes = classes
+        self.checkpoint = None
+        self.checkpoint_name = checkpoint_name
+        self.config_file = config_file
 
-        if self.classes:
-            if self.num_classes:
-                assert len(self.classes) == self.num_classes
-            else:
-                self.num_classes = len(self.classes)
+        # TODO: Config only init (without checkpoint)
 
-        checkpoint, config_file = self._load_checkpoint_and_config()
+        self._get_checkpoint_and_config_file(checkpoint_name=checkpoint_name, config_file=config_file)
+        self._load_config()
 
-        # read config files
-        assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-        if isinstance(config_file, str):
-            self.config = mmcv.Config.fromfile(config_file)
+        self._update_classes(classes)
+        self._load_checkpoint(self.checkpoint_file)
 
-        if self.num_classes:
+    def _reset_classes(self, classes: list):
+        temp_ckpt_file = f"temp_ckpt_{int(time.time()*1000)}.pth"
+        self._save_weights(temp_ckpt_file)
+        self._update_classes(classes)
+        self._load_checkpoint()
+        os.remove(temp_ckpt_file)
+
+    def _update_classes(self, classes: Optional[list] = None):
+        if classes:
+            self.num_classes = len(classes)
+            self.classes = classes
             update_mmdet_config(key="num_classes", value=self.num_classes, config=self.config)
         else:
             self.num_classes = lookup_mmdet_config(key="num_classes", config=self.config)
             if not self.num_classes:
                 raise ValueError("Cannot retrieve num_classes for current model structure.")
-
+            self.classes = None
         self.id2label = dict(zip(range(self.num_classes), range(self.num_classes)))
+        return
 
+    def _load_checkpoint(self, checkpoint_file):
         # build model and load pretrained weights
         assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
         self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
 
-        if self.pretrained and checkpoint is not None:  # TODO: enable training from scratch
-            checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
+        if self.pretrained and checkpoint_file is not None:  # TODO: enable training from scratch
+            self.checkpoint = load_checkpoint(self.model, checkpoint_file, map_location="cpu")
 
+        # save the config and classes in the model for convenience
+        self.model.cfg = self.config
         if self.classes:
             self.model.CLASSES = self.classes
         else:
-            if num_classes == 20:  # TODO: remove hardcode
+            if self.checkpoint and "CLASSES" in self.checkpoint.get("meta", {}):
                 warnings.simplefilter("once")
                 warnings.warn(
-                    f"Using VOC classes because num_classes = {num_classes}. Provide data while init MultiModalPredictor if this is not VOC."
+                    f"Using classes provided in checkpoints: {self.checkpoint['meta']['CLASSES']}. Provide data while init MultiModalPredictor if this is not expected."
                 )
-                self.model.CLASSES = get_classes("voc")
-            elif num_classes == 80:
-                warnings.simplefilter("once")
-                warnings.warn(
-                    f"Using COCO classes because num_classes = {num_classes}. Provide data while init MultiModalPredictor if this is not COCO."
-                )
-                self.model.CLASSES = get_classes("coco")
-            elif "CLASSES" in checkpoint.get("meta", {}):
-                warnings.simplefilter("once")
-                warnings.warn(
-                    f"Using classes provided in checkpoints: {checkpoint['meta']['CLASSES']}. Provide data while init MultiModalPredictor if this is not expected."
-                )
-                self.model.CLASSES = checkpoint["meta"]["CLASSES"]
+                self.model.CLASSES = self.checkpoint["meta"]["CLASSES"]
             else:
                 raise ValueError("Classes need to be specified.")
-
-        self.model.cfg = self.config  # save the config in the model for convenience
-
-        self.prefix = prefix
 
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
-    def _load_checkpoint_and_config(self, checkpoint_name=None):
+    def save(self, save_path: str = "./", tokenizers: Optional[dict] = None):
+
+        weights_save_path = os.path.join(save_path, "model.pth")
+        configs_save_path = os.path.join(save_path, "config.py")
+
+        self._save_weights(save_path=weights_save_path)
+        self._save_configs(save_path=configs_save_path)
+
+        return save_path
+
+    def _save_weights(self, save_path=None):
+        if not save_path:
+            save_path = f"./{self.checkpoint_name}_autogluon.pth"
+
+        torch.save({"state_dict": self.model.state_dict(), "meta": {"CLASSES": self.model.CLASSES}}, save_path)
+
+    def _save_configs(self, save_path=None):
+        if not save_path:
+            save_path = f"./{self.checkpoint_name}_autogluon.py"
+
+        self.config.dump(save_path)
+
+    def _get_checkpoint_and_config_file(self, checkpoint_name: str = None, config_file: str = None):
         from mim.commands import download as mimdownload
 
         from ..utils import download, get_pretrain_configs_dir
 
-        # TODO: add sha1_hash
+        logger.debug(f"initializing {checkpoint_name}")
 
-        mmdet_configs_dir = get_pretrain_configs_dir(subfolder="detection")
         if not checkpoint_name:
             checkpoint_name = self.checkpoint_name
+        if not config_file:
+            config_file = self.config_file
 
-        if checkpoint_name == "faster_rcnn_r50_fpn_1x_voc0712":
-            if not os.path.exists("voc_config"):
-                os.makedirs("voc_config")
-            checkpoint = download(
-                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn_1x_voc0712_20220320_192712-54bef0f3.pth",
-            )
-            config_file = os.path.join(mmdet_configs_dir, "voc", "faster_rcnn_r50_fpn_1x_voc0712.py")
-        elif checkpoint_name == "yolox_s_8x8_300e_coco":
-            checkpoint = download(
-                url="https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_s_8x8_300e_coco/yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth",
-            )
-            config_file = os.path.join(mmdet_configs_dir, "yolox", "yolox_s_8x8_300e_coco.py")
-        elif checkpoint_name == "yolox_l_8x8_300e_coco":
-            checkpoint = download(
-                url="https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_l_8x8_300e_coco/yolox_l_8x8_300e_coco_20211126_140236-d3bd2b23.pth",
-            )
-            config_file = os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py")
+        mmdet_configs_dir = get_pretrain_configs_dir(subfolder="detection")
+
+        AG_CUSTOM_MODELS = {
+            "faster_rcnn_r50_fpn_1x_voc0712": {
+                "url": "https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn_1x_voc0712_20220320_192712-54bef0f3.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "voc", "faster_rcnn_r50_fpn_1x_voc0712.py"),
+            },
+            "yolox_s_8x8_300e_coco": {
+                "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_s_8x8_300e_coco/yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_s_8x8_300e_coco.py"),
+            },
+            "yolox_l_8x8_300e_coco": {
+                "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_l_8x8_300e_coco/yolox_l_8x8_300e_coco_20211126_140236-d3bd2b23.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py"),
+            },
+            "yolox_l_objects365": {  # TODO: update with better pretrained weights
+                "url": "https://automl-mm-bench.s3.amazonaws.com/object_detection/checkpoints/yolox/yolox_l_objects365_temp.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py"),
+            },
+        }
+
+        if os.path.isfile(checkpoint_name):
+            checkpoint_file = checkpoint_name
+        elif os.path.isdir(checkpoint_name):
+            checkpoint_file = os.path.join(checkpoint_name, "model.pth")
+            config_file = os.path.join(checkpoint_name, "config.py")
         else:
-            # download config and checkpoint files using openmim
-            checkpoint = mimdownload(package="mmdet", configs=[checkpoint_name], dest_root=".")[0]
-            config_file = checkpoint_name + ".py"
+            if checkpoint_name in AG_CUSTOM_MODELS:
+                # TODO: add sha1_hash
+                checkpoint_file = download(
+                    url=AG_CUSTOM_MODELS[checkpoint_name]["url"],
+                )
+            else:
+                # download config and checkpoint files using openmim
+                checkpoint_file = mimdownload(package="mmdet", configs=[checkpoint_name], dest_root=".")[0]
 
-        return checkpoint, config_file
+        if config_file:
+            if not os.path.isfile(config_file):
+                raise ValueError(f"Invalid checkpoint_name ({checkpoint_name}) or config_file ({config_file}): ")
+        else:
+            if checkpoint_name in AG_CUSTOM_MODELS:
+                config_file = AG_CUSTOM_MODELS[checkpoint_name]["config_file"]
+            else:
+                try:
+                    # download config and checkpoint files using openmim
+                    mimdownload(package="mmdet", configs=[checkpoint_name], dest_root=".")
+                    config_file = checkpoint_name + ".py"
+                except Exception as e:
+                    print(e)
+                    raise ValueError(f"Invalid checkpoint_name ({checkpoint_name}) or config_file ({config_file}): ")
 
-    def dump_config(self, path):
-        self.config.dump(path)
+        self.checkpoint_name = checkpoint_name
+        self.checkpoint_file = checkpoint_file
+        self.config_file = config_file
 
-        self.name_to_id = self.get_layer_ids()
+    def _load_config(self):
+        # read config files
+        assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+        if isinstance(self.config_file, str):
+            self.config = mmcv.Config.fromfile(self.config_file)
+        else:
+            if not isinstance(self.config_file, dict):
+                raise ValueError(
+                    f"The variable config_file has type {type(self.config_file)}."
+                    f"Detection Model's config_file should either be a str of file path, or a dict as config."
+                )
 
     @property
     def image_key(self):

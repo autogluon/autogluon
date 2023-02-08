@@ -91,46 +91,6 @@ Multimodal Prediction
       How MultiModalPredictor can be applied to multimodal data tables with a mix of text, numerical, and categorical columns.
 
 
-Image Prediction
-----------------
-.. container:: cards
-
-   .. card::
-      :title: Dataset Preparation for Image Predictor
-      :link: image_prediction/dataset.html
-
-      Quick dataset preparation guide for image prediction.
-
-   .. card::
-      :title: Quick Start Using FIT
-      :link: image_prediction/beginner.html
-
-      5 min tutorial on classifying images.
-
-   .. card::
-      :title: Customized Search and HPO
-      :link: image_prediction/hpo.html
-
-      Hyperparameter tuning to improve image classification accuracy.
-
-
-Object Detection
-----------------
-.. container:: cards
-
-   .. card::
-      :title: Dataset Preparation for Object Detector
-      :link: object_detection/dataset.html
-
-      Quick dataset preparation guide for object detection.
-
-   .. card::
-      :title: Quick Start Using FIT
-      :link: object_detection/beginner.html
-
-      5 min tutorial on detecting objects in images.
-
-
 Time Series Forecasting
 -----------------------
 .. container:: cards
@@ -190,13 +150,49 @@ Cloud Training and Deployment
 
       A tutorial on how to deploy trained models using AWS Lambda.
 
+Exploratory Data Analysis
+-------------------------
+
+.. container:: cards
+
+   .. card::
+      :title: Automated Dataset Overview
+      :link: eda/eda-auto-dataset-overview.html
+
+      Tool to get a high-level understanding of datasets including basic statistical information and feature information.
+
+   .. card::
+      :title: Automated Target Variable Analysis
+      :link: eda/eda-auto-target-analysis.html
+
+      Automatically analyze and summarize the variable we are trying to predict and it's relationship with other variables.
+
+   .. card::
+      :title: Quick Model Fit
+      :link: eda/eda-auto-quick-fit.html
+
+      Automatically analyze and summarize the variable we are trying to predict and it's relationship with other variables.
+
+   .. card::
+      :title: Covariate Shift Detection
+      :link: eda/eda-auto-covariate-shift.html
+
+      Identify situations where the distribution of features in a dataset changes between the training
+      and testing phases, which can lead to biased model performance.
+
+   .. card::
+      :title: Feature interaction charts
+      :link: eda/eda-auto-analyze-interaction.html
+
+      Simple visualization tool to visualize 1/2/3-way relationships between features.
+      The tool automatically picks a chart type given each property type.
+
 
 .. toctree::
    :maxdepth: 3
    :hidden:
 
-   image_prediction/index
-   object_detection/index
    tabular_prediction/index
    multimodal/index
    cloud_fit_deploy/index
+   eda/index

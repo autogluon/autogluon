@@ -9,6 +9,8 @@ NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
 IMAGE_BYTEARRAY = "image_bytearray"
 IDENTIFIER = "identifier"
+DOCUMENT = "document"
+DOCUMENT_IMAGE = "document_image"
 
 # Problem types
 CLASSIFICATION = "classification"
@@ -40,6 +42,10 @@ CHOICES_IDS = "choices_ids"
 TEXT_VALID_LENGTH = "text_valid_length"
 TEXT_SEGMENT_IDS = "text_segment_ids"
 COLUMN = "column"
+ATTENTION_MASK = "attention_mask"
+TOKEN_TYPE_IDS = "token_type_ids"
+PIXEL_VALUES = "pixel_values"
+INPUT_IDS = "input_ids"
 
 # Output keys
 LOGITS = "logits"
@@ -58,9 +64,37 @@ ROIS = "rois"
 SCORE = "score"
 LOGIT_SCALE = "logit_scale"
 
-# Metric
+# Metric for Object Detection
 MAP = "map"
 MEAN_AVERAGE_PRECISION = "mean_average_precision"
+MAP_50 = "map_50"
+MAP_75 = "map_75"
+MAP_SMALL = "map_small"
+MAP_MEDIUM = "map_medium"
+MAP_LARGE = "map_large"
+MAR_1 = "mar_1"
+MAR_10 = "mar_10"
+MAR_100 = "mar_100"
+MAR_SMALL = "mar_small"
+MAR_MEDIUM = "mar_medium"
+MAR_LARGE = "mar_large"
+DETECTION_METRICS = [
+    MAP,
+    MEAN_AVERAGE_PRECISION,
+    MAP_50,
+    MAP_75,
+    MAP_SMALL,
+    MAP_MEDIUM,
+    MAP_LARGE,
+    MAR_1,
+    MAR_10,
+    MAR_100,
+    MAR_SMALL,
+    MAR_MEDIUM,
+    MAR_LARGE,
+]
+
+# Metric
 MAX = "max"
 MIN = "min"
 ACCURACY = "accuracy"
@@ -121,7 +155,7 @@ MMDET = "mmdet"
 MMOCR = "mmocr"
 
 # Modality keys. may need to update here if new modality keys are added in above.
-ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER]
+ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER, DOCUMENT]
 
 # Keys to compute metrics
 Y_PRED = "y_pred"
@@ -204,7 +238,8 @@ MMDET_IMAGE = "mmdet_image"
 MMOCR_TEXT_DET = "mmocr_text_detection"
 MMOCR_TEXT_RECOG = "mmocr_text_recognition"
 NER_TEXT = "ner_text"
-HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT)
+DOCUMENT_TRANSFORMER = "document_transformer"
+HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT, DOCUMENT_TRANSFORMER)
 MMLAB_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
 
 # matcher loss type
@@ -243,3 +278,10 @@ RESPONSE = "response"
 QUERY_RESPONSE = f"{QUERY}_{RESPONSE}"
 PAIR = "pair"
 TRIPLET = "triplet"
+
+# presets
+DEFAULT = "default"
+HIGH_QUALITY = "high_quality"
+MEDIUM_QUALITY = "medium_quality"
+BEST_QUALITY = "best_quality"
+ALL_MODEL_QUALITIES = [HIGH_QUALITY, MEDIUM_QUALITY, BEST_QUALITY, DEFAULT]

@@ -11,18 +11,16 @@ from torch import nn
 from ..constants import (
     AUTOMM,
     CATEGORICAL_TRANSFORMER,
-    FUSION_MLP,
-    FUSION_NER,
+    DATA,
     FUSION_TRANSFORMER,
     HF_MODELS,
-    NER,
-    NER_TEXT,
+    MODEL,
     NUMERICAL_TRANSFORMER,
     REGRESSION,
     VALID_CONFIG_KEYS,
 )
-from ..models import TimmAutoModelForImagePrediction
-from ..presets import get_automm_presets, get_basic_automm_config, get_preset_str
+from ..presets import get_automm_presets, get_basic_automm_config
+from .data import get_detected_data_types
 
 logger = logging.getLogger(AUTOMM)
 
@@ -63,10 +61,60 @@ def filter_search_space(hyperparameters: Dict, keys_to_filter: Union[str, List[s
     return hyperparameters
 
 
+def get_default_config(config: Optional[Union[Dict, DictConfig]] = None, extra: Optional[List[str]] = None):
+    """
+    Get the default config.
+
+    Parameters
+    ----------
+    config
+        A dictionary including four keys: "model", "data", "optimization", and "environment".
+        If any key is not given, we will fill in with the default value.
+    extra
+        A list of extra config keys.
+
+    Returns
+    -------
+    The default config.
+    """
+    if isinstance(config, DictConfig):
+        return config
+
+    if config is None:
+        config = {}
+
+    basic_config = get_basic_automm_config(extra=extra)
+    for k, default_value in basic_config.items():
+        if k not in config:
+            config[k] = default_value
+
+    all_configs = []
+    for k, v in config.items():
+        if isinstance(v, dict):
+            per_config = OmegaConf.create(v)
+        elif isinstance(v, DictConfig):
+            per_config = v
+        elif isinstance(v, str):
+            if v.lower().endswith((".yaml", ".yml")):
+                per_config = OmegaConf.load(os.path.expanduser(v))
+            else:
+                cur_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                config_path = os.path.join(cur_path, "configs", k, f"{v}.yaml")
+                per_config = OmegaConf.load(config_path)
+        else:
+            raise ValueError(f"Unknown configuration type: {type(v)}")
+
+        all_configs.append(per_config)
+
+    config = OmegaConf.merge(*all_configs)
+
+    return config
+
+
 def get_config(
     problem_type: Optional[str] = None,
     presets: Optional[str] = None,
-    config: Optional[Union[dict, DictConfig]] = None,
+    config: Optional[Union[Dict, DictConfig]] = None,
     overrides: Optional[Union[str, List[str], Dict]] = None,
     extra: Optional[List[str]] = None,
 ):
@@ -79,7 +127,7 @@ def get_config(
     problem_type
         Problem type.
     presets
-        Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+        Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
     config
         A dictionary including four keys: "model", "data", "optimization", and "environment".
         If any key is not given, we will fill in with the default value.
@@ -129,44 +177,17 @@ def get_config(
     -------
     Configurations as a DictConfig object
     """
-    presets = get_preset_str(problem_type=problem_type, presets=presets)
-
-    if config is None:
-        config = {}
 
     if not config and not presets:
         presets = "default"
 
     if not isinstance(config, DictConfig):
-        basic_config = get_basic_automm_config(extra=extra)
         if presets is None:
             preset_overrides = None
         else:
-            preset_overrides = get_automm_presets(presets=presets)
+            preset_overrides, _ = get_automm_presets(problem_type=problem_type, presets=presets)
 
-        for k, default_value in basic_config.items():
-            if k not in config:
-                config[k] = default_value
-
-        all_configs = []
-        for k, v in config.items():
-            if isinstance(v, dict):
-                per_config = OmegaConf.create(v)
-            elif isinstance(v, DictConfig):
-                per_config = v
-            elif isinstance(v, str):
-                if v.lower().endswith((".yaml", ".yml")):
-                    per_config = OmegaConf.load(os.path.expanduser(v))
-                else:
-                    cur_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                    config_path = os.path.join(cur_path, "configs", k, f"{v}.yaml")
-                    per_config = OmegaConf.load(config_path)
-            else:
-                raise ValueError(f"Unknown configuration type: {type(v)}")
-
-            all_configs.append(per_config)
-
-        config = OmegaConf.merge(*all_configs)
+        config = get_default_config(config, extra=extra)
         # apply the preset's overrides
         if preset_overrides:
             config = apply_omegaconf_overrides(config, overrides=preset_overrides, check_key_exist=True)
@@ -564,7 +585,7 @@ def get_pretrain_configs_dir(subfolder: Optional[str] = None):
     return pretrain_config_dir
 
 
-def _filter_timm_pretrained_cfg(cfg, remove_source=False, remove_null=True):
+def filter_timm_pretrained_cfg(cfg, remove_source=False, remove_null=True):
     filtered_cfg = {}
     keep_null = {"pool_size", "first_conv", "classifier"}  # always keep these keys, even if none
     for k, v in cfg.items():
@@ -576,33 +597,139 @@ def _filter_timm_pretrained_cfg(cfg, remove_source=False, remove_null=True):
     return filtered_cfg
 
 
-def save_timm_config(
-    model: TimmAutoModelForImagePrediction,
-    config_path: str,
+def update_hyperparameters(
+    problem_type,
+    presets,
+    provided_hyperparameters,
+    provided_hyperparameter_tune_kwargs,
+    teacher_predictor: Optional[str] = None,
 ):
     """
-    Save TIMM image model configs to a local file.
+    Update preset hyperparameters hyperparameter_tune_kwargs by the provided.
 
     Parameters
     ----------
-    model
-        A TimmAutoModelForImagePrediction model object.
-    config_path:
-        A file to where the config is written to.
+    problem_type
+        Problem type.
+    presets
+        A preset string regarding modality quality or hpo.
+    provided_hyperparameters
+        The hyperparameters provided by users.
+    provided_hyperparameter_tune_kwargs
+        The hyperparameter_tune_kwargs provided by users.
+    teacher_predictor
+        The path of a saved teacher predictor, used for distillation HPO.
+
+    Returns
+    -------
+    The updated hyperparameters and hyperparameter_tune_kwargs.
     """
-    config = {}
-    pretrained_cfg = _filter_timm_pretrained_cfg(model.config, remove_source=True, remove_null=True)
-    # set some values at root config level
-    config["architecture"] = pretrained_cfg.pop("architecture")
-    config["num_classes"] = model.num_classes
-    config["num_features"] = model.out_features
+    hyperparameters, hyperparameter_tune_kwargs = get_automm_presets(problem_type=problem_type, presets=presets)
 
-    global_pool_type = getattr(model, "global_pool", None)
-    if isinstance(global_pool_type, str) and global_pool_type:
-        config["global_pool"] = global_pool_type
+    if hyperparameter_tune_kwargs and provided_hyperparameter_tune_kwargs:
+        hyperparameter_tune_kwargs.update(provided_hyperparameter_tune_kwargs)
+    elif provided_hyperparameter_tune_kwargs:
+        hyperparameter_tune_kwargs = provided_hyperparameter_tune_kwargs
 
-    config["pretrained_cfg"] = pretrained_cfg
+    if hyperparameter_tune_kwargs:
+        if provided_hyperparameters:
+            hyperparameters.update(provided_hyperparameters)
+    else:  # use the provided hyperparameters if no hpo.
+        hyperparameters = provided_hyperparameters
 
-    with open(config_path, "w") as f:
-        json.dump(config, f, indent=2)
-        logger.info(f"Timm config saved to {config_path}.")
+    if hyperparameter_tune_kwargs:
+        assert isinstance(
+            hyperparameters, dict
+        ), "Please provide hyperparameters as a dictionary if you want to do HPO"
+        if teacher_predictor is not None:
+            assert isinstance(
+                teacher_predictor, str
+            ), "HPO with distillation only supports passing a path to the predictor"
+
+    return hyperparameters, hyperparameter_tune_kwargs
+
+
+def filter_hyperparameters(
+    hyperparameters: Dict,
+    column_types: Dict,
+    config: Optional[Union[Dict, DictConfig]] = None,
+    fit_called: Optional[bool] = False,
+):
+    """
+    Filter out the hyperparameters that have no effect for HPO.
+
+    Parameters
+    ----------
+    hyperparameters
+        The hyperparameters to override the default config.
+    column_types
+        Dataframe's column types.
+    config
+        A config provided by users or from the previous training.
+    fit_called
+        Whether fit() has been called.
+
+    Returns
+    -------
+    The filtered hyperparameters.
+    """
+    model_names_key = f"{MODEL}.names"
+    keys_to_filter = []
+
+    if model_names_key in hyperparameters:
+        # If continuous training or config is provided, make sure models are in config.model.
+        config = get_default_config(config)
+        selected_model_names = []
+        config_model_names = list(config.model.keys())
+        config_model_names.remove("names")
+        for name in hyperparameters[model_names_key]:
+            if name in config_model_names:
+                selected_model_names.append(name)
+        hyperparameters[model_names_key] = selected_model_names
+        assert (
+            len(selected_model_names) > 0
+        ), f"hyperparameters['model.names'] {hyperparameters[model_names_key]} doesn't match any config model names {config_model_names}."
+
+        # Filter models that are not in hyperparameters[model_names_key]
+        # Avoid key not in config error when applying the overrides later.
+        model_keys = [k for k in hyperparameters.keys() if k.startswith(MODEL)]
+        if model_keys and model_names_key in model_keys:
+            model_keys.remove(model_names_key)
+            for k in model_keys:
+                if k.split(".")[1] not in hyperparameters[model_names_key] and k not in keys_to_filter:
+                    keys_to_filter.append(k)
+
+        # Filter models whose data types are not detected.
+        # Avoid sampling unused checkpoints, e.g., hf_text models for image classification, to run jobs,
+        # which wastes resources and time.
+        detected_data_types = get_detected_data_types(column_types)
+        selected_model_names = []
+        for model_name in hyperparameters[model_names_key]:
+            model_config = config.model[model_name]
+            if model_config.data_types:
+                model_data_status = [d_type in detected_data_types for d_type in model_config.data_types]
+                if not all(model_data_status):
+                    keys_to_filter.append(f"{MODEL}.{model_name}")
+                else:
+                    selected_model_names.append(model_name)
+            else:  # keep the fusion model, which will be handled by select_model().
+                selected_model_names.append(model_name)
+        hyperparameters[model_names_key] = selected_model_names
+        assert (
+            len(selected_model_names) > 0
+        ), f"Model {hyperparameters[model_names_key]} can't handle the data with column types {column_types}"
+
+    # Filter keys for continuous training.
+    # Model and data processors would be reused.
+    if fit_called:
+        warnings.warn(
+            "HPO while continuous training."
+            "Hyperparameters related to Model and Data will NOT take effect."
+            "We will filter them out from the search space."
+        )
+        keys_to_filter.extend([MODEL, DATA])
+
+    for key in keys_to_filter:
+        hyperparameters = {k: v for k, v in hyperparameters.items() if not k.startswith(key)}
+
+    return hyperparameters

@@ -27,7 +27,7 @@ def init_pretrained(
     problem_type
         Problem type.
     presets
-        Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+        Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
     hyperparameters
         The customized hyperparameters used to override the default.
 
@@ -67,7 +67,7 @@ def init_pretrained_matcher(
     pipeline
         Matching pipeline.
     presets
-        Presets regarding model quality, e.g., best_quality, high_quality_fast_inference, and medium_quality_faster_inference.
+        Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
     hyperparameters
         The customized hyperparameters used to override the default.
 

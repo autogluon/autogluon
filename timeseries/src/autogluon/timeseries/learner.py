@@ -95,7 +95,6 @@ class TimeSeriesLearner(AbstractLearner):
                 "\tThis metric's sign has been flipped to adhere to being 'higher is better'. "
                 "The reported score can be multiplied by -1 to get the metric value.",
             )
-
         train_data = self.feature_generator.fit_transform(train_data, data_frame_name="train_data")
         if val_data is not None:
             val_data = self.feature_generator.transform(val_data, data_frame_name="tuning_data")

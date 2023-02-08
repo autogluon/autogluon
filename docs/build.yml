@@ -4,5 +4,5 @@ dependencies:
 - pip
 - pip:
   - flake8
-  - black>=22.3
+  - black>=22.3,<23.0
   - isort>=5.10

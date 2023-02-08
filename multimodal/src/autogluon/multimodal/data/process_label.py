@@ -20,12 +20,10 @@ class LabelProcessor:
         """
         Parameters
         ----------
-        prefix
-            The prefix connecting a processor to its corresponding model.
+        model
+            The model for which this processor would be created.
         """
         self.prefix = model.prefix
-        self.tokenizer = None
-        self.model = model
 
     @property
     def label_key(self):

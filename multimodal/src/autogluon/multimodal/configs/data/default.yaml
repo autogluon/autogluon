@@ -1,6 +1,6 @@
 data:
   image:
-    missing_value_strategy: "skip"  # How to deal with missing images. By default, we skip a sample with missing images. We also support choice "zero", i.e., using a zero image to replace a missing image.
+    missing_value_strategy: "zero"  # How to deal with missing images. By default, we use a zero image to replace a missing image. We also support "skip", i.e., skipping a sample with missing images.
   text:
     normalize_text: False  # Whether to normalize text
   categorical:
@@ -11,6 +11,8 @@ data:
     convert_to_text: False  # Whether to convert the feature to text.
     scaler_with_mean: True  # Whether to normalize with mean.
     scaler_with_std: True  # Whether to normalize with std.
+  document:
+    missing_value_strategy: "zero"  # How to deal with missing documents. By default, we use a zero document image to replace a missing document. We also support "skip", i.e., skipping a sample with missing documents.
   label:
     numerical_label_preprocessing: "standardscaler"  # The mode of label preprocessing for . Support "standardscaler" or "minmaxscaler" or "none" / None (means no transform).
   pos_label:  # The name of binary classification's positive class. It's used in computing some metrics, e.g., roc_auc. If not provided, then use label_encoder.classes_[1],

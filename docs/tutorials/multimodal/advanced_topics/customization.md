@@ -536,9 +536,9 @@ How to deal with missing images, opening which fails.
 
 ```
 # default used by AutoMM
-predictor.fit(hyperparameters={"data.image.missing_value_strategy": "skip"})
-# use zero image
 predictor.fit(hyperparameters={"data.image.missing_value_strategy": "zero"})
+# skip the image
+predictor.fit(hyperparameters={"data.image.missing_value_strategy": "skip"})
 ```
 
 ### data.text.normalize_text

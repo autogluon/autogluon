@@ -5,14 +5,29 @@ import pytest
 from omegaconf import OmegaConf
 from ray import tune
 from sklearn.preprocessing import LabelEncoder
+from transformers import AutoTokenizer
 
-from autogluon.multimodal.constants import BINARY, DATA, ENVIRONMENT, MODEL, MULTICLASS, OPTIMIZATION
+from autogluon.multimodal.constants import (
+    BINARY,
+    CATEGORICAL,
+    DATA,
+    ENVIRONMENT,
+    IMAGE_PATH,
+    MODEL,
+    MULTICLASS,
+    NUMERICAL,
+    OPTIMIZATION,
+    TEXT,
+)
 from autogluon.multimodal.data.preprocess_dataframe import MultiModalFeaturePreprocessor
+from autogluon.multimodal.data.utils import process_ner_annotations
 from autogluon.multimodal.utils import (
     apply_omegaconf_overrides,
     data_to_df,
+    filter_hyperparameters,
     filter_search_space,
     get_config,
+    get_default_config,
     is_url,
     merge_bio_format,
     parse_dotlist_conf,
@@ -196,3 +211,200 @@ def test_misc_visualize_ner():
 
     # Test using string for annotation
     visualize_ner(sentence, json.dumps(annotation))
+
+
+def test_process_ner_annotations():
+    text = "SwissGear Sion Softside Expandable Roller Luggage, Dark Grey, Checked-Medium 25-Inch"
+    annotation = [((0, 14), "Brand"), ((50, 60), "Color"), ((70, 85), "Dimensions")]
+    entity_map = {
+        "X": 1,
+        "O": 2,
+        "B-Brand": 3,
+        "I-Brand": 4,
+        "B-Color": 5,
+        "I-Color": 6,
+        "B-Dimensions": 7,
+        "I-Dimensions": 8,
+    }
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/deberta-v3-small")
+    tokenizer.model_max_length = 512
+    res = process_ner_annotations(annotation, text, entity_map, tokenizer, is_eval=True)[0]
+    assert res == [3, 4, 1, 1, 1, 1, 5, 6, 7, 8], "Labelling is wrong!"
+
+
+@pytest.mark.parametrize(
+    "hyperparameters,column_types,model_in_config,fit_called,result",
+    [
+        (
+            {
+                "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+                "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+                "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            },
+            {"a": IMAGE_PATH, "b": TEXT, "c": NUMERICAL, "d": CATEGORICAL},
+            None,
+            False,
+            {
+                "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+                "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+                "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            },
+        ),
+        (
+            {
+                "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+                "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+                "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            },
+            {"a": IMAGE_PATH},
+            None,
+            False,
+            {
+                "model.names": ["timm_image", "fusion_mlp"],
+                "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+            },
+        ),
+        (
+            {
+                "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+                "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+                "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            },
+            {"b": TEXT},
+            None,
+            False,
+            {
+                "model.names": ["hf_text", "fusion_mlp"],
+                "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            },
+        ),
+        (
+            {
+                "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+                "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+                "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            },
+            {"b": TEXT, "c": NUMERICAL},
+            None,
+            False,
+            {
+                "model.names": ["numerical_mlp", "hf_text", "fusion_mlp"],
+                "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            },
+        ),
+        (
+            {
+                "model.names": ["timm_image"],
+                "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+                "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            },
+            {"a": IMAGE_PATH},
+            None,
+            False,
+            {
+                "model.names": ["timm_image"],
+                "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+            },
+        ),
+        (
+            {
+                "model.names": ["hf_text"],
+                "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+                "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            },
+            {"b": TEXT, "c": NUMERICAL, "d": CATEGORICAL},
+            None,
+            False,
+            {
+                "model.names": ["hf_text"],
+                "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            },
+        ),
+        (
+            {
+                "model.names": ["hf_text"],
+                "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+                "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            },
+            {"c": NUMERICAL, "d": CATEGORICAL},
+            None,
+            False,
+            AssertionError,
+        ),
+        (
+            {
+                "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+                "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+                "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            },
+            {"a": IMAGE_PATH, "b": TEXT, "c": NUMERICAL, "d": CATEGORICAL},
+            "timm_image",
+            False,
+            {
+                "model.names": ["timm_image"],
+                "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+            },
+        ),
+        (
+            {
+                "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+                "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+                "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            },
+            {"a": IMAGE_PATH, "b": TEXT, "c": NUMERICAL, "d": CATEGORICAL},
+            "numerical_mlp",
+            False,
+            {
+                "model.names": ["numerical_mlp"],
+            },
+        ),
+        (
+            {
+                "model.names": ["categorical_mlp", "numerical_mlp", "fusion_mlp"],
+            },
+            {"a": IMAGE_PATH, "b": TEXT, "c": NUMERICAL, "d": CATEGORICAL},
+            "hf_text",
+            False,
+            AssertionError,
+        ),
+        (
+            {
+                "model.names": ["timm_image", "hf_text", "fusion_mlp"],
+                "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+                "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            },
+            {"a": IMAGE_PATH, "b": TEXT},
+            None,
+            True,
+            {},
+        ),
+    ],
+)
+def test_filter_hyperparameters(hyperparameters, column_types, model_in_config, fit_called, result):
+    if model_in_config:
+        config = get_default_config()
+        config.model.names = [model_in_config]
+        model_keys = list(config.model.keys())
+        for key in model_keys:
+            if key != "names" and key != model_in_config:
+                delattr(config.model, key)
+    else:
+        config = None
+
+    if result == AssertionError:
+        with pytest.raises(AssertionError):
+            filtered_hyperparameters = filter_hyperparameters(
+                hyperparameters=hyperparameters,
+                column_types=column_types,
+                config=config,
+                fit_called=fit_called,
+            )
+    else:
+        filtered_hyperparameters = filter_hyperparameters(
+            hyperparameters=hyperparameters,
+            column_types=column_types,
+            config=config,
+            fit_called=fit_called,
+        )
+
+        assert filtered_hyperparameters == result

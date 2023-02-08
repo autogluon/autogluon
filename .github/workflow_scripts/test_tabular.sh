@@ -19,8 +19,6 @@ fi
 
 install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/[all,tests]"
 install_multimodal "[tests]"
-install_local_packages "text/"
-install_vision
 
 cd tabular/
 if [ -n "$ADDITIONAL_TEST_ARGS" ]

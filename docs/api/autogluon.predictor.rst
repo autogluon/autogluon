@@ -67,19 +67,6 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
 
    MultiModalPredictor
 
-.. automodule:: autogluon.vision
-.. autosummary::
-   :nosignatures:
-
-   ImagePredictor
-   ObjectDetector
-
-.. automodule:: autogluon.text
-.. autosummary::
-   :nosignatures:
-
-   TextPredictor
-
 .. automodule:: autogluon.timeseries
 .. autosummary::
    :nosignatures:
@@ -113,50 +100,6 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
     .. rubric:: Methods
 
     .. autoautosummary:: MultiModalPredictor
-        :methods:
-
-
-:hidden:`ImagePredictor`
-~~~~~~~~~~~~~~~~~~~~~~~~~
-.. automodule:: autogluon.vision
-
-.. autoclass:: ImagePredictor
-   :members:
-   :inherited-members:
-   :exclude-members: run_fit
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: ImagePredictor
-        :methods:
-
-
-:hidden:`ObjectDetector`
-~~~~~~~~~~~~~~~~~~~~~~~~
-.. automodule:: autogluon.vision
-
-.. autoclass:: ObjectDetector
-   :members:
-   :inherited-members:
-   :exclude-members: run_fit
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: ObjectDetector
-        :methods:
-
-
-:hidden:`TextPredictor`
-~~~~~~~~~~~~~~~~~~~~~~~~
-.. automodule:: autogluon.text
-
-.. autoclass:: TextPredictor
-   :members:
-   :inherited-members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: TextPredictor
         :methods:
 
 
@@ -205,5 +148,5 @@ Additional Time Series APIs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TimeSeriesDataFrame
-    :members: freq, from_iterable_dataset, from_data_frame, from_pickle,
-              split_by_time, slice_by_timestep, slice_by_time
+    :members: freq, fill_missing_values, from_iterable_dataset, from_data_frame, from_pickle,
+              split_by_time, slice_by_timestep, slice_by_time, to_regular_index

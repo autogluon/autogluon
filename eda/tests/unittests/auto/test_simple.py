@@ -1,12 +1,14 @@
 import os
 import re
 import tempfile
+from sys import platform
 from unittest.mock import MagicMock, call
 
 import numpy as np
 import pandas as pd
 import pytest
 
+import autogluon.eda as eda
 from autogluon.eda import AnalysisState
 from autogluon.eda.analysis import Namespace
 from autogluon.eda.analysis.base import BaseAnalysis
@@ -30,6 +32,7 @@ from autogluon.eda.visualization import (
     DatasetTypeMismatch,
     FeatureImportance,
     FeatureInteractionVisualization,
+    LabelInsightsVisualization,
     MarkdownSectionComponent,
     ModelLeaderboard,
     PropertyRendererComponent,
@@ -135,6 +138,7 @@ def test_quick_fit(monkeypatch):
         m.setattr(ModelLeaderboard, "render", call_ldr_render)
         m.setattr(FeatureImportance, "render", call_fi_render)
         m.setattr(PropertyRendererComponent, "render", call_prc_render)
+        _force_using_rf_if_on_mac(m)
 
         with tempfile.TemporaryDirectory() as path:
             quick_fit(path=path, train_data=df_train, label="class")
@@ -169,7 +173,8 @@ def test_dataset_overview(monkeypatch):
     call_md_render.assert_has_calls(
         [
             call("### Feature Distance"),
-            call("### Near duplicate group analysis: `education-num`, `near_duplicate` - distance `0.0`"),
+            call("**Near duplicate group analysis: `education-num`, `near_duplicate` - distance `0.0000`**"),
+            call("Feature interaction between `education-num`/`near_duplicate`"),
         ]
     )
     call_ds_render.assert_called_once()
@@ -188,6 +193,7 @@ def test_covariate_shift_detection(monkeypatch):
     call_md_render = MagicMock()
     call_fiv_render = MagicMock()
     with monkeypatch.context() as m:
+        _force_using_rf_if_on_mac(m)
         with tempfile.TemporaryDirectory() as path:
             m.setattr(XShiftSummary, "render", call_xss_render)
             m.setattr(MarkdownSectionComponent, "render_markdown", call_md_render)
@@ -202,7 +208,14 @@ def test_covariate_shift_detection(monkeypatch):
     assert state.xshift_results.pvalue < 0.01
     assert state.xshift_results.feature_importance.iloc[0].name == "shift_col"
     call_fiv_render.assert_called_once()
-    call_md_render.assert_called_once_with("#### `shift_col` values distribution between datasets; p-value: `0.0000`")
+    call_md_render.assert_called_once_with("**`shift_col` values distribution between datasets; p-value: `0.0000`**")
+
+
+def _force_using_rf_if_on_mac(m):
+    if platform == "darwin":
+        # Stability - use RF instead of LightGBM can on mac for tests
+        call_is_lightgbm_available = MagicMock(return_value=False)
+        m.setattr(eda.auto.simple, "_is_lightgbm_available", call_is_lightgbm_available)
 
 
 def test_get_empty_dict_if_none():
@@ -211,25 +224,35 @@ def test_get_empty_dict_if_none():
 
 
 @pytest.mark.parametrize(
-    "hyperparameters_present, presets_present",
+    "hyperparameters_present, lgbm_present, presets_present",
     [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
+        (True, False, True),
+        (True, False, False),
+        (False, False, True),
+        (False, False, False),
+        (True, True, True),
+        (True, True, False),
+        (False, True, True),
+        (False, True, False),
     ],
 )
-def test_get_default_estimator_if_not_specified(hyperparameters_present, presets_present):
+def test_get_default_estimator_if_not_specified(monkeypatch, hyperparameters_present, lgbm_present, presets_present):
     fit_args = {}
     if hyperparameters_present:
         fit_args["hyperparameters"] = "some_params"
     if presets_present:
         fit_args["presets"] = "some_presets"
 
-    if (not hyperparameters_present) and (not presets_present):
-        assert "RF" in get_default_estimator_if_not_specified(fit_args)["hyperparameters"]
-    else:
-        assert get_default_estimator_if_not_specified(fit_args) == fit_args
+    with monkeypatch.context() as m:
+        m.setattr(eda.auto.simple, "_is_lightgbm_available", lambda: lgbm_present)
+
+        if (not hyperparameters_present) and (not presets_present):
+            if lgbm_present:
+                assert "GBM" in get_default_estimator_if_not_specified(fit_args)["hyperparameters"]
+            else:
+                assert "RF" in get_default_estimator_if_not_specified(fit_args)["hyperparameters"]
+        else:
+            assert get_default_estimator_if_not_specified(fit_args) == fit_args
 
 
 @pytest.mark.parametrize(
@@ -295,25 +318,25 @@ def test_target_analysis__classification(monkeypatch):
     call_ds_render = MagicMock()
     call_cv_render = MagicMock()
     call_fiv_render = MagicMock()
+    call_liv_render = MagicMock()
     with monkeypatch.context() as m:
         m.setattr(MarkdownSectionComponent, "render_markdown", call_md_render)
         m.setattr(DatasetStatistics, "render", call_ds_render)
         m.setattr(CorrelationVisualization, "render", call_cv_render)
         m.setattr(FeatureInteractionVisualization, "render", call_fiv_render)
+        m.setattr(LabelInsightsVisualization, "render", call_liv_render)
 
         state = target_analysis(train_data=df_train, label="class", return_state=True)
 
     call_md_render.assert_has_calls(
         [
             call("## Target variable analysis"),
-            call(
-                "### Target variable correlations\n"
-                " - absolute correlation greater than `0.5` found for target variable `class`"
-            ),
+            call("### Label Insights"),
         ]
     )
     call_ds_render.assert_called_once()
     call_cv_render.assert_called_once()
+    call_liv_render.assert_called_once()
     assert call_fiv_render.call_count == 2
     assert sorted(set(state.keys())) == [
         "correlations",
@@ -323,7 +346,9 @@ def test_target_analysis__classification(monkeypatch):
         "correlations_method",
         "dataset_stats",
         "interactions",
+        "label_insights",
         "missing_statistics",
+        "problem_type",
         "raw_type",
         "special_types",
         "variable_type",
@@ -341,11 +366,13 @@ def test_target_analysis__regression(monkeypatch):
     call_ds_render = MagicMock()
     call_cv_render = MagicMock()
     call_fiv_render = MagicMock()
+    call_liv_render = MagicMock()
     with monkeypatch.context() as m:
         m.setattr(MarkdownSectionComponent, "render_markdown", call_md_render)
         m.setattr(DatasetStatistics, "render", call_ds_render)
         m.setattr(CorrelationVisualization, "render", call_cv_render)
         m.setattr(FeatureInteractionVisualization, "render", call_fiv_render)
+        m.setattr(LabelInsightsVisualization, "render", call_liv_render)
 
         state = target_analysis(train_data=df_train, label="fnlwgt", return_state=True)
 
@@ -368,9 +395,9 @@ def test_target_analysis__regression(monkeypatch):
                 " - [skewnorm](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.skewnorm.html)",
                 "   - p-value: 0.963",
                 "   - Parameters: (a: 3.xx, loc: 78497.xx, scale: 150470.xx)",
-                " - [genlogistic](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.genlogistic.html)",
-                "   - p-value: 0.962",
-                "   - Parameters: (c: 129.xx, loc: -233264.xx, scale: 78753.xx)",
+                " - [weibull_min](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.weibull_min.html)",
+                "   - p-value: 0.963",
+                "   - Parameters: (c: 1.xx, loc: 16324.xx, scale: 200669.xx)",
             ]
         ),
         "### Target variable correlations\n - ⚠️ no fields with absolute correlation greater than `0.5` found for target variable `fnlwgt`.",
@@ -379,6 +406,7 @@ def test_target_analysis__regression(monkeypatch):
     call_ds_render.assert_called_once()
     call_cv_render.assert_called_once()
     call_fiv_render.assert_called_once()
+    call_liv_render.assert_called_once()
     assert sorted(set(state.keys())) == [
         "correlations",
         "correlations_focus_field",
@@ -390,6 +418,7 @@ def test_target_analysis__regression(monkeypatch):
         "distributions_fit_pvalue_min",
         "interactions",
         "missing_statistics",
+        "problem_type",
         "raw_type",
         "special_types",
         "variable_type",
@@ -403,5 +432,5 @@ def test_target_analysis__regression(monkeypatch):
         "gumbel_r",
         "nakagami",
         "skewnorm",
-        "genlogistic",
+        "weibull_min",
     ]

@@ -18,6 +18,8 @@ from autogluon.timeseries.dataset.ts_dataframe import (
     TimeSeriesDataFrame,
 )
 
+from .common import get_data_frame_with_variable_lengths
+
 START_TIMESTAMP = pd.Timestamp("01-01-2019", freq="D")  # type: ignore
 END_TIMESTAMP = pd.Timestamp("01-02-2019", freq="D")  # type: ignore
 ITEM_IDS = (0, 1, 2)
@@ -747,3 +749,86 @@ def test_when_path_is_given_to_constructor_then_tsdf_is_constructed_correctly():
         assert isinstance(ts_df.index, pd.MultiIndex)
         assert ts_df.index.names == [ITEMID, TIMESTAMP]
         assert len(ts_df) == len(SAMPLE_TS_DATAFRAME)
+
+
+@pytest.mark.parametrize("freq", ["D", "W", "M", "Q", "A", "Y", "H", "T", "min", "S", "30T", "2H", "17S"])
+def test_given_index_is_irregular_when_to_regular_index_called_then_result_has_regular_index(freq):
+    df_original = get_data_frame_with_variable_lengths({"B": 15, "A": 20}, freq=freq, covariates_names=["Y", "X"])
+
+    # Select random rows & reset cached freq
+    df_irregular = df_original.iloc[[2, 5, 7, 10, 14, 15, 16, 33]]
+    df_irregular._cached_freq = None
+    df_regular = df_irregular.to_regular_index(freq=freq)
+    for idx, value in df_regular.iterrows():
+        if idx in df_irregular.index:
+            assert (value == df_original.loc[idx]).all()
+        else:
+            assert value.isna().all()
+
+
+def test_given_index_is_regular_when_to_regular_index_called_then_original_df_is_returned():
+    df = SAMPLE_TS_DATAFRAME.copy()
+    df_regular = df.to_regular_index(freq=df.freq)
+    assert df is df_regular
+
+
+def test_given_index_is_regular_and_freq_doesnt_match_when_to_regular_index_called_then_exception_is_raised():
+    df = SAMPLE_TS_DATAFRAME.copy()
+    with pytest.raises(ValueError, match="already has a regular index with freq"):
+        df.to_regular_index(freq="Q")
+
+
+@pytest.mark.parametrize("freq", ["D", "W", "M", "Q", "A", "H"])
+def test_given_irregular_index_isnt_compatible_with_given_freq_then_exception_is_raised(freq):
+    df = TimeSeriesDataFrame(
+        pd.DataFrame(
+            {
+                ITEMID: [0, 0, 0],
+                TIMESTAMP: ["1900-01-01 00:00", "1900-01-02 00:00", "1900-01-03 00:30"],
+                "target": [1, 2, 3],
+            }
+        )
+    )
+    with pytest.raises(ValueError, match="timestamps in this TimeSeriesDataFrame are not compatible"):
+        df.to_regular_index(freq=freq)
+
+
+FILL_METHODS = ["auto", "ffill", "pad", "backfill", "bfill", "interpolate", "constant"]
+
+
+@pytest.mark.parametrize("method", FILL_METHODS)
+def test_when_fill_missing_values_called_then_gaps_are_filled_and_index_is_unchanged(method):
+    df = get_data_frame_with_variable_lengths({"B": 15, "A": 20})
+    df.iloc[[1, 5, 10, 22]] = np.nan
+    df_filled = df.fill_missing_values(method=method)
+    assert not df_filled.isna().any().any()
+    assert df_filled.index.equals(df.index)
+
+
+@pytest.mark.parametrize("method", FILL_METHODS)
+def test_when_fill_missing_values_called_then_leading_nans_are_filled_and_index_is_unchanged(method):
+    if method in ["ffill", "pad", "interpolate"]:
+        pytest.skip(f"{method} doesn't fill leading NaNs")
+    df = get_data_frame_with_variable_lengths({"B": 15, "A": 20})
+    df.iloc[[0, 1, 2, 15, 16]] = np.nan
+    df_filled = df.fill_missing_values(method=method)
+    assert not df_filled.isna().any().any()
+    assert df_filled.index.equals(df.index)
+
+
+@pytest.mark.parametrize("method", FILL_METHODS)
+def test_when_fill_missing_values_called_then_trailing_nans_are_filled_and_index_is_unchanged(method):
+    if method in ["bfill", "backfill"]:
+        pytest.skip(f"{method} doesn't fill trailing NaNs")
+    df = get_data_frame_with_variable_lengths({"B": 15, "A": 20})
+    df.iloc[[13, 14, 34]] = np.nan
+    df_filled = df.fill_missing_values(method=method)
+    assert not df_filled.isna().any().any()
+    assert df_filled.index.equals(df.index)
+
+
+def test_when_dropna_called_then_missing_values_are_dropped():
+    df = get_data_frame_with_variable_lengths({"B": 15, "A": 20})
+    df.iloc[[1, 5, 10, 14, 22]] = np.nan
+    df_dropped = df.dropna()
+    assert not df_dropped.isna().any().any()

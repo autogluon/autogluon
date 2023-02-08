@@ -36,7 +36,7 @@ class MissingValuesAnalysis(AbstractAnalysis):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         s: Dict[str, Any] = {}
-        for (ds, df) in self.available_datasets(args):
+        for ds, df in self.available_datasets(args):
             s[ds] = {
                 "count": {},
                 "ratio": {},

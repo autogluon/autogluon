@@ -147,13 +147,13 @@ pil_img = Image(filename=example_image)
 display(pil_img)
 ```
 
-The PetFinder dataset is fairly large. For the purposes of the tutorial, we will sample 500 rows for training.
+The PetFinder dataset is fairly large. For the purposes of the tutorial, we will sample 300 rows for training.
 
 Training on large multi-modal datasets can be very computationally intensive, especially if using the `best_quality` preset in AutoGluon. When prototyping, it is recommended to sample your data to get an idea of which models are worth training, then gradually train with larger amounts of data and longer time limits as you would with any other machine learning algorithm.
 
 
 ```{.python .input}
-train_data = train_data.sample(500, random_state=0)
+train_data = train_data.sample(300, random_state=0)
 ```
 
 ## Constructing the FeatureMetadata
@@ -206,7 +206,7 @@ predictor = TabularPredictor(label=label).fit(
     train_data=train_data,
     hyperparameters=hyperparameters,
     feature_metadata=feature_metadata,
-    time_limit=900,
+    time_limit=600,
 )
 ```
 
