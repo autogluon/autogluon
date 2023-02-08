@@ -64,9 +64,37 @@ ROIS = "rois"
 SCORE = "score"
 LOGIT_SCALE = "logit_scale"
 
-# Metric
+# Metric for Object Detection
 MAP = "map"
 MEAN_AVERAGE_PRECISION = "mean_average_precision"
+MAP_50 = "map_50"
+MAP_75 = "map_75"
+MAP_SMALL = "map_small"
+MAP_MEDIUM = "map_medium"
+MAP_LARGE = "map_large"
+MAR_1 = "mar_1"
+MAR_10 = "mar_10"
+MAR_100 = "mar_100"
+MAR_SMALL = "mar_small"
+MAR_MEDIUM = "mar_medium"
+MAR_LARGE = "mar_large"
+DETECTION_METRICS = [
+    MAP,
+    MEAN_AVERAGE_PRECISION,
+    MAP_50,
+    MAP_75,
+    MAP_SMALL,
+    MAP_MEDIUM,
+    MAP_LARGE,
+    MAR_1,
+    MAR_10,
+    MAR_100,
+    MAR_SMALL,
+    MAR_MEDIUM,
+    MAR_LARGE,
+]
+
+# Metric
 MAX = "max"
 MIN = "min"
 ACCURACY = "accuracy"
