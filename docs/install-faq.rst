@@ -59,3 +59,5 @@
       !conda create -n newPython -c cctbx202208 -y
       !source /opt/conda/bin/activate newPython && conda install -c cctbx202208 python -y
       !/opt/conda/envs/newPython/bin/python3 -m pip install autogluon
+
+   Note that, once AutoGluon is installed, please restart the notebook runtime and then import modules to run your code. 
