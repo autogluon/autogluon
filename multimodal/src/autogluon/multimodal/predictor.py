@@ -26,7 +26,7 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.multimodal.utils import save_result_df
+from autogluon.multimodal.utils import object_detection_data_to_df, save_result_df, setup_detection_train_tuning_data
 
 from . import version as ag_version
 from .constants import (
@@ -670,16 +670,9 @@ class MultiModalPredictor(ExportMixin):
             return self
 
         if self._problem_type == OBJECT_DETECTION:
-            self._detection_anno_train = train_data
-            train_data = from_coco_or_voc(train_data, "train")
-            if tuning_data is not None:
-                self.detection_anno_train = tuning_data
-                tuning_data = from_coco_or_voc(tuning_data, "val")
-                if max_num_tuning_data is not None:
-                    if len(tuning_data) > max_num_tuning_data:
-                        tuning_data = tuning_data.sample(
-                            n=max_num_tuning_data, replace=False, random_state=seed
-                        ).reset_index(drop=True)
+            train_data, tuning_data = setup_detection_train_tuning_data(
+                self, max_num_tuning_data, seed, train_data, tuning_data
+            )
 
         pl.seed_everything(seed, workers=True)
 
@@ -1851,14 +1844,25 @@ class MultiModalPredictor(ExportMixin):
                 return NotImplementedError(
                     f"Current problem type {self._problem_type} does not support realtime predict."
                 )
-            return evaluate_coco(
-                predictor=self,
-                anno_file_or_df=data,
-                metrics=metrics,
-                return_pred=return_pred,
-                seed=seed,
-                eval_tool=eval_tool,
-            )
+            if isinstance(data, str):
+                return evaluate_coco(
+                    predictor=self,
+                    anno_file_or_df=data,
+                    metrics=metrics,
+                    return_pred=return_pred,
+                    seed=seed,
+                    eval_tool=eval_tool,
+                )
+            else:
+                data = object_detection_data_to_df(data)
+                return evaluate_coco(
+                    predictor=self,
+                    anno_file_or_df=data,
+                    metrics=metrics,
+                    return_pred=return_pred,
+                    seed=seed,
+                    eval_tool="torchmetrics",
+                )
 
         if self._problem_type == NER:
             ret_type = NER_RET
@@ -2029,14 +2033,7 @@ class MultiModalPredictor(ExportMixin):
                 realtime=realtime,
             )
         if self._problem_type == OBJECT_DETECTION:
-            if isinstance(data, str):
-                data = from_coco_or_voc(data, "test")
-            elif isinstance(data, dict):
-                data = from_dict(data)
-            else:
-                assert isinstance(
-                    data, pd.DataFrame
-                ), "TypeError: Expected data type to be a filepath, a folder or a dictionary, but got {}".format(data)
+            data = object_detection_data_to_df(data)
 
             if self._label_column not in data:
                 self._label_column = None
