@@ -140,7 +140,7 @@ def apply_log_filter(log_filter):
 
 def get_fit_start_message(save_path, validation_metric_name):
     return f"""\
-AutoMM starts to create the model. ✨
+AutoMM starts to create your model. ✨
 
 - Model will be saved to "{save_path}".
 
