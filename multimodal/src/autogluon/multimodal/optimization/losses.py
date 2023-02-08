@@ -304,7 +304,7 @@ class FocalLoss(nn.Module):
             epsilon for numerical stability
         """
         super(FocalLoss, self).__init__()
-        self.alpha = alpha
+
         self.gamma = gamma
         self.reduction = reduction
         self.eps = eps
@@ -322,10 +322,10 @@ class FocalLoss(nn.Module):
             # (N, d1, d2, ..., dK) --> (N * d1 * ... * dK,)
             target = target.view(-1)
 
-        pt = F.softmax(input, dim=-1) + self.eps
+        pt = F.softmax(input, dim=-1)
 
         # -alpha_t * log(pt) term
-        log_p = torch.log(pt)
+        log_p = torch.log_softmax(input, dim=-1)
         ce = self.nll_loss(log_p, target)
 
         # (1 - pt)^gamma term
