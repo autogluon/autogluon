@@ -34,7 +34,6 @@ else:
 
     log = logging.getLogger(__name__)
 
-
     @dataclass
     class MAPMetricResults:
         """Dataclass to wrap the final mAP results."""
@@ -57,7 +56,6 @@ else:
         def __getitem__(self, key: str) -> Union[Tensor, List[Tensor]]:
             return getattr(self, key)
 
-
     # noinspection PyMethodMayBeStatic
     class WriteToLog:
         """Logging class to move logs to log.debug()."""
@@ -74,7 +72,6 @@ else:
             for handler in log.handlers:
                 handler.close()
 
-
     class _hide_prints:
         """Internal helper context to suppress the default output of the pycocotools package."""
 
@@ -88,7 +85,6 @@ else:
         def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
             sys.stdout.close()
             sys.stdout = self._original_stdout  # type: ignore
-
 
     def _input_validator(preds: List[Dict[str, torch.Tensor]], targets: List[Dict[str, torch.Tensor]]) -> None:
         """Ensure the correct input format of `preds` and `targets`"""
@@ -132,13 +128,11 @@ else:
                     f" got {item['labels'].size(0)} labels and {item['scores'].size(0)})"
                 )
 
-
     def _fix_empty_tensors(boxes: torch.Tensor) -> torch.Tensor:
         """Empty tensors can cause problems in DDP mode, this methods corrects them."""
         if boxes.numel() == 0 and boxes.ndim == 1:
             return boxes.unsqueeze(0)
         return boxes
-
 
     class MeanAveragePrecision(Metric):
         r"""
@@ -195,14 +189,14 @@ else:
         """
 
         def __init__(
-                self,
-                class_metrics: bool = False,
-                compute_on_step: bool = True,
-                dist_sync_on_step: bool = False,
-                process_group: Optional[Any] = None,
-                dist_sync_fn: Callable = None,
-                box_format: str = None,
-                iou_type: str = None,
+            self,
+            class_metrics: bool = False,
+            compute_on_step: bool = True,
+            dist_sync_on_step: bool = False,
+            process_group: Optional[Any] = None,
+            dist_sync_fn: Callable = None,
+            box_format: str = None,
+            iou_type: str = None,
         ) -> None:  # type: ignore
             super().__init__(
                 compute_on_step=compute_on_step,
@@ -311,8 +305,9 @@ else:
             """
             coco_target, coco_preds = COCO(), COCO()
             coco_target.dataset = self._get_coco_format(self.groundtruth_boxes, self.groundtruth_labels)
-            coco_preds.dataset = self._get_coco_format(self.detection_boxes, self.detection_labels,
-                                                       self.detection_scores)
+            coco_preds.dataset = self._get_coco_format(
+                self.detection_boxes, self.detection_labels, self.detection_scores
+            )
 
             with _hide_prints():
                 coco_target.createIndex()
@@ -361,7 +356,7 @@ else:
             return metrics.__dict__
 
         def _get_coco_format(
-                self, boxes: List[torch.Tensor], labels: List[torch.Tensor], scores: Optional[List[torch.Tensor]] = None
+            self, boxes: List[torch.Tensor], labels: List[torch.Tensor], scores: Optional[List[torch.Tensor]] = None
         ) -> Dict:
             """Transforms and returns all cached targets or predictions in COCO format.
 
