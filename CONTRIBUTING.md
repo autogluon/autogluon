@@ -67,8 +67,6 @@ cd ../extra/
 pytest
 cd ../text/
 pytest
-cd ../vision/
-pytest
 cd ../features/
 pytest
 ```

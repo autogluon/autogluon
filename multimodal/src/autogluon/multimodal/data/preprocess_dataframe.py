@@ -661,7 +661,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         ), "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_label."
         y_df = df[self._label_column]
         if self.label_type == CATEGORICAL:
-            y = self._label_generator.transform(y_df)
+            y = self._label_generator.transform(y_df).astype(np.int64)
         elif self.label_type == NUMERICAL:
             y = pd.to_numeric(y_df).to_numpy()
             y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
