@@ -2,7 +2,7 @@ import torchmetrics
 from packaging import version
 
 # There is a bug >=0.9, <=0.11.0
-# And the slow speed problem is not fixed in 0.11.1
+# And the slow speed problem is still not fixed in 0.11.1
 if version.parse(torchmetrics.__version__) > version.parse("0.12.0"):
     from torchmetrics.detection.mean_ap import MeanAveragePrecision
 else:
