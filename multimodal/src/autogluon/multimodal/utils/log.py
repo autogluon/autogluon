@@ -176,7 +176,8 @@ AutoMM has created your model 🎉🎉🎉
     tensorboard --logdir {save_path}
     ```
 
-- If you are not satisfied with the model, try to increase the training time, adjust the [hyperparameters](https://auto.gluon.ai/stable/tutorials/multimodal/advanced_topics/customization.html), \
-or post issues on [Github](https://github.com/autogluon/autogluon).
+- If you are not satisfied with the model, try to increase the training time, 
+  adjust the [hyperparameters](https://auto.gluon.ai/stable/tutorials/multimodal/advanced_topics/customization.html),
+  or post issues on [Github](https://github.com/autogluon/autogluon).
 
 """
