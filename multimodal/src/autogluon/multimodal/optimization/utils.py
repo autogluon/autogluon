@@ -102,22 +102,10 @@ def get_loss_func(
             loss_func = SoftTargetCrossEntropy()
         else:
             if loss_func_name is not None and loss_func_name.lower() == "focal_loss":
-                if OmegaConf.select(config, "focal_loss.alpha"):
-                    alpha = torch.tensor(OmegaConf.select(config, "focal_loss.alpha"))
-                else:
-                    alpha = None
-
-                if OmegaConf.select(config, "focal_loss.gamma"):
-                    gamma = OmegaConf.select(config, "focal_loss.gamma")
-                else:
-                    gamma = 2.0
-
-                if OmegaConf.select(config, "focal_loss.reduction"):
-                    reduction = OmegaConf.select(config, "focal_loss.reduction")
-                else:
-                    reduction = "mean"
-
-                loss_func = FocalLoss(alpha=alpha, gamma=gamma, reduction=reduction)
+                loss_func = FocalLoss(
+                    alpha=OmegaConf.select(config, "focal_loss.alpha"),
+                    gamma=OmegaConf.select(config, "focal_loss.gamma", default=2.0),
+                    reduction=OmegaConf.select(config, "focal_loss.reduction", default="mean"))
             else:
                 loss_func = nn.CrossEntropyLoss()
     elif problem_type == REGRESSION:

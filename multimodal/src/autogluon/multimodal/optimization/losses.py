@@ -308,6 +308,8 @@ class FocalLoss(nn.Module):
         self.gamma = gamma
         self.reduction = reduction
         self.eps = eps
+        if alpha is not None:
+            alpha = torch.tensor(alpha)
         self.nll_loss = nn.NLLLoss(weight=alpha, reduction="none")
 
     def forward(self, input: torch.Tensor, target: torch.Tensor):
