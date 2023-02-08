@@ -105,7 +105,8 @@ def get_loss_func(
                 loss_func = FocalLoss(
                     alpha=OmegaConf.select(config, "focal_loss.alpha"),
                     gamma=OmegaConf.select(config, "focal_loss.gamma", default=2.0),
-                    reduction=OmegaConf.select(config, "focal_loss.reduction", default="mean"))
+                    reduction=OmegaConf.select(config, "focal_loss.reduction", default="mean"),
+                )
             else:
                 loss_func = nn.CrossEntropyLoss()
     elif problem_type == REGRESSION:
