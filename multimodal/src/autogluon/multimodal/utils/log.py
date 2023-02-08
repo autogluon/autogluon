@@ -161,7 +161,7 @@ def get_fit_complete_message(save_path):
     return f"""\
 AutoMM has created your model 🎉🎉🎉
 
-- To load the model, use the following code 
+- To load the model, use the code below:
 
 ```python
 from autogluon.multimodal import MultiModalPredictor
@@ -178,6 +178,6 @@ tensorboard --logdir {save_path}
 
 - If you are not satisfied with the model, try to increase the training time, 
 adjust the [hyperparameters](https://auto.gluon.ai/stable/tutorials/multimodal/advanced_topics/customization.html),
-or post issues on [Github](https://github.com/autogluon/autogluon).
+or post issues on [GitHub](https://github.com/autogluon/autogluon).
 
 """
