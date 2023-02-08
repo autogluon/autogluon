@@ -56,6 +56,7 @@
    https://www.kaggle.com/code/amareltaylor/how-to-install-alternative-python-version-hack
 
    .. code-block::
+      
       !conda create -n newPython -c cctbx202208 -y
       !source /opt/conda/bin/activate newPython && conda install -c cctbx202208 python -y
       !/opt/conda/envs/newPython/bin/python3 -m pip install autogluon
