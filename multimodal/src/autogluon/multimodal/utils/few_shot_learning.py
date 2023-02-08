@@ -68,7 +68,6 @@ class FewShotSVMPredictor:
         self._fit_called = False
         self._model_loaded = False
         self._save_path = path
-        pass
 
     def fit(self, train_data: pd.DataFrame):
         features = self.extract_embedding(data=train_data)
@@ -152,29 +151,50 @@ class FewShotSVMPredictor:
             return results, self._automm_predictor._as_pandas(data=data, to_be_converted=preds)
         return results
 
+    def save_svm(self, path: Optional[str] = None):
+        # self._save_path = setup_save_path(
+        #     old_save_path=self._save_path,
+        #     proposed_save_path=path,
+        #     raise_if_exist=True,
+        #     warn_if_exist=False,
+        #     fit_called=self._fit_called,
+        # )
+        params = self.clf.get_params()
+        logger.info(f"Saving into {os.path.join(path, 'svm_model.pkl')}")
+        with open(os.path.join(path, "svm_model.pkl"), "wb") as fp:
+            pickle.dump(params, fp)
+
+    def load_svm(self, path: Optional[str] = None):
+        # if path is not None:
+        #     logger.info(f"Loading from {os.path.join(path, 'svm_model.pkl')}")
+        #     with open(os.path.join(path, "svm_model.pkl"), "rb") as fp:
+        #         params = CustomUnpickler(fp).load()
+        # else:
+        #     logger.info(f"Loading from {os.path.join(self._save_path, 'svm_model.pkl')}")
+        #     assert self._save_path is not None, "Expect at least one of path and self._save_path to be not None."
+        #     with open(os.path.join(self._save_path, "svm_model.pkl"), "rb") as fp:
+        #         params = CustomUnpickler(fp).load()
+        logger.info(f"Loading from {os.path.join(path, 'svm_model.pkl')}")
+        with open(os.path.join(path, "svm_model.pkl"), "rb") as fp:
+            params = CustomUnpickler(fp).load()
+        self.clf.set_params(**params)
+        self._model_loaded = True
+
+
+    @classmethod
+    def load(cls, path: str):
+        predictor = cls("dummy_label")
+        predictor._automm_predictor.load(path)
+        predictor.load_svm(path)
+        return predictor
+
     def save(self, path: Optional[str] = None):
         self._save_path = setup_save_path(
             old_save_path=self._save_path,
             proposed_save_path=path,
             raise_if_exist=True,
-            warn_if_exist=False,
+            warn_if_exist=True,
             fit_called=self._fit_called,
         )
-        params = self.clf.get_params()
-        logger.info(f"Saving into {os.path.join(self._save_path, 'svm_model.pkl')}")
-        with open(os.path.join(self._save_path, "svm_model.pkl"), "wb") as fp:
-            pickle.dump(params, fp)
-        return self._save_path
-
-    def load(self, path: Optional[str] = None):
-        if path is not None:
-            logger.info(f"Loading from {os.path.join(path, 'svm_model.pkl')}")
-            with open(os.path.join(path, "svm_model.pkl"), "rb") as fp:
-                params = CustomUnpickler(fp).load()
-        else:
-            logger.info(f"Loading from {os.path.join(self._save_path, 'svm_model.pkl')}")
-            assert self._save_path is not None, "Expect at least one of path and self._save_path to be not None."
-            with open(os.path.join(self._save_path, "svm_model.pkl"), "rb") as fp:
-                params = CustomUnpickler(fp).load()
-        self.clf.set_params(**params)
-        self._model_loaded = True
+        self._automm_predictor.save(self._save_path)
+        self.save_svm(self._save_path)
