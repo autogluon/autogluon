@@ -27,7 +27,7 @@ def test_classification_str_list_input():
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "swin_base_patch4_window7_224",
+        "swin_tiny_patch4_window7_224",
     ],
 )
 def test_focal_loss_multiclass(checkpoint_name):

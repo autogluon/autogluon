@@ -24,10 +24,6 @@ others:
 - sentence-transformers/all-mpnet-base-v2
 - sentence-transformers/msmarco-MiniLM-L-12-v3
 - xlm-roberta-base
-- swin_base_patch4_window7_224
-- yolov3_mobilenetv2_320_300e_coco
-- faster_rcnn_r50_fpn_2x_coco
-- detr_r50_8x2_150e_coco
 others_2:
 - google/electra-small-discriminator
 - google/flan-t5-small
