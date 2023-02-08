@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import pickle
@@ -68,6 +69,11 @@ class FewShotSVMPredictor:
         self._fit_called = False
         self._model_loaded = False
         self._save_path = path
+
+        self._label = label
+        self._hyperparameters = hyperparameters
+        self._presets = presets
+        self._eval_metric = eval_metric
 
     def fit(self, train_data: pd.DataFrame):
         features = self.extract_embedding(data=train_data)
@@ -152,39 +158,53 @@ class FewShotSVMPredictor:
         return results
 
     def save_svm(self, path: Optional[str] = None):
-        # self._save_path = setup_save_path(
-        #     old_save_path=self._save_path,
-        #     proposed_save_path=path,
-        #     raise_if_exist=True,
-        #     warn_if_exist=False,
-        #     fit_called=self._fit_called,
-        # )
         params = self.clf.get_params()
         logger.info(f"Saving into {os.path.join(path, 'svm_model.pkl')}")
         with open(os.path.join(path, "svm_model.pkl"), "wb") as fp:
             pickle.dump(params, fp)
 
     def load_svm(self, path: Optional[str] = None):
-        # if path is not None:
-        #     logger.info(f"Loading from {os.path.join(path, 'svm_model.pkl')}")
-        #     with open(os.path.join(path, "svm_model.pkl"), "rb") as fp:
-        #         params = CustomUnpickler(fp).load()
-        # else:
-        #     logger.info(f"Loading from {os.path.join(self._save_path, 'svm_model.pkl')}")
-        #     assert self._save_path is not None, "Expect at least one of path and self._save_path to be not None."
-        #     with open(os.path.join(self._save_path, "svm_model.pkl"), "rb") as fp:
-        #         params = CustomUnpickler(fp).load()
         logger.info(f"Loading from {os.path.join(path, 'svm_model.pkl')}")
         with open(os.path.join(path, "svm_model.pkl"), "rb") as fp:
             params = CustomUnpickler(fp).load()
         self.clf.set_params(**params)
         self._model_loaded = True
 
+    def save_meta_data(self, path: str):
+        with open(os.path.join(path, "fewshot_svm_assets.json"), "w") as fp:
+            json.dump(
+                {
+                    "path": self._save_path,
+                    "label": self._label,
+                    "hyperparameters": self._hyperparameters,
+                    "presets": self._presets,
+                    "eval_metric": self._eval_metric,
+                },
+                fp,
+            )
+
+    def load_predictor_from_meta_data(self, path: str):
+        with open(os.path.join(path, "fewshot_svm_assets.json"), "r") as fp:
+            assets = json.load(fp)
+            predictor = MultiModalPredictor(
+                label=assets["label"],
+                hyperparameters=assets["hyperparameters"],
+                problem_type=FEATURE_EXTRACTION,
+                eval_metric=assets["eval_metric"],
+                path=assets["path"],
+                presets=assets["presets"],
+            )
+        return predictor, assets
 
     @classmethod
     def load(cls, path: str):
         predictor = cls("dummy_label")
-        predictor._automm_predictor.load(path)
+        predictor._automm_predictor, assets = predictor.load_predictor_from_meta_data(path)
+        predictor._save_path = assets["path"]
+        predictor._label = assets["label"]
+        predictor._hyperparameters = assets["hyperparameters"]
+        predictor._eval_metric = assets["eval_metric"]
+        predictor._presets = assets["presets"]
         predictor.load_svm(path)
         return predictor
 
@@ -196,5 +216,5 @@ class FewShotSVMPredictor:
             warn_if_exist=True,
             fit_called=self._fit_called,
         )
-        self._automm_predictor.save(self._save_path)
+        self.save_meta_data(self._save_path)
         self.save_svm(self._save_path)
