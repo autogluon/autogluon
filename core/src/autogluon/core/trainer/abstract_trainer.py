@@ -52,6 +52,7 @@ class AbstractTrainer:
                  num_classes=None, quantile_levels=None, low_memory=False, feature_metadata=None, k_fold=0, n_repeats=1,
                  sample_weight=None, weight_evaluation=False, save_data=False, random_state=0, verbosity=2):
         self.path = path
+        self._og_os_path_sep = os.path.sep  # Keep track of the original os.path.sep value in case we need to load from a different OS
         self.problem_type = problem_type
         self.feature_metadata = feature_metadata
         self.save_data = save_data
@@ -231,13 +232,20 @@ class AbstractTrainer:
         self.path, model_paths = self.create_contexts(path_context)
         for model, path in model_paths.items():
             self.set_model_attribute(model=model, attribute='path', val=path)
+        self._og_os_path_sep = os.path.sep  # Update os.path.sep as now self.path is based on the current os.path.sep
 
     def create_contexts(self, path_context: str) -> (str, dict):
         path = path_context
         model_paths = self.get_models_attribute_dict(attribute='path')
-        for model, prev_path in model_paths.items():
-            prev_path = os.path.abspath(prev_path) + os.path.sep
-            abs_path = os.path.abspath(self.path) + os.path.sep
+        og_path = self.path
+        if os.path.sep != self._og_os_path_sep:
+            # Update the original path to use the current OS os.path.sep value
+            og_path = og_path.replace(self._og_os_path_sep, os.path.sep)
+        for model, og_path_model in model_paths.items():
+            if os.path.sep != self._og_os_path_sep:
+                og_path_model = og_path_model.replace(self._og_os_path_sep, os.path.sep)
+            prev_path = os.path.abspath(og_path_model) + os.path.sep
+            abs_path = os.path.abspath(og_path) + os.path.sep
             model_local_path = prev_path.split(abs_path, 1)[1]
             new_path = path + model_local_path
             model_paths[model] = new_path
