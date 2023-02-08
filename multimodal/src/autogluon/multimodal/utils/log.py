@@ -148,10 +148,12 @@ AutoMM starts to create the model. ✨
 
 - To track the learning progress, you can open a terminal and launch Tensorboard:
 
-```shell
-# Assume you have installed tensorboard
-tensorboard --logdir {save_path}
-```
+    ```shell
+
+    # Assume you have installed tensorboard
+    tensorboard --logdir {save_path}
+
+    ```
 
 Enjoy your coffee, and let AutoMM do the job ☕☕☕ Learn more at https://auto.gluon.ai
 """
@@ -163,18 +165,21 @@ AutoMM has created your model 🎉🎉🎉
 
 - To load the model, use the code below:
 
-```python
-from autogluon.multimodal import MultiModalPredictor
+    ```python
 
-predictor = MultiModalPredictor.load("{save_path}")
-```
+    from autogluon.multimodal import MultiModalPredictor
+    predictor = MultiModalPredictor.load("{save_path}")
+    
+    ```
 
 - You can open a terminal and launch Tensorboard to visualize the training log:
 
-```shell
-# Assume you have installed tensorboard
-tensorboard --logdir {save_path}
-```
+    ```shell
+    
+    # Assume you have installed tensorboard
+    tensorboard --logdir {save_path}
+
+    ```
 
 - If you are not satisfied with the model, try to increase the training time, 
 adjust the [hyperparameters](https://auto.gluon.ai/stable/tutorials/multimodal/advanced_topics/customization.html),
