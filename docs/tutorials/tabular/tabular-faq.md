@@ -136,7 +136,7 @@ task.fit(..., excluded_model_types=['KNN','RF','XT'])
 
 ## How can I add my own custom model to the set of models that AutoGluon trains, tunes, and ensembles?
 
-To learn how to add your own custom models to the set that AutoGluon trains, tunes, and ensembles, review :ref:`sec_tabularcustommodel`.
+To learn how to add your own custom models to the set that AutoGluon trains, tunes, and ensembles, review [Tabular Custom Model](advanced/tabular-custom-model).
 
 ## How can I reproduce the results of model XYZ without using AutoGluon?
 
