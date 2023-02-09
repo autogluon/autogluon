@@ -134,6 +134,12 @@ path_clone_opt = predictor.clone_for_deployment(path=save_path_clone_opt)
 predictor_clone_opt = TabularPredictor.load(path=path_clone_opt)
 ```
 
+To avoid loading the model in every prediction call, we can persist the model in memory by:
+
+```{.python .input}
+predictor_clone_opt.persist_models()
+```
+
 We can see that the optimized clone still makes the same predictions:
 
 ```{.python .input}
@@ -171,6 +177,28 @@ Optimized:
 
 ```{.python .input}
 predictor_clone_opt.get_size_disk_per_file()
+```
+
+## Compile models for maximized inference speed
+
+In order to further improve inference efficiency, we can call `.compile_models()` to automatically
+convert sklearn function calls into their ONNX equivalents.
+Note that this is currently an experimental feature, which only improves RandomForest and TabularNeuralNetwork models.
+The compilation and inference speed acceleration require installation of `skl2onnx` and `onnxruntime` packages.
+To install supported verisons of these packages automatically, we can call `pip install autogluon.tabular[skl2onnx]`
+on top of an existing AutoGluon installation, or `pip install autogluon.tabular[all,skl2onnx]` on a new AutoGluon installation.
+
+It is important to make sure the predictor is cloned, because once the models are compiled, it won't support fitting.
+
+```{.python .input}
+predictor_clone_opt.compile_models()
+```
+
+With the compiled predictor, the prediction results might not be exactly the same, but should be very close.
+
+```{.python .input}
+y_pred_compile_opt = predictor_clone_opt.predict(test_data)
+y_pred_compile_opt
 ```
 
 Now all that is left is to upload the optimized predictor to a centralized storage location such as S3.

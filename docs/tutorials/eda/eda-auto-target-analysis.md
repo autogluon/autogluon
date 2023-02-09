@@ -1,4 +1,4 @@
-# EDA: Automated Target Variable Analysis
+# Automated Target Variable Analysis
 
 In this section we explore automated dataset overview functionality.
 

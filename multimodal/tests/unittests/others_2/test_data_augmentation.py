@@ -148,7 +148,7 @@ def test_trivialaugment():
             shutil.rmtree(save_path)
         predictor.fit(
             train_data=dataset.train_df,
-            time_limit=10,
+            time_limit=30,
             save_path=save_path,
             hyperparameters=hyperparameters,
         )

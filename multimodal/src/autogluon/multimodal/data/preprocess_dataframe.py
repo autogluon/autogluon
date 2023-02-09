@@ -198,13 +198,14 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         image_feature_names = (
             self._image_path_names if hasattr(self, "_image_path_names") else self._image_feature_names
         )
+        rois_feature_names = self._rois_feature_names if hasattr(self, "_rois_feature_names") else []
 
         return (
             image_feature_names
             + self._text_feature_names
             + self._numerical_feature_names
             + self._categorical_feature_names
-            + self._rois_feature_names
+            + rois_feature_names
         )
 
     @property
@@ -661,7 +662,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         ), "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_label."
         y_df = df[self._label_column]
         if self.label_type == CATEGORICAL:
-            y = self._label_generator.transform(y_df)
+            y = self._label_generator.transform(y_df).astype(np.int64)
         elif self.label_type == NUMERICAL:
             y = pd.to_numeric(y_df).to_numpy()
             y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
