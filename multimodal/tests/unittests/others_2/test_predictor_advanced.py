@@ -9,7 +9,7 @@ from torch import Tensor
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import BIT_FIT, IA3, IA3_BIAS, IA3_LORA, LORA_BIAS, LORA_NORM, NORM_FIT
 
-from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset
+from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset, PetFinderDataset
 
 
 def _is_lazy_weight_tensor(p: Tensor) -> bool:
@@ -81,3 +81,26 @@ def test_predictor_gradient_checkpointing(
     new_predictor = MultiModalPredictor.load(save_path)
     new_predictions = new_predictor.predict(test_data, as_pandas=False)
     npt.assert_allclose(new_predictions, predictions)
+
+
+def test_predictor_skip_final_val():
+    dataset = PetFinderDataset()
+    save_path = "petfinder_checkpoint"
+
+    predictor = MultiModalPredictor(
+        label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric, path=save_path
+    )
+    hyperparameters = {
+        "model.names": ["timm_image", "hf_text", "fusion_mlp"],
+        "model.timm_image.checkpoint_name": "ghostnet_100",
+        "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+        "optimization.skip_final_val": True,
+    }
+    predictor.fit(
+        train_data=dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=2,
+        seed=42,
+    )
+    model_file = f"{save_path}/model.ckpt"
+    assert os.path.isfile(model_file)
