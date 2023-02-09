@@ -24,6 +24,8 @@ others:
 - sentence-transformers/all-mpnet-base-v2
 - sentence-transformers/msmarco-MiniLM-L-12-v3
 - xlm-roberta-base
+- yolov3_mobilenetv2_320_300e_coco
+- yolox_s_8x8_300e_coco
 others_2:
 - google/electra-small-discriminator
 - google/flan-t5-small
