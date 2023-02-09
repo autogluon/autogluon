@@ -111,9 +111,9 @@ def infer_metrics(
         else:
             eval_metric_name = RMSE
     elif problem_type == OBJECT_DETECTION:
-        if (not validation_metric_name) or validation_metric_name.lower() == DIRECT_LOSS:
+        if validation_metric_name.lower() == DIRECT_LOSS:
             return DIRECT_LOSS, MAP
-        elif validation_metric_name == MAP:
+        elif (not validation_metric_name) or validation_metric_name.lower() == MAP:
             return MAP, MAP
         else:
             raise ValueError(
