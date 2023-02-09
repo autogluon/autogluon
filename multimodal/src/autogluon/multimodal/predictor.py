@@ -184,7 +184,7 @@ class MultiModalPredictor(ExportMixin):
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
-        verbosity: Optional[int] = 3,
+        verbosity: Optional[int] = 2,
         num_classes: Optional[int] = None,  # TODO: can we infer this from data?
         classes: Optional[list] = None,
         warn_if_exist: Optional[bool] = True,
@@ -369,10 +369,6 @@ class MultiModalPredictor(ExportMixin):
 
         if verbosity is not None:
             set_logger_verbosity(verbosity, logger=logger)
-
-        # Add handler to logger
-        if not len(logger.handlers):
-            logger.addHandler(logging.StreamHandler(sys.stdout))
 
         self._label_column = label
         self._problem_type = problem_type
