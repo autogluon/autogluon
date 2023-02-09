@@ -264,7 +264,7 @@ Whether to skip the final validation after training is signaled to stop.
 # default used by AutoMM
 predictor.fit(hyperparameters={"optimization.skip_final_val": False})
 # skip the final validation
-predictor.fit(hyperparameters={"optimization.top_k_average_method": True})
+predictor.fit(hyperparameters={"optimization.skip_final_val": True})
 ```
 
 ## Environment

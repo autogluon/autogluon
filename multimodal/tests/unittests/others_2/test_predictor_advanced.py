@@ -95,6 +95,8 @@ def test_predictor_skip_final_val():
         "model.timm_image.checkpoint_name": "ghostnet_100",
         "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
         "optimization.skip_final_val": True,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
     }
     predictor.fit(
         train_data=dataset.train_df,

@@ -1632,7 +1632,6 @@ class MultiModalPredictor(ExportMixin):
                 model_postprocess_fn=self._model_postprocess_fn,
                 efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
                 trainable_param_names=trainable_param_names,
-                skip_final_val=self._config.optimization.skip_final_val,
                 **optimization_kwargs,
             )
 
