@@ -42,7 +42,7 @@ def get_args():
     parser.add_argument("--search_step", type=int, nargs="+", default=[200, 20], help="The steps of searching hyper-parameters alpha and beta.")
     args = parser.parse_args()
 
-    args.bank_dir = os.path.join('./banks', args.dataset)
+    args.bank_dir = os.path.join('./memory_bank_models', args.dataset)
     os.makedirs(args.bank_dir, exist_ok=True)
 
     if args.column_names is None:
