@@ -83,7 +83,7 @@ def generate_clip_weights(args, classnames, template, predictor):
 
 def generate_bank_model(args, train_df, predictor):
     bank_keys = []
-    bank_values = []
+    bank_labels = []
     with torch.no_grad():
         for augment_idx in range(args.aug_epochs):
             print('Augment Epoch: {:} / {:}'.format(augment_idx, args.aug_epochs))
@@ -91,18 +91,17 @@ def generate_bank_model(args, train_df, predictor):
             bank_keys.append(train_features.unsqueeze(0))
         
         for index, per_data in train_df.iterrows():
-            bank_values.append(per_data[args.label_column])
+            bank_labels.append(per_data[args.label_column])
             
         bank_keys = torch.cat(bank_keys, dim=0).mean(dim=0)
         bank_keys /= bank_keys.norm(dim=-1, keepdim=True)
         bank_keys = bank_keys.permute(1, 0)
-        bank_values = F.one_hot(torch.tensor(bank_values).cuda()).float()
+        bank_labels = torch.tensor(bank_labels).cuda()
     
-    return bank_keys, bank_values
+    return bank_keys, bank_labels
 
 
 def extract_val_test(args, predictor, val_df, test_df):
-    
     val_features = extract_embedding(args, val_df, predictor, args.column_names)
     test_features = extract_embedding(args, test_df, predictor, args.column_names)
     val_labels = torch.tensor(val_df[args.label_column]).cuda()
@@ -129,7 +128,7 @@ def search_hp(
     memory_bank_model
         The AutoMMMemoryBank to generate logits and logits with memory bank.
     logits_type
-        The target logits of searching corresponding to "pure_logits", "logits_with_adapter", "logits_with_finetuned_adapter".
+        The target logits of searching corresponding to "logits_with_adapter" and "logits_with_finetuned_adapter".
     
     Return
     ------
@@ -141,10 +140,13 @@ def search_hp(
     best_acc = 0
     best_beta, best_alpha = 0, 0
 
+    pure_logits = None
     for beta in beta_list:
         for alpha in alpha_list:
             with torch.no_grad():
-                logits = memory_bank_model(features, alpha, beta)
+                logits = memory_bank_model(features, alpha, beta, pure_logits)
+            if pure_logits is None:
+                pure_logits = logits["pure_logits"]
             acc = cls_acc(logits[logits_type], labels)
             
             if acc > best_acc:

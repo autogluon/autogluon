@@ -12,7 +12,7 @@ After preparing the datasets, run the example:
 
     python memory_bank.py --type clip --dataset food101 --shots 16
 
-- `type` is the type of few-shot learning. You choose from `clip`, `text`, `image` for different backbone methods.
+- `type` is the type of few-shot learning. You can choose from `clip`, `text`, `image` for different backbone methods.
 - `backbone` is the backbone model of MultiModal Predictor.
 - `data_path` is the path for image dataset.
 - `dataset` is the name of dataset. Support image datasets in COOP and text datasets in Hugging Face.
@@ -20,6 +20,7 @@ After preparing the datasets, run the example:
 - `label_column` is the name of the label column.
 - `shots` is the shots for each class in training set.
 - `aug_epochs` is the epochs to create the bank.
+- `model_head_type` is the model head for few-shot classification. You can choose from 'linear' and 'SVM' for different classification heads.
 - `lr` is the learning rate for training the model head.
 - `lr_F` is the learning rate for finetuing the memory bank.
 - `train_epoch` is the training epochs for training the model head.
@@ -41,30 +42,36 @@ Hyper-parameters `alpha` and `beta` which adjust the memory bank are modified th
 
 The training results of memory bank can be seen in the followed table. `Acc w/o memory bank` is the few-shot classification accuracy of method. `ACC w. memory bank` and `ACC w. memory bank (+finetune)` show the classification results after introducing and fine-tuning the memory bank, respectively.
 
-| Datasets | Method | BackBone | Shots | lr | lr_F | Acc w/o memory bank| Acc w. memory bank | Acc w. memory bank (+finetune) | 
-|----------|--------|----------|-------|----|------|--------------------|--------------------|--------------------------------| 
-| Food-101 | CLIP | openai/clip-vit-large-patch14-336 | 16 | NaN | 1e-3 | 91.90 | 92.42 | 92.80 | 
-| Food-101 | CLIP | openai/clip-vit-large-patch14-336 | 1 | NaN | 1e-3 | 91.90 | 91.99 | 91.97 | 
-| Food-101 | CLIP | openai/clip-vit-large-patch14-336 | 64 | NaN | 1e-3 | 91.90 | 92.43 | 93.10 | 
-| Food-101 | CLIP | openai/clip-vit-base-patch32 | 16 | NaN | 1e-3 | 80.42 | 80.88 | 82.01 | 
-| Caltech101 | CLIP | openai/clip-vit-large-patch14-336 | 16 | NaN | 1e-3 | 94.48 | 97.32 | 98.80 | 
-| DTD | CLIP | openai/clip-vit-large-patch14-336 | 16 | NaN | 1e-3 | 54.2 | 69.86 | 72.10 | 
-| EuraSAT | CLIP | openai/clip-vit-large-patch14-336 | 16 | NaN | 1e-3 | 61.48 | 79.01 | 83.65 | 
-| Flower-102 | CLIP | openai/clip-vit-large-patch14-336 | 16 | NaN | 1e-3 | 79.13 | 96.95 | 96.51 | 
-| Oxford Pets | CLIP | openai/clip-vit-large-patch14-336 | 16 | NaN | 1e-3 | 93.79 | 94.22 | 95.52 | 
-| Stanford Cars | CLIP | openai/clip-vit-large-patch14-336 | 16 | NaN | 1e-3 | 78.20 | 84.09 | 87.95 | 
-| Food-101 | Image | swin_base_patch4_window7_224 | 16 | 1e-2 | 1e-3 | 73.66 | 73.64 | 76.18 | 
-| Caltech101 | Image | swin_base_patch4_window7_224 | 16 | 1e-2 | 1e-3 | 96.75 | 96.75 | 97.16 | 
-| DTD | Image | swin_base_patch4_window7_224 | 16 | 1e-2 | 1e-3 | 67.55 | 68.26 | 70.45 | 
-| SetFit/sst5 | Text | sentence-transformers/paraphrase-mpnet-base-v2 | 16 | 1e-2 | 1e-3 | 38.42 | 38.42 | 39.23 | 
-| SetFit/sst5 | Text | sentence-transformers/paraphrase-mpnet-base-v2 | 1 | 1e-2 | 1e-3 | 33.08 | 33.08 | 33.08 | 
-| SetFit/sst5 | Text | sentence-transformers/paraphrase-mpnet-base-v2 | 64 | 1e-2 | 1e-3 | 45.61 | 46.02 | 48.19 | 
-| SetFit/sst5 | Text | sentence-transformers/msmarco-MiniLM-L-12-v3 | 16 | 1e-2 | 1e-3 | 30.18 | 30.86 | 30.59 |
-| SetFit/Emotion | Text | sentence-transformers/paraphrase-mpnet-base-v2 | 16 | 1e-2 | 1e-3 | 43.10 | 43.65 | 43.90 | 
-| SetFit/subj | Text | sentence-transformers/paraphrase-mpnet-base-v2 | 16 | 1e-2 | 1e-3 | 90.50 | 90.55 | 90.75 | 
-| SetFit/20_newsgroups | Text | sentence-transformers/paraphrase-mpnet-base-v2 | 16 | 1e-2 | 1e-3 | 54.14 | 57.36 | 58.90 | 
-| SetFit/enron_spam | Text | sentence-transformers/paraphrase-mpnet-base-v2 | 16 | 1e-2 | 1e-3 | 91.35 | 91.70 | 92.85 | 
-| SetFit/SentEval-CR | Text | sentence-transformers/paraphrase-mpnet-base-v2 | 16 | 1e-2 | 1e-3 | 88.31 | 88.58 | 89.24 | 
+| Datasets | Method | BackBone | Head | Shots | lr | lr_F | Acc w/o memory bank| Acc w. memory bank | Acc w. memory bank (+finetune) | 
+|----------|--------|----------|------|-------|----|------|--------------------|--------------------|--------------------------------| 
+| Food-101 | CLIP | openai/clip-vit-large-patch14-336 | NaN | 16 | NaN | 1e-3 | 91.90 | 92.42 | 92.80 | 
+| Food-101 | CLIP | openai/clip-vit-large-patch14-336 | NaN | 1 | NaN | 1e-3 | 91.90 | 91.99 | 91.97 | 
+| Food-101 | CLIP | openai/clip-vit-large-patch14-336 | NaN | 64 | NaN | 1e-3 | 91.90 | 92.43 | 93.10 | 
+| Food-101 | CLIP | openai/clip-vit-base-patch32 | NaN | 16 | NaN | 1e-3 | 80.42 | 80.88 | 82.01 | 
+| Caltech101 | CLIP | openai/clip-vit-large-patch14-336 | NaN | 16 | NaN | 1e-3 | 94.48 | 97.32 | 98.80 | 
+| DTD | CLIP | openai/clip-vit-large-patch14-336 | NaN | 16 | NaN | 1e-3 | 54.2 | 69.86 | 72.10 | 
+| EuraSAT | CLIP | openai/clip-vit-large-patch14-336 | NaN | 16 | NaN | 1e-3 | 61.48 | 79.01 | 83.65 | 
+| Flower-102 | CLIP | openai/clip-vit-large-patch14-336 | NaN | 16 | NaN | 1e-3 | 79.13 | 96.95 | 96.51 | 
+| Oxford Pets | CLIP | openai/clip-vit-large-patch14-336 | NaN | 16 | NaN | 1e-3 | 93.79 | 94.22 | 95.52 | 
+| Stanford Cars | CLIP | openai/clip-vit-large-patch14-336 | NaN | 16 | NaN | 1e-3 | 78.20 | 84.09 | 87.95 | 
+| Food-101 | Image | swin_base_patch4_window7_224 | Linear | 16 | 1e-2 | 1e-3 | 73.66 | 73.64 | 76.18 | 
+| Caltech101 | Image | swin_base_patch4_window7_224 | Linear | 16 | 1e-2 | 1e-3 | 96.75 | 96.75 | 97.16 | 
+| DTD | Image | swin_base_patch4_window7_224 | Linear | 16 | 1e-2 | 1e-3 | 67.55 | 68.26 | 70.45 | 
+| SetFit/sst5 | Text | sentence-transformers/paraphrase-mpnet-base-v2 | Linear | 16 | 1e-2 | 1e-3 | 38.42 | 38.42 | 39.23 | 
+| SetFit/sst5 | Text | sentence-transformers/paraphrase-mpnet-base-v2 | Linear | 1 | 1e-2 | 1e-3 | 33.08 | 33.08 | 33.08 | 
+| SetFit/sst5 | Text | sentence-transformers/paraphrase-mpnet-base-v2 | Linear | 64 | 1e-2 | 1e-3 | 45.61 | 46.02 | 48.19 | 
+| SetFit/sst5 | Text | sentence-transformers/msmarco-MiniLM-L-12-v3 | Linear | 16 | 1e-2 | 1e-3 | 30.18 | 30.86 | 30.59 | 
+| SetFit/Emotion | Text | sentence-transformers/paraphrase-mpnet-base-v2 | Linear | 16 | 1e-2 | 1e-3 | 43.10 | 43.65 | 43.90 | 
+| SetFit/subj | Text | sentence-transformers/paraphrase-mpnet-base-v2 | Linear | 16 | 1e-2 | 1e-3 | 90.50 | 90.55 | 90.75 | 
+| SetFit/20_newsgroups | Text | sentence-transformers/paraphrase-mpnet-base-v2 | Linear | 16 | 1e-2 | 1e-3 | 54.14 | 57.36 | 58.90 | 
+| SetFit/enron_spam | Text | sentence-transformers/paraphrase-mpnet-base-v2 | Linear | 16 | 1e-2 | 1e-3 | 91.35 | 91.70 | 92.85 | 
+| SetFit/SentEval-CR | Text | sentence-transformers/paraphrase-mpnet-base-v2 | Linear | 16 | 1e-2 | 1e-3 | 88.31 | 88.58 | 89.24 | 
+| Food-101 | Image | swin_base_patch4_window7_224 | SVM | 16 | NaN | 1e-3 | 73.06 | 74.42 | 75.72 | 
+| Caltech101 | Image | swin_base_patch4_window7_224 | SVM | 16 | NaN | 1e-3 | 93.10 | 97.16 | 97.44 | 
+| DTD | Image | swin_base_patch4_window7_224 | SVM | 16 | NaN | 1e-3 | 69.39 | 70.45 | 70.39 | 
+| SetFit/sst5 | Text | sentence-transformers/paraphrase-mpnet-base-v2 | SVM | 16 | NaN | 1e-3 | 30.90 | 39.28 | 39.95 | 
+| SetFit/Emotion | Text | sentence-transformers/paraphrase-mpnet-base-v2 | SVM | 16 | NaN | 1e-3 | 26.55 | 43.15 | 44.20 | 
+| SetFit/20_newsgroups | Text | sentence-transformers/paraphrase-mpnet-base-v2 | SVM | 16 | NaN | 1e-3 | 48.43 | 57.90 | 58.72 | 
 
 
 ---

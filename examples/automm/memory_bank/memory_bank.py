@@ -10,6 +10,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import argparse
 from tqdm import tqdm
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 from utils import *
 
 
@@ -28,14 +31,15 @@ def get_args():
     parser.add_argument("--label_column", type=str, default="label", help="The name of the label column.")
     parser.add_argument("--shots", type=int, default=16, help="The shots for each class in training set.")
     parser.add_argument("--aug_epochs", type=int, default=1, help="The epochs to create the bank.")
+    parser.add_argument("--model_head_type", type=str, default="linear", help="The model head for few-shot classification. Choose from 'linear' and 'SVM'.")
     parser.add_argument("--lr", type=float, default=1e-2, help="The learning rate for training the model head.")
     parser.add_argument("--lr_F", type=float, default=1e-3, help="The learning rate for finetuing the memory bank.")
     parser.add_argument("--train_epoch", type=int, default=20, help="The training epochs for training the model head.")
     parser.add_argument("--train_epoch_F", type=int, default=20, help="The training epochs for finetuning the memory bank.")
     parser.add_argument("--init_alpha", type=float, default=1.17, help="The initial value of hyper-parameter alpha in memory bank. Alpha adjusts the weight of probability between the classifier and memory bank.")
     parser.add_argument("--init_beta", type=float, default=1., help="The initial values of hyper-parameter beta in memory bank. Beta modulates the sharpness when converting the similarities into non-negative values.")
-    parser.add_argument("--search_scale", type=list, default=[10, 10], help="The search scale of alpha and beta.")
-    parser.add_argument("--search_step", type=list, default=[200, 20], help="The steps of searching hyper-parameters alpha and beta.")
+    parser.add_argument("--search_scale", type=int, nargs="+", default=[10, 10], help="The search scale of alpha and beta.")
+    parser.add_argument("--search_step", type=int, nargs="+", default=[200, 20], help="The steps of searching hyper-parameters alpha and beta.")
     args = parser.parse_args()
 
     args.bank_dir = os.path.join('./banks', args.dataset)
@@ -64,10 +68,11 @@ class AutoMMMemoryBank(nn.Module):
     def __init__(
         self, 
         bank_keys, 
-        bank_values,
+        bank_labels,
         hidden_size, 
         num_classes,
         clip_weights=None, 
+        model_head_type="linear",
     ):
         """
         Create the model head and the memory bank.
@@ -76,24 +81,34 @@ class AutoMMMemoryBank(nn.Module):
         ----------
         bank_keys
             The content of bank composed of features in the training set.
-        bank_values 
-            The one-hot encoded label of corresponding bank_keys.
+        bank_labels 
+            The labels of corresponding bank_keys.
         hidden_size
             The size of features.
         num_classes
             The classes of the dataset.
         clip_weights
             The encoded label-text prompts which is only used in type "clip".
+        model_head_type 
+            The type of the few-shot classification head.
         """
         super(AutoMMMemoryBank, self).__init__()
         self.bank_keys = bank_keys
-        self.bank_values = bank_values
+        self.bank_values = F.one_hot(bank_labels).float()
         self.adapter = nn.Linear(bank_keys.shape[0], bank_keys.shape[1], bias=False)
         self.adapter.weight = nn.Parameter(bank_keys.t())
 
         self.clip_weights = clip_weights
-
-        self.model_head = nn.Linear(hidden_size, num_classes, bias=True) if clip_weights is None else None
+        
+        self.model_head_type = model_head_type
+        if clip_weights is None:
+            if model_head_type == "SVM":
+                self.model_head = make_pipeline(StandardScaler(), SVC(gamma="auto", probability=True))
+                self.model_head.fit(bank_keys.t().cpu(), bank_labels.cpu())
+            else:
+               self.model_head = nn.Linear(hidden_size, num_classes, bias=True) if clip_weights is None else None
+        else:
+            self.model_head = None
 
     def get_adapter_logits(self, affinity, pure_logits, alpha, beta):
         """
@@ -127,7 +142,7 @@ class AutoMMMemoryBank(nn.Module):
         grad_state
             The needed training state of the model head.
         """
-        if self.model_head is not None:
+        if self.model_head is not None and self.model_head_type == "linear":
             for param in self.model_head.parameters():
                 param.requires_grad = grad_state
     
@@ -143,7 +158,7 @@ class AutoMMMemoryBank(nn.Module):
         for param in self.adapter.parameters():
             param.requires_grad = grad_state
 
-    def forward(self, x, alpha = 1, beta = 1):
+    def forward(self, x, alpha=1, beta=1, pure_logits=None):
         """
         Generate three types of logits with features.
 
@@ -166,10 +181,13 @@ class AutoMMMemoryBank(nn.Module):
             - "logits_with_finetuned_adapter"
                 The predict probability composed of classifier and fine-tuned memory bank result.
         """
-        if self.clip_weights is not None:
-            pure_logits = 100. * x @ self.clip_weights
-        else:
-            pure_logits = self.model_head(x)
+        if pure_logits is None:
+            if self.clip_weights is not None:
+                pure_logits = 100. * x @ self.clip_weights
+            elif self.model_head_type == "SVM":
+                pure_logits = torch.tensor(self.model_head.predict_proba(x.cpu())).cuda()
+            else:
+                pure_logits = self.model_head(x)
         
         affinity = x @ self.bank_keys
         logits_with_adapter = self.get_adapter_logits(affinity, pure_logits, alpha, beta)
@@ -275,7 +293,7 @@ def train_logits(
             torch.save(memory_bank_model.state_dict(), args.bank_dir + "/best_F_" + str(args.shots) + "shots.pt")
     
     memory_bank_model.load_state_dict(torch.load(args.bank_dir + "/best_F_" + str(args.shots) + "shots.pt"))
-    print(f"**** After fine-tuning {logits_type}, best test accuracy: {best_acc:.2f}, at epoch: {best_epoch}. ****\n")
+    print(f"**** After fine-tuning {logits_type}, best val accuracy: {best_acc:.2f}, at epoch: {best_epoch}. ****\n")
     
     return memory_bank_model
 
@@ -311,7 +329,7 @@ def run_memory_bank(
     """
     beta, alpha = args.init_beta, args.init_alpha
 
-    if args.type != "clip":
+    if args.type != "clip" and args.model_head_type =="linear":
         memory_bank_model = train_logits(
             args=args,
             val_features=val_features,
@@ -417,7 +435,7 @@ def main():
             predictor=predictor,
         )
 
-    bank_keys, bank_values = generate_bank_model(
+    bank_keys, bank_labels = generate_bank_model(
         args=args, 
         train_df=train_df, 
         predictor=predictor,
@@ -440,10 +458,11 @@ def main():
     
     memory_bank_model = AutoMMMemoryBank(
         bank_keys=bank_keys, 
-        bank_values=bank_values, 
+        bank_labels=bank_labels, 
         hidden_size=test_features.shape[1], 
         num_classes=num_classes, 
         clip_weights=clip_weights if args.type == "clip" else None, 
+        model_head_type=args.model_head_type,
     ).cuda()
 
     run_memory_bank(
