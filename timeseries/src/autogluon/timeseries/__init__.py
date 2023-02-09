@@ -30,7 +30,7 @@ try:
     import sktime
     import tbats
 
-    if parse("0.14") > parse(sktime.__version__) >= parse("0.13.1"):
+    if parse("0.16") > parse(sktime.__version__) >= parse("0.14"):
         SKTIME_INSTALLED = True
     else:
         warnings.warn(

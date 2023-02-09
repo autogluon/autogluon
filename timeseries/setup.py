@@ -49,7 +49,7 @@ extras_require = {
         "isort>=5.10",
         "black>=22.3,<23.0",
     ],
-    "sktime": ["sktime>=0.13.1,<0.14", "pmdarima>=1.8.2,<1.9", "tbats>=1.1,<2"],
+    "sktime": ["sktime>=0.14,<0.16", "pmdarima>=1.8.2,<1.9", "tbats>=1.1,<2"],
 }
 
 all_requires = []
