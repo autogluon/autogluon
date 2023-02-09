@@ -34,7 +34,8 @@ def test_invalid_images(invalid_value):
         ],
         "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
         "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
-        "env.num_workers": 2,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
     }
 
     with tempfile.TemporaryDirectory() as save_path:

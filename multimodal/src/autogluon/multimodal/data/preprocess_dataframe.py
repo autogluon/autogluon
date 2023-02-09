@@ -198,13 +198,14 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         image_feature_names = (
             self._image_path_names if hasattr(self, "_image_path_names") else self._image_feature_names
         )
+        rois_feature_names = self._rois_feature_names if hasattr(self, "_rois_feature_names") else []
 
         return (
             image_feature_names
             + self._text_feature_names
             + self._numerical_feature_names
             + self._categorical_feature_names
-            + self._rois_feature_names
+            + rois_feature_names
         )
 
     @property
