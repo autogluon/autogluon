@@ -60,7 +60,7 @@ jobs:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
-          python-version: 3.9
+          python-version: ["3.8", "3.9", "3.10"]
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -91,7 +91,7 @@ jobs:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
-          python-version: 3.9
+          python-version: ["3.8", "3.9", "3.10"]
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -122,7 +122,7 @@ jobs:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
-          python-version: 3.9
+          python-version: ["3.8", "3.9", "3.10"]
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -153,7 +153,7 @@ jobs:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
-          python-version: 3.9
+          python-version: ["3.8", "3.9", "3.10"]
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -185,7 +185,7 @@ jobs:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
-          python-version: 3.9
+          python-version: ["3.8", "3.9", "3.10"]
       - name: Setup OMP
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
@@ -224,7 +224,7 @@ jobs:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
-          python-version: 3.9
+          python-version: ["3.8", "3.9", "3.10"]
       - name: unit-test
         shell: bash -l {0}
         run: |
