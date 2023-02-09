@@ -146,6 +146,46 @@ class BaseAnalysis(AbstractAnalysis):
 
 
 class Namespace(AbstractAnalysis):
+    """
+    Creates a nested namespace in state. All the components within `children` will have relative root of the state moved into this subspace.
+    To instruct visualization facets to use a specific subspace, please use `namespace` argument (see the example).
+
+    Parameters
+    ----------
+    namespace: Optional[str], default = None
+        namespace to use; use root if not specified
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: Optional[List[AbstractAnalysis]], default None
+        wrapped analyses; these will receive sampled `args` during `fit` call
+    kwargs
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.visualization as viz
+    >>> import autogluon.eda.auto as auto
+    >>>
+    >>> auto.analyze(
+    >>>     train_data=..., label=...,
+    >>>     anlz_facets=[
+    >>>         # Puts output into the root namespace
+    >>>         eda.interaction.Correlation(),
+    >>>         # Puts output into the focus namespace
+    >>>         eda.Namespace(namespace='focus', children=[
+    >>>             eda.interaction.Correlation(focus_field='Fare', focus_field_threshold=0.3),
+    >>>         ])
+    >>>     ],
+    >>>     viz_facets=[
+    >>>         # Renders correlations from the root namespace
+    >>>         viz.interaction.CorrelationVisualization(),
+    >>>         # Renders correlations from the focus namespace
+    >>>         viz.interaction.CorrelationVisualization(namespace='focus'),
+    >>>     ]
+    >>> )
+
+    """
+
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return True
 

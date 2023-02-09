@@ -38,3 +38,7 @@ optimization:
     "auto" # The replaced loss for regression. Can only support loss function in torch.nn.
     # example
     # "BCEWithLogitsLoss" or "nn.BCEWithLogitsloss"
+  focal_loss:
+    alpha: null
+    gamma: 2.0
+    reduction: "mean"

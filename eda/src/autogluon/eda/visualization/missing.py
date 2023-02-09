@@ -18,6 +18,8 @@ class MissingValues(AbstractVisualization, JupyterMixin):
 
     This visualization depends on :py:class:`~autogluon.eda.analysis.missing.MissingValuesAnalysis` analysis.
 
+    See also `missingno <https://github.com/ResidentMario/missingno>`_ documentation
+
     Parameters
     ----------
     graph_type: str, default = 'matrix'
@@ -43,7 +45,6 @@ class MissingValues(AbstractVisualization, JupyterMixin):
 
     See Also
     --------
-    `missingno <https://github.com/ResidentMario/missingno>`_ documentation
     :py:class:`~autogluon.eda.analysis.missing.MissingValuesAnalysis`
     """
 

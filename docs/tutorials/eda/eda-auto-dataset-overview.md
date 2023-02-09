@@ -1,4 +1,4 @@
-# EDA: Automated Dataset Overview
+# Automated Dataset Overview
 
 In this section we explore automated dataset overview functionality. This feature allows you to easily get
 a high-level understanding of datasets, including information about the number of rows and columns, the data types
