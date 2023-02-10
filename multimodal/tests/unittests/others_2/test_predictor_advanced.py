@@ -4,10 +4,13 @@ import warnings
 
 import numpy.testing as npt
 import pytest
+from sklearn.model_selection import train_test_split
 from torch import Tensor
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import BIT_FIT, IA3, IA3_BIAS, IA3_LORA, LORA_BIAS, LORA_NORM, NORM_FIT
+from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePrediction
+from autogluon.multimodal.utils.misc import shopee_dataset
 
 from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset, PetFinderDataset
 
@@ -84,25 +87,25 @@ def test_predictor_gradient_checkpointing(
 
 
 def test_predictor_skip_final_val():
-    dataset = PetFinderDataset()
+    download_dir = "./"
     save_path = "petfinder_checkpoint"
+    train_df, tune_df = shopee_dataset(download_dir=download_dir)
 
-    predictor = MultiModalPredictor(
-        label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric, path=save_path
-    )
+    predictor = MultiModalPredictor(label="label", path=save_path)
     hyperparameters = {
-        "model.names": ["timm_image", "hf_text", "fusion_mlp"],
+        "model.names": ["timm_image"],
         "model.timm_image.checkpoint_name": "ghostnet_100",
-        "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
-        "optimization.skip_final_val": True,
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
+        "optimization.top_k_average_method": "best",
+        "optimization.val_check_interval": 1.0,
+        "optimization.skip_final_val": True,
     }
     predictor.fit(
-        train_data=dataset.train_df,
+        train_data=train_df,
+        tuning_data=tune_df,
         hyperparameters=hyperparameters,
         time_limit=2,
-        seed=42,
     )
-    model_file = f"{save_path}/model.ckpt"
-    assert os.path.isfile(model_file)
+    predictor_new = MultiModalPredictor.load(path=save_path)
+    assert isinstance(predictor_new._model, TimmAutoModelForImagePrediction)
