@@ -1,4 +1,4 @@
-# EDA: Automated Quick Model Fit
+# Automated Quick Model Fit
 
 The purpose of this feature is to provide a quick and easy way to obtain a preliminary understanding of the
 relationships between the target variable and the independent variables in a dataset.

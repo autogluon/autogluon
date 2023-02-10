@@ -10,7 +10,7 @@ from scipy.special import softmax
 
 from ..constants import AUTOMM
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def logits_to_prob(logits: np.ndarray):

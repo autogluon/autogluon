@@ -20,7 +20,7 @@ from ..constants import (
 )
 from .utils import assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class CLIPForImageText(nn.Module):

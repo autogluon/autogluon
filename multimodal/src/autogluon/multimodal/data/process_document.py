@@ -19,7 +19,7 @@ from ..constants import AUTOMM, BBOX, DOCUMENT_PDF
 from .collator import PadCollator, StackCollator
 from .utils import construct_image_processor, image_mean_std
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 # Disable tokenizer parallelism
 os.environ["TOKENIZERS_PARALLELISM"] = "false"

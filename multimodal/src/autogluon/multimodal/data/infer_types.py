@@ -35,7 +35,7 @@ from ..constants import (
 )
 from .utils import is_rois_input
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def is_categorical_column(

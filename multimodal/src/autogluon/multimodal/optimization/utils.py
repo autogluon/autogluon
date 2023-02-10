@@ -4,7 +4,6 @@ import re
 import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import numpy as np
 import torch
 import torchmetrics
 from omegaconf import DictConfig, OmegaConf
@@ -50,7 +49,6 @@ from ..constants import (
     NORM_FIT,
     OBJECT_DETECTION,
     OVERALL_ACCURACY,
-    OVERALL_F1,
     PAIR_MARGIN_MINER,
     PEARSONR,
     PEFT_STRATEGIES,
@@ -64,20 +62,21 @@ from ..constants import (
     SPEARMANR,
 )
 from ..utils.map import MeanAveragePrecision
-from .losses import MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
+from .losses import FocalLoss, MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
     get_polynomial_decay_schedule_with_warmup,
 )
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def get_loss_func(
     problem_type: str,
     mixup_active: bool,
     loss_func_name: Optional[str] = None,
+    config: Optional[DictConfig] = None,
 ):
     """
     Choose a suitable Pytorch loss module based on the provided problem type.
@@ -90,7 +89,10 @@ def get_loss_func(
         The activation determining whether to use mixup.
     loss_func_name
         The name of the function the user wants to use.
-
+    config
+        The optimization configs containing values such as i.e. optimization.loss_function
+        An example purpose of this config here is to pass through the parameters for focal loss, i.e.:
+            alpha = optimization.focal_loss.alpha
     Returns
     -------
     A Pytorch loss module.
@@ -99,7 +101,14 @@ def get_loss_func(
         if mixup_active:
             loss_func = SoftTargetCrossEntropy()
         else:
-            loss_func = nn.CrossEntropyLoss()
+            if loss_func_name is not None and loss_func_name.lower() == "focal_loss":
+                loss_func = FocalLoss(
+                    alpha=OmegaConf.select(config, "focal_loss.alpha"),
+                    gamma=OmegaConf.select(config, "focal_loss.gamma", default=2.0),
+                    reduction=OmegaConf.select(config, "focal_loss.reduction", default="mean"),
+                )
+            else:
+                loss_func = nn.CrossEntropyLoss()
     elif problem_type == REGRESSION:
         if loss_func_name is not None:
             if "bcewithlogitsloss" in loss_func_name.lower():

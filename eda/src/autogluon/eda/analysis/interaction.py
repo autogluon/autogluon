@@ -70,7 +70,6 @@ class Correlation(AbstractAnalysis):
 
     See Also
     --------
-    `phik <https://github.com/KaveIO/PhiK>`_ documentation
     :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
 
     """
@@ -154,7 +153,6 @@ class CorrelationSignificance(AbstractAnalysis):
 
     See Also
     --------
-    `phik <https://github.com/KaveIO/PhiK>`_ documentation
     :py:meth:`~phik.significance.significance_matrix`
     :py:class:`~autogluon.eda.analysis.interaction.Correlation`
     :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
@@ -336,7 +334,6 @@ class DistributionFit(AbstractAnalysis):
     --------
     :py:class:`~autogluon.eda.analysis.interaction.FeatureInteraction`
     :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`
-    `scipy <https://docs.scipy.org/doc/scipy/reference/stats.html>`_ documentation for each distribution details
 
     """
 
