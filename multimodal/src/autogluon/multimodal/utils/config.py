@@ -388,6 +388,38 @@ def get_local_pretrained_config_paths(config: DictConfig, path: str) -> DictConf
     return config
 
 
+def upgrade_config(config, loaded_version):
+    """
+
+    Parameters
+    ----------
+    config
+        The configuration
+    loaded_version
+        The version of the config that has been loaded
+
+    Returns
+    -------
+    config
+        The upgraded configuration
+    """
+    # backward compatibility for variable image size.
+    if version.parse(loaded_version) <= version.parse("0.6.2"):
+        logger.info(f"Start to upgrade the previous configuration trained by AutoMM version={loaded_version}.")
+        if OmegaConf.select(config, "model.timm_image") is not None:
+            logger.warn(
+                "Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "
+                "Try to update the timm image size."
+            )
+            config.model.timm_image.image_size = None
+    if version.parse(loaded_version) < version.parse("0.7.0"):
+        logger.info(f"Start to upgrade the previous configuration trained by AutoMM version={loaded_version}.")
+        if OmegaConf.select(config, "env.num_workers_evaluation") > 0:
+            logger.warn("Set the number of workers in evaluation to be 0")
+            config.env.num_workers_evaluation = 0
+    return config
+
+
 def parse_dotlist_conf(conf):
     """
     Parse the config files that is potentially in the dotlist format to a dictionary.
