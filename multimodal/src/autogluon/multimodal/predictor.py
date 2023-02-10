@@ -26,6 +26,7 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
+from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from . import version as ag_version
 from .constants import (
@@ -180,7 +181,7 @@ class MultiModalPredictor(ExportMixin):
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
-        verbosity: Optional[int] = 3,
+        verbosity: Optional[int] = 2,
         num_classes: Optional[int] = None,  # TODO: can we infer this from data?
         classes: Optional[list] = None,
         warn_if_exist: Optional[bool] = True,
@@ -359,7 +360,6 @@ class MultiModalPredictor(ExportMixin):
                     )
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
-            verbosity = 1  # don't use 3, which doesn't suppress logger.info() in .load().
             enable_progress_bar = False
             # Also disable progress bar of transformers package
             transformers.logging.disable_progress_bar()
@@ -822,7 +822,10 @@ class MultiModalPredictor(ExportMixin):
         self._fit(**_fit_args)
         training_end = time.time()
         self._total_train_time = training_end - training_start
-        logger.info(f"Models and intermediate outputs are saved to {self._save_path} ")
+
+        # TODO(?) We should have a separate "_post_training_event()" for logging messages.
+        logger.info(get_fit_complete_message(self._save_path))
+
         return self
 
     def _verify_inference_ready(self):
@@ -979,7 +982,8 @@ class MultiModalPredictor(ExportMixin):
         clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
-
+        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
+        logger.info(get_fit_start_message(save_path, validation_metric_name))
         config = get_config(
             problem_type=self._problem_type,
             presets=presets,
@@ -2486,7 +2490,6 @@ class MultiModalPredictor(ExportMixin):
 
         # backward compatibility for variable image size.
         if version.parse(assets["version"]) <= version.parse("0.6.2"):
-            print("hasattr model.timm_image", hasattr(config, "model.timm_image"))
             if OmegaConf.select(config, "model.timm_image") is not None:
                 logger.warn(
                     "Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "

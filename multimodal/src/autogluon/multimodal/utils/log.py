@@ -136,3 +136,44 @@ def apply_log_filter(log_filter):
     finally:
         remove_log_filter(logging.getLogger(), log_filter)
         remove_log_filter(logging.getLogger("pytorch_lightning"), log_filter)
+
+
+def get_fit_start_message(save_path, validation_metric_name):
+    return f"""\
+AutoMM starts to create your model. ✨
+
+- Model will be saved to "{save_path}".
+
+- Validation metric is "{validation_metric_name}".
+
+- To track the learning progress, you can open a terminal and launch Tensorboard:
+    ```shell
+    # Assume you have installed tensorboard
+    tensorboard --logdir {save_path}
+    ```
+
+Enjoy your coffee, and let AutoMM do the job ☕☕☕ Learn more at https://auto.gluon.ai
+"""
+
+
+def get_fit_complete_message(save_path):
+    return f"""\
+AutoMM has created your model 🎉🎉🎉
+
+- To load the model, use the code below:
+    ```python
+    from autogluon.multimodal import MultiModalPredictor
+    predictor = MultiModalPredictor.load("{save_path}")
+    ```
+
+- You can open a terminal and launch Tensorboard to visualize the training log:
+    ```shell
+    # Assume you have installed tensorboard
+    tensorboard --logdir {save_path}
+    ```
+
+- If you are not satisfied with the model, try to increase the training time, 
+adjust the hyperparameters (https://auto.gluon.ai/stable/tutorials/multimodal/advanced_topics/customization.html),
+or post issues on GitHub: https://github.com/autogluon/autogluon
+
+"""
