@@ -390,7 +390,7 @@ def get_local_pretrained_config_paths(config: DictConfig, path: str) -> DictConf
 
 
 def upgrade_config(config, loaded_version):
-    """
+    """Upgrade outdated configurations
 
     Parameters
     ----------
