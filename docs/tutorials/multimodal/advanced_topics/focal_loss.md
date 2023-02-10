@@ -7,7 +7,7 @@ and can be used for balancing hard/easy samples as well as un-even sample distri
 
 ## Create Dataset
 We use the shopee dataset for demonstration in this tutorial.
-```.python .input
+```{.python .input}
 from autogluon.multimodal.utils.misc import shopee_dataset
 
 download_dir = "./ag_automm_tutorial_imgcls_focalloss"
@@ -25,7 +25,7 @@ Note that the `len` of the list ***must*** match the total number of classes in 
 
 `optimization.focal_loss.reduction` - how to aggregate the loss value. Can only take `"mean"` or `"sum"` for now.
 
-```.python .input
+```{.python .input}
 import uuid
 from autogluon.multimodal import MultiModalPredictor
 
