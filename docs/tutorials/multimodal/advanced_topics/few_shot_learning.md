@@ -9,7 +9,7 @@ Specifically, we extract sample features with pretrained models, and use the fea
 We prepare all datasets in the format of `pd.DataFrame` as in many of our tutorials have done. 
 For this tutorial, we'll use a small `shopee` dataset for demonstration.
 
-```python
+```{.python .input}
 import pandas as pd
 import os
 
@@ -25,7 +25,7 @@ test_df = pd.read_csv(f"{dataset_path}/test.csv")
 
 ## Create the `FewShotSVMPredictor`
 In order to run FusionSVM model, we first initialize a `FewShotSVMPredictor` with the following parameters.
-```python
+```{.python .input}
 from autogluon.multimodal.utils.few_shot_learning import FewShotSVMPredictor
 hyperparameters = {
     "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",
@@ -46,12 +46,12 @@ predictor = FewShotSVMPredictor(
 
 ## Train the model
 Now we train the model with the `train_df`.
-```python
+```{.python .input}
 predictor.fit(train_df)
 ```
 
 ## Run evaluation
-```python
+```{.python .input}
 result = predictor.evaluate(test_df, metrics=["acc", "macro_f1"])
 print(result)
 ```
@@ -61,7 +61,7 @@ The `FewShotSVMPredictor` automatically saves the model and artifacts to disk du
 You can specify the path to save by setting the `path=<your_desired_save_path>` when initializing the predictor.
 You can also load a pretrained `FewShotSVMPredictor` and perform downstream tasks by the following code:
 
-```python
+```{.python .input}
 predictor2 = FewShotSVMPredictor.load(model_path)
 result2 = predictor2.evaluate(test_df, metrics=["acc", "macro_f1"])
 print(result2)
