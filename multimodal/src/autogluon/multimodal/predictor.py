@@ -152,6 +152,7 @@ from .utils import (
     update_config_by_rules,
     update_hyperparameters,
     update_tabular_config_by_resources,
+    upgrade_config,
 )
 
 logger = logging.getLogger(AUTOMM)
