@@ -108,7 +108,7 @@ predictions = predictor.predict(test_data)
 ```
 :::
 
-:::{tab} Named Entity Recognition
+:::{tab} NER
 ```python
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.core.utils.loaders import load_pd
