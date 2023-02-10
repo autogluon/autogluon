@@ -56,7 +56,8 @@ extras_require = {
         'imodels>=1.3.10,<1.4.0',  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
     ],
     'vowpalwabbit': [
-        'vowpalwabbit>=8.10,<8.11'
+        # FIXME: 9.5+ causes VW to save an empty model which always predicts 0. Confirmed on MacOS (Intel CPU). Unknown how to fix.
+        'vowpalwabbit>=9,<9.5',
     ],
     'skl2onnx': [
         'skl2onnx>=1.13.0,<1.14.0',
