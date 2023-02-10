@@ -99,6 +99,7 @@ from .utils import (
     split_train_tuning_data,
     try_to_infer_pos_label,
     update_hyperparameters,
+    upgrade_config,
 )
 
 logger = logging.getLogger(AUTOMM)
