@@ -508,7 +508,7 @@ class MultiModalPredictor(ExportMixin):
 
         """
         self._verbosity = verbosity
-        set_logger_verbosity(4)
+        set_logger_verbosity(verbosity)
         transformers.logging.set_verbosity(verbosity2loglevel(verbosity))
 
     def fit(
