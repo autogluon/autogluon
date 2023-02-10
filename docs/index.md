@@ -128,31 +128,6 @@ prediction = predictor.predict({ 'text_snippet': [sentence]})
 ```
 :::
 
-:::{tab} Object Detection
-```python
-# !mim install mmcv-full
-# !pip install mmdet
-from autogluon.multimodal import MultiModalPredictor
-
-data_zip = "https://automl-mm-bench.s3.amazonaws.com/object_detection_dataset/" +
-           "tiny_motorbike_coco.zip"
-# Unzip dataset
-
-train_path = "./Annotations/trainval_cocoformat.json"
-test_path = "./Annotations/test_cocoformat.json"
-
-predictor = MultiModalPredictor(
-  problem_type="object_detection",
-  sample_data_path=train_path
-)
-
-predictor.fit(train_path)
-predictor.evaluate(test_path)
-
-pred = predictor.predict({"image": [test_image]})
-```
-:::
-
 :::{tab} Matching
 ```python
 from autogluon.multimodal import MultiModalPredictor, utils
@@ -172,6 +147,35 @@ q_embedding = predictor.extract_embedding([
 similarity = utils.compute_semantic_similarity(q_embedding, doc_embedding)
 ```
 :::
+
+:::{tab} Object Detection
+```ipython
+# Install mmcv-related dependencies
+!mim install mmcv-full
+!pip install mmdet
+
+from autogluon.multimodal import MultiModalPredictor
+from autogluon.core.utils.loaders import load_zip
+
+data_zip = "https://automl-mm-bench.s3.amazonaws.com/object_detection_dataset/" + \
+           "tiny_motorbike_coco.zip"
+load_zip.unzip(data_zip, unzip_dir=".")
+
+train_path = "./tiny_motorbike/Annotations/trainval_cocoformat.json"
+test_path = "./tiny_motorbike/Annotations/test_cocoformat.json"
+
+predictor = MultiModalPredictor(
+  problem_type="object_detection",
+  sample_data_path=train_path
+)
+
+predictor.fit(train_path)
+score = predictor.evaluate(test_path)
+
+pred = predictor.predict({"image": ["./tiny_motorbike/JPEGImages/000038.jpg"]})
+```
+:::
+
 ::::
 
 
@@ -231,6 +235,7 @@ tutorials/tabular/index
 tutorials/multimodal/index
 tutorials/timeseries/index
 tutorials/cloud_fit_deploy/index
+EDA <tutorials/eda/index>
 ```
 
 ```{toctree}
