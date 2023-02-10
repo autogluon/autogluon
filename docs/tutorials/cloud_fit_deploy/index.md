@@ -5,6 +5,7 @@
 maxdepth: 1
 ---
 
+AutoGluon Cloud <autogluon-cloud>
 AutoGluon Tabular on SageMaker AutoPilot <autopilot-autogluon>
 Deploy AutoGluon Models on Severless Templates <cloud-aws-lambda-deployment>
 Deploy AutoGluon Models on Amazon SageMaker <cloud-aws-sagemaker-deployment>
