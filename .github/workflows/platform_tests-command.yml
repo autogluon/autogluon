@@ -45,6 +45,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
+        python: ["3.8", "3.9", "3.10"]
     steps:  
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -60,7 +61,7 @@ jobs:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
-          python-version: ["3.8", "3.9", "3.10"]
+          python-version: ${{ matrix.python }}
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -76,6 +77,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
+        python: ["3.8", "3.9", "3.10"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -91,7 +93,7 @@ jobs:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
-          python-version: ["3.8", "3.9", "3.10"]
+          python-version: ${{ matrix.python }}
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -107,6 +109,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
+        python: ["3.8", "3.9", "3.10"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -122,7 +125,7 @@ jobs:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
-          python-version: ["3.8", "3.9", "3.10"]
+          python-version: ${{ matrix.python }}
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -138,6 +141,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
+        python: ["3.8", "3.9", "3.10"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -153,7 +157,7 @@ jobs:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
-          python-version: ["3.8", "3.9", "3.10"]
+          python-version: ${{ matrix.python }}
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -170,6 +174,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
+        python: ["3.8", "3.9", "3.10"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -185,7 +190,7 @@ jobs:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
-          python-version: ["3.8", "3.9", "3.10"]
+          python-version: ${{ matrix.python }}
       - name: Setup OMP
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
@@ -209,6 +214,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
+        python: ["3.8", "3.9", "3.10"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -224,7 +230,7 @@ jobs:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
-          python-version: ["3.8", "3.9", "3.10"]
+          python-version: ${{ matrix.python }}
       - name: unit-test
         shell: bash -l {0}
         run: |
