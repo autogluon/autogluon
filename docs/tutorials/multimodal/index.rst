@@ -147,6 +147,12 @@ Document Data
 
       How to use MultiModalPredictor to build a scanned document classifier.
 
+   .. card::
+      :title: Classifying PDF Documents with AutoMM
+      :link: document/pdf_classification.html
+
+      Train a model for PDF documents classification with MultiModalPredictor.
+
 
 Matching
 --------
