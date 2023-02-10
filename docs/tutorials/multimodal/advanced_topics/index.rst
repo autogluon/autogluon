@@ -27,6 +27,11 @@ Advanced Topics
 
       How to customize AutoMM configurations.
    
+   .. card::
+      :title: Focal Loss
+      :link: focal_loss.html
+
+      How to use focal loss in AutoMM.
 
 .. toctree::
    :maxdepth: 1
@@ -36,3 +41,4 @@ Advanced Topics
    hyperparameter_optimization
    model_distillation
    customization
+   focal_loss
