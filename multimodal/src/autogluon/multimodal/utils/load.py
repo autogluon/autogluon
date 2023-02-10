@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from ..constants import AUTOMM
 from ..data import NerProcessor, TextProcessor
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def load_text_tokenizers(

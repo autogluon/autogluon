@@ -22,7 +22,7 @@ from ..constants import (
 from ..presets import get_automm_presets, get_basic_automm_config
 from .data import get_detected_data_types
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def filter_search_space(hyperparameters: Dict, keys_to_filter: Union[str, List[str]]):

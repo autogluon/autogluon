@@ -155,7 +155,7 @@ from .utils import (
     update_tabular_config_by_resources,
 )
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class MultiModalPredictor(ExportMixin):
@@ -365,7 +365,7 @@ class MultiModalPredictor(ExportMixin):
             transformers.logging.disable_progress_bar()
 
         if verbosity is not None:
-            set_logger_verbosity(verbosity, logger=logger)
+            set_logger_verbosity(verbosity)
 
         self._label_column = label
         self._problem_type = problem_type
@@ -508,7 +508,7 @@ class MultiModalPredictor(ExportMixin):
 
         """
         self._verbosity = verbosity
-        set_logger_verbosity(verbosity, logger=logger)
+        set_logger_verbosity(4)
         transformers.logging.set_verbosity(verbosity2loglevel(verbosity))
 
     def fit(

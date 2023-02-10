@@ -30,7 +30,7 @@ from .utils import DummyLayer, assign_layer_ids, get_column_features
 
 hf_logging.set_verbosity_error()
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 @lru_cache(None)
