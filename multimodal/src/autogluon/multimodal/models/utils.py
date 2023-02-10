@@ -10,7 +10,7 @@ from transformers import AutoConfig, AutoModel
 from ..constants import AUTOMM, LOGITS, REGRESSION
 from .adaptation_layers import IA3Linear, IA3LoRALinear, LoRALinear
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class DummyLayer(nn.Module):

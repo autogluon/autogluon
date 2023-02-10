@@ -38,7 +38,7 @@ from ...constants import AUTOMM, COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
 from ..collator import StackCollator
 from ..utils import is_rois_input
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 

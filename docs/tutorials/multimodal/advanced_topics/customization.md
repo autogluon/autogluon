@@ -256,6 +256,17 @@ predictor.fit(hyperparameters={"optimization.efficient_finetune": "bit_fit"})
 predictor.fit(hyperparameters={"optimization.efficient_finetune": "ia3_bias"})
 ```
 
+### optimization.skip_final_val
+
+Whether to skip the final validation after training is signaled to stop.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"optimization.skip_final_val": False})
+# skip the final validation
+predictor.fit(hyperparameters={"optimization.skip_final_val": True})
+```
+
 ## Environment
 
 ### env.num_gpus

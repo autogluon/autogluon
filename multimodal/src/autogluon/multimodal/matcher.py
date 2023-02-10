@@ -20,6 +20,7 @@ from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from . import version as ag_version
 from .constants import (
@@ -100,7 +101,7 @@ from .utils import (
     update_hyperparameters,
 )
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class MultiModalMatcher:
@@ -504,7 +505,9 @@ class MultiModalMatcher:
             return predictor
 
         self._fit(**_fit_args)
-        logger.info(f"Models and intermediate outputs are saved to {self._save_path} ")
+
+        # TODO(?) We should have a separate "_post_training_event()" for logging messages.
+        logger.info(get_fit_complete_message(self._save_path))
         return self
 
     def _get_matcher_df_preprocessor(
@@ -621,6 +624,8 @@ class MultiModalMatcher:
         hpo_mode: bool = False,
         **hpo_kwargs,
     ):
+        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
+        logger.info(get_fit_start_message(save_path, validation_metric_name))
         config = self._config
         config = get_config(
             problem_type=self._pipeline,

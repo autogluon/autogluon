@@ -13,7 +13,7 @@ from ..constants import AUTOMM, NER_ANNOTATION, NER_TEXT, TEXT, TEXT_NER
 from .collator import PadCollator, StackCollator
 from .utils import process_ner_annotations, tokenize_ner_text
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 # Disable tokenizer parallelism
 os.environ["TOKENIZERS_PARALLELISM"] = "false"

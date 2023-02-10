@@ -29,7 +29,7 @@ except ImportError as e:
 from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
 from .utils import lookup_mmdet_config, update_mmdet_config
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class MMDetAutoModelForObjectDetection(nn.Module):

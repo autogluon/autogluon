@@ -26,7 +26,7 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.multimodal.utils import save_result_df
+from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from . import version as ag_version
 from .constants import (
@@ -119,8 +119,6 @@ from .utils import (
     evaluate_coco,
     extract_from_output,
     filter_hyperparameters,
-    from_coco_or_voc,
-    from_dict,
     get_config,
     get_detection_classes,
     get_local_pretrained_config_paths,
@@ -139,11 +137,14 @@ from .utils import (
     logits_to_prob,
     merge_bio_format,
     modify_duplicate_model_names,
+    object_detection_data_to_df,
     predict,
     process_batch,
     save_pretrained_model_configs,
+    save_result_df,
     save_text_tokenizers,
     select_model,
+    setup_detection_train_tuning_data,
     setup_save_path,
     split_train_tuning_data,
     tensor_to_ndarray,
@@ -154,7 +155,7 @@ from .utils import (
     update_tabular_config_by_resources,
 )
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class MultiModalPredictor(ExportMixin):
@@ -180,7 +181,7 @@ class MultiModalPredictor(ExportMixin):
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
-        verbosity: Optional[int] = 3,
+        verbosity: Optional[int] = 2,
         num_classes: Optional[int] = None,  # TODO: can we infer this from data?
         classes: Optional[list] = None,
         warn_if_exist: Optional[bool] = True,
@@ -359,13 +360,12 @@ class MultiModalPredictor(ExportMixin):
                     )
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
-            verbosity = 1  # don't use 3, which doesn't suppress logger.info() in .load().
             enable_progress_bar = False
             # Also disable progress bar of transformers package
             transformers.logging.disable_progress_bar()
 
         if verbosity is not None:
-            set_logger_verbosity(verbosity, logger=logger)
+            set_logger_verbosity(verbosity)
 
         self._label_column = label
         self._problem_type = problem_type
@@ -508,7 +508,7 @@ class MultiModalPredictor(ExportMixin):
 
         """
         self._verbosity = verbosity
-        set_logger_verbosity(verbosity, logger=logger)
+        set_logger_verbosity(verbosity)
         transformers.logging.set_verbosity(verbosity2loglevel(verbosity))
 
     def fit(
@@ -667,16 +667,9 @@ class MultiModalPredictor(ExportMixin):
             return self
 
         if self._problem_type == OBJECT_DETECTION:
-            self._detection_anno_train = train_data
-            train_data = from_coco_or_voc(train_data, "train")
-            if tuning_data is not None:
-                self.detection_anno_train = tuning_data
-                tuning_data = from_coco_or_voc(tuning_data, "val")
-                if max_num_tuning_data is not None:
-                    if len(tuning_data) > max_num_tuning_data:
-                        tuning_data = tuning_data.sample(
-                            n=max_num_tuning_data, replace=False, random_state=seed
-                        ).reset_index(drop=True)
+            train_data, tuning_data = setup_detection_train_tuning_data(
+                self, max_num_tuning_data, seed, train_data, tuning_data
+            )
 
         pl.seed_everything(seed, workers=True)
 
@@ -829,7 +822,10 @@ class MultiModalPredictor(ExportMixin):
         self._fit(**_fit_args)
         training_end = time.time()
         self._total_train_time = training_end - training_start
-        logger.info(f"Models and intermediate outputs are saved to {self._save_path} ")
+
+        # TODO(?) We should have a separate "_post_training_event()" for logging messages.
+        logger.info(get_fit_complete_message(self._save_path))
+
         return self
 
     def _verify_inference_ready(self):
@@ -986,7 +982,8 @@ class MultiModalPredictor(ExportMixin):
         clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
-
+        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
+        logger.info(get_fit_start_message(save_path, validation_metric_name))
         config = get_config(
             problem_type=self._problem_type,
             presets=presets,
@@ -1230,6 +1227,7 @@ class MultiModalPredictor(ExportMixin):
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
                 model_postprocess_fn=model_postprocess_fn,
                 trainable_param_names=trainable_param_names,
+                skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1702,9 +1700,8 @@ class MultiModalPredictor(ExportMixin):
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
     ):
-        data = data_to_df(data=data)
-
         if self._column_types is None:
+            data = data_to_df(data=data)
             allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
             column_types = infer_column_types(
                 data=data,
@@ -1724,6 +1721,14 @@ class MultiModalPredictor(ExportMixin):
                     data=data,
                 )
         else:  # called .fit() or .load()
+            column_names = list(self._column_types.keys())
+            # remove label column since it's not required in inference.
+            column_names.remove(self._label_column)
+            data = data_to_df(
+                data=data,
+                required_columns=self._df_preprocessor.required_feature_names,
+                all_columns=column_names,
+            )
             column_types = self._column_types
             column_types_copy = copy.deepcopy(column_types)
             for col_name, col_type in column_types.items():
@@ -1849,14 +1854,25 @@ class MultiModalPredictor(ExportMixin):
                 return NotImplementedError(
                     f"Current problem type {self._problem_type} does not support realtime predict."
                 )
-            return evaluate_coco(
-                predictor=self,
-                anno_file_or_df=data,
-                metrics=metrics,
-                return_pred=return_pred,
-                seed=seed,
-                eval_tool=eval_tool,
-            )
+            if isinstance(data, str):
+                return evaluate_coco(
+                    predictor=self,
+                    anno_file_or_df=data,
+                    metrics=metrics,
+                    return_pred=return_pred,
+                    seed=seed,
+                    eval_tool=eval_tool,
+                )
+            else:
+                data = object_detection_data_to_df(data)
+                return evaluate_coco(
+                    predictor=self,
+                    anno_file_or_df=data,
+                    metrics=metrics,
+                    return_pred=return_pred,
+                    seed=seed,
+                    eval_tool="torchmetrics",
+                )
 
         if self._problem_type == NER:
             ret_type = NER_RET
@@ -2027,14 +2043,7 @@ class MultiModalPredictor(ExportMixin):
                 realtime=realtime,
             )
         if self._problem_type == OBJECT_DETECTION:
-            if isinstance(data, str):
-                data = from_coco_or_voc(data, "test")
-            elif isinstance(data, dict):
-                data = from_dict(data)
-            else:
-                assert isinstance(
-                    data, pd.DataFrame
-                ), "TypeError: Expected data type to be a filepath, a folder or a dictionary, but got {}".format(data)
+            data = object_detection_data_to_df(data)
 
             if self._label_column not in data:
                 self._label_column = None
@@ -2481,7 +2490,6 @@ class MultiModalPredictor(ExportMixin):
 
         # backward compatibility for variable image size.
         if version.parse(assets["version"]) <= version.parse("0.6.2"):
-            print("hasattr model.timm_image", hasattr(config, "model.timm_image"))
             if OmegaConf.select(config, "model.timm_image") is not None:
                 logger.warn(
                     "Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "

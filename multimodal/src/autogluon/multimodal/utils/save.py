@@ -7,7 +7,7 @@ from autogluon.common.utils.utils import setup_outputdir
 from ..constants import AUTOMM, HF_MODELS, LAST_CHECKPOINT
 from ..data import TextProcessor
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def save_text_tokenizers(

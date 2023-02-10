@@ -8,7 +8,7 @@ from ..constants import AUTOMM, BEST_K_MODELS_FILE, RAY_TUNE_CHECKPOINT
 from .matcher import create_siamese_model
 from .model import create_fusion_model
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def hpo_trial(sampled_hyperparameters, predictor, checkpoint_dir=None, **_fit_args):
