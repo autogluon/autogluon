@@ -23,6 +23,7 @@ from ..constants import (
     DOCUMENT,
     FEW_SHOT,
     IMAGE,
+    IMAGE_PATH,
     LABEL,
     MMLAB_MODELS,
     NER,
@@ -47,6 +48,7 @@ from ..data import (
     NumericalProcessor,
     TextProcessor,
 )
+from ..data.infer_types import is_image_column
 
 logger = logging.getLogger(AUTOMM)
 
@@ -462,29 +464,31 @@ def data_to_df(
         Required columns.
     all_columns
         All the possible columns got from training data. The column order is preserved.
+    header
+        Provided header to create a dataframe.
 
     Returns
     -------
     A dataframe with required columns.
     """
+    has_header = True
     if isinstance(data, pd.DataFrame):
         pass
     elif isinstance(data, dict):
         data = pd.DataFrame(data)
     elif isinstance(data, list):
         assert len(data) > 0, f"Expected data to have length > 0, but got {data} of len {len(data)}"
-        if contains_valid_images(data):
-            data_dict = {"image": data}
-            data = pd.DataFrame(data_dict)
+        if header is None:
+            has_header = False
+            data = pd.DataFrame(data)
         else:
-            if header is None:
-                data = pd.DataFrame(data)
-            else:
-                data = pd.DataFrame({header: data})
+            data = pd.DataFrame({header: data})
     elif isinstance(data, str):
-        if contains_valid_images(data):
-            data_dict = {"image": [data]}
-            data = pd.DataFrame(data_dict)
+        df = pd.DataFrame([data])
+        col_name = list(df.columns)[0]
+        if is_image_column(df[col_name], col_name=col_name, image_type=IMAGE_PATH):
+            has_header = False
+            data = df
         else:
             data = load_pd.load(data)
     else:
@@ -503,12 +507,13 @@ def data_to_df(
         if len(missing_columns) > 0:
             # assume no column names are provided and users organize data in the same column order of training data.
             if len(detected_columns) == len(all_columns):
-                warnings.warn(
-                    f"Replacing detected dataframe columns `{detected_columns}` with columns "
-                    f"`{all_columns}` from training data."
-                    "Double check the correspondences between them to avoid unexpected behaviors.",
-                    UserWarning,
-                )
+                if has_header:
+                    warnings.warn(
+                        f"Replacing detected dataframe columns `{detected_columns}` with columns "
+                        f"`{all_columns}` from training data."
+                        "Double check the correspondences between them to avoid unexpected behaviors.",
+                        UserWarning,
+                    )
                 data.rename(dict(zip(detected_columns, required_columns)), axis=1, inplace=True)
             else:
                 raise ValueError(
@@ -569,41 +574,6 @@ def infer_dtypes_by_model_names(model_config: DictConfig):
         fallback_dtype = list(allowable_dtypes)[0]
 
     return allowable_dtypes, fallback_dtype
-
-
-def contains_valid_images(data: Union[str, list], sample_n: Optional[int] = 50) -> bool:
-    """
-    Check if the data contains valid uncorrupted images. If data is a list of file paths, as long as there's 1 image
-    that can be opened with PIL, the data contains valid uncorrupted images.
-    Parameters
-    ----------
-    data
-        path to the file to be checked, or list of file paths
-    Returns
-    -------
-    whether the data contains valid uncorrupted images
-    """
-
-    if isinstance(data, str):
-        try:
-            with PIL.Image.open(data) as _:
-                return True
-        except:
-            return False
-    elif isinstance(data, list):
-        data_index = list(range(len(data)))
-        num_samples = min(len(data), sample_n)
-        subsample_index = random.sample(data_index, k=num_samples)
-        for i in subsample_index:
-            image_path = data[i]
-            try:
-                with PIL.Image.open(image_path) as _:
-                    return True
-            except:
-                continue
-        return False
-    else:
-        raise Exception(f"Expected data to be a list or a str, but got {type(data)}")
 
 
 def split_train_tuning_data(train_data, tuning_data, holdout_frac, is_classification, label_column, seed):

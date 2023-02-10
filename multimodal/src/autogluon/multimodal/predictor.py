@@ -26,7 +26,6 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.multimodal.utils import object_detection_data_to_df, save_result_df, setup_detection_train_tuning_data
 from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from . import version as ag_version
@@ -38,7 +37,6 @@ from .constants import (
     BEST_K_MODELS_FILE,
     BINARY,
     COLUMN_FEATURES,
-    DATA,
     DEEPSPEED_MIN_PL_VERSION,
     DEEPSPEED_MODULE,
     DEEPSPEED_OFFLOADING,
@@ -58,7 +56,6 @@ from .constants import (
     MASKS,
     MAX,
     MIN,
-    MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
     NER,
@@ -68,7 +65,6 @@ from .constants import (
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
     OVERALL_F1,
-    PROBABILITY,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
     ROIS,
@@ -123,8 +119,6 @@ from .utils import (
     evaluate_coco,
     extract_from_output,
     filter_hyperparameters,
-    from_coco_or_voc,
-    from_dict,
     get_config,
     get_detection_classes,
     get_local_pretrained_config_paths,
@@ -143,11 +137,14 @@ from .utils import (
     logits_to_prob,
     merge_bio_format,
     modify_duplicate_model_names,
+    object_detection_data_to_df,
     predict,
     process_batch,
     save_pretrained_model_configs,
+    save_result_df,
     save_text_tokenizers,
     select_model,
+    setup_detection_train_tuning_data,
     setup_save_path,
     split_train_tuning_data,
     tensor_to_ndarray,
@@ -1078,11 +1075,11 @@ class MultiModalPredictor(ExportMixin):
                 "The per_gpu_batch_size should be >1 and even for reasonable operation",
                 UserWarning,
             )
-
         loss_func = get_loss_func(
             problem_type=self._problem_type,
             mixup_active=mixup_active,
             loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
+            config=config.optimization,
         )
 
         model_postprocess_fn = get_model_postprocess_fn(
@@ -1230,6 +1227,7 @@ class MultiModalPredictor(ExportMixin):
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
                 model_postprocess_fn=model_postprocess_fn,
                 trainable_param_names=trainable_param_names,
+                skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1399,7 +1397,8 @@ class MultiModalPredictor(ExportMixin):
                     val_df=val_df,
                     validation_metric_name=validation_metric_name,
                     strategy=strategy,
-                    strict_loading=not trainable_param_names,  # Not strict loading if using parameter-efficient finetuning
+                    strict_loading=not trainable_param_names,
+                    # Not strict loading if using parameter-efficient finetuning
                     standalone=standalone,
                     clean_ckpts=clean_ckpts,
                 )
@@ -1701,9 +1700,8 @@ class MultiModalPredictor(ExportMixin):
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
     ):
-        data = data_to_df(data=data)
-
         if self._column_types is None:
+            data = data_to_df(data=data)
             allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
             column_types = infer_column_types(
                 data=data,
@@ -1723,6 +1721,14 @@ class MultiModalPredictor(ExportMixin):
                     data=data,
                 )
         else:  # called .fit() or .load()
+            column_names = list(self._column_types.keys())
+            # remove label column since it's not required in inference.
+            column_names.remove(self._label_column)
+            data = data_to_df(
+                data=data,
+                required_columns=self._df_preprocessor.required_feature_names,
+                all_columns=column_names,
+            )
             column_types = self._column_types
             column_types_copy = copy.deepcopy(column_types)
             for col_name, col_type in column_types.items():
@@ -2634,6 +2640,7 @@ class MultiModalPredictor(ExportMixin):
             problem_type=predictor._problem_type,
             mixup_active=False,
             loss_func_name=OmegaConf.select(predictor._config, "optimization.loss_function"),
+            config=predictor._config.optimization,
         )
 
         model_postprocess_fn = get_model_postprocess_fn(
