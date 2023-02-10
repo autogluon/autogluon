@@ -412,11 +412,6 @@ def upgrade_config(config, loaded_version):
                 "Try to update the timm image size."
             )
             config.model.timm_image.image_size = None
-    if version.parse(loaded_version) < version.parse("0.7.0"):
-        logger.info(f"Start to upgrade the previous configuration trained by AutoMM version={loaded_version}.")
-        if OmegaConf.select(config, "env.num_workers_evaluation") > 0:
-            logger.warn("Set the number of workers in evaluation to be 0")
-            config.env.num_workers_evaluation = 0
     return config
 
 
