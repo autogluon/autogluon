@@ -13,6 +13,7 @@ optimization:
   patience: 10
   val_check_interval: 0.5 # Check validation score a fraction of epoch if float and every n steps if integer with n < total step in epoch.
   check_val_every_n_epoch: 1 # Check validation score every n epochs.
+  skip_final_val: False # Flag to skip the last validation
   gradient_clip_val: 1
   gradient_clip_algorithm: "norm"
   track_grad_norm: -1 # Whether to check gradient norm. We can set it to 2 to check for gradient norm.
