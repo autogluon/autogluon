@@ -69,7 +69,7 @@ from .lr_scheduler import (
     get_polynomial_decay_schedule_with_warmup,
 )
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def get_loss_func(

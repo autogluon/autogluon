@@ -12,7 +12,7 @@ from PIL import Image, ImageEnhance, ImageOps
 
 from ..constants import AUTOMM, IMAGE, TEXT
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def scale_parameter(level, maxval, type):

@@ -101,7 +101,7 @@ from .utils import (
     update_hyperparameters,
 )
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class MultiModalMatcher:

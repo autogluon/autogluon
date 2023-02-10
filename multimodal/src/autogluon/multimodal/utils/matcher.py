@@ -14,7 +14,7 @@ from ..constants import AUTOMM, FUSION, QUERY, RESPONSE
 from .data import data_to_df
 from .model import create_model
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def get_fusion_model_dict(

@@ -30,7 +30,7 @@ from .download import download, is_url
 from .inference import predict
 from .save import setup_save_path
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def object_detection_data_to_df(data: Union[pd.DataFrame, dict, list, str]) -> pd.DataFrame:

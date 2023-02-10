@@ -14,7 +14,7 @@ from torch import nn
 from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
 from .utils import assign_layer_ids, get_column_features, get_mmocr_config_and_model, get_model_head
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class MMOCRAutoModelForTextDetection(nn.Module):

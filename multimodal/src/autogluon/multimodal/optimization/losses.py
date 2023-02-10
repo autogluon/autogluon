@@ -20,7 +20,7 @@ except ImportError:
 
 from ..constants import AUTOMM
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class RKDLoss(nn.Module):

@@ -50,7 +50,7 @@ from ..data import (
 )
 from ..data.infer_types import is_image_column
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def init_df_preprocessor(

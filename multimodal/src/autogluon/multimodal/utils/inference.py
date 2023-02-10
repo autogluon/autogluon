@@ -42,7 +42,7 @@ from .log import LogFilter, apply_log_filter
 from .matcher import compute_matching_probability
 from .misc import tensor_to_ndarray
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional[bool] = True):
