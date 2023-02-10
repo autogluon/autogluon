@@ -27,7 +27,7 @@ from .utils import DummyLayer, assign_layer_ids, get_column_features, get_hf_con
 
 hf_logging.set_verbosity_error()
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class HFAutoModelForNER(HFAutoModelForTextPrediction):

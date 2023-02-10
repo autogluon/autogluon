@@ -10,7 +10,7 @@ from ..mlp import MLP
 from ..utils import run_model
 from .base import AbstractMultimodalFusionModel
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class MultimodalFusionNER(AbstractMultimodalFusionModel):
