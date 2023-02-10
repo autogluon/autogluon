@@ -88,7 +88,7 @@ class AutoMMMemoryBank(nn.Module):
         num_classes
             The classes of the dataset.
         clip_weights
-            The encoded label-text prompts which is only used in type "clip".
+            The clip embedding of the semantic text that describes the labels.
         model_head_type 
             The type of the few-shot classification head.
         """
@@ -110,7 +110,7 @@ class AutoMMMemoryBank(nn.Module):
         else:
             self.model_head = None
 
-    def get_adapter_logits(self, affinity, pure_logits, alpha, beta):
+    def adapt_logits(self, affinity, pure_logits, alpha, beta):
         """
         Generate logits with memory bank based on pure_logits and bank output.
 
@@ -135,12 +135,12 @@ class AutoMMMemoryBank(nn.Module):
     
     def change_head_state(self, grad_state):
         """
-        Change the training state of model head.
+        Change the training state of the model head.
 
         Parameters
         ----------
         grad_state
-            The needed training state of the model head.
+            The training state of the model head. If "True", the model head is trainable. If "False", the model head is freezed.
         """
         if self.model_head is not None and self.model_head_type == "linear":
             for param in self.model_head.parameters():
@@ -148,12 +148,12 @@ class AutoMMMemoryBank(nn.Module):
     
     def change_adapter_state(self, grad_state):
         """
-        Change the training state of memory bank.
+        Change the training state of the memory bank.
 
         Parameters
         ----------
         grad_state
-            The needed training state of the memory bank.
+            The training state of the memory bank. If "True", the memory bank is trainable. If "False", the memory bank is freezed.
         """
         for param in self.adapter.parameters():
             param.requires_grad = grad_state
@@ -176,9 +176,9 @@ class AutoMMMemoryBank(nn.Module):
         The predict probability of the feature.
             - "pure_logits"
                 The predict probability of classifier.
-            - "logits_with_adapter"
+            - "adapted_logits"
                 The predict probability composed of classifier and memory bank similarity result.
-            - "logits_with_finetuned_adapter"
+            - "adapted_logits_with_finetuning"
                 The predict probability composed of classifier and fine-tuned memory bank result.
         """
         if pure_logits is None:
@@ -190,15 +190,15 @@ class AutoMMMemoryBank(nn.Module):
                 pure_logits = self.model_head(x)
         
         affinity = x @ self.bank_keys
-        logits_with_adapter = self.get_adapter_logits(affinity, pure_logits, alpha, beta)
+        adapted_logits = self.adapt_logits(affinity, pure_logits, alpha, beta)
 
         finetuned_affinity = self.adapter(x)
-        logits_with_finetuned_adapter = self.get_adapter_logits(finetuned_affinity, pure_logits, alpha, beta)
+        adapted_logits_with_finetuning = self.adapt_logits(finetuned_affinity, pure_logits, alpha, beta)
 
         return {
             "pure_logits": pure_logits,
-            "logits_with_adapter": logits_with_adapter,
-            "logits_with_finetuned_adapter": logits_with_finetuned_adapter,
+            "adapted_logits": adapted_logits,
+            "adapted_logits_with_finetuning": adapted_logits_with_finetuning,
         }
 
 
@@ -235,13 +235,13 @@ def train_logits(
     loader
         The dataset loader for training.
     logits_type
-        The target logits of training corresponding to "pure_logits", "logits_with_adapter", "logits_with_finetuned_adapter".
+        The target logits of training corresponding to "pure_logits", "adapted_logits", "adapted_logits_with_finetuning".
     
     Return
     ------
     The best model after training.
     """
-    if logits_type != "logits_with_finetuned_adapter":
+    if logits_type != "adapted_logits_with_finetuning":
         memory_bank_model.change_head_state(grad_state=True)
         memory_bank_model.change_adapter_state(grad_state=False)
         lr, train_epoch = args.lr, args.train_epoch
@@ -310,7 +310,7 @@ def run_memory_bank(
 ):
     """
     Test the effectiveness of memory bank. 
-    Compare the results of pure_logits, logits_with_adapter and logits_with_finetuned_adapter.
+    Compare the results of pure_logits, adapted_logits and adapted_logits_with_finetuning.
 
     Parameters
     ----------
@@ -349,7 +349,7 @@ def run_memory_bank(
     acc = cls_acc(logits["pure_logits"], val_labels)
     print("\n**** Pure model's val accuracy: {:.2f}. ****\n".format(acc))
     
-    acc = cls_acc(logits["logits_with_adapter"], val_labels)
+    acc = cls_acc(logits["adapted_logits"], val_labels)
     print("**** Model with memory_bank's val accuracy: {:.2f}. ****\n".format(acc))
 
     best_beta, best_alpha = search_hp(
@@ -357,7 +357,7 @@ def run_memory_bank(
         features=val_features, 
         labels=val_labels, 
         memory_bank_model=memory_bank_model, 
-        logits_type="logits_with_adapter",
+        logits_type="adapted_logits",
     )
 
     print("\n-------- Evaluating on the test set. --------")
@@ -367,7 +367,7 @@ def run_memory_bank(
     acc = cls_acc(logits["pure_logits"], test_labels)
     print("\n**** Pure Model's test accuracy: {:.2f}. ****\n".format(acc))
  
-    acc = cls_acc(logits["logits_with_adapter"], test_labels)
+    acc = cls_acc(logits["adapted_logits"], test_labels)
     print("**** Model with Adapter's test accuracy: {:.2f}. ****\n".format(acc))
 
     print("\n-------- Finetune Adapter. --------")
@@ -382,18 +382,18 @@ def run_memory_bank(
         alpha=alpha, 
         beta=beta, 
         loader=loader, 
-        logits_type="logits_with_finetuned_adapter",
+        logits_type="adapted_logits_with_finetuning",
     )
     best_beta, best_alpha = search_hp(
         args=args, 
         features=val_features, 
         labels=val_labels, 
         memory_bank_model=memory_bank_model, 
-        logits_type="logits_with_finetuned_adapter",
+        logits_type="adapted_logits_with_finetuning",
     )
     with torch.no_grad():
         logits = memory_bank_model(test_features, best_alpha, best_beta)
-    acc = cls_acc(logits["logits_with_finetuned_adapter"], test_labels)
+    acc = cls_acc(logits["adapted_logits_with_finetuning"], test_labels)
     print("**** Model with Finetuned Adapter's test accuracy: {:.2f}. ****\n".format(acc))
 
 def main():

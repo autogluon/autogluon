@@ -32,9 +32,9 @@ After preparing the datasets, run the example:
 
 ### 2. Method
 
-Memory bank follows the excellent design of [Tip-Adapter](https://arxiv.org/pdf/2207.09519.pdf) which stores the image features of few-shot training set to improve the performance of zero-shot CLIP through feature similarity. The stored features can also serve as the initialization of a trainable classifier. This ProtoNet-like design makes full use of few-shot training information and leads to good performance [3]. We believe that the effectiveness of this design is not limited to CLIP, and can be widely applied to few-shot classification tasks of images and texts. 
+The Memory Bank, inspired by [Tip-Adapter](https://arxiv.org/pdf/2207.09519.pdf), stores image features of the few-shot training set to improve the performance of zero-shot CLIP through feature similarity and serve as an initialization for a trainable classifier. This ProtoNet-like design effectively utilizes few-shot training information, resulting in good performance [3]. It has potential to be widely applied to few-shot classification tasks for images and texts.
 
-Memory bank which is the derivative application of Tip-Adapter obtains diversified multi-modal features through MultiModal Feature Extraction. In this example, we first trained a linear classifier based on multi-modal features to generate baseline accuracy. Then, the similarity result between features and memory bank is introduced to baseline predict probability. Finally, an additional linear adapter which is initialized with memory bank is trained to help few-shot classification.
+The Memory Bank, which is based on the Tip-Adapter model, uses MultiModal Feature Extraction to acquire diverse multi-modal features. To evaluate its performance, a linear classifier was first trained using these multi-modal features to establish a baseline accuracy. The similarity between the features and the Memory Bank was then incorporated into the baseline prediction probability. Finally, an additional linear adapter was trained, initialized with the Memory Bank, to aid in few-shot classification.
 
 Hyper-parameters `alpha` and `beta` which adjust the memory bank are modified through grid search on validation set to attain the superior performance.
 

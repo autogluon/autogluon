@@ -128,7 +128,7 @@ def search_hp(
     memory_bank_model
         The AutoMMMemoryBank to generate logits and logits with memory bank.
     logits_type
-        The target logits of searching corresponding to "logits_with_adapter" and "logits_with_finetuned_adapter".
+        The target logits of searching corresponding to "adapted_logits" and "adapted_logits_with_finetuning".
     
     Return
     ------
