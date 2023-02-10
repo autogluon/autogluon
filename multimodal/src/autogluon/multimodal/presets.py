@@ -341,12 +341,10 @@ def object_detection(presets: str = DEFAULT):
             {
                 "model.mmdet_image.checkpoint_name": "yolox_l_8x8_300e_coco",
                 "env.per_gpu_batch_size": 6,  # Works on GPU >= 24G
-                "optimization.learning_rate": 5e-5,
-                "optimization.lr_decay": 0.95,
-                "optimization.patience": 3,
-                "optimization.max_epochs": 30,
-                "optimization.val_check_interval": 1.0,
-                "optimization.check_val_every_n_epoch": 3,
+                "optimization.learning_rate": 1e-5,
+                "optimization.lr_mult": 32,
+                "optimization.patience": 20,
+                "optimization.max_epochs": 50,
             }
         )
     elif presets == BEST_QUALITY:
@@ -354,10 +352,9 @@ def object_detection(presets: str = DEFAULT):
             {
                 "model.mmdet_image.checkpoint_name": "yolox_x_8x8_300e_coco",
                 "env.per_gpu_batch_size": 3,  # Works on GPU >= 24G
-                "optimization.learning_rate": 1e-5,
-                "optimization.lr_decay": 0.95,
+                "optimization.learning_rate": 5e-6,
                 "optimization.patience": 20,
-                "optimization.max_epochs": 50,
+                "optimization.max_epochs": 100,
             }
         )
     else:
