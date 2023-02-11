@@ -21,7 +21,7 @@ import os
 import pandas as pd
 from autogluon.core.utils.loaders import load_zip
 
-download_dir = './ag_automm_tutorial_doc_classifier'
+download_dir = './ag_automm_tutorial_pdf_classifier'
 zip_file = "https://automl-mm-bench.s3.amazonaws.com/doc_classification/pdf_docs_small.zip"
 load_zip.unzip(zip_file, unzip_dir=download_dir)
 
