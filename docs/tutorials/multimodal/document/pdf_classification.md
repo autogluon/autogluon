@@ -10,7 +10,7 @@ It’s fair to say that AI has been the bedrock of modern digital document proce
 
 In this tutorial, we show how you can build a scanned document classifier with Autogluon Multimodal using a few lines of code. Let’s get started!
 
-## Get a Document Dataset
+## Get a PDF Document Dataset
 Now let's download a scanned document dataset. 
 This dataset is a sample of [RVL-CDIP](https://huggingface.co/datasets/rvl_cdip) which originally consists of 400,000 grayscale images in 16 classes, with 25,000 images per class. 
 Here, we sampled around 100 documents and three categories of document including budget (labelled as 0), email (labelled as 1), and form (labelled as 2).
