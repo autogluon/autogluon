@@ -31,13 +31,11 @@ train_data = pdf_docs.sample(frac=0.8, random_state=200)
 test_data = pdf_docs.drop(train_data.index)
 ```
 
-Now, let's visualize one of the PDF documents using `IFrame`.
+Now, let's visualize one of the PDF documents. Here, we use the S3 URL of the PDF document and `IFrame` to show it in the tutorial.
 ```{.python .input}
 from IPython.display import IFrame
 
-pdf_path_example = f"{download_dir}/{train_data.iloc[0].doc_path}"
-print(pdf_path_example)
-IFrame(pdf_path_example, width=400, height=500)
+IFrame("https://automl-mm-bench.s3.amazonaws.com/doc_classification/historical_1.pdf", width=400, height=500)
 ```
 As you can see, this document is an America's historical document in PDF format. 
 To make sure the tutorial can locate the documents correctly, we need to overwrite the document paths.
