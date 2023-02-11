@@ -38,6 +38,15 @@ text_prediction/index
 
 ```{toctree}
 ---
+caption: Document
+maxdepth: 1
+---
+
+document/index
+```
+
+```{toctree}
+---
 caption: Matching
 maxdepth: 1
 ---

@@ -21,7 +21,7 @@ For most of these models, CUDA will have to be installed and some models may nee
 
 ## What machine is best for running AutoGluon Tabular?
 
-As an open-source library, AutoGluon can be run on any machine including your laptop. Currently it is not necessary to use a GPU to train TabularPredictor so CPU machines are fine (in contrast, TextPredictor/ImagePredictor/ObjectDetector require GPUs). Most Tabular issues arise due to lack of memory, so we recommend running on a machine with as much memory as possible. For example if using AWS instances for Tabular: we recommend [M5 instances](https://aws.amazon.com/ec2/instance-types/m5/), where a **m5.24xlarge** machine should be able to handle most datasets.
+As an open-source library, AutoGluon can be run on any machine including your laptop. Currently it is not necessary to use a GPU to train TabularPredictor so CPU machines are fine (in contrast, MultiModalPredictor requires GPUs). Most Tabular issues arise due to lack of memory, so we recommend running on a machine with as much memory as possible. For example if using AWS instances for Tabular: we recommend [M5 instances](https://aws.amazon.com/ec2/instance-types/m5/), where a **m5.24xlarge** machine should be able to handle most datasets.
 
 
 ## How can I resolve memory issues?
