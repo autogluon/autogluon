@@ -18,7 +18,7 @@ from autogluon.core.utils.loaders import load_zip
 download_dir = "./ag_automm_tutorial_fs_cls"
 zip_file = "https://automl-mm-bench.s3.amazonaws.com/nlp_datasets/MLDoc-10shot-en.zip"
 load_zip.unzip(zip_file, unzip_dir=download_dir)
-dataset_path = os.path.join(download_dir, "MLDoc-10shot-en")
+dataset_path = os.path.join(download_dir)
 train_df = pd.read_csv(f"{dataset_path}/train.csv")
 test_df = pd.read_csv(f"{dataset_path}/test.csv")
 ```
