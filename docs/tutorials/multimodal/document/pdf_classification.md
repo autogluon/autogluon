@@ -1,5 +1,5 @@
 # Classifying PDF Documents with AutoMM.
-PDF comes short from Portable Document Format and is one of the most popular document formats. 
+PDF comes short from Portable Document Format and is one of the most popular document formats.
 We can find PDFs everywhere, from personal resumes to business contracts, and from commercial brochures to government documents. 
 The list can be endless. 
 PDF is highly praised for its portability. 
