@@ -1,9 +1,9 @@
 # AutoMM Presets
-:label:`sec_automm_multimodal_beginner`
+:label:`sec_automm_presets`
 
-AutoMM is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that are suitable for multimodal datasets. You will only need to convert the data into the multimodal dataframe format
-and AutoMM can predict the values of one column conditioned on the features from the other columns including images, text, and tabular data.
+It is well known that we usually need to set hyperparameters before the learning process begins. Deep learning models, e.g., pretrained foundation models, can have anywhere from a few hyperparameters to a few hundred hyperparameters. The hyperparameters can impact the learning rate, final model performance, as well as the inference speed. However, choosing the proper hyperparameters may be challenging for many users with limited expertise. 
 
+In this tutorial, we will introduce the easy-to-use presets in AutoMM. Our presets condense the complex hyperparameter setups into short strings. More specifically, 
 
 ```{.python .input}
 import os
