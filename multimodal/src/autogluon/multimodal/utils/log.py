@@ -8,7 +8,7 @@ import pytz
 
 from ..constants import AUTOMM
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def make_exp_dir(

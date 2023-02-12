@@ -23,7 +23,7 @@ from .utils import (
     get_optimizer,
 )
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class MatcherLitModule(pl.LightningModule):

@@ -17,7 +17,7 @@ from autogluon.multimodal.predictor import MultiModalPredictor
 from ..constants import AUTOMM, FEATURE_EXTRACTION, Y_PRED, Y_TRUE
 from ..utils import CustomUnpickler, compute_score, setup_save_path, try_to_infer_pos_label
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class FewShotSVMPredictor:

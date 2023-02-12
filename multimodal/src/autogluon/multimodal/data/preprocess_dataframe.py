@@ -31,7 +31,7 @@ from ..constants import (
     TEXT_NER,
 )
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
