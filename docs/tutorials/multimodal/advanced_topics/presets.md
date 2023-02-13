@@ -1,24 +1,21 @@
 # AutoMM Presets
 :label:`sec_automm_presets`
 
-It is well known that we usually need to set hyperparameters before the learning process begins. Deep learning models, e.g., pretrained foundation models, can have anywhere from a few hyperparameters to a few hundred hyperparameters. The hyperparameters can impact the learning rate, final model performance, as well as the inference speed. However, choosing the proper hyperparameters may be challenging for many users with limited expertise. 
+It is well-known that we usually need to set hyperparameters before the learning process begins. Deep learning models, e.g., pretrained foundation models, can have anywhere from a few hyperparameters to a few hundred. The hyperparameters can impact training speed, final model performance, and inference overhead. However, choosing the proper hyperparameters may be challenging for many users with limited expertise.
 
-In this tutorial, we will introduce the easy-to-use presets in AutoMM. Our presets condense the complex hyperparameter setups into simple strings. More specifically, AutoMM supports three presets: `medium_quality`, `high_quality`, and `best_quality`.
+In this tutorial, we will introduce the easy-to-use presets in AutoMM. Our presets can condense the complex hyperparameter setups into simple strings. More specifically, AutoMM supports three presets: `medium_quality`, `high_quality`, and `best_quality`.
 
 
 ```{.python .input}
-import os
-import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
-np.random.seed(123)
 ```
 
 ## Dataset
 
 For demonstration, we use a subsampled Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)) dataset, which consists of movie reviews and their associated sentiment. 
-Given a new movie review, the goal is to predict the sentiment reflected in the text (in this case a **binary classification**, where reviews are 
-labeled as 1 if they convey a positive opinion and labeled as 0 otherwise).
+Given a new movie review, the goal is to predict the sentiment reflected in the text (in this case, a **binary classification**, where reviews are 
+labeled as 1 if they conveyed a positive opinion and 0 otherwise).
 To get started, let's download and prepare the dataset.
 
 
@@ -54,7 +51,7 @@ scores
 ```
 
 ## High Quality
-If you want to balance the prediction quality and training/inference speed, you can try the `high_quality` preset, which uses a larger model than `medium_quality`. Accordingly, we need to increase the time limit since larger models requires more time to train.
+If you want to balance the prediction quality and training/inference speed, you can try the `high_quality` preset, which uses a larger model than `medium_quality`. Accordingly, we need to increase the time limit since larger models require more time to train.
 
 
 ```{.python .input}
@@ -75,7 +72,7 @@ scores
 ```
 
 ## Best Quality
-If you want the best performance and don't care about the training/inference cost, give it a try about the `best_quality` preset . High-end GPUs with large memory is preferred in this case. Compared to `high_quality`, it requires much longer training time.
+If you want the best performance and don't care about the training/inference cost, give it a try for the `best_quality` preset. High-end GPUs with large memory are preferred in this case. Compared to `high_quality`, it requires much longer training time.
 
 
 ```{.python .input}
@@ -93,7 +90,31 @@ scores
 ```
 
 ## HPO Presets
-The above three presets all use the default hyperparameters, which might not be optimal for your tasks. Fortunately, we also support doing hyperparameter optimization (HPO) with simple presets. To perform HPO, you can simply add a posfix `_hpo` in the three presets, resulting in `medium_quality_hpo`, `high_quality_hpo`, and `best_quality_hpo`.
+The above three presets all use the default hyperparameters, which might not be optimal for your tasks. Fortunately, we also support hyperparameter optimization (HPO) with simple presets. To perform HPO, you can add a postfix `_hpo` in the three presets, resulting in `medium_quality_hpo`, `high_quality_hpo`, and `best_quality_hpo`.
+
+## Display Presets
+In case you want to see each preset's inside details, we provide you with a util function to get the hyperparameter setups. For example, here are hyperparameters of preset `high_quality`. 
+
+
+```{.python .input}
+import json
+from autogluon.multimodal.presets import get_automm_presets
+hyperparameters, hyperparameter_tune_kwargs = get_automm_presets(problem_type="default", presets="high_quality")
+print(f"hyperparameters: {json.dumps(hyperparameters, sort_keys=True, indent=4)}")
+print(f"hyperparameter_tune_kwargs: {json.dumps(hyperparameter_tune_kwargs, sort_keys=True, indent=4)}")
+```
+
+The HPO presets make several hyperparameters tunable such as model backbone, batch size, learning rate, max epoch, and optimizer type. Below are the details of preset `high_quality_hpo`.
+
+
+```{.python .input}
+import json
+import yaml
+from autogluon.multimodal.presets import get_automm_presets
+hyperparameters, hyperparameter_tune_kwargs = get_automm_presets(problem_type="default", presets="high_quality_hpo")
+print(f"hyperparameters: {yaml.dump(hyperparameters, allow_unicode=True, default_flow_style=False)}")
+print(f"hyperparameter_tune_kwargs: {json.dumps(hyperparameter_tune_kwargs, sort_keys=True, indent=4)}")
+```
 
 ## Other Examples
 
