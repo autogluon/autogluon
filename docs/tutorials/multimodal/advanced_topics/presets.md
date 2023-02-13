@@ -6,7 +6,7 @@ It is well known that we usually need to set hyperparameters before the learning
 In this tutorial, we will introduce the easy-to-use presets in AutoMM. Our presets condense the complex hyperparameter setups into simple strings. More specifically, AutoMM supports three presets: `medium_quality`, `high_quality`, and `best_quality`.
 
 
-```python
+```{.python .input}
 import os
 import numpy as np
 import warnings
@@ -22,7 +22,7 @@ labeled as 1 if they convey a positive opinion and labeled as 0 otherwise).
 To get started, let's download and prepare the dataset.
 
 
-```python
+```{.python .input}
 from autogluon.core.utils.loaders import load_pd
 train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
 test_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
@@ -36,7 +36,7 @@ In some situations, we prefer fast training and inference over the prediction qu
 Among the three presets, `medium_quality` has the smallest model size. Now let's fit the predictor using the `medium_quality` preset. Here we set a tight time budget for a quick demo.
 
 
-```python
+```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
 predictor = MultiModalPredictor(label='label', eval_metric='acc', presets="medium_quality")
 predictor.fit(
@@ -48,7 +48,7 @@ predictor.fit(
 Then we can evaluate the predictor on the test data.
 
 
-```python
+```{.python .input}
 scores = predictor.evaluate(test_data, metrics=["roc_auc"])
 scores
 ```
@@ -57,7 +57,7 @@ scores
 If you want to balance the prediction quality and training/inference speed, you can try the `high_quality` preset, which uses a larger model than `medium_quality`. Accordingly, we need to increase the time limit since larger models requires more time to train.
 
 
-```python
+```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
 predictor = MultiModalPredictor(label='label', eval_metric='acc', presets="high_quality")
 predictor.fit(
@@ -69,7 +69,7 @@ predictor.fit(
 Although `high_quality` requires more training time than `medium_quality`, it also brings performance gains.
 
 
-```python
+```{.python .input}
 scores = predictor.evaluate(test_data, metrics=["roc_auc"])
 scores
 ```
@@ -78,7 +78,7 @@ scores
 If you want the best performance and don't care about the training/inference cost, give it a try about the `best_quality` preset . High-end GPUs with large memory is preferred in this case. Compared to `high_quality`, it requires much longer training time.
 
 
-```python
+```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
 predictor = MultiModalPredictor(label='label', eval_metric='acc', presets="best_quality")
 predictor.fit(train_data=train_data, time_limit=180)
@@ -87,7 +87,7 @@ predictor.fit(train_data=train_data, time_limit=180)
 We can see that `best_quality` achieves better performance than `high_quality`.
 
 
-```python
+```{.python .input}
 scores = predictor.evaluate(test_data, metrics=["roc_auc"])
 scores
 ```
