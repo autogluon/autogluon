@@ -6,11 +6,11 @@ dependencies:
   - black>=22.3,<23.0
   - isort>=5.10
   - sphinx
-  - myst_parser
-  - sphinx-material
   - furo
-  - git+https://github.com/executablebooks/sphinx-togglebutton # because of https://github.com/executablebooks/sphinx-togglebutton/issues/44
-  - sphinx-copybutton
+  - myst_parser
   - myst-nb
+  - sphinx-material
+  - sphinx-togglebutton
+  - sphinx-copybutton
   - sphinx-design
   - sphinx-inline-tabs
