@@ -57,4 +57,3 @@ def test_focal_loss_multiclass(checkpoint_name):
     predictions_str = predictor.predict(image_path)
     predictions_list1 = predictor.predict([image_path])
     predictions_list10 = predictor.predict([image_path] * 10)
-
