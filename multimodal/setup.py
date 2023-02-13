@@ -28,17 +28,17 @@ install_requires = [
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "boto3",  # version range defined in `core/_setup_utils.py`
     "requests>=2.21,<3",
-    "jsonschema<4.18",
-    "seqeval<1.3.0",
-    "evaluate<0.4.0",
+    "jsonschema>=4.14,<4.18",
+    "seqeval>=1.2.2,<1.3.0",
+    "evaluate>=0.2.2,<0.4.0",
     "accelerate>=0.9,<0.17",
-    "timm<0.7.0",
+    "timm>0.6,<0.7.0",
     "torch>=1.9,<1.14",
     "torchvision<0.15.0",
     "fairscale>=0.4.5,<0.4.14",
     "scikit-image>=0.19.1,<0.20.0",
     "pytorch-lightning>=1.8.0,<1.10.0",
-    "text-unidecode<1.4",
+    "text-unidecode>1.2,<1.4",
     "torchmetrics>=0.8.0,<0.9.0",
     "transformers>=4.23.0,<4.27.0",
     "nptyping>=1.4.4,<2.5.0",
@@ -53,8 +53,8 @@ install_requires = [
     "openmim>0.1.5,<0.4.0",
     "defusedxml>=0.7.1,<0.7.2",
     "jinja2>=3.0.3,<3.2",
-    "tensorboard",
-    "pytesseract<0.3.11",
+    "tensorboard>=2.9,<3",
+    "pytesseract>=0.3.9,<0.3.11",
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
