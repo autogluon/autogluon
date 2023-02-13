@@ -3,9 +3,10 @@
 
 It is well known that we usually need to set hyperparameters before the learning process begins. Deep learning models, e.g., pretrained foundation models, can have anywhere from a few hyperparameters to a few hundred hyperparameters. The hyperparameters can impact the learning rate, final model performance, as well as the inference speed. However, choosing the proper hyperparameters may be challenging for many users with limited expertise. 
 
-In this tutorial, we will introduce the easy-to-use presets in AutoMM. Our presets condense the complex hyperparameter setups into short strings. More specifically, 
+In this tutorial, we will introduce the easy-to-use presets in AutoMM. Our presets condense the complex hyperparameter setups into simple strings. More specifically, AutoMM supports three presets: `medium_quality`, `high_quality`, and `best_quality`.
 
-```{.python .input}
+
+```python
 import os
 import numpy as np
 import warnings
@@ -15,141 +16,84 @@ np.random.seed(123)
 
 ## Dataset
 
-For demonstration, we use a simplified and subsampled version of [PetFinder dataset](https://www.kaggle.com/c/petfinder-adoption-prediction). The task is to predict the animals' adoption rates based on their adoption profile information. In this simplified version, the adoption speed is grouped into two categories: 0 (slow) and 1 (fast).
-
+For demonstration, we use a subsampled Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)) dataset, which consists of movie reviews and their associated sentiment. 
+Given a new movie review, the goal is to predict the sentiment reflected in the text (in this case a **binary classification**, where reviews are 
+labeled as 1 if they convey a positive opinion and labeled as 0 otherwise).
 To get started, let's download and prepare the dataset.
 
 
-```{.python .input}
-download_dir = './ag_automm_tutorial'
-zip_file = 'https://automl-mm-bench.s3.amazonaws.com/petfinder_for_tutorial.zip'
-from autogluon.core.utils.loaders import load_zip
-load_zip.unzip(zip_file, unzip_dir=download_dir)
+```python
+from autogluon.core.utils.loaders import load_pd
+train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
+test_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
+subsample_size = 1000  # subsample data for faster demo, try setting this to larger values
+train_data = train_data.sample(n=subsample_size, random_state=0)
+train_data.head(10)
 ```
 
-Next, we will load the CSV files.
+## Medium Quality
+In some situations, we prefer fast training and inference over the prediction quality. `medium_quality` is designed for this purpose.
+Among the three presets, `medium_quality` has the smallest model size. Now let's fit the predictor using the `medium_quality` preset. Here we set a tight time budget for a quick demo.
 
 
-```{.python .input}
-import pandas as pd
-dataset_path = download_dir + '/petfinder_for_tutorial'
-train_data = pd.read_csv(f'{dataset_path}/train.csv', index_col=0)
-test_data = pd.read_csv(f'{dataset_path}/test.csv', index_col=0)
-label_col = 'AdoptionSpeed'
-```
-
-We need to expand the image paths to load them in training.
-
-
-```{.python .input}
-image_col = 'Images'
-train_data[image_col] = train_data[image_col].apply(lambda ele: ele.split(';')[0]) # Use the first image for a quick tutorial
-test_data[image_col] = test_data[image_col].apply(lambda ele: ele.split(';')[0])
-
-
-def path_expander(path, base_folder):
-    path_l = path.split(';')
-    return ';'.join([os.path.abspath(os.path.join(base_folder, path)) for path in path_l])
-
-train_data[image_col] = train_data[image_col].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
-test_data[image_col] = test_data[image_col].apply(lambda ele: path_expander(ele, base_folder=dataset_path))
-
-train_data[image_col].iloc[0]
-```
-
-Each animal's adoption profile includes pictures, a text description, and various tabular features such as age, breed, name, color, and more. Let's look at an example row of data and display the text description and a picture.
-
-
-```{.python .input}
-example_row = train_data.iloc[0]
-
-example_row
-```
-
-
-```{.python .input}
-example_row['Description']
-```
-
-
-```{.python .input}
-example_image = example_row[image_col]
-
-from IPython.display import Image, display
-pil_img = Image(filename=example_image)
-display(pil_img)
-```
-
-## Training
-Now let's fit the predictor with the training data. Here we set a tight time budget for a quick demo.
-
-```{.python .input}
+```python
 from autogluon.multimodal import MultiModalPredictor
-predictor = MultiModalPredictor(label=label_col)
+predictor = MultiModalPredictor(label='label', eval_metric='acc', presets="medium_quality")
 predictor.fit(
     train_data=train_data,
-    time_limit=120, # seconds
+    time_limit=30, # seconds
 )
 ```
-Under the hood, AutoMM automatically infers the problem type (classification or regression), detects the data modalities, selects the related models from the multimodal model pools, and trains the selected models. If multiple backbones are available, AutoMM appends a late-fusion model (MLP or transformer) on top of them.
 
-
-## Evaluation
 Then we can evaluate the predictor on the test data.
-```{.python .input}
+
+
+```python
 scores = predictor.evaluate(test_data, metrics=["roc_auc"])
 scores
 ```
 
+## High Quality
+If you want to balance the prediction quality and training/inference speed, you can try the `high_quality` preset, which uses a larger model than `medium_quality`. Accordingly, we need to increase the time limit since larger models requires more time to train.
 
-## Prediction
-Given a multimodal dataframe without the label column, we can predict the labels.
 
-
-```{.python .input}
-predictions = predictor.predict(test_data.drop(columns=label_col))
-predictions[:5]
+```python
+from autogluon.multimodal import MultiModalPredictor
+predictor = MultiModalPredictor(label='label', eval_metric='acc', presets="high_quality")
+predictor.fit(
+    train_data=train_data,
+    time_limit=60, # seconds
+)
 ```
 
-For classification tasks, we can get the probabilities of all classes.
+Although `high_quality` requires more training time than `medium_quality`, it also brings performance gains.
 
 
-```{.python .input}
-probas = predictor.predict_proba(test_data.drop(columns=label_col))
-probas[:5]
+```python
+scores = predictor.evaluate(test_data, metrics=["roc_auc"])
+scores
 ```
 
-Note that calling `.predict_proba()` on one regression task will throw an exception.
+## Best Quality
+If you want the best performance and don't care about the training/inference cost, give it a try about the `best_quality` preset . High-end GPUs with large memory is preferred in this case. Compared to `high_quality`, it requires much longer training time.
 
 
-## Extract Embeddings
-
-Extracting embeddings can also be useful in many cases, where we want to convert each sample (per row in the dataframe) into an embedding vector.
-
-```{.python .input}
-embeddings = predictor.extract_embedding(test_data.drop(columns=label_col))
-embeddings.shape
+```python
+from autogluon.multimodal import MultiModalPredictor
+predictor = MultiModalPredictor(label='label', eval_metric='acc', presets="best_quality")
+predictor.fit(train_data=train_data, time_limit=180)
 ```
 
+We can see that `best_quality` achieves better performance than `high_quality`.
 
-## Save and Load
-It is also convenient to save a predictor and re-load it.
 
-:::warning
-
-`MultiModalPredictor.load()` used `pickle` module implicitly, which is known to be insecure. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling. Never load data that could have come from an untrusted source, or that could have been tampered with. **Only load data you trust.**
-
-:::
-
-```{.python .input}
-import uuid
-
-model_path = f"./tmp/{uuid.uuid4().hex}-saved_model"
-predictor.save(model_path)
-loaded_predictor = MultiModalPredictor.load(model_path)
-scores2 = loaded_predictor.evaluate(test_data, metrics=["roc_auc"])
-scores2
+```python
+scores = predictor.evaluate(test_data, metrics=["roc_auc"])
+scores
 ```
+
+## HPO Presets
+The above three presets all use the default hyperparameters, which might not be optimal for your tasks. Fortunately, we also support doing hyperparameter optimization (HPO) with simple presets. To perform HPO, you can simply add a posfix `_hpo` in the three presets, resulting in `medium_quality_hpo`, `high_quality_hpo`, and `best_quality_hpo`.
 
 ## Other Examples
 
