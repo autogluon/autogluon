@@ -1,9 +1,8 @@
 # Release process
-# TODO: need to update all these resources based on new doc build approach
 
 ## Prior to release: 1 week out
 
-* Ensure the version specified in `docs/config.ini`, `VERSION`, `docs/index.rst`, and `docs/badges.rst` align with the intended release version.
+* Ensure the version specified in `docs/conf.py`, `VERSION`, and `docs/index.md` align with the intended release version.
 * Check all dependency version ranges.
   * Ensure all dependencies are not capped by major version, unless the reason is documented inline.
     * Example of major version cap: `scikit-learn<2`
@@ -38,10 +37,7 @@
 * Wait 1 day after code-freeze for pre-release to be published.
 * Ensure latest pre-release is working via `pip install --pre autogluon` and testing to get an idea of how the actual release will function (Ideally with fresh venv). DO NOT RELEASE if the pre-release does not work.
 * Ensure pip install instructions are working correctly for both CPU and GPU.
-  * Ensure explicit torch installs have the correct version range and are not overwritten during `pip install autogluon`:
-    * install-cpu-pip.rst
-    * install-cpu-source.rst
-    * install-windows-gpu.rst
+  * Ensure explicit torch installs have the correct version range and are not overwritten during `pip install autogluon`.
 * Ensure each sub-module is working IN ISOLATION via `pip install --pre autogluon.{submodule}`.
   * Ensure a fresh venv is used for each submodule.
   * Doing this will avoid issues like in v0.4 release with `autogluon.text` crashing when installed standalone due to missing setup.py dependencies
@@ -54,7 +50,7 @@
 * Ensure that the mainline code you are planning to release is stable: Benchmark, ensure CI passes, check with team, etc.
 * Cut a release branch with format `0.x.y` (no v) - this branch is required to publish docs to versioned path
   * Clone from master branch
-  * Add 1 commit to the release branch to remove pre-release warnings and update install instructions to remove `--pre`: https://github.com/autogluon/autogluon/commit/1d66194d4685b06e884bbf15dcb97580cbfb9261
+  * Add 1 commit to the release branch to remove pre-release warnings and update install instructions to remove `--pre`: [Old diff](https://github.com/autogluon/autogluon/commit/1d66194d4685b06e884bbf15dcb97580cbfb9261)
   * Update links to AG sub-modules website to be stable ones, i.e. cloud
   * Push release branch
   * Build the release branch docs in [CI](https://ci.gluon.ai/job/autogluon/).
@@ -93,7 +89,7 @@ After GitHub & PyPi release, conduct release on Conda-Forge
 ## Release Cheatsheet
 
 * If intending to create a new cheatsheet for the release, refer to [autogluon-doc-utils README.md](https://github.com/Innixma/autogluon-doc-utils) for instructions on creating a new cheatsheet.
-* If a cheatsheet exists for `0.x.y` (or `0.x`), update the `docs/cheatsheet.rst` url paths ([example](https://github.com/autogluon/autogluon/blob/0.4.1/docs/cheatsheet.rst)) in branch `0.x.y` to the correct location ([example for v0.4.0 and v0.4.1](https://github.com/Innixma/autogluon-doc-utils/tree/main/docs/cheatsheets/v0.4.0)).
+* If a cheatsheet exists for `0.x.y` (or `0.x`), update the `docs/cheatsheet.md` url paths ([example](https://github.com/autogluon/autogluon/blob/0.4.1/docs/cheatsheet.rst)) in branch `0.x.y` to the correct location ([example for v0.4.0 and v0.4.1](https://github.com/Innixma/autogluon-doc-utils/tree/main/docs/cheatsheets/v0.4.0)).
   * Example urls: [JPEG](https://raw.githubusercontent.com/Innixma/autogluon-doc-utils/main/docs/cheatsheets/v0.4.0/autogluon-cheat-sheet.jpeg), [PDF](https://nbviewer.org/github/Innixma/autogluon-doc-utils/blob/main/docs/cheatsheets/v0.4.0/autogluon-cheat-sheet.pdf)
   * Do NOT do this for `stable` branch or `master` branch, instead have them continue pointing to the [stable cheatsheet files](https://github.com/Innixma/autogluon-doc-utils/tree/main/docs/cheatsheets/stable). This is to ensure that as we release new versions of the cheatsheet, old docs will still refer to the correct cheatsheet for their version.
   * Finally, update the stable files [here](https://github.com/Innixma/autogluon-doc-utils/tree/main/docs/cheatsheets/stable) to reflect the latest released version of the cheatsheet.
@@ -103,16 +99,14 @@ After GitHub & PyPi release, conduct release on Conda-Forge
 * IF THERE IS A MAJOR ISSUE: Do an emergency hot-fix and a new release ASAP. Releases cannot be deleted, so a new release will have to be done.
 
 After release is published, on the mainline branch:
-* Update `release` in `docs/config.ini`
+* Update `release` in `docs/conf.py`
 * Increment version in the `VERSION` file
 * Update `ReleaseVersion` image link in `docs/badges.rst`
 * Update `README.md` sample code with new release version.
-* Add new version links to `docs/versions.rst`
-
 * Send release update to internal and external slack channels and mailing lists
 * Publish any blogs / talks planned for release to generate interest.
 
-### Post Release Conda-Forge Patching
+## Post Release Conda-Forge Patching
 
 Conda-Forge releases are mutable and can be changed post-release to fix breaking bugs without releasing a new version.
 
