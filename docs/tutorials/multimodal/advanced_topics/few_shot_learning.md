@@ -7,7 +7,7 @@ Specifically, we extract sample features with pretrained models, and use the fea
 
 ## Load Dataset
 We prepare all datasets in the format of `pd.DataFrame` as in many of our tutorials have done. 
-For this tutorial, we'll use a small `shopee` dataset for demonstration.
+For this tutorial, we'll use a small `MLDoc` dataset for demonstration. The dataset contains 4 classes and each class has 10 samples, a.k.a 10 shots.
 
 ```{.python .input}
 import pandas as pd
