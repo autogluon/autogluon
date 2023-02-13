@@ -39,7 +39,7 @@ from ..constants import (
     Y_TRUE,
 )
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def infer_metrics(

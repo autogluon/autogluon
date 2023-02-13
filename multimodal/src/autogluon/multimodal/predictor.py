@@ -26,6 +26,7 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
+from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from . import version as ag_version
 from .constants import (
@@ -152,9 +153,10 @@ from .utils import (
     update_config_by_rules,
     update_hyperparameters,
     update_tabular_config_by_resources,
+    upgrade_config,
 )
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class MultiModalPredictor(ExportMixin):
@@ -180,7 +182,7 @@ class MultiModalPredictor(ExportMixin):
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
-        verbosity: Optional[int] = 3,
+        verbosity: Optional[int] = 2,
         num_classes: Optional[int] = None,  # TODO: can we infer this from data?
         classes: Optional[list] = None,
         warn_if_exist: Optional[bool] = True,
@@ -359,13 +361,12 @@ class MultiModalPredictor(ExportMixin):
                     )
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
-            verbosity = 1  # don't use 3, which doesn't suppress logger.info() in .load().
             enable_progress_bar = False
             # Also disable progress bar of transformers package
             transformers.logging.disable_progress_bar()
 
         if verbosity is not None:
-            set_logger_verbosity(verbosity, logger=logger)
+            set_logger_verbosity(verbosity)
 
         self._label_column = label
         self._problem_type = problem_type
@@ -508,7 +509,7 @@ class MultiModalPredictor(ExportMixin):
 
         """
         self._verbosity = verbosity
-        set_logger_verbosity(verbosity, logger=logger)
+        set_logger_verbosity(verbosity)
         transformers.logging.set_verbosity(verbosity2loglevel(verbosity))
 
     def fit(
@@ -822,7 +823,10 @@ class MultiModalPredictor(ExportMixin):
         self._fit(**_fit_args)
         training_end = time.time()
         self._total_train_time = training_end - training_start
-        logger.info(f"Models and intermediate outputs are saved to {self._save_path} ")
+
+        # TODO(?) We should have a separate "_post_training_event()" for logging messages.
+        logger.info(get_fit_complete_message(self._save_path))
+
         return self
 
     def _verify_inference_ready(self):
@@ -979,7 +983,8 @@ class MultiModalPredictor(ExportMixin):
         clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
-
+        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
+        logger.info(get_fit_start_message(save_path, validation_metric_name))
         config = get_config(
             problem_type=self._problem_type,
             presets=presets,
@@ -1223,6 +1228,7 @@ class MultiModalPredictor(ExportMixin):
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
                 model_postprocess_fn=model_postprocess_fn,
                 trainable_param_names=trainable_param_names,
+                skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1783,7 +1789,6 @@ class MultiModalPredictor(ExportMixin):
         label: Optional[str] = None,
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
-        seed: Optional[int] = 123,
         eval_tool: Optional[str] = None,
     ):
         """
@@ -1819,8 +1824,6 @@ class MultiModalPredictor(ExportMixin):
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
-        seed
-            The random seed to use for this evaluation run.
         eval_tool
             The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
 
@@ -1855,7 +1858,6 @@ class MultiModalPredictor(ExportMixin):
                     anno_file_or_df=data,
                     metrics=metrics,
                     return_pred=return_pred,
-                    seed=seed,
                     eval_tool=eval_tool,
                 )
             else:
@@ -1865,7 +1867,6 @@ class MultiModalPredictor(ExportMixin):
                     anno_file_or_df=data,
                     metrics=metrics,
                     return_pred=return_pred,
-                    seed=seed,
                     eval_tool="torchmetrics",
                 )
 
@@ -1879,7 +1880,6 @@ class MultiModalPredictor(ExportMixin):
             data=data,
             requires_label=True,
             realtime=realtime,
-            seed=seed,
         )
         logits = extract_from_output(ret_type=ret_type, outputs=outputs)
 
@@ -1998,7 +1998,6 @@ class MultiModalPredictor(ExportMixin):
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
-        seed: Optional[int] = 123,
         save_results: Optional[bool] = None,
     ):
         """
@@ -2020,10 +2019,9 @@ class MultiModalPredictor(ExportMixin):
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
-        seed
-            The random seed to use for this prediction run.
         save_results
             Whether to save the prediction results (only works for detection now)
+
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
@@ -2064,7 +2062,6 @@ class MultiModalPredictor(ExportMixin):
                 data=data,
                 requires_label=False,
                 realtime=realtime,
-                seed=seed,
             )
 
             if self._problem_type == OCR_TEXT_RECOGNITION:
@@ -2130,7 +2127,6 @@ class MultiModalPredictor(ExportMixin):
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
         realtime: Optional[bool] = None,
-        seed: Optional[int] = 123,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -2155,8 +2151,6 @@ class MultiModalPredictor(ExportMixin):
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
-        seed
-            The random seed to use for this prediction run.
 
         Returns
         -------
@@ -2190,7 +2184,6 @@ class MultiModalPredictor(ExportMixin):
                 data=data,
                 requires_label=False,
                 realtime=realtime,
-                seed=seed,
             )
 
             if self._problem_type == NER:
@@ -2438,6 +2431,7 @@ class MultiModalPredictor(ExportMixin):
 
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)
+        config = upgrade_config(config, assets["version"])
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = CustomUnpickler(fp).load()
@@ -2482,16 +2476,6 @@ class MultiModalPredictor(ExportMixin):
             "pipeline" in assets and assets["pipeline"] == OBJECT_DETECTION
         ):
             data_processors = None
-
-        # backward compatibility for variable image size.
-        if version.parse(assets["version"]) <= version.parse("0.6.2"):
-            print("hasattr model.timm_image", hasattr(config, "model.timm_image"))
-            if OmegaConf.select(config, "model.timm_image") is not None:
-                logger.warn(
-                    "Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "
-                    "Try to update the timm image size."
-                )
-                config.model.timm_image.image_size = None
 
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]

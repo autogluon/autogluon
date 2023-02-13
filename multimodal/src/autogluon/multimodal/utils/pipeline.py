@@ -8,7 +8,7 @@ from .data import create_fusion_data_processors
 from .matcher import create_siamese_model
 from .model import create_fusion_model
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def init_pretrained(

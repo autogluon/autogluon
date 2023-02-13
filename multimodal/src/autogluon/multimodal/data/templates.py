@@ -19,7 +19,7 @@ from jinja2 import BaseLoader, Environment, meta
 
 from ..constants import AUTOMM
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 # Local path to the folder containing the templates
 TEMPLATES_FOLDER_PATH = pkg_resources.resource_filename(__name__, "templates")

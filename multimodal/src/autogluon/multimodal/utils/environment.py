@@ -11,7 +11,7 @@ from torch import nn
 from ..constants import AUTOMM, OBJECT_DETECTION, OCR
 from .mmcv import DataContainer
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def is_interactive():

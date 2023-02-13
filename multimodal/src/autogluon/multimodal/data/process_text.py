@@ -22,7 +22,7 @@ from .utils import (
     register_encoding_decoding_error_handlers,
 )
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 # Disable tokenizer parallelism
 os.environ["TOKENIZERS_PARALLELISM"] = "false"

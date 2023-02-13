@@ -11,7 +11,7 @@ from omegaconf import DictConfig, OmegaConf
 from ..constants import AUTOMM, END_OFFSET, ENTITY_GROUP, NER_ANNOTATION, PROBABILITY, START_OFFSET
 from .utils import process_ner_annotations
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class NerLabelEncoder:

@@ -9,7 +9,7 @@ from ..ft_transformer import CLSToken, FT_Transformer
 from ..utils import init_weights, run_model
 from .base import AbstractMultimodalFusionModel
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class MultimodalFusionTransformer(AbstractMultimodalFusionModel):

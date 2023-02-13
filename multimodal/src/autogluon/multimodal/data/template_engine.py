@@ -7,7 +7,7 @@ from autogluon.multimodal.data.templates import DatasetTemplates, Template, Temp
 
 from ..constants import AUTOMM
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class TemplateEngine:

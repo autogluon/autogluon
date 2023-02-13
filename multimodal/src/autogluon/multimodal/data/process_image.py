@@ -44,7 +44,7 @@ from .collator import PadCollator, StackCollator
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config, is_rois_input
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 

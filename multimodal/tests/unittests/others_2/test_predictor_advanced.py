@@ -4,12 +4,15 @@ import warnings
 
 import numpy.testing as npt
 import pytest
+from sklearn.model_selection import train_test_split
 from torch import Tensor
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import BIT_FIT, IA3, IA3_BIAS, IA3_LORA, LORA_BIAS, LORA_NORM, NORM_FIT
+from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePrediction
+from autogluon.multimodal.utils.misc import shopee_dataset
 
-from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset
+from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset, PetFinderDataset
 
 
 def _is_lazy_weight_tensor(p: Tensor) -> bool:
@@ -81,3 +84,28 @@ def test_predictor_gradient_checkpointing(
     new_predictor = MultiModalPredictor.load(save_path)
     new_predictions = new_predictor.predict(test_data, as_pandas=False)
     npt.assert_allclose(new_predictions, predictions)
+
+
+def test_predictor_skip_final_val():
+    download_dir = "./"
+    save_path = "petfinder_checkpoint"
+    train_df, tune_df = shopee_dataset(download_dir=download_dir)
+
+    predictor = MultiModalPredictor(label="label", path=save_path)
+    hyperparameters = {
+        "model.names": ["timm_image"],
+        "model.timm_image.checkpoint_name": "ghostnet_100",
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "optimization.top_k_average_method": "best",
+        "optimization.val_check_interval": 1.0,
+        "optimization.skip_final_val": True,
+    }
+    predictor.fit(
+        train_data=train_df,
+        tuning_data=tune_df,
+        hyperparameters=hyperparameters,
+        time_limit=2,
+    )
+    predictor_new = MultiModalPredictor.load(path=save_path)
+    assert isinstance(predictor_new._model, TimmAutoModelForImagePrediction)
