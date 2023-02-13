@@ -304,8 +304,8 @@ def object_detection(presets: str = DEFAULT):
         "env.precision": 32,
         "env.strategy": "ddp",
         "env.auto_select_gpus": False,  # Have to turn off for detection!
-        "env.num_gpus": -1,
-        "env.per_gpu_batch_size": 16,  # Works on GPU >= 24G
+        "env.num_gpus": 2,
+        "env.per_gpu_batch_size": 16,  # Works on 16G GPU
         "env.num_workers": 2,
         "optimization.learning_rate": 1e-4,
         "optimization.lr_decay": 0.90,
@@ -340,7 +340,7 @@ def object_detection(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "yolox_l_8x8_300e_coco",
-                "env.per_gpu_batch_size": 6,  # Works on GPU >= 24G
+                "env.per_gpu_batch_size": 4,  # Works on 16G GPU
                 "optimization.learning_rate": 5e-5,
                 "optimization.lr_decay": 0.95,
                 "optimization.patience": 3,
@@ -353,7 +353,7 @@ def object_detection(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "yolox_x_8x8_300e_coco",
-                "env.per_gpu_batch_size": 3,  # Works on GPU >= 24G
+                "env.per_gpu_batch_size": 2,  # Works on 16G GPU
                 "optimization.learning_rate": 1e-5,
                 "optimization.lr_decay": 0.95,
                 "optimization.patience": 20,
