@@ -59,7 +59,7 @@ from autogluon.multimodal import MultiModalPredictor
 predictor = MultiModalPredictor(label='label', eval_metric='acc', presets="high_quality")
 predictor.fit(
     train_data=train_data,
-    time_limit=60, # seconds
+    time_limit=50, # seconds
 )
 ```
 
