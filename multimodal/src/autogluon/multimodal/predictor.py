@@ -1931,7 +1931,7 @@ class MultiModalPredictor(ExportMixin):
                     if per_metric.lower() in score:
                         results.update({per_metric: score[per_metric.lower()]})
                     else:
-                        logger.warning(f"Warning: {per_metric} is not a suppported evaluation metric!")
+                        logger.warning(f"Warning: {per_metric} is not a supported evaluation metric!")
                 if not results:
                     results = score  # If the results dict is empty, return all scores.
         else:

@@ -66,7 +66,7 @@ If user follows the Label-Studio's import data instruction(https://labelstud.io/
 
 However, if the labeling tasks contains data that are imported directly through Label-Studio Web UI, it's recommended to set the `ls_host_on` to `True` and make sure the Label-Studio Web UI host is on.
 
-Some examples are given below to demostrate the impact of the value of  `ls_host_on` .
+Some examples are given below to demonstrate the impact of the value of  `ls_host_on` .
 
 
 
@@ -86,7 +86,7 @@ These two params indicate the data and label contents of an exported file that u
 
 ### Example 1. data with files  
 
-we use the label-studio **Image Classification Template** export file to demostrate how we deal with data with files. In this use case, user:
+we use the label-studio **Image Classification Template** export file to demonstrate how we deal with data with files. In this use case, user:
 
 - Choose "Image Classification" template in Label-Studio
 - Annotate the images in Label-Studio 
@@ -118,7 +118,7 @@ Normally,  data with files like images should be provided with their URL as we m
 | :------------------------: | :---------------------------: | :----------------------------: | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | file url, text content,... |               √               |               √                |                                                              | Not doing anything                                           |
 |     "/data/upload/..."     |               √               |               X                | use didn't provide url of the image, just import the image directly in LS | [ls_host_on=True]:   join with the label-studio host(e.g: http://locahost:8080/data/upload/...), when the LS host is on, the file is accessible<br />[ls_host_on=False]: cannot access |
-|  "/data/local-files/..."   |               √               |         √(conditional)         | use didn't provide url of the image, instead they set up a localstorage in LS. | [ls_host_on=True]:   join with the label-studio host(e.g: http://locahost:8080/data/upload/...)<br />[ls_host_on=False]: reserve the local path of the data files(if the root of the dataset is not moved) |
+|  "/data/local-files/..."   |               √               |         √(conditional)         | use didn't provide url of the image, instead they set up a local storage in LS. | [ls_host_on=True]:   join with the label-studio host(e.g: http://locahost:8080/data/upload/...)<br />[ls_host_on=False]: reserve the local path of the data files(if the root of the dataset is not moved) |
 |            ...             |                               |                                |                                                              |                                                              |
 
 
@@ -133,13 +133,13 @@ An demo output with `ls_host_on=True` :
 
 An demo output with `ls_host_on=False` :
 
-(the "uploaded" data will be warned for not accessable)
+(the "uploaded" data will be warned for not accessible)
 
 ![image-20221230233443558](assets/image-20221230233443558.png)
 
 ### Example 2. Text annotations  (URL not required )
 
-To we use the label-studio **named entity recognition** export file to demostrate cases like this. In this use case, user: 
+To we use the label-studio **named entity recognition** export file to demonstrate cases like this. In this use case, user: 
 
 - Choose "named entity recognition" template in Label-Studio
 

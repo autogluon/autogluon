@@ -61,7 +61,7 @@ num_gpus = -1  # use all GPUs
 
 We create the MultiModalPredictor with selected checkpoint name and number of GPUs.
 We need to specify the problem_type to `"object_detection"`,
-and also provide a `sample_data_path` for the predictor to infer the catgories of the dataset.
+and also provide a `sample_data_path` for the predictor to infer the catagories of the dataset.
 Here we provide the `train_path`, and it also works using any other split of this dataset.
 
 ```python .input
