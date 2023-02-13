@@ -1,7 +1,7 @@
 # AutoMM Presets
 :label:`sec_automm_presets`
 
-It is well-known that we usually need to set hyperparameters before the learning process begins. Deep learning models, e.g., pretrained foundation models, can have anywhere from a few hyperparameters to a few hundred. The hyperparameters can impact training speed, final model performance, and inference overhead. However, choosing the proper hyperparameters may be challenging for many users with limited expertise.
+It is well-known that we usually need to set hyperparameters before the learning process begins. Deep learning models, e.g., pretrained foundation models, can have anywhere from a few hyperparameters to a few hundred. The hyperparameters can impact training speed, final model performance, and inference latency. However, choosing the proper hyperparameters may be challenging for many users with limited expertise.
 
 In this tutorial, we will introduce the easy-to-use presets in AutoMM. Our presets can condense the complex hyperparameter setups into simple strings. More specifically, AutoMM supports three presets: `medium_quality`, `high_quality`, and `best_quality`.
 
@@ -29,7 +29,7 @@ train_data.head(10)
 ```
 
 ## Medium Quality
-In some situations, we prefer fast training and inference over the prediction quality. `medium_quality` is designed for this purpose.
+In some situations, we prefer fast training and inference to the prediction quality. `medium_quality` is designed for this purpose.
 Among the three presets, `medium_quality` has the smallest model size. Now let's fit the predictor using the `medium_quality` preset. Here we set a tight time budget for a quick demo.
 
 
