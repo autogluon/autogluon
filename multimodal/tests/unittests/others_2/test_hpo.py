@@ -6,6 +6,7 @@ from ray import tune
 
 from autogluon.core.hpo.ray_tune_constants import SCHEDULER_PRESETS, SEARCHER_PRESETS
 from autogluon.multimodal import MultiModalPredictor
+from autogluon.multimodal.constants import ALL_MODEL_QUALITIES
 
 from ..others.test_matcher import verify_matcher_save_load
 from ..predictor.test_predictor import verify_predictor_save_load
@@ -13,9 +14,7 @@ from ..utils.unittest_datasets import IDChangeDetectionDataset, PetFinderDataset
 from ..utils.utils import get_home_dir
 
 
-@pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))
-@pytest.mark.parametrize("scheduler", list(SCHEDULER_PRESETS.keys()))
-def test_predictor_hpo(searcher, scheduler):
+def predictor_hpo(searcher, scheduler, presets=None):
     dataset = PetFinderDataset()
 
     hyperparameters = {
@@ -38,6 +37,7 @@ def test_predictor_hpo(searcher, scheduler):
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=dataset.metric,
+        presets=presets,
     )
 
     save_path = os.path.join(get_home_dir(), "hpo", f"_{searcher}", f"_{scheduler}")
@@ -64,9 +64,7 @@ def test_predictor_hpo(searcher, scheduler):
     )
 
 
-@pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))
-@pytest.mark.parametrize("scheduler", list(SCHEDULER_PRESETS.keys()))
-def test_matcher_hpo(searcher, scheduler):
+def matcher_hpo(searcher, scheduler, presets=None):
     dataset = IDChangeDetectionDataset()
 
     hyperparameters = {
@@ -75,6 +73,7 @@ def test_matcher_hpo(searcher, scheduler):
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
         "optimization.top_k_average_method": "greedy_soup",
+        "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
     }
 
     hyperparameter_tune_kwargs = {
@@ -90,6 +89,7 @@ def test_matcher_hpo(searcher, scheduler):
         label=dataset.label_columns[0] if dataset.label_columns else None,
         match_label=dataset.match_label,
         eval_metric=dataset.metric,
+        presets=presets,
     )
 
     save_path = os.path.join(get_home_dir(), "hpo", f"_{searcher}", f"_{scheduler}")
@@ -99,7 +99,7 @@ def test_matcher_hpo(searcher, scheduler):
     matcher = matcher.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=60,
+        time_limit=90,
         save_path=save_path,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
@@ -111,9 +111,31 @@ def test_matcher_hpo(searcher, scheduler):
     predictor = matcher.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=60,
+        time_limit=90,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
+
+
+@pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))
+@pytest.mark.parametrize("scheduler", list(SCHEDULER_PRESETS.keys()))
+def test_predictor_hpo(searcher, scheduler):
+    predictor_hpo(searcher, scheduler)
+
+
+@pytest.mark.parametrize("presets", [f"{quality}_hpo" for quality in ALL_MODEL_QUALITIES])
+def test_predictor_hpo_presets(presets):
+    predictor_hpo("random", "FIFO", presets)
+
+
+@pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))
+@pytest.mark.parametrize("scheduler", list(SCHEDULER_PRESETS.keys()))
+def test_matcher_hpo(searcher, scheduler):
+    matcher_hpo(searcher, scheduler)
+
+
+@pytest.mark.parametrize("presets", [f"{quality}_hpo" for quality in ALL_MODEL_QUALITIES])
+def test_matcher_hpo_presets(presets):
+    matcher_hpo("random", "FIFO", presets)
 
 
 @pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))

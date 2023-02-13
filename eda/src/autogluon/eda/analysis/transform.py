@@ -10,6 +10,8 @@ from .base import AbstractAnalysis
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["ApplyFeatureGenerator"]
+
 
 class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
     """
@@ -82,7 +84,7 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
             x = x.drop(columns=args.label)
         self.feature_generator.fit(x)
         self.args["feature_generator"] = True
-        for (ds, df) in self.available_datasets(args):
+        for ds, df in self.available_datasets(args):
             x = df
             y = None
             if args.label in df.columns:

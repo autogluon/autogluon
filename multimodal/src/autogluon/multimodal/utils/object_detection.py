@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import warnings
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Union
 
@@ -8,15 +9,132 @@ import defusedxml.ElementTree as ET
 import numpy as np
 import pandas as pd
 
-from ..constants import AUTOMM, MAP, OBJECT_DETECTION
+from ..constants import (
+    AUTOMM,
+    MAP,
+    MAP_50,
+    MAP_75,
+    MAP_LARGE,
+    MAP_MEDIUM,
+    MAP_SMALL,
+    MAR_1,
+    MAR_10,
+    MAR_100,
+    MAR_LARGE,
+    MAR_MEDIUM,
+    MAR_SMALL,
+    MEAN_AVERAGE_PRECISION,
+    OBJECT_DETECTION,
+)
 from .download import download, is_url
 from .inference import predict
 from .save import setup_save_path
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
-def from_dict(data: dict):
+def object_detection_data_to_df(data: Union[pd.DataFrame, dict, list, str]) -> pd.DataFrame:
+    """
+    Construct a dataframe from a data dictionary, json file path (for COCO), folder path (for VOC),
+    image path (for single image), list of image paths (for multiple images)
+    Parameters
+    ----------
+    data (dict, str, list)
+
+    Returns
+    -------
+    a pandas DataFrame with columns "image", "rois", and "label".
+    """
+    if isinstance(data, dict):
+        return from_dict(data)
+    if isinstance(data, list):
+        return from_list(data)
+    if isinstance(data, str):
+        if os.path.isdir(data) or data.endswith(".json"):
+            return from_coco_or_voc(data)
+        return from_str(data)
+    if isinstance(data, pd.DataFrame):
+        sanity_check_dataframe(data)
+        return data
+
+    raise TypeError(
+        "Expected data to be an instance of dict, list, str or pd.DataFrame, but got {} of type {}".format(
+            data, type(data)
+        )
+    )
+
+
+def sanity_check_dataframe(data: pd.DataFrame):
+    """
+    Checking if the dataframe contains valid headers and values
+    Parameters
+    ----------
+    data
+        dataframe holding the data for object detection
+    Returns
+    -------
+
+    """
+    if "image" not in data:
+        raise ValueError(f"column 'image' not found in data column names: {data.columns.to_list()}")
+    if "rois" not in data and "label" not in data:
+        raise ValueError(f"Both column 'rois' and 'label' not found in data column names: {data.columns.to_list()}")
+    else:
+        if "rois" not in data:
+            warnings.warn(
+                f"column 'rois' not found in data column names: {data.columns.to_list()}. Copying from 'label' column..."
+            )
+            data["rois"] = data["label"]
+        if "label" not in data:
+            warnings.warn(
+                f"column 'label' not found in data column names: {data.columns.to_list()}. Copying from 'rois' column..."
+            )
+            data["label"] = data["rois"]
+    assert data.shape[0] > 0, "data frame is empty"
+
+
+def from_str(data: str) -> pd.DataFrame:
+    """
+    Construct a dataframe a string representing a single image path
+    Parameters
+    ----------
+    data
+        string of the image path
+    Returns
+    -------
+    a pandas DataFrame with columns "image", "rois", and "label".
+    """
+    d = {"image": [], "rois": [], "label": []}
+    d["image"].append(data)
+    # Dummy rois
+    d["rois"].append([[-1, -1, -1, -1, 0]])
+    d["label"].append([[-1, -1, -1, -1, 0]])
+    df = pd.DataFrame(d)
+    return df.sort_values("image").reset_index(drop=True)
+
+
+def from_list(data: List[str]) -> pd.DataFrame:
+    """
+    Construct a dataframe from list of image paths
+    Parameters
+    ----------
+    data
+        List containing the image paths
+    Returns
+    -------
+    a pandas DataFrame with columns "image", "rois", and "label".
+    """
+    d = {"image": [], "rois": [], "label": []}
+    for image_name in data:
+        d["image"].append(image_name)
+        # Dummy rois
+        d["rois"].append([[-1, -1, -1, -1, 0]])
+        d["label"].append([[-1, -1, -1, -1, 0]])
+    df = pd.DataFrame(d)
+    return df.sort_values("image").reset_index(drop=True)
+
+
+def from_dict(data: dict) -> pd.DataFrame:
     """
     Construct a dataframe (dummy) from a data dictionary, with the form {"image": ["img1.jpg", "img2.jpg", ...]}
     Parameters
@@ -455,6 +573,7 @@ def from_coco(
         else:
             abs_path = os.path.join(root, entry["file_name"])
         if not os.path.exists(abs_path):
+            logger.warning(f"File skipped since not exists: {abs_path}.")
             continue
         rois, _ = _check_load_coco_bbox(
             coco,
@@ -616,7 +735,10 @@ def cocoeval_torchmetrics(outputs: List):
 
 
 def cocoeval_pycocotools(
-    outputs: List, data: pd.DataFrame, anno_file: str, cache_path: str, metrics: Optional[Union[str, List]]
+    outputs: List,
+    data: pd.DataFrame,
+    anno_file: str,
+    cache_path: str,
 ):
     """
     Evaluate predictor's output using pycocotool's mAP implementation: https://github.com/cocodataset/cocoapi
@@ -633,8 +755,6 @@ def cocoeval_pycocotools(
         The path to COCO format json annotation file.
     cache_path
         The cache path to store prediction result in COCO format.
-    metrics
-        The name of metrics to be reported.
 
     Returns
     -------
@@ -662,13 +782,31 @@ def cocoeval_pycocotools(
     cocoEval.accumulate()
     cocoEval.summarize()
 
-    # TODO: support assigning metrics
-    if isinstance(metrics, list):
-        metrics = metrics[0]
-    elif metrics is None:
-        metrics = MAP
+    return cocoEval.stats
 
-    return {metrics: cocoEval.stats[0]}
+
+def parse_detection_result(
+    result: Optional[Union[Dict, np.ndarray]],
+):
+    if isinstance(result, np.ndarray):
+        return {
+            MAP: result[0],
+            MEAN_AVERAGE_PRECISION: result[0],
+            MAP_50: result[1],
+            MAP_75: result[2],
+            MAP_SMALL: result[3],
+            MAP_MEDIUM: result[4],
+            MAP_LARGE: result[5],
+            MAR_1: result[6],
+            MAR_10: result[7],
+            MAR_100: result[8],
+            MAR_SMALL: result[9],
+            MAR_MEDIUM: result[10],
+            MAR_LARGE: result[11],
+        }
+    else:
+        result[MEAN_AVERAGE_PRECISION] = result[MAP]
+        return result
 
 
 def cocoeval(
@@ -702,9 +840,21 @@ def cocoeval(
     The mAP result.
     """
     if (not tool) or tool == "pycocotools":
-        return cocoeval_pycocotools(outputs, data, anno_file, cache_path, metrics)
+        result = cocoeval_pycocotools(outputs, data, anno_file, cache_path)
     elif tool == "torchmetrics":
-        return cocoeval_torchmetrics(outputs)
+        result = cocoeval_torchmetrics(outputs)
+    else:
+        raise ValueError(f"Unsupported eval_tool: {tool}")
+
+    result = parse_detection_result(result)
+
+    if metrics:
+        if isinstance(metrics, str) and metrics.lower() in result:
+            return {metrics.lower(): result[metrics.lower()]}
+        elif isinstance(metrics, list):
+            return {metric.lower(): result[metric.lower()] for metric in metrics}
+
+    return result
 
 
 def dump_voc_classes(voc_annotation_path: str, voc_class_names_output_path: str = None) -> [str]:
@@ -1218,7 +1368,6 @@ def evaluate_coco(
     anno_file_or_df: str,
     metrics: str,
     return_pred: Optional[bool] = False,
-    seed: Optional[int] = 123,
     eval_tool: Optional[str] = None,
 ):
     """
@@ -1253,7 +1402,6 @@ def evaluate_coco(
         predictor=predictor,
         data=data,
         requires_label=True,
-        seed=seed,
     )  # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
 
     # Cache prediction results as COCO format # TODO: refactor this
@@ -1276,3 +1424,32 @@ def evaluate_coco(
         return eval_results, outputs
     else:
         return eval_results
+
+
+def setup_detection_train_tuning_data(predictor, max_num_tuning_data, seed, train_data, tuning_data):
+    if isinstance(train_data, str):
+        predictor._detection_anno_train = train_data
+        train_data = from_coco_or_voc(train_data, "train")  # TODO: Refactor to use convert_data_to_df
+        if tuning_data is not None:
+            predictor.detection_anno_train = tuning_data
+            tuning_data = from_coco_or_voc(tuning_data, "val")  # TODO: Refactor to use convert_data_to_df
+            if max_num_tuning_data is not None:
+                if len(tuning_data) > max_num_tuning_data:
+                    tuning_data = tuning_data.sample(
+                        n=max_num_tuning_data, replace=False, random_state=seed
+                    ).reset_index(drop=True)
+    elif isinstance(train_data, pd.DataFrame):
+        predictor._detection_anno_train = None
+        # sanity check dataframe columns
+        train_data = object_detection_data_to_df(train_data)
+        if tuning_data is not None:
+            predictor.detection_anno_train = tuning_data
+            tuning_data = object_detection_data_to_df(tuning_data)
+            if max_num_tuning_data is not None:
+                if len(tuning_data) > max_num_tuning_data:
+                    tuning_data = tuning_data.sample(
+                        n=max_num_tuning_data, replace=False, random_state=seed
+                    ).reset_index(drop=True)
+    else:
+        raise TypeError(f"Expected train_data to have type str or pd.DataFrame, but got type: {type(train_data)}")
+    return train_data, tuning_data

@@ -11,9 +11,10 @@ from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
 from ..constants import AUTOMM, FEATURES, LOGITS, WEIGHT
+from ..models.utils import run_model
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class DistillerLitModule(pl.LightningModule):
@@ -340,10 +341,10 @@ class DistillerLitModule(pl.LightningModule):
         self,
         batch: dict,
     ):
-        student_output = self.student_model(batch)
+        student_output = run_model(self.student_model, batch)
         self.teacher_model.eval()
         with torch.no_grad():
-            teacher_output = self.teacher_model(batch)
+            teacher_output = run_model(self.teacher_model, batch)
         label = batch[self.student_model.label_key]
         loss = self._compute_loss(
             student_output=student_output,

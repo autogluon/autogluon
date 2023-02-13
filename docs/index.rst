@@ -92,22 +92,11 @@ Tutorials
       How to train time series models for forecasting.
 
    .. card::
-      :title: Image Prediction (Legacy Version)
-      :link: tutorials/image_prediction/index.html
+      :title: Exploratory Data Analysis
+      :link: tutorials/eda/index.html
 
-      How to classify images into various categories.
+      Tools to explore and visualize data.
 
-   .. card::
-      :title: Object Detection (Legacy Version)
-      :link: tutorials/object_detection/index.html
-
-      How to detect objects and their location in images.
-
-   .. card::
-      :title: Text Prediction (Legacy Version)
-      :link: tutorials/text_prediction/index.html
-
-      How to solve NLP problems via supervised learning from raw text.
 
 Managed Solutions Featuring AutoGluon
 -------------------------------------
@@ -129,10 +118,8 @@ Launch Tutorial Notebooks
    tutorials/multimodal/index
    tutorials/timeseries/index
    tutorials/cloud_fit_deploy/index
+   tutorials/eda/index
    cheatsheet.rst
-   tutorials/image_prediction/index
-   tutorials/object_detection/index
-   tutorials/text_prediction/index
    api/autogluon.predictor
    api/autogluon.features
    api/autogluon.tabular.models

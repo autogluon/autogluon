@@ -5,6 +5,7 @@ import pandas as pd
 import pytorch_lightning as pl
 import torch
 from omegaconf import OmegaConf
+from scipy.special import softmax
 from torch import nn
 
 from ..constants import (
@@ -41,7 +42,7 @@ from .log import LogFilter, apply_log_filter
 from .matcher import compute_matching_probability
 from .misc import tensor_to_ndarray
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional[bool] = True):
@@ -92,19 +93,21 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         as_ndarray = False
         for ele in outputs:
             logits_label = ele[NER_ANNOTATION].detach().cpu().numpy()
+            logits = softmax(ele[LOGITS].detach().cpu().numpy(), axis=-1)
             token_word_mapping = ele[TOKEN_WORD_MAPPING].detach().cpu().numpy()
             word_offsets = ele[WORD_OFFSETS].detach().cpu().numpy()
-            for token_preds, mappings, offsets in zip(logits_label, token_word_mapping, word_offsets):
-                pred_one_sentence, word_offset = [], []
+            for token_preds, logit, mappings, offsets in zip(logits_label, logits, token_word_mapping, word_offsets):
+                pred_one_sentence, word_offset, pred_proba = [], [], []
                 counter = 0
                 temp = set()
-                for token_pred, mapping in zip(token_preds, mappings):
+                for token_pred, mapping, lt in zip(token_preds, mappings, logit):
                     if mapping != -1 and mapping not in temp:
                         temp.add(mapping)
                         word_offset.append(list(offsets[counter]))
                         pred_one_sentence.append(token_pred)
+                        pred_proba.append(lt)
                         counter += 1
-                ner_pred.append((pred_one_sentence, word_offset))
+                ner_pred.append((pred_one_sentence, word_offset, pred_proba))
         return ner_pred
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
@@ -431,7 +434,6 @@ def predict(
     signature: Optional[str] = None,
     realtime: Optional[bool] = None,
     is_matching: Optional[bool] = False,
-    seed: Optional[int] = 123,
 ) -> List[Dict]:
     """
     Perform inference for predictor or matcher.
@@ -460,9 +462,6 @@ def predict(
     -------
     A list of output dicts.
     """
-    with apply_log_filter(LogFilter("Global seed set to")):  # Ignore the log "Global seed set to"
-        pl.seed_everything(seed, workers=True)
-
     if is_matching:
         data, df_preprocessor, data_processors, match_label = predictor._on_predict_start(
             data=data,

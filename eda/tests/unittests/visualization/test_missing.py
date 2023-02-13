@@ -13,17 +13,17 @@ def test_MissingValues():
     state = __prepare_test_data()
     viz = MissingValues(graph_type="matrix", headers=True, abc=123)
     viz._internal_render = MagicMock()
-    viz.render_text = MagicMock()
+    viz.render_markdown = MagicMock()
 
     viz.render(state)
 
     assert viz._internal_render.call_count == 2
 
-    assert viz.render_text.call_count == 2
-    viz.render_text.assert_has_calls(
+    assert viz.render_markdown.call_count == 2
+    viz.render_markdown.assert_has_calls(
         calls=[
-            call("train_data missing values analysis", text_type="h3"),
-            call("test_data missing values analysis", text_type="h3"),
+            call("**`train_data` missing values analysis**"),
+            call("**`test_data` missing values analysis**"),
         ]
     )
 
@@ -39,12 +39,12 @@ def test_MissingValues__no_headers():
     state = __prepare_test_data()
     viz = MissingValues(headers=False)
     viz._internal_render = MagicMock()
-    viz.render_text = MagicMock()
+    viz.render_markdown = MagicMock()
 
     viz.render(state)
 
     assert viz._internal_render.call_count == 2
-    assert viz.render_text.call_count == 0
+    assert viz.render_markdown.call_count == 0
 
 
 @pytest.mark.parametrize(

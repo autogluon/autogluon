@@ -22,11 +22,13 @@ def test_existing_save_path_but_empty_folder(save_path):
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
         "model.names": ["timm_image", "hf_text", "fusion_mlp"],
-        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
     }
 
     abs_path = os.path.abspath(os.path.expanduser(save_path))
+    if os.path.exists(abs_path):
+        shutil.rmtree(abs_path)
     os.makedirs(abs_path, exist_ok=True)
     predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
@@ -72,11 +74,13 @@ def test_existing_save_path_with_content_inside(save_path):
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
         "model.names": ["timm_image", "hf_text", "fusion_mlp"],
-        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
     }
 
     abs_path = os.path.abspath(os.path.expanduser(save_path))
+    if os.path.exists(abs_path):
+        shutil.rmtree(abs_path)
     os.makedirs(abs_path, exist_ok=True)
     dummy_file_path = os.path.join(abs_path, "dummy.txt")
     with open(dummy_file_path, "w") as f:
@@ -114,7 +118,7 @@ def test_continuous_training_save_path():
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
         "model.names": ["timm_image", "hf_text", "fusion_mlp"],
-        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
     }
     predictor.fit(train_data=dataset.train_df, save_path=save_path, hyperparameters=hyperparameters, time_limit=10)

@@ -70,7 +70,6 @@ class Correlation(AbstractAnalysis):
 
     See Also
     --------
-    `phik <https://github.com/KaveIO/PhiK>`_ documentation
     :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
 
     """
@@ -96,8 +95,7 @@ class Correlation(AbstractAnalysis):
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         state.correlations = {}
         state.correlations_method = self.method
-        for (ds, df) in self.available_datasets(args):
-
+        for ds, df in self.available_datasets(args):
             if args.label in df.columns and df[args.label].dtype not in [R_INT, R_FLOAT]:
                 df[args.label] = df[args.label].astype("category").cat.codes
 
@@ -155,7 +153,6 @@ class CorrelationSignificance(AbstractAnalysis):
 
     See Also
     --------
-    `phik <https://github.com/KaveIO/PhiK>`_ documentation
     :py:meth:`~phik.significance.significance_matrix`
     :py:class:`~autogluon.eda.analysis.interaction.Correlation`
     :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
@@ -166,7 +163,7 @@ class CorrelationSignificance(AbstractAnalysis):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         state.significance_matrix = {}
-        for (ds, df) in self.available_datasets(args):
+        for ds, df in self.available_datasets(args):
             state.significance_matrix[ds] = df[state.correlations[ds].columns].significance_matrix(
                 **self.args, verbose=False
             )
@@ -254,7 +251,7 @@ class FeatureInteraction(AbstractAnalysis):
         cols = {k: v for k, v in cols.items() if v is not None}
 
         interactions: Dict[str, Dict[str, Any]] = state.get("interactions", {})
-        for (ds, df) in self.available_datasets(args):
+        for ds, df in self.available_datasets(args):
             missing_cols = [c for c in cols.values() if c not in df.columns]
             if len(missing_cols) == 0:
                 df = df[cols.values()]
@@ -337,7 +334,6 @@ class DistributionFit(AbstractAnalysis):
     --------
     :py:class:`~autogluon.eda.analysis.interaction.FeatureInteraction`
     :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`
-    `scipy <https://docs.scipy.org/doc/scipy/reference/stats.html>`_ documentation for each distribution details
 
     """
 
@@ -393,7 +389,7 @@ class DistributionFit(AbstractAnalysis):
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         state.distributions_fit = {}
         state.distributions_fit_pvalue_min = self.pvalue_min
-        for (ds, df) in self.available_datasets(args):
+        for ds, df in self.available_datasets(args):
             state.distributions_fit[ds] = {}
             for c in self.columns:
                 if c in df.columns:

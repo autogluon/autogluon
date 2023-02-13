@@ -68,6 +68,11 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
             hyperparameters=hyperparameters,
             **kwargs,
         )
+        logger.warning(
+            f"Warning: Model {self.__class__.__name__} has been deprecated in v0.7.\n"
+            "\tStarting from v0.8, using this model will raise an exception.\n"
+            "\tConsider instead using other local models such as 'AutoETS', 'AutoARIMA' and 'ARIMA'.",
+        )
         self.sktime_forecaster: Optional[BaseForecaster] = None
         self._fit_hash: Optional[pd.Series] = None
 

@@ -14,13 +14,22 @@ from ..analysis import (
     DistributionFit,
     FeatureInteraction,
     MissingValuesAnalysis,
+    ProblemTypeControl,
     TrainValidationSplit,
     XShiftDetector,
 )
 from ..analysis.base import AbstractAnalysis, BaseAnalysis
-from ..analysis.dataset import DatasetSummary, RawTypesAnalysis, Sampler, SpecialTypesAnalysis, VariableTypeAnalysis
+from ..analysis.dataset import (
+    DatasetSummary,
+    LabelInsightsAnalysis,
+    RawTypesAnalysis,
+    Sampler,
+    SpecialTypesAnalysis,
+    VariableTypeAnalysis,
+)
 from ..analysis.interaction import FeatureDistanceAnalysis
 from ..state import is_key_present_in_state
+from ..utils.defaults import QuickFitDefaults
 from ..visualization import (
     ConfusionMatrix,
     CorrelationVisualization,
@@ -28,7 +37,9 @@ from ..visualization import (
     DatasetTypeMismatch,
     FeatureImportance,
     FeatureInteractionVisualization,
+    LabelInsightsVisualization,
     MarkdownSectionComponent,
+    MissingValues,
     ModelLeaderboard,
     PropertyRendererComponent,
     RegressionEvaluation,
@@ -41,9 +52,10 @@ from ..visualization.layouts import SimpleVerticalLinearLayout
 __all__ = [
     "analyze",
     "analyze_interaction",
-    "quick_fit",
-    "dataset_overview",
     "covariate_shift_detection",
+    "dataset_overview",
+    "missing_values_analysis",
+    "quick_fit",
     "target_analysis",
 ]
 
@@ -99,7 +111,7 @@ def analyze(
 
     Returns
     -------
-        state after `fit` call if `return_state` is `True`; `None` otherwise
+    state after `fit` call if `return_state` is `True`; `None` otherwise
 
     """
 
@@ -180,8 +192,10 @@ def analyze_interaction(
     --------
     :py:class:`~autogluon.eda.analysis.interaction.FeatureInteraction`
     :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`
-
     """
+    assert (
+        (x is not None) or (y is not None) or (hue is not None)
+    ), "At least one of the parameters must be specified: x, y or hue"
     fig_args = get_empty_dict_if_none(fig_args).copy()
     if "figsize" not in fig_args:
         fig_args["figsize"] = (12, 6)
@@ -198,17 +212,18 @@ def analyze_interaction(
         FeatureInteraction(key=key, x=x, y=y, hue=hue),
     ]
 
-    x_type = state.variable_type.train_data[x]
-    if _is_single_numeric_variable(x, y, hue, x_type) and (fit_distributions is not False):
-        dists: Optional[List[str]]  # fit all
-        if fit_distributions is True:
-            dists = None
-        elif isinstance(fit_distributions, str):
-            dists = [fit_distributions]
-        else:
-            dists = fit_distributions
+    if x is not None:
+        x_type = state.variable_type.train_data[x]
+        if _is_single_numeric_variable(x, y, hue, x_type) and (fit_distributions is not False):
+            dists: Optional[List[str]]  # fit all
+            if fit_distributions is True:
+                dists = None
+            elif isinstance(fit_distributions, str):
+                dists = [fit_distributions]
+            else:
+                dists = fit_distributions
 
-        analysis_facets.append(DistributionFit(columns=x, keep_top_n=5, distributions_to_fit=dists))  # type: ignore # x is always present
+            analysis_facets.append(DistributionFit(columns=x, keep_top_n=5, distributions_to_fit=dists))  # type: ignore # x is always present
 
     _analysis_args = analysis_args.copy()
     _analysis_args.pop("state", None)
@@ -257,7 +272,7 @@ def quick_fit(
         - model leaderboard
         - feature importance
         - samples with the highest prediction error - candidates for inspection
-        - smaples with the least distance from the other class - candidates for labeling
+        - samples with the least distance from the other class - candidates for labeling
 
     Supported `fig_args`/`chart_args` keys:
         - confusion_matrix - confusion matrix chart for classification predictor
@@ -347,9 +362,9 @@ def quick_fit(
         state=state,
         return_state=return_state,
         anlz_facets=[
+            ProblemTypeControl(problem_type=problem_type),
             TrainValidationSplit(
                 val_size=val_size,
-                problem_type=problem_type,
                 children=[
                     AutoGluonModelQuickFit(
                         estimator_args={"path": path},
@@ -361,7 +376,7 @@ def quick_fit(
                         **fit_args,
                     ),
                 ],
-            )
+            ),
         ],
         viz_facets=[
             MarkdownSectionComponent(markdown=f"### Model Prediction for {label}"),
@@ -494,15 +509,21 @@ def dataset_overview(
     if len(distance.near_duplicates) > 0:  # type: ignore # state is always present
         for group in distance.near_duplicates:
             nodes = group["nodes"]
+
+            interactions: List[AbstractVisualization] = []
+            for n in nodes[1:]:
+                interactions.append(MarkdownSectionComponent(f"Feature interaction between `{nodes[0]}`/`{n}`"))
+                interactions.append(FeatureInteractionVisualization(key=f"{nodes[0]}:{n}"))
+
             analyze(
                 train_data=train_data,
                 state=state,
                 anlz_facets=[FeatureInteraction(key=f"{nodes[0]}:{n}", x=nodes[0], y=n) for n in nodes[1:]],
                 viz_facets=[
                     MarkdownSectionComponent(
-                        f'### Near duplicate group analysis: `{"`, `".join(nodes)}` - distance `{group["distance"]}`'
+                        f'**Near duplicate group analysis: `{"`, `".join(nodes)}` - distance `{group["distance"]:.4f}`**'
                     ),
-                    *[FeatureInteractionVisualization(headers=True, key=f"{nodes[0]}:{n}") for n in nodes[1:]],
+                    *interactions,
                 ],
             )
 
@@ -607,7 +628,7 @@ def covariate_shift_detection(
                 analyze(
                     viz_facets=[
                         MarkdownSectionComponent(
-                            f"#### `{var}` values distribution between datasets; p-value: `{pvalue:.4f}`"
+                            f"**`{var}` values distribution between datasets; p-value: `{pvalue:.4f}`**"
                         )
                     ]
                 )
@@ -616,23 +637,24 @@ def covariate_shift_detection(
     return state if return_state else None
 
 
+def _is_lightgbm_available() -> bool:
+    try:
+        import lightgbm  # noqa
+
+        return True
+    except (ImportError, OSError):
+        return False
+
+
 def get_default_estimator_if_not_specified(fit_args):
     if ("hyperparameters" not in fit_args) and ("presets" not in fit_args):
         fit_args = fit_args.copy()
-        fit_args["hyperparameters"] = {
-            "RF": [
-                {
-                    "criterion": "entropy",
-                    "max_depth": 15,
-                    "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]},
-                },
-                {
-                    "criterion": "squared_error",
-                    "max_depth": 15,
-                    "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
-                },
-            ],
-        }
+
+        fit_args["fit_weighted_ensemble"] = False
+        if _is_lightgbm_available():
+            fit_args["hyperparameters"] = QuickFitDefaults.DEFAULT_LGBM_CONFIG
+        else:
+            fit_args["hyperparameters"] = QuickFitDefaults.DEFAULT_RF_CONFIG
     return fit_args
 
 
@@ -645,6 +667,9 @@ def get_empty_dict_if_none(value) -> dict:
 def target_analysis(
     train_data: pd.DataFrame,
     label: str,
+    test_data: Optional[pd.DataFrame] = None,
+    problem_type: str = "auto",
+    fit_distributions: Union[bool, str, List[str]] = True,
     sample: Union[None, int, float] = None,
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
@@ -661,8 +686,15 @@ def target_analysis(
     ----------
     train_data: Optional[DataFrame]
         training dataset
+    test_data: Optional[DataFrame], default = None
+        test dataset
     label: : Optional[str]
         target variable
+    problem_type: str, default = 'auto'
+        problem type to use. Valid problem_type values include ['auto', 'binary', 'multiclass', 'regression', 'quantile', 'softclass']
+        auto means it will be Auto-detected using AutoGluon methods.
+    fit_distributions: Union[bool, str, List[str]], default = False,
+        If `True`, or list of distributions is provided, then fit distributions. Performed only if `y` and `hue` are not present.
     state: Union[None, dict, AnalysisState], default = None
         pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
     sample: Union[None, int, float], default = None
@@ -675,7 +707,7 @@ def target_analysis(
 
     Returns
     -------
-        state after `fit` call if `return_state` is `True`; `None` otherwise
+    state after `fit` call if `return_state` is `True`; `None` otherwise
 
     Examples
     --------
@@ -683,14 +715,20 @@ def target_analysis(
     >>>
     >>> auto.target_analysis(train_data=..., label=...)
 
-
     """
 
     assert label in train_data.columns, f"label `{label}` is not in `train_data` columns: `{train_data.columns}`"
 
+    if (test_data is not None) and (label in test_data.columns):
+        _test_data = test_data[[label]]
+    else:
+        _test_data = None
+
     # Basic variable information table
     state: AnalysisState = analyze(  # type: ignore # state is always present
         train_data=train_data[[label]],
+        test_data=_test_data,
+        label=label,
         state=state,
         sample=sample,
         return_state=True,
@@ -699,9 +737,16 @@ def target_analysis(
             MissingValuesAnalysis(),
             RawTypesAnalysis(),
             SpecialTypesAnalysis(),
+            ProblemTypeControl(problem_type=problem_type),
+            LabelInsightsAnalysis(),
         ],
         viz_facets=[
             MarkdownSectionComponent("## Target variable analysis"),
+            MarkdownSectionComponent(
+                "### Label Insights",
+                condition_fn=(lambda s: is_key_present_in_state(s, "label_insights")),
+            ),
+            LabelInsightsVisualization(),
             DatasetStatistics(),
         ],
     )
@@ -713,7 +758,7 @@ def target_analysis(
         x=label,
         state=state,
         return_state=True,
-        fit_distributions=True,
+        fit_distributions=fit_distributions,
     )
 
     state = _render_distribution_fit_information_if_available(state, label)
@@ -751,10 +796,6 @@ def _render_correlation_analysis(state, train_data, label, sample) -> AnalysisSt
             f" - ⚠️ no fields with absolute correlation greater than "  # type: ignore
             f"`{state.correlations_focus_field_threshold}` found for target variable `{label}`."
         )
-    else:
-        corr_info.append(
-            f" - absolute correlation greater than `{state.correlations_focus_field_threshold}` found for target variable `{label}`"  # type: ignore
-        )
     analyze(
         state=state,
         viz_facets=[
@@ -785,3 +826,85 @@ def _render_distribution_fit_information_if_available(state, label) -> Optional[
             )
         analyze(viz_facets=[MarkdownSectionComponent("\n".join(dist_info))])
     return state
+
+
+def missing_values_analysis(
+    graph_type: str = "matrix",
+    train_data: Optional[pd.DataFrame] = None,
+    test_data: Optional[pd.DataFrame] = None,
+    val_data: Optional[pd.DataFrame] = None,
+    state: Union[None, dict, AnalysisState] = None,
+    return_state: bool = False,
+    sample: Union[None, int, float] = None,
+    **chart_args,
+):
+    """
+    Perform quick analysis of missing values across datasets.
+
+    Parameters
+    ----------
+    graph_type: str, default = 'matrix'
+        One of the following visualization types:
+        - matrix - nullity matrix is a data-dense display which lets you quickly visually pick out patterns in data completion
+            This visualization will comfortably accommodate up to 50 labelled variables.
+            Past that range labels begin to overlap or become unreadable, and by default large displays omit them.
+        - bar - visualizes how many rows are non-null vs null in the column. Logarithmic scale can by specifying `log=True` in `kwargs`
+        - heatmap - correlation heatmap measures nullity correlation: how strongly the presence or absence of one
+            variable affects the presence of another. Nullity correlation ranges from -1
+            (if one variable appears the other definitely does not) to 0 (variables appearing or not appearing have no effect on one another)
+            to 1 (if one variable appears the other definitely also does).
+            Entries marked <1 or >-1 have a correlation that is close to being exactingly negative or positive but is still not quite perfectly so.
+        - dendrogram - the dendrogram allows to more fully correlate variable completion, revealing trends deeper than the pairwise ones
+            visible in the correlation heatmap. The dendrogram uses a hierarchical clustering algorithm (courtesy of scipy) to bin variables
+            against one another by their nullity correlation (measured in terms of binary distance).
+            At each step of the tree the variables are split up based on which combination minimizes the distance of the remaining clusters.
+            The more monotone the set of variables, the closer their total distance is to zero, and the closer their average distance (the y-axis) is to zero.
+    train_data: Optional[DataFrame]
+        training dataset
+    test_data: Optional[DataFrame], default = None
+        test dataset
+    val_data
+        validation dataset
+    state: Union[None, dict, AnalysisState], default = None
+        pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
+    return_state: bool, default = False
+        return state if `True`
+    sample: Union[None, int, float], default = None
+        sample size; if `int`, then row number is used;
+        `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
+        `None` means no sampling
+        See also :func:`autogluon.eda.analysis.dataset.Sampler`
+
+    Returns
+    -------
+    state after `fit` call if `return_state` is `True`; `None` otherwise
+
+    Examples
+    --------
+    >>> import autogluon.eda.auto as auto
+    >>>
+    >>> auto.missing_values_analysis(train_data=...)
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.missing.MissingValuesAnalysis`
+    :py:class:`~autogluon.eda.visualization.dataset.DatasetStatistics`
+    :py:class:`~autogluon.eda.visualization.missing.MissingValues`
+
+    """
+    return analyze(
+        train_data=train_data,
+        test_data=test_data,
+        val_data=val_data,
+        state=state,
+        return_state=return_state,
+        sample=sample,
+        anlz_facets=[
+            MissingValuesAnalysis(),
+        ],
+        viz_facets=[
+            MarkdownSectionComponent("### Missing Values Analysis"),
+            DatasetStatistics(),
+            MissingValues(graph_type=graph_type, **chart_args),
+        ],
+    )

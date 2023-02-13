@@ -1,3 +1,4 @@
+import ast
 import codecs
 import random
 import re
@@ -7,10 +8,27 @@ from typing import Dict, Iterable, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from text_unidecode import unidecode
+from timm.data.constants import (
+    IMAGENET_DEFAULT_MEAN,
+    IMAGENET_DEFAULT_STD,
+    IMAGENET_INCEPTION_MEAN,
+    IMAGENET_INCEPTION_STD,
+)
+from torchvision import transforms
 
-from ..constants import IDENTIFIER, MMLAB_MODELS
+from ..constants import CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, IDENTIFIER, IMAGE, MMLAB_MODELS
 from .collator import DictCollator
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
+
+try:
+    from torchvision.transforms import InterpolationMode
+
+    BICUBIC = InterpolationMode.BICUBIC
+except ImportError:
+    BICUBIC = PIL.Image.BICUBIC
+
+from .randaug import RandAugment
+from .trivial_augmenter import TrivialAugment
 
 
 def extract_value_from_config(
@@ -261,7 +279,8 @@ def process_ner_annotations(ner_annotations, ner_text, entity_map, tokenizer, is
         is_start_word = True
         for idx, word_offset in enumerate(word_offsets[:num_words, :]):
             # support multiple words in an annotated offset range.
-            if word_offset[0] >= custom_offset[0] and word_offset[1] <= custom_offset[1]:
+            # Allow partial overlapping between custom annotations and pretokenized words.
+            if (word_offset[0] < custom_offset[1]) and (custom_offset[0] < word_offset[1]):
                 if not (
                     re.match(b_prefix, custom_label, re.IGNORECASE) or re.match(i_prefix, custom_label, re.IGNORECASE)
                 ):
@@ -382,3 +401,139 @@ def is_rois_input(sample):
     bool, whether a sample is rois for object detection
     """
     return isinstance(sample, list) and len(sample) and isinstance(sample[0], list) and len(sample[0]) == 5
+
+
+def get_text_token_max_len(provided_max_len, config, tokenizer, checkpoint_name):
+    """
+    Compute the allowable max length of token sequences.
+
+    Parameters
+    ----------
+    provided_max_len
+        The provided max length.
+    config
+        Model config.
+    tokenizer
+        Text tokenizer.
+    checkpoint_name
+        Name of checkpoint.
+
+    Returns
+    -------
+    Token sequence max length.
+    """
+    if hasattr(config, "relative_attention") and config.relative_attention:
+        default_max_len = tokenizer.model_max_length
+    elif hasattr(config, "position_embedding_type") and "relative" in config.position_embedding_type:
+        default_max_len = tokenizer.model_max_length
+    elif hasattr(config, "max_position_embeddings"):
+        default_max_len = config.max_position_embeddings
+    else:
+        default_max_len = tokenizer.model_max_length
+
+    if provided_max_len is None or provided_max_len <= 0:
+        max_len = default_max_len
+    else:
+        if provided_max_len < default_max_len:
+            if default_max_len < 10**6:  # Larger than this value usually means infinite.
+                warnings.warn(
+                    f"provided max length: {provided_max_len} "
+                    f"is smaller than {checkpoint_name}'s default: {default_max_len}"
+                )
+        max_len = min(provided_max_len, default_max_len)
+
+    return max_len
+
+
+def construct_image_processor(
+    size,
+    normalization,
+    transform_types: List[str],
+) -> transforms.Compose:
+    """
+    Build up an image processor from the provided list of transform types.
+
+    Parameters
+    ----------
+    transform_types
+        A list of image transform types.
+
+    Returns
+    -------
+    A torchvision transform.
+    """
+    processor = []
+    for trans_type in transform_types:
+        args = None
+        kargs = None
+        if "(" in trans_type:
+            trans_mode = trans_type[0 : trans_type.find("(")]
+            if "{" in trans_type:
+                kargs = ast.literal_eval(trans_type[trans_type.find("{") : trans_type.rfind(")")])
+            else:
+                args = ast.literal_eval(trans_type[trans_type.find("(") :])
+        else:
+            trans_mode = trans_type
+
+        if trans_mode == "resize_to_square":
+            processor.append(transforms.Resize((size, size), interpolation=BICUBIC))
+        elif trans_mode == "resize_shorter_side":
+            processor.append(transforms.Resize(size, interpolation=BICUBIC))
+        elif trans_mode == "center_crop":
+            processor.append(transforms.CenterCrop(size))
+        elif trans_mode == "horizontal_flip":
+            processor.append(transforms.RandomHorizontalFlip())
+        elif trans_mode == "vertical_flip":
+            processor.append(transforms.RandomVerticalFlip())
+        elif trans_mode == "color_jitter":
+            if kargs is not None:
+                processor.append(transforms.ColorJitter(**kargs))
+            elif args is not None:
+                processor.append(transforms.ColorJitter(*args))
+            else:
+                processor.append(transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1))
+        elif trans_mode == "affine":
+            if kargs is not None:
+                processor.append(transforms.RandomAffine(**kargs))
+            elif args is not None:
+                processor.append(transforms.RandomAffine(*args))
+            else:
+                processor.append(transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)))
+        elif trans_mode == "randaug":
+            if kargs is not None:
+                processor.append(RandAugment(**kargs))
+            elif args is not None:
+                processor.append(RandAugment(*args))
+            else:
+                processor.append(RandAugment(2, 9))
+        elif trans_mode == "trivial_augment":
+            processor.append(TrivialAugment(IMAGE, 30))
+        else:
+            raise ValueError(f"unknown transform type: {trans_mode}")
+
+    processor.append(transforms.ToTensor())
+    processor.append(normalization)
+    return transforms.Compose(processor)
+
+
+def image_mean_std(norm_type: str):
+    """
+    Get image normalization mean and std by its name.
+
+    Parameters
+    ----------
+    norm_type
+        Name of image normalization.
+
+    Returns
+    -------
+    Normalization mean and std.
+    """
+    if norm_type == "inception":
+        return IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
+    elif norm_type == "imagenet":
+        return IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+    elif norm_type == "clip":
+        return CLIP_IMAGE_MEAN, CLIP_IMAGE_STD
+    else:
+        raise ValueError(f"unknown image normalization: {norm_type}")

@@ -7,12 +7,16 @@ import autogluon.timeseries as agts
 
 from . import (
     ARIMAModel,
+    AutoARIMAModel,
+    AutoETSModel,
     AutoGluonTabularModel,
     DeepARModel,
+    DynamicOptimizedThetaModel,
     ETSModel,
     NaiveModel,
     SeasonalNaiveModel,
     SimpleFeedForwardModel,
+    TemporalFusionTransformerModel,
     ThetaModel,
 )
 from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
@@ -23,6 +27,7 @@ logger = logging.getLogger(__name__)
 MODEL_TYPES = dict(
     SimpleFeedForward=SimpleFeedForwardModel,
     DeepAR=DeepARModel,
+    TemporalFusionTransformer=TemporalFusionTransformerModel,
     # Prophet=ProphetModel,
     ETS=ETSModel,
     ARIMA=ARIMAModel,
@@ -30,6 +35,9 @@ MODEL_TYPES = dict(
     AutoGluonTabular=AutoGluonTabularModel,
     Naive=NaiveModel,
     SeasonalNaive=SeasonalNaiveModel,
+    AutoETS=AutoETSModel,
+    AutoARIMA=AutoARIMAModel,
+    DynamicOptimizedTheta=DynamicOptimizedThetaModel,
 )
 if agts.MXNET_INSTALLED:
     from .gluonts.mx import (
@@ -72,14 +80,18 @@ DEFAULT_MODEL_PRIORITY = dict(
     ARIMA=80,
     AutoGluonTabular=70,
     DeepAR=60,
-    TemporalFusionTransformerMXNet=50,
+    TemporalFusionTransformer=50,
     SimpleFeedForward=40,
     TransformerMXNet=30,
+    AutoARIMA=50,
+    AutoETS=70,
+    DynamicOptimizedTheta=60,
     # Models below are not included in any presets
     AutoETSSktime=60,
     ARIMASktime=50,
     DeepARMXNet=50,
     SimpleFeedForwardMXNet=30,
+    TemporalFusionTransformerMXNet=50,
     AutoARIMASktime=20,
     MQCNNMXNet=10,
     MQRNNMXNet=10,
@@ -103,6 +115,7 @@ def get_default_hps(key, prediction_length):
             "SeasonalNaive": {},
             "ARIMA": {},
             "ETS": {},
+            "AutoETS": {},
             "Theta": {},
             "AutoGluonTabular": {},
             "DeepAR": {
@@ -112,14 +125,10 @@ def get_default_hps(key, prediction_length):
         "high_quality": {
             "Naive": {},
             "SeasonalNaive": {},
-            "ARIMA": {
-                "order": ag.Categorical((2, 1, 0), (2, 1, 1), (5, 1, 1)),
-                "seasonal_order": ag.Categorical((0, 0, 0), (1, 0, 0)),
-            },
-            "ETS": {
-                "trend": ag.Categorical("add", None),
-                "seasonal": ag.Categorical("add", None),
-            },
+            "ARIMA": {},
+            "ETS": {},
+            "AutoETS": {},
+            "AutoARIMA": {},
             "Theta": {
                 "deseasonalize": ag.Categorical(True, False),
             },
@@ -130,18 +139,16 @@ def get_default_hps(key, prediction_length):
             "SimpleFeedForward": {
                 "context_length": context_length,
             },
+            "TemporalFusionTransformer": {},
         },
         "best_quality": {
             "Naive": {},
             "SeasonalNaive": {},
-            "ARIMA": {
-                "order": ag.Categorical((2, 1, 0), (2, 1, 1), (5, 1, 1)),
-                "seasonal_order": ag.Categorical((0, 0, 0), (1, 0, 0)),
-            },
-            "ETS": {
-                "trend": ag.Categorical("add", None),
-                "seasonal": ag.Categorical("add", None),
-            },
+            "ARIMA": {},
+            "ETS": {},
+            "AutoETS": {},
+            "AutoARIMA": {},
+            "DynamicOptimizedTheta": {},
             "Theta": {
                 "deseasonalize": ag.Categorical(True, False),
             },
@@ -154,17 +161,14 @@ def get_default_hps(key, prediction_length):
                 "context_length": context_length,
                 "hidden_dimensions": ag.Categorical([40], [40, 40], [120]),
             },
+            "TemporalFusionTransformer": {},
         },
     }
 
     # update with MXNet if installed
     if agts.MXNET_INSTALLED:
         mxnet_default_updates = {
-            "high_quality": {
-                "TemporalFusionTransformerMXNet": {"context_length": context_length},
-            },
             "best_quality": {
-                "TemporalFusionTransformerMXNet": {"context_length": context_length},
                 "TransformerMXNet": {"context_length": context_length},
             },
         }

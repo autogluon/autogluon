@@ -1,7 +1,7 @@
 import logging
 import re
 from multiprocessing import cpu_count
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 from joblib import Parallel, delayed
@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 class AbstractLocalModel(AbstractTimeSeriesModel):
     allowed_local_model_args: List[str] = []
+    # Use 50% of the cores since some models rely on parallel ops and are actually slower if n_jobs=-1
+    DEFAULT_N_JOBS: Union[float, int] = 0.5
 
     def __init__(
         self,
@@ -40,7 +42,8 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         )
         if hyperparameters is None:
             hyperparameters = {}
-        n_jobs = hyperparameters.get("n_jobs", 0.5)
+        # TODO: Replace with 'num_cpus' argument passed to fit (after predictor API is changed)
+        n_jobs = hyperparameters.get("n_jobs", self.DEFAULT_N_JOBS)
         if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
             self.n_jobs = max(int(cpu_count() * n_jobs), 1)
         elif isinstance(n_jobs, int):
@@ -122,6 +125,8 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
                 )
             for item_id, preds in zip(items_to_fit, predictions):
                 self._cached_predictions[data_hash.loc[item_id]] = preds
+            # Make sure cached predictions can be reused by other models
+            self.save()
 
     @staticmethod
     def _predict_with_local_model(

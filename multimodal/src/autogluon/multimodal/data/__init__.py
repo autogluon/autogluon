@@ -5,6 +5,7 @@ from .labelencoder_ner import NerLabelEncoder
 from .mixup import MixupModule
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from .process_categorical import CategoricalProcessor
+from .process_document import DocumentProcessor
 from .process_image import ImageProcessor
 from .process_label import LabelProcessor
 from .process_mmlab import MMDetProcessor, MMOcrProcessor

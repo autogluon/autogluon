@@ -6,13 +6,12 @@ from typing import Any, Dict, List, Optional, Union
 import jsonschema
 import numpy as np
 import pandas as pd
-from nptyping import NDArray
 from omegaconf import DictConfig, OmegaConf
 
-from ..constants import AUTOMM, END_OFFSET, ENTITY_GROUP, NER_ANNOTATION, START_OFFSET
+from ..constants import AUTOMM, END_OFFSET, ENTITY_GROUP, NER_ANNOTATION, PROBABILITY, START_OFFSET
 from .utils import process_ner_annotations
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class NerLabelEncoder:
@@ -168,13 +167,21 @@ class NerLabelEncoder:
         pred_with_offset
             Predictions with both labels and the position (character offset) of the corresponding words.
         """
-        pred_label_only, pred_with_offset = [], []
-        for token_preds, offsets in y:
-            temp_pred, temp_offset = [], []
-            for token_pred, offset in zip(token_preds, offsets):
+        pred_label_only, pred_with_offset, pred_with_proba = [], [], []
+        for token_preds, offsets, pred_proba in y:
+            temp_pred, temp_offset, temp_proba = [], [], []
+            for token_pred, offset, probability in zip(token_preds, offsets, pred_proba):
                 inverse_pred_label = self.inverse_entity_map[token_pred]
                 temp_pred.append(inverse_pred_label)
-                if inverse_pred_label != self.ner_special_tags[-1]:
+                temp_proba.append(
+                    {
+                        ENTITY_GROUP: inverse_pred_label,
+                        START_OFFSET: offset[0],
+                        END_OFFSET: offset[1],
+                        PROBABILITY: {e: p for e, p in zip(list(self.entity_map.keys())[1:], probability[1:])},
+                    }
+                )
+                if inverse_pred_label not in self.ner_special_tags:
                     temp_offset.append(
                         {
                             ENTITY_GROUP: inverse_pred_label,
@@ -184,4 +191,5 @@ class NerLabelEncoder:
                     )
             pred_label_only.append(temp_pred)
             pred_with_offset.append(temp_offset)
-        return pred_label_only, pred_with_offset
+            pred_with_proba.append(temp_proba)
+        return pred_label_only, pred_with_offset, pred_with_proba

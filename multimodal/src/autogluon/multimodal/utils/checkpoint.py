@@ -7,13 +7,14 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.plugins.io.checkpoint_plugin import CheckpointIO
-from pytorch_lightning.utilities.cloud_io import atomic_save, get_filesystem
-from pytorch_lightning.utilities.cloud_io import load as pl_load
 from pytorch_lightning.utilities.rank_zero import rank_zero_warn
 
 from ..constants import AUTOMM, DEEPSPEED_STRATEGY
+from .cloud_io import _atomic_save
+from .cloud_io import _load as pl_load
+from .cloud_io import get_filesystem
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def average_checkpoints(
@@ -118,14 +119,14 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
         fs.makedirs(os.path.dirname(path), exist_ok=True)
         try:
             # write the checkpoint dictionary on the file
-            atomic_save(checkpoint, path)
+            _atomic_save(checkpoint, path)
         except AttributeError as err:
             # todo (sean): is this try catch necessary still?
             # https://github.com/Lightning-AI/lightning/pull/431
             key = pl.LightningModule.CHECKPOINT_HYPER_PARAMS_KEY
             checkpoint.pop(key, None)
             rank_zero_warn(f"Warning, `{key}` dropped from checkpoint. An attribute is not picklable: {err}")
-            atomic_save(checkpoint, path)
+            _atomic_save(checkpoint, path)
 
     def load_checkpoint(self, path, map_location: Optional[Any] = None) -> Dict[str, Any]:
         """

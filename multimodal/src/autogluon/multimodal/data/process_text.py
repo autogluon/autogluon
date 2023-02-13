@@ -11,23 +11,18 @@ from omegaconf import DictConfig
 from torch import nn
 from transformers import AutoConfig, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 
-from ..constants import (
-    AUTOMM,
-    CHOICES_IDS,
-    COLUMN,
-    TEXT,
-    TEXT_SEGMENT_IDS,
-    TEXT_TOKEN_IDS,
-    TEXT_VALID_LENGTH,
-    TOKEN_WORD_MAPPING,
-    WORD_OFFSETS,
-)
+from ..constants import AUTOMM, CHOICES_IDS, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH
 from .collator import PadCollator, StackCollator
 from .template_engine import TemplateEngine
 from .trivial_augmenter import TrivialAugment
-from .utils import extract_value_from_config, normalize_txt, register_encoding_decoding_error_handlers
+from .utils import (
+    extract_value_from_config,
+    get_text_token_max_len,
+    normalize_txt,
+    register_encoding_decoding_error_handlers,
+)
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 # Disable tokenizer parallelism
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -104,10 +99,8 @@ class TextProcessor:
         """
         Parameters
         ----------
-        prefix
-            The prefix connecting a processor to its corresponding model.
-        checkpoint_name
-            Name of the pretrained huggingface checkpoint, e.g., "microsoft/deberta-v3-small"
+        model
+            The model for which this processor would be created.
         tokenizer_name
             Name of the huggingface tokenizer type (default "hf_auto").
         max_len
@@ -150,19 +143,13 @@ class TextProcessor:
             self.tokenizer.deprecation_warnings["sequence-length-is-longer-than-the-specified-maximum"] = True
 
         self.cls_token_id, self.sep_token_id, self.eos_token_id = self.get_special_tokens(tokenizer=self.tokenizer)
-        if max_len is None or max_len <= 0:
-            self.max_len = self.tokenizer.model_max_length
-        else:
-            if max_len < self.tokenizer.model_max_length:
-                # TODO, Consider to fix the logic
-                if self.tokenizer.model_max_length < 10**6:
-                    warnings.warn(
-                        f"provided max length: {max_len} "
-                        f"is smaller than {model.checkpoint_name}'s default: {self.tokenizer.model_max_length}"
-                    )
-            self.max_len = min(max_len, self.tokenizer.model_max_length)
+        self.max_len = get_text_token_max_len(
+            provided_max_len=max_len,
+            config=model.config,
+            tokenizer=self.tokenizer,
+            checkpoint_name=model.checkpoint_name,
+        )
         logger.debug(f"text max length: {self.max_len}")
-
         self.insert_sep = insert_sep
         self.eos_only = self.cls_token_id == self.sep_token_id == self.eos_token_id
 
@@ -195,7 +182,10 @@ class TextProcessor:
         self.text_trivial_aug_maxscale = text_trivial_aug_maxscale
         self.train_augmenter = construct_text_augmenter(self.text_trivial_aug_maxscale, self.train_augment_types)
         self.template_config = template_config
-        self.template_engine = TemplateEngine(self.template_config)
+        if self.template_config.turn_on:
+            self.template_engine = TemplateEngine(self.template_config)
+        else:
+            self.template_engine = None
 
         if self.normalize_text:
             register_encoding_decoding_error_handlers()
@@ -248,7 +238,7 @@ class TextProcessor:
 
     def build_one_token_sequence(
         self,
-        text_tokens: Dict[str, NDArray[(Any,), np.int32]],
+        text_tokens: Dict[str, NDArray],
     ) -> Dict:
         """
         Construct one token sequence based on multiple token sequences coming from different

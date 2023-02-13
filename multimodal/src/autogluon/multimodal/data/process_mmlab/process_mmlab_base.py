@@ -38,7 +38,7 @@ from ...constants import AUTOMM, COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
 from ..collator import StackCollator
 from ..utils import is_rois_input
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
@@ -53,7 +53,7 @@ class MMLabProcessor:
         model: nn.Module,
         collate_func: Callable,
         max_img_num_per_col: Optional[int] = 1,
-        missing_value_strategy: Optional[str] = "skip",
+        missing_value_strategy: Optional[str] = "zero",
         requires_column_info: bool = False,
     ):
         """

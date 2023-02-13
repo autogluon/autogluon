@@ -16,7 +16,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v1
       with:
-        python-version: '3.7'
+        python-version: '3.8'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -27,7 +27,7 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.PYPI_TEST_PASSWORD }}
         RELEASE: 1
       run: |
-        for v in common core features tabular multimodal vision timeseries autogluon
+        for v in common core features tabular multimodal timeseries autogluon eda
         do
           cd "$v"/
           python setup.py sdist bdist_wheel

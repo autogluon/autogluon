@@ -8,7 +8,7 @@ from ..constants import AUTOMM, GET_ITEM_ERROR_RETRY
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from .utils import apply_data_processor, apply_df_preprocessor, get_per_sample_features
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class BaseDataset(torch.utils.data.Dataset):

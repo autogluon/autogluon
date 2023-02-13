@@ -256,6 +256,17 @@ predictor.fit(hyperparameters={"optimization.efficient_finetune": "bit_fit"})
 predictor.fit(hyperparameters={"optimization.efficient_finetune": "ia3_bias"})
 ```
 
+### optimization.skip_final_val
+
+Whether to skip the final validation after training is signaled to stop.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"optimization.skip_final_val": False})
+# skip the final validation
+predictor.fit(hyperparameters={"optimization.skip_final_val": True})
+```
+
 ## Environment
 
 ### env.num_gpus
@@ -536,9 +547,9 @@ How to deal with missing images, opening which fails.
 
 ```
 # default used by AutoMM
-predictor.fit(hyperparameters={"data.image.missing_value_strategy": "skip"})
-# use zero image
 predictor.fit(hyperparameters={"data.image.missing_value_strategy": "zero"})
+# skip the image
+predictor.fit(hyperparameters={"data.image.missing_value_strategy": "skip"})
 ```
 
 ### data.text.normalize_text

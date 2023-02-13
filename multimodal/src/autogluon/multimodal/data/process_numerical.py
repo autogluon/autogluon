@@ -23,8 +23,8 @@ class NumericalProcessor:
         """
         Parameters
         ----------
-        prefix
-            The prefix connecting a processor to its corresponding model.
+        model
+            The model for which this processor would be created.
         merge
             How to merge numerical features from multiple columns in a multimodal pd.DataFrame.
             Currently, it only supports one choice:

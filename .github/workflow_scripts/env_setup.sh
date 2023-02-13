@@ -2,7 +2,7 @@ function setup_build_env {
     python3 -m pip install --upgrade pip
     python3 -m pip install tox
     python3 -m pip install flake8
-    python3 -m pip install black>=22.3
+    python3 -m pip install "black>=22.3,<23.0"
     python3 -m pip install isort>=5.10
     python3 -m pip install bandit
 }
@@ -38,6 +38,12 @@ function setup_torch_cpu_non_linux {
     pip3 install torch==1.13.1 torchvision==0.14.1
 }
 
+function setup_hf_model_mirror {
+    pip3 install PyYAML
+    SUB_FOLDER="$1"
+    python3 $(dirname "$0")/setup_hf_model_mirror.py --model_list_file $(dirname "$0")/../../multimodal/tests/hf_model_list.yaml --sub_folder $SUB_FOLDER
+}
+
 function install_local_packages {
     while(($#)) ; do
         python3 -m pip install --upgrade -e $1
@@ -54,27 +60,20 @@ function install_multimodal {
     python3 -m pip install --upgrade mmocr
 }
 
-function install_vision {
-    python3 -m pip install --upgrade pytest-xdist  # launch different process for each test to avoid resource not being released by either mxnet or torch
-    install_local_packages "vision/"
-}
-
 function install_all {
     install_local_packages "common/[tests]" "core/[all]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
-    install_multimodal "[tests]" # multimodal must be install before vision and text
-    install_vision
-    install_local_packages "text/" "autogluon/"
+    install_multimodal "[tests]"
+    install_local_packages "autogluon/"
 }
 
 function install_all_no_tests {
     install_local_packages "common/" "core/[all]" "features/" "tabular/[all]" "timeseries/[all]" "eda/"
-    install_multimodal # multimodal must be installed before vision and text
-    install_vision
-    install_local_packages "text/" "autogluon/"
+    install_multimodal
+    install_local_packages "autogluon/"
 }
 
 function build_all {
-    for module in common core features tabular multimodal text vision timeseries autogluon
+    for module in common core features tabular multimodal timeseries autogluon eda
     do
         cd "$module"/
         python setup.py sdist bdist_wheel
