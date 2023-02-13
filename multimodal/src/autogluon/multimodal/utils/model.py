@@ -55,7 +55,7 @@ from ..models import (
 )
 from ..models.utils import inject_adaptation_to_linear_layer
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def select_model(

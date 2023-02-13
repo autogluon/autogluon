@@ -20,6 +20,7 @@ from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from . import version as ag_version
 from .constants import (
@@ -98,9 +99,10 @@ from .utils import (
     split_train_tuning_data,
     try_to_infer_pos_label,
     update_hyperparameters,
+    upgrade_config,
 )
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class MultiModalMatcher:
@@ -504,7 +506,9 @@ class MultiModalMatcher:
             return predictor
 
         self._fit(**_fit_args)
-        logger.info(f"Models and intermediate outputs are saved to {self._save_path} ")
+
+        # TODO(?) We should have a separate "_post_training_event()" for logging messages.
+        logger.info(get_fit_complete_message(self._save_path))
         return self
 
     def _get_matcher_df_preprocessor(
@@ -621,6 +625,8 @@ class MultiModalMatcher:
         hpo_mode: bool = False,
         **hpo_kwargs,
     ):
+        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
+        logger.info(get_fit_start_message(save_path, validation_metric_name))
         config = self._config
         config = get_config(
             problem_type=self._pipeline,
@@ -1854,6 +1860,9 @@ class MultiModalMatcher:
 
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)
+
+        query_config = upgrade_config(query_config, assets["version"])
+        response_config = upgrade_config(response_config, assets["version"])
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = CustomUnpickler(fp).load()

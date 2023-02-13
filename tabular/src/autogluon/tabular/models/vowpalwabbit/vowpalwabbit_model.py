@@ -52,7 +52,7 @@ class VowpalWabbitModel(AbstractModel):
              **kwargs):  # kwargs includes many other potential inputs, refer to AbstractModel documentation for details
         time_start = time.time()
         try_import_vowpalwabbit()
-        from vowpalwabbit import pyvw
+        import vowpalwabbit
         seed = 0  # Random seed
 
         # Valid self.problem_type values include ['binary', 'multiclass', 'regression', 'quantile', 'softclass']
@@ -96,7 +96,7 @@ class VowpalWabbitModel(AbstractModel):
             # Ref: https://github.com/VowpalWabbit/vowpal_wabbit/wiki/Predicting-probabilities#multi-class---oaa
             extra_params['oaa'] = self.num_classes
             extra_params['probabilities'] = True
-        self.model = pyvw.vw(**params, **extra_params)
+        self.model = vowpalwabbit.Workspace(**params, **extra_params)
 
         time_start_fit = time.time()
         if time_limit is not None:
@@ -182,7 +182,7 @@ class VowpalWabbitModel(AbstractModel):
         For VW, based on different problem_type/hyperparams, loading arguments will be different
         """
         try_import_vowpalwabbit()
-        from vowpalwabbit import pyvw
+        import vowpalwabbit
         # Load Abstract Model. This is without the internal model
         model = super().load(path, reset_paths=reset_paths, verbose=verbose)
         params = model._get_model_params()
@@ -196,7 +196,7 @@ class VowpalWabbitModel(AbstractModel):
             if params['sparse_weights']:
                 model_load_params += " --sparse_weights"
 
-            model.model = pyvw.vw(model_load_params)
+            model.model = vowpalwabbit.Workspace(model_load_params)
         model._load_model = None
         return model
 
@@ -216,7 +216,7 @@ class VowpalWabbitModel(AbstractModel):
     # User-specified parameters will override these values on a key-by-key basis.
     def _set_default_params(self):
         default_params = {
-            'passes': 10,
+            'passes': 10,  # TODO: Much better if 500+, revisit this if wanting to use VW to get strong results
             'bit_precision': 32,
             'ngram': 2,
             'skips': 1,

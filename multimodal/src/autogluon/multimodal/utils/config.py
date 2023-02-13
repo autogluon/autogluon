@@ -6,6 +6,7 @@ import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
 from omegaconf import DictConfig, OmegaConf
+from packaging import version
 from torch import nn
 
 from ..constants import (
@@ -22,7 +23,7 @@ from ..constants import (
 from ..presets import get_automm_presets, get_basic_automm_config
 from .data import get_detected_data_types
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def filter_search_space(hyperparameters: Dict, keys_to_filter: Union[str, List[str]]):
@@ -385,6 +386,33 @@ def get_local_pretrained_config_paths(config: DictConfig, path: str) -> DictConf
                     os.path.join(model_config.checkpoint_name, "config.json")
                 )  # guarantee the existence of local configs
 
+    return config
+
+
+def upgrade_config(config, loaded_version):
+    """Upgrade outdated configurations
+
+    Parameters
+    ----------
+    config
+        The configuration
+    loaded_version
+        The version of the config that has been loaded
+
+    Returns
+    -------
+    config
+        The upgraded configuration
+    """
+    # backward compatibility for variable image size.
+    if version.parse(loaded_version) <= version.parse("0.6.2"):
+        logger.info(f"Start to upgrade the previous configuration trained by AutoMM version={loaded_version}.")
+        if OmegaConf.select(config, "model.timm_image") is not None:
+            logger.warn(
+                "Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "
+                "Try to update the timm image size."
+            )
+            config.model.timm_image.image_size = None
     return config
 
 
