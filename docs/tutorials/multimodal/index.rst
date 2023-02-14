@@ -230,6 +230,12 @@ Advanced Topics
 
       How to use AutoMM presets.
 
+   .. card::
+      :title: Focal Loss
+      :link: focal_loss.html
+
+      How to use focal loss in AutoMM.
+
 FAQ
 ---
 .. container:: cards

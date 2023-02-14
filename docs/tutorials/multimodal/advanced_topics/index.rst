@@ -31,6 +31,12 @@ Advanced Topics
       :title: AutoMM Presets
       :link: presets.html
 
+   .. card::
+      :title: Focal Loss
+      :link: focal_loss.html
+
+      How to use focal loss in AutoMM.
+
       How to use AutoMM presets.
 
 .. toctree::
@@ -42,3 +48,4 @@ Advanced Topics
    model_distillation
    customization
    presets
+   focal_loss
