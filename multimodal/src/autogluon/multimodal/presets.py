@@ -85,6 +85,7 @@ def default(presets: str = DEFAULT):
     if presets in [HIGH_QUALITY, DEFAULT]:
         if use_hpo:
             from ray import tune
+
             hyperparameters.update(
                 {
                     "model.hf_text.checkpoint_name": tune.choice(
@@ -117,6 +118,7 @@ def default(presets: str = DEFAULT):
     elif presets == MEDIUM_QUALITY:
         if use_hpo:
             from ray import tune
+
             hyperparameters.update(
                 {
                     "model.hf_text.checkpoint_name": tune.choice(
@@ -147,6 +149,7 @@ def default(presets: str = DEFAULT):
         hyperparameters.update({"env.per_gpu_batch_size": 1})
         if use_hpo:
             from ray import tune
+
             hyperparameters.update(
                 {
                     "model.hf_text.checkpoint_name": tune.choice(
