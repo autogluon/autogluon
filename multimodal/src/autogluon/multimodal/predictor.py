@@ -416,7 +416,7 @@ class MultiModalPredictor(ExportMixin):
 
         if self._problem_type == OBJECT_DETECTION:
             self._label_column = "label"
-            if self._sample_data_path:
+            if self._sample_data_path is not None:
                 self._classes = get_detection_classes(self._sample_data_path)
                 self._output_shape = len(self._classes)
 
