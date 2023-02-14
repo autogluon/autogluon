@@ -77,7 +77,7 @@ hyperparameters = {
 
 automm_predictor = MultiModalPredictor(
     label="label",
-    problem_type="Classification",
+    problem_type="classification",
     eval_metric="acc"
 )
 
