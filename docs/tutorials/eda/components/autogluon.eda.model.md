@@ -1,15 +1,21 @@
+```{eval-rst}
 .. role:: hidden
     :class: hidden-section
+```
 
-Components: model
-=================
+# Components: model
 
-autogluon.eda.visualization.model
----------------------------------
+## autogluon.eda.visualization.model
 
+```{eval-rst}
 .. automodule:: autogluon.eda.visualization.model
-.. currentmodule:: autogluon.eda.visualization.model
+```
 
+```{eval-rst}
+.. currentmodule:: autogluon.eda.visualization.model
+```
+
+```{eval-rst}
 .. autosummary::
     :nosignatures:
 
@@ -18,54 +24,66 @@ autogluon.eda.visualization.model
     RegressionEvaluation
     ModelLeaderboard
 
+```
 
-:hidden:`ConfusionMatrix`
-~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`ConfusionMatrix`
 
+```{eval-rst}
 .. autoclass:: ConfusionMatrix
    :members: init
+```
 
-:hidden:`FeatureImportance`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`FeatureImportance`
 
+```{eval-rst}
 .. autoclass:: FeatureImportance
    :members: init
+```
 
-:hidden:`RegressionEvaluation`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`RegressionEvaluation`
 
+```{eval-rst}
 .. autoclass:: RegressionEvaluation
    :members: init
+```
 
-:hidden:`ModelLeaderboard`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`ModelLeaderboard`
 
+```{eval-rst}
 .. autoclass:: ModelLeaderboard
    :members: init
 
+```
 
-autogluon.eda.analysis.model
-----------------------------
+## autogluon.eda.analysis.model
 
+```{eval-rst}
 .. automodule:: autogluon.eda.analysis.model
-.. currentmodule:: autogluon.eda.analysis.model
+```
 
+```{eval-rst}
+.. currentmodule:: autogluon.eda.analysis.model
+```
+
+```{eval-rst}
 .. autosummary::
     :nosignatures:
 
     AutoGluonModelEvaluator
     AutoGluonModelQuickFit
 
+```
 
-:hidden:`AutoGluonModelEvaluator`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`AutoGluonModelEvaluator`
 
+```{eval-rst}
 .. autoclass:: AutoGluonModelEvaluator
    :members: init
+```
 
-:hidden:`AutoGluonModelQuickFit`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`AutoGluonModelQuickFit`
 
+```{eval-rst}
 .. autoclass:: AutoGluonModelQuickFit
    :members: init
-
+```
