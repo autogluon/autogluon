@@ -34,7 +34,7 @@ annotation = [{"entity_group": "PERSON", "start": 0, "end": 15},
 visualize_ner(sentence, annotation)
 ```
 
-If you are already familiar with the NER task, you probably have heard about the [BIO](https://en.wikipedia.org/wiki/Inside%E2%80%93outside%E2%80%93beginning_(tagging)) (Beginning-Inside-Outside) format. You can adopt this format (which is not compulsory) to add an *I-prefix* or a *B-prefix* to each tag to indicate wether the tag is the beginning of the annotated chunk or inside the chunk. For example, you can annotate "Albert" as "B-PERSON" because it is the beginning of the name and "Einstein" as "I-PERSON" as it is inside the PERSON chunk. You do not need to worry about the *O* tags, an *O* tag indicates that a word belongs to no chunk, as AutoMM will take care of that automatically. 
+If you are already familiar with the NER task, you probably have heard about the [BIO](https://en.wikipedia.org/wiki/Inside%E2%80%93outside%E2%80%93beginning_(tagging)) (Beginning-Inside-Outside) format. You can adopt this format (which is not compulsory) to add an *I-prefix* or a *B-prefix* to each tag to indicate whether the tag is the beginning of the annotated chunk or inside the chunk. For example, you can annotate "Albert" as "B-PERSON" because it is the beginning of the name and "Einstein" as "I-PERSON" as it is inside the PERSON chunk. You do not need to worry about the *O* tags, an *O* tag indicates that a word belongs to no chunk, as AutoMM will take care of that automatically. 
 
 Now, let's look at an example dataset. This dataset is converted from the [MIT movies corpus](https://groups.csail.mit.edu/sls/downloads/movie/) which provides annotations on entity groups such as actor, character, director, genre, song, title, trailer, year, etc.
 

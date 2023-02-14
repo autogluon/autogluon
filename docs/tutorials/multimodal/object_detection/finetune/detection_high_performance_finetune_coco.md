@@ -72,7 +72,7 @@ val_metric = "map"
 
 We create the MultiModalPredictor with selected checkpoint name, val_metric, and number of GPUs.
 We need to specify the problem_type to `"object_detection"`,
-and also provide a `sample_data_path` for the predictor to infer the catagories of the dataset.
+and also provide a `sample_data_path` for the predictor to infer the categories of the dataset.
 Here we provide the `train_path`, and it also works using any other split of this dataset.
 
 ```python .input

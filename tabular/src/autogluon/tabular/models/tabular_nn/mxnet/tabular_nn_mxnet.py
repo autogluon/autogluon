@@ -157,7 +157,7 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
         logger.log(15, "Training data for neural network has: %d examples, %d features (%d vector, %d embedding)" %
                    (train_dataset.num_examples, train_dataset.num_features, len(train_dataset.feature_groups['vector']), len(train_dataset.feature_groups['embed'])
                   ))
-        # self._save_preprocessor()  # TODO: should save these things for hyperparam tunning. Need one HP tuner for network-specific HPs, another for preprocessing HPs.
+        # self._save_preprocessor()  # TODO: should save these things for hyperparam tuning. Need one HP tuner for network-specific HPs, another for preprocessing HPs.
 
         if num_gpus is not None and num_gpus >= 1:
             self.ctx = mx.gpu()  # Currently cannot use more than 1 GPU

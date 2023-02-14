@@ -62,7 +62,7 @@ def average_checkpoints(
 
 class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
     """
-    Class that customizes how checkpoints are saved. Saves either the entire model or only parameters that have been explicitly updated during training. The latter reduces memory footprint substentially when training very large models with parameter-efficient finetuning methods.
+    Class that customizes how checkpoints are saved. Saves either the entire model or only parameters that have been explicitly updated during training. The latter reduces memory footprint substantially when training very large models with parameter-efficient finetuning methods.
     Class is based on pl.plugins.TorchCheckpointIO.
 
     """
