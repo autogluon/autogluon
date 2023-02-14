@@ -1058,7 +1058,7 @@ class AbstractModel:
     # a trustworthy variable for final input shape
     def _get_input_types(self, batch_size=None) -> list:
         """
-        Get input types as a list of tuples, containining shape and dtype.
+        Get input types as a list of tuples, containing shape and dtype.
         This can be useful for building the input_types argument for
         model compilation. This method can be overloaded in derived classes,
         in order to satisfy class-specific requirements.
@@ -1423,7 +1423,7 @@ class AbstractModel:
         Parameters
         ----------
         is_gpu_available
-            Whether gpu is availalbe in the system.
+            Whether gpu is available in the system.
             Model that can be trained both on cpu and gpu can decide the minimum resources based on this.
 
         Returns a dictionary of minimum resource requirements to fit the model.

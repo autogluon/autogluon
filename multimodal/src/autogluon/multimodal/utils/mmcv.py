@@ -116,7 +116,7 @@ def unpack_datacontainers(datacontainers):
 
 def send_datacontainers_to_device(data, device, dont_send=[]):
     """
-    Recieves dictionary, send `mmcv.parallel.DataContainer` items that has
+    Receives dictionary, send `mmcv.parallel.DataContainer` items that has
     `cpu_only` set to False to the device. Excludes items listed in `dont_send`.
     """
     for k, v in data.items():
