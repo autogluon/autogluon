@@ -225,10 +225,10 @@ Advanced Topics
       How to customize AutoMM configurations.
 
    .. card::
-      :title: Focal Loss
-      :link: focal_loss.html
+      :title: Few Shot Learning with FusionSVM
+      :link: few_shot_learning.html
 
-      How to use focal loss in AutoMM.
+      How to use SVM combined with feature extraction for few shot learning.
 
 FAQ
 ---

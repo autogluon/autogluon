@@ -99,7 +99,6 @@ from .utils import (
     split_train_tuning_data,
     try_to_infer_pos_label,
     update_hyperparameters,
-    upgrade_config,
 )
 
 logger = logging.getLogger(__name__)
@@ -1860,9 +1859,6 @@ class MultiModalMatcher:
 
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)
-
-        query_config = upgrade_config(query_config, assets["version"])
-        response_config = upgrade_config(response_config, assets["version"])
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = CustomUnpickler(fp).load()

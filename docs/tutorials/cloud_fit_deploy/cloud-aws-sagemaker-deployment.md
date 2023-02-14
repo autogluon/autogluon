@@ -27,70 +27,36 @@ the following content types: JSON, CSV, numpy array, NPZ.
 ```{.python}
 from autogluon.tabular import TabularPredictor
 # or from autogluon.multimodal import MultiModalPredictor for example
-from io import BytesIO, StringIO
-
+import os
+import json
+from io import StringIO
 import pandas as pd
-
-from autogluon.core.constants import REGRESSION
-from autogluon.core.utils import get_pred_from_proba_df
+import numpy as np
 
 
 def model_fn(model_dir):
     """loads model from previously saved artifact"""
-    model = TabularPredictor.load(model_dir)  # or model = MultiModalPredictor.load(model_dir) for example
-    globals()["column_names"] = model.feature_metadata_in.get_features()
+    model = TabularPredictor.load(model_dir)  # or model = MultiModalPredictor.load(model_dir) for example 
+    model.persist_models()  # This line only works for TabularPredictor
     return model
 
 
-def transform_fn(
-    model, request_body, input_content_type, output_content_type="application/json"
-):
-    if input_content_type == "application/x-parquet":
-        buf = BytesIO(request_body)
-        data = pd.read_parquet(buf)
+def transform_fn(model, request_body, input_content_type, output_content_type="application/json"):
 
-    elif input_content_type == "text/csv":
+    if input_content_type == "text/csv":
         buf = StringIO(request_body)
-        data = pd.read_csv(buf)
-
-    elif input_content_type == "application/json":
-        buf = StringIO(request_body)
-        data = pd.read_json(buf)
-
-    elif input_content_type == "application/jsonl":
-        buf = StringIO(request_body)
-        data = pd.read_json(buf, orient="records", lines=True)
-
+        data = pd.read_csv(buf, header=None)
+        num_cols = len(data.columns)
+        
     else:
-        raise ValueError(f"{input_content_type} input content type not supported.")
+        raise Exception(f"{input_content_type} content type not supported")
 
-    if model.problem_type != REGRESSION:
-        pred_proba = model.predict_proba(data, as_pandas=True)
-        pred = get_pred_from_proba_df(pred_proba, problem_type=model.problem_type)
-        pred_proba.columns = [str(c) + "_proba" for c in pred_proba.columns]
-        pred.name = str(pred.name) + "_pred" if pred.name is not None else "pred"
-        prediction = pd.concat([pred, pred_proba], axis=1)
-    else:
-        prediction = model.predict(data, as_pandas=True)
-    if isinstance(prediction, pd.Series):
-        prediction = prediction.to_frame()
+    pred = model.predict(data)
+    pred_proba = model.predict_proba(data)
+    prediction = pd.concat([pred, pred_proba], axis=1)
 
-    if "application/x-parquet" in output_content_type:
-        prediction.columns = prediction.columns.astype(str)
-        output = prediction.to_parquet()
-        output_content_type = "application/x-parquet"
-    elif "application/json" in output_content_type:
-        output = prediction.to_json()
-        output_content_type = "application/json"
-    elif "text/csv" in output_content_type:
-        output = prediction.to_csv(index=None)
-        output_content_type = "text/csv"
-    else:
-        raise ValueError(f"{output_content_type} content type not supported")
-
-    return output, output_content_type
+    return prediction.to_json(), output_content_type
 ```
-
 For inference with other types of AutoGluon Predictors, i.e. TextPredictor, the inference script you provided will be quite similar to the one above.
 Mostly, you just need to replace `TabularPredictor` to be `TextPredictor` for example.
 
@@ -150,19 +116,14 @@ To deploy AutoGluon model as a SageMaker inference endpoint, we configure SageMa
 
 ```{.python}
 import sagemaker
-import pandas as pd
+
 # Helper wrappers referred earlier
 from ag_model import (
-    AutoGluonSagemakerEstimator,
-    AutoGluonNonRepackInferenceModel,
-    AutoGluonSagemakerInferenceModel,
-    AutoGluonRealtimePredictor,
-    AutoGluonBatchPredictor,
+    AutoGluonTraining,
+    AutoGluonInferenceModel,
+    AutoGluonTabularPredictor,
 )
 from sagemaker import utils
-from sagemaker.serializers import CSVSerializer
-import os
-import boto3
 
 role = sagemaker.get_execution_role()
 sagemaker_session = sagemaker.session.Session()
@@ -190,19 +151,19 @@ Deploy the model:
 ```{.python}
 instance_type = "ml.m5.2xlarge"  # You might want to use GPU instances, i.e. ml.g4dn.2xlarge for Text/Image/MultiModal Predictors etc
 
-model = AutoGluonNonRepackInferenceModel(
+model = AutoGluonInferenceModel(
     model_data=model_data,
     role=role,
     region=region,
-    framework_version="0.6",  # Replace this with the AutoGluon DLC container version you want to use
+    framework_version="0.5.2",  # Replace this with the AutoGluon DLC container version you want to use
     py_version="py38",
     instance_type=instance_type,
-    source_dir="scripts",
     entry_point="YOUR_SERVING_SCRIPT_PATH",  # example: "tabular_serve.py"
 )
 
-model.deploy(initial_instance_count=1, serializer=CSVSerializer(), instance_type=instance_type)
-predictor = AutoGluonRealtimePredictor(model.endpoint_name)
+predictor = model.deploy(
+    initial_instance_count=1, serializer=CSVSerializer(), instance_type=instance_type
+)
 ```
 
 Once the predictor is deployed, it can be used for inference in the following way:
@@ -238,16 +199,15 @@ Prepare transform job:
 ```{.python}
 instance_type = "ml.m5.2xlarge"  # You might want to use GPU instances, i.e. ml.g4dn.2xlarge for Text/Image/MultiModal Predictors etc
 
-model = AutoGluonSagemakerInferenceModel(
+model = AutoGluonInferenceModel(
     model_data=model_data,
     role=role,
     region=region,
-    framework_version="0.6",  # Replace this with the AutoGluon DLC container version you want to use
+    framework_version="0.5.2",  # Replace this with the AutoGluon DLC container version you want to use
     py_version="py38",
     instance_type=instance_type,
     entry_point="YOUR_BATCH_SERVE_SCRIPT",  # example: "tabular_serve.py"
-    source_dir="scripts",
-    predictor_cls=AutoGluonBatchPredictor,
+    predictor_cls=AutoGluonTabularPredictor,
     # or AutoGluonMultiModalPredictor if model is trained by MultiModalPredictor.
     # Please refer to https://github.com/aws/amazon-sagemaker-examples/blob/main/advanced_functionality/autogluon-tabular-containers/ag_model.py#L60-L64 on how you would customize it.
 )
@@ -267,24 +227,27 @@ transformer = model.transformer(
 Upload the test data.
 
 ```{.python}
-test_input = transformer.sagemaker_session.upload_data(path=os.path.join("data", "test.csv"), key_prefix=s3_prefix)
+test_input = transformer.sagemaker_session.upload_data(
+    path=os.path.join("data", "test.csv"), key_prefix=s3_prefix
+)
 ```
 
 The inference script would be identical to the one used for deployment:
 
 ```{.python}
-# or from autogluon.multimodal import MultiModalPredictor for example
 from autogluon.tabular import TabularPredictor
+# or from autogluon.multimodal import MultiModalPredictor for example
+import os
+import json
 from io import StringIO
 import pandas as pd
+import numpy as np
 
 
 def model_fn(model_dir):
     """loads model from previously saved artifact"""
-    model = TabularPredictor.load(model_dir)  # or model = MultiModalPredictor.load(model_dir) for example
+    model = TabularPredictor.load(model_dir)  # or model = MultiModalPredictor.load(model_dir) for example 
     model.persist_models()  # This line only works for TabularPredictor
-    globals()["column_names"] = model.feature_metadata_in.get_features()
-
     return model
 
 
@@ -294,10 +257,7 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         buf = StringIO(request_body)
         data = pd.read_csv(buf, header=None)
         num_cols = len(data.columns)
-        if num_cols != len(column_names):
-            raise Exception(f"Invalid data format. Input data has {num_cols} while the model expects {len(column_names)}")
-        else:
-            data.columns = column_names
+        
     else:
         raise Exception(f"{input_content_type} content type not supported")
 
