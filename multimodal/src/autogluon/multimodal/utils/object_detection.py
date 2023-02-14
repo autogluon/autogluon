@@ -5,10 +5,10 @@ import warnings
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Union
 
-import PIL
 import defusedxml.ElementTree as ET
 import numpy as np
 import pandas as pd
+import PIL
 
 from ..constants import (
     AUTOMM,
