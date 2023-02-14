@@ -899,6 +899,7 @@ class TabularPredictor:
             if infer_limit is not None:
                 infer_limit = infer_limit - self._learner.preprocess_1_time
             trainer_model_best = self._trainer.get_model_best(infer_limit=infer_limit)
+            logger.log(20, 'Automatically performing refit_full as a post-fit operation (due to `.fit(..., refit_full=True)`')
             self.refit_full(model=refit_full, set_best_to_refit_full=False)
             if set_best_to_refit_full:
                 model_full_dict = self._trainer.get_model_full_dict()
@@ -1525,6 +1526,7 @@ class TabularPredictor:
         ----------
         data : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
             This Dataset must also contain the label-column with the same column-name as specified during fit().
+            If extra_metrics=None and skip_score=True, then the label column is not required.
             If specified, then the leaderboard returned will contain additional columns 'score_test', 'pred_time_test', and 'pred_time_test_marginal'.
                 'score_test': The score of the model on the 'eval_metric' for the data provided.
                     NOTE: Metrics scores always show in higher is better form.
@@ -2263,7 +2265,12 @@ class TabularPredictor:
         Dictionary of original model names -> refit_full model names.
         """
         self._assert_is_fit('refit_full')
+        ts = time.time()
         model_best = self._get_model_best(can_infer=None)
+        logger.log(20, 'Refitting models via `predictor.refit_full` using all of the data (combined train and validation)...\n'
+                       '\tModels trained in this way will have the suffix "_FULL" and have NaN validation score.\n'
+                       '\tThis process is not bound by time_limit, but should take less time than the original `predictor.fit` call.\n'
+                       '\tTo learn more, refer to the `.refit_full` method docstring which explains how "_FULL" models differ from normal models.')
         refit_full_dict = self._learner.refit_ensemble_full(model=model)
 
         if set_best_to_refit_full:
@@ -2288,6 +2295,8 @@ class TabularPredictor:
                     f'Best model ("{model_best}") is not present in refit_full dictionary. '
                     f'Training may have failed on the refit model. AutoGluon will default to using "{model_best}" for predict() and predict_proba().')
 
+        te = time.time()
+        logger.log(20, f'Refit complete, total runtime = {round(te - ts, 2)}s')
         return refit_full_dict
 
     def get_model_best(self):

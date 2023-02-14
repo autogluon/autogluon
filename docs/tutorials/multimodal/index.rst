@@ -225,6 +225,12 @@ Advanced Topics
       How to customize AutoMM configurations.
 
    .. card::
+      :title: AutoMM Presets
+      :link: presets.html
+
+      How to use AutoMM presets.
+
+   .. card::
       :title: Focal Loss
       :link: focal_loss.html
 

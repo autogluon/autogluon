@@ -407,18 +407,22 @@ class AbstractTabularLearner(AbstractLearner):
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None, skip_score=False, silent=False):
         leaderboard_df = self.leaderboard(extra_info=extra_info, silent=silent)
-        if y is None:
-            X, y = self.extract_label(X)
         if extra_metrics is None:
             extra_metrics = []
-        self._validate_class_labels(y)
+        if y is None:
+            error_if_missing = extra_metrics or not skip_score
+            X, y = self.extract_label(X, error_if_missing=error_if_missing)
         w = None
         if self.weight_evaluation:
             X, w = extract_column(X, self.sample_weight)
 
         X = self.transform_features(X)
-        y_internal = self.label_cleaner.transform(y)
-        y_internal = y_internal.fillna(-1)
+        if y is not None:
+            self._validate_class_labels(y)
+            y_internal = self.label_cleaner.transform(y)
+            y_internal = y_internal.fillna(-1)
+        else:
+            y_internal = None
 
         trainer = self.load_trainer()
         scores = {}
@@ -450,7 +454,7 @@ class AbstractTabularLearner(AbstractLearner):
         extra_scores = {}
         for model_name, y_pred_proba_internal in model_pred_proba_dict.items():
             if skip_score:
-                scores[model_name] = None
+                scores[model_name] = np.nan
             else:
                 scores[model_name] = self._score_with_pred_proba(
                     y_pred_proba_internal=y_pred_proba_internal,
@@ -737,9 +741,12 @@ class AbstractTabularLearner(AbstractLearner):
                     logger.log(20, json.dumps(performance_dict[metric_name], indent=4))
         return performance_dict
 
-    def extract_label(self, X):
+    def extract_label(self, X, error_if_missing=True):
         if self.label not in list(X.columns):
-            raise ValueError(f"Provided DataFrame does not contain label column: {self.label}")
+            if error_if_missing:
+                raise ValueError(f"Provided DataFrame does not contain label column: {self.label}")
+            else:
+                return X, None
         y = X[self.label].copy()
         X = X.drop(self.label, axis=1)
         return X, y
