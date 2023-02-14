@@ -1525,6 +1525,7 @@ class TabularPredictor:
         ----------
         data : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
             This Dataset must also contain the label-column with the same column-name as specified during fit().
+            If extra_metrics=None and skip_score=True, then the label column is not required.
             If specified, then the leaderboard returned will contain additional columns 'score_test', 'pred_time_test', and 'pred_time_test_marginal'.
                 'score_test': The score of the model on the 'eval_metric' for the data provided.
                     NOTE: Metrics scores always show in higher is better form.

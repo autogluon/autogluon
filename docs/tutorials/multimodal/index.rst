@@ -230,6 +230,12 @@ Advanced Topics
 
       How to customize AutoMM configurations.
 
+   .. card::
+      :title: AutoMM Presets
+      :link: presets.html
+
+      How to use AutoMM presets.
+
 FAQ
 ---
 .. container:: cards

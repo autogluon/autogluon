@@ -26,6 +26,7 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
+from autogluon.multimodal.utils import object_detection_data_to_df, save_result_df, setup_detection_train_tuning_data
 from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from . import version as ag_version
@@ -153,6 +154,7 @@ from .utils import (
     update_config_by_rules,
     update_hyperparameters,
     update_tabular_config_by_resources,
+    upgrade_config,
 )
 
 logger = logging.getLogger(__name__)
@@ -415,7 +417,7 @@ class MultiModalPredictor(ExportMixin):
 
         if self._problem_type == OBJECT_DETECTION:
             self._label_column = "label"
-            if self._sample_data_path:
+            if self._sample_data_path is not None:
                 self._classes = get_detection_classes(self._sample_data_path)
                 self._output_shape = len(self._classes)
 
@@ -1788,7 +1790,6 @@ class MultiModalPredictor(ExportMixin):
         label: Optional[str] = None,
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
-        seed: Optional[int] = 123,
         eval_tool: Optional[str] = None,
     ):
         """
@@ -1824,8 +1825,6 @@ class MultiModalPredictor(ExportMixin):
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
-        seed
-            The random seed to use for this evaluation run.
         eval_tool
             The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
 
@@ -1860,7 +1859,6 @@ class MultiModalPredictor(ExportMixin):
                     anno_file_or_df=data,
                     metrics=metrics,
                     return_pred=return_pred,
-                    seed=seed,
                     eval_tool=eval_tool,
                 )
             else:
@@ -1870,7 +1868,6 @@ class MultiModalPredictor(ExportMixin):
                     anno_file_or_df=data,
                     metrics=metrics,
                     return_pred=return_pred,
-                    seed=seed,
                     eval_tool="torchmetrics",
                 )
 
@@ -1884,7 +1881,6 @@ class MultiModalPredictor(ExportMixin):
             data=data,
             requires_label=True,
             realtime=realtime,
-            seed=seed,
         )
         logits = extract_from_output(ret_type=ret_type, outputs=outputs)
 
@@ -2003,7 +1999,6 @@ class MultiModalPredictor(ExportMixin):
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
-        seed: Optional[int] = 123,
         save_results: Optional[bool] = None,
     ):
         """
@@ -2025,10 +2020,9 @@ class MultiModalPredictor(ExportMixin):
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
-        seed
-            The random seed to use for this prediction run.
         save_results
             Whether to save the prediction results (only works for detection now)
+
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
@@ -2069,7 +2063,6 @@ class MultiModalPredictor(ExportMixin):
                 data=data,
                 requires_label=False,
                 realtime=realtime,
-                seed=seed,
             )
 
             if self._problem_type == OCR_TEXT_RECOGNITION:
@@ -2135,7 +2128,6 @@ class MultiModalPredictor(ExportMixin):
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
         realtime: Optional[bool] = None,
-        seed: Optional[int] = 123,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -2160,8 +2152,6 @@ class MultiModalPredictor(ExportMixin):
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
-        seed
-            The random seed to use for this prediction run.
 
         Returns
         -------
@@ -2195,7 +2185,6 @@ class MultiModalPredictor(ExportMixin):
                 data=data,
                 requires_label=False,
                 realtime=realtime,
-                seed=seed,
             )
 
             if self._problem_type == NER:
@@ -2443,6 +2432,7 @@ class MultiModalPredictor(ExportMixin):
 
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)
+        config = upgrade_config(config, assets["version"])
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = CustomUnpickler(fp).load()
@@ -2487,15 +2477,6 @@ class MultiModalPredictor(ExportMixin):
             "pipeline" in assets and assets["pipeline"] == OBJECT_DETECTION
         ):
             data_processors = None
-
-        # backward compatibility for variable image size.
-        if version.parse(assets["version"]) <= version.parse("0.6.2"):
-            if OmegaConf.select(config, "model.timm_image") is not None:
-                logger.warn(
-                    "Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "
-                    "Try to update the timm image size."
-                )
-                config.model.timm_image.image_size = None
 
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]
