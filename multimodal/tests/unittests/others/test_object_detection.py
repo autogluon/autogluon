@@ -318,7 +318,6 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
         sample_data_path=train_df,
     )
 
-
     predictor.fit(
         train_df,
         hyperparameters={
