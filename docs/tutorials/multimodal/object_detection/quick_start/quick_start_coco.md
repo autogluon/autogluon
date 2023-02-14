@@ -193,7 +193,7 @@ To run inference and save results, run the following:
 pred = better_predictor.predict(test_path, save_results=True)
 ```
 Here, we save `pred` into a `.txt` file, which exactly follows the same layout as in `pred`.
-You can use a predictor initialzed in anyway (i.e. finetuned predictor, predictor with pretrained model, etc.).
+You can use a predictor initialized in anyway (i.e. finetuned predictor, predictor with pretrained model, etc.).
 Here, we demonstrate using the `better_predictor` loaded previously.
 
 ### Visualizing Results

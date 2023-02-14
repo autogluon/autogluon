@@ -606,7 +606,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
     ):  
         """
         Get resources per job, number of total batches, and number of jobs running in parallel for a single batch
-        based on total number of jobs, user specified number of jobs to be run in parallel, and user specified resourecs per job.
+        based on total number of jobs, user specified number of jobs to be run in parallel, and user specified resources per job.
         When user specified resources per job, will validate and force this value if legit.
         Otherwise, will try to run as many jobs in parallel as possible respecting the minimum resources required per job.
         """

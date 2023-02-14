@@ -45,7 +45,7 @@ pothole/Annotations/usersplit_test_cocoformat.json
 
 ### If You Download From Kaggle
 
-Original Pothole dataset is in VOC format and is not splitted. **In Autogluon MultiModalPredictor, we strongly recommend using COCO as your data format instead.
+Original Pothole dataset is in VOC format and is not split. **In Autogluon MultiModalPredictor, we strongly recommend using COCO as your data format instead.
 Check :label:`sec_automm_detection_prepare_coco17` and :ref:`convert_data_to_coco_format` for more information
 about COCO dataset and how to split and convert a VOC dataset to COCO.**
 

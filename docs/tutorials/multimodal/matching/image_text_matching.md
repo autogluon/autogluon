@@ -128,7 +128,7 @@ print(f"txt_to_img_scores: {txt_to_img_scores}")
 print(f"img_to_txt_scores: {img_to_txt_scores}")
 ```
 
-Here we report the `recall`, which is the `eval_metric` in intializing the predictor above. One `cutoff` value means using the top k retrieved items to calculate the score. You may find that the text-to-image recalls are much higher than the image-to-text recalls. This is because each image is paired with five texts. In image-to-text retrieval, the upper bound of `recall@1` is 20%, which means that the top-1 text is correct, but there are totally five texts to retrieve.
+Here we report the `recall`, which is the `eval_metric` in initializing the predictor above. One `cutoff` value means using the top k retrieved items to calculate the score. You may find that the text-to-image recalls are much higher than the image-to-text recalls. This is because each image is paired with five texts. In image-to-text retrieval, the upper bound of `recall@1` is 20%, which means that the top-1 text is correct, but there are totally five texts to retrieve.
 
 ## Finetune Predictor
 After measuring the pretrained performance, we can finetune the model on our dataset to see whether we can get improvements. For a quick demo, here we set the time limit to 180 seconds.
