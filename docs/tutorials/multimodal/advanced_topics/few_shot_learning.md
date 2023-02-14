@@ -10,7 +10,7 @@ We show the effectiveness of this FusionSVMModel on a text classification datase
 ### Load Dataset
 We prepare all datasets in the format of `pd.DataFrame` as in many of our tutorials have done. 
 For this tutorial, we'll use a small `MLDoc` dataset for demonstration. 
-The dataset contains 4 classes and we downsampled the training data to 10 samples per class, a.k.a 10 shots.
+The dataset is a text classification dataset, which contains 4 classes and we downsampled the training data to 10 samples per class, a.k.a 10 shots.
 For more details regarding `MLDoc` please see this [link](https://github.com/facebookresearch/MLDoc).
 
 ```{.python .input}
@@ -112,6 +112,7 @@ print(result2)
 ### Load Dataset
 We also provide an example of using `FewShotSVMPredictor` on a few-shot image classification task. 
 We use the Stanford Cars dataset for demonstration and downsampled the training set to have 8 samples per class.
+The Stanford Cars is an image classification dataset and contains 196 classes.
 For more information regarding the dataset, please see [here](http://ai.stanford.edu/~jkrause/cars/car_dataset.html).
 
 ```{.python .input}
