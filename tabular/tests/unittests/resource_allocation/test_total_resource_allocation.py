@@ -176,7 +176,7 @@ def test_nonbagged_model_with_total_resources(mock_system_resources_ctx_mgr, moc
     
 def test_nonbagged_model_with_total_resources_but_no_gpu_specified(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus):
     with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
-        # If model by deafult needs gpu, we use it even if user didn't specify it
+        # If model by default needs gpu, we use it even if user didn't specify it
         model_base = DummyModel()
         total_resources = {
             'num_cpus': 2,

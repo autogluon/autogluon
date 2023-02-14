@@ -345,7 +345,7 @@ predictor.fit(train_data, presets="medium_quality")
 Higher quality presets usually result in better forecasts but take longer to train.
 The following presets are available:
 
-- ``"fast_training"``: fit simple "local" statistical models (``ETS``, ``ARIMA``, ``Theta``, ``Naive``, ``SeasonalNaive``). These models are fast to train, but cannot capture more complex patters in the data.
+- ``"fast_training"``: fit simple "local" statistical models (``ETS``, ``ARIMA``, ``Theta``, ``Naive``, ``SeasonalNaive``). These models are fast to train, but cannot capture more complex patterns in the data.
 - ``"medium_quality"``: all models in ``"fast_training"`` in addition to the tree-based ``AutoGluonTabular`` and the ``DeepAR`` deep learning model. Default setting that produces good forecasts with reasonable training time.
 - ``"high_quality"``: all models in ``"medium_quality"`` in addition to two more deep learning models: ``TemporalFusionTransformerMXNet`` (if MXNet is available) and ``SimpleFeedForward``. Moreover, this preset will enable hyperparameter optimization for local statistical models. Usually more accurate than ``medium_quality``, but takes longer to train.
 - ``"best_quality"``: all models in ``"high_quality"`` in addition to the transformer-based ``TransformerMXNet`` model (if MXNet is available). This setting also enables hyperparameter optimization for deep learning models. Usually better than ``high_quality``, but takes much longer to train.
