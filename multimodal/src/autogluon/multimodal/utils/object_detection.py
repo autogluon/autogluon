@@ -5,7 +5,6 @@ import warnings
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Union
 
-import PIL
 import defusedxml.ElementTree as ET
 import numpy as np
 import pandas as pd
@@ -32,118 +31,6 @@ from .inference import predict
 from .save import setup_save_path
 
 logger = logging.getLogger(__name__)
-
-
-def _get_image_info(image_path: str):
-    """
-    Get the image width and height info
-    Parameters
-    ----------
-    image_path
-        str representing the path to the image
-    Returns
-    -------
-        dict containing image info. None if cannot open image
-    """
-    info_dict = {}
-    try:
-        with PIL.Image.open(image_path) as im:
-            height, width = im.size
-            info_dict["height"] = height
-            info_dict["width"] = width
-        return info_dict
-    except Exception as err:
-        warnings.warn(f"Skip image {image_path} due to {err}")
-        return None
-
-
-def get_df_unique_classes(data: pd.DataFrame):
-    """
-    Get the unique classes in the dataframe for object detection
-    Parameters
-    ----------
-    data
-        pd.DataFrame holding the data for object detection
-    Returns
-    -------
-        list of unique classes
-    """
-    unique_classes = {}
-    for idx in range(data.shape[0]):
-        row = data.iloc[idx]
-        rois = row["rois"]
-        for roi in rois:
-            _, _, _, _, class_label = roi
-            if class_label not in unique_classes:
-                unique_classes[class_label] = len(unique_classes)
-    return list(unique_classes.keys())
-
-
-def object_detection_df_to_coco(data: pd.DataFrame, save_path: Optional[str] = None):
-    """
-    If the user already has dataframe format data and wants to convert to coco format .json files, this function
-    completes the task
-    Parameters
-    ----------
-    data
-        pd.DataFrame format of object detection data
-    save_path
-        str path to save the output
-    Returns
-    -------
-        Dict
-    """
-    output_json_dict = {"images": [], "type": "instances", "annotations": [], "categories": []}
-    bbox_count = 0
-    unique_classes = {}
-    for idx in range(data.shape[0]):
-        row = data.iloc[idx]
-        image_path = row["image"]
-        rois = row["rois"]
-        # label = row["label"]
-        image_id = idx
-
-        image_info = _get_image_info(image_path)
-        if image_info:
-            image_entry = {
-                "file_name": image_path,
-                "height": image_info["height"],
-                "width": image_info["width"],
-                "id": image_id,
-            }
-            output_json_dict["images"].append(image_entry)
-        else:
-            continue
-
-        for roi in rois:
-            xmin, ymin, xmax, ymax, class_label = roi
-            x, y, w, h = bbox_xyxy_to_xywh([xmin, ymin, xmax, ymax])
-
-            ann = {
-                "area": w * h,
-                "iscrowd": 0,
-                "bbox": [x, y, w, h],
-                "category_id": class_label,
-                "ignore": 0,
-                "segmentation": [],  # This script is not for segmentation
-                "image_id": image_id,
-                "id": bbox_count,
-            }
-            bbox_count += 1
-
-            output_json_dict["annotations"].append(ann)
-
-            if class_label not in unique_classes:
-                unique_classes[class_label] = len(unique_classes)
-
-    for class_name, id in unique_classes.items():
-        output_json_dict["categories"].append({"supercategory": "none", "id": id, "name": class_name})
-
-    if save_path and save_path.endswith(".json"):
-        with open(save_path, "w") as fp:
-            json.dump(output_json_dict, fp)
-
-    return output_json_dict
 
 
 def object_detection_data_to_df(data: Union[pd.DataFrame, dict, list, str]) -> pd.DataFrame:
@@ -1169,13 +1056,10 @@ def get_detection_classes(sample_data_path):
     -------
         All the class names.
     """
-    if isinstance(sample_data_path, str):
-        if os.path.isdir(sample_data_path):
-            return get_voc_format_classes(sample_data_path)
-        else:
-            return get_coco_format_classes(sample_data_path)
-    elif isinstance(sample_data_path, pd.DataFrame):
-        return get_df_unique_classes(sample_data_path)
+    if os.path.isdir(sample_data_path):
+        return get_voc_format_classes(sample_data_path)
+    else:
+        return get_coco_format_classes(sample_data_path)
 
 
 def visualize_detection(
