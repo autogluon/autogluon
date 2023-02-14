@@ -76,6 +76,7 @@ class NNFastAiTabularModel(AbstractModel):
         self.cat_columns = None
         self.cont_columns = None
         self.columns_fills = None
+        self._columns_fills_names = None
         self.procs = None
         self.y_scaler = None
         self._cont_normalization = None
@@ -124,7 +125,8 @@ class NNFastAiTabularModel(AbstractModel):
         if fit:
             self.cont_columns = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
             self.cat_columns = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
-            self._cont_normalization = (X[self.cont_columns].mean(), X[self.cont_columns].std())
+            if self.cont_columns:
+                self._cont_normalization = (np.array(X[self.cont_columns].mean()), np.array(X[self.cont_columns].std()))
 
             num_cat_cols_og = len(self.cat_columns)
             if self.cat_columns:
@@ -141,19 +143,37 @@ class NNFastAiTabularModel(AbstractModel):
 
             nullable_numeric_features = self._feature_metadata.get_features(valid_raw_types=[R_FLOAT, R_DATETIME], invalid_special_types=[S_TEXT_SPECIAL])
             self.columns_fills = dict()
-            for c in nullable_numeric_features:  # No need to do this for int features, int can't have null
+            self._columns_fills_names = nullable_numeric_features
+            for c in self._columns_fills_names:  # No need to do this for int features, int can't have null
                 self.columns_fills[c] = X[c].mean()
         X = self._fill_missing(X)
         if self.cont_columns:
             cont_mean, cont_std = self._cont_normalization
-            X[self.cont_columns] = (X[self.cont_columns] - cont_mean) / cont_std
-            X = X.copy()  # Removes potential DF fragmentation
+            # Creating a new DataFrame is 10x+ faster than assigning results to X[self.cont_columns]
+            X_cont = pd.DataFrame(
+                (X[self.cont_columns].values - cont_mean) / cont_std,
+                columns=self.cont_columns,
+                index=X.index,
+            )
+            if self.cat_columns:
+                # Creating a new DataFrame via concatenation is faster than editing values in-place
+                X = pd.concat([X_cont, X[self.cat_columns]], axis=1)
+            else:
+                X = X_cont.copy()
         return X
 
     def _fill_missing(self, df: pd.DataFrame) -> pd.DataFrame:
         # FIXME: Consider representing categories as int
         if self.columns_fills:
-            df = df.fillna(self.columns_fills, inplace=False, downcast=False)
+            # Speed up preprocessing by only filling columns where NaNs are present
+            is_null = df[self._columns_fills_names].isnull().values.max(axis=0)
+            columns_to_fill = [self._columns_fills_names[i] for i in range(len(is_null)) if is_null[i]]
+            column_fills = {k: self.columns_fills[k] for k in columns_to_fill}
+            if column_fills:
+                # TODO: pandas==1.5.3 fillna is 10x+ slower than pandas==1.3.5 with large column count
+                df = df.fillna(column_fills, inplace=False, downcast=False)
+            else:
+                df = df.copy()
         else:
             df = df.copy()
         return df

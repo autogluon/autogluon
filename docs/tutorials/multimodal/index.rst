@@ -225,6 +225,12 @@ Advanced Topics
       How to customize AutoMM configurations.
 
    .. card::
+      :title: AutoMM Presets
+      :link: presets.html
+
+      How to use AutoMM presets.
+
+   .. card::
       :title: Few Shot Learning with FusionSVM
       :link: few_shot_learning.html
 

@@ -62,6 +62,7 @@ from .object_detection import (
     from_voc,
     get_detection_classes,
     object_detection_data_to_df,
+    object_detection_df_to_coco,
     save_result_coco_format,
     save_result_df,
     save_result_voc_format,

@@ -26,12 +26,18 @@ Advanced Topics
       :link: customization.html
 
       How to customize AutoMM configurations.
-   
+
+   .. card::
+      :title: AutoMM Presets
+      :link: presets.html
+
    .. card::
       :title: Few Shot Learning with FusionSVM
       :link: few_shot_learning.html
 
       How to use SVM combined with feature extraction for few shot learning.
+
+      How to use AutoMM presets.
 
 .. toctree::
    :maxdepth: 1
@@ -42,3 +48,4 @@ Advanced Topics
    model_distillation
    customization
    few_shot_learning
+   presets

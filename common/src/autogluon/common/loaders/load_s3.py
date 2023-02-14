@@ -2,9 +2,6 @@ import logging
 import os
 import pathlib
 
-from . import load_pd
-from ..utils import s3_utils
-
 logger = logging.getLogger(__name__)
 
 
@@ -74,15 +71,3 @@ def list_bucket_prefix_suffix_contains_s3(bucket, prefix, suffix=None, banned_su
             files.append(object_summary.key)
 
     return files
-
-
-def load_multipart_s3(bucket, prefix, columns_to_keep=None, dtype=None, sample_count=None):
-    files = list_bucket_prefix_s3(bucket, prefix)
-    files_cleaned = [file for file in files if prefix + '/part-' in file]
-    paths_full = [s3_utils.s3_bucket_prefix_to_path(bucket=bucket, prefix=file, version='s3') for file in files_cleaned]
-    if sample_count is not None:
-        logger.log(15, 'Taking sample of ' + str(sample_count) + ' of ' + str(len(paths_full)) + ' s3 files to load')
-        paths_full = paths_full[:sample_count]
-
-    df = load_pd.load(path=paths_full, columns_to_keep=columns_to_keep, dtype=dtype)
-    return df

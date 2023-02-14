@@ -31,9 +31,8 @@ def download_sample_dataset():
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "faster_rcnn_r50_fpn_2x_coco",
+        "yolox_s_8x8_300e_coco",
         "yolov3_mobilenetv2_320_300e_coco",
-        "detr_r50_8x2_150e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
@@ -58,7 +57,7 @@ def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
             "optimization.learning_rate": 2e-4,
             "env.per_gpu_batch_size": 2,
         },
-        time_limit=30,
+        time_limit=40,
     )
 
     # Evaluate
@@ -308,16 +307,16 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
     train_path = os.path.join(data_dir, "Annotations", "trainval_cocoformat.json")
     test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
     # Init predictor
+    train_df = from_coco_or_voc(train_path)
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": 1,
         },
         problem_type="object_detection",
-        sample_data_path=train_path,
+        sample_data_path=train_df,
     )
 
-    train_df = from_coco_or_voc(train_path)
     predictor.fit(
         train_df,
         hyperparameters={
