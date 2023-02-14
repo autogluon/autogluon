@@ -667,8 +667,6 @@ def test_image_bytearray():
         "optimization.max_epochs": 2,
         "model.names": model_names,
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
-        "env.num_workers": 0,
-        "env.num_workers_evaluation": 0,
     }
     predictor_1.fit(
         train_data=train_data_1,
