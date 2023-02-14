@@ -111,10 +111,10 @@ def infer_metrics(
         else:
             eval_metric_name = RMSE
     elif problem_type == OBJECT_DETECTION:
-        if (not validation_metric_name) or validation_metric_name.lower() == DIRECT_LOSS:
-            return DIRECT_LOSS, MAP
-        elif validation_metric_name == MAP:
+        if (not validation_metric_name) or validation_metric_name.lower() == MAP:
             return MAP, MAP
+        elif validation_metric_name.lower() == DIRECT_LOSS:
+            return DIRECT_LOSS, MAP
         else:
             raise ValueError(
                 f"Problem type: {problem_type}, validation_metric_name: {validation_metric_name} is not supported!"

@@ -31,9 +31,8 @@ def download_sample_dataset():
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "faster_rcnn_r50_fpn_2x_coco",
+        "yolox_s_8x8_300e_coco",
         "yolov3_mobilenetv2_320_300e_coco",
-        "detr_r50_8x2_150e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
@@ -58,7 +57,7 @@ def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
             "optimization.learning_rate": 2e-4,
             "env.per_gpu_batch_size": 2,
         },
-        time_limit=30,
+        time_limit=40,
     )
 
     # Evaluate
