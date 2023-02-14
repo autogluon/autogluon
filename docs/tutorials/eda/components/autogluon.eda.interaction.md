@@ -1,49 +1,64 @@
+```{eval-rst}
 .. role:: hidden
     :class: hidden-section
+```
 
-Components: interaction
-=======================
+# Components: interaction
 
-autogluon.eda.visualization.interaction
----------------------------------------
+## autogluon.eda.visualization.interaction
 
+```{eval-rst}
 .. automodule:: autogluon.eda.visualization.interaction
-.. currentmodule:: autogluon.eda.visualization.interaction
+```
 
+```{eval-rst}
+.. currentmodule:: autogluon.eda.visualization.interaction
+```
+
+```{eval-rst}
 .. autosummary::
     :nosignatures:
 
     CorrelationVisualization
     CorrelationSignificanceVisualization
     FeatureInteractionVisualization
+```
 
-:hidden:`CorrelationVisualization`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`CorrelationVisualization`
 
+```{eval-rst}
 .. autoclass:: CorrelationVisualization
    :members: init
 
+```
 
-:hidden:`CorrelationSignificanceVisualization`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`CorrelationSignificanceVisualization`
 
+```{eval-rst}
 .. autoclass:: CorrelationSignificanceVisualization
    :members: init
 
+```
 
-:hidden:`FeatureInteractionVisualization`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`FeatureInteractionVisualization`
 
+```{eval-rst}
 .. autoclass:: FeatureInteractionVisualization
    :members: init
 
+```
 
-autogluon.eda.analysis.interaction
-----------------------------------
+## autogluon.eda.analysis.interaction
 
+```{eval-rst}
 .. automodule:: autogluon.eda.analysis.interaction
-.. currentmodule:: autogluon.eda.analysis.interaction
+```
 
+```{eval-rst}
+.. currentmodule:: autogluon.eda.analysis.interaction
+```
+
+```{eval-rst}
 .. autosummary::
     :nosignatures:
 
@@ -51,30 +66,35 @@ autogluon.eda.analysis.interaction
     CorrelationSignificance
     FeatureInteraction
     DistributionFit
+```
 
-:hidden:`Correlation`
-~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`Correlation`
 
+```{eval-rst}
 .. autoclass:: Correlation
    :members: init
 
+```
 
-:hidden:`CorrelationSignificance`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`CorrelationSignificance`
 
+```{eval-rst}
 .. autoclass:: CorrelationSignificance
    :members: init
 
+```
 
-:hidden:`FeatureInteraction`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`FeatureInteraction`
 
+```{eval-rst}
 .. autoclass:: FeatureInteraction
    :members: init
 
+```
 
-:hidden:`DistributionFit`
-~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`DistributionFit`
 
+```{eval-rst}
 .. autoclass:: DistributionFit
    :members: init
+```

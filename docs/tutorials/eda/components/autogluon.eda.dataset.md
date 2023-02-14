@@ -1,47 +1,62 @@
+```{eval-rst}
 .. role:: hidden
     :class: hidden-section
+```
 
-Components: dataset
-===================
+# Components: dataset
 
-autogluon.eda.visualization.dataset
------------------------------------
+## autogluon.eda.visualization.dataset
 
+```{eval-rst}
 .. automodule:: autogluon.eda.visualization.dataset
-.. currentmodule:: autogluon.eda.visualization.dataset
+```
 
+```{eval-rst}
+.. currentmodule:: autogluon.eda.visualization.dataset
+```
+
+```{eval-rst}
 .. autosummary::
    :nosignatures:
 
    DatasetStatistics
    DatasetTypeMismatch
    LabelInsightsVisualization
+```
 
-:hidden:`DatasetStatistics`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`DatasetStatistics`
 
+```{eval-rst}
 .. autoclass:: DatasetStatistics
    :members: init
+```
 
-:hidden:`DatasetTypeMismatch`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`DatasetTypeMismatch`
 
+```{eval-rst}
 .. autoclass:: DatasetTypeMismatch
    :members: init
+```
 
-:hidden:`LabelInsightsVisualization`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`LabelInsightsVisualization`
 
+```{eval-rst}
 .. autoclass:: LabelInsightsVisualization
    :members: init
 
+```
 
-autogluon.eda.analysis.dataset
-------------------------------
+## autogluon.eda.analysis.dataset
 
+```{eval-rst}
 .. automodule:: autogluon.eda.analysis.dataset
-.. currentmodule:: autogluon.eda.analysis.dataset
+```
 
+```{eval-rst}
+.. currentmodule:: autogluon.eda.analysis.dataset
+```
+
+```{eval-rst}
 .. autosummary::
    :nosignatures:
 
@@ -53,58 +68,67 @@ autogluon.eda.analysis.dataset
    SpecialTypesAnalysis
    DatasetSummary
    LabelInsightsAnalysis
+```
 
-:hidden:`Sampler`
-~~~~~~~~~~~~~~~~~
+### {hidden}`Sampler`
 
+```{eval-rst}
 .. autoclass:: Sampler
    :members: init
 
+```
 
-:hidden:`TrainValidationSplit`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`TrainValidationSplit`
 
+```{eval-rst}
 .. autoclass:: TrainValidationSplit
    :members: init
 
+```
 
-:hidden:`ProblemTypeControl`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`ProblemTypeControl`
 
+```{eval-rst}
 .. autoclass:: ProblemTypeControl
    :members: init
 
+```
 
-:hidden:`RawTypesAnalysis`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`RawTypesAnalysis`
 
+```{eval-rst}
 .. autoclass:: RawTypesAnalysis
    :members: init
 
+```
 
-:hidden:`VariableTypeAnalysis`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`VariableTypeAnalysis`
 
+```{eval-rst}
 .. autoclass:: VariableTypeAnalysis
    :members: init
 
+```
 
-:hidden:`SpecialTypesAnalysis`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`SpecialTypesAnalysis`
 
+```{eval-rst}
 .. autoclass:: SpecialTypesAnalysis
    :members: init
 
+```
 
-:hidden:`DatasetSummary`
-~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`DatasetSummary`
 
+```{eval-rst}
 .. autoclass:: DatasetSummary
    :members: init
 
+```
 
-:hidden:`LabelInsightsAnalysis`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### {hidden}`LabelInsightsAnalysis`
 
+```{eval-rst}
 .. autoclass:: LabelInsightsAnalysis
    :members: init
+```
