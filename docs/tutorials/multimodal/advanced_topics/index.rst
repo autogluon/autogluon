@@ -26,7 +26,12 @@ Advanced Topics
       :link: customization.html
 
       How to customize AutoMM configurations.
-   
+
+   .. card::
+      :title: AutoMM Presets
+      :link: presets.html
+
+      How to use AutoMM presets.
 
 .. toctree::
    :maxdepth: 1
@@ -36,3 +41,4 @@ Advanced Topics
    hyperparameter_optimization
    model_distillation
    customization
+   presets
