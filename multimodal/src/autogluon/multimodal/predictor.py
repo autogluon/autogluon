@@ -26,6 +26,7 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
+from autogluon.multimodal.utils import object_detection_data_to_df, save_result_df, setup_detection_train_tuning_data
 from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from . import version as ag_version
@@ -416,7 +417,7 @@ class MultiModalPredictor(ExportMixin):
 
         if self._problem_type == OBJECT_DETECTION:
             self._label_column = "label"
-            if self._sample_data_path:
+            if self._sample_data_path is not None:
                 self._classes = get_detection_classes(self._sample_data_path)
                 self._output_shape = len(self._classes)
 
@@ -1931,7 +1932,7 @@ class MultiModalPredictor(ExportMixin):
                     if per_metric.lower() in score:
                         results.update({per_metric: score[per_metric.lower()]})
                     else:
-                        logger.warning(f"Warning: {per_metric} is not a suppported evaluation metric!")
+                        logger.warning(f"Warning: {per_metric} is not a supported evaluation metric!")
                 if not results:
                     results = score  # If the results dict is empty, return all scores.
         else:

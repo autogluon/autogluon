@@ -78,7 +78,7 @@ display(pil_img)
 
 ## Train your Model
 
-Ideally, we want to obtain a model that can return high/low scores for positive/negative image pairs. With AutoMM, we can easily train a model that captures the semantic relationship between images. Bascially, it uses [Swin Transformer](https://arxiv.org/abs/2103.14030) to project each image into a high-dimensional vector and compute the cosine similarity of feature vectors. 
+Ideally, we want to obtain a model that can return high/low scores for positive/negative image pairs. With AutoMM, we can easily train a model that captures the semantic relationship between images. Basically, it uses [Swin Transformer](https://arxiv.org/abs/2103.14030) to project each image into a high-dimensional vector and compute the cosine similarity of feature vectors. 
 
 With AutoMM, you just need to specify the `query`, `response`, and `label` column names and fit the model on the training dataset without worrying the implementation details.
 

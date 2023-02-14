@@ -326,7 +326,7 @@ class LGBModel(AbstractModel):
         return default_auxiliary_params
     
     def _is_gpu_lgbm_installed(self):
-        # Taken frmo https://github.com/microsoft/LightGBM/issues/3939
+        # Taken from https://github.com/microsoft/LightGBM/issues/3939
         try_import_lightgbm()
         import lightgbm
         try:
