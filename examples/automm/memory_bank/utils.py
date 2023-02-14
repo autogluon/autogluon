@@ -155,7 +155,7 @@ def search_hp(
                 best_beta = beta
                 best_alpha = alpha
 
-        print("\nAfter searching, the best accuarcy: {:.2f}.\n".format(best_acc))
+        print("\nAfter searching, the best accuracy: {:.2f}.\n".format(best_acc))
 
     return best_beta, best_alpha
 

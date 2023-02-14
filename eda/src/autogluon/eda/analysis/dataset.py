@@ -34,7 +34,7 @@ from autogluon.core.utils import generate_train_test_split_combined, infer_probl
 
 class Sampler(AbstractAnalysis):
     """
-    Sampler is a wrapper that provides sampling capabilites for the wrapped analyses.
+    Sampler is a wrapper that provides sampling capabilities for the wrapped analyses.
     The sampling is performed for all datasets in `args` and passed to all `children` during `fit` call shadowing outer parameters.
 
     Parameters

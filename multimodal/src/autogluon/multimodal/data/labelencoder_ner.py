@@ -135,7 +135,7 @@ class NerLabelEncoder:
         Returns
         -------
         transformed_y
-            A list of word level anotations.
+            A list of word level annotations.
         """
         all_annotations, _ = self.extract_ner_annotations(y)
         transformed_y = []

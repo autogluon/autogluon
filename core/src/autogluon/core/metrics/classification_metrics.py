@@ -175,7 +175,7 @@ def pac(solution, prediction):
 
     def prior_log_loss(frac_pos, task):
         """Baseline log loss.
-        For multiple classes ot labels return the values for each column
+        For multiple classes or labels return the values for each column
         """
         eps = 1e-15
         frac_pos_ = np.maximum(eps, frac_pos)
