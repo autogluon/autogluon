@@ -454,7 +454,7 @@ class AbstractTabularLearner(AbstractLearner):
         extra_scores = {}
         for model_name, y_pred_proba_internal in model_pred_proba_dict.items():
             if skip_score:
-                scores[model_name] = None
+                scores[model_name] = np.nan
             else:
                 scores[model_name] = self._score_with_pred_proba(
                     y_pred_proba_internal=y_pred_proba_internal,
