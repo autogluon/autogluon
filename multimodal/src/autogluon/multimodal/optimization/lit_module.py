@@ -14,7 +14,7 @@ from ..data.mixup import MixupModule, multimodel_mixup
 from ..models.utils import run_model
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class LitModule(pl.LightningModule):
@@ -46,6 +46,7 @@ class LitModule(pl.LightningModule):
         mixup_fn: Optional[MixupModule] = None,
         mixup_off_epoch: Optional[int] = 0,
         model_postprocess_fn: Callable = None,
+        skip_final_val: Optional[bool] = False,
     ):
         """
         Parameters
@@ -127,6 +128,7 @@ class LitModule(pl.LightningModule):
         self.custom_metric_func = custom_metric_func
         self.model_postprocess_fn = model_postprocess_fn
         self.trainable_param_names = trainable_param_names if trainable_param_names else []
+        self.skip_final_val = skip_final_val
 
     def _compute_template_loss(
         self,
@@ -232,6 +234,17 @@ class LitModule(pl.LightningModule):
         output, loss = self._shared_step(batch)
         self.log("train_loss", loss)
         return loss
+
+    def on_validation_start(self) -> None:
+        if self.skip_final_val and self.trainer.should_stop:
+            self.trainer.val_dataloaders = []  # skip the final validation by setting val_dataloaders empty
+            self.log(
+                self.validation_metric_name,
+                self.validation_metric,
+                on_step=False,
+                on_epoch=True,
+            )
+        return super().on_validation_start()
 
     def validation_step(self, batch, batch_idx):
         """

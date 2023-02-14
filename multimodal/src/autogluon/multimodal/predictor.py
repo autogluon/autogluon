@@ -27,6 +27,7 @@ from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.multimodal.utils import object_detection_data_to_df, save_result_df, setup_detection_train_tuning_data
+from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from . import version as ag_version
 from .constants import (
@@ -37,7 +38,6 @@ from .constants import (
     BEST_K_MODELS_FILE,
     BINARY,
     COLUMN_FEATURES,
-    DATA,
     DEEPSPEED_MIN_PL_VERSION,
     DEEPSPEED_MODULE,
     DEEPSPEED_OFFLOADING,
@@ -57,7 +57,6 @@ from .constants import (
     MASKS,
     MAX,
     MIN,
-    MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
     NER,
@@ -67,7 +66,6 @@ from .constants import (
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
     OVERALL_F1,
-    PROBABILITY,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
     ROIS,
@@ -122,8 +120,6 @@ from .utils import (
     evaluate_coco,
     extract_from_output,
     filter_hyperparameters,
-    from_coco_or_voc,
-    from_dict,
     get_config,
     get_detection_classes,
     get_local_pretrained_config_paths,
@@ -142,11 +138,14 @@ from .utils import (
     logits_to_prob,
     merge_bio_format,
     modify_duplicate_model_names,
+    object_detection_data_to_df,
     predict,
     process_batch,
     save_pretrained_model_configs,
+    save_result_df,
     save_text_tokenizers,
     select_model,
+    setup_detection_train_tuning_data,
     setup_save_path,
     split_train_tuning_data,
     tensor_to_ndarray,
@@ -155,9 +154,10 @@ from .utils import (
     update_config_by_rules,
     update_hyperparameters,
     update_tabular_config_by_resources,
+    upgrade_config,
 )
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class MultiModalPredictor(ExportMixin):
@@ -183,7 +183,7 @@ class MultiModalPredictor(ExportMixin):
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
-        verbosity: Optional[int] = 3,
+        verbosity: Optional[int] = 2,
         num_classes: Optional[int] = None,  # TODO: can we infer this from data?
         classes: Optional[list] = None,
         warn_if_exist: Optional[bool] = True,
@@ -362,13 +362,12 @@ class MultiModalPredictor(ExportMixin):
                     )
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
-            verbosity = 1  # don't use 3, which doesn't suppress logger.info() in .load().
             enable_progress_bar = False
             # Also disable progress bar of transformers package
             transformers.logging.disable_progress_bar()
 
         if verbosity is not None:
-            set_logger_verbosity(verbosity, logger=logger)
+            set_logger_verbosity(verbosity)
 
         self._label_column = label
         self._problem_type = problem_type
@@ -511,7 +510,7 @@ class MultiModalPredictor(ExportMixin):
 
         """
         self._verbosity = verbosity
-        set_logger_verbosity(verbosity, logger=logger)
+        set_logger_verbosity(verbosity)
         transformers.logging.set_verbosity(verbosity2loglevel(verbosity))
 
     def fit(
@@ -825,7 +824,10 @@ class MultiModalPredictor(ExportMixin):
         self._fit(**_fit_args)
         training_end = time.time()
         self._total_train_time = training_end - training_start
-        logger.info(f"Models and intermediate outputs are saved to {self._save_path} ")
+
+        # TODO(?) We should have a separate "_post_training_event()" for logging messages.
+        logger.info(get_fit_complete_message(self._save_path))
+
         return self
 
     def _verify_inference_ready(self):
@@ -982,7 +984,8 @@ class MultiModalPredictor(ExportMixin):
         clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
-
+        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
+        logger.info(get_fit_start_message(save_path, validation_metric_name))
         config = get_config(
             problem_type=self._problem_type,
             presets=presets,
@@ -1074,11 +1077,11 @@ class MultiModalPredictor(ExportMixin):
                 "The per_gpu_batch_size should be >1 and even for reasonable operation",
                 UserWarning,
             )
-
         loss_func = get_loss_func(
             problem_type=self._problem_type,
             mixup_active=mixup_active,
             loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
+            config=config.optimization,
         )
 
         model_postprocess_fn = get_model_postprocess_fn(
@@ -1226,6 +1229,7 @@ class MultiModalPredictor(ExportMixin):
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
                 model_postprocess_fn=model_postprocess_fn,
                 trainable_param_names=trainable_param_names,
+                skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1395,7 +1399,8 @@ class MultiModalPredictor(ExportMixin):
                     val_df=val_df,
                     validation_metric_name=validation_metric_name,
                     strategy=strategy,
-                    strict_loading=not trainable_param_names,  # Not strict loading if using parameter-efficient finetuning
+                    strict_loading=not trainable_param_names,
+                    # Not strict loading if using parameter-efficient finetuning
                     standalone=standalone,
                     clean_ckpts=clean_ckpts,
                 )
@@ -1697,9 +1702,8 @@ class MultiModalPredictor(ExportMixin):
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
     ):
-        data = data_to_df(data=data)
-
         if self._column_types is None:
+            data = data_to_df(data=data)
             allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
             column_types = infer_column_types(
                 data=data,
@@ -1719,6 +1723,14 @@ class MultiModalPredictor(ExportMixin):
                     data=data,
                 )
         else:  # called .fit() or .load()
+            column_names = list(self._column_types.keys())
+            # remove label column since it's not required in inference.
+            column_names.remove(self._label_column)
+            data = data_to_df(
+                data=data,
+                required_columns=self._df_preprocessor.required_feature_names,
+                all_columns=column_names,
+            )
             column_types = self._column_types
             column_types_copy = copy.deepcopy(column_types)
             for col_name, col_type in column_types.items():
@@ -1778,7 +1790,6 @@ class MultiModalPredictor(ExportMixin):
         label: Optional[str] = None,
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
-        seed: Optional[int] = 123,
         eval_tool: Optional[str] = None,
     ):
         """
@@ -1814,8 +1825,6 @@ class MultiModalPredictor(ExportMixin):
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
-        seed
-            The random seed to use for this evaluation run.
         eval_tool
             The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
 
@@ -1850,7 +1859,6 @@ class MultiModalPredictor(ExportMixin):
                     anno_file_or_df=data,
                     metrics=metrics,
                     return_pred=return_pred,
-                    seed=seed,
                     eval_tool=eval_tool,
                 )
             else:
@@ -1860,7 +1868,6 @@ class MultiModalPredictor(ExportMixin):
                     anno_file_or_df=data,
                     metrics=metrics,
                     return_pred=return_pred,
-                    seed=seed,
                     eval_tool="torchmetrics",
                 )
 
@@ -1874,7 +1881,6 @@ class MultiModalPredictor(ExportMixin):
             data=data,
             requires_label=True,
             realtime=realtime,
-            seed=seed,
         )
         logits = extract_from_output(ret_type=ret_type, outputs=outputs)
 
@@ -1993,7 +1999,6 @@ class MultiModalPredictor(ExportMixin):
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
-        seed: Optional[int] = 123,
         save_results: Optional[bool] = None,
     ):
         """
@@ -2015,10 +2020,9 @@ class MultiModalPredictor(ExportMixin):
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
-        seed
-            The random seed to use for this prediction run.
         save_results
             Whether to save the prediction results (only works for detection now)
+
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
@@ -2059,7 +2063,6 @@ class MultiModalPredictor(ExportMixin):
                 data=data,
                 requires_label=False,
                 realtime=realtime,
-                seed=seed,
             )
 
             if self._problem_type == OCR_TEXT_RECOGNITION:
@@ -2125,7 +2128,6 @@ class MultiModalPredictor(ExportMixin):
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
         realtime: Optional[bool] = None,
-        seed: Optional[int] = 123,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -2150,8 +2152,6 @@ class MultiModalPredictor(ExportMixin):
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
-        seed
-            The random seed to use for this prediction run.
 
         Returns
         -------
@@ -2185,7 +2185,6 @@ class MultiModalPredictor(ExportMixin):
                 data=data,
                 requires_label=False,
                 realtime=realtime,
-                seed=seed,
             )
 
             if self._problem_type == NER:
@@ -2433,6 +2432,7 @@ class MultiModalPredictor(ExportMixin):
 
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)
+        config = upgrade_config(config, assets["version"])
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = CustomUnpickler(fp).load()
@@ -2477,16 +2477,6 @@ class MultiModalPredictor(ExportMixin):
             "pipeline" in assets and assets["pipeline"] == OBJECT_DETECTION
         ):
             data_processors = None
-
-        # backward compatibility for variable image size.
-        if version.parse(assets["version"]) <= version.parse("0.6.2"):
-            print("hasattr model.timm_image", hasattr(config, "model.timm_image"))
-            if OmegaConf.select(config, "model.timm_image") is not None:
-                logger.warn(
-                    "Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "
-                    "Try to update the timm image size."
-                )
-                config.model.timm_image.image_size = None
 
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]
@@ -2631,6 +2621,7 @@ class MultiModalPredictor(ExportMixin):
             problem_type=predictor._problem_type,
             mixup_active=False,
             loss_func_name=OmegaConf.select(predictor._config, "optimization.loss_function"),
+            config=predictor._config.optimization,
         )
 
         model_postprocess_fn = get_model_postprocess_fn(

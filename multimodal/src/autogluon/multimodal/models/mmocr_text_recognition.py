@@ -26,7 +26,7 @@ from ..constants import (
 )
 from .utils import assign_layer_ids, get_column_features, get_mmocr_config_and_model, get_model_head
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 class MMOCRAutoModelForTextRecognition(nn.Module):

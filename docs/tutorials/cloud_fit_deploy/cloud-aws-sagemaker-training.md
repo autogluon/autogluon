@@ -21,8 +21,8 @@ Here is one of the possible `TabularPredictor` training scripts, which takes Aut
 ```{.python}
 import argparse
 import os
+import shutil
 from pprint import pprint
-
 import yaml
 from autogluon.tabular import TabularDataset, TabularPredictor
 
@@ -57,11 +57,10 @@ if __name__ == "__main__":
     )
     parser.add_argument("--model-dir", type=str, default=get_env_if_present("SM_MODEL_DIR"))
     parser.add_argument("--n_gpus", type=str, default=get_env_if_present("SM_NUM_GPUS"))
-    parser.add_argument("--training_dir", type=str, default=get_env_if_present("SM_CHANNEL_TRAIN"))
-    parser.add_argument(
-        "--test_dir", type=str, required=False, default=get_env_if_present("SM_CHANNEL_TEST")
-    )
+    parser.add_argument("--train_dir", type=str, default=get_env_if_present("SM_CHANNEL_TRAIN"))
+    parser.add_argument("--test_dir", type=str, required=False, default=get_env_if_present("SM_CHANNEL_TEST"))
     parser.add_argument("--ag_config", type=str, default=get_env_if_present("SM_CHANNEL_CONFIG"))
+    parser.add_argument("--serving_script", type=str, default=get_env_if_present("SM_CHANNEL_SERVING"))
 
     args, _ = parser.parse_known_args()
 
@@ -82,11 +81,13 @@ if __name__ == "__main__":
 
     # ---------------------------------------------------------------- Training
 
-    train_file = get_input_path(args.training_dir)
+    train_file = get_input_path(args.train_dir)
     train_data = TabularDataset(train_file)
 
+    save_path = os.path.normpath(args.model_dir)
+
     ag_predictor_args = config["ag_predictor_args"]
-    ag_predictor_args["path"] = args.model_dir
+    ag_predictor_args["path"] = save_path
     ag_fit_args = config["ag_fit_args"]
 
     predictor = TabularPredictor(**ag_predictor_args).fit(train_data, **ag_fit_args)
@@ -117,6 +118,18 @@ if __name__ == "__main__":
         if config.get("leaderboard", False):
             lb = predictor.leaderboard(silent=False)
             lb.to_csv(f"{args.output_data_dir}/leaderboard.csv")
+
+    if args.serving_script:
+        print("Saving serving script")
+        serving_script_saving_path = os.path.join(save_path, "code")
+        os.mkdir(serving_script_saving_path)
+        serving_script_path = get_input_path(args.serving_script)
+        shutil.move(
+            serving_script_path,
+            os.path.join(
+                serving_script_saving_path, os.path.basename(serving_script_path)
+            ),
+        )
 ```
 For training other types of AutoGluon Predictors, i.e. MultiModalPredictor, the training script you provided will be quite similar to the one above.
 Mostly, you just need to replace `TabularPredictor` to be `MultiModalPredictor` for example.
@@ -175,18 +188,26 @@ Other predictors would follow similar format as the previous two examples.
 
 ## Training
 
+Note the `ag_model` imports are sourced from [this helper package](https://github.com/aws/amazon-sagemaker-examples/blob/main/advanced_functionality/autogluon-tabular-containers/ag_model.py).
+
 To train AutoGluon model, set up a SageMaker session:
 
 ```{.python}
 import sagemaker
+import pandas as pd
 
 # Helper wrappers referred earlier
 from ag_model import (
-    AutoGluonTraining,
-    AutoGluonInferenceModel,
-    AutoGluonTabularPredictor,
+    AutoGluonSagemakerEstimator,
+    AutoGluonNonRepackInferenceModel,
+    AutoGluonSagemakerInferenceModel,
+    AutoGluonRealtimePredictor,
+    AutoGluonBatchPredictor,
 )
 from sagemaker import utils
+from sagemaker.serializers import CSVSerializer
+import os
+import boto3
 
 role = sagemaker.get_execution_role()
 sagemaker_session = sagemaker.session.Session()
@@ -200,19 +221,24 @@ output_path = f"s3://{bucket}/{s3_prefix}/output/"
 Create a training task:
 
 ```{.python}
-ag = AutoGluonTraining(
+ag = AutoGluonSagemakerEstimator(
     role=role,
     entry_point="YOUR_TRAINING_SCRIPT_PATH",
     region=region,
     instance_count=1,
     instance_type="ml.m5.2xlarge",  # You might want to use GPU instances for Text/Image/MultiModal Predictors etc
-    framework_version="0.5.2",  # Replace this with the AutoGLuon DLC container version you want to use
+    framework_version="0.6",  # Replace this with the AutoGLuon DLC container version you want to use
     py_version="py38",
     base_job_name="YOUR_JOB_NAME",
+    # Disable torch profiler instrumentation to avoid deserialization issues during deployment
+    disable_profiler=True,
+    debugger_hook_config=False,
 )
 ```
 
-Upload the required inputs, via SageMaker session (in this case it is a training set, test set and training YAML config) and start the training job:
+Upload the required inputs, via SageMaker session (in this case it is a training set, test set and training YAML config) and start the training job.
+Please read more on "Why do I see a repack step in my SageMaker pipeline?" [here](https://docs.aws.amazon.com/sagemaker/latest/dg/mlopsfaq.html).
+Example of inference script can be found here: [tabular_serve.py](https://github.com/aws/amazon-sagemaker-examples/blob/main/advanced_functionality/autogluon-tabular-containers/scripts/tabular_serve.py)
 
 ```{.python}
 s3_prefix = f"autogluon_sm/{utils.sagemaker_timestamp()}"
@@ -225,10 +251,18 @@ eval_input = ag.sagemaker_session.upload_data(
 config_input = ag.sagemaker_session.upload_data(
     path=os.path.join("config", "config-med.yaml"), key_prefix=s3_prefix
 )
+inference_script = ag.sagemaker_session.upload_data(
+    path=os.path.join("scripts", "INFERENCE_SCRIPT_LOCATION"), key_prefix=s3_prefix
+)
 
 job_name = utils.unique_name_from_base("test-autogluon-image")
 ag.fit(
-    {"config": config_input, "train": train_input, "test": eval_input},
+    {
+        "config": config_input,
+        "train": train_input,
+        "test": eval_input,
+        "serving": inference_script,
+    },
     job_name=job_name,
 )
 ```

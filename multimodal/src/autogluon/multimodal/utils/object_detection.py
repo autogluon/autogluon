@@ -30,7 +30,7 @@ from .download import download, is_url
 from .inference import predict
 from .save import setup_save_path
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def object_detection_data_to_df(data: Union[pd.DataFrame, dict, list, str]) -> pd.DataFrame:
@@ -1368,7 +1368,6 @@ def evaluate_coco(
     anno_file_or_df: str,
     metrics: str,
     return_pred: Optional[bool] = False,
-    seed: Optional[int] = 123,
     eval_tool: Optional[str] = None,
 ):
     """
@@ -1403,7 +1402,6 @@ def evaluate_coco(
         predictor=predictor,
         data=data,
         requires_label=True,
-        seed=seed,
     )  # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
 
     # Cache prediction results as COCO format # TODO: refactor this

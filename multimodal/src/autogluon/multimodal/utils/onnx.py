@@ -5,7 +5,7 @@ from torch import tensor
 
 from ..constants import AUTOMM, FEATURE_EXTRACTION, MULTICLASS
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def get_onnx_input(pipeline: str, config: Optional[Dict] = None):

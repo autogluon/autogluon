@@ -42,7 +42,7 @@ from .log import LogFilter, apply_log_filter
 from .matcher import compute_matching_probability
 from .misc import tensor_to_ndarray
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional[bool] = True):
@@ -434,7 +434,6 @@ def predict(
     signature: Optional[str] = None,
     realtime: Optional[bool] = None,
     is_matching: Optional[bool] = False,
-    seed: Optional[int] = 123,
 ) -> List[Dict]:
     """
     Perform inference for predictor or matcher.
@@ -463,9 +462,6 @@ def predict(
     -------
     A list of output dicts.
     """
-    with apply_log_filter(LogFilter("Global seed set to")):  # Ignore the log "Global seed set to"
-        pl.seed_everything(seed, workers=True)
-
     if is_matching:
         data, df_preprocessor, data_processors, match_label = predictor._on_predict_start(
             data=data,

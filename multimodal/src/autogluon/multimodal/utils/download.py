@@ -14,7 +14,7 @@ import tqdm
 
 from ..constants import AUTOMM, S3_PREFIX
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 
 
 _URL_REGEX = re.compile(

@@ -3,7 +3,6 @@ import pytest
 
 @pytest.mark.gpu
 def test_automm_sts(fit_helper):
-    pytest.skip("Temporary skip the unittest")
     fit_args = dict(
         hyperparameters={'AG_AUTOMM': {}},
     )

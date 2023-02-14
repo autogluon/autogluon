@@ -17,7 +17,7 @@ from ...constants import AUTOMM
 from ..utils import is_rois_input
 from .process_mmlab_base import MMLabProcessor
 
-logger = logging.getLogger(AUTOMM)
+logger = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
