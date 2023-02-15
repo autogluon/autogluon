@@ -1,4 +1,4 @@
-# Classifying PDF Documents with AutoMM.
+# Classifying PDF Documents with AutoMM
 PDF comes short from Portable Document Format and is one of the most popular document formats.
 We can find PDFs everywhere, from personal resumes to business contracts, and from commercial brochures to government documents. 
 The list can be endless. 
@@ -17,6 +17,8 @@ We picked 20 PDF documents for each of the category.
 Now, let's download the dataset and split it into training and test sets.
 
 ```{.python .input}
+import warnings
+warnings.filterwarnings('ignore')
 import os
 import pandas as pd
 from autogluon.core.utils.loaders import load_zip
