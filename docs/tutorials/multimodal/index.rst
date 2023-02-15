@@ -101,6 +101,12 @@ Image Data -- Object Detection
       How to convert a dataset from VOC format to COCO format for object detection.
 
    .. card::
+      :title: Object Detection with DataFrame
+      :link: object_detection/data_preparation/object_detection_with_dataframe.html
+
+      How to use pd.DataFrame format for object detection
+
+   .. card::
       :title: Fast Finetune on COCO Format Dataset
       :link: object_detection/finetune/detection_fast_finetune_coco.html
 
