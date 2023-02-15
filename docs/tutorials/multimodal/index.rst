@@ -101,6 +101,12 @@ Image Data -- Object Detection
       How to convert a dataset from VOC format to COCO format for object detection.
 
    .. card::
+      :title: Object Detection with DataFrame
+      :link: object_detection/data_preparation/object_detection_with_dataframe.html
+
+      How to use pd.DataFrame format for object detection
+
+   .. card::
       :title: Fast Finetune on COCO Format Dataset
       :link: object_detection/finetune/detection_fast_finetune_coco.html
 
@@ -232,19 +238,19 @@ Advanced Topics
 
    .. card::
       :title: AutoMM Presets
-      :link: presets.html
+      :link: advanced_topics/presets.html
 
       How to use AutoMM presets.
 
    .. card::
       :title: Few Shot Learning with FusionSVM
-      :link: few_shot_learning.html
+      :link: advanced_topics/few_shot_learning.html
 
       How to use SVM combined with feature extraction for few shot learning.
 
    .. card::
       :title: Focal Loss
-      :link: focal_loss.html
+      :link: advanced_topics/focal_loss.html
 
       How to use focal loss in AutoMM.
 
