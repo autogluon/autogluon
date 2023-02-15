@@ -364,7 +364,7 @@ class MatcherLitModule(pl.LightningModule):
         """
         # TODO: need to consider query_model and response_model in the optimizer
         # TODO: how to avoid pass one parameter multiple times in the optimizer?
-        # TODO: in the late-fusion siamese setting, one shared parameter may have different layer ids in the query and reponse models.
+        # TODO: in the late-fusion siamese setting, one shared parameter may have different layer ids in the query and response models.
         kwargs = dict(
             model=self.query_model,
             lr=self.hparams.lr,

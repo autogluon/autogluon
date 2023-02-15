@@ -77,7 +77,7 @@ def test_predictor_smoke_test(
         "AutoGluonTabular": {},
         "DeepAR": DUMMY_MODEL_HPARAMS,
         "SimpleFeedForward": DUMMY_MODEL_HPARAMS,
-        "TemporalFusionTransformerMXNet": DUMMY_MODEL_HPARAMS,
+        "TemporalFusionTransformer": DUMMY_MODEL_HPARAMS,
     }
 
     train_data, test_data = generate_train_and_test_data(

@@ -597,7 +597,7 @@ def split_train_tuning_data(train_data, tuning_data, holdout_frac, is_classifica
 
     Returns
     -------
-    The splitted training and tuning data.
+    The split training and tuning data.
     """
     if tuning_data is None:
         if is_classification:
