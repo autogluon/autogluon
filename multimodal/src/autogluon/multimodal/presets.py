@@ -316,7 +316,7 @@ def object_detection(presets: str = DEFAULT):
         "env.precision": 32,
         "env.strategy": "ddp",
         "env.auto_select_gpus": False,  # Have to turn off for detection!
-        "env.num_gpus": 2,
+        "env.num_gpus": -1,
         "env.per_gpu_batch_size": 16,  # Works on 16G GPU
         "env.num_workers": 2,
         "optimization.learning_rate": 1e-4,
