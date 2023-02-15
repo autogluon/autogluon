@@ -226,13 +226,13 @@ Advanced Topics
 
    .. card::
       :title: AutoMM Presets
-      :link: presets.html
+      :link: advanced_topics/presets.html
 
       How to use AutoMM presets.
 
    .. card::
       :title: Few Shot Learning with FusionSVM
-      :link: few_shot_learning.html
+      :link: advanced_topics/few_shot_learning.html
 
       How to use SVM combined with feature extraction for few shot learning.
 
