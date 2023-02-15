@@ -238,7 +238,7 @@ Advanced Topics
 
    .. card::
       :title: Focal Loss
-      :link: focal_loss.html
+      :link: advanced_topics/focal_loss.html
 
       How to use focal loss in AutoMM.
 
