@@ -1,4 +1,4 @@
-# Few Shot Learning with FusionSVM Model
+# Few Shot Learning with `FewShotSVMPredictor`
 :label:`sec_automm_few_shot_learning`
 
 In this tutorial we introduce a simple but effective way for few shot classification problems. 
@@ -63,7 +63,7 @@ print(result)
 ```
 
 ### Comparing to the normal `MultiModalPredictor`
-```{.python .input} 
+```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
 import numpy as np
 from sklearn.metrics import f1_score
@@ -116,6 +116,11 @@ The Stanford Cars is an image classification dataset and contains 196 classes.
 For more information regarding the dataset, please see [here](http://ai.stanford.edu/~jkrause/cars/car_dataset.html).
 
 ```{.python .input}
+!wget https://automl-mm-bench.s3.amazonaws.com/vision_datasets/stanfordcars/train_8shot.csv -O ./ag_automm_tutorial_fs_cls/stanfordcars/train.csv
+!wget https://automl-mm-bench.s3.amazonaws.com/vision_datasets/stanfordcars/test.csv -O ./ag_automm_tutorial_fs_cls/stanfordcars/test.csv
+```
+
+```{.python .input}
 import pandas as pd
 import os
 
@@ -128,9 +133,6 @@ test_csv = "https://automl-mm-bench.s3.amazonaws.com/vision_datasets/stanfordcar
 
 load_zip.unzip(zip_file, unzip_dir=download_dir)
 dataset_path = os.path.join(download_dir)
-
-!wget https://automl-mm-bench.s3.amazonaws.com/vision_datasets/stanfordcars/train_8shot.csv -O ./ag_automm_tutorial_fs_cls/stanfordcars/train.csv
-!wget https://automl-mm-bench.s3.amazonaws.com/vision_datasets/stanfordcars/test.csv -O ./ag_automm_tutorial_fs_cls/stanfordcars/test.csv
 
 train_df_raw = pd.read_csv(os.path.join(download_dir, "train.csv"))
 train_df = train_df_raw.drop(
@@ -149,7 +151,6 @@ train_df = train_df_raw.drop(
         ]
     )
 train_df["ImageID"] = download_dir + train_df["ImageID"].astype(str)
-
 
 test_df_raw = pd.read_csv(os.path.join(download_dir, "test.csv"))
 test_df = test_df_raw.drop(
@@ -210,7 +211,7 @@ print(result)
 ```
 
 ### Comparing to the normal `MultiModalPredictor`
-```{.python .input} 
+```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
 import numpy as np
 from sklearn.metrics import f1_score
