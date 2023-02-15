@@ -233,7 +233,7 @@ hidden:
 
 tutorials/tabular/index
 tutorials/multimodal/index
-tutorials/timeseries/index
+Time Series <tutorials/timeseries/index>
 tutorials/cloud_fit_deploy/index
 EDA <tutorials/eda/index>
 ```
