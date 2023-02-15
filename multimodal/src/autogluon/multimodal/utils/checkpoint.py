@@ -62,7 +62,7 @@ def average_checkpoints(
 
 class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
     """
-    Class that customizes how checkpoints are saved. Saves either the entire model or only parameters that have been explicitly updated during training. The latter reduces memory footprint substentially when training very large models with parameter-efficient finetuning methods.
+    Class that customizes how checkpoints are saved. Saves either the entire model or only parameters that have been explicitly updated during training. The latter reduces memory footprint substantially when training very large models with parameter-efficient finetuning methods.
     Class is based on pl.plugins.TorchCheckpointIO.
 
     """
@@ -190,7 +190,7 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
 
         if (
             trainer.strategy.strategy_name == DEEPSPEED_STRATEGY
-        ):  # Deepspeed saves model and optimizer states in a sharded state in seperate folder (even when using single GPU). Merging folder to single checkpoint file.
+        ):  # Deepspeed saves model and optimizer states in a shared state in separate folder (even when using single GPU). Merging folder to single checkpoint file.
             from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
 
             current_save_path = self.kth_best_model_path

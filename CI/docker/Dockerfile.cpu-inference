@@ -1,4 +1,4 @@
-FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/autogluon-inference:0.6.1-cpu-py38-ubuntu20.04
+FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/autogluon-inference:0.6.2-cpu-py38-ubuntu20.04
 
 RUN apt-get update \
  && apt-get -y upgrade \
