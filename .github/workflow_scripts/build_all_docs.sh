@@ -56,13 +56,8 @@ fi
 setup_build_contrib_env
 install_all_no_tests
 
-# shopt -s extglob
-# rm -rf ./docs/tutorials/!(index.md)
 cd docs && sphinx-build -D nb_execution_mode=off -b html . _build/html
-# sphinx-autogen api/*.rst -t _templates/autosummary
-# find ./tutorials -name "index.md" -type f | xargs sphinx-build -b html . _build/html/
 
-# mkdir -p docs/_build/html/tutorials/
 aws s3 cp $BUILD_DOCS_PATH _build/html/tutorials/ --recursive --exclude "*/index.html"
 
 COMMAND_EXIT_CODE=$?
