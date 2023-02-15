@@ -276,7 +276,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         # start training loop:
         logger.log(15, f"Training tabular neural network for up to {num_epochs} epochs...")
         total_updates = 0
-        num_updates_per_epoch = len(train_dataloader)
+        num_updates_per_epoch = max(round(len(train_dataset) / batch_size) + 1, 1)
         update_to_check_time = min(10, max(1, int(num_updates_per_epoch/10)))
         do_update = True
         epoch = 0

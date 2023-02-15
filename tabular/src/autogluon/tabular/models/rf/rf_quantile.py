@@ -443,7 +443,7 @@ def get_quantiles(neighbors_df, quantile_levels):
     Parameters
     ----------
     neighbors_df : pd.DataFrame
-        DataFrame with columns y (target values for each sample) and weight (weigth assigned to each sample)
+        DataFrame with columns y (target values for each sample) and weight (weight assigned to each sample)
     quantile_levels : List[float]
         List of quantiles to predict between 0.0 and 1.0
 

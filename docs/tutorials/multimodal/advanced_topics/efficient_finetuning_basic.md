@@ -122,7 +122,7 @@ By combining [gradient checkpointing](https://pytorch.org/docs/stable/checkpoint
 [google/flan-t5-xl](https://huggingface.co/google/flan-t5-xl) that has close to two billion parameterswith a single T4 GPU available in
 [AWS G4 instances](https://aws.amazon.com/ec2/instance-types/g4/). 
 To turn on gradient checkpointing, you just need to set `"model.hf_text.gradient_checkpointing"` to `True`. 
-To accelerate the training, we downsample the number of training sampels to be 200.
+To accelerate the training, we downsample the number of training samples to be 200.
 
 
 ```{.python .input}

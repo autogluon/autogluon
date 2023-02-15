@@ -108,6 +108,22 @@ def test_advanced_functionality():
     predictor: TabularPredictor = TabularPredictor(label=label, path=savedir_predictor_original).fit(train_data)
     leaderboard = predictor.leaderboard(data=test_data)
     extra_metrics = ['accuracy', 'roc_auc', 'log_loss']
+    test_data_no_label = test_data.drop(columns=[label])
+    with pytest.raises(ValueError):
+        # Error because skip_score is False and label not present
+        predictor.leaderboard(data=test_data_no_label)
+    with pytest.raises(ValueError):
+        # Error because extra_metrics != None and label not present
+        predictor.leaderboard(data=test_data_no_label, skip_score=True, extra_metrics=extra_metrics)
+    # Valid because skip_score=True
+    leaderboard_no_score = predictor.leaderboard(data=test_data.drop(columns=[label]), skip_score=True)
+    assert len(leaderboard) == len(leaderboard_no_score)
+    assert 'pred_time_test' in leaderboard_no_score
+    assert 'pred_time_test_marginal' in leaderboard_no_score
+    assert 'score_test' in leaderboard_no_score
+    for i in range(len(leaderboard_no_score)):
+        # Assert that score_test is NaN for all models
+        assert leaderboard_no_score['score_test'].isnull().iloc[i]
     leaderboard_extra = predictor.leaderboard(data=test_data, extra_info=True, extra_metrics=extra_metrics)
     _assert_predict_dict_identical_to_predict(predictor=predictor, data=test_data)
     assert set(predictor.get_model_names()) == set(leaderboard['model'])

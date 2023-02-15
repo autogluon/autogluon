@@ -290,7 +290,7 @@ class DistributionFit(AbstractAnalysis):
     Parameters
     ----------
     columns: Union[str, List[str]]
-        colums to be included into analysis. Can be passed as a string or a list of strings.
+        column to be included into analysis. Can be passed as a string or a list of strings.
     pvalue_min: float = 0.01,
         min pvalue to consider including distribution fit in the results.
     keep_top_n: Optional[int] = None,

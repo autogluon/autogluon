@@ -160,7 +160,7 @@ else:
             ``pip install torchmetrics[detection]``.
 
         .. note::
-            As the pycocotools library cannot deal with tensors directly, all results have to be transfered
+            As the pycocotools library cannot deal with tensors directly, all results have to be transferred
             to the CPU, this might have an performance impact on your training.
 
         Args:

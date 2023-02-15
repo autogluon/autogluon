@@ -282,7 +282,7 @@ class DocumentProcessor:
                 token_boxes = []
                 all_tokens = []
                 for word, box in zip(words, normalized_word_boxes):
-                    # Tokenize bounding box seperately.
+                    # Tokenize bounding box separately.
                     word_tokens = self.tokenizer.tokenize(word)
                     all_tokens.append(word_tokens)
                     token_boxes.extend([box] * len(word_tokens))

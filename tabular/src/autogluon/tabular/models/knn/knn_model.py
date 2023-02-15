@@ -107,14 +107,16 @@ class KNNModel(AbstractModel):
         return expected_final_model_size_bytes
 
     def _validate_fit_memory_usage(self, **kwargs):
+        max_memory_safety_proportion = 0.2
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         expected_final_model_size_bytes = self.estimate_memory_usage(**kwargs) 
         if expected_final_model_size_bytes > 10000000:  # Only worth checking if expected model size is >10MB
             available_mem = ResourceManager.get_available_virtual_mem()
             model_memory_ratio = expected_final_model_size_bytes / available_mem
             if model_memory_ratio > (0.15 * max_memory_usage_ratio):
-                logger.warning(f'\tWarning: Model is expected to require {round(model_memory_ratio * 100, 2)}% of available memory...')
-            if model_memory_ratio > (0.20 * max_memory_usage_ratio):
+                logger.warning(f'\tWarning: Model is expected to require {round(model_memory_ratio * 100, 2)}% of available memory... '
+                               f'({max_memory_safety_proportion*100}% is the max safe size.)')
+            if model_memory_ratio > (max_memory_safety_proportion * max_memory_usage_ratio):
                 raise NotEnoughMemoryError  # don't train full model to avoid OOM error
 
     # TODO: Won't work for RAPIDS without modification
