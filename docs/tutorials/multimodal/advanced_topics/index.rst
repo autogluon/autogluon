@@ -30,7 +30,7 @@ Advanced Topics
    .. card::
       :title: AutoMM Presets
       :link: presets.html
-      
+
       How to use AutoMM presets.
 
    .. card::
@@ -45,7 +45,7 @@ Advanced Topics
 
       How to use focal loss in AutoMM.
 
-      
+
 
 .. toctree::
    :maxdepth: 1
