@@ -66,7 +66,8 @@ extras_require = {
         # Therefore, we install onnxruntime explicitly here just for macOS.
         'onnxruntime>=1.13.0,<1.14.0'
     ] if sys.platform == 'darwin' else [
-        'skl2onnx>=1.13.0,<1.14.0'
+        'skl2onnx>=1.13.0,<1.14.0',
+        'onnxruntime-gpu>=1.13.0,<1.14.0'
     ]
 }
 

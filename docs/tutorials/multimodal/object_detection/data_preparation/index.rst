@@ -32,6 +32,11 @@ Data Preparation
 
       How to convert a dataset from VOC format to COCO format for object detection.
 
+   .. card::
+      :title: Object Detection with DataFrame
+      :link: object_detection_with_dataframe.html
+
+      How to use pd.DataFrame format for object detection
 
 .. toctree::
    :maxdepth: 1

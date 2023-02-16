@@ -58,6 +58,8 @@ class RFOnnxCompiler:
         """Verify whether the required package has been installed."""
         try:
             import skl2onnx
+            import onnxruntime
+
             return True
         except ImportError:
             return False
