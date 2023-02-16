@@ -6,13 +6,13 @@ The section contains a reference of base constructs and composite components.
   :gutter: 3
 
 :::{grid-item-card} Auto: High-level Composite Components
-   :link: references/autogluon.eda.auto.html
+   :link: autogluon.eda.auto.html
 
    Reference for high-level composite components.
 :::
 
 :::{grid-item-card} Base APIs
-   :link: references/autogluon.eda.base-apis.html
+   :link: autogluon.eda.base-apis.html
 
    Components building blocks APIs.
 

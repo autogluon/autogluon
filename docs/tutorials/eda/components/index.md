@@ -6,37 +6,37 @@ The section contains a reference for low-level components.
   :gutter: 3
 
 :::{grid-item-card} autogluon.eda.dataset
-   :link: components/autogluon.eda.dataset.html
+   :link: autogluon.eda.dataset.html
 
    Dataset-level APIs
 :::
 
 :::{grid-item-card} autogluon.eda.interaction
-   :link: components/autogluon.eda.interaction.html
+   :link: autogluon.eda.interaction.html
 
    Feature-level interactions APIs
 :::
 
 :::{grid-item-card} autogluon.eda.missing
-   :link: components/autogluon.eda.missing.html
+   :link: autogluon.eda.missing.html
 
    Missing data APIs
 :::
 
 :::{grid-item-card} autogluon.eda.model
-   :link: components/autogluon.eda.model.html
+   :link: autogluon.eda.model.html
 
    Model level APIs
 :::
 
 :::{grid-item-card} autogluon.eda.shift
-   :link: components/autogluon.eda.shift.html
+   :link: autogluon.eda.shift.html
 
    Distribution shift APIs
 :::
 
 :::{grid-item-card} autogluon.eda.transform
-   :link: components/autogluon.eda.transform.html
+   :link: autogluon.eda.transform.html
 
    Transformations APIs
 :::
