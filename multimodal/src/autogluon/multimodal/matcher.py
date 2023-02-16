@@ -80,6 +80,7 @@ from .utils import (
     data_to_df,
     extract_from_output,
     filter_hyperparameters,
+    get_available_devices,
     get_config,
     get_local_pretrained_config_paths,
     get_minmax_mode,
@@ -889,8 +890,11 @@ class MultiModalMatcher:
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else None,
-                devices=num_gpus if num_gpus > 0 else None,
-                auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
+                devices=get_available_devices(
+                    num_gpus=num_gpus,
+                    auto_select_gpus=config.env.auto_select_gpus,
+                    use_ray_lightning=use_ray_lightning,
+                ),
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
@@ -1235,8 +1239,7 @@ class MultiModalMatcher:
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else None,
-                devices=num_gpus if num_gpus > 0 else None,
-                auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
+                devices=get_available_devices(num_gpus=num_gpus, auto_select_gpus=self._config.env.auto_select_gpus),
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,

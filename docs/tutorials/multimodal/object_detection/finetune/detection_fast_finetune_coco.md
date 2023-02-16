@@ -8,7 +8,7 @@ In this section, our goal is to fast finetune and evaluate a pretrained model
 on [Pothole dataset](https://www.kaggle.com/datasets/andrewmvd/pothole-detection) in COCO format.
 Pothole is a single object, i.e. `pothole`, detection dataset, containing 665 images with bounding box annotations
 for the creation of detection models and can work as POC/POV for the maintenance of roads.
-See :ref:`sec_automm_detection_prepare_voc` for how to prepare Pothole dataset.
+See :ref:`sec_automm_detection_prepare_pothole` for how to prepare Pothole dataset.
 
 To start, let's import MultiModalPredictor:
 
@@ -49,13 +49,15 @@ In this example, `usersplit_train_cocoformat.json` is the annotation file of the
 `usersplit_val_cocoformat.json` is the annotation file of the validation split.
 And `usersplit_test_cocoformat.json` is the annotation file of the test split.
 
-We select the YOLOv3 with MobileNetV2 as backbone,
-and input resolution is 320x320, pretrained on COCO dataset. With this setting, it is fast to finetune or inference,
-and easy to deploy.
+We select the YOLOX-small model pretrained on COCO dataset. With this setting, it is fast to finetune or inference,
+and easy to deploy. Note that you can use a YOLOX-large by setting the `checkpoint_name` to `"yolox_l_8x8_300e_coco"` for better performance (but slower speed).
+Note that you may need to change the learning_rate and per_gpu_batch_size for a different model.
+An easier way is to use our predefined presets `"medium_quality"`, `"high_quality"`, or `"best_quality"`.
+For more about using presets, see :ref:`sec_automm_detection_quick_start_coco`.
 And we use all the GPUs (if any):
 
 ```python .input
-checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
+checkpoint_name = "yolox_s_8x8_300e_coco"
 num_gpus = -1  # use all GPUs
 ```
 
@@ -75,13 +77,15 @@ predictor = MultiModalPredictor(
 )
 ```
 
-We set the learning rate to be `2e-4`.
+We set the learning rate to be `1e-4`.
 Note that we use a two-stage learning rate option during finetuning by default,
 and the model head will have 100x learning rate.
 Using a two-stage learning rate with high learning rate only on head layers makes
 the model converge faster during finetuning. It usually gives better performance as well,
 especially on small datasets with hundreds or thousands of images.
-We also set the epoch to be 30 for fast finetuning and batch_size to be 32.
+We set batch size to be 16, and you can increase or decrease the batch size based on your available GPU memory.
+We set max number of epochs to 30, number of validation check per interval to 1.0, 
+and validation check per n epochs to 3 for fast finetuning.
 We also compute the time of the fit process here for better understanding the speed.
 
 ```python .input
@@ -89,10 +93,14 @@ import time
 start = time.time()
 predictor.fit(
     train_path,
+    tuning_data=val_path,
     hyperparameters={
-        "optimization.learning_rate": 2e-4, # we use two stage and detection head has 100x lr
-        "optimization.max_epochs": 30,
-        "env.per_gpu_batch_size": 32,  # decrease it when model is large
+        "optimization.learning_rate": 1e-4,  # we use two stage and detection head has 100x lr
+        "env.per_gpu_batch_size": 16,  # decrease it when model is large
+        "optimization.max_epochs": 30,  # max number of training epochs, note that we may early stop before this based on validation setting
+        "optimization.val_check_interval": 1.0,  # Do 1 validation each epoch
+        "optimization.check_val_every_n_epoch": 3,  # Do 1 validation each 3 epochs
+        "optimization.patience": 3,  # Early stop after 3 consective validations are not the best
     },
 )
 end = time.time()
@@ -109,6 +117,20 @@ To evaluate the model we just trained, run:
 ```python .input
 predictor.evaluate(test_path)
 ```
+
+Note that you can also use our predefined presets `"medium_quality"` to do the exact same thing with following code script:
+
+```python
+predictor = MultiModalPredictor(
+    problem_type="object_detection",
+    sample_data_path=train_path,
+    presets="medium_quality",
+)
+predictor.fit(train_path, tuning_data=val_path)
+predictor.evaluate(test_path)
+```
+
+For more about using presets, see :ref:`sec_automm_detection_quick_start_coco`.
 
 And the evaluation results are shown in command line output. 
 The first value is mAP in COCO standard, and the second one is mAP in VOC standard (or mAP50). 
@@ -156,12 +178,21 @@ To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization
 
 ### Citation
 ```
-@misc{redmon2018yolov3,
-    title={YOLOv3: An Incremental Improvement},
-    author={Joseph Redmon and Ali Farhadi},
-    year={2018},
-    eprint={1804.02767},
-    archivePrefix={arXiv},
-    primaryClass={cs.CV}
+@article{DBLP:journals/corr/abs-2107-08430,
+  author    = {Zheng Ge and
+               Songtao Liu and
+               Feng Wang and
+               Zeming Li and
+               Jian Sun},
+  title     = {{YOLOX:} Exceeding {YOLO} Series in 2021},
+  journal   = {CoRR},
+  volume    = {abs/2107.08430},
+  year      = {2021},
+  url       = {https://arxiv.org/abs/2107.08430},
+  eprinttype = {arXiv},
+  eprint    = {2107.08430},
+  timestamp = {Tue, 05 Apr 2022 14:09:44 +0200},
+  biburl    = {https://dblp.org/rec/journals/corr/abs-2107-08430.bib},
+  bibsource = {dblp computer science bibliography, https://dblp.org},
 }
 ```

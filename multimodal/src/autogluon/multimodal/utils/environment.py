@@ -6,6 +6,7 @@ import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
 import torch
+from pytorch_lightning.accelerators import find_usable_cuda_devices
 from torch import nn
 
 from ..constants import AUTOMM, OBJECT_DETECTION, OCR
@@ -274,3 +275,31 @@ def check_if_packages_installed(problem_type: str):
                 raise ValueError(
                     f"Encountered error while importing mmocr: {e}. Try to install mmocr: pip install mmocr."
                 )
+
+
+def get_available_devices(num_gpus: int, auto_select_gpus: bool, use_ray_lightning: Optional[bool] = False):
+    """
+    Get the available devices.
+
+    Parameters
+    ----------
+    num_gpus
+        Number of GPUs.
+    auto_select_gpus
+        Whether to pick GPU indices that are "accessible". See here: https://github.com/Lightning-AI/lightning/blob/accd2b9e61063ba3c683764043030545ed87c71f/src/lightning/fabric/accelerators/cuda.py#L79
+    use_ray_lightning
+        Whether use ray lightning.
+
+    Returns
+    -------
+    The available devices.
+    """
+    if num_gpus > 0 and not use_ray_lightning:  # ray lightning requires not specifying gpus
+        if auto_select_gpus:
+            devices = find_usable_cuda_devices(num_gpus)
+        else:
+            devices = num_gpus
+    else:
+        devices = None
+
+    return devices
