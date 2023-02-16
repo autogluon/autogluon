@@ -5,21 +5,23 @@ Pre-requisite
 -------------
 Processing document data depends on the optical character recognition (OCR) package: ``tesseract``.
 
+
 For Ubuntu users, you can install Tesseract and its developer tools by simply running:
     ``sudo apt install tesseract-ocr``
-    ``sudo apt install libtesseract-dev``
 
 For macOS users, run:
     ``sudo port install tesseract``
 or:
     ``brew install tesseract``
 
-For Windows users, installer is available from [Tesseract at UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki). 
+For Windows users, installer is available from Tesseract at UB-Mannheim_. 
 To access tesseract-OCR from any location you may have to add the directory where the tesseract-OCR binaries are located to the Path variables, probably *C:\Program Files\Tesseract-OCR*.
 
 For additional support, please refer to official instructions for tesseract_
 
+.. _UB-Mannheim: https://github.com/UB-Mannheim/tesseract/wiki
 .. _tesseract: https://tesseract-ocr.github.io/tessdoc/Installation.html
+
 
 
 
