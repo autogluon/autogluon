@@ -23,7 +23,7 @@ extensions = [
 myst_enable_extensions = ['colon_fence', 'deflist', 'dollarmath', 'html_image', 'substitution']
 
 nb_execution_mode = 'force'
-nb_execution_timeout = 1200
+nb_execution_timeout = 3600
 nb_merge_streams = True
 
 nb_execution_excludepatterns = ['jupyter_execute']
