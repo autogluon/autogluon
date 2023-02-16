@@ -19,6 +19,8 @@ others:
 - microsoft/deberta-v3-base
 - nlpaueb/legal-bert-small-uncased
 - openai/clip-vit-base-patch32
+- openai/clip-vit-large-patch14
+- openai/clip-vit-large-patch14-336
 - roberta-base
 - sentence-transformers/all-MiniLM-L6-v2
 - sentence-transformers/all-mpnet-base-v2
