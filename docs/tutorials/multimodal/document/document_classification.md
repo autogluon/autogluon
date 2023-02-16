@@ -16,6 +16,8 @@ This dataset is a sample of [RVL-CDIP](https://huggingface.co/datasets/rvl_cdip)
 Here, we sampled around 100 documents and three categories of document including budget (labelled as 0), email (labelled as 1), and form (labelled as 2).
 
 ```{.python .input}
+import warnings
+warnings.filterwarnings('ignore')
 import os
 import pandas as pd
 from autogluon.core.utils.loaders import load_zip
@@ -72,7 +74,7 @@ We set the training time limit to 120 seconds for demonstration purposes.
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
 
-predictor = MultiModalPredictor(label="label")
+predictor = MultiModalPredictor(label="label", verbosity=5)
 predictor.fit(
     train_data=train_data,
     hyperparameters={"model.document_transformer.checkpoint_name":"microsoft/layoutlm-base-uncased",
