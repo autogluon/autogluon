@@ -20,7 +20,7 @@ extensions = [
     ]
 
 # See https://myst-parser.readthedocs.io/en/latest/syntax/optional.html
-myst_enable_extensions = ['colon_fence', 'deflist', 'substitution', 'html_image']
+myst_enable_extensions = ['colon_fence', 'deflist', 'dollarmath', 'html_image', 'substitution']
 
 nb_execution_mode = 'force'
 nb_execution_timeout = 1200
