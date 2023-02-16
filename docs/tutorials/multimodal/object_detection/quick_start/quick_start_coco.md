@@ -45,8 +45,8 @@ In this example, `trainval_cocoformat.json` is the annotation file of the train-
 and `test_cocoformat.json` is the annotation file of the test split.
 
 ### Creating the MultiModalPredictor
-We select the "medium_quality" presets, which uses a YOLOX-small model pretrained on COCO dataset. This preset is fast to finetune or inference,
-and easy to deploy. We also provide presets "high_quality" and "best quality", with higher performance but also slower.
+We select the `"medium_quality"` presets, which uses a YOLOX-small model pretrained on COCO dataset. This preset is fast to finetune or inference,
+and easy to deploy. We also provide presets `"high_quality"` and `"best quality"`, with higher performance but also slower.
 
 ```python .input
 presets = "medium_quality"
@@ -110,7 +110,7 @@ The first line is mAP in COCO standard, and the second line is mAP in VOC standa
 For more details about these metrics, see [COCO's evaluation guideline](https://cocodataset.org/#detection-eval).
 Note that for presenting a fast finetuning we use presets "medium_quality", 
 you could get better result on this dataset by simply using "high_quality" or "best_quality" presets, 
-or customize your own model and hyperparameter settings: :ref:`sec_automm_customization`.
+or customize your own model and hyperparameter settings: :ref:`sec_automm_customization`, and some other examples at :ref:`sec_automm_detection_fast_ft_coco` or :ref:`sec_automm_detection_high_ft_coco`.
 
 ```python .input
 predictor.evaluate(test_path)
@@ -162,11 +162,10 @@ Note that, by default, the `predictor.predict` does not save the detection resul
 
 To run inference and save results, run the following:
 ```python .input
-pred = better_predictor.predict(test_path, save_results=True)
+pred = predictor.predict(test_path, save_results=True)
 ```
 Here, we save `pred` into a `.txt` file, which exactly follows the same layout as in `pred`.
 You can use a predictor initialized in anyway (i.e. finetuned predictor, predictor with pretrained model, etc.).
-Here, we demonstrate using the `better_predictor` loaded previously.
 
 ### Visualizing Results
 To run visualizations, ensure that you have `opencv` installed. If you haven't already, install `opencv` by running 
@@ -206,7 +205,7 @@ test_image = download(image_url)
 Run inference:
 
 ```python .input
-pred_test_image = better_predictor.predict({"image": [test_image]})
+pred_test_image = predictor.predict({"image": [test_image]})
 print(pred_test_image)
 ```
 
