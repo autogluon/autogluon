@@ -114,11 +114,6 @@ The Stanford Cars is an image classification dataset and contains 196 classes.
 For more information regarding the dataset, please see [here](http://ai.stanford.edu/~jkrause/cars/car_dataset.html).
 
 ```{.python .input}
-!wget https://automl-mm-bench.s3.amazonaws.com/vision_datasets/stanfordcars/train_8shot.csv -O ./ag_automm_tutorial_fs_cls/stanfordcars/train.csv
-!wget https://automl-mm-bench.s3.amazonaws.com/vision_datasets/stanfordcars/test.csv -O ./ag_automm_tutorial_fs_cls/stanfordcars/test.csv
-```
-
-```{.python .input}
 import pandas as pd
 import os
 
@@ -131,7 +126,14 @@ test_csv = "https://automl-mm-bench.s3.amazonaws.com/vision_datasets/stanfordcar
 
 load_zip.unzip(zip_file, unzip_dir=download_dir)
 dataset_path = os.path.join(download_dir)
+```
 
+```{.python .input}
+!wget https://automl-mm-bench.s3.amazonaws.com/vision_datasets/stanfordcars/train_8shot.csv -O ./ag_automm_tutorial_fs_cls/stanfordcars/train.csv
+!wget https://automl-mm-bench.s3.amazonaws.com/vision_datasets/stanfordcars/test.csv -O ./ag_automm_tutorial_fs_cls/stanfordcars/test.csv
+```
+
+```{.python .input}
 train_df_raw = pd.read_csv(os.path.join(download_dir, "train.csv"))
 train_df = train_df_raw.drop(
         columns=[
