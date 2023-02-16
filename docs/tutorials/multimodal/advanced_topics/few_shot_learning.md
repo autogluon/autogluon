@@ -71,8 +71,6 @@ from sklearn.metrics import f1_score
 hyperparameters = {
     "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",
     "model.hf_text.pooling_mode": "mean",
-    "env.per_gpu_batch_size": 32,
-    "env.eval_batch_size_ratio": 4,
 }
 
 automm_predictor = MultiModalPredictor(
