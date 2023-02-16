@@ -10,6 +10,8 @@ RUN apt-get update \
  && apt-get autoremove -y \
  && apt-get clean
 
+RUN apt install tesseract-ocr -y
+
 RUN adduser --disabled-password --disabled-login ci
 WORKDIR /home/ci
 
