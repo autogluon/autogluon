@@ -13,8 +13,26 @@ function build_doc {
     bash docs/build_pip_install.sh
     setup_mmcv
 
-    SPHINX_BUILD_TAG="$DOC" && [[ -n $SUB_DOC ]] && SPHINX_BUILD_TAG+="/$SUB_DOC"
-    cd docs && rm -rf _build && sphinx-build -t $SPHINX_BUILD_TAG -b html . _build/
+    if [[ -n $PR_NUMBER ]]; then
+        BUCKET=autogluon-ci
+        S3_PATH=s3://$BUCKET/build_docs/$PR_NUMBER/$COMMIT_SHA/$DOC/
+    else
+        BUCKET=autogluon-ci-push
+        S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA/$DOC/
+    fi
+
+    DOC_PATH=docs/_build/tutorials/$DOC/
+    SPHINX_BUILD_TAG="$DOC"
+
+    if [[ -n $SUB_DOC ]]; then
+        DOC_PATH+="/$SUB_DOC/"
+        S3_PATH+="/$SUB_DOC/"
+        SPHINX_BUILD_TAG+="/$SUB_DOC"
+    fi
+
+    cd docs
+    rm -rf _build
+    sphinx-build -t $SPHINX_BUILD_TAG -b html . _build/
 
     COMMAND_EXIT_CODE=$?
     if [ $COMMAND_EXIT_CODE -ne 0 ]; then
@@ -22,19 +40,5 @@ function build_doc {
     fi
 
     cd ..
-    rm -rf ./docs/tutorials/!($DOC)
-    if [[ -n $SUB_DOC ]]; then rm -rf ./docs/tutorials/$DOC/!($SUB_DOC); fi
-
-    if [[ -n $PR_NUMBER ]]; then
-        BUCKET=autogluon-ci
-        S3_PATH=s3://$BUCKET/build_docs/$PR_NUMBER/$COMMIT_SHA
-    else
-        BUCKET=autogluon-ci-push
-        S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA
-    fi
-
-    DOC_PATH=docs/_build/tutorials/$DOC/
-    S3_PATH=$S3_PATH/$DOC/
-
     write_to_s3 $BUCKET $DOC_PATH $S3_PATH
 }
