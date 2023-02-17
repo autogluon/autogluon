@@ -23,6 +23,7 @@ extensions = [
 myst_enable_extensions = ['colon_fence', 'deflist', 'dollarmath', 'html_image', 'substitution']
 
 nb_execution_mode = 'force'
+nb_execution_raise_on_error=True
 nb_execution_timeout = 3600
 nb_merge_streams = True
 
