@@ -49,7 +49,7 @@
 
 * How to upgrade python version in Kaggle to install AutoGluon 0.7 and later? 
 
-   AutoGluon will drop python 3.7 support in release v0.7 and afterwards. However, the python version is still 3.7 in Kaggle default container, 
+   AutoGluon dropped python 3.7 support in release v0.7 and afterwards. However, the python version is still 3.7 in Kaggle default container, 
    which will lead to installation issue. To upgrade the python version to 3.8 or higher, here is a quick solution following 
    https://www.kaggle.com/code/amareltaylor/how-to-install-alternative-python-version-hack
 
