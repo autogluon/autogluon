@@ -149,9 +149,9 @@ def check_if_nlp_feature(X: Series) -> bool:
     return True
 
 
-def get_bool_true_val(series: pd.Series):
+def get_bool_true_val(uniques):
     """
-    From a pandas series, get the replace_val to convert to boolean when calling:
+    From a pandas series with `uniques = series.uniques()`, get the replace_val to convert to boolean when calling:
     series_bool = series == replace_val
 
     Therefore, any value other than `replace_val` will be set to `False` when converting to boolean.
@@ -170,17 +170,19 @@ def get_bool_true_val(series: pd.Series):
     # This is a safety net in case the unique types are mixed (such as string and int). In this scenario, an exception is raised
     # and therefore we use the unsorted values.
     try:
-        uniques = series.unique()
         # Sort the values to avoid relying on row-order when determining which value is mapped to `True`.
         uniques.sort()
     except:
-        uniques = series.unique()
+        pass
     replace_val = uniques[1]
     try:
         # This is to ensure that we don't map np.nan to `True` in the boolean.
         is_nan = np.isnan(replace_val)
     except:
-        is_nan = False
+        if replace_val is None:
+            is_nan = True
+        else:
+            is_nan = False
     if is_nan:
         replace_val = uniques[0]
     return replace_val
