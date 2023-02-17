@@ -34,9 +34,9 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         [Advanced] If `convert_bool_method="auto"`, this value determines which method is used.
         If the number of boolean features is >= this value, then "v2" is used. Otherwise, "v1" is used.
         15 is roughly the optimal value on average.
-    convert_bool_method_v2_row_threshold : int, default 100
+    convert_bool_method_v2_row_threshold : int, default 128
         [Advanced] If using "v2" bool method, this is the row count in which when >=, the batch method is used instead of the realtime method.
-        100 is roughly the optimal value on average.
+        128 is roughly the optimal value on average.
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
@@ -44,7 +44,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
                  convert_bool: bool = True,
                  convert_bool_method: str = "auto",
                  convert_bool_method_v2_threshold: int = 15,
-                 convert_bool_method_v2_row_threshold: int = 100,
+                 convert_bool_method_v2_row_threshold: int = 128,
                  **kwargs):
         super().__init__(**kwargs)
         # FeatureMetadata object based on the original input features real dtypes
