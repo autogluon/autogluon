@@ -151,7 +151,7 @@ def check_if_nlp_feature(X: Series) -> bool:
 
 def get_bool_true_val(uniques):
     """
-    From a pandas series with `uniques = series.uniques()`, get the replace_val to convert to boolean when calling:
+    From a pandas series with `uniques = series.unique()`, get the replace_val to convert to boolean when calling:
     series_bool = series == replace_val
 
     Therefore, any value other than `replace_val` will be set to `False` when converting to boolean.
