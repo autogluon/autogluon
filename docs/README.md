@@ -19,7 +19,7 @@ pip install -U pip wheel
 ./full_install.sh
 ```
 
-Then run in package root:
+Then run in package root: 
 
 ```shell
 # Note: GPU & CUDA is required to build tutorials
