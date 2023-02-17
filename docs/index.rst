@@ -7,7 +7,7 @@ AutoGluon: AutoML for Text, Image, Time Series, and Tabular Data
 .. |StableVersion| image:: https://img.shields.io/github/v/release/autogluon/autogluon?color=blue&label=stable%20release&sort=semver
     :target: https://auto.gluon.ai/stable/index.html
     :scale: 100%
-.. |PythonVersion| image:: https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue
+.. |PythonVersion| image:: https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue
     :target: https://pypi.org/project/autogluon/
 .. |GitHub| image:: https://img.shields.io/github/stars/autogluon/autogluon?style=social
     :target: https://github.com/autogluon/autogluon/stargazers

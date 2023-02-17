@@ -2,7 +2,7 @@
 .. _ReleaseVersion: https://auto.gluon.ai/dev/versions.html
 .. |StableVersion| image:: https://img.shields.io/github/v/release/autogluon/autogluon?color=blue&label=stable%20release&sort=semver
 .. _StableVersion: https://auto.gluon.ai/stable/index.html
-.. |PythonVersion| image:: https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue
+.. |PythonVersion| image:: https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue
 .. _PythonVersion: https://pypi.org/project/autogluon/
 .. |GitHub| image:: https://img.shields.io/github/stars/autogluon/autogluon?style=social
 .. _GitHub: https://github.com/autogluon/autogluon/stargazers
