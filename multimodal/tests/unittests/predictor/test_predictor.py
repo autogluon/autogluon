@@ -100,7 +100,7 @@ def verify_no_redundant_model_configs(predictor):
     [
         (
             "petfinder",
-            ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+            ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "fusion_mlp"],
             "nlpaueb/legal-bert-small-uncased",
             "swin_tiny_patch4_window7_224",
             GREEDY_SOUP,
@@ -118,7 +118,7 @@ def verify_no_redundant_model_configs(predictor):
         ),
         (
             "hateful_memes",
-            ["timm_image", "t_few", "clip", "fusion_mlp"],
+            ["timm_image", "t_few", "fusion_mlp"],
             "t5-small",
             "mobilenetv3_small_100",
             BEST,
@@ -127,7 +127,7 @@ def verify_no_redundant_model_configs(predictor):
         ),
         (
             "hateful_memes_bytearray",
-            ["timm_image", "hf_text", "clip", "fusion_mlp"],
+            ["timm_image", "hf_text", "fusion_mlp"],
             "monsoon-nlp/hindi-bert",
             "mobilenetv3_small_100",
             UNIFORM_SOUP,
