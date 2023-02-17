@@ -105,6 +105,12 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
   How to convert a dataset from VOC format to COCO format for object detection.
 :::
 
+:::{grid-item-card} Object Detection with DataFrame
+  :link: object_detection/data_preparation/object_detection_with_dataframe.html
+
+  How to use pd.DataFrame format for object detection
+:::
+
 :::{grid-item-card} Fast Finetune on COCO Format Dataset
   :link: object_detection/finetune/detection_fast_finetune_coco.html
 

@@ -40,6 +40,12 @@
 
   How to convert a dataset from VOC format to COCO format for object detection.
 :::
+
+:::{grid-item-card} Object Detection with DataFrame
+  :link: data_preparation/object_detection_with_dataframe.html
+
+  How to use pd.DataFrame format for object detection
+:::
 ::::
 
 ## Finetuning
