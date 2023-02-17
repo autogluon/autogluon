@@ -30,10 +30,22 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         If "v2": Will use an optimized method that was introduced in v0.7 (`_convert_to_bool_fast`)
         Note that "v2" is not always faster than "v1", and is often slower when there are few boolean columns.
         All options produce identical results, except in extreme synthetic edge-cases.
+    convert_bool_method_v2_threshold : int, default 15
+        [Advanced] If `convert_bool_method="auto"`, this value determines which method is used.
+        If the number of boolean features is >= this value, then "v2" is used. Otherwise, "v1" is used.
+        15 is roughly the optimal value on average.
+    convert_bool_method_v2_row_threshold : int, default 100
+        [Advanced] If using "v2" bool method, this is the row count in which when >=, the batch method is used instead of the realtime method.
+        100 is roughly the optimal value on average.
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
-    def __init__(self, convert_bool: bool = True, convert_bool_method: str = "auto", **kwargs):
+    def __init__(self,
+                 convert_bool: bool = True,
+                 convert_bool_method: str = "auto",
+                 convert_bool_method_v2_threshold: int = 15,
+                 convert_bool_method_v2_row_threshold: int = 100,
+                 **kwargs):
         super().__init__(**kwargs)
         # FeatureMetadata object based on the original input features real dtypes
         # (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
@@ -43,6 +55,8 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         self._int_features = None
         self._bool_features = None
         self._convert_bool = convert_bool
+        self._convert_bool_method_v2_threshold = convert_bool_method_v2_threshold
+        self._convert_bool_method_v2_row_threshold = convert_bool_method_v2_row_threshold
         if convert_bool_method == 'v1':
             self._use_fast_bool_method = False
         elif convert_bool_method == 'v2':
@@ -80,7 +94,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
             if num_rows > 1000:
                 # Sample and filter out features that already have >2 unique values
                 # in the first 500 rows from bool consideration
-                X_nunique_sample = X[self.features_in].head(500).nunique()
+                X_nunique_sample = X[self.features_in].head(500).nunique(dropna=False)
                 X_nunique_sample = X_nunique_sample[X_nunique_sample <= 2]
                 bool_candidates = list(X_nunique_sample.index)
             else:
@@ -97,7 +111,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
                           f'as they only contain 2 unique values.')
             self._set_bool_features_val()
             if self._use_fast_bool_method == 'auto':
-                self._use_fast_bool_method = len(self._bool_features) >= 15
+                self._use_fast_bool_method = len(self._bool_features) >= self._convert_bool_method_v2_threshold
             X = self._convert_to_bool(X)
             for feature in self._bool_features:
                 type_map_special[feature] = [S_BOOL]
@@ -143,6 +157,9 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
     def _convert_to_bool_simple(self, X: DataFrame) -> DataFrame:
         """Generic method to convert feature types to booleans. Efficient with small amounts of features."""
         for feature in self._bool_features_list:
+            # Note, this edits inplace, altering outer context.
+            #  This is ok when used in PipelineFeatureGenerator, as the data is already deep copied.
+            #  We avoid deep copying here to speed up processing.
             X[feature] = (X[feature] == self._bool_features[feature]).astype(np.int8)
         return X
 
@@ -153,7 +170,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
 
         Note that the fast method alters the column order with boolean features being last.
         """
-        if len(X) > 100:
+        if len(X) >= self._convert_bool_method_v2_row_threshold:
             return self._convert_to_bool_fast_batch(X)
         else:
             return self._convert_to_bool_fast_realtime(X)
@@ -168,10 +185,6 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
 
     def _convert_to_bool_fast_realtime(self, X: DataFrame) -> DataFrame:
         """Optimized for when X is <= 100 rows"""
-        # Note: Technically if there are two values `5` and `"5"`, this will treat them as the same value.
-        #  This is impossible to avoid when using numpy and maintaining the speedup.
-        #  This scenario is probably so rare that it doesn't matter in practice,
-        #  and if such a feature carried relevant predictive signal, I would be concerned.
         X_bool_features_np = X[self._bool_features_list].to_numpy(dtype='object')
         X_bool_numpy = X_bool_features_np == self._bool_features_val_np
         X_bool = pd.DataFrame(X_bool_numpy, columns=self._bool_features_list, dtype=np.int8, index=X.index)
