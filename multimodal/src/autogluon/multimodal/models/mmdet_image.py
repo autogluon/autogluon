@@ -29,6 +29,7 @@ except ImportError as e:
 from ..constants import (
     AUTOMM,
     BBOX,
+    BBOX_FORMATS,
     COLUMN,
     COLUMN_FEATURES,
     FEATURES,
@@ -37,7 +38,6 @@ from ..constants import (
     LABEL,
     LOGITS,
     MASKS,
-    BBOX_FORMATS,
     XYWH,
     XYXY,
 )
