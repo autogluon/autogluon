@@ -2094,7 +2094,6 @@ class MultiModalPredictor(ExportMixin):
 
             if self._problem_type == OBJECT_DETECTION:
                 if self._model.output_bbox_format == XYWH:
-                    print("converted to XYWH")
                     pred = convert_pred_to_xywh(pred)
 
         if save_results:
