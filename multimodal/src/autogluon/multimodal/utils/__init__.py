@@ -56,6 +56,7 @@ from .object_detection import (
     COCODataset,
     bbox_xyxy_to_xywh,
     cocoeval,
+    convert_pred_to_xywh,
     evaluate_coco,
     from_coco,
     from_coco_or_voc,

@@ -148,6 +148,7 @@ model:
     data_types:
       - "image"
     max_img_num_per_col: 1
+    output_bbox_format: "xyxy"
 
   mmocr_text_detection:
     checkpoint_name: "TextSnake"

@@ -73,6 +73,7 @@ from .constants import (
     TEXT,
     TEXT_NER,
     UNIFORM_SOUP,
+    XYWH,
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
@@ -114,6 +115,7 @@ from .utils import (
     check_if_packages_installed,
     compute_num_gpus,
     compute_score,
+    convert_pred_to_xywh,
     create_fusion_data_processors,
     create_fusion_model,
     data_to_df,
@@ -2088,6 +2090,11 @@ class MultiModalPredictor(ExportMixin):
 
             if self._problem_type == NER:
                 pred = merge_bio_format(data[self._df_preprocessor.ner_feature_names[0]], pred)
+
+            if self._problem_type == OBJECT_DETECTION:
+                if self._model.output_bbox_format == XYWH:
+                    pred = convert_pred_to_xywh(pred)
+
         if save_results:
             ## Dumping Result for detection only now
             assert (

@@ -1569,3 +1569,8 @@ def setup_detection_train_tuning_data(predictor, max_num_tuning_data, seed, trai
     else:
         raise TypeError(f"Expected train_data to have type str or pd.DataFrame, but got type: {type(train_data)}")
     return train_data, tuning_data
+
+
+def convert_pred_to_xywh(pred):
+    print(pred)
+    exit()
