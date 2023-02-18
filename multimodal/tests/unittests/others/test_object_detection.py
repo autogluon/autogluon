@@ -97,6 +97,28 @@ def test_mmdet_object_detection_inference_list_str_dict(checkpoint_name):
         "yolov3_mobilenetv2_320_300e_coco",
     ],
 )
+def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
+    mmdet_image_name = download_sample_images()
+
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "model.mmdet_image.output_bbox_format": "xywh",
+            "env.num_gpus": 1,  # currently mmdet only support single gpu inference
+        },
+        problem_type="object_detection",
+    )
+
+    pred = predictor.predict([mmdet_image_name] * 10)  # test batch inference
+    assert len(pred) == 10  # test data size is 100
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "yolov3_mobilenetv2_320_300e_coco",
+    ],
+)
 def test_mmdet_object_detection_inference_df(checkpoint_name):
 
     data_dir = download_sample_dataset()
