@@ -56,18 +56,22 @@ fi
 setup_build_contrib_env
 install_all_no_tests
 
-cd docs && sphinx-build -D nb_execution_mode=off -b html . _build/html
+LOCAL_DOC_PATH=_build/html
 
-aws s3 cp $BUILD_DOCS_PATH _build/html/tutorials/ --recursive --exclude "*/index.html"
+cd docs
+sphinx-build -D nb_execution_mode=off -b html . $LOCAL_DOC_PATH
+
+# Overwrite un-executed tutorials w/ executed versions (with images) from other build jobs
+aws s3 cp $BUILD_DOCS_PATH/tutorials/ $LOCAL_DOC_PATH/tutorials/ --recursive --exclude "*/index.html"
+aws s3 cp $BUILD_DOCS_PATH/_images/ $LOCAL_DOC_PATH/_images/ --recursive
 
 COMMAND_EXIT_CODE=$?
 if [ $COMMAND_EXIT_CODE -ne 0 ]; then
     exit COMMAND_EXIT_CODE
 fi
 
-DOC_PATH=_build/html/
 # Write docs to s3
-write_to_s3 $BUCKET $DOC_PATH $S3_PATH
+write_to_s3 $BUCKET $LOCAL_DOC_PATH $S3_PATH
 # Write root_index to s3 if master
 if [[ ($BRANCH == 'master') && ($GIT_REPO == autogluon/autogluon) ]]
 then
