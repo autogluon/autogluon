@@ -21,10 +21,10 @@ function build_doc {
         S3_PATH="s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA"
     fi
 
-    S3_DOC_PATH="$S3_PATH/$DOC"
+    S3_DOC_PATH="$S3_PATH/tutorials/$DOC"
     S3_IMG_PATH="$S3_PATH/_images"
 
-    BUILD_DIR="_build"
+    BUILD_DIR="_build/html"
 
     LOCAL_DOC_PATH="$BUILD_DIR/tutorials/$DOC"
     LOCAL_IMG_PATH="$BUILD_DIR/_images"
