@@ -9,16 +9,17 @@ def test_isnan_feature_generator(generator_helper, data_helper):
     input_data = data_helper.generate_multi_feature_full()
 
     expected_output_data = pd.DataFrame([
-        [0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 1, 0, 1],
-        [0, 1, 0, 0, 1, 1, 0],
-        [0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 1, 1, 0, 0],
-        [0, 0, 0, 1, 1, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 1],
+        [0, 0, 1, 0, 0, 1, 1, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 0, 0],
+        [0, 0, 0, 0, 1, 1, 0, 0],
     ], columns=[
+        '__nan__.int_bool',
         '__nan__.int',
         '__nan__.float',
         '__nan__.obj',
@@ -34,7 +35,7 @@ def test_isnan_feature_generator(generator_helper, data_helper):
         ('category', ()): ['cat'],
         ('datetime', ()): ['datetime'],
         ('float', ()): ['float'],
-        ('int', ()): ['int'],
+        ('int', ()): ['int_bool', 'int'],
         ('object', ()): ['obj'],
         ('object', ('datetime_as_object',)): ['datetime_as_object'],
         ('object', ('text',)): ['text']
@@ -42,6 +43,7 @@ def test_isnan_feature_generator(generator_helper, data_helper):
 
     expected_feature_metadata_full = {
         ('int', ('bool',)): [
+            '__nan__.int_bool',
             '__nan__.int',
             '__nan__.float',
             '__nan__.obj',

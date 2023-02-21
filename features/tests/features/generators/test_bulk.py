@@ -18,7 +18,7 @@ def test_bulk_feature_generator(generator_helper, data_helper):
 
     generator = BulkFeatureGenerator(
         generators=[
-            [AsTypeFeatureGenerator()],
+            [AsTypeFeatureGenerator(convert_bool_method='v2')],
             [FillNaFeatureGenerator()],
             [
                 IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT])),
@@ -28,14 +28,14 @@ def test_bulk_feature_generator(generator_helper, data_helper):
                 text_ngram_feature_generator,
             ],
             [DropUniqueFeatureGenerator()],
-        ]
+        ], reset_index=True
     )
 
     expected_feature_metadata_in_full = {
         ('category', ()): ['cat'],
         ('datetime', ()): ['datetime'],
         ('float', ()): ['float'],
-        ('int', ()): ['int'],
+        ('int', ()): ['int_bool', 'int'],
         ('object', ()): ['obj'],
         ('object', ('datetime_as_object',)): ['datetime_as_object'],
         ('object', ('text',)): ['text']
@@ -52,6 +52,7 @@ def test_bulk_feature_generator(generator_helper, data_helper):
             'text.special_ratio',
             'text.symbol_ratio. '
         ],
+        ('int', ('bool',)): ['int_bool'],
         ('int', ('datetime_as_int',)): [
             'datetime',
             'datetime.year',
@@ -100,6 +101,40 @@ def test_bulk_feature_generator(generator_helper, data_helper):
         expected_feature_metadata_in_full=expected_feature_metadata_in_full,
         expected_feature_metadata_full=expected_feature_metadata_full,
     )
+
+    assert list(output_data.columns) == [
+        'int',
+        'float',
+        'int_bool',  # Notably, this is now the 3rd feature rather than the 1st because we used "v2" which shifts the position of the boolean feature
+        'obj',
+        'cat',
+        'datetime',
+        'datetime.year',
+        'datetime.month',
+        'datetime.day',
+        'datetime.dayofweek',
+        'datetime_as_object',
+        'datetime_as_object.year',
+        'datetime_as_object.month',
+        'datetime_as_object.day',
+        'datetime_as_object.dayofweek',
+        'text.char_count',
+        'text.word_count',
+        'text.lower_ratio',
+        'text.special_ratio',
+        'text.symbol_ratio. ',
+        '__nlp__.breaks',
+        '__nlp__.end',
+        '__nlp__.end of',
+        '__nlp__.end of the',
+        '__nlp__.of',
+        '__nlp__.sentence',
+        '__nlp__.sentence breaks',
+        '__nlp__.the',
+        '__nlp__.the end',
+        '__nlp__.world',
+        '__nlp__._total_',
+    ]
 
     # int and float checks
     assert output_data['int'].equals(input_data['int'])
