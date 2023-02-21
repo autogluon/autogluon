@@ -1,102 +1,238 @@
-# Installation
+# Installing AutoGluon
 
-AutoGluon requires Python version 3.7, 3.8, or 3.9. 
+:::{note} 
 
-::::{dropdown} Optional: Use `conda` to manage Python environment
-You can use [miniconda](https://docs.conda.io/en/latest/miniconda.html) or [anaconda](https://www.anaconda.com/products/distribution) to
-manage your Python environment. Once installed, create an environment with a specific Python version and activate it:
+AutoGluon requires Python version 3.8, 3.9, or 3.10 and is available on Linux, MacOS, and Windows.
 
-```bash
-conda create -n autogluon python=3.9 -y
-conda activate autogluon
-```
-::::
+:::
 
-[pip](https://pip.pypa.io/en/stable/installation/) is the primary way to install AutoGluon, and a recent version is required by AutoGluon's dependencies:
+::::::{tab} Linux
 
-```bash
-python -m pip install --upgrade pip
-```
+  :::::{tab} Pip
+  
+    ::::{tab} CPU
+    ```{include} install-cpu-pip.md
+    ```
+    ::::
+    
+    ::::{tab} GPU
+    ```{include} install-gpu-pip.md
+    ```
+    ::::
+  
+  :::::
+  
+  :::::{tab} Conda
+  
+    ::::{tab} CPU
+    ```{include} install-conda-full.md
+    ```
+    ::::
+    
+    ::::{tab} GPU
+    ```{include} install-conda-full.md
+    ```
+    ::::
+  
+  :::::
+  
+  :::::{tab} Source
+  
+    ::::{tab} CPU
+    ```{include} install-cpu-source.md
+    ```
+    ::::
+    
+    ::::{tab} GPU
+    ```{include} install-gpu-source.md
+    ```
+    ::::
+  
+  :::::
+  
+::::::
 
-Install AutoGluon:
+::::::{tab} Mac
 
-```bash
-python -m pip install autogluon
-```
+  :::::{tab} Pip
+  
+    ::::{tab} CPU
+    ```{include} install-mac-libomp.md
+    ```
 
-````{tip}
-You can use `pip` instead of `python -m pip`. The latter guarantees the use of the `pip` module from your active Python installation.
-````
+    ```{include} install-cpu-pip.md 
+    ``` 
+    ::::
+  
+    ::::{tab} GPU
+    ```{include} install-mac-nogpu.md
+    ::::
+  
+  :::::
+  
+  :::::{tab} Conda
+  
+    ::::{tab} CPU
+    ```{include} install-conda-full.md
+    ```
+    ::::
+  
+    ::::{tab} GPU
+    ```{include} install-mac-nogpu.md
+    ```
+    ::::
+  
+  :::::
+  
+  :::::{tab} Source
+  
+    ::::{tab} CPU
+    ```{include} install-mac-libomp.md
+    ```
 
-::::{dropdown} Install a specific AutoGluon module
+    ```{include} install-cpu-source.md
+    ```
+    ::::
+    
+    ::::{tab} GPU
+    ```{include} install-mac-nogpu.md
+    ```
+    ::::
+  
+  :::::
+
+::::::
+
+::::::{tab} Windows
+
+  :::::{tab} Pip
+  
+    ::::{tab} CPU
+    ```{include} install-windows-cpu.md
+    ```
+    
+	  ```{include} install-cpu-pip.md 
+    ```
+    ::::
+    
+    ::::{tab} GPU
+    ```{include} install-windows-gpu.md
+    ```
+
+	  ```{include} install-gpu-pip.md 
+    ```
+    ::::
+  
+  :::::
+  
+  :::::{tab} Conda
+  
+    ::::{tab} CPU
+    ```{include} install-windows-conda.md
+    ```
+    ::::
+    
+    ::::{tab} GPU
+    ```{include} install-windows-conda.md
+    ```
+    ::::
+  
+  :::::
+  
+  :::::{tab} Source
+  
+    ::::{tab} CPU
+    ```{include} install-windows-cpu.md
+    ```
+
+    ```{include} install-cpu-source.md
+    ```
+    ::::
+    
+    ::::{tab} GPU
+    ```{include} install-windows-gpu.md
+    ```
+
+    ```{include} install-gpu-source.md
+    ```
+    ::::
+  
+  :::::
+
+::::::
+
+:::{dropdown} Install specific AutoGluon modules and dependencies
 By default, AutoGluon installs all modules. You can accelerate installation by installing specific modules:
 
 ```bash
-python -m pip install autogluon.tabular
+pip install autogluon.tabular
 ```
 
 You can also specify optional dependencies:
 
 ```bash
-python -m pip install autogluon.tabular[lightgbm,catboost]
+pip install autogluon.tabular[lightgbm,catboost]
 ```
 
 Modules and optional dependencies:
 
 1. `autogluon.tabular`: functionality for tabular data (TabularPredictor)
    - Optional dependencies included by default: `lightgbm`,`catboost`,`xgboost`,`fastai`.
-   - Optional dependencies not included by default: `vowpalwabbit`, `skex`. The later will speedup KNN training and inference on CPU by 25x.
+   - Optional dependencies not included by default: `vowpalwabbit`, `skex`. The latter will speedup KNN training and inference on CPU by 25x.
 1. `autogluon.multimodal`: functionality for image, text, and multimodal data (MultiModalPredictor)
+1. `autogluon.timeseries`: functionality for time series data forecasting
+1. `autogluon.eda`: functionality for exploratory data analysis
 1. `autogluon.core`: core functionality including HPO support
 1. `autogluon.features`: functionality for feature generation and preprocessing
 
-::::
+:::
 
-::::{dropdown} CPU-only install
-By default, AutoGluon is installed with GPU support on both Linux and Windows, and this version also works well for CPU. If you only need CPU support and are concerned about network and disk usage, run the following command before installing AutoGluon, which installs the CPU-only version of `pytorch` that is 10x smaller than the default version with GPU support:
 
-```bash
-python -m pip install torch==1.12.1+cpu torchvision==0.13.1+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
-```
-::::
+:::{dropdown} Install nightly builds
 
-::::{dropdown} M1 Apple Silicon
-Running AutoGluon on M1 Macs requires additional setup steps. See this [github issue](https://github.com/autogluon/autogluon/issues/1242#issuecomment-1285276870) for specific instructions. M2 Macs are currently not supported, but support is being tracked [here](https://github.com/autogluon/autogluon/issues/2271).
-::::
-
-::::{dropdown} `LibOMP` on MacOS
-AutoGluon dependencies LightGBM and XGBoost use `libomp` for multi-threading. If you install `libomp` via `brew install libomp`, you may get segmentation faults due to incompatible library versions. Install a compatible version using these commands:
-
-```bash
-# Uninstall libomp if it was previous installed
-brew uninstall -f libomp
-wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
-brew install libomp.rb
-```
-::::
-
-::::{dropdown} Install nightly builds
 AutoGluon offers nightly builds that can be installed using the `--pre` argument. Nightly builds have the latest features but have not been as rigorously tested as stable releases.
 
 ```bash
-python -m pip install --pre autogluon
+pip install --pre autogluon
 ```
-::::
+:::
 
 
-::::{dropdown} Install from source
 
-To build AutoGluon from source, make sure `pip` is updated, clone the source repository, and run the install script:
+:::{dropdown} Install from source for a specific pull-request
+
+To build AutoGluon from source for the purposes of testing a pull-request, you can clone and install the exact branch by following these instructions.
+This process is useful if you are a code reviewer or want to test if a PR fixes a bug you have reported.
+
+In this example, we are using [this PR](https://github.com/autogluon/autogluon/pull/2944).
+It is from the user `innixma` and the PR branch is called `accel_preprocess_bool`. 
+This information is provided in the PR page directly under the title of the PR (where it says `into autogluon:master from Innixma:accel_preprocess_bool`).
 
 ```bash
-python -m pip install --upgrade pip
-git clone https://github.com/autogluon/autogluon
+# Edit these two variables to change which PR / branch is being installed
+GITHUB_USER=innixma
+BRANCH=accel_preprocess_bool
+
+pip install -U pip
+git clone --depth 1 --single-branch --branch ${BRANCH} --recurse-submodules https://github.com/${GITHUB_USER}/autogluon.git
 cd autogluon && ./full_install.sh
 ```
 
-::::
+Note that the above example is only valid while the branch still exists. A user could delete the branch after the PR is merged, so this advice is primarily focused on unmerged PRs.
 
-````{admonition} Trouble Shooting
+:::
 
-If you encounter installation issues not covered here, please create a [github issue](https://github.com/autogluon/autogluon/issues).
+
+:::{dropdown} M1 and M2 Apple Silicon
+
+Apple Silicon is now supported via the `conda` installation instructions outlined above. `conda-forge` will install the GPU version if a user's machine supports it.
+
+:::
+
+
+:::{admonition} Trouble Shooting
+
+If you encounter installation issues not covered here, please create a [GitHub issue](https://github.com/autogluon/autogluon/issues).
+
+:::
 
