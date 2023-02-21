@@ -1,6 +1,6 @@
 .. note::
 
-  AutoGluon requires `Python <https://www.python.org/downloads/release/python-399/>`_ version 3.7, 3.8, or 3.9.
+  AutoGluon requires `Python <https://www.python.org/downloads/release/python-399/>`_ version 3.8, 3.9 or 3.10.
   For troubleshooting the installation process, you can check the `Installation FAQ <install.html#installation-faq>`_.
 
 
