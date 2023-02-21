@@ -27,6 +27,10 @@ job_type_info = {
         'job_definition': 'autogluon-ci-gpu-push:4',
         'job_queue': 'CI-GPU'
     },
+    'CI-WASM-PUSH': {
+        'job_definition': 'autogluon-ci-wasm-push:1',
+        'job_queue': 'CI-CPU'
+    },
 }
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
