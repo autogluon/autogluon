@@ -188,17 +188,6 @@ Modules and optional dependencies:
 :::
 
 
-:::{dropdown} Install nightly builds
-
-AutoGluon offers nightly builds that can be installed using the `--pre` argument. Nightly builds have the latest features but have not been as rigorously tested as stable releases.
-
-```bash
-pip install --pre autogluon
-```
-:::
-
-
-
 :::{dropdown} Install from source for a specific pull-request
 
 To build AutoGluon from source for the purposes of testing a pull-request, you can clone and install the exact branch by following these instructions.
@@ -223,9 +212,35 @@ Note that the above example is only valid while the branch still exists. A user 
 :::
 
 
+:::{dropdown} Install nightly builds
+
+AutoGluon offers nightly builds that can be installed using the `--pre` argument. Nightly builds have the latest features but have not been as rigorously tested as stable releases.
+
+```bash
+pip install --pre autogluon
+```
+:::
+
+
 :::{dropdown} M1 and M2 Apple Silicon
 
 Apple Silicon is now supported via the `conda` installation instructions outlined above. `conda-forge` will install the GPU version if a user's machine supports it.
+
+:::
+
+
+:::{dropdown} Kaggle
+
+AutoGluon dropped Python 3.7 support in v0.7. However, the Kaggle container's default Python version is still 3.7, which will lead to AutoGluon installation issues.
+To upgrade the Python version to 3.8 or higher, a workaround is described here: [Alternative Python Version (Hack)](https://www.kaggle.com/code/amareltaylor/how-to-install-alternative-python-version-hack).
+
+```bash
+conda create -n newPython -c cctbx202208 -y
+source /opt/conda/bin/activate newPython && conda install -c cctbx202208 python -y
+/opt/conda/envs/newPython/bin/python3 -m pip install autogluon
+```
+
+Once AutoGluon is installed, restart the notebook runtime and import modules before running AutoGluon code.
 
 :::
 
