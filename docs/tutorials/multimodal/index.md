@@ -12,15 +12,15 @@ stack-ensemble of [AutoGluon Tabular](https://auto.gluon.ai/stable/tutorials/tab
 
 Here are some example use-cases of AutoMM:
 
-- Multilingual text classification :doc:`[Tutorial] <text_prediction/multilingual_text>`
-- Predicting pets' popularity based on their description, photo, and other metadata. [Tutorial](multimodal_prediction/beginner_multimodal), [Example](https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_pawpularity).
-- Predicting the price of book. [Tutorial](multimodal_prediction/multimodal_text_tabular).
-- Scoring student's essays. [Example](https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_feedback_prize).
-- Image classification. [Tutorial](image_prediction/beginner_image_cls).
-- Object detection. [Tutorial](object_det>ction/quick_start/quick_start_coco) [Example](https://github.com/autogluon/autogluon/tree/master/examples/automm/object_detection).
-- Extracting named entities. [Tutorial](text_prediction/ner).
-- Search for relevant text / image via text queries. [Tutorial](matching/index).
-- Document Classification (Experimental). [Tutorial](document/index).
+- Multilingual text classification: [Tutorial](text_prediction/multilingual_text)
+- Predicting pets' popularity based on their description, photo, and other metadata: [Tutorial](multimodal_prediction/beginner_multimodal), [Example](https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_pawpularity)
+- Predicting the price of book: [Tutorial](multimodal_prediction/multimodal_text_tabular)
+- Scoring student's essays: [Example](https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_feedback_prize)
+- Image classification: [Tutorial](image_prediction/beginner_image_cls)
+- Object detection: [Tutorial](object_detection/quick_start/quick_start_coco), [Example](https://github.com/autogluon/autogluon/tree/master/examples/automm/object_detection)
+- Extracting named entities: [Tutorial](text_prediction/ner)
+- Search for relevant text / image via text queries: [Tutorial](matching/index)
+- Document Classification (Experimental): [Tutorial](document/index)
 
 
 In the following, we decomposed the functionalities of AutoMM and prepared step-by-step guide for each functionality.
