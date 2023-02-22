@@ -29,10 +29,9 @@ Download the PDF version with clickable links `multimodal-cheatsheet`_.
 Time Series
 -----------
 
-.. image:: https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/autogluon_timeseries_cheatsheet.png
+.. image:: https://raw.githubusercontent.com/Innixma/autogluon-doc-utils/main/docs/cheatsheets/stable/timeseries/autogluon-cheat-sheet-ts.jpeg
    :width: 900
 
 Download the PDF version with clickable links `ts-cheatsheet`_.
 
-.. _ts-cheatsheet: https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/autogluon_timeseries_cheatsheet.pdf
-
+.. _ts-cheatsheet: https://nbviewer.org/github/Innixma/autogluon-doc-utils/blob/main/docs/cheatsheets/stable/timeseries/autogluon-cheat-sheet-ts.pdf
