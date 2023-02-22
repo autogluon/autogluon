@@ -205,7 +205,7 @@ predictions = predictor.predict(data)
 Install AutoGluon using [pip](https://pip.pypa.io/en/stable/installation/):
 
 ```bash
-python -m pip install autogluon
+pip install autogluon
 ```
 
 AutoGluon supports Linux, MacOS, and Windows. See {doc}`./install` for detailed instructions. 
