@@ -9,8 +9,8 @@ For a stable public API, refer to TimeSeriesPredictor.
 This page contains the list of time series forecasting models available in AutoGluon.
 The available hyperparameters for each model are listed under **Other Parameters**.
 
-This list is useful if you want to override the default hyperparameters ([Manually configuring models](forecasting-indepth))
-or define custom hyperparameter search spaces ([Hyperparameter tuning](forecasting-indepth)), as described in the In-depth Tutorial.
+This list is useful if you want to override the default hyperparameters ([Manually configuring models](https://auto.gluon.ai/stable/tutorials/timeseries/forecasting-indepth.html#manually-configuring-models))
+or define custom hyperparameter search spaces ([Hyperparameter tuning](https://auto.gluon.ai/stable/tutorials/timeseries/forecasting-indepth.html#hyperparameter-tuning)), as described in the In-depth Tutorial.
 For example, the following code will train a `TimeSeriesPredictor` with `DeepAR` and `ETS` models with default hyperparameters (and a weighted ensemble on top of them):
 
 ```
