@@ -34,4 +34,4 @@ Time Series
 
 Download the PDF version with clickable links `ts-cheatsheet`_.
 
-.. _ts-cheatsheet: https://nbviewer.org/github/Innixma/autogluon-doc-utils/blob/main/docs/cheatsheets/stable/timeseries/autogluon-cheat-sheet-ts.pdf
+.. _ts-cheatsheet: https://nbviewer.org/github/innixma/autogluon-doc-utils/blob/main/docs/cheatsheets/stable/timeseries/autogluon-cheat-sheet-ts.pdf
