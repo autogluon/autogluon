@@ -82,6 +82,7 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
     ):
         evaluator = TimeSeriesEvaluator(
             eval_metric=self.eval_metric,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
             prediction_length=self.prediction_length,
             target_column=self.target,
         )

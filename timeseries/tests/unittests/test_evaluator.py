@@ -11,7 +11,7 @@ from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTS
 
 from .common import DUMMY_TS_DATAFRAME
 
-GLUONTS_PARITY_METRICS = ["mean_wQuantileLoss", "MAPE", "sMAPE", "MSE", "RMSE"]
+GLUONTS_PARITY_METRICS = ["mean_wQuantileLoss", "MAPE", "sMAPE", "MSE", "RMSE", "MASE"]
 
 
 pytestmark = pytest.mark.filterwarnings("ignore")
@@ -62,10 +62,12 @@ def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_glu
         forecast_index=forecast_index,
     )
 
-    ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=prediction_length)
+    ag_evaluator = TimeSeriesEvaluator(
+        eval_metric=metric_name, prediction_length=prediction_length, eval_metric_seasonal_period=3
+    )
     ag_value = ag_evaluator(DUMMY_TS_DATAFRAME, forecast_df)
 
-    gts_evaluator = GluonTSEvaluator()
+    gts_evaluator = GluonTSEvaluator(seasonality=3)
     gts_results, _ = gts_evaluator(
         ts_iterator=ts_list,
         fcst_iterator=fcast_list,
@@ -78,6 +80,9 @@ def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_glu
 def test_when_given_all_zero_data_when_evaluator_called_then_output_equal_to_gluonts(
     metric_name, deepar_trained_zero_data
 ):
+    if metric_name == "MASE":
+        pytest.skip("MASE is undefined if all data is constant")
+
     model = deepar_trained_zero_data
     data = DUMMY_TS_DATAFRAME.copy() * 0
 

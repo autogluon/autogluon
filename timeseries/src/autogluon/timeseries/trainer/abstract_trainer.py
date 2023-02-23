@@ -273,6 +273,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         path: str,
         prediction_length: Optional[int] = 1,
         eval_metric: Optional[str] = None,
+        eval_metric_seasonal_period: int = 1,
         save_data: bool = True,
         enable_ensemble: bool = True,
         verbosity: int = 2,
@@ -301,6 +302,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         # Dict of FULL model -> normal model validation score in case the normal model had been deleted.
         self._model_full_dict_val_score = {}
         self.eval_metric = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
+        self.eval_metric_seasonal_period = eval_metric_seasonal_period
         self.hpo_results = {}
 
     def save_train_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
@@ -693,6 +695,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         ensemble = self.ensemble_model_type(
             name=self._get_ensemble_model_name(),
             eval_metric=self.eval_metric,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
             target=self.target,
             prediction_length=self.prediction_length,
             path=self.path,
@@ -706,6 +709,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         evaluator = TimeSeriesEvaluator(
             eval_metric=self.eval_metric,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
             prediction_length=self.prediction_length,
             target_column=self.target,
         )
@@ -831,6 +835,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         if isinstance(model, AbstractTimeSeriesEnsembleModel):
             evaluator = TimeSeriesEvaluator(
                 eval_metric=eval_metric,
+                eval_metric_seasonal_period=self.eval_metric_seasonal_period,
                 prediction_length=self.prediction_length,
                 target_column=self.target,
             )

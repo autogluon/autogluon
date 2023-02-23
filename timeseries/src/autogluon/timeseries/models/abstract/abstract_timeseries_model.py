@@ -76,6 +76,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         name: Optional[str] = None,
         metadata: Optional[CovariateMetadata] = None,
         eval_metric: Optional[str] = None,
+        eval_metric_seasonal_period: int = 1,
         hyperparameters: Dict[str, Union[int, float, str, ag.Space]] = None,
         **kwargs,
     ):
@@ -87,6 +88,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             hyperparameters=hyperparameters,
         )
         self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
+        self.eval_metric_seasonal_period = eval_metric_seasonal_period
         self.stopping_metric = None
         self.problem_type = "timeseries"
         self.conformalize = False
@@ -328,6 +330,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         metric = self.eval_metric if metric is None else metric
         evaluator = TimeSeriesEvaluator(
             eval_metric=metric,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
             prediction_length=self.prediction_length,
             target_column=self.target,
         )

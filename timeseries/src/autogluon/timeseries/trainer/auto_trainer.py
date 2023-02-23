@@ -11,11 +11,13 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
     def construct_model_templates(self, hyperparameters, **kwargs):
         path = kwargs.pop("path", self.path)
         eval_metric = kwargs.pop("eval_metric", self.eval_metric)
+        eval_metric_seasonal_period = kwargs.pop("eval_metric", self.eval_metric_seasonal_period)
         quantile_levels = kwargs.pop("quantile_levels", self.quantile_levels)
         hyperparameter_tune = kwargs.get("hyperparameter_tune", False)
         return get_preset_models(
             path=path,
             eval_metric=eval_metric,
+            eval_metric_seasonal_period=eval_metric_seasonal_period,
             prediction_length=self.prediction_length,
             freq=kwargs.get("freq"),
             hyperparameters=hyperparameters,

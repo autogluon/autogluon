@@ -29,6 +29,7 @@ class TimeSeriesLearner(AbstractLearner):
         known_covariates_names: Optional[List[str]] = None,
         trainer_type: Type[AbstractTimeSeriesTrainer] = AutoTimeSeriesTrainer,
         eval_metric: Optional[str] = None,
+        eval_metric_seasonal_period: int = 1,
         prediction_length: int = 1,
         validation_splitter: AbstractTimeSeriesSplitter = LastWindowSplitter(),
         ignore_time_index: bool = False,
@@ -36,6 +37,7 @@ class TimeSeriesLearner(AbstractLearner):
     ):
         super().__init__(path_context=path_context)
         self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
+        self.eval_metric_seasonal_period = eval_metric_seasonal_period
         self.trainer_type = trainer_type
         self.target = target
         self.known_covariates_names = [] if known_covariates_names is None else known_covariates_names
@@ -115,6 +117,7 @@ class TimeSeriesLearner(AbstractLearner):
                 path=self.model_context,
                 prediction_length=self.prediction_length,
                 eval_metric=self.eval_metric,
+                eval_metric_seasonal_period=self.eval_metric_seasonal_period,
                 target=self.target,
                 quantile_levels=self.quantile_levels,
                 verbosity=kwargs.get("verbosity", 2),
