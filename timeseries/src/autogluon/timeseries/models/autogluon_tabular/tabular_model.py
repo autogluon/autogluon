@@ -6,10 +6,10 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from joblib.parallel import Parallel, delayed
 
 # TODO: Drop GluonTS dependency
 from gluonts.time_feature import get_lags_for_frequency, time_features_from_frequency_str
+from joblib.parallel import Parallel, delayed
 
 import autogluon.core as ag
 from autogluon.tabular import TabularPredictor
