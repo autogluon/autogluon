@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-import scipy.stats
+from joblib.parallel import Parallel, delayed
 
 # TODO: Drop GluonTS dependency
 from gluonts.time_feature import get_lags_for_frequency, time_features_from_frequency_str
@@ -38,7 +38,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
     max_train_size : int, default = 1_000_000
         Maximum number of rows in the training and validation sets. If the number of rows in train or validation data
         exceeds ``max_train_size``, then ``max_train_size`` many rows are subsampled from the dataframe.
-    tabular_hyperparmeters : Dict[Dict[str, Any]], optional
+    tabular_hyperparameters : Dict[Dict[str, Any]], optional
         Hyperparameters dictionary passed to `TabularPredictor.fit`. Contains the names of models that should be fit.
         Defaults to ``{"XGB": {}, "CAT": {}, "GBM" :{}}``.
     """
@@ -50,6 +50,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
     }
 
     PREDICTION_BATCH_SIZE = 100_000
+    MAX_ROWS_PER_ITEM = 100_000
 
     TIMESERIES_METRIC_TO_TABULAR_METRIC = {
         "MASE": "mean_absolute_error",
@@ -97,7 +98,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
     def _get_features_dataframe(
         self,
         data: TimeSeriesDataFrame,
-        last_k_values: Optional[int] = None,
+        max_rows_per_item: int = 100_000,
     ) -> pd.DataFrame:
         """Generate a feature matrix used by TabularPredictor.
 
@@ -105,56 +106,32 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         ----------
         data : TimeSeriesDataFrame
             Dataframe containing features derived from time index & past time series values, as well as the target.
-        last_k_values: int, optional
-            If provided, features will be generated only for the last `last_k_values` timesteps of each time series.
+        max_rows_per_item: int, optional
+            Features will be generated only for the last `max_rows_per_item` timesteps of each time series.
         """
-        # TODO: Rethink the featurization process for time series based on SotA tree-based models (scaling, rolling feautres)
-        # TODO: More efficient featurization with tsfresh? (currently sequential over time series => slow)
 
-        def get_lags(df: pd.DataFrame, lag_indices: List[int]) -> pd.DataFrame:
-            """Construct a dataframe consisting of shifted copies of the original df.
-
-            Parameters
-            ----------
-            df
-                Original dataframe, shape [N, D]
-            lag_indices
-                List of lag features to compute.
-
-            Returns
-            -------
-            lag_df
-                Dataframe with lag features, shape [N, D * len(lag_indices)]
-            """
-            shifted = [df.shift(idx).add_suffix(f"_lag_{idx}") for idx in lag_indices]
-            return pd.concat(shifted, axis=1)
-
-        def apply_mask(
-            df: pd.DataFrame, num_hidden: np.ndarray, lag_indices: np.ndarray, num_columns: int = 1
-        ) -> pd.DataFrame:
+        def apply_mask(array: np.ndarray, num_hidden: np.ndarray, lag_indices: np.ndarray) -> pd.DataFrame:
             """Apply a mask that mimics the situation at prediction time when target/covariates are unknown during the
             forecast horizon.
 
             Parameters
             ----------
-            df
-                Dataframe to mask, shape [N, D * len(lag_indices)]
+            array
+                Array to mask, shape [N, len(lag_indices)]
             num_hidden
                 Number of entries hidden in each row, shape [N]
             lag_indices
                 Lag indices used to construct the dataframe
-            num_columns
-                D - number of columns in the original dataframe, before lag features were constructed
 
             Returns
             -------
-            masked_df
-                Dataframe with the masking applied, shape [N, D * len(lag_indices)]
+            masked_array
+                Array with the masking applied, shape [N, D * len(lag_indices)]
 
 
             For example, given the following inputs
 
-            df = [
+            array = [
                 [1, 1, 1, 1],
                 [1, 1, 1, 1],
                 [1, 1, 1, 1],
@@ -163,78 +140,130 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             lag_indices = [1, 2, 5, 10]
             num_columns = 1
 
-            The resulting masked dataframe will be
+            The resulting masked output will be
 
-            masked_df = [
+            masked_array = [
                 [NaN, NaN, NaN, 1],
                 [1, 1, 1, 1],
                 [NaN, 1, 1, 1],
             ]
 
             """
-            if num_columns > 1:
-                lag_indices = np.repeat(lag_indices, num_columns)
-            mask = num_hidden[:, None] >= lag_indices[None]  # shape [len(num_hidden), len(lag_indices) * num_columns]
-            df[mask] = np.nan
-            return df
+            mask = num_hidden[:, None] >= lag_indices[None]  # shape [len(num_hidden), len(lag_indices)]
+            array[mask] = np.nan
+            return array
 
-        def get_lag_features_and_target(time_series: pd.DataFrame) -> pd.DataFrame:
-            """Construct the dataframe with lagged features and prediction target for a single time series.
+        def get_lags(
+            ts: np.ndarray,
+            lag_indices: np.ndarray,
+            prediction_length: int,
+            max_rows_per_item: int = 100_000,
+            mask: bool = False,
+        ) -> np.ndarray:
+            """Generate the matrix of lag features for a single time series.
 
             Parameters
             ----------
-            time_series
-                Dataframe containing a single time series, including target & past/known covariates.
-                Such time series can equivalently be obtained with data.loc[item_id] for some item_id in the dataset.
+            ts
+                Array with target or covariate values, shape [N]
+            lag_indices
+                Array with the lag indices to use for feature generation.
+            prediction_length
+                Length of the forecast horizon.
+            max_rows_per_item
+                Maximum number of rows to include in the feature matrix.
+                If max_rows_per_item < len(ts), the lag features will be generated only
+                for the *last* max_rows_per_item entries of ts.
+            mask
+                If True, a mask will be applied to some entries of the feature matrix,
+                mimicking the behavior at prediction time, when the ts values are not
+                known during the forecast horizon.
 
             Returns
             -------
             features
-                Feature dataframe, where each row corresponds to a single timestep of the input time series.
+                Array with lag features, shape [min(N, max_rows_per_item), len(lag_indices)]
             """
-            target_lags = get_lags(time_series[[self.target]], self._target_lag_indices)
-
-            # Starting from the end of the time series, mask the values as if the last `prediction_length` steps weren't observed
-            # This mimics what will happen at test time, when we simultaneously predict the next `prediction_length` values
-            num_windows = (len(time_series) - 1) // self.prediction_length
-            # We don't hide any past values for the first `remainder` values, otherwise the features will be all empty
-            remainder = len(time_series) - num_windows * self.prediction_length
-            num_hidden = np.concatenate([np.zeros(remainder), np.tile(np.arange(self.prediction_length), num_windows)])
-            target_lags = apply_mask(target_lags, num_hidden=num_hidden, lag_indices=self._target_lag_indices)
-            feature_dfs = [target_lags, time_series[[self.target]]]
-
-            if self.metadata.past_covariates_real:
-                past_covariates_lags = get_lags(
-                    time_series[self.metadata.past_covariates_real], self._past_covariates_lag_indices
-                )
-                past_covariates_lags = apply_mask(
-                    past_covariates_lags,
-                    num_hidden=num_hidden,
-                    lag_indices=self._past_covariates_lag_indices,
-                    num_columns=len(self.metadata.past_covariates_real),
-                )
-                feature_dfs.append(past_covariates_lags)
-
-            if self.metadata.known_covariates_real:
-                known_covariates_lags = get_lags(
-                    time_series[self.metadata.known_covariates_real], self._known_covariates_lag_indices
-                )
-                feature_dfs.append(known_covariates_lags)
-
-            features = pd.concat(feature_dfs, axis=1)
+            num_rows = min(max_rows_per_item, len(ts))
+            features = np.full([num_rows, len(lag_indices)], fill_value=np.nan)
+            for i in range(1, num_rows + 1):
+                target_idx = len(ts) - i
+                selected_lags = lag_indices[lag_indices <= target_idx]
+                features[num_rows - i, np.arange(len(selected_lags))] = ts[target_idx - selected_lags]
+            if mask:
+                num_windows = (len(ts) - 1) // prediction_length
+                # We don't hide any past values for the first `remainder` values, otherwise the features will be all empty
+                remainder = len(ts) - num_windows * prediction_length
+                num_hidden = np.concatenate([np.zeros(remainder), np.tile(np.arange(prediction_length), num_windows)])
+                features = apply_mask(features, num_hidden[-num_rows:], lag_indices)
             return features
 
-        df = pd.DataFrame(data).reset_index(level=TIMESTAMP)
-        timestamps = pd.DatetimeIndex(df.pop(TIMESTAMP))
-        features = df.groupby(level=ITEMID, sort=False, group_keys=False).apply(get_lag_features_and_target)
+        def get_lag_features(
+            all_series: List[np.ndarray],
+            lag_indices: np.ndarray,
+            prediction_length: int,
+            max_rows_per_item: int,
+            mask: bool,
+            name: str,
+        ):
+            """Generate lag features for all time series in the dataset.
 
-        for time_feat in self._time_features:
-            features[time_feat.__name__] = time_feat(timestamps)
+            See the docstring of get_lags for the description of the parameters.
+            """
+            lags_per_item = Parallel(n_jobs=-1)(
+                delayed(get_lags)(
+                    ts,
+                    lag_indices,
+                    prediction_length=prediction_length,
+                    max_rows_per_item=max_rows_per_item,
+                    mask=mask,
+                )
+                for ts in all_series
+            )
+            features = np.concatenate(lags_per_item)
+            return pd.DataFrame(features, columns=[f"{name}_lag_{idx}" for idx in lag_indices])
 
-        if last_k_values is not None:
-            features = features.groupby(level=ITEMID, sort=False, group_keys=False).tail(last_k_values)
+        df = pd.DataFrame(data)
+        all_series = [ts for _, ts in df.droplevel(TIMESTAMP).groupby(level=ITEMID, sort=False)]
+
+        feature_dfs = []
+        for column_name in df.columns:
+            if column_name == self.target:
+                mask = True
+                lag_indices = self._target_lag_indices
+            elif column_name in self.metadata.past_covariates_real:
+                mask = True
+                lag_indices = self._past_covariates_lag_indices
+            elif column_name in self.metadata.known_covariates_real:
+                mask = False
+                lag_indices = self._known_covariates_lag_indices
+            else:
+                raise ValueError(f"Unexpected column {column_name} is not among target or covariates.")
+
+            feature_dfs.append(
+                get_lag_features(
+                    [ts[column_name].to_numpy() for ts in all_series],
+                    lag_indices=lag_indices,
+                    prediction_length=self.prediction_length,
+                    max_rows_per_item=max_rows_per_item,
+                    mask=mask,
+                    name=column_name,
+                )
+            )
+
+        # Only the last max_rows_per_item entries for each item will be included in the feature matrix
+        target_with_index = df[self.target].groupby(level=ITEMID, sort=False).tail(max_rows_per_item)
+        feature_dfs.append(target_with_index.reset_index(drop=True))
+
+        timestamps = target_with_index.index.get_level_values(level=TIMESTAMP)
+        feature_dfs.append(
+            pd.DataFrame({time_feat.__name__: time_feat(timestamps) for time_feat in self._time_features})
+        )
+
+        features = pd.concat(feature_dfs, axis=1)
 
         if data.static_features is not None:
+            features.index = target_with_index.index.get_level_values(level=ITEMID)
             features = pd.merge(features, data.static_features, how="left", on=ITEMID, suffixes=(None, "_static_feat"))
 
         features.reset_index(inplace=True, drop=True)
@@ -277,7 +306,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
                     f"train_data and val_data must have the same freq (received {train_data.freq} and {val_data.freq})"
                 )
             val_data, _ = self._normalize_targets(val_data)
-            val_df = self._get_features_dataframe(val_data, last_k_values=self.prediction_length)
+            val_df = self._get_features_dataframe(val_data, max_rows_per_item=self.prediction_length)
             val_df = val_df[self._available_features]
 
             if len(val_df) > max_train_size:
@@ -331,7 +360,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
 
         data, scale_per_item = self._normalize_targets(data)
         data_extended = self._extend_index(data)
-        features = self._get_features_dataframe(data_extended, last_k_values=self.prediction_length)
+        features = self._get_features_dataframe(data_extended, max_rows_per_item=self.prediction_length)
         features = features[self._available_features]
 
         # Predict for batches (instead of using full dataset) to avoid high memory usage
