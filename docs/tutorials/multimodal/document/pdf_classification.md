@@ -86,7 +86,7 @@ print('The test acc: %.3f' % scores["accuracy"])
 Given an example PDF document, we can easily use the final model to predict the label:
 ```{.python .input}
 predictions = predictor.predict({DOC_PATH_COL: [test_data.iloc[0][DOC_PATH_COL]]})
-print(f"Ground-truth label: {test_data.iloc[1]['label']}, Prediction: {predictions}")
+print(f"Ground-truth label: {test_data.iloc[0]['label']}, Prediction: {predictions}")
 ```
 
 If probabilities of all categories are needed, you can call predict_proba:
