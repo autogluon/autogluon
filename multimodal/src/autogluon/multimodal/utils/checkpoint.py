@@ -37,7 +37,14 @@ def average_checkpoints(
         avg_state_dict = {}
         avg_counts = {}
         for per_path in checkpoint_paths:
-            state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
+            if os.path.isdir(per_path + "-dir"):  # deepspeed save checkpoints into a directory
+                from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
+
+                convert_zero_checkpoint_to_fp32_state_dict(per_path + "-dir", per_path)
+                shutil.rmtree(per_path + "-dir")
+                state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
+            else:
+                state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
             for k, v in state_dict.items():
                 if k not in avg_state_dict:
                     avg_state_dict[k] = v.clone().to(dtype=torch.float64)
@@ -174,7 +181,11 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
     """
 
     def _save_checkpoint(self, trainer, filepath):
-        trainer.save_checkpoint(filepath, self.save_weights_only)
+        # Deepspeed saves model and optimizer states in a shared state in a separate folder
+        if trainer.strategy.strategy_name == DEEPSPEED_STRATEGY:
+            trainer.save_checkpoint(filepath + "-dir", self.save_weights_only)
+        else:
+            trainer.save_checkpoint(filepath, self.save_weights_only)
 
     def _update_best_and_save(
         self,
@@ -187,17 +198,3 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
             current=current, trainer=trainer, monitor_candidates=monitor_candidates
         )
         self.to_yaml()
-
-        if (
-            trainer.strategy.strategy_name == DEEPSPEED_STRATEGY
-        ):  # Deepspeed saves model and optimizer states in a shared state in separate folder (even when using single GPU). Merging folder to single checkpoint file.
-            from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
-
-            current_save_path = self.kth_best_model_path
-            convert_zero_checkpoint_to_fp32_state_dict(current_save_path, current_save_path + ".tmp")
-            shutil.rmtree(current_save_path)
-            os.rename(current_save_path + ".tmp", current_save_path)
-            client_state = torch.load(current_save_path, map_location=torch.device("cpu"))
-            state_dict = client_state["state_dict"]
-            client_state["state_dict"] = state_dict
-            torch.save(client_state, current_save_path)

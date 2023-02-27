@@ -35,6 +35,7 @@ from .environment import (
     check_if_packages_installed,
     compute_inference_batch_size,
     compute_num_gpus,
+    get_available_devices,
     get_precision_context,
     infer_precision,
     is_interactive,

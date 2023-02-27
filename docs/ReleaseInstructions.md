@@ -54,6 +54,7 @@
 * Cut a release branch with format `0.x.y` (no v) - this branch is required to publish docs to versioned path
   * Clone from master branch
   * Add 1 commit to the release branch to remove pre-release warnings and update install instructions to remove `--pre`: https://github.com/autogluon/autogluon/commit/1d66194d4685b06e884bbf15dcb97580cbfb9261
+  * Update links to AG sub-modules website to be stable ones, i.e. cloud
   * Push release branch
   * Build the release branch docs in [CI](https://ci.gluon.ai/job/autogluon/).
   * Once CI passes, verify it's available at `https://auto.gluon.ai/0.x.y/index.html`

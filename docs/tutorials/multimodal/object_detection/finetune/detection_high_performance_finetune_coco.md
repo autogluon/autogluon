@@ -8,7 +8,7 @@ In this section, our goal is to fast finetune and evaluate a pretrained model
 on [Pothole dataset](https://www.kaggle.com/datasets/andrewmvd/pothole-detection) in COCO format.
 Pothole is a single object, i.e. `pothole`, detection dataset, containing 665 images with bounding box annotations
 for the creation of detection models and can work as POC/POV for the maintenance of roads.
-See :ref:`sec_automm_detection_prepare_voc` for how to prepare Pothole dataset.
+See :ref:`sec_automm_detection_prepare_pothole` for how to prepare Pothole dataset.
 
 To start, let's import MultiModalPredictor:
 

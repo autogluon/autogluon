@@ -28,7 +28,7 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
         ('category', ()): ['cat'],
         ('datetime', ()): ['datetime'],
         ('float', ()): ['float'],
-        ('int', ()): ['int'],
+        ('int', ()): ['int_bool', 'int'],
         ('object', ()): ['obj'],
         ('object', ('datetime_as_object',)): ['datetime_as_object'],
         ('object', ('text',)): ['text']
@@ -45,6 +45,7 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
             'text.special_ratio',
             'text.symbol_ratio. '
         ],
+        ('int', ('bool',)): ['int_bool'],
         ('int', ('datetime_as_int',)): [
             'datetime',
             'datetime.year',
@@ -131,7 +132,7 @@ def test_auto_ml_pipeline_feature_generator_raw_text(generator_helper, data_help
         ('category', ()): ['cat'],
         ('datetime', ()): ['datetime'],
         ('float', ()): ['float'],
-        ('int', ()): ['int'],
+        ('int', ()): ['int_bool', 'int'],
         ('object', ()): ['obj'],
         ('object', ('datetime_as_object',)): ['datetime_as_object'],
         ('object', ('text',)): ['text']
@@ -148,6 +149,7 @@ def test_auto_ml_pipeline_feature_generator_raw_text(generator_helper, data_help
             'text.special_ratio',
             'text.symbol_ratio. '
         ],
+        ('int', ('bool',)): ['int_bool'],
         ('int', ('datetime_as_int',)): [
             'datetime',
             'datetime.year',

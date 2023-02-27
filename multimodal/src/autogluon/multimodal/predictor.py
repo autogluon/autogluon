@@ -120,6 +120,7 @@ from .utils import (
     evaluate_coco,
     extract_from_output,
     filter_hyperparameters,
+    get_available_devices,
     get_config,
     get_detection_classes,
     get_local_pretrained_config_paths,
@@ -1342,10 +1343,11 @@ class MultiModalPredictor(ExportMixin):
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else None,
-                devices=num_gpus
-                if not use_ray_lightning and num_gpus > 0
-                else None,  # ray lightning requires not specifying gpus
-                auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
+                devices=get_available_devices(
+                    num_gpus=num_gpus,
+                    auto_select_gpus=config.env.auto_select_gpus,
+                    use_ray_lightning=use_ray_lightning,
+                ),
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
@@ -1653,8 +1655,7 @@ class MultiModalPredictor(ExportMixin):
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else None,
-                devices=num_gpus if num_gpus > 0 else None,
-                auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
+                devices=get_available_devices(num_gpus=num_gpus, auto_select_gpus=self._config.env.auto_select_gpus),
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
@@ -2315,7 +2316,14 @@ class MultiModalPredictor(ExportMixin):
         strict: bool = True,
     ):
         if state_dict is None:
-            state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
+            if os.path.isdir(path + "-dir"):  # deepspeed save checkpoints into a directory
+                from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
+
+                convert_zero_checkpoint_to_fp32_state_dict(path + "-dir", path)
+                shutil.rmtree(path + "-dir")
+                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
+            else:
+                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
         load_result = model.load_state_dict(state_dict, strict=strict)
         assert (

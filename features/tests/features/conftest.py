@@ -171,6 +171,22 @@ class DataHelper:
         return pd.to_datetime(DataHelper.generate_datetime_as_object_feature(), errors='coerce')
 
     @staticmethod
+    def generate_bool_feature_int() -> DataFrame:
+        return Series([0, 1, 1, 0, 0, 0, 1, 0, 1], name='int_bool').to_frame()
+
+    @staticmethod
+    def generate_bool_feature_with_nan() -> DataFrame:
+        return Series([None, 5, None, 5], name='edgecase_with_nan_bool').to_frame()
+
+    @staticmethod
+    def generate_bool_feature_edgecase() -> DataFrame:
+        return Series([None, None, None, np.nan, np.nan, np.nan, None, None, None], name='edgecase_bool').to_frame()
+
+    @staticmethod
+    def generate_bool_feature_extreme_edgecase() -> DataFrame:
+        return Series([5, "5", 5, 5, "5"], name='edgecase_extreme_bool').to_frame()
+
+    @staticmethod
     def generate_multi_feature_standard() -> DataFrame:
         df = pd.concat(
             [
@@ -201,6 +217,7 @@ class DataHelper:
     def generate_multi_feature_full() -> DataFrame:
         df = pd.concat(
             [
+                DataHelper.generate_bool_feature_int(),
                 DataHelper.generate_multi_feature_standard(),
                 DataHelper.generate_multi_feature_special(),
             ],

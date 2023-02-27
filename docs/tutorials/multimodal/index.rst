@@ -21,6 +21,7 @@ Here are some example use-cases of AutoMM:
 - Object detection. :doc:`[Tutorial] <object_detection/quick_start/quick_start_coco>` `[Example] <https://github.com/autogluon/autogluon/tree/master/examples/automm/object_detection>`_.
 - Extracting named entities. :doc:`[Tutorial] <text_prediction/ner>`.
 - Search for relevant text / image via text queries. :doc:`[Tutorial] <matching/index>`.
+- Document Classification (Experimental). :doc:`[Tutorial] <document/index>`.
 
 
 In the following, we decomposed the functionalities of AutoMM and prepared step-by-step guide for each functionality.

@@ -146,7 +146,9 @@ class MultimodalFusionMLP(AbstractMultimodalFusionModel):
         output = {}
         for per_model, per_adapter in zip(self.model, self.adapter):
             per_output = run_model(per_model, batch)
-            multimodal_features.append(per_adapter(per_output[per_model.prefix][FEATURES]))
+            multimodal_features.append(
+                per_adapter(per_output[per_model.prefix][FEATURES].to(per_adapter.weight.dtype))
+            )
             if self.loss_weight is not None:
                 per_output[per_model.prefix].update(
                     {WEIGHT: torch.tensor(self.loss_weight).to(multimodal_features[0])}
