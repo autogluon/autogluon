@@ -260,7 +260,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     @classmethod
     def _construct_pandas_frame_from_iterable_dataset(cls, iterable_dataset: Iterable) -> pd.DataFrame:
-        def load_single_df(item_id: int, ts: dict) -> pd.DataFrame:
+        def load_single_item(item_id: int, ts: dict) -> pd.DataFrame:
             start_timestamp = ts["start"]
             freq = start_timestamp.freq
             if isinstance(start_timestamp, pd.Period):
@@ -272,7 +272,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         cls._validate_iterable(iterable_dataset)
         all_ts = Parallel(n_jobs=-1)(
-            delayed(load_single_df)(item_id, ts) for item_id, ts in enumerate(iterable_dataset)
+            delayed(load_single_item)(item_id, ts) for item_id, ts in enumerate(iterable_dataset)
         )
         return pd.concat(all_ts)
 
