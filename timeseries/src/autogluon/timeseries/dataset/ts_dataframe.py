@@ -8,6 +8,7 @@ from typing import Any, Optional, Tuple, Type
 
 import numpy as np
 import pandas as pd
+from joblib.parallel import Parallel, delayed
 from pandas.core.internals import ArrayManager, BlockManager
 
 from autogluon.common.loaders import load_pd
@@ -259,19 +260,20 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     @classmethod
     def _construct_pandas_frame_from_iterable_dataset(cls, iterable_dataset: Iterable) -> pd.DataFrame:
-        cls._validate_iterable(iterable_dataset)
-
-        all_ts = []
-        for i, ts in enumerate(iterable_dataset):
+        def load_single_df(item_id: int, ts: dict) -> pd.DataFrame:
             start_timestamp = ts["start"]
             freq = start_timestamp.freq
             if isinstance(start_timestamp, pd.Period):
                 start_timestamp = start_timestamp.to_timestamp(how="S")
             target = ts["target"]
             datetime_index = tuple(pd.date_range(start_timestamp, periods=len(target), freq=freq))
-            idx = pd.MultiIndex.from_product([(i,), datetime_index], names=[ITEMID, TIMESTAMP])
-            ts_df = pd.Series(target, name="target", index=idx).to_frame()
-            all_ts.append(ts_df)
+            idx = pd.MultiIndex.from_product([(item_id,), datetime_index], names=[ITEMID, TIMESTAMP])
+            return pd.Series(target, name="target", index=idx).to_frame()
+
+        cls._validate_iterable(iterable_dataset)
+        all_ts = Parallel(n_jobs=-1)(
+            delayed(load_single_df)(item_id, ts) for item_id, ts in enumerate(iterable_dataset)
+        )
         return pd.concat(all_ts)
 
     @classmethod
