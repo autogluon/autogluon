@@ -231,8 +231,8 @@ maxdepth: 3
 hidden:
 ---
 
-tutorials/tabular/index
-tutorials/multimodal/index
+Tabular <tutorials/tabular/index>
+Multimodal <tutorials/multimodal/index>
 Time Series <tutorials/timeseries/index>
 tutorials/cloud_fit_deploy/index
 EDA <tutorials/eda/index>
@@ -260,10 +260,10 @@ maxdepth: 1
 hidden:
 ---
 
-api/_autogen/autogluon.tabular.TabularPredictor
-api/_autogen/autogluon.tabular.TabularDataset
-api/_autogen/autogluon.multimodal.MultiModalPredictor
-api/_autogen/autogluon.timeseries.TimeSeriesDataFrame
-api/_autogen/autogluon.timeseries.TimeSeriesPredictor
-api/_autogen/autogluon.common.features.feature_metadata.FeatureMetadata
+TabularPredictor <api/autogluon.tabular.TabularPredictor>
+TabularDataset <api/autogluon.tabular.TabularDataset>
+MultiModalPredictor <api/autogluon.multimodal.MultiModalPredictor>
+TimeSeriesDataFrame <api/autogluon.timeseries.TimeSeriesDataFrame>
+TimeSeriesPredictor <api/autogluon.timeseries.TimeSeriesPredictor>
+FeatureMetadata <api/autogluon.common.features.feature_metadata.FeatureMetadata>
 ```

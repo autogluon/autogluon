@@ -14,7 +14,7 @@ Yes!
 
 Yes! Most of the models used by AutoGluon support GPU training, including LightGBM, CatBoost, XGBoost, MXNet Neural Network, and FastAI Neural Network.
 
-To enable GPU training, specify in [predictor.fit](../../api/_autogen/autogluon.tabular.TabularPredictor.rst) the argument `num_gpus=SOME_VALUE`. This will enable GPU training for all models that support it. Multi-GPU training is still experimental.
+To enable GPU training, specify in [predictor.fit](../../api/autogluon.tabular.TabularPredictor.fit.rst) the argument `num_gpus=SOME_VALUE`. This will enable GPU training for all models that support it. Multi-GPU training is still experimental.
 
 For most of these models, CUDA will have to be installed and some models may need special installations such as LightGBM and MXNet to be compatible with GPU training. Refer to [installation instructions](../../install.md) for more details.
 
@@ -36,7 +36,7 @@ See ["If you encounter disk space issues" in the In Depth Tutorial](tabular-inde
 
 ## How can I reduce the time required for training?
 
-Specify the `time_limit` argument in [predictor.fit](../../api/_autogen/autogluon.tabular.TabularPredictor.rst) to the number of seconds you are willing to wait (longer time limits generally result in superior predictive performance). You may also try other settings of the `presets` argument in [predictor.fit](../../api/_autogen/autogluon.tabular.TabularPredictor.rst), and can also subsample your data for a quick trial run via `train_data.sample(n=SUBSAMPLE_SIZE)`. If a particular type of model is taking much longer to train on your data than the other types of models, you can tell AutoGluon not to train any models of this particular type by specifying its short-name in the `excluded_model_types` argument of `fit()`.
+Specify the `time_limit` argument in [predictor.fit](../../api/autogluon.tabular.TabularPredictor.fit.rst) to the number of seconds you are willing to wait (longer time limits generally result in superior predictive performance). You may also try other settings of the `presets` argument in [predictor.fit](../../api/autogluon.tabular.TabularPredictor.fit.rst), and can also subsample your data for a quick trial run via `train_data.sample(n=SUBSAMPLE_SIZE)`. If a particular type of model is taking much longer to train on your data than the other types of models, you can tell AutoGluon not to train any models of this particular type by specifying its short-name in the `excluded_model_types` argument of `fit()`.
 
 Since many of the strategies to reduce memory usage also reduce training times, also check out: ["If you encounter memory issues" in the In Depth Tutorial](tabular-indepth.ipynb).
 
@@ -167,7 +167,7 @@ To solely use custom data preprocessing and automatically apply your custom tran
 
 ## How can I differently weight the importance of training examples?
 
-You can specify the `sample_weight` and `weight_evaluation` [arguments](../../api/_autogen/autogluon.tabular.TabularPredictor.rst) when initializing a `TabularPredictor`.
+You can specify the `sample_weight` and `weight_evaluation` [arguments](../../api/autogluon.tabular.TabularPredictor.rst) when initializing a `TabularPredictor`.
 
 ## How does missing value imputation work in AutoGluon?
 
@@ -214,4 +214,4 @@ To address it, either cleanup your workspace, or 1) shutdown your Notebook insta
 
 ## Issues not addressed here
 
-First search if your issue is addressed in the [tutorials](index.md), [examples](https://github.com/autogluon/autogluon/tree/master/examples/tabular), [documentation](../../api/_autogen/autogluon.tabular.TabularPredictor.rst), or [Github issues](https://github.com/autogluon/autogluon/issues) (search both Closed and Open issues). If it is not there, please open a [new Github Issue](https://github.com/autogluon/autogluon/issues/new) and clearly state your issue. If you have a bug, please include: your code (call `fit(..., verbosity=4)` which will print more details), the output printed during the code execution, and information about your operating system, Python version, and installed packages (output of `pip freeze`).
+First search if your issue is addressed in the [tutorials](index.md), [examples](https://github.com/autogluon/autogluon/tree/master/examples/tabular), [documentation](../../api/autogluon.tabular.TabularPredictor.rst), or [Github issues](https://github.com/autogluon/autogluon/issues) (search both Closed and Open issues). If it is not there, please open a [new Github Issue](https://github.com/autogluon/autogluon/issues/new) and clearly state your issue. If you have a bug, please include: your code (call `fit(..., verbosity=4)` which will print more details), the output printed during the code execution, and information about your operating system, Python version, and installed packages (output of `pip freeze`).

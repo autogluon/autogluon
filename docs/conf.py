@@ -16,11 +16,15 @@ extensions = [
     'sphinx_togglebutton',    # sphinx-togglebutton.readthedocs.io
     'sphinx.ext.autodoc',     # www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
     'sphinx.ext.autosummary', # www.sphinx-doc.org/en/master/usage/extensions/autosummary.html
+    'sphinx.ext.napoleon',    # www.sphinx-doc.org/en/master/usage/extensions/napoleon.html
     'sphinx.ext.viewcode',    # www.sphinx-doc.org/en/master/usage/extensions/viewcode.html
     ]
 
 # See https://myst-parser.readthedocs.io/en/latest/syntax/optional.html
 myst_enable_extensions = ['colon_fence', 'deflist', 'dollarmath', 'html_image', 'substitution']
+
+autosummary_generate = True
+numpydoc_show_class_members = False
 
 nb_execution_mode = 'force'
 # nb_execution_raise_on_error=True
@@ -40,7 +44,7 @@ if len(nb_dirs_to_exec) > 0:
         nb_execution_excludepatterns.append(os.path.join(nb_dir, '*.ipynb'))
 
 templates_path = ['_templates']
-exclude_patterns = ['_build', 'README.md', 'ReleaseInstructions.md', 'jupyter_execute']
+exclude_patterns = ['_build', '_templates', 'olds', 'README.md', 'ReleaseInstructions.md', 'jupyter_execute']
 master_doc = 'index'
 numfig = True
 numfig_secnum_depth = 2
