@@ -53,12 +53,6 @@ For standard datasets that are represented as tables (stored as CSV file, parque
   How to train models with GPU support.
 :::
 
-:::{grid-item-card} Interpretable rule-based modeling
-  :link: advanced/tabular-interpretability.html
-
-  Fitting interpretable models to data table for understanding data and predictions.
-:::
-
 :::{grid-item-card} Adding a Custom Metric
   :link: advanced/tabular-custom-metric.html
 
