@@ -88,10 +88,11 @@ hyperparameter_config_dict = dict(
     # Hyperparameters intended to find an interpretable model which doesn't sacrifice predictive accuracy
     interpretable={
         'IM_RULEFIT': [{'max_rules': 7}, {'max_rules': 12}, {'max_rules': 18}],
-        'IM_GREEDYTREE': [{'max_leaf_nodes': 7, 'max_leaf_nodes': 18}],
-        'IM_BOOSTEDRULES': [{'n_estimators': 5}, {'n_estimators': 10}],
         'IM_FIGS': [{'max_rules': 6}, {'max_rules': 10}, {'max_rules': 15}],
-        'IM_HSTREE': [{'max_rules': 6}, {'max_rules': 12}, {'max_rules': 18}],
+        # Note: Below are commented out because they are not meaningfully interpretable via the existing API
+        # 'IM_GREEDYTREE': [{'max_leaf_nodes': 7, 'max_leaf_nodes': 18}],
+        # 'IM_BOOSTEDRULES': [{'n_estimators': 5}, {'n_estimators': 10}],
+        # 'IM_HSTREE': [{'max_rules': 6}, {'max_rules': 12}, {'max_rules': 18}],
     }
 )
 

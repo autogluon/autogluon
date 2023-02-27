@@ -34,7 +34,7 @@ tabular_presets_dict = dict(
     ignore_text={'_feature_generator_kwargs': {'enable_text_ngram_features': False, 'enable_text_special_features': False, 'enable_raw_text_features': False}},
 
     # Fit only interpretable models.
-    interpretable={'auto_stack': False, 'hyperparameters': 'interpretable'},
+    interpretable={'auto_stack': False, 'hyperparameters': 'interpretable', 'fit_weighted_ensemble': False},
 
     # ------------------------------------------
     # ------------------------------------------
