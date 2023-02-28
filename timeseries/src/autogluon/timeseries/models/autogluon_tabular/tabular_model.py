@@ -50,7 +50,6 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
     }
 
     PREDICTION_BATCH_SIZE = 100_000
-    MAX_ROWS_PER_ITEM = 100_000
 
     TIMESERIES_METRIC_TO_TABULAR_METRIC = {
         "MASE": "mean_absolute_error",
@@ -98,7 +97,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
     def _get_features_dataframe(
         self,
         data: TimeSeriesDataFrame,
-        max_rows_per_item: int = 100_000,
+        max_rows_per_item: Optional[int] = None,
     ) -> pd.DataFrame:
         """Generate a feature matrix used by TabularPredictor.
 
@@ -107,7 +106,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         data : TimeSeriesDataFrame
             Dataframe containing features derived from time index & past time series values, as well as the target.
         max_rows_per_item: int, optional
-            Features will be generated only for the last `max_rows_per_item` timesteps of each time series.
+            If given, features will be generated only for the last `max_rows_per_item` timesteps of each time series.
         """
 
         def apply_mask(array: np.ndarray, num_hidden: np.ndarray, lag_indices: np.ndarray) -> pd.DataFrame:
@@ -210,6 +209,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
 
             See the docstring of get_lags for the description of the parameters.
             """
+            # TODO: Expose n_jobs to the user as a hyperparameter
             lags_per_item = Parallel(n_jobs=-1)(
                 delayed(get_lags)(
                     ts,
@@ -225,6 +225,8 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
 
         df = pd.DataFrame(data)
         all_series = [ts for _, ts in df.droplevel(TIMESTAMP).groupby(level=ITEMID, sort=False)]
+        if max_rows_per_item is None:
+            max_rows_per_item = data.num_timesteps_per_item().max()
 
         feature_dfs = []
         for column_name in df.columns:
