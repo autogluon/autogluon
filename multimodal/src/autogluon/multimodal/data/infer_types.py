@@ -317,6 +317,7 @@ def is_document_image_column(
         # Sample to speed-up type inference
         data = data.sample(n=sample_m, random_state=0)
     failure_count = 0
+    exception = None
     for images in data:
         success = False
         if not isinstance(images, list):
@@ -328,13 +329,16 @@ def is_document_image_column(
                     words = pytesseract.image_to_string(doc_image)
                     words_len.append(len(words))
             except Exception as e:
-                logger.debug(f"Exception {e} found dealing with {per_image}.")
+                exception = e
                 words_len.append(0)
                 success = False
                 break
             success = True
         if not success:
             failure_count += 1
+
+    if exception is not None:
+        logger.debug(f"{e} found when dealing with images.")
 
     if (1 - failure_count / sample_m) >= 0.8:
         logger.debug(f"Average length of words of this dataset is {sum(words_len) / len(words_len)}.")
