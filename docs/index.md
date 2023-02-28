@@ -98,10 +98,9 @@ predictions = predictor.predict(test_data)
 
 ```python
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.vision import ImageDataset
+from autogluon.multimodal.utils.misc import shopee_dataset
 
-data_zip = 'https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip'
-train_data, _, test_data = ImageDataset.from_folders(data_zip)
+train_data, test_data = shopee_dataset('./automm_shopee_data')
 
 predictor = MultiModalPredictor(label='label').fit(train_data=train_data)
 predictions = predictor.predict(test_data)
