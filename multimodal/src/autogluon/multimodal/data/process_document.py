@@ -286,22 +286,23 @@ class DocumentProcessor:
                     pix = first_page.get_pixmap(matrix=fitz.Matrix(1, 1))
                     # Convert pdf into PIL images.
                     with PIL.Image.frombytes(image_mode, [pix.width, pix.height], pix.samples) as doc_image:
+                        doc_image = doc_image.convert(image_mode)
                         words, normalized_word_boxes = self.get_ocr_features(per_col_image_features[0], doc_image)
                 else:
                     # Process document image.
                     with PIL.Image.open(per_col_image_features[0]) as doc_image:
+                        doc_image = doc_image.convert(image_mode)
                         words, normalized_word_boxes = self.get_ocr_features(per_col_image_features[0], doc_image)
 
             except Exception as e:
                 if self.missing_value_strategy.lower() == "zero":
                     logger.debug(f"Using a zero image due to '{e}'")
                     doc_image = PIL.Image.new(image_mode, (self.size, self.size), color=0)
+                    doc_image = doc_image.convert(image_mode)
                     words = ""  # empty words
                     normalized_word_boxes = [self.pad_token_box]
                 else:
                     raise e
-
-            doc_image = doc_image.convert(image_mode)
 
             if is_training:
                 doc_image = self.train_processor(doc_image)

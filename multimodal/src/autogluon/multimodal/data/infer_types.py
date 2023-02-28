@@ -317,6 +317,7 @@ def is_document_image_column(
         # Sample to speed-up type inference
         data = data.sample(n=sample_m, random_state=0)
     failure_count = 0
+    exception = None
     for images in data:
         success = False
         if not isinstance(images, list):
@@ -328,6 +329,7 @@ def is_document_image_column(
                     words = pytesseract.image_to_string(doc_image)
                     words_len.append(len(words))
             except Exception as e:
+                exception = e
                 words_len.append(0)
                 success = False
                 break
