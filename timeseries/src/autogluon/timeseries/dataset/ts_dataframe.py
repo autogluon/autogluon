@@ -259,7 +259,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"all entries in index `{ITEMID}` must be of integer or string dtype")
 
     @classmethod
-    def _construct_pandas_frame_from_iterable_dataset(cls, iterable_dataset: Iterable) -> pd.DataFrame:
+    def _construct_pandas_frame_from_iterable_dataset(
+        cls, iterable_dataset: Iterable, num_cpus: int = -1
+    ) -> pd.DataFrame:
         def load_single_item(item_id: int, ts: dict) -> pd.DataFrame:
             start_timestamp = ts["start"]
             freq = start_timestamp.freq
@@ -271,13 +273,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
             return pd.Series(target, name="target", index=idx).to_frame()
 
         cls._validate_iterable(iterable_dataset)
-        all_ts = Parallel(n_jobs=-1)(
+        all_ts = Parallel(n_jobs=num_cpus)(
             delayed(load_single_item)(item_id, ts) for item_id, ts in enumerate(iterable_dataset)
         )
         return pd.concat(all_ts)
 
     @classmethod
-    def from_iterable_dataset(cls, iterable_dataset: Iterable) -> pd.DataFrame:
+    def from_iterable_dataset(cls, iterable_dataset: Iterable, num_cpus: int = -1) -> pd.DataFrame:
         """Construct a ``TimeSeriesDataFrame`` from an Iterable of dictionaries each of which
         represent a single time series.
 
@@ -296,13 +298,15 @@ class TimeSeriesDataFrame(pd.DataFrame):
                     {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq='D')},
                     {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq='D')}
                 ]
+        num_cpus : int, default = -1
+            Number of CPU cores used to process the iterable dataset in parallel. Set to -1 to use all cores.
 
         Returns
         -------
         ts_df: TimeSeriesDataFrame
             A data frame in TimeSeriesDataFrame format.
         """
-        return cls(cls._construct_pandas_frame_from_iterable_dataset(iterable_dataset))
+        return cls(cls._construct_pandas_frame_from_iterable_dataset(iterable_dataset, num_cpus=num_cpus))
 
     @classmethod
     def _load_data_frame_from_file(cls, path: str) -> pd.DataFrame:
