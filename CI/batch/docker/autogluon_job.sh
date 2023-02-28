@@ -17,6 +17,7 @@ SAFE_TO_USE_SCRIPT=$7
 
 # Copy the workflow from master branch
 git clone https://github.com/autogluon/autogluon.git
+git checkout ci_pyodide
 WORKFLOW_SCRIPTS=autogluon/.github/workflow_scripts
 if [ -d "$WORKFLOW_SCRIPTS" ]; then
     cp -R autogluon/.github/workflow_scripts .
