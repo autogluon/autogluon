@@ -7,7 +7,7 @@ from datasets import load_dataset
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics.pairwise import paired_cosine_distances
 
-from autogluon.multimodal import MultiModalOnnxPredictor, MultiModalPredictor
+from autogluon.multimodal import MultiModalPredictor
 
 
 def evaluate(predictor, df, onnx_session=None):
@@ -102,12 +102,11 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     load_proba = loaded_predictor.predict_proba({"image": [image_path_test]})
 
     # convert
-    onnx_path = loaded_predictor.export_onnx(path=model_path, data={"image": [image_path_export]})
+    onnx_module = loaded_predictor.export_onnx({"image": [image_path_export]})
 
-    # TODO: Test with CUDA EP when we upgrade CUDA version to 11.7 (along with pytorch v1.13.1).
-    # onnxruntime-gpu v1.13.1 require CUDA version >=11.6
-    onnx_predictor = MultiModalOnnxPredictor.load(model_path, providers=["CPUExecutionProvider"])
-    onnx_proba = onnx_predictor.predict_proba({"image": [image_path_test]})
+    # simply replace _model in the loaded predictor to predict with onnxruntime
+    loaded_predictor._model = onnx_module
+    onnx_proba = loaded_predictor.predict_proba({"image": [image_path_test]})
 
     # assert allclose
     np.testing.assert_allclose(load_proba, onnx_proba, rtol=1e-3, atol=1e-3)
