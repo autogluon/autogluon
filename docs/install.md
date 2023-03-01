@@ -162,28 +162,9 @@ AutoGluon requires Python version 3.8, 3.9, or 3.10 and is available on Linux, M
 ::::::
 
 :::{dropdown} Install specific AutoGluon modules and dependencies
-By default, AutoGluon installs all modules. You can accelerate installation by installing specific modules:
 
-```bash
-pip install autogluon.tabular
+```{include} install-modules.md
 ```
-
-You can also specify optional dependencies:
-
-```bash
-pip install autogluon.tabular[lightgbm,catboost]
-```
-
-Modules and optional dependencies:
-
-1. `autogluon.tabular`: functionality for tabular data (TabularPredictor)
-   - Optional dependencies included by default: `lightgbm`,`catboost`,`xgboost`,`fastai`.
-   - Optional dependencies not included by default: `vowpalwabbit`, `skex`. The latter will speedup KNN training and inference on CPU by 25x.
-1. `autogluon.multimodal`: functionality for image, text, and multimodal data (MultiModalPredictor)
-1. `autogluon.timeseries`: functionality for time series data forecasting
-1. `autogluon.eda`: functionality for exploratory data analysis
-1. `autogluon.core`: core functionality including HPO support
-1. `autogluon.features`: functionality for feature generation and preprocessing
 
 :::
 
