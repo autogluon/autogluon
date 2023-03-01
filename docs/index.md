@@ -260,7 +260,7 @@ hidden:
 ---
 
 TabularPredictor <api/autogluon.tabular.TabularPredictor>
-TabularDataset <api/autogluon.tabular.TabularDataset>
+TabularDataset <api/autogluon.core.TabularDataset>
 MultiModalPredictor <api/autogluon.multimodal.MultiModalPredictor>
 TimeSeriesDataFrame <api/autogluon.timeseries.TimeSeriesDataFrame>
 TimeSeriesPredictor <api/autogluon.timeseries.TimeSeriesPredictor>

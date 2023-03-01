@@ -9,8 +9,14 @@ API
     :template: custom_class.rst
 
     TabularPredictor
-    TabularDataset
 
+.. currentmodule:: autogluon.core
+
+.. autosummary::
+    :toctree: api
+    :template: custom_class.rst
+
+    TabularDataset
 
 .. currentmodule:: autogluon.multimodal
 
