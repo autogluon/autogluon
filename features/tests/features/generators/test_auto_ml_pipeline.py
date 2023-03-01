@@ -120,8 +120,6 @@ def test_auto_ml_pipeline_feature_generator_raw_text(generator_helper, data_help
 
     toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=10, dtype=np.uint8)
 
-    from autogluon.common.utils.log_utils import set_logger_verbosity
-    set_logger_verbosity(3)
     generator = AutoMLPipelineFeatureGenerator(enable_raw_text_features=True, vectorizer=toy_vectorizer)
 
     for generator_stage in generator.generators:
