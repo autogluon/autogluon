@@ -518,7 +518,8 @@ class AbstractFeatureGenerator:
                 self._feature_metadata_before_post = self._feature_metadata_before_post.keep_features(features_to_keep)
 
             self.feature_metadata_in = self.feature_metadata_in.remove_features(features=features)
-            self.features_in = self.feature_metadata_in.get_features()
+            features_in_new = set(self.feature_metadata_in.get_features())
+            self.features_in = [f for f in self.features_in if f in features_in_new]
             if self._pre_astype_generator:
                 self._pre_astype_generator._remove_features_out(features)
 

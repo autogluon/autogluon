@@ -103,9 +103,9 @@ def test_bulk_feature_generator(generator_helper, data_helper):
     )
 
     assert list(output_data.columns) == [
+        'int_bool',
         'int',
         'float',
-        'int_bool',  # Notably, this is now the 3rd feature rather than the 1st because we used "v2" which shifts the position of the boolean feature
         'obj',
         'cat',
         'datetime',
