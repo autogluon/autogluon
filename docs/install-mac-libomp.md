@@ -6,6 +6,7 @@ AutoGluon dependency LightGBM uses `libomp` for multi-threading. If you install 
 brew uninstall -f libomp
 wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
 brew install libomp.rb
+rm libomp.rb
 ```
 :::
 
