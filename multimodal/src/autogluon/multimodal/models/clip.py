@@ -169,6 +169,7 @@ class CLIPForImageText(nn.Module):
                 return_dict=True,
             )
             text_features = self.model.text_projection(text_outputs.pooler_output)  # (b, num_features)
+            last_hidden_state = text_outputs[0]
 
             # normalized features
             text_features = text_features / text_features.norm(dim=-1, keepdim=True)
@@ -177,7 +178,7 @@ class CLIPForImageText(nn.Module):
             text_column_features, text_column_feature_masks = get_column_features(
                 batch=batch,
                 column_name_prefix=self.text_column_prefix,
-                features=self.model.text_projection(text_outputs.last_hidden_state),
+                features=self.model.text_projection(last_hidden_state),
                 valid_lengths=text_valid_length,
                 cls_feature=text_features,
             )

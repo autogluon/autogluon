@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -134,14 +134,14 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
             Mapping the named entities to task specific labels.
         word_offsets : torch.Tensor
             Locations of the named entities.
-        text_column_names : list of torch.Tensor, optional
+        text_column_names : list of str, optional
             Names of the text columns.
         text_column_indices : list of torch.Tensor, optional
             Start and stop indices of the text columns.
 
         Returns
         -------
-            A tuple that contains (sequence_output, logits, logits_label, token_word_mapping, word_offsets, column_features, column_feature_masks)
+            A tuple that contains (last_hidden_state, logits, logits_label, token_word_mapping, word_offsets, column_features, column_feature_masks)
         """
         if self.disable_seg_ids:
             text_segment_ids = None
@@ -164,13 +164,13 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
                 attention_mask=text_masks,
             )
 
-        sequence_output = outputs.last_hidden_state
-        batch_size, max_len, feat_dim = sequence_output.shape
+        last_hidden_state = outputs[0]
+        batch_size, max_len, feat_dim = last_hidden_state.shape
         valid_output = torch.zeros(batch_size, max_len, feat_dim, dtype=torch.float32)
 
-        pooled_features = outputs.last_hidden_state[:, 0, :]
+        pooled_features = last_hidden_state[:, 0, :]
 
-        logits = self.head(sequence_output)
+        logits = self.head(last_hidden_state)
 
         logits_label = torch.argmax(F.log_softmax(logits, dim=-1), dim=-1)
 
@@ -185,16 +185,16 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
         column_features, column_feature_masks = get_column_features(
             batch=batch,
             column_name_prefix=self.text_column_prefix,
-            features=outputs.last_hidden_state,
+            features=last_hidden_state,
             valid_lengths=text_valid_length,
             cls_feature=pooled_features,
         )
 
         if column_features == {} or column_feature_masks == {}:
-            return sequence_output, logits, logits_label, token_word_mapping, word_offsets
+            return last_hidden_state, logits, logits_label, token_word_mapping, word_offsets
         else:
             return (
-                sequence_output,
+                last_hidden_state,
                 logits,
                 logits_label,
                 token_word_mapping,
@@ -205,13 +205,13 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
 
     def get_output_dict(
         self,
-        sequence_output: torch.Tensor,
+        last_hidden_state: torch.Tensor,
         logits: torch.Tensor,
         logits_label: torch.Tensor,
         token_word_mapping: torch.Tensor,
         word_offsets: torch.Tensor,
-        column_features: Optional[List[torch.Tensor]] = None,
-        column_feature_masks: Optional[List[torch.Tensor]] = None,
+        column_features: Optional[Dict[str, torch.Tensor]] = None,
+        column_feature_masks: Optional[Dict[str, torch.Tensor]] = None,
     ):
         ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
         if column_features != None:
@@ -221,7 +221,7 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
         ret.update(
             {
                 LOGITS: logits,
-                FEATURES: sequence_output,  # input of ner fusion model
+                FEATURES: last_hidden_state,  # input of ner fusion model
                 NER_ANNOTATION: logits_label,
                 TOKEN_WORD_MAPPING: token_word_mapping,
                 WORD_OFFSETS: word_offsets,

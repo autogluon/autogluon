@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import torch
 from torch import nn
@@ -158,7 +158,7 @@ class HFAutoModelForTextPrediction(nn.Module):
             Indices of input sequence segments.
         text_valid_length : torch.Tensor
             Valid length of the input text sequence.
-        text_column_names : list of torch.Tensor, optional
+        text_column_names : list of str, optional
             Names of the text columns.
         text_column_indices : list of torch.Tensor, optional
             Start and stop indices of the text columns.
@@ -199,10 +199,11 @@ class HFAutoModelForTextPrediction(nn.Module):
                     input_ids=text_token_ids,
                     attention_mask=text_masks,
                 )
+        last_hidden_state = outputs[0]
         if self.pooling_mode == "cls":
-            pooled_features = outputs.last_hidden_state[:, 0, :]
+            pooled_features = last_hidden_state[:, 0, :]
         elif self.pooling_mode == "mean":
-            pooled_features = (outputs.last_hidden_state * text_masks.unsqueeze(-1)).sum(1)
+            pooled_features = (last_hidden_state * text_masks.unsqueeze(-1)).sum(1)
             sum_mask = text_masks.unsqueeze(-1).sum(1)
             sum_mask = torch.clamp(sum_mask, min=1e-9)
             pooled_features = pooled_features / sum_mask
@@ -210,7 +211,6 @@ class HFAutoModelForTextPrediction(nn.Module):
             raise NotImplementedError(f"Pooling mode={self.pooling_mode} is not supported.")
 
         logits = self.head(pooled_features)
-        last_hidden_state = outputs.last_hidden_state
 
         batch = {
             self.text_token_ids_key: text_token_ids,
@@ -219,7 +219,8 @@ class HFAutoModelForTextPrediction(nn.Module):
         }
         if text_column_names:
             assert len(text_column_names) == len(text_column_indices), "invalid text column inputs"
-            batch.update(**dict(zip(text_column_names, text_column_indices)))
+            for idx, name in enumerate(text_column_names):
+                batch[name] = text_column_indices[idx]
         column_features, column_feature_masks = get_column_features(
             batch=batch,
             column_name_prefix=self.text_column_prefix,
@@ -237,8 +238,8 @@ class HFAutoModelForTextPrediction(nn.Module):
         self,
         pooled_features: torch.Tensor,
         logits: torch.Tensor,
-        column_features: Optional[List[torch.Tensor]] = None,
-        column_feature_masks: Optional[List[torch.Tensor]] = None,
+        column_features: Optional[Dict[str, torch.Tensor]] = None,
+        column_feature_masks: Optional[Dict[str, torch.Tensor]] = None,
     ):
         ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
         if column_features != None:

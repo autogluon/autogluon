@@ -186,12 +186,13 @@ class DocumentTransformer(HFAutoModelForTextPrediction):
         text_masks = batch[self.text_attention_mask_key]
 
         outputs = self.model(**input_data)
+        last_hidden_state = outputs[0]
 
         if self.pooling_mode == "cls":
-            pooled_features = outputs.last_hidden_state[:, 0, :]
+            pooled_features = last_hidden_state[:, 0, :]
         elif self.pooling_mode == "mean":
             # In some models, last_hidden_state is the concatenation of document image features and text features.
-            pooled_features = outputs.last_hidden_state.mean(1)
+            pooled_features = last_hidden_state.mean(1)
         else:
             raise NotImplementedError(f"Pooling mode={self.pooling_mode} is not supported.")
 
@@ -201,7 +202,7 @@ class DocumentTransformer(HFAutoModelForTextPrediction):
         column_features, column_feature_masks = get_column_features(
             batch=batch,
             column_name_prefix=self.text_column_prefix,
-            features=outputs.last_hidden_state,
+            features=last_hidden_state,
             valid_lengths=sum(text_masks),
             cls_feature=pooled_features,
         )
