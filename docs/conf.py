@@ -74,7 +74,7 @@ html_sidebars = {
     ]
 }
 
-html_favicon = '_static/favicon.png'
+html_favicon = '_static/favicon.ico'
 
 html_static_path = ['_static']
 html_css_files = ['custom.css']
