@@ -8,6 +8,8 @@ __all__ = ["XShiftSummary"]
 
 
 class XShiftSummary(AbstractVisualization, JupyterMixin):
+    MAX_FEATURES_TO_DISPLAY = 5
+
     """
     Summarize the results of the XShiftDetector.  It will render the results as markdown in jupyter.
     This will contain the detection status (True if detected), the details of the hypothesis test (test
@@ -44,7 +46,7 @@ class XShiftSummary(AbstractVisualization, JupyterMixin):
                 self.render_markdown(
                     "**Feature importances**: The variables that are the most responsible for this shift are those with high feature importance:\n\n"
                 )
-                self.display_obj(fi)
+                self.display_obj(fi[: self.MAX_FEATURES_TO_DISPLAY])
 
     def can_handle(self, state: AnalysisState) -> bool:
         return self.at_least_one_key_must_be_present(state, "xshift_results")

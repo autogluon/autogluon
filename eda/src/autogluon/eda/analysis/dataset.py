@@ -86,7 +86,9 @@ class Sampler(AbstractAnalysis):
                 arg = "n"
                 if self.sample is not None and isinstance(self.sample, float):
                     arg = "frac"
-                self.args[ds] = df.sample(**{arg: self.sample}, random_state=0)
+                if len(df) > self.sample:
+                    df = df.sample(**{arg: self.sample}, random_state=0)
+                self.args[ds] = df
 
 
 class ProblemTypeControl(AbstractAnalysis):

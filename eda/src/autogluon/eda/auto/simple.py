@@ -61,9 +61,9 @@ __all__ = [
 
 
 def analyze(
-    train_data=None,
-    test_data=None,
-    val_data=None,
+    train_data: Optional[pd.DataFrame] = None,
+    test_data: Optional[pd.DataFrame] = None,
+    val_data: Optional[pd.DataFrame] = None,
     model=None,
     label: Optional[str] = None,
     state: Union[None, dict, AnalysisState] = None,
@@ -245,14 +245,17 @@ def _is_single_numeric_variable(x, y, hue, x_type):
 def quick_fit(
     train_data: pd.DataFrame,
     label: str,
+    test_data: Optional[pd.DataFrame] = None,
     path: Optional[str] = None,
     val_size: float = 0.3,
     problem_type: str = "auto",
     sample: Union[None, int, float] = None,
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
+    save_model_to_state: bool = False,
     verbosity: int = 0,
     show_feature_importance_barplots: bool = False,
+    estimator_args: Optional[Dict[str, Dict[str, Any]]] = None,
     fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
     chart_args: Optional[Dict[str, Dict[str, Any]]] = None,
     **fit_args,
@@ -302,6 +305,9 @@ def quick_fit(
         pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
     return_state: bool, default = False
         return state if `True`
+    save_model_to_state: bool, default = False,
+        save fitted model into `state` under `model` key.
+        This functionality might be helpful in cases when the fitted model could be usable for other purposes (i.e. imputers)
     verbosity: int, default = 0
         Verbosity levels range from 0 to 4 and control how much information is printed.
         Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
@@ -309,7 +315,9 @@ def quick_fit(
         where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
     show_feature_importance_barplots: bool, default = False
         if `True`, then barplot char will ba added with feature importance visualization
-    fit_args
+    estimator_args: Optional[Dict[str, Dict[str, Any]]], default = None,
+        args to pass into the estimator constructor
+    fit_args: Optional[Dict[str, Dict[str, Any]]], default = None,
         kwargs to pass into `TabularPredictor` fit
     fig_args: Optional[Dict[str, Any]], default = None,
         figures args for vizualizations; key == component; value = dict of kwargs for component figure
@@ -353,10 +361,18 @@ def quick_fit(
     fig_args = get_empty_dict_if_none(fig_args)
     chart_args = get_empty_dict_if_none(chart_args)
 
+    estimator_args = get_empty_dict_if_none(estimator_args)
     fit_args = get_default_estimator_if_not_specified(fit_args)
+
+    if "path" not in estimator_args:
+        estimator_args["path"] = path  # type: ignore
+
+    if (test_data is not None) and (label not in test_data.columns):
+        test_data = None
 
     return analyze(
         train_data=train_data,
+        test_data=test_data,
         label=label,
         sample=sample,
         state=state,
@@ -367,9 +383,10 @@ def quick_fit(
                 val_size=val_size,
                 children=[
                     AutoGluonModelQuickFit(
-                        estimator_args={"path": path},
+                        estimator_args=estimator_args,
                         verbosity=verbosity,
                         problem_type=problem_type,
+                        save_model_to_state=save_model_to_state,
                         children=[
                             AutoGluonModelEvaluator(),
                         ],
@@ -491,6 +508,7 @@ def dataset_overview(
             DatasetSummary(),
             MissingValuesAnalysis(),
             RawTypesAnalysis(),
+            VariableTypeAnalysis(),
             SpecialTypesAnalysis(),
             ApplyFeatureGenerator(category_to_numbers=True, children=[FeatureDistanceAnalysis()]),
         ],
@@ -512,17 +530,15 @@ def dataset_overview(
 
             interactions: List[AbstractVisualization] = []
             for n in nodes[1:]:
-                interactions.append(MarkdownSectionComponent(f"Feature interaction between `{nodes[0]}`/`{n}`"))
-                interactions.append(FeatureInteractionVisualization(key=f"{nodes[0]}:{n}"))
+                if state.variable_type.train_data[n] != "category":  # type: ignore
+                    interactions.append(MarkdownSectionComponent(f"Feature interaction between `{nodes[0]}`/`{n}`"))
+                    interactions.append(FeatureInteractionVisualization(key=f"{nodes[0]}:{n}"))
 
             analyze(
                 train_data=train_data,
                 state=state,
                 anlz_facets=[FeatureInteraction(key=f"{nodes[0]}:{n}", x=nodes[0], y=n) for n in nodes[1:]],
                 viz_facets=[
-                    MarkdownSectionComponent(
-                        f'**Near duplicate group analysis: `{"`, `".join(nodes)}` - distance `{group["distance"]:.4f}`**'
-                    ),
                     *interactions,
                 ],
             )
@@ -615,7 +631,7 @@ def covariate_shift_detection(
     if xshift_results.detection_status:
         fi = xshift_results.feature_importance
         fi = fi[fi.p_value <= xshift_results.pvalue_threshold]
-        vars_to_plot = fi.index.tolist()
+        vars_to_plot = fi.index.tolist()[: XShiftSummary.MAX_FEATURES_TO_DISPLAY]
         if len(vars_to_plot) > 0:
             _train_data = train_data[vars_to_plot].copy()
             _train_data["__dataset__"] = "train_data"

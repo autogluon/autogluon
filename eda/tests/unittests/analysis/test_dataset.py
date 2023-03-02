@@ -52,6 +52,26 @@ def test_Sampler():
     assert state.ns_no_sampler.sample_size is None
 
 
+def test_Sampler__window_larger_than_dataset():
+    df_train = pd.DataFrame(np.random.randint(0, 100, size=(10, 4)), columns=list("ABCD"))
+    df_test = pd.DataFrame(np.random.randint(0, 100, size=(20, 4)), columns=list("EFGH"))
+    assert df_train.shape == (10, 4)
+    assert df_test.shape == (20, 4)
+
+    analysis = BaseAnalysis(
+        train_data=df_train,
+        test_data=df_test,
+        children=[
+            Sampler(sample=10000, children=[SomeAnalysis()]),
+        ],
+    )
+
+    state = analysis.fit()
+    assert state.args.train_data.shape == (10, 4)
+    assert state.args.test_data.shape == (20, 4)
+    assert state.sample_size == 10000
+
+
 def test_Sampler_frac():
     df_train = pd.DataFrame(np.random.randint(0, 100, size=(10, 4)), columns=list("ABCD"))
     df_test = pd.DataFrame(np.random.randint(0, 100, size=(20, 4)), columns=list("EFGH"))
