@@ -132,9 +132,8 @@ class ExportMixin:
 
         # Infer default onnx path, and create parent directory if needed
         if not path:
-            onnx_path = os.path.join(self.path, "model.onnx")
-        else:
-            onnx_path = os.path.join(path, "model.onnx")
+            path = self.path
+        onnx_path = os.path.join(path, "model.onnx")
         dirname = os.path.dirname(os.path.abspath(onnx_path))
         if not os.path.exists(dirname):
             os.makedirs(dirname)

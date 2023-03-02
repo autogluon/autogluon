@@ -199,11 +199,10 @@ class HFAutoModelForTextPrediction(nn.Module):
                     input_ids=text_token_ids,
                     attention_mask=text_masks,
                 )
-        last_hidden_state = outputs[0]
         if self.pooling_mode == "cls":
-            pooled_features = last_hidden_state[:, 0, :]
+            pooled_features = outputs.last_hidden_state[:, 0, :]
         elif self.pooling_mode == "mean":
-            pooled_features = (last_hidden_state * text_masks.unsqueeze(-1)).sum(1)
+            pooled_features = (outputs.last_hidden_state * text_masks.unsqueeze(-1)).sum(1)
             sum_mask = text_masks.unsqueeze(-1).sum(1)
             sum_mask = torch.clamp(sum_mask, min=1e-9)
             pooled_features = pooled_features / sum_mask
@@ -211,6 +210,7 @@ class HFAutoModelForTextPrediction(nn.Module):
             raise NotImplementedError(f"Pooling mode={self.pooling_mode} is not supported.")
 
         logits = self.head(pooled_features)
+        last_hidden_state = outputs.last_hidden_state
 
         batch = {
             self.text_token_ids_key: text_token_ids,
