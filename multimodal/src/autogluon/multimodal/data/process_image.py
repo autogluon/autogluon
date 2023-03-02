@@ -16,9 +16,6 @@ from timm.data.constants import (
 from torch import nn
 from torchvision import transforms
 
-from .randaug import RandAugment
-from .utils import construct_image_processor, image_mean_std
-
 from ..constants import (
     AUTOMM,
     CLIP,
@@ -33,8 +30,9 @@ from ..constants import (
 )
 from ..models.timm_image import TimmAutoModelForImagePrediction
 from .collator import PadCollator, StackCollator
+from .randaug import RandAugment
 from .trivial_augmenter import TrivialAugment
-from .utils import extract_value_from_config, is_rois_input
+from .utils import construct_image_processor, extract_value_from_config, image_mean_std, is_rois_input
 
 logger = logging.getLogger(__name__)
 
