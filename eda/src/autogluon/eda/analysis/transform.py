@@ -27,6 +27,11 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
         parent Analysis
     children: Optional[List[AbstractAnalysis]], default None
         wrapped analyses; these will receive sampled `args` during `fit` call
+    verbosity: int, default = 0,
+        Verbosity levels range from 0 to 4 and control how much information is printed.
+        Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+        If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
+        where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
     kwargs
 
     See also :func:`autogluon.features.AbstractFeatureGenerator`
@@ -57,6 +62,7 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
         state: Optional[AnalysisState] = None,
         category_to_numbers: bool = False,
         feature_generator: Optional[AbstractFeatureGenerator] = None,
+        verbosity: int = 0,
         **kwargs,
     ) -> None:
         super().__init__(parent, children, state, **kwargs)
@@ -70,7 +76,7 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
                 enable_text_ngram_features=False,
                 enable_raw_text_features=False,
                 enable_vision_features=False,
-                verbosity=0,
+                verbosity=verbosity,
                 **kwargs,
             )
         self.feature_generator = feature_generator
