@@ -229,7 +229,7 @@ def test_process_ner_annotations():
     tokenizer = AutoTokenizer.from_pretrained("microsoft/deberta-v3-small")
     tokenizer.model_max_length = 512
     res = process_ner_annotations(annotation, text, entity_map, tokenizer, is_eval=True)[0]
-    assert res == [3, 4, 1, 1, 1, 1, 5, 6, 7, 8], "Labelling is wrong!"
+    assert res == [3, 4, 1, 1, 1, 1, 1, 5, 6, 1, 1, 1, 7, 8, 8, 8], "Labelling is wrong!"
 
 
 @pytest.mark.parametrize(
