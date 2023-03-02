@@ -23,9 +23,9 @@ from .preprocess_dataframe import MultiModalFeaturePreprocessor
 try:
     from torchvision.transforms import InterpolationMode
 
-    BICUBIC = InterpolationMode.BICUBIC
+    BILINEAR = InterpolationMode.BILINEAR
 except ImportError:
-    BICUBIC = PIL.Image.BICUBIC
+    BILINEAR = PIL.Image.BILINEAR
 
 from .randaug import RandAugment
 from .trivial_augmenter import TrivialAugment
@@ -476,9 +476,9 @@ def construct_image_processor(
             trans_mode = trans_type
 
         if trans_mode == "resize_to_square":
-            processor.append(transforms.Resize((size, size), interpolation=BICUBIC))
+            processor.append(transforms.Resize((size, size), interpolation=BILINEAR))
         elif trans_mode == "resize_shorter_side":
-            processor.append(transforms.Resize(size, interpolation=BICUBIC))
+            processor.append(transforms.Resize(size, interpolation=BILINEAR))
         elif trans_mode == "center_crop":
             processor.append(transforms.CenterCrop(size))
         elif trans_mode == "horizontal_flip":

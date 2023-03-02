@@ -4,10 +4,9 @@ import warnings
 from io import BytesIO
 from typing import Dict, List, Optional, Union
 
+import cv2
 import numpy as np
-import PIL
 import torch
-from PIL import ImageFile
 from timm.data.constants import (
     IMAGENET_DEFAULT_MEAN,
     IMAGENET_DEFAULT_STD,
@@ -19,13 +18,6 @@ from torchvision import transforms
 
 from .randaug import RandAugment
 from .utils import construct_image_processor, image_mean_std
-
-try:
-    from torchvision.transforms import InterpolationMode
-
-    BICUBIC = InterpolationMode.BICUBIC
-except ImportError:
-    BICUBIC = PIL.Image.BICUBIC
 
 from ..constants import (
     AUTOMM,
@@ -45,7 +37,6 @@ from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config, is_rois_input
 
 logger = logging.getLogger(__name__)
-ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class ImageProcessor:
@@ -281,14 +272,15 @@ class ImageProcessor:
                     try:
                         if feature_modalities.get(per_col_name) == IMAGE_BYTEARRAY:
                             image_feature = BytesIO(img_feature)
+                            img = cv2.imdecode(image_feature, flags=cv2.IMREAD_COLOR)
                         else:
                             image_feature = img_feature
-                        with PIL.Image.open(image_feature) as img:
-                            img = img.convert(image_mode)
+                            img = cv2.imread(image_feature, flag=cv2.IMREAD_COLOR)
+                        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                     except Exception as e:
                         if self.missing_value_strategy.lower() == "zero":
                             logger.debug(f"Using a zero image due to '{e}'")
-                            img = PIL.Image.new(image_mode, (self.size, self.size), color=0)
+                            img = np.zeros(shape=(3, self.size, self.size), dtype=np.int8)
                             is_zero_img = True
                         else:
                             raise e
