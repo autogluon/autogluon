@@ -1,3 +1,4 @@
+import collections
 import json
 import logging
 import os
@@ -161,6 +162,7 @@ class NERVisualizer:
         self.sent = sent
         self.colors = {}
         self.spans = merge_spans(sent, pred, for_visualizer=True)
+        self.spans = collections.OrderedDict(sorted(self.spans.items()))
         self.rng = np.random.RandomState(seed)
 
     @staticmethod
@@ -189,8 +191,8 @@ class NERVisualizer:
         color
             The background color of the mark tag.
         """
-        text = '<mark style="background-color:{}; color:white; border-radius: 1em .1em; padding: .3em;">{} \
-         <b style="background-color:white; color:black; font-size:x-small; border-radius: 0.3em .3em; padding: .1em;">{} </b> \
+        text = '<mark style="background-color:{}; color:white; border-radius: .6em .6em; padding: .1em;">{} \
+         <b style="background-color:white; color:black; font-size:x-small; border-radius: 0.5em .5em; padding: .0em;">{} </b> \
          </mark>'.format(
             color, self.escape_html(text), self.escape_html(label)
         )
