@@ -155,7 +155,6 @@ Document Data
       How to use MultiModalPredictor to build a scanned document classifier.
 
 
-
 Matching
 --------
 .. container:: cards
