@@ -14,3 +14,4 @@ dependencies:
   - sphinx-copybutton
   - sphinx-design
   - sphinx-inline-tabs
+  - sphinxcontrib-googleanalytics

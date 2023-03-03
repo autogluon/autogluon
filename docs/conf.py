@@ -9,15 +9,16 @@ copyright = '2023, All authors. Licensed under Apache 2.0.'
 author = 'AutoGluon contributors'
 
 extensions = [
-    'myst_nb',                # myst-nb.readthedocs.io
-    'sphinx_copybutton',      # sphinx-copybutton.readthedocs.io
-    'sphinx_design',          # github.com/executablebooks/sphinx-design
-    'sphinx_inline_tabs',     # sphinx-inline-tabs.readthedocs.io
-    'sphinx_togglebutton',    # sphinx-togglebutton.readthedocs.io
-    'sphinx.ext.autodoc',     # www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
-    'sphinx.ext.autosummary', # www.sphinx-doc.org/en/master/usage/extensions/autosummary.html
-    'sphinx.ext.napoleon',    # www.sphinx-doc.org/en/master/usage/extensions/napoleon.html
-    'sphinx.ext.viewcode',    # www.sphinx-doc.org/en/master/usage/extensions/viewcode.html
+    'myst_nb',                       # myst-nb.readthedocs.io
+    'sphinx_copybutton',             # sphinx-copybutton.readthedocs.io
+    'sphinx_design',                 # github.com/executablebooks/sphinx-design
+    'sphinx_inline_tabs',            # sphinx-inline-tabs.readthedocs.io
+    'sphinx_togglebutton',           # sphinx-togglebutton.readthedocs.io
+    'sphinx.ext.autodoc',            # www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
+    'sphinx.ext.autosummary',        # www.sphinx-doc.org/en/master/usage/extensions/autosummary.html
+    'sphinx.ext.napoleon',           # www.sphinx-doc.org/en/master/usage/extensions/napoleon.html
+    'sphinx.ext.viewcode',           # www.sphinx-doc.org/en/master/usage/extensions/viewcode.html
+    'sphinxcontrib.googleanalytics', # github.com/sphinx-contrib/googleanalytics
     ]
 
 # See https://myst-parser.readthedocs.io/en/latest/syntax/optional.html
@@ -25,6 +26,8 @@ myst_enable_extensions = ['colon_fence', 'deflist', 'dollarmath', 'html_image', 
 
 autosummary_generate = True
 numpydoc_show_class_members = False
+
+googleanalytics_id = "UA-96378503-20"
 
 nb_execution_mode = 'force'
 # nb_execution_raise_on_error=True

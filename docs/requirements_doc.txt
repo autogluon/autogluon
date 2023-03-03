@@ -5,3 +5,4 @@ sphinx-copybutton
 sphinx-design
 sphinx-inline-tabs
 sphinx-togglebutton
+sphinxcontrib-googleanalytics
