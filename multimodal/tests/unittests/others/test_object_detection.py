@@ -82,13 +82,55 @@ def test_mmdet_object_detection_inference_list_str_dict(checkpoint_name):
     )
 
     pred = predictor.predict([mmdet_image_name] * 10)  # test batch inference
-    assert len(pred) == 10  # test data size is 100
+    assert len(pred) == 10  # test data size is 10
 
     pred = predictor.predict(mmdet_image_name)  # test batch inference
-    assert len(pred) == 1  # test data size is 100
+    assert len(pred) == 1  # test data size is 1
 
     pred = predictor.predict({"image": [mmdet_image_name] * 10})  # test batch inference
-    assert len(pred) == 10  # test data size is 100
+    assert len(pred) == 10  # test data size is 10
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "yolov3_mobilenetv2_320_300e_coco",
+    ],
+)
+def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
+    mmdet_image_name = download_sample_images()
+
+    xywh_predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "model.mmdet_image.output_bbox_format": "xywh",
+            "env.num_gpus": 1,  # currently mmdet only support single gpu inference
+        },
+        problem_type="object_detection",
+    )
+    xywh_preds = xywh_predictor.predict([mmdet_image_name] * 10)  # test batch inference
+    assert len(xywh_preds) == 10  # test data size is 10
+
+    xyxy_predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": 1,  # currently mmdet only support single gpu inference
+        },
+        problem_type="object_detection",
+    )
+    xyxy_preds = xyxy_predictor.predict([mmdet_image_name] * 10)  # test batch inference
+    assert len(xyxy_preds) == 10  # test data size is 10
+
+    xywh_bbox = xywh_preds.iloc[0]["bboxes"][0]
+    xyxy_bbox = xyxy_preds.iloc[0]["bboxes"][0]
+    x, y, w, h = xywh_bbox["bbox"]
+    x1, y1, x2, y2 = xyxy_bbox["bbox"]
+    assert xywh_bbox["class"] == xyxy_bbox["class"]
+    assert abs(xywh_bbox["score"] - xyxy_bbox["score"]) < 1e-4
+    assert abs(x - x1) < 1e-4
+    assert abs(y - y1) < 1e-4
+    assert abs(x2 - x1 + 1 - w) < 1e-4
+    assert abs(y2 - y1 + 1 - h) < 1e-4
 
 
 @pytest.mark.parametrize(

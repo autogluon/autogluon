@@ -181,7 +181,10 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         for feature in self._bool_features_list:
             X_bool_list.append((X[feature] == self._bool_features[feature]).astype(np.int8))
         X_bool = pd.concat(X_bool_list, axis=1)
-        return pd.concat([X[self._non_bool_features_list], X_bool], axis=1)
+
+        # TODO: re-order columns to features_in required because `feature_interactions=False` to avoid error when feature prune.
+        #  Note that this is slower than avoiding the re-order, but avoiding the re-order is very complicated to do correctly.
+        return pd.concat([X[self._non_bool_features_list], X_bool], axis=1)[self.features_in]
 
     def _convert_to_bool_fast_realtime(self, X: DataFrame) -> DataFrame:
         """Optimized for when X is <= 100 rows"""
@@ -189,7 +192,9 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         X_bool_numpy = X_bool_features_np == self._bool_features_val_np
         X_bool = pd.DataFrame(X_bool_numpy, columns=self._bool_features_list, dtype=np.int8, index=X.index)
 
-        return pd.concat([X[self._non_bool_features_list], X_bool], axis=1)
+        # TODO: re-order columns to features_in required because `feature_interactions=False` to avoid error when feature prune.
+        #  Note that this is slower than avoiding the re-order, but avoiding the re-order is very complicated to do correctly.
+        return pd.concat([X[self._non_bool_features_list], X_bool], axis=1)[self.features_in]
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:

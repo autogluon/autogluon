@@ -153,7 +153,8 @@ def test_quick_fit(monkeypatch):
 
 def test_dataset_overview(monkeypatch):
     df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
-    df_train["near_duplicate"] = df_train["education-num"] + 1
+    df_train["education-num"] = df_train["education-num"] + np.random.rand(len(df_train)) / 100
+    df_train["near_duplicate"] = df_train["education-num"] + 0.1
 
     call_ds_render = MagicMock()
     call_dtm_render = MagicMock()
@@ -173,7 +174,6 @@ def test_dataset_overview(monkeypatch):
     call_md_render.assert_has_calls(
         [
             call("### Feature Distance"),
-            call("**Near duplicate group analysis: `education-num`, `near_duplicate` - distance `0.0000`**"),
             call("Feature interaction between `education-num`/`near_duplicate`"),
         ]
     )

@@ -93,6 +93,10 @@ class NumericalMLP(nn.Module):
         return f"{self.prefix}_{NUMERICAL}"
 
     @property
+    def input_keys(self):
+        return [self.numerical_key]
+
+    @property
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
 

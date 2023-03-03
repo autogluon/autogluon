@@ -56,6 +56,7 @@ from .object_detection import (
     COCODataset,
     bbox_xyxy_to_xywh,
     cocoeval,
+    convert_pred_to_xywh,
     evaluate_coco,
     from_coco,
     from_coco_or_voc,
@@ -71,6 +72,5 @@ from .object_detection import (
     visualize_detection,
 )
 from .object_detection_visualizer import Visualizer
-from .onnx import get_onnx_input
 from .pipeline import init_pretrained, init_pretrained_matcher
 from .save import process_save_path, save_text_tokenizers, setup_save_path

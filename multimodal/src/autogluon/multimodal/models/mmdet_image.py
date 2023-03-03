@@ -26,7 +26,21 @@ try:
 except ImportError as e:
     mmdet = None
 
-from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
+from ..constants import (
+    AUTOMM,
+    BBOX,
+    BBOX_FORMATS,
+    COLUMN,
+    COLUMN_FEATURES,
+    FEATURES,
+    IMAGE,
+    IMAGE_VALID_NUM,
+    LABEL,
+    LOGITS,
+    MASKS,
+    XYWH,
+    XYXY,
+)
 from .utils import lookup_mmdet_config, update_mmdet_config
 
 logger = logging.getLogger(__name__)
@@ -45,6 +59,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         config_file: Optional[str] = None,
         classes: Optional[list] = None,
         pretrained: Optional[bool] = True,
+        output_bbox_format: Optional[str] = XYXY,
     ):
         """
         Load a pretrained object detector from MMdetection.
@@ -66,6 +81,13 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.checkpoint = None
         self.checkpoint_name = checkpoint_name
         self.config_file = config_file
+
+        if output_bbox_format.lower() in BBOX_FORMATS:
+            self.output_bbox_format = output_bbox_format.lower()
+        else:
+            raise ValueError(
+                f"Not supported bounding box output format for object detection: {output_bbox_format}. All supported bounding box output formats are: {BBOX_FORMATS}."
+            )
 
         # TODO: Config only init (without checkpoint)
 
