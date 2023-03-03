@@ -279,6 +279,11 @@ QUERY_RESPONSE = f"{QUERY}_{RESPONSE}"
 PAIR = "pair"
 TRIPLET = "triplet"
 
+# mmdet
+XYWH = "xywh"
+XYXY = "xyxy"
+BBOX_FORMATS = [XYWH, XYXY]
+
 # presets
 DEFAULT = "default"
 HIGH_QUALITY = "high_quality"

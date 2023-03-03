@@ -33,6 +33,7 @@ from ..constants import (
     TEXT,
     TEXT_NER,
     TIMM_IMAGE,
+    XYXY,
 )
 from ..data import MultiModalFeaturePreprocessor
 from ..models import (
@@ -310,6 +311,7 @@ def create_model(
             config_file=OmegaConf.select(model_config, "config_file", default=None),
             classes=classes,
             pretrained=pretrained,
+            output_bbox_format=OmegaConf.select(model_config, "output_bbox_format", default=XYXY),
         )
     elif model_name.lower().startswith(MMOCR_TEXT_DET):
         model = MMOCRAutoModelForTextDetection(
