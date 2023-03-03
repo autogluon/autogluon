@@ -43,6 +43,8 @@ from .constants import (
     DEEPSPEED_OFFLOADING,
     DEEPSPEED_STRATEGY,
     DEPRECATED_ZERO_SHOT,
+    DOCUMENT_IMAGE,
+    DOCUMENT_PDF,
     FEATURE_EXTRACTION,
     FEATURES,
     FEW_SHOT,
@@ -2391,6 +2393,11 @@ class MultiModalPredictor(ExportMixin):
                     text_processors=data_processors[modality],
                     path=path,
                 )
+
+        # Clear the documents cache dictionary before saving.
+        for modality in [DOCUMENT_IMAGE, DOCUMENT_PDF]:
+            if modality in data_processors:
+                data_processors[modality].documents.clear()
 
         with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
             pickle.dump(data_processors, fp)

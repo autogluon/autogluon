@@ -264,23 +264,19 @@ def is_document_pdf_column(
     if len(data) > sample_m:
         # Sample to speed-up type inference
         data = data.sample(n=sample_m, random_state=0)
-    is_all_pdf = []
 
     for docs in data:
         try:
             if not isinstance(docs, list):
                 docs = [docs]
             for per_doc in docs:
-                if per_doc.endswith(".pdf"):
-                    is_all_pdf.append(True)
-                else:
-                    is_all_pdf.append(False)
+                # If there is non-pdf document, return False
+                if not per_doc.endswith(".pdf"):
+                    return False
         except:
             return False
-    if is_all_pdf and all(element for element in is_all_pdf):
-        return True
-    else:
-        return False
+
+    return True
 
 
 def is_document_image_column(
@@ -317,7 +313,6 @@ def is_document_image_column(
         # Sample to speed-up type inference
         data = data.sample(n=sample_m, random_state=0)
     failure_count = 0
-    exception = None
     for images in data:
         success = False
         if not isinstance(images, list):
@@ -329,7 +324,6 @@ def is_document_image_column(
                     words = pytesseract.image_to_string(doc_image)
                     words_len.append(len(words))
             except Exception as e:
-                exception = e
                 words_len.append(0)
                 success = False
                 break
