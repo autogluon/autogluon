@@ -36,7 +36,7 @@ Quick Start
       :title: AutoMM for Scanned Document Classification - Quick Start
       :link: document_classification.html
 
-      How to use MultiModalPredictor to build a scanned document classifier. 
+      How to use MultiModalPredictor to build a scanned document classifier.
 
 
 .. toctree::
