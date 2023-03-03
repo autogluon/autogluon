@@ -17,17 +17,8 @@ def evaluate(predictor, df, onnx_session=None):
         QEmb = predictor.extract_embedding(df[["sentence1"]])["sentence1"]
         AEmb = predictor.extract_embedding(df[["sentence2"]])["sentence2"]
     else:
-        valid_input = [
-            "hf_text_text_token_ids",
-            "hf_text_text_segment_ids",
-            "hf_text_text_valid_length",
-        ]
-        QEmb = onnx_session.run(
-            None, predictor.get_processed_batch_for_deployment(data=df[["sentence1"]], valid_input=valid_input)
-        )[0]
-        AEmb = onnx_session.run(
-            None, predictor.get_processed_batch_for_deployment(data=df[["sentence2"]], valid_input=valid_input)
-        )[0]
+        QEmb = onnx_session.run(None, predictor.get_processed_batch_for_deployment(data=df[["sentence1"]]))[0]
+        AEmb = onnx_session.run(None, predictor.get_processed_batch_for_deployment(data=df[["sentence2"]]))[0]
 
     cosine_scores = 1 - paired_cosine_distances(QEmb, AEmb)
     eval_pearson_cosine, _ = pearsonr(labels, cosine_scores)
@@ -52,9 +43,8 @@ def test_onnx_export_hf_text(checkpoint_name):
     )
     ag_pearson, ag_spearman = evaluate(predictor, test_df)
 
-    onnx_path = checkpoint_name.replace("/", "_") + ".onnx"
-
-    predictor.export_onnx(onnx_path=onnx_path, data=test_df)
+    model_path = checkpoint_name.replace("/", "_")
+    onnx_path = predictor.export_onnx(path=model_path, data=test_df)
 
     # TODO: Test with CUDA EP when we upgrade CUDA version to 11.7 (along with pytorch v1.13.1).
     # onnxruntime-gpu v1.13.1 require CUDA version >=11.6
@@ -91,6 +81,7 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     # train
     predictor = MultiModalPredictor(
         hyperparameters={
+            "optimization.max_epochs": 1,
             "model.names": ["timm_image"],
             "model.timm_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
@@ -111,7 +102,7 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     load_proba = loaded_predictor.predict_proba({"image": [image_path_test]})
 
     # convert
-    loaded_predictor.export_onnx({"image": [image_path_export]})
+    onnx_path = loaded_predictor.export_onnx(path=model_path, data={"image": [image_path_export]})
 
     # TODO: Test with CUDA EP when we upgrade CUDA version to 11.7 (along with pytorch v1.13.1).
     # onnxruntime-gpu v1.13.1 require CUDA version >=11.6

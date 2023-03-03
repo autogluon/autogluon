@@ -7,7 +7,7 @@ from torch import nn
 from torch.nn.modules.loss import _Loss
 from transformers import AutoConfig, AutoModel
 
-from ..constants import AUTOMM, LOGITS, REGRESSION
+from ..constants import AUTOMM, COLUMN_FEATURES, FEATURES, LOGITS, MASKS, REGRESSION
 from .adaptation_layers import IA3Linear, IA3LoRALinear, LoRALinear
 
 logger = logging.getLogger(__name__)
@@ -686,28 +686,45 @@ def update_mmdet_config(key, value, config):
                     update_mmdet_config(key, value, subsubconfig)
 
 
-def run_model(model: nn.Module, batch: dict):
+def run_model(model: nn.Module, batch: dict, trt_model: Optional[nn.Module] = None):
+    from ..utils.onnx import OnnxModule
     from .document_transformer import DocumentTransformer
+    from .fusion.fusion_mlp import MultimodalFusionMLP
     from .huggingface_text import HFAutoModelForTextPrediction
+    from .t_few import TFewModel
     from .timm_image import TimmAutoModelForImagePrediction
 
-    supported_models = (TimmAutoModelForImagePrediction, HFAutoModelForTextPrediction)
+    supported_models = (
+        TimmAutoModelForImagePrediction,
+        HFAutoModelForTextPrediction,
+        MultimodalFusionMLP,
+        TFewModel,
+        OnnxModule,
+    )
     pure_model = model.module if isinstance(model, nn.DataParallel) else model
+    if isinstance(pure_model, OnnxModule):
+        for k in batch:
+            # HACK input data types in ONNX
+            if batch[k].dtype == torch.int32:
+                batch[k] = batch[k].to(torch.int64)
     if (not isinstance(pure_model, DocumentTransformer)) and isinstance(pure_model, supported_models):
         input_vec = [batch[k] for k in pure_model.input_keys]
         column_names, column_values = [], []
         for k in batch.keys():
-            if (
-                isinstance(pure_model, TimmAutoModelForImagePrediction)
-                and k.startswith(pure_model.image_column_prefix)
-            ) or (
-                isinstance(pure_model, HFAutoModelForTextPrediction) and k.startswith(pure_model.text_column_prefix)
-            ):
+            has_image_column_prefix = isinstance(pure_model, TimmAutoModelForImagePrediction) and k.startswith(
+                pure_model.image_column_prefix
+            )
+            has_text_column_prefix = isinstance(pure_model, HFAutoModelForTextPrediction) and k.startswith(
+                pure_model.text_column_prefix
+            )
+            if has_image_column_prefix or has_text_column_prefix:
                 column_names.append(k)
                 column_values.append(batch[k])
-        input_vec.append(column_names)
-        input_vec.append(column_values)
+        if column_names != [] and column_values != []:
+            input_vec.append(column_names)
+            input_vec.append(column_values)
         output_vec = model(*tuple(input_vec))
+
         output = pure_model.get_output_dict(*output_vec)
     else:
         output = model(batch)
