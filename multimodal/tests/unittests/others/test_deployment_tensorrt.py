@@ -69,25 +69,29 @@ def test_tensorrt_export_hf_text(dataset_name, model_names, text_backbone, image
     model_path = predictor.path
     predictor.save(path=model_path)
 
-    batch_size = 2
-
     # Subsample test data for efficient testing, and use a different subset of the dataset for compilation.
-    test_df = dataset.test_df.head(batch_size)
-    tail_df = dataset.test_df.tail(batch_size)
+    tail_df = dataset.test_df.tail(2)
+    test_df_b2 = dataset.test_df.head(2)
+    test_df_b4 = dataset.test_df.head(4)
+    test_df_b8 = dataset.test_df.head(8)
 
     # Prediction with default predictor
-    y_pred = predictor.predict(test_df)
+    y_pred_b2 = predictor.predict(test_df_b2)
+    y_pred_b4 = predictor.predict(test_df_b4)
+    y_pred_b8 = predictor.predict(test_df_b8)
 
-    trt_module = predictor.export_tensorrt(path=model_path, data=tail_df, batch_size=batch_size)
-
-    # To use the TensorRT module for prediction, simply replace the _model in the predictor
-    predictor._model = trt_module
+    predictor.optimize_for_inference(data=tail_df)
 
     # Prediction with tensorrt predictor
-    y_pred_trt = predictor.predict(test_df)
+    y_pred_trt_b2 = predictor.predict(test_df_b2)
+    y_pred_trt_b4 = predictor.predict(test_df_b4)
+    y_pred_trt_b8 = predictor.predict(test_df_b8)
 
-    # TODO: caching tensorrt engine
     assert isinstance(
         predictor._model, OnnxModule
-    ), f"invalid tensorrt module type, expected to be RecursiveScriptModule, but the model type is {type(predictor._model)}"
-    numpy.testing.assert_allclose(y_pred, y_pred_trt, rtol=0.002, atol=0.1)
+    ), f"invalid onnx module type, expected to be OnnxModule, but the model type is {type(predictor._model)}"
+
+    # Verify correctness of results
+    numpy.testing.assert_allclose(y_pred_b2, y_pred_trt_b2, rtol=0.002)
+    numpy.testing.assert_allclose(y_pred_b4, y_pred_trt_b4, rtol=0.002)
+    numpy.testing.assert_allclose(y_pred_b8, y_pred_trt_b8, rtol=0.002)

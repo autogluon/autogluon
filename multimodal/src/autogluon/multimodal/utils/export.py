@@ -76,7 +76,7 @@ class ExportMixin:
 
     def export_onnx(
         self,
-        data: pd.DataFrame,
+        data: Union[dict, pd.DataFrame],
         path: Optional[str] = None,
         batch_size: Optional[int] = None,
         verbose: Optional[bool] = False,
@@ -153,11 +153,9 @@ class ExportMixin:
 
         return onnx_path
 
-    def export_tensorrt(
+    def optimize_for_inference(
         self,
-        data: Optional[pd.DataFrame] = None,
-        path: Optional[str] = None,
-        batch_size: Optional[int] = None,
+        data: Union[dict, pd.DataFrame],
     ):
         """
         Export this predictor's model to ONNX file.
@@ -167,15 +165,10 @@ class ExportMixin:
         data
             Raw data used to trace and export the model.
             If this is None, will check if a processed batch is provided.
-        path
-            The export path of onnx model.
-        batch_size
-            The batch_size of export model's input.
-            Normally the batch_size is a dynamic axis, so we could use a small value for faster export.
 
         Returns
         -------
-        trt_module : OnnxModule
+        onnx_module : OnnxModule
             The onnx-based module that can be used to replace predictor._model for model inference.
         """
         import onnx
@@ -183,19 +176,20 @@ class ExportMixin:
 
         from .onnx import OnnxModule
 
-        truncate_long_and_double = False
-        onnx_path = self.export_onnx(
-            data=data, path=path, batch_size=batch_size, truncate_long_and_double=truncate_long_and_double
-        )
+        onnx_path = self.export_onnx(data=data, path=self.path, truncate_long_and_double=True)
 
         logger.info("Loading ONNX file from path {}...".format(onnx_path))
         onnx_model = onnx.load(onnx_path)
 
-        trt_module = OnnxModule(onnx_model)
-        trt_module.input_keys = self._model.input_keys
-        trt_module.prefix = self._model.prefix
-        trt_module.get_output_dict = self._model.get_output_dict
-        return trt_module
+        onnx_module = OnnxModule(onnx_model)
+        onnx_module.input_keys = self._model.input_keys
+        onnx_module.prefix = self._model.prefix
+        onnx_module.get_output_dict = self._model.get_output_dict
+
+        # To use the TensorRT module for prediction, simply replace the _model in the predictor
+        self._model = onnx_module
+
+        return onnx_module
 
     def get_processed_batch_for_deployment(
         self,

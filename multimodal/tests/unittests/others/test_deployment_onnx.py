@@ -63,11 +63,13 @@ def test_onnx_export_hf_text(checkpoint_name):
 )
 def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     import numpy as np
+    import onnx
     import torch
     from torch import FloatTensor
 
     from autogluon.multimodal.utils import logits_to_prob
     from autogluon.multimodal.utils.misc import shopee_dataset
+    from autogluon.multimodal.utils.onnx import OnnxModule
 
     model_path = "./automm_shopee"
     download_dir = "./ag_automm_tutorial_imgcls"
@@ -102,7 +104,14 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     load_proba = loaded_predictor.predict_proba({"image": [image_path_test]})
 
     # convert
-    onnx_module = loaded_predictor.export_onnx({"image": [image_path_export]})
+    onnx_path = loaded_predictor.export_onnx({"image": [image_path_export]})
+    onnx_model = onnx.load(onnx_path)
+
+    # create onnx module for evaluation
+    onnx_module = OnnxModule(onnx_model)
+    onnx_module.input_keys = loaded_predictor._model.input_keys
+    onnx_module.prefix = loaded_predictor._model.prefix
+    onnx_module.get_output_dict = loaded_predictor._model.get_output_dict
 
     # simply replace _model in the loaded predictor to predict with onnxruntime
     loaded_predictor._model = onnx_module
