@@ -2396,7 +2396,8 @@ class MultiModalPredictor(ExportMixin):
         # Clear the documents cache dictionary before saving.
         for modality in [DOCUMENT]:
             if modality in data_processors:
-                data_processors[modality].documents.clear()
+                for p in data_processors[modality]:
+                    p.documents.clear()
 
         with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
             pickle.dump(data_processors, fp)
