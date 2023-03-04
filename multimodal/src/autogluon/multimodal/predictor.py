@@ -2395,7 +2395,7 @@ class MultiModalPredictor(ExportMixin):
                 )
 
         # Clear the documents cache dictionary before saving.
-        for modality in [DOCUMENT_IMAGE, DOCUMENT_PDF]:
+        for modality in [DOCUMENT]:
             if modality in data_processors:
                 data_processors[modality].documents.clear()
 
