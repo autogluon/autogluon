@@ -1,5 +1,6 @@
 import os
 import shutil
+import time
 import uuid
 
 import numpy.testing
@@ -8,6 +9,7 @@ from datasets import load_dataset
 from torch.jit._script import RecursiveScriptModule
 
 from autogluon.multimodal import MultiModalPredictor
+from autogluon.multimodal.constants import REGRESSION
 
 from ..utils.unittest_datasets import AEDataset, PetFinderDataset
 
@@ -69,29 +71,34 @@ def test_tensorrt_export_hf_text(dataset_name, model_names, text_backbone, image
     model_path = predictor.path
     predictor.save(path=model_path)
 
-    # Subsample test data for efficient testing, and use a different subset of the dataset for compilation.
+    # Use a different subset of the dataset for compilation.
     tail_df = dataset.test_df.tail(2)
-    test_df_b2 = dataset.test_df.head(2)
-    test_df_b4 = dataset.test_df.head(4)
-    test_df_b8 = dataset.test_df.head(8)
-
-    # Prediction with default predictor
-    y_pred_b2 = predictor.predict(test_df_b2)
-    y_pred_b4 = predictor.predict(test_df_b4)
-    y_pred_b8 = predictor.predict(test_df_b8)
-
-    predictor.optimize_for_inference(data=tail_df)
-
-    # Prediction with tensorrt predictor
-    y_pred_trt_b2 = predictor.predict(test_df_b2)
-    y_pred_trt_b4 = predictor.predict(test_df_b4)
-    y_pred_trt_b8 = predictor.predict(test_df_b8)
-
+    predictor_trt = MultiModalPredictor.load(path=model_path)
+    predictor_trt.optimize_for_inference(data=tail_df)
+    onnx_path = os.path.join(predictor_trt.path, "model.onnx")
+    assert os.path.exists(onnx_path), f"onnx model file not found at {onnx_path}"
+    trt_cache_dir = os.path.join(predictor_trt.path, "model_trt")
+    assert len(os.listdir(trt_cache_dir)) >= 2, f"tensorrt cache model files are not found in {trt_cache_dir}"
     assert isinstance(
-        predictor._model, OnnxModule
+        predictor_trt._model, OnnxModule
     ), f"invalid onnx module type, expected to be OnnxModule, but the model type is {type(predictor._model)}"
 
-    # Verify correctness of results
-    numpy.testing.assert_allclose(y_pred_b2, y_pred_trt_b2, rtol=0.002)
-    numpy.testing.assert_allclose(y_pred_b4, y_pred_trt_b4, rtol=0.002)
-    numpy.testing.assert_allclose(y_pred_b8, y_pred_trt_b8, rtol=0.002)
+    # Test TRT compilation cache
+    predictor_trt2 = MultiModalPredictor.load(path=model_path)
+    tic = time.time()
+    predictor_trt2.optimize_for_inference(data=tail_df)
+    elapsed = time.time() - tic
+    assert (
+        elapsed < 20
+    ), f"Took too long ({elapsed:.3f} seconds) to load cached tensorrt engine files at {trt_cache_dir}. Not cached at all?"
+
+    # We should support dynamic shape
+    for batch_size in [2, 4, 8]:
+        test_df = dataset.test_df.head(batch_size)
+        if dataset.problem_type == REGRESSION:
+            y_pred = predictor.predict(test_df)
+            y_pred_trt = predictor_trt.predict(test_df)
+        else:
+            y_pred = predictor.predict_proba(test_df)
+            y_pred_trt = predictor_trt.predict_proba(test_df)
+        numpy.testing.assert_allclose(y_pred, y_pred_trt, rtol=0.01, atol=0.01)

@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Dict, List, Optional, Tuple, Union
 
 from torch import tensor
@@ -35,16 +36,23 @@ class OnnxModule(object):
     so that we can predict with TensorRT by simply replacing predictor._model with OnnxModule.
     """
 
-    def __init__(self, model, providers: Optional[Union[dict, List[str]]] = None):
+    def __init__(self, onnx_path: str, providers: Optional[Union[dict, List[str]]] = None):
         """
         Parameters
         ----------
-        model : onnx.ModelProto
-            The onnx model that need to be executed in onnxruntime.
+        onnx_path : str
+            The file path of the onnx model that need to be executed in onnxruntime.
         providers : dict or str, default=None
             A list of execution providers for model prediction in onnxruntime.
         """
+        import onnx
         import onnxruntime as ort
+
+        logger.info("Loading ONNX file from path {}...".format(onnx_path))
+        onnx_model = onnx.load(onnx_path)
+
+        dirname = os.path.dirname(os.path.abspath(onnx_path))
+        cache_path = os.path.join(dirname, "model_trt")
 
         if providers == None:
             providers = [
@@ -54,6 +62,8 @@ class OnnxModule(object):
                         "device_id": 0,
                         "trt_max_workspace_size": 2147483648,
                         "trt_fp16_enable": True,
+                        "trt_engine_cache_path": cache_path,
+                        "trt_engine_cache_enable": True,
                     },
                 ),
                 (
@@ -68,7 +78,7 @@ class OnnxModule(object):
                 ),
                 ("CPUExecutionProvider", {}),
             ]
-        self.sess = ort.InferenceSession(model.SerializeToString(), providers=providers)
+        self.sess = ort.InferenceSession(onnx_model.SerializeToString(), providers=providers)
         inputs = self.sess.get_inputs()
         outputs = self.sess.get_outputs()
         self.input_names = [i.name for i in inputs]

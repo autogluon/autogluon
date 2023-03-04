@@ -178,16 +178,18 @@ class ExportMixin:
 
         onnx_path = self.export_onnx(data=data, path=self.path, truncate_long_and_double=True)
 
-        logger.info("Loading ONNX file from path {}...".format(onnx_path))
-        onnx_model = onnx.load(onnx_path)
-
-        onnx_module = OnnxModule(onnx_model)
+        onnx_module = OnnxModule(onnx_path)
         onnx_module.input_keys = self._model.input_keys
         onnx_module.prefix = self._model.prefix
         onnx_module.get_output_dict = self._model.get_output_dict
 
         # To use the TensorRT module for prediction, simply replace the _model in the predictor
         self._model = onnx_module
+
+        # Evaluate and cache TensorRT engine files
+        logger.info("Compiling to TensorRT engine and profile, this may take a few minutes ...")
+        _ = self.predict(data)
+        logger.info("Finished compilation!")
 
         return onnx_module
 
