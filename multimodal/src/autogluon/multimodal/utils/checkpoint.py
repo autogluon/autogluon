@@ -187,6 +187,9 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
         else:
             trainer.save_checkpoint(filepath, self.save_weights_only)
 
+        # Required to avoid redundant evaluation and checkpointing
+        self._last_global_step_saved = trainer.global_step
+
     def _update_best_and_save(
         self,
         current: torch.Tensor,
