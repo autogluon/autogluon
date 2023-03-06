@@ -731,9 +731,9 @@ class MultiModalPredictor(ExportMixin):
         )
 
         if tuning_data is None:
-            train_data, tuning_data = self._split_train_tuning(data=train_data,
-                                                               holdout_frac=holdout_frac,
-                                                               random_state=seed)
+            train_data, tuning_data = self._split_train_tuning(
+                data=train_data, holdout_frac=holdout_frac, random_state=seed
+            )
 
             # FIXME: Because output_shape is paired with problem_type detection,
             #  need to do this again in-case output_shape changed when splitting data
@@ -854,10 +854,9 @@ class MultiModalPredictor(ExportMixin):
 
         return self
 
-    def _split_train_tuning(self,
-                            data: pd.DataFrame,
-                            holdout_frac: float = None,
-                            random_state: int = 0) -> (pd.DataFrame, pd.DataFrame):
+    def _split_train_tuning(
+        self, data: pd.DataFrame, holdout_frac: float = None, random_state: int = 0
+    ) -> (pd.DataFrame, pd.DataFrame):
         """
         Splits `data` into `train_data` and `tuning_data`.
         If the problem_type is one of ['binary', 'multiclass']:
@@ -883,8 +882,7 @@ class MultiModalPredictor(ExportMixin):
         Tuple of (train_data, tuning_data) of the split `data`
         """
         if holdout_frac is None:
-            holdout_frac = default_holdout_frac(num_train_rows=len(data),
-                                                hyperparameter_tune=False)
+            holdout_frac = default_holdout_frac(num_train_rows=len(data), hyperparameter_tune=False)
 
         # TODO: Hack since the recognized problem types are only binary, multiclass, and regression
         #  Problem types used for purpose of stratification, so regression = no stratification
