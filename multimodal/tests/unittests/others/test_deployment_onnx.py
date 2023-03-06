@@ -108,7 +108,7 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     onnx_path = loaded_predictor.export_onnx({"image": [image_path_export]})
 
     # create onnx module for evaluation
-    onnx_module = OnnxModule(onnx_path)
+    onnx_module = OnnxModule(onnx_path, providers=["CUDAExecutionProvider"])
     onnx_module.input_keys = loaded_predictor._model.input_keys
     onnx_module.prefix = loaded_predictor._model.prefix
     onnx_module.get_output_dict = loaded_predictor._model.get_output_dict
