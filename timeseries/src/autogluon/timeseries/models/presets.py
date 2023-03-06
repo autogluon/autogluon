@@ -152,6 +152,7 @@ def get_default_hps(key, prediction_length):
             "Theta": {
                 "deseasonalize": ag.Categorical(True, False),
             },
+            "AutoGluonTabular": {},
             "DeepAR": {
                 "context_length": context_length,
                 "num_layers": ag.Int(1, 3, default=2),
