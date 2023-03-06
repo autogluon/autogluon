@@ -599,6 +599,11 @@ def split_train_tuning_data(train_data, tuning_data, holdout_frac, is_classifica
     -------
     The split training and tuning data.
     """
+    if isinstance(train_data, str):
+        train_data = load_pd.load(train_data)
+    if isinstance(tuning_data, str):
+        tuning_data = load_pd.load(tuning_data)
+
     if tuning_data is None:
         if is_classification:
             stratify = train_data[label_column]

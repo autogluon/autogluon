@@ -654,10 +654,6 @@ class MultiModalPredictor(ExportMixin):
                 f"The problem_type='{self._problem_type}' does not support `predictor.fit()`. "
                 f"You may try to use `predictor.predict()` or `predictor.evaluate()`."
             )
-        if isinstance(train_data, str):
-            train_data = load_pd.load(train_data)
-        if isinstance(tuning_data, str):
-            tuning_data = load_pd.load(tuning_data)
 
         training_start = time.time()
         if self._matcher:
