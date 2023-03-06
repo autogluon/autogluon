@@ -10,6 +10,7 @@ import pandas as pd
 
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID
+from autogluon.timeseries.utils.seasonality import get_seasonality
 from autogluon.timeseries.utils.warning_filters import evaluator_warning_filter
 
 logger = logging.getLogger(__name__)
@@ -78,9 +79,10 @@ class TimeSeriesEvaluator:
         Length of the forecast horizon
     target_column : str, default = "target"
         Name of the target column to be forecasting.
-    eval_metric_seasonal_period : int
+    eval_metric_seasonal_period : int, optional
         Seasonal period used to compute the mean absolute scaled error (MASE) evaluation metric. This parameter is only
         used if ``eval_metric="MASE"`. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for more details.
+        Defaults to ``None``, in which case the seasonal period is computed based on the data frequency.
 
     Class Attributes
     ----------------
@@ -103,7 +105,7 @@ class TimeSeriesEvaluator:
         eval_metric: str,
         prediction_length: int,
         target_column: str = "target",
-        eval_metric_seasonal_period: int = 1,
+        eval_metric_seasonal_period: Optional[int] = None,
     ):
         assert eval_metric in self.AVAILABLE_METRICS, f"Metric {eval_metric} not available"
 
@@ -197,8 +199,9 @@ class TimeSeriesEvaluator:
         return metric
 
     def save_past_metrics(self, data_past: TimeSeriesDataFrame):
+        seasonal_period = get_seasonality(data_past.freq) if self.seasonal_period is None else self.seasonal_period
         self._past_naive_error = in_sample_seasonal_naive_error(
-            y_past=data_past[self.target_column], seasonal_period=self.seasonal_period
+            y_past=data_past[self.target_column], seasonal_period=seasonal_period
         )
 
     def score_with_saved_past_metrics(

@@ -1,6 +1,6 @@
 import copy
 import logging
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import autogluon.core as ag
 import autogluon.timeseries as agts
@@ -188,7 +188,7 @@ def get_preset_models(
     prediction_length: int,
     path: str,
     eval_metric: str,
-    eval_metric_seasonal_period: int,
+    eval_metric_seasonal_period: Optional[int],
     hyperparameters: Union[str, Dict],
     hyperparameter_tune: bool,
     invalid_model_names: List[str],

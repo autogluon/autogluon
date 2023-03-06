@@ -29,7 +29,7 @@ class TimeSeriesLearner(AbstractLearner):
         known_covariates_names: Optional[List[str]] = None,
         trainer_type: Type[AbstractTimeSeriesTrainer] = AutoTimeSeriesTrainer,
         eval_metric: Optional[str] = None,
-        eval_metric_seasonal_period: int = 1,
+        eval_metric_seasonal_period: Optional[int] = None,
         prediction_length: int = 1,
         validation_splitter: AbstractTimeSeriesSplitter = LastWindowSplitter(),
         ignore_time_index: bool = False,

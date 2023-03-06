@@ -45,6 +45,10 @@ class AbstractTimeSeriesModel(AbstractModel):
         Available metrics can be found in `autogluon.timeseries.utils.metric_utils.AVAILABLE_METRICS`, and
         detailed documentation can be found in `gluonts.evaluation.Evaluator`. By default, `mean_wQuantileLoss`
         will be used.
+    eval_metric_seasonal_period : int, optional
+        Seasonal period used to compute the mean absolute scaled error (MASE) evaluation metric. This parameter is only
+        used if ``eval_metric="MASE"`. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for more details.
+        Defaults to ``None``, in which case the seasonal period is computed based on the data frequency.
     hyperparameters : dict, default = None
         Hyperparameters that will be used by the model (can be search spaces instead of fixed values).
         If None, model defaults are used. This is identical to passing an empty dictionary.
@@ -76,7 +80,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         name: Optional[str] = None,
         metadata: Optional[CovariateMetadata] = None,
         eval_metric: Optional[str] = None,
-        eval_metric_seasonal_period: int = 1,
+        eval_metric_seasonal_period: Optional[int] = None,
         hyperparameters: Dict[str, Union[int, float, str, ag.Space]] = None,
         **kwargs,
     ):
