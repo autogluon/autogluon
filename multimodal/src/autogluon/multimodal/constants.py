@@ -11,6 +11,7 @@ IMAGE_BYTEARRAY = "image_bytearray"
 IDENTIFIER = "identifier"
 DOCUMENT = "document"
 DOCUMENT_IMAGE = "document_image"
+DOCUMENT_PDF = "document_pdf"
 
 # Problem types
 CLASSIFICATION = "classification"
