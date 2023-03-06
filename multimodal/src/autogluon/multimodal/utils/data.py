@@ -576,7 +576,14 @@ def infer_dtypes_by_model_names(model_config: DictConfig):
     return allowable_dtypes, fallback_dtype
 
 
-def split_train_tuning_data(train_data, tuning_data, holdout_frac, is_classification, label_column, seed):
+def split_train_tuning_data(
+    train_data: Union[pd.DataFrame, str],
+    tuning_data: Optional[Union[pd.DataFrame, str]] = None,
+    holdout_frac: Optional[float] = None,
+    is_classification: Optional[bool] = False,
+    label_column: Optional[str] = None,
+    seed: Optional[int] = 123,
+):
     """
     Split training and tuning data.
 
