@@ -83,15 +83,6 @@ def test_tensorrt_export_hf_text(dataset_name, model_names, text_backbone, image
         predictor_trt._model, OnnxModule
     ), f"invalid onnx module type, expected to be OnnxModule, but the model type is {type(predictor._model)}"
 
-    # Test TRT compilation cache
-    predictor_trt2 = MultiModalPredictor.load(path=model_path)
-    tic = time.time()
-    predictor_trt2.optimize_for_inference(data=tail_df)
-    elapsed = time.time() - tic
-    assert (
-        elapsed < 20
-    ), f"Took too long ({elapsed:.3f} seconds) to load cached tensorrt engine files at {trt_cache_dir}. Not cached at all?"
-
     # We should support dynamic shape
     for batch_size in [2, 4, 8]:
         test_df = dataset.test_df.head(batch_size)

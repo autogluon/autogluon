@@ -38,6 +38,7 @@ def test_onnx_export_hf_text(checkpoint_name):
     predictor = MultiModalPredictor(
         problem_type="feature_extraction",
         hyperparameters={
+            "optimization.max_epochs": 1,
             "model.hf_text.checkpoint_name": checkpoint_name,
         },
     )
@@ -105,10 +106,9 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
 
     # convert
     onnx_path = loaded_predictor.export_onnx({"image": [image_path_export]})
-    onnx_model = onnx.load(onnx_path)
 
     # create onnx module for evaluation
-    onnx_module = OnnxModule(onnx_model)
+    onnx_module = OnnxModule(onnx_path)
     onnx_module.input_keys = loaded_predictor._model.input_keys
     onnx_module.prefix = loaded_predictor._model.prefix
     onnx_module.get_output_dict = loaded_predictor._model.get_output_dict

@@ -48,6 +48,9 @@ class OnnxModule(object):
         import onnx
         import onnxruntime as ort
 
+        if not os.path.exists(onnx_path):
+            raise FileNotFoundError(f"failed to located onnx file at {onnx_path}")
+
         logger.info("Loading ONNX file from path {}...".format(onnx_path))
         onnx_model = onnx.load(onnx_path)
 
