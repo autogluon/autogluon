@@ -141,7 +141,7 @@ jobs:
         with:
           job-type: CI-WASM
           job-name: AutoGluon-Lite
-          command: ls ./
+          command: ls
   test_eda:
     needs: lint_check
     runs-on: ubuntu-latest
