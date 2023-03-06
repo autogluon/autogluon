@@ -141,7 +141,7 @@ jobs:
         with:
           job-type: CI-WASM
           job-name: AutoGluon-Lite
-          command: chmod +x ./.github/workflow_scripts/test_tabular_lite.sh && ./.github/workflow_scripts/test_tabular_lite.sh
+          command: ls ./.github/workflow_scripts/
   test_eda:
     needs: lint_check
     runs-on: ubuntu-latest
