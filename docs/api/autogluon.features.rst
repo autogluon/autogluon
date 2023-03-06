@@ -32,7 +32,7 @@ Feature Generators
    RenameFeatureGenerator
    TextNgramFeatureGenerator
    TextSpecialFeatureGenerator
-   
+
 
 :hidden:`AbstractFeatureGenerator`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

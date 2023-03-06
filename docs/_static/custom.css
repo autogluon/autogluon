@@ -1,0 +1,43 @@
+.highlight-bash .highlight {
+    border: 1px #ccc solid;
+}
+
+div.cell div.cell_input, .highlight-bash .highlight {
+    border-left-color: var(--color-brand-content);
+    border-left-width: medium;
+    border-radius: 0.2rem;
+}
+
+div.cell_output table {
+    color: #2b8cee;
+    font-size: 0.8rem;
+}
+
+div.cell_output {
+    overflow-x: scroll;
+    margin-top: 0;
+}
+
+.dataframe {
+    margin: 1em 0;
+}
+
+details.toggle-details summary:hover, details.toggle-details summary:active, details.toggle-details summary {
+    background: transparent;
+}
+
+
+details.sd-dropdown summary {
+    padding: .5rem;
+}
+
+details.sd-dropdown .sd-summary-up, details.sd-dropdown .sd-summary-down {
+    top: .5rem;
+}
+
+body[data-theme="dark"] {
+  --mystnb-source-bg-color: #202020;
+  --mystnb-stdout-bg-color: #202020;
+  --mystnb-stderr-bg-color: #ee0000;
+  --mystnb-traceback-bg-color: #202020;
+}

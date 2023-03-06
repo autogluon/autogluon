@@ -12,21 +12,42 @@ function build_doc {
     setup_build_contrib_env
     bash docs/build_pip_install.sh
     setup_mmcv
-    # only build for docs/$DOC
-    rm -rf ./docs/tutorials/!($DOC)
-    if [[ -n $SUB_DOC ]]; then rm -rf ./docs/tutorials/"$DOC"/!(index.rst|$SUB_DOC); fi
-    cd docs && rm -rf _build && d2lbook build rst
+
+    if [[ -n $PR_NUMBER ]]; then
+        BUCKET="autogluon-ci"
+        S3_PATH="s3://$BUCKET/build_docs/$PR_NUMBER/$COMMIT_SHA"
+    else
+        BUCKET="autogluon-ci-push"
+        S3_PATH="s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA"
+    fi
+
+    S3_DOC_PATH="$S3_PATH/tutorials/$DOC"
+    S3_IMG_PATH="$S3_PATH/_images"
+
+    BUILD_DIR="_build/html"
+
+    LOCAL_DOC_PATH="$BUILD_DIR/tutorials/$DOC"
+    LOCAL_IMG_PATH="$BUILD_DIR/_images"
+
+    SPHINX_BUILD_TAG="$DOC"
+
+    if [[ -n $SUB_DOC ]]; then
+        LOCAL_DOC_PATH+="/$SUB_DOC"
+        S3_DOC_PATH+="/$SUB_DOC"
+        SPHINX_BUILD_TAG+="/$SUB_DOC"
+    fi
+
+    cd docs
+    rm -rf "$BUILD_DIR"
+    sphinx-build -t "$SPHINX_BUILD_TAG" -b html . "$BUILD_DIR"
 
     COMMAND_EXIT_CODE=$?
     if [ $COMMAND_EXIT_CODE -ne 0 ]; then
         exit COMMAND_EXIT_CODE
     fi
 
+    write_to_s3 $BUCKET $LOCAL_DOC_PATH $S3_DOC_PATH
+    write_to_s3 $BUCKET $LOCAL_IMG_PATH $S3_IMG_PATH
+
     cd ..
-
-    if [[ -n $PR_NUMBER ]]; then BUCKET=autogluon-ci S3_PATH=s3://$BUCKET/build_docs/$PR_NUMBER/$COMMIT_SHA; else BUCKET=autogluon-ci-push S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA; fi
-    DOC_PATH=docs/_build/rst/tutorials/$DOC/
-    S3_PATH=$S3_PATH/$DOC/
-
-    write_to_s3 $BUCKET $DOC_PATH $S3_PATH
 }
