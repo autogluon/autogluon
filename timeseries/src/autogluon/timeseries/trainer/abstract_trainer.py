@@ -273,7 +273,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         path: str,
         prediction_length: Optional[int] = 1,
         eval_metric: Optional[str] = None,
-        eval_metric_seasonal_period: int = 1,
+        eval_metric_seasonal_period: Optional[int] = None,
         save_data: bool = True,
         enable_ensemble: bool = True,
         verbosity: int = 2,
