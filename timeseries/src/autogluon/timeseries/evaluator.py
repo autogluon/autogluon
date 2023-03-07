@@ -10,19 +10,16 @@ import pandas as pd
 
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID
+from autogluon.timeseries.utils.seasonality import get_seasonality
 from autogluon.timeseries.utils.warning_filters import evaluator_warning_filter
 
 logger = logging.getLogger(__name__)
 
 
-def in_sample_naive_1_error(*, y_past: pd.Series) -> pd.Series:
-    """Compute the error of naive forecast (predict previous value) for each time series."""
-    diff = y_past.diff()
-    # We ignore the differences between the last value of prev item and the first value of the next item
-    length_per_item = y_past.groupby(level=ITEMID, sort=False).size()
-    first_index_for_each_item = length_per_item.cumsum().values[:-1]
-    diff.iloc[first_index_for_each_item] = np.nan
-    return diff.abs().groupby(level=ITEMID, sort=False).mean()
+def in_sample_seasonal_naive_error(*, y_past: pd.Series, seasonal_period: int = 1) -> pd.Series:
+    """Compute seasonal naive forecast error (predict value from seasonal_period steps ago) for each time series."""
+    seasonal_diffs = y_past.groupby(level=ITEMID, sort=False).diff(seasonal_period).abs()
+    return seasonal_diffs.groupby(level=ITEMID, sort=False).mean().fillna(1.0)
 
 
 def mse_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
@@ -67,7 +64,7 @@ class TimeSeriesEvaluator:
 
     Parameters
     ----------
-    eval_metric: str
+    eval_metric : str
         Name of the metric to be computed. Available metrics are
 
         * ``MASE``: mean absolute scaled error. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error
@@ -78,10 +75,14 @@ class TimeSeriesEvaluator:
         * ``MSE``: mean squared error
         * ``RMSE``: root mean squared error
 
-    prediction_length: int
+    prediction_length : int
         Length of the forecast horizon
-    target_column: str
+    target_column : str, default = "target"
         Name of the target column to be forecasting.
+    eval_metric_seasonal_period : int, optional
+        Seasonal period used to compute the mean absolute scaled error (MASE) evaluation metric. This parameter is only
+        used if ``eval_metric="MASE"`. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for more details.
+        Defaults to ``None``, in which case the seasonal period is computed based on the data frequency.
 
     Class Attributes
     ----------------
@@ -99,15 +100,22 @@ class TimeSeriesEvaluator:
     METRIC_COEFFICIENTS = {"MASE": -1, "MAPE": -1, "sMAPE": -1, "mean_wQuantileLoss": -1, "MSE": -1, "RMSE": -1}
     DEFAULT_METRIC = "mean_wQuantileLoss"
 
-    def __init__(self, eval_metric: str, prediction_length: int, target_column: str = "target"):
+    def __init__(
+        self,
+        eval_metric: str,
+        prediction_length: int,
+        target_column: str = "target",
+        eval_metric_seasonal_period: Optional[int] = None,
+    ):
         assert eval_metric in self.AVAILABLE_METRICS, f"Metric {eval_metric} not available"
 
         self.prediction_length = prediction_length
         self.eval_metric = eval_metric
         self.target_column = target_column
+        self.seasonal_period = eval_metric_seasonal_period
 
         self.metric_method = self.__getattribute__("_" + self.eval_metric.lower())
-        self._past_naive_1_error: Optional[pd.Series] = None
+        self._past_naive_error: Optional[pd.Series] = None
 
     @property
     def coefficient(self) -> int:
@@ -130,7 +138,7 @@ class TimeSeriesEvaluator:
     def _mase(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         y_pred = self._get_median_forecast(predictions)
         mae = mae_per_item(y_true=y_true, y_pred=y_pred)
-        return self._safemean(mae / self._past_naive_1_error)
+        return self._safemean(mae / self._past_naive_error)
 
     def _mape(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         y_pred = self._get_median_forecast(predictions)
@@ -191,7 +199,10 @@ class TimeSeriesEvaluator:
         return metric
 
     def save_past_metrics(self, data_past: TimeSeriesDataFrame):
-        self._past_naive_1_error = in_sample_naive_1_error(y_past=data_past[self.target_column])
+        seasonal_period = get_seasonality(data_past.freq) if self.seasonal_period is None else self.seasonal_period
+        self._past_naive_error = in_sample_seasonal_naive_error(
+            y_past=data_past[self.target_column], seasonal_period=seasonal_period
+        )
 
     def score_with_saved_past_metrics(
         self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
@@ -202,7 +213,7 @@ class TimeSeriesEvaluator:
         it doesn't require splitting the test data into past/future portions each time (e.g., when fitting ensembles).
         """
         assert (predictions.num_timesteps_per_item() == self.prediction_length).all()
-        assert self._past_naive_1_error is not None, "Call save_past_metrics before score_with_saved_past_metrics"
+        assert self._past_naive_error is not None, "Call save_past_metrics before score_with_saved_past_metrics"
         assert data_future.index.equals(predictions.index), "Prediction and data indices do not match."
 
         with evaluator_warning_filter(), warnings.catch_warnings():

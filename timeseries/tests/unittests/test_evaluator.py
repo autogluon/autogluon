@@ -6,12 +6,12 @@ from gluonts.evaluation import make_evaluation_predictions
 from gluonts.model.forecast import SampleForecast
 
 from autogluon.timeseries import TimeSeriesPredictor
-from autogluon.timeseries.evaluator import TimeSeriesEvaluator
+from autogluon.timeseries.evaluator import TimeSeriesEvaluator, in_sample_seasonal_naive_error
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
 from .common import DUMMY_TS_DATAFRAME
 
-GLUONTS_PARITY_METRICS = ["mean_wQuantileLoss", "MAPE", "sMAPE", "MSE", "RMSE"]
+GLUONTS_PARITY_METRICS = ["mean_wQuantileLoss", "MAPE", "sMAPE", "MSE", "RMSE", "MASE"]
 
 
 pytestmark = pytest.mark.filterwarnings("ignore")
@@ -55,6 +55,7 @@ def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_glu
     )
     fcast_list, ts_list = list(forecast_iter), list(ts_iter)
     prediction_length = 2
+    seasonal_period = 3
     forecast_index = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None).index
     forecast_df = model._gluonts_forecasts_to_data_frame(
         fcast_list,
@@ -62,10 +63,12 @@ def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_glu
         forecast_index=forecast_index,
     )
 
-    ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=prediction_length)
+    ag_evaluator = TimeSeriesEvaluator(
+        eval_metric=metric_name, prediction_length=prediction_length, eval_metric_seasonal_period=seasonal_period
+    )
     ag_value = ag_evaluator(DUMMY_TS_DATAFRAME, forecast_df)
 
-    gts_evaluator = GluonTSEvaluator()
+    gts_evaluator = GluonTSEvaluator(seasonality=seasonal_period)
     gts_results, _ = gts_evaluator(
         ts_iterator=ts_list,
         fcst_iterator=fcast_list,
@@ -78,6 +81,9 @@ def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_glu
 def test_when_given_all_zero_data_when_evaluator_called_then_output_equal_to_gluonts(
     metric_name, deepar_trained_zero_data
 ):
+    if metric_name == "MASE":
+        pytest.skip("MASE is undefined if all data is constant")
+
     model = deepar_trained_zero_data
     data = DUMMY_TS_DATAFRAME.copy() * 0
 
@@ -124,6 +130,7 @@ def test_when_given_zero_forecasts_when_evaluator_called_then_output_equal_to_gl
             )
         )
     prediction_length = 2
+    seasonal_period = 3
     forecast_index = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None).index
     forecast_df = model._gluonts_forecasts_to_data_frame(
         zero_forecast_list,
@@ -131,10 +138,12 @@ def test_when_given_zero_forecasts_when_evaluator_called_then_output_equal_to_gl
         forecast_index=forecast_index,
     )
 
-    ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=prediction_length)
+    ag_evaluator = TimeSeriesEvaluator(
+        eval_metric=metric_name, prediction_length=prediction_length, eval_metric_seasonal_period=seasonal_period
+    )
     ag_value = ag_evaluator(DUMMY_TS_DATAFRAME, forecast_df)
 
-    gts_evaluator = GluonTSEvaluator()
+    gts_evaluator = GluonTSEvaluator(seasonality=seasonal_period)
     gts_results, _ = gts_evaluator(ts_iterator=ts_list, fcst_iterator=zero_forecast_list)
 
     assert np.isclose(gts_results[metric_name], ag_value, atol=1e-5)
@@ -185,3 +194,11 @@ def test_given_historic_data_not_cached_when_scoring_then_exception_is_raised(ev
     predictions = data_future.rename({"target": "mean"}, axis=1)
     with pytest.raises(AssertionError, match="Call save_past_metrics before"):
         evaluator.score_with_saved_past_metrics(data_future=data_future, predictions=predictions)
+
+
+def test_when_eval_metric_seasonal_period_is_longer_than_ts_then_scale_is_set_to_1():
+    seasonal_period = max(DUMMY_TS_DATAFRAME.num_timesteps_per_item())
+    naive_error_per_item = in_sample_seasonal_naive_error(
+        y_past=DUMMY_TS_DATAFRAME["target"], seasonal_period=seasonal_period
+    )
+    assert (naive_error_per_item == 1.0).all()
