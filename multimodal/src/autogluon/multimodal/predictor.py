@@ -26,8 +26,7 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.multimodal.utils import object_detection_data_to_df, save_result_df, setup_detection_train_tuning_data
-from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
+from autogluon.core.utils.loaders import load_pd
 
 from . import version as ag_version
 from .constants import (
@@ -125,6 +124,8 @@ from .utils import (
     get_available_devices,
     get_config,
     get_detection_classes,
+    get_fit_complete_message,
+    get_fit_start_message,
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_mixup,
@@ -675,6 +676,11 @@ class MultiModalPredictor(ExportMixin):
             train_data, tuning_data = setup_detection_train_tuning_data(
                 self, max_num_tuning_data, seed, train_data, tuning_data
             )
+
+        if isinstance(train_data, str):
+            train_data = load_pd.load(train_data)
+        if isinstance(tuning_data, str):
+            tuning_data = load_pd.load(tuning_data)
 
         pl.seed_everything(seed, workers=True)
 
