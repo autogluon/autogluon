@@ -14,7 +14,7 @@ from ..models.mmdet_image import MMDetAutoModelForObjectDetection
 from ..models.timm_image import TimmAutoModelForImagePrediction
 from .environment import compute_num_gpus, get_precision_context, infer_precision, move_to_device
 from .inference import process_batch
-from .onnx import onnx_get_dynamic_axes
+from .onnx import onnx_get_dynamic_axes, OnnxModule
 
 logger = logging.getLogger(__name__)
 
@@ -156,29 +156,34 @@ class ExportMixin:
     def optimize_for_inference(
         self,
         data: Union[dict, pd.DataFrame],
+        providers: Optional[Union[dict, List[str]]] = None,
     ):
         """
-        Export this predictor's model to ONNX file.
+        Optimize the predictor's model for inference.
+
+        Under the hood, the implementation would convert the PyTorch module into an ONNX module, so that
+        we can leverage efficient execution providers in onnxruntime for faster inference.
 
         Parameters
         ----------
         data
             Raw data used to trace and export the model.
             If this is None, will check if a processed batch is provided.
+        providers : dict or str, default=None
+            A list of execution providers for model prediction in onnxruntime.
+
+            By default, the providers argument is None. The method would generate an ONNX module that
+            would perform model inference with TensorrtExecutionProvider in onnxruntime, if tensorrt
+            package is properly installed. Otherwise, the onnxruntime would fallback to use CUDA or CPU
+            execution providers instead.
 
         Returns
         -------
         onnx_module : OnnxModule
             The onnx-based module that can be used to replace predictor._model for model inference.
         """
-        import onnx
-        import torch
-
-        from .onnx import OnnxModule
-
         onnx_path = self.export_onnx(data=data, path=self.path, truncate_long_and_double=True)
-
-        onnx_module = OnnxModule(onnx_path)
+        onnx_module = OnnxModule(onnx_path, providers)
         onnx_module.input_keys = self._model.input_keys
         onnx_module.prefix = self._model.prefix
         onnx_module.get_output_dict = self._model.get_output_dict
@@ -187,8 +192,9 @@ class ExportMixin:
         self._model = onnx_module
 
         # Evaluate and cache TensorRT engine files
-        logger.info("Compiling to TensorRT engine and profile, this may take a few minutes ...")
+        logger.info("Compiling ... (this may take a few minutes)")
         _ = self.predict(data)
+        _ = self.predict(data.head(1))
         logger.info("Finished compilation!")
 
         return onnx_module

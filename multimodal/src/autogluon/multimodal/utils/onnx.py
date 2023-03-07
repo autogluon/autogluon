@@ -8,13 +8,14 @@ from ..constants import AUTOMM, FEATURE_EXTRACTION, MULTICLASS
 
 logger = logging.getLogger(__name__)
 
+# TODO: Try a better workaround to lazy import tensorrt package.
+tensorrt_imported = False
 try:
     import tensorrt  # Unused but required by TensorrtExecutionProvider
+    tensorrt_imported = True
 except:
-    logger.warning(
-        "Failed to import tensorrt package. "
-        "onnxruntime would fallback to CUDAExecutionProvider instead of using TensorrtExecutionProvider."
-    )
+    # We silently omit the import failure here to avoid overwhelming warning messages in case of multi-gpu.
+    tensorrt_imported = False
 
 
 def onnx_get_dynamic_axes(input_keys: List[str]):
@@ -26,6 +27,15 @@ def onnx_get_dynamic_axes(input_keys: List[str]):
             dynamic_axes[k] = {0: "batch_size"}
 
     return dynamic_axes
+
+
+def get_provider_name(provider_config: Union[str, tuple]) -> str:
+    if isinstance(provider_config, tuple):
+        provider_name = provider_config[0]
+    else:
+        assert isinstance(provider_config, str), "input provider config is expected to be either str or tuple"
+        provider_name = provider_config
+    return provider_name
 
 
 class OnnxModule(object):
@@ -54,10 +64,9 @@ class OnnxModule(object):
         logger.info("Loading ONNX file from path {}...".format(onnx_path))
         onnx_model = onnx.load(onnx_path)
 
-        dirname = os.path.dirname(os.path.abspath(onnx_path))
-        cache_path = os.path.join(dirname, "model_trt")
-
         if providers == None:
+            dirname = os.path.dirname(os.path.abspath(onnx_path))
+            cache_path = os.path.join(dirname, "model_trt")
             providers = [
                 (
                     "TensorrtExecutionProvider",
@@ -81,7 +90,18 @@ class OnnxModule(object):
                 ),
                 ("CPUExecutionProvider", {}),
             ]
+
+        if len(providers) == 1 and get_provider_name(providers[0]) == "TensorrtExecutionProvider":
+            if not tensorrt_imported:
+                raise ImportError(
+                    "tensorrt package is not installed. The package can be install via `pip install tensorrt`."
+                )
+
         self.sess = ort.InferenceSession(onnx_model.SerializeToString(), providers=providers)
+
+        if get_provider_name(providers[0]) == "TensorrtExecutionProvider" and tensorrt_imported:
+            assert "TensorrtExecutionProvider" in self.sess.get_providers(), f"unexpected TensorRT compilation failure"
+
         inputs = self.sess.get_inputs()
         outputs = self.sess.get_outputs()
         self.input_names = [i.name for i in inputs]
