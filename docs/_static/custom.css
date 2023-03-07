@@ -18,6 +18,10 @@ div.cell_output {
     margin-top: 0;
 }
 
+div.sidebar-scroll {
+  scroll-behavior: auto;
+}
+
 .dataframe {
     margin: 1em 0;
 }
