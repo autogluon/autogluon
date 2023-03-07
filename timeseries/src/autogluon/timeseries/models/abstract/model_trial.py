@@ -74,15 +74,17 @@ def fit_and_save_model(model, fit_kwargs, train_data, val_data, eval_metric, tim
     time_fit_start = time.time()
     model.fit(train_data=train_data, val_data=val_data, time_limit=time_left, **fit_kwargs)
     time_fit_end = time.time()
-    model.val_score = model.score(val_data, eval_metric)
+    val_predictions = model.predict_for_scoring(val_data)
     time_pred_end = time.time()
+    model.cache_val_predictions(val_predictions)
+    model.val_score = model.score_with_val_predictions(data=val_data, eval_metric=eval_metric)
 
     logger.debug(f"\tHyperparameter tune run: {model.name}")
     logger.debug(f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({eval_metric})")
     model.fit_time = time_fit_end - time_fit_start
     model.predict_time = time_pred_end - time_fit_end
     logger.debug(f"\t\t{model.fit_time:<7.3f} s".ljust(15) + "= Training runtime")
-    logger.debug(f"\t\t{model.predict_time:<7.3f} s".ljust(15) + "= Training runtime")
+    logger.debug(f"\t\t{model.predict_time:<7.3f} s".ljust(15) + "= Prediction runtime")
     model.save()
     return model
 

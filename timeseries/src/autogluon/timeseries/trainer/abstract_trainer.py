@@ -336,6 +336,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         self.models = models
 
+    def get_model_val_predictions(self, model_name: str) -> TimeSeriesDataFrame:
+        model_path = self.get_model_attribute(model=model_name, attribute="path")
+        model_type = self.get_model_attribute(model=model_name, attribute="type")
+        return model_type.load_val_predictions(path=model_path)
+
     def _add_model(
         self,
         model: AbstractTimeSeriesModel,
@@ -478,8 +483,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
     ) -> List[str]:
-        """Fit and save the given model on given training and validation data and save the
-        trained model.
+        """Fit the given model on training and validation data, and save the trained model to disk.
+
+        If validation data is provided, model's predictions on the validation data will also be saved to disk.
 
         Returns
         -------
@@ -496,16 +502,21 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             model = self._train_single(train_data, model, val_data=val_data, time_limit=time_limit)
             fit_end_time = time.time()
 
-            val_score = model.score(val_data) if val_data is not None else None
-            model.val_score = val_score
-
-            pred_end_time = time.time()
+            if val_data is not None:
+                val_predictions = model.predict_for_scoring(val_data)
+                pred_end_time = time.time()
+                model.cache_val_predictions(val_predictions)
+                predict_time = pred_end_time - fit_end_time
+                val_score = model.score_with_val_predictions(val_data)
+            else:
+                predict_time = None
+                val_score = None
 
             model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
-            if model.predict_time is None:
-                model.predict_time = None if val_score is None else (pred_end_time - fit_end_time)
+            model.predict_time = model.predict_time or predict_time
+            model.val_score = val_score
 
-            self._log_scores_and_times(val_score, model.fit_time, model.predict_time)
+            self._log_scores_and_times(model.val_score, model.fit_time, model.predict_time)
 
             self.save_model(model=model)
         except (Exception, MemoryError) as err:
@@ -685,11 +696,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         model_preds = {}
         for model_name in model_names:
-            model: AbstractGluonTSModel = self.load_model(model_name=model_name)
-
-            # FIXME: This differs from predictions made to calc val_score for the models. Try to align.
-            #  Can either seed for deterministic results or cache the pred during val_score calc and reuse.
-            model_preds[model_name] = model.predict_for_scoring(data=val_data, quantile_levels=self.quantile_levels)
+            model_preds[model_name] = self.get_model_val_predictions(model_name=model_name)
 
         time_start = time.time()
         ensemble = self.ensemble_model_type(
@@ -714,7 +721,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             target_column=self.target,
         )
         forecasts = ensemble.predict({n: model_preds[n] for n in ensemble.model_names})
-        ensemble.val_score = evaluator(val_data, forecasts) * evaluator.coefficient
+        ensemble.val_score = evaluator(data=val_data, predictions=forecasts) * evaluator.coefficient
 
         predict_time = 0
         for m in ensemble.model_names:

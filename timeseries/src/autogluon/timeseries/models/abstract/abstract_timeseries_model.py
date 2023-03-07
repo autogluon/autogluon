@@ -5,6 +5,7 @@ import time
 from typing import Any, Dict, List, Optional, Union
 
 import autogluon.core as ag
+from autogluon.common.loaders import load_pkl
 from autogluon.common.savers import save_pkl
 from autogluon.core.hpo.exceptions import EmptySearchSpace
 from autogluon.core.hpo.executors import HpoExecutor
@@ -53,6 +54,8 @@ class AbstractTimeSeriesModel(AbstractModel):
         Hyperparameters that will be used by the model (can be search spaces instead of fixed values).
         If None, model defaults are used. This is identical to passing an empty dictionary.
     """
+
+    _val_predictions_filename = "val_predictions.pkl"
 
     # TODO: refactor "pruned" methods after AbstractModel is refactored
     predict_proba = None
@@ -105,6 +108,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             "quantile_levels",
             kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
+        self._val_predictions: Optional[TimeSeriesDataFrame] = None
 
     def __repr__(self) -> str:
         return self.name
@@ -424,6 +428,52 @@ class AbstractTimeSeriesModel(AbstractModel):
             return {}
         else:
             return self._user_params.copy()
+
+    def save(self, path: str = None, verbose=True) -> str:
+        if self._val_predictions is not None:
+            save_pkl.save(
+                path=os.path.join(self.path + "utils", self._val_predictions_filename),
+                object=self._val_predictions,
+                verbose=verbose,
+            )
+        return super().save(path=path, verbose=verbose)
+
+    @classmethod
+    def load(
+        cls, path: str, reset_paths: bool = True, load_val_predictions: bool = False, verbose: bool = True
+    ) -> "AbstractTimeSeriesModel":
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        if load_val_predictions and model._val_predictions is None:
+            model._val_predictions = cls.load_val_predictions(path=path, verbose=verbose)
+        return model
+
+    @classmethod
+    def load_val_predictions(cls, path: str, verbose: bool = True) -> TimeSeriesDataFrame:
+        """Load the cached validation predictions from disk."""
+        return load_pkl.load(path=os.path.join(path + "utils", cls._val_predictions_filename), verbose=verbose)
+
+    def cache_val_predictions(self, val_predictions: TimeSeriesDataFrame) -> None:
+        self._val_predictions = val_predictions
+
+    def get_val_predictions(self) -> TimeSeriesDataFrame:
+        if self._val_predictions is None:
+            try:
+                self._val_predictions = self.load_val_predictions(path=self.path)
+            except FileNotFoundError:
+                raise ValueError(
+                    f"Val predictions must be cached with `cache_val_predictions` before calling `get_val_predictions`"
+                )
+        return self._val_predictions
+
+    def score_with_val_predictions(self, data: TimeSeriesDataFrame, metric: str = None) -> float:
+        metric = self.eval_metric if metric is None else metric
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=metric,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
+        )
+        predictions = self.get_val_predictions()
+        return evaluator(data, predictions) * evaluator.coefficient
 
 
 class AbstractTimeSeriesModelFactory:
