@@ -14,7 +14,7 @@ from ..models.mmdet_image import MMDetAutoModelForObjectDetection
 from ..models.timm_image import TimmAutoModelForImagePrediction
 from .environment import compute_num_gpus, get_precision_context, infer_precision, move_to_device
 from .inference import process_batch
-from .onnx import onnx_get_dynamic_axes, OnnxModule
+from .onnx import OnnxModule, onnx_get_dynamic_axes
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +194,6 @@ class ExportMixin:
         # Evaluate and cache TensorRT engine files
         logger.info("Compiling ... (this may take a few minutes)")
         _ = self.predict(data)
-        _ = self.predict(data.head(1))
         logger.info("Finished compilation!")
 
         return onnx_module

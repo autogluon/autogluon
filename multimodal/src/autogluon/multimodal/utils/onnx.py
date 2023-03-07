@@ -10,12 +10,14 @@ logger = logging.getLogger(__name__)
 
 # TODO: Try a better workaround to lazy import tensorrt package.
 tensorrt_imported = False
-try:
-    import tensorrt  # Unused but required by TensorrtExecutionProvider
-    tensorrt_imported = True
-except:
-    # We silently omit the import failure here to avoid overwhelming warning messages in case of multi-gpu.
-    tensorrt_imported = False
+if not tensorrt_imported:
+    try:
+        import tensorrt  # Unused but required by TensorrtExecutionProvider
+
+        tensorrt_imported = True
+    except:
+        # We silently omit the import failure here to avoid overwhelming warning messages in case of multi-gpu.
+        tensorrt_imported = False
 
 
 def onnx_get_dynamic_axes(input_keys: List[str]):
@@ -100,7 +102,10 @@ class OnnxModule(object):
         self.sess = ort.InferenceSession(onnx_model.SerializeToString(), providers=providers)
 
         if get_provider_name(providers[0]) == "TensorrtExecutionProvider" and tensorrt_imported:
-            assert "TensorrtExecutionProvider" in self.sess.get_providers(), f"unexpected TensorRT compilation failure"
+            assert "TensorrtExecutionProvider" in self.sess.get_providers(), (
+                f"unexpected TensorRT compilation failure: TensorrtExecutionProvider not in providers ({self.sess.get_providers()}). "
+                "Make sure onnxruntime package gets lazy imported everywhere."
+            )
 
         inputs = self.sess.get_inputs()
         outputs = self.sess.get_outputs()

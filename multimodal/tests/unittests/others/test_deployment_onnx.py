@@ -3,8 +3,6 @@ import shutil
 
 import numpy as np
 import numpy.testing
-import onnx
-import onnxruntime as ort
 import pytest
 import torch
 from datasets import load_dataset
@@ -48,6 +46,9 @@ def evaluate(predictor, df, onnx_session=None):
     ["sentence-transformers/msmarco-MiniLM-L-12-v3", "sentence-transformers/all-MiniLM-L6-v2"],
 )
 def test_onnx_export_hf_text(checkpoint_name):
+    # IMPORTANT: lazy import onnxruntime, otherwise onnxruntime won't be able to compile to tensorrt EP.
+    import onnxruntime as ort
+
     test_df = load_dataset("wietsedv/stsbenchmark", split="test").to_pandas()
     test_df = test_df.head()  # subsample the data to avoid OOM in tracing
 
