@@ -838,7 +838,7 @@ class MultiModalPredictor(ExportMixin):
 
     # FIXME: Avoid having separate logic for inferring features and label column that is combined together
     def _infer_column_types(
-            self, train_data: pd.DataFrame, tuning_data: pd.DataFrame = None, column_types: dict = None
+        self, train_data: pd.DataFrame, tuning_data: pd.DataFrame = None, column_types: dict = None
     ) -> dict:
         column_types = infer_column_types(
             data=train_data,
@@ -859,7 +859,9 @@ class MultiModalPredictor(ExportMixin):
     #  don't combine output_shape and problem_type detection, make them separate
     #  Use autogluon.core.utils.utils.infer_problem_type
     def _infer_problem_type(self, train_data: pd.DataFrame, column_types: dict = None) -> str:
-        column_types_label = self._infer_column_types(train_data=train_data[[self._label_column]], column_types=column_types)
+        column_types_label = self._infer_column_types(
+            train_data=train_data[[self._label_column]], column_types=column_types
+        )
 
         problem_type, _ = infer_problem_type_output_shape(
             label_column=self._label_column,
