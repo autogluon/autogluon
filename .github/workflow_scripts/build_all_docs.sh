@@ -72,8 +72,4 @@ fi
 
 # Write docs to s3
 write_to_s3 $BUCKET $LOCAL_DOC_PATH $S3_PATH
-# Write root_index to s3 if master
-if [[ ($BRANCH == 'master') && ($GIT_REPO == autogluon/autogluon) ]]
-then
-    write_to_s3 $BUCKET root_index.html s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA/root_index.html
-fi
+

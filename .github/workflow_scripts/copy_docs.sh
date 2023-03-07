@@ -45,8 +45,3 @@ fi
 aws s3 sync ${flags} ${BUILD_DOCS_PATH}/all/ s3://${bucket}/${path} --acl public-read ${cacheControl}
 echo "Uploaded doc to http://${site}/index.html"
 
-if [[ ($BRANCH == 'master') && ($GIT_REPO == autogluon/autogluon) ]]
-then
-    aws s3 cp ${BUILD_DOCS_PATH}/root_index.html s3://${bucket}/index.html --acl public-read ${cacheControl}
-    echo "Uploaded root_index.html s3://${bucket}/index.html"
-fi
