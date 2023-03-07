@@ -45,7 +45,7 @@ if [[ ${SAFE_TO_USE_SCRIPT,,} != ${TRUE,,} ]]; then
 fi
 
 cd $WORK_DIR
-/bin/bash -o pipefail -c "$COMMAND"
+/bin/bash -o pipefail -c "eval $COMMAND"
 COMMAND_EXIT_CODE=$?
 
 exit $COMMAND_EXIT_CODE
