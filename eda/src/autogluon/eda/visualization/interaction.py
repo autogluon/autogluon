@@ -14,7 +14,7 @@ from ..state import AnalysisState
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
 
-__all__ = ["CorrelationVisualization", "CorrelationSignificanceVisualization", "FeatureInteractionVisualization"]
+__all__ = ["CorrelationVisualization", "CorrelationSignificanceVisualization", "FeatureInteractionVisualization", "FeatureDistanceAnalysisVisualization"]
 
 
 class _AbstractCorrelationChart(AbstractVisualization, JupyterMixin, ABC):

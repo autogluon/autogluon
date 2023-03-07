@@ -3,6 +3,7 @@ from .interaction import (
     CorrelationSignificanceVisualization,
     CorrelationVisualization,
     FeatureInteractionVisualization,
+    FeatureDistanceAnalysisVisualization
 )
 from .layouts import (
     MarkdownSectionComponent,

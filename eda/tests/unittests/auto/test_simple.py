@@ -2,7 +2,7 @@ import os
 import re
 import tempfile
 from sys import platform
-from unittest.mock import MagicMock, call
+from unittest.mock import ANY, MagicMock, call
 
 import numpy as np
 import pandas as pd
@@ -17,6 +17,7 @@ from autogluon.eda.auto import (
     analyze_interaction,
     covariate_shift_detection,
     dataset_overview,
+    explain_rows,
     quick_fit,
     target_analysis,
 )
@@ -41,6 +42,7 @@ from autogluon.eda.visualization import (
 )
 from autogluon.eda.visualization.base import AbstractVisualization
 from autogluon.eda.visualization.interaction import FeatureDistanceAnalysisVisualization
+from autogluon.eda.visualization.jupyter import JupyterMixin
 
 RESOURCE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources"))
 
@@ -434,3 +436,75 @@ def test_target_analysis__regression(monkeypatch):
         "skewnorm",
         "weibull_min",
     ]
+
+
+@pytest.mark.parametrize(
+    "label,expected_task_type",
+    [
+        ("class", "binary"),
+        ("fnlwgt", "regression"),
+    ],
+)
+def test_explain_rows(label, expected_task_type, monkeypatch):
+    df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
+    with tempfile.TemporaryDirectory() as path:
+        state = quick_fit(
+            estimator_args=dict(path=path),
+            train_data=df_train,
+            label=label,
+            return_state=True,
+            save_model_to_state=True,
+            render_analysis=False,
+        )
+
+        assert state.model.problem_type == expected_task_type
+
+        with monkeypatch.context() as m:
+            call_shap_force_plot = MagicMock()
+            call_shap_waterfall_plot = MagicMock()
+            m.setattr("shap.force_plot", call_shap_force_plot)
+            m.setattr(eda.auto.simple, "waterfall_plot", call_shap_waterfall_plot)
+
+            # --- force_plot
+
+            call_display_obj = MagicMock()
+            m.setattr(JupyterMixin, "display_obj", call_display_obj)
+            explain_rows(
+                train_data=df_train,
+                model=state.model,
+                rows=state.model_evaluation.highest_error[:2],
+                text_rotation=40,
+                display_rows=True,
+                other_arg="a",
+            )
+            expected_calls = [
+                call(ANY, ANY, ANY, text_rotation=40, matplotlib=True, other_arg="a"),
+                call(ANY, ANY, ANY, text_rotation=40, matplotlib=True, other_arg="a"),
+            ]
+
+            expected_rows = [state.model_evaluation.highest_error.iloc[i][df_train.columns] for i in range(2)]
+
+            assert call_display_obj.call_count == 2
+            call_shap_force_plot.assert_has_calls(expected_calls)
+
+            for c, er in zip(call_shap_force_plot.call_args_list, expected_rows):
+                assert er.equals(c.args[2])
+
+            # --- waterfall_plot
+
+            call_display_obj = MagicMock()
+            m.setattr(JupyterMixin, "display_obj", call_display_obj)
+            explain_rows(
+                train_data=df_train,
+                model=state.model,
+                rows=state.model_evaluation.highest_error[2:4],
+                waterfall=True,
+            )
+
+            expected_rows = [state.model_evaluation.highest_error.iloc[i][df_train.columns] for i in range(2, 4)]
+
+            call_display_obj.assert_not_called()
+            assert call_shap_waterfall_plot.call_count == 2
+
+            for c, er in zip(call_shap_waterfall_plot.call_args_list, expected_rows):
+                assert er.equals(c.args[2])

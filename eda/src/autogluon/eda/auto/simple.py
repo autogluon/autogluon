@@ -2,9 +2,12 @@ import logging
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
+import shap
+from shap.plots._waterfall import waterfall_legacy as waterfall_plot
 
 from autogluon.common.utils.log_utils import verbosity2loglevel
 
+from autogluon.tabular import TabularPredictor
 from .. import AnalysisState
 from ..analysis import (
     ApplyFeatureGenerator,
@@ -47,7 +50,10 @@ from ..visualization import (
 )
 from ..visualization.base import AbstractVisualization
 from ..visualization.interaction import FeatureDistanceAnalysisVisualization
+from ..visualization.jupyter import JupyterMixin
 from ..visualization.layouts import SimpleVerticalLinearLayout
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "analyze",
@@ -57,6 +63,7 @@ __all__ = [
     "missing_values_analysis",
     "quick_fit",
     "target_analysis",
+    "explain_rows",
 ]
 
 
@@ -258,6 +265,7 @@ def quick_fit(
     estimator_args: Optional[Dict[str, Dict[str, Any]]] = None,
     fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
     chart_args: Optional[Dict[str, Dict[str, Any]]] = None,
+    render_analysis: bool = True,
     **fit_args,
 ):
     """
@@ -323,6 +331,9 @@ def quick_fit(
         figures args for vizualizations; key == component; value = dict of kwargs for component figure
     chart_args: Optional[Dict[str, Any]], default = None,
         figures args for vizualizations; key == component; value = dict of kwargs for component chart
+    render_analysis: bool, default = True
+        if `False`, then don't render any visualizations; this can be used if user just needs to train a model. It is recommended to use this option
+        with `save_model_to_state=True` and `return_state=True` options.
 
     Returns
     -------
@@ -370,32 +381,8 @@ def quick_fit(
     if (test_data is not None) and (label not in test_data.columns):
         test_data = None
 
-    return analyze(
-        train_data=train_data,
-        test_data=test_data,
-        label=label,
-        sample=sample,
-        state=state,
-        return_state=return_state,
-        anlz_facets=[
-            ProblemTypeControl(problem_type=problem_type),
-            TrainValidationSplit(
-                val_size=val_size,
-                children=[
-                    AutoGluonModelQuickFit(
-                        estimator_args=estimator_args,
-                        verbosity=verbosity,
-                        problem_type=problem_type,
-                        save_model_to_state=save_model_to_state,
-                        children=[
-                            AutoGluonModelEvaluator(),
-                        ],
-                        **fit_args,
-                    ),
-                ],
-            ),
-        ],
-        viz_facets=[
+    if render_analysis:
+        viz = [
             MarkdownSectionComponent(markdown=f"### Model Prediction for {label}"),
             ConfusionMatrix(
                 fig_args=fig_args.get("confusion_matrix", {}),
@@ -426,7 +413,36 @@ def quick_fit(
                 "and are good candidates for additional labeling",
             ),
             PropertyRendererComponent("model_evaluation.undecided", transform_fn=(lambda df: df.head(10))),
+        ]
+    else:
+        viz = []
+
+    return analyze(
+        train_data=train_data,
+        test_data=test_data,
+        label=label,
+        sample=sample,
+        state=state,
+        return_state=return_state,
+        anlz_facets=[
+            ProblemTypeControl(problem_type=problem_type),
+            TrainValidationSplit(
+                val_size=val_size,
+                children=[
+                    AutoGluonModelQuickFit(
+                        estimator_args=estimator_args,
+                        verbosity=verbosity,
+                        problem_type=problem_type,
+                        save_model_to_state=save_model_to_state,
+                        children=[
+                            AutoGluonModelEvaluator(),
+                        ],
+                        **fit_args,
+                    ),
+                ],
+            ),
         ],
+        viz_facets=viz,
     )
 
 
@@ -924,3 +940,80 @@ def missing_values_analysis(
             MissingValues(graph_type=graph_type, **chart_args),
         ],
     )
+
+
+class _ShapAutogluonWrapper:
+    def __init__(self, predictor, feature_names, target_class=None):
+        self.ag_model = predictor
+        self.feature_names = feature_names
+        self.target_class = target_class
+        if target_class is None and predictor.problem_type != "regression":
+            print("Since target_class not specified, SHAP will explain predictions for each class")
+
+    def predict_proba(self, X):
+        if isinstance(X, pd.Series):
+            X = X.values.reshape(1, -1)
+        if not isinstance(X, pd.DataFrame):
+            X = pd.DataFrame(X, columns=self.feature_names)
+        preds = self.ag_model.predict_proba(X)
+        if self.ag_model.problem_type == "regression" or self.target_class is None:
+            return preds
+        else:
+            return preds[self.target_class]
+
+
+def explain_rows(
+    train_data: pd.DataFrame,
+    model: TabularPredictor,
+    rows: pd.DataFrame,
+    display_rows: bool = False,
+    waterfall: bool = False,
+    baseline_sample: int = 100,
+    **kwargs,
+) -> None:
+    """
+    Kernel SHAP is a method that uses a special weighted linear regression
+    to compute the importance of each feature. The computed importance values
+    are Shapley values from game theory and also coefficients from a local linear
+    regression values analysis for the given rows.
+
+    The results are rendered either as force plot or waterfall plot.
+
+    Parameters
+    ----------
+    train_data: DataFrame
+        training dataset
+    model: TabularPredictor
+        trained AutoGluon predictor
+    rows: pd.DataFrame,
+        rows to explain
+    display_rows: bool, default = False
+        if `True` then display the row before the explanation chart
+    waterfall: bool, default = False
+        render the analysis as waterfall plot instead of force plot
+    baseline_sample: int, default = 100
+        The background dataset size to use for integrating out features. To determine the impact
+        of a feature, that feature is set to "missing" and the change in the model output
+        is observed.
+    kwargs
+
+    See Also
+    --------
+    :py:class:`~shap.KernelExplainer`
+
+    """
+    assert baseline_sample >= 30
+    baseline = train_data.sample(baseline_sample, random_state=0)
+    for _, row in rows.iterrows():
+        target_class = row[model.label] if model.problem_type != "regression" else None
+        ag_wrapper = _ShapAutogluonWrapper(model, train_data.columns, target_class)
+        explainer = shap.KernelExplainer(ag_wrapper.predict_proba, baseline)
+        _row = pd.DataFrame([row])
+        if display_rows:
+            JupyterMixin.display_obj(_row)
+        shap_values = explainer.shap_values(_row[train_data.columns], silent=True)
+        if waterfall:
+            waterfall_plot(explainer.expected_value, shap_values[0], row[train_data.columns], **kwargs)
+        else:
+            _kwargs = {**dict(text_rotation=45, matplotlib=True), **kwargs}
+            shap.force_plot(explainer.expected_value, shap_values[0], row[train_data.columns], **_kwargs)
