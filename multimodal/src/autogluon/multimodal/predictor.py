@@ -688,6 +688,16 @@ class MultiModalPredictor(ExportMixin):
 
         pl.seed_everything(seed, workers=True)
 
+        if self._presets is not None:
+            # FIXME: Silently ignoring user input, there should be a warning
+            presets = self._presets
+        else:
+            self._presets = presets
+
+        if self._config is not None:  # continuous training
+            # FIXME: Silently ignoring user input, there should be a warning
+            config = self._config
+
         self._save_path = setup_save_path(
             resume=self._resume,
             old_save_path=self._save_path,
@@ -697,52 +707,24 @@ class MultiModalPredictor(ExportMixin):
             fit_called=fit_called,
         )
 
-        column_types = infer_column_types(
-            data=train_data,
-            valid_data=tuning_data,
-            label_columns=self._label_column,
-            provided_column_types=column_types,
-            problem_type=self._problem_type,
-        )
-
-        column_types = infer_label_column_type_by_problem_type(
-            column_types=column_types,
-            label_columns=self._label_column,
-            problem_type=self._problem_type,
-            data=train_data,
-            valid_data=tuning_data,
-        )
-
-        if self._presets is not None:
-            presets = self._presets
-        else:
-            self._presets = presets
-
-        if self._config is not None:  # continuous training
-            config = self._config
-
-        # FIXME: Align logic with Tabular,
-        #  don't combine output_shape and problem_type detection, make them separate
-        self._problem_type, output_shape = infer_problem_type_output_shape(
-            label_column=self._label_column,
-            column_types=column_types,
-            data=train_data,
-            provided_problem_type=self._problem_type,
-        )
+        self._problem_type = self._infer_problem_type(train_data=train_data, column_types=column_types)
 
         if tuning_data is None:
             train_data, tuning_data = self._split_train_tuning(
                 data=train_data, holdout_frac=holdout_frac, random_state=seed
             )
 
-            # FIXME: Because output_shape is paired with problem_type detection,
-            #  need to do this again in-case output_shape changed when splitting data
-            self._problem_type, output_shape = infer_problem_type_output_shape(
-                label_column=self._label_column,
-                column_types=column_types,
-                data=train_data,
-                provided_problem_type=self._problem_type,
-            )
+        column_types = self._infer_column_types(
+            train_data=train_data, tuning_data=tuning_data, column_types=column_types
+        )
+
+        # FIXME: separate infer problem_type with output_shape, should be logically distinct
+        _, output_shape = infer_problem_type_output_shape(
+            label_column=self._label_column,
+            column_types=column_types,
+            data=train_data,
+            provided_problem_type=self._problem_type,
+        )
 
         # Determine data scarcity mode, i.e. a few-shot scenario
         scarcity_mode = infer_scarcity_mode_by_data_size(
@@ -853,6 +835,39 @@ class MultiModalPredictor(ExportMixin):
         logger.info(get_fit_complete_message(self._save_path))
 
         return self
+
+    # FIXME: Avoid having separate logic for inferring features and label column that is combined together
+    def _infer_column_types(
+            self, train_data: pd.DataFrame, tuning_data: pd.DataFrame = None, column_types: dict = None
+    ) -> dict:
+        column_types = infer_column_types(
+            data=train_data,
+            label_columns=self._label_column,
+            provided_column_types=column_types,
+            valid_data=tuning_data,
+        )
+        column_types = infer_label_column_type_by_problem_type(
+            column_types=column_types,
+            label_columns=self._label_column,
+            problem_type=self._problem_type,
+            data=train_data,
+            valid_data=tuning_data,
+        )
+        return column_types
+
+    # FIXME: Align logic with Tabular,
+    #  don't combine output_shape and problem_type detection, make them separate
+    #  Use autogluon.core.utils.utils.infer_problem_type
+    def _infer_problem_type(self, train_data: pd.DataFrame, column_types: dict = None) -> str:
+        column_types_label = self._infer_column_types(train_data=train_data[[self._label_column]], column_types=column_types)
+
+        problem_type, _ = infer_problem_type_output_shape(
+            label_column=self._label_column,
+            column_types=column_types_label,
+            data=train_data,
+            provided_problem_type=self._problem_type,
+        )
+        return problem_type
 
     def _split_train_tuning(
         self, data: pd.DataFrame, holdout_frac: float = None, random_state: int = 0
