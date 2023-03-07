@@ -6,8 +6,8 @@ import shap
 from shap.plots._waterfall import waterfall_legacy as waterfall_plot
 
 from autogluon.common.utils.log_utils import verbosity2loglevel
-
 from autogluon.tabular import TabularPredictor
+
 from .. import AnalysisState
 from ..analysis import (
     ApplyFeatureGenerator,

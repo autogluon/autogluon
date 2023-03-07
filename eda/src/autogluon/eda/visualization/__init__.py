@@ -2,8 +2,8 @@ from .dataset import DatasetStatistics, DatasetTypeMismatch, LabelInsightsVisual
 from .interaction import (
     CorrelationSignificanceVisualization,
     CorrelationVisualization,
+    FeatureDistanceAnalysisVisualization,
     FeatureInteractionVisualization,
-    FeatureDistanceAnalysisVisualization
 )
 from .layouts import (
     MarkdownSectionComponent,
