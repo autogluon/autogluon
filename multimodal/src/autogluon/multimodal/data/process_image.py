@@ -2,22 +2,15 @@ import ast
 import logging
 import warnings
 from io import BytesIO
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Callable
 
 import numpy as np
 import PIL
 import torch
 from PIL import ImageFile
-from timm.data.constants import (
-    IMAGENET_DEFAULT_MEAN,
-    IMAGENET_DEFAULT_STD,
-    IMAGENET_INCEPTION_MEAN,
-    IMAGENET_INCEPTION_STD,
-)
 from torch import nn
 from torchvision import transforms
 
-from .randaug import RandAugment
 from .utils import construct_image_processor, image_mean_std
 
 try:
@@ -41,8 +34,7 @@ from ..constants import (
 )
 from ..models.timm_image import TimmAutoModelForImagePrediction
 from .collator import PadCollator, StackCollator
-from .trivial_augmenter import TrivialAugment
-from .utils import extract_value_from_config, is_rois_input
+from .utils import extract_value_from_config
 
 logger = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -57,8 +49,8 @@ class ImageProcessor:
     def __init__(
         self,
         model: nn.Module,
-        train_transform_types: List[str],
-        val_transform_types: List[str],
+        train_transforms: Union[List[str], Callable, List[Callable]],
+        val_transforms: Union[List[str], Callable, List[Callable]],
         norm_type: Optional[str] = None,
         size: Optional[int] = None,
         max_img_num_per_col: Optional[int] = 1,
@@ -70,9 +62,9 @@ class ImageProcessor:
         ----------
         model
             The model for which this processor would be created.
-        train_transform_types
+        train_transforms
             A list of image transforms used in training. Note that the transform order matters.
-        val_transform_types
+        val_transforms
             A list of image transforms used in validation/test/prediction. Note that the transform order matters.
         norm_type
             How to normalize an image. We now support:
@@ -96,10 +88,10 @@ class ImageProcessor:
         requires_column_info
             Whether to require feature column information in dataloader.
         """
-        self.train_transform_types = train_transform_types
-        self.val_transform_types = val_transform_types
-        logger.debug(f"image training transform type: {train_transform_types}")
-        logger.debug(f"image validation transform type: {val_transform_types}")
+        self.train_transforms = train_transforms
+        self.val_transforms = val_transforms
+        logger.debug(f"image training transforms: {self.train_transforms}")
+        logger.debug(f"image validation transforms: {self.val_transforms}")
 
         self.prefix = model.prefix
         self.missing_value_strategy = missing_value_strategy
@@ -152,8 +144,8 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        self.train_processor = construct_image_processor(self.size, self.normalization, self.train_transform_types)
-        self.val_processor = construct_image_processor(self.size, self.normalization, self.val_transform_types)
+        self.train_processor = construct_image_processor(image_transforms=self.train_transforms, size=self.size, normalization=self.normalization)
+        self.val_processor = construct_image_processor(image_transforms=self.val_transforms, size=self.size, normalization=self.normalization)
 
     @property
     def image_key(self):
@@ -200,8 +192,8 @@ class ImageProcessor:
 
         Parameters
         ----------
-        checkpoint_name
-            Name of a pre-trained checkpoint.
+        config
+            Config of a pre-trained checkpoint.
 
         Returns
         -------
@@ -352,5 +344,14 @@ class ImageProcessor:
 
     def __setstate__(self, state):
         self.__dict__ = state
-        if len(state["train_transform_types"]) > 0:
-            self.train_processor = construct_image_processor(self.size, self.normalization, self.train_transform_types)
+        if "train_transform_types" in state:  # backward compatible
+            self.train_transforms = self.train_transform_types
+        if "val_transform_types" in state:
+            self.val_transforms = self.val_transform_types
+
+        self.train_processor = construct_image_processor(
+            image_transforms=self.train_transforms,
+            size=self.size,
+            normalization=self.normalization,
+        )
+

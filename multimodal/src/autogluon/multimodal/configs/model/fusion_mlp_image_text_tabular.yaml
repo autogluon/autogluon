@@ -94,10 +94,10 @@ model:
     pooling_mode: 'cls'  # The pooling mode, can be 'cls' or 'mean'
     data_types:
       - "document"
-    train_transform_types:
+    train_transforms:
       - "resize_shorter_side"
       - "center_crop"
-    val_transform_types:
+    val_transforms:
       - "resize_shorter_side"
       - "center_crop"
     image_norm: "imagenet"
@@ -131,11 +131,11 @@ model:
     mix_choice: "all_logits"
     data_types:
       - "image"
-    train_transform_types:
+    train_transforms:
       - "resize_shorter_side"
       - "center_crop"
       - "trivial_augment"
-    val_transform_types:
+    val_transforms:
       - "resize_shorter_side"
       - "center_crop"
     image_norm: "imagenet"
@@ -154,11 +154,11 @@ model:
     checkpoint_name: "TextSnake"
     data_types:
       - "image"
-    train_transform_types:
+    train_transforms:
       - "resize_shorter_side"
       - "center_crop"
       - "trivial_augment"
-    val_transform_types:
+    val_transforms:
       - "resize_shorter_side"
       - "center_crop"
     image_norm: "imagenet"
@@ -169,11 +169,11 @@ model:
     checkpoint_name: "ABINet"
     data_types:
       - "image"
-    train_transform_types:
+    train_transforms:
       - "resize_shorter_side"
       - "center_crop"
       - "trivial_augment"
-    val_transform_types:
+    val_transforms:
       - "resize_shorter_side"
       - "center_crop"
     image_norm: "imagenet"
@@ -185,11 +185,11 @@ model:
     data_types:
       - "image"
       - "text"
-    train_transform_types:
+    train_transforms:
       - "resize_shorter_side"
       - "center_crop"
       - "trivial_augment"
-    val_transform_types:
+    val_transforms:
       - "resize_shorter_side"
       - "center_crop"
     image_norm: "clip"

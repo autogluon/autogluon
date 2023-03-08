@@ -1,6 +1,6 @@
 import logging
 import os
-import random
+import copy
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -106,6 +106,7 @@ def create_data_processor(
     data_type: str,
     config: DictConfig,
     model: nn.Module,
+    advanced_hyperparameters: Optional[Dict] = None,
 ):
     """
     Create one data processor based on the data type and model.
@@ -127,10 +128,16 @@ def create_data_processor(
     """
     model_config = getattr(config.model, model.prefix)
     if data_type == IMAGE:
+        train_transforms, val_transforms = get_image_transforms(
+            model_config=model_config,
+            model_name=model.prefix,
+            advanced_hyperparameters=advanced_hyperparameters,
+        )
+
         data_processor = ImageProcessor(
             model=model,
-            train_transform_types=model_config.train_transform_types,
-            val_transform_types=model_config.val_transform_types,
+            train_transforms=train_transforms,
+            val_transforms=val_transforms,
             norm_type=model_config.image_norm,
             size=model_config.image_size,
             max_img_num_per_col=model_config.max_img_num_per_col,
@@ -174,10 +181,15 @@ def create_data_processor(
             missing_value_strategy=config.data.image.missing_value_strategy,
         )
     elif data_type == DOCUMENT:
+        train_transforms, val_transforms = get_image_transforms(
+            model_config=model_config,
+            model_name=model.prefix,
+            advanced_hyperparameters=advanced_hyperparameters,
+        )
         data_processor = DocumentProcessor(
             model=model,
-            train_transform_types=model_config.train_transform_types,
-            val_transform_types=model_config.val_transform_types,
+            train_transform_types=train_transforms,
+            val_transform_types=val_transforms,
             norm_type=model_config.image_norm,
             size=model_config.image_size,
             text_max_len=model_config.max_text_len,
@@ -194,6 +206,7 @@ def create_fusion_data_processors(
     model: nn.Module,
     requires_label: Optional[bool] = True,
     requires_data: Optional[bool] = True,
+    advanced_hyperparameters: Optional[Dict] = None,
 ):
     """
     Create the data processors for late-fusion models. This function creates one processor for
@@ -281,6 +294,7 @@ def create_fusion_data_processors(
                     data_type=data_type,
                     model=per_model,
                     config=config,
+                    advanced_hyperparameters=advanced_hyperparameters,
                 )
                 data_processors[data_type].append(per_data_processor)
 
@@ -649,3 +663,19 @@ def get_detected_data_types(column_types: Dict):
             data_types.append(ROIS)
 
     return data_types
+
+
+def get_image_transforms(model_config, model_name, advanced_hyperparameters):
+    train_transform_key = f"model.{model_name}.train_transforms"
+    val_transform_key = f"model.{model_name}.val_transforms"
+    if advanced_hyperparameters and train_transform_key in advanced_hyperparameters:
+        train_transforms = advanced_hyperparameters[train_transform_key]
+    else:
+        train_transforms = model_config.train_transform_types if hasattr(model_config, "train_transform_types") else model_config.train_transforms
+
+    if advanced_hyperparameters and val_transform_key in advanced_hyperparameters:
+        val_transforms = advanced_hyperparameters[val_transform_key]
+    else:
+        val_transforms = model_config.val_transform_types if hasattr(model_config, "val_transform_types") else model_config.val_transforms
+
+    return train_transforms, val_transforms

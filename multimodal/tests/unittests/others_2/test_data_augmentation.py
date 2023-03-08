@@ -4,6 +4,8 @@ import pickle
 import shutil
 import tempfile
 
+from torchvision import transforms
+
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import (
     BEST,
@@ -22,15 +24,17 @@ from autogluon.multimodal.constants import (
     OPTIMIZATION,
     UNIFORM_SOUP,
 )
+from autogluon.multimodal.utils.misc import shopee_dataset
+from unittest_datasets import IDChangeDetectionDataset
 
-from ..predictor.test_predictor import verify_predictor_save_load
-from ..utils.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
+# from ..predictor.test_predictor import verify_predictor_save_load
+# from ..utils.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset, IDChangeDetectionDataset
 
-ALL_DATASETS = {
-    "petfinder": PetFinderDataset,
-    "hateful_memes": HatefulMeMesDataset,
-    "ae": AEDataset,
-}
+# ALL_DATASETS = {
+#     "petfinder": PetFinderDataset,
+#     "hateful_memes": HatefulMeMesDataset,
+#     "ae": AEDataset,
+# }
 
 
 def test_mixup():
@@ -155,3 +159,72 @@ def test_trivialaugment():
 
         score = predictor.evaluate(dataset.test_df)
         verify_predictor_save_load(predictor, dataset.test_df)
+
+
+def test_customizing_image_aug():
+    download_dir = "./"
+    train_data, test_data = shopee_dataset(download_dir)
+    predictor = MultiModalPredictor(label="label", verbosity=4)
+    train_transforms = [
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+    ]
+    val_transforms = [
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+    ]
+    predictor.fit(
+        train_data=train_data,
+        hyperparameters={
+            "model.timm_image.train_transforms": train_transforms,
+            "model.timm_image.val_transforms": val_transforms,
+        },
+        time_limit=10,  # seconds
+    )
+
+    assert str(train_transforms) == str(predictor._data_processors["image"][0].train_transforms)
+    assert str(val_transforms) == str(predictor._data_processors["image"][0].val_transforms)
+
+
+def test_customizing_image_aug_matcher():
+    dataset = IDChangeDetectionDataset()
+
+    train_transforms = [
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+    ]
+    val_transforms = [
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+    ]
+
+    matcher = MultiModalPredictor(
+        query="Previous Image",
+        response="Current Image",
+        problem_type="image_similarity",
+        label=dataset.label_columns[0] if dataset.label_columns else None,
+        match_label=dataset.match_label,
+        eval_metric=dataset.metric,
+        hyperparameters={
+            "model.timm_image.train_transforms": train_transforms,
+            "model.timm_image.val_transforms": val_transforms,
+        },
+    )
+
+    matcher.fit(
+        train_data=dataset.train_df,
+        tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
+        time_limit=0,  # seconds
+    )
+    # print(str(matcher._matcher._query_processors["image"][0].train_transforms))
+    # exit()
+
+    assert str(train_transforms) == str(matcher._matcher._query_processors["image"][0].train_transforms)
+    assert str(train_transforms) == str(matcher._matcher._response_processors["image"][0].train_transforms)
+    assert str(val_transforms) == str(matcher._matcher._query_processors["image"][0].val_transforms)
+    assert str(val_transforms) == str(matcher._matcher._response_processors["image"][0].val_transforms)
+
+
+if __name__ == "__main__":
+    # test_customizing_image_aug()
+    test_customizing_image_aug_matcher()

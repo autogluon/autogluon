@@ -275,6 +275,7 @@ def get_name_prefix(
 def customize_model_names(
     config: DictConfig,
     customized_names: Union[str, List[str]],
+    advanced_hyperparameters: Optional[Dict] = None,
 ):
     """
     Customize attribute names of `config` with the provided names.
@@ -303,6 +304,9 @@ def customize_model_names(
     if isinstance(customized_names, str):
         customized_names = OmegaConf.from_dotlist([f"names={customized_names}"]).names
 
+    if advanced_hyperparameters:
+        new_advanced_hyperparameters = copy.deepcopy(advanced_hyperparameters)
+
     new_config = OmegaConf.create()
     new_config.names = []
     available_prefixes = list(config.keys())
@@ -316,6 +320,13 @@ def customize_model_names(
             per_config = getattr(config, per_prefix)
             setattr(new_config, per_name, copy.deepcopy(per_config))
             new_config.names.append(per_name)
+
+            if advanced_hyperparameters:
+                for k, v in advanced_hyperparameters.items():
+                    if k.startswith(f"{MODEL}.{per_prefix}"):
+                        new_k = k.replace(f"{MODEL}.{per_prefix}", f"{MODEL}.{per_name}")
+                        new_advanced_hyperparameters.pop(k)
+                        new_advanced_hyperparameters[new_k] = v
         else:
             logger.debug(f"Removing {per_name}, which doesn't start with any of these prefixes: {available_prefixes}.")
 
@@ -324,7 +335,10 @@ def customize_model_names(
             f"No customized name in `{customized_names}` starts with name prefixes in `{available_prefixes}`."
         )
 
-    return new_config
+    if advanced_hyperparameters:
+        return new_config, new_advanced_hyperparameters
+    else:
+        return new_config
 
 
 def save_pretrained_model_configs(
@@ -761,3 +775,20 @@ def filter_hyperparameters(
         hyperparameters = {k: v for k, v in hyperparameters.items() if not k.startswith(key)}
 
     return hyperparameters
+
+
+def split_hyperparameters(hyperparameters: Dict):
+    if not hyperparameters:
+        return {}, {}
+
+    advanced_hyperparameters = dict()
+    for k, v in hyperparameters.items():
+        if k in [
+            "model.timm_image.train_transforms",
+            "model.timm_image.val_transforms",
+        ]:
+            if not all([isinstance(trans, str) for trans in hyperparameters[k]]):
+                advanced_hyperparameters[k] = copy.deepcopy(v)
+                hyperparameters[k] = []
+
+    return hyperparameters, advanced_hyperparameters

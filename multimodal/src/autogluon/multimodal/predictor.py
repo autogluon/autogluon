@@ -13,7 +13,7 @@ import sys
 import time
 import warnings
 from datetime import timedelta
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Callable
 
 import numpy as np
 import pandas as pd
@@ -159,6 +159,7 @@ from .utils import (
     update_hyperparameters,
     update_tabular_config_by_resources,
     upgrade_config,
+    split_hyperparameters,
 )
 
 logger = logging.getLogger(__name__)
@@ -783,6 +784,9 @@ class MultiModalPredictor(ExportMixin):
             provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             teacher_predictor=teacher_predictor,
         )
+        # split out the hyperparameters whose values are complex objects
+        hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
+
         hpo_mode = True if hyperparameter_tune_kwargs else False
         if hpo_mode and self._problem_type != NER:  # TODO: support ner.
             hyperparameters = filter_hyperparameters(
@@ -805,6 +809,7 @@ class MultiModalPredictor(ExportMixin):
             presets=presets,
             config=config,
             hyperparameters=hyperparameters,
+            advanced_hyperparameters=advanced_hyperparameters,
             teacher_predictor=teacher_predictor,
             standalone=standalone,
             hpo_mode=hpo_mode,  # skip average checkpoint if in hpo mode
@@ -982,6 +987,7 @@ class MultiModalPredictor(ExportMixin):
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+        advanced_hyperparameters: Optional[Dict] = None,
         teacher_predictor: Union[str, MultiModalPredictor] = None,
         hpo_mode: bool = False,
         standalone: bool = True,
@@ -1049,6 +1055,7 @@ class MultiModalPredictor(ExportMixin):
             data_processors = create_fusion_data_processors(
                 config=config,
                 model=model,
+                advanced_hyperparameters=advanced_hyperparameters,
             )
         else:  # continuing training
             data_processors = self._data_processors
