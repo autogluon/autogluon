@@ -46,6 +46,8 @@ function build_doc {
         exit COMMAND_EXIT_CODE
     fi
 
+    rm -rf "$BUILD_DIR/.doctrees/" # remove build artifacts that are not needed to serve webpage
+
     write_to_s3 $BUCKET $LOCAL_DOC_PATH $S3_DOC_PATH
     write_to_s3 $BUCKET $LOCAL_IMG_PATH $S3_IMG_PATH
 

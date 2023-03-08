@@ -61,6 +61,8 @@ LOCAL_DOC_PATH=_build/html
 cd docs
 sphinx-build -D nb_execution_mode=off -b html . $LOCAL_DOC_PATH
 
+rm -rf "$LOCAL_DOC_PATH/.doctrees/" # remove build artifacts that are not needed to serve webpage
+
 # Overwrite un-executed tutorials w/ executed versions (with images) from other build jobs
 aws s3 cp $BUILD_DOCS_PATH/tutorials/ $LOCAL_DOC_PATH/tutorials/ --recursive --exclude "*/index.html"
 aws s3 cp $BUILD_DOCS_PATH/_images/ $LOCAL_DOC_PATH/_images/ --recursive
