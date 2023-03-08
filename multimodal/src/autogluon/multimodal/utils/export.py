@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Union
 import pandas as pd
 import torch
 
-from ..constants import HF_TEXT, MMDET_IMAGE, TEXT, TIMM_IMAGE
+from ..constants import CATEGORICAL, HF_TEXT, IMAGE_PATH, MMDET_IMAGE, NULL, NUMERICAL, TEXT, TIMM_IMAGE
 from ..models.fusion import AbstractMultimodalFusionModel
 from ..models.huggingface_text import HFAutoModelForTextPrediction
 from ..models.mmdet_image import MMDetAutoModelForObjectDetection
@@ -155,7 +155,6 @@ class ExportMixin:
 
     def optimize_for_inference(
         self,
-        data: Union[dict, pd.DataFrame],
         providers: Optional[Union[dict, List[str]]] = None,
     ):
         """
@@ -182,6 +181,18 @@ class ExportMixin:
         onnx_module : OnnxModule
             The onnx-based module that can be used to replace predictor._model for model inference.
         """
+        data_dict = {}
+        for col_name, col_type in self._column_types.items():
+            if col_type in [NUMERICAL, CATEGORICAL, NULL]:
+                data_dict[col_name] = [0, 1]
+            elif col_type == TEXT:
+                data_dict[col_name] = ["some text", "some other text"]
+            elif col_type in [IMAGE_PATH]:
+                data_dict[col_name] = ["/not-exist-dir/xxx.jpg", "/not-exist-dir/yyy.jpg"]
+            else:
+                raise ValueError(f"unsupported column type: {col_type}")
+        data = pd.DataFrame.from_dict(data_dict)
+
         onnx_path = self.export_onnx(data=data, path=self.path, truncate_long_and_double=True)
         onnx_module = OnnxModule(onnx_path, providers)
         onnx_module.input_keys = self._model.input_keys

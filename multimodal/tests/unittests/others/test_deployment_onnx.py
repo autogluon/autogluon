@@ -182,7 +182,7 @@ def test_onnx_optimize_for_inference(dataset_name, model_names, text_backbone, i
 
     # Load a refresh predictor and optimize it for inference
     predictor_trt = MultiModalPredictor.load(path=model_path)
-    predictor_trt.optimize_for_inference(data=tail_df)
+    predictor_trt.optimize_for_inference()
 
     # Check existence of the exported onnx model file and tensorrt cache files
     onnx_path = os.path.join(predictor_trt.path, "model.onnx")
