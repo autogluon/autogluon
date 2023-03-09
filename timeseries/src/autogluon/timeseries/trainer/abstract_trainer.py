@@ -742,11 +742,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 "will be sorted according to test score (`score_test`)."
             )
             past_data, known_covariates = self.slice_data_for_scoring(data)
+            # TODO: Cache predictions for all models using `model_pred_proba_dict` as in Tabular
             for model_name in model_names:
                 try:
-                    time_start_test_score = time.time()
+                    pred_start_time = time.time()
                     predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model_name)
-                    model_info[model_name]["pred_time_test"] = time.time() - time_start_test_score
+                    model_info[model_name]["pred_time_test"] = time.time() - pred_start_time
                     model_info[model_name]["score_test"] = self.score_with_predictions(data, predictions)
                 except Exception as e:  # noqa
                     logger.error(f"Cannot score with model {model_name}. An error occurred: {str(e)}")
