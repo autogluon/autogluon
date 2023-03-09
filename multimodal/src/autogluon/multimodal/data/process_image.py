@@ -2,7 +2,7 @@ import ast
 import logging
 import warnings
 from io import BytesIO
-from typing import Dict, List, Optional, Union, Callable
+from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
 import PIL
@@ -144,8 +144,12 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        self.train_processor = construct_image_processor(image_transforms=self.train_transforms, size=self.size, normalization=self.normalization)
-        self.val_processor = construct_image_processor(image_transforms=self.val_transforms, size=self.size, normalization=self.normalization)
+        self.train_processor = construct_image_processor(
+            image_transforms=self.train_transforms, size=self.size, normalization=self.normalization
+        )
+        self.val_processor = construct_image_processor(
+            image_transforms=self.val_transforms, size=self.size, normalization=self.normalization
+        )
 
     @property
     def image_key(self):
@@ -354,4 +358,3 @@ class ImageProcessor:
             size=self.size,
             normalization=self.normalization,
         )
-

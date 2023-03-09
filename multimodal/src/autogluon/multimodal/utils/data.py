@@ -1,6 +1,6 @@
+import copy
 import logging
 import os
-import copy
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -671,11 +671,21 @@ def get_image_transforms(model_config, model_name, advanced_hyperparameters):
     if advanced_hyperparameters and train_transform_key in advanced_hyperparameters:
         train_transforms = advanced_hyperparameters[train_transform_key]
     else:
-        train_transforms = model_config.train_transform_types if hasattr(model_config, "train_transform_types") else model_config.train_transforms
+        train_transforms = (
+            model_config.train_transform_types
+            if hasattr(model_config, "train_transform_types")
+            else model_config.train_transforms
+        )
+        train_transforms = list(train_transforms)
 
     if advanced_hyperparameters and val_transform_key in advanced_hyperparameters:
         val_transforms = advanced_hyperparameters[val_transform_key]
     else:
-        val_transforms = model_config.val_transform_types if hasattr(model_config, "val_transform_types") else model_config.val_transforms
+        val_transforms = (
+            model_config.val_transform_types
+            if hasattr(model_config, "val_transform_types")
+            else model_config.val_transforms
+        )
+        val_transforms = list(val_transforms)
 
     return train_transforms, val_transforms

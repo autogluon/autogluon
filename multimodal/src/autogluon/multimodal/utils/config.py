@@ -200,7 +200,7 @@ def get_config(
         overrides = copy.deepcopy(overrides)
         # apply customized model names
         overrides = parse_dotlist_conf(overrides)  # convert to a dict
-        config.model = customize_model_names(
+        config.model, _ = customize_model_names(
             config=config.model,
             customized_names=overrides.get("model.names", None),
         )
@@ -299,13 +299,15 @@ def customize_model_names(
         A new config with its first-level attributes customized by the provided names.
     """
     if not customized_names:
-        return config
+        return config, advanced_hyperparameters
 
     if isinstance(customized_names, str):
         customized_names = OmegaConf.from_dotlist([f"names={customized_names}"]).names
 
     if advanced_hyperparameters:
         new_advanced_hyperparameters = copy.deepcopy(advanced_hyperparameters)
+    else:
+        new_advanced_hyperparameters = dict()
 
     new_config = OmegaConf.create()
     new_config.names = []
@@ -335,10 +337,7 @@ def customize_model_names(
             f"No customized name in `{customized_names}` starts with name prefixes in `{available_prefixes}`."
         )
 
-    if advanced_hyperparameters:
-        return new_config, new_advanced_hyperparameters
-    else:
-        return new_config
+    return new_config, new_advanced_hyperparameters
 
 
 def save_pretrained_model_configs(
@@ -779,7 +778,7 @@ def filter_hyperparameters(
 
 def split_hyperparameters(hyperparameters: Dict):
     if not hyperparameters:
-        return {}, {}
+        return dict(), dict()
 
     advanced_hyperparameters = dict()
     for k, v in hyperparameters.items():

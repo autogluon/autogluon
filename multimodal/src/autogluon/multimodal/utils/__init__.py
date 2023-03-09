@@ -12,11 +12,11 @@ from .config import (
     get_pretrain_configs_dir,
     parse_dotlist_conf,
     save_pretrained_model_configs,
+    split_hyperparameters,
     update_config_by_rules,
     update_hyperparameters,
     update_tabular_config_by_resources,
     upgrade_config,
-    split_hyperparameters,
 )
 from .data import (
     assign_feature_column_names,

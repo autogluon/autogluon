@@ -3,7 +3,7 @@ import codecs
 import copy
 import re
 import warnings
-from typing import Dict, Iterable, List, Optional, Tuple, Union, Callable
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -462,11 +462,11 @@ def get_image_transform_funcs(transform_types: List[str], size: int):
         args = None
         kargs = None
         if "(" in trans_type:
-            trans_mode = trans_type[0: trans_type.find("(")]
+            trans_mode = trans_type[0 : trans_type.find("(")]
             if "{" in trans_type:
-                kargs = ast.literal_eval(trans_type[trans_type.find("{"): trans_type.rfind(")")])
+                kargs = ast.literal_eval(trans_type[trans_type.find("{") : trans_type.rfind(")")])
             else:
-                args = ast.literal_eval(trans_type[trans_type.find("("):])
+                args = ast.literal_eval(trans_type[trans_type.find("(") :])
         else:
             trans_mode = trans_type
 
@@ -476,9 +476,11 @@ def get_image_transform_funcs(transform_types: List[str], size: int):
             image_transforms.append(transforms.Resize(size, interpolation=BICUBIC))
         elif trans_mode == "center_crop":
             image_transforms.append(transforms.CenterCrop(size))
-        elif trans_mode == "horizontal_flip":
+        elif trans_mode == "random_resize_crop":
+            image_transforms.append(transforms.RandomResizedCrop(size))
+        elif trans_mode == "random_horizontal_flip":
             image_transforms.append(transforms.RandomHorizontalFlip())
-        elif trans_mode == "vertical_flip":
+        elif trans_mode == "random_vertical_flip":
             image_transforms.append(transforms.RandomVerticalFlip())
         elif trans_mode == "color_jitter":
             if kargs is not None:

@@ -13,7 +13,7 @@ import sys
 import time
 import warnings
 from datetime import timedelta
-from typing import Dict, List, Optional, Union, Callable
+from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -151,6 +151,7 @@ from .utils import (
     select_model,
     setup_detection_train_tuning_data,
     setup_save_path,
+    split_hyperparameters,
     split_train_tuning_data,
     tensor_to_ndarray,
     try_to_infer_pos_label,
@@ -159,7 +160,6 @@ from .utils import (
     update_hyperparameters,
     update_tabular_config_by_resources,
     upgrade_config,
-    split_hyperparameters,
 )
 
 logger = logging.getLogger(__name__)
