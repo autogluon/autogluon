@@ -501,20 +501,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
             model = self._train_single(train_data, model, val_data=val_data, time_limit=time_limit)
             fit_end_time = time.time()
+            model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
 
             if val_data is not None:
-                val_predictions = model.predict_for_scoring(val_data)
-                pred_end_time = time.time()
-                model.cache_val_predictions(val_predictions)
-                predict_time = pred_end_time - fit_end_time
-                val_score = model.score_with_val_predictions(val_data)
-            else:
-                predict_time = None
-                val_score = None
-
-            model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
-            model.predict_time = model.predict_time or predict_time
-            model.val_score = val_score
+                model.score_on_val_data_and_cache(val_data)
 
             self._log_scores_and_times(model.val_score, model.fit_time, model.predict_time)
 

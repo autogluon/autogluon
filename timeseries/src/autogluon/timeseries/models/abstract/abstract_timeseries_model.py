@@ -452,28 +452,36 @@ class AbstractTimeSeriesModel(AbstractModel):
         """Load the cached validation predictions from disk."""
         return load_pkl.load(path=os.path.join(path + "utils", cls._val_predictions_filename), verbose=verbose)
 
-    def cache_val_predictions(self, val_predictions: TimeSeriesDataFrame) -> None:
+    def score_on_val_data_and_cache(self, val_data: TimeSeriesDataFrame) -> float:
+        """Score on validation data, cache predictions and record prediction time."""
+        if self.val_score is not None or self.predict_time is not None:
+            raise ValueError(f"score_on_val_data_and_cache should only be called once for {self.name}.")
+
+        pred_start_time = time.time()
+        val_predictions = self.predict_for_scoring(data=val_data)
+        self.predict_time = time.time() - pred_start_time
+
+        # Cache val_predictions for later reuse
         self._val_predictions = val_predictions
 
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=self.eval_metric,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
+        )
+        self.val_score = evaluator(val_data, val_predictions) * evaluator.coefficient
+        return self.val_score
+
     def get_val_predictions(self) -> TimeSeriesDataFrame:
+        """Get the cached predictions computed on the validation data."""
         if self._val_predictions is None:
             try:
                 self._val_predictions = self.load_val_predictions(path=self.path)
             except FileNotFoundError:
                 raise ValueError(
-                    f"Val predictions must be cached with `cache_val_predictions` before calling `get_val_predictions`"
+                    f"Val predictions must be saved with `score_on_val_data_and_cache` before calling `get_val_predictions`"
                 )
         return self._val_predictions
-
-    def score_with_val_predictions(self, data: TimeSeriesDataFrame, metric: str = None) -> float:
-        metric = self.eval_metric if metric is None else metric
-        evaluator = TimeSeriesEvaluator(
-            eval_metric=metric,
-            prediction_length=self.prediction_length,
-            target_column=self.target,
-        )
-        predictions = self.get_val_predictions()
-        return evaluator(data, predictions) * evaluator.coefficient
 
 
 class AbstractTimeSeriesModelFactory:
