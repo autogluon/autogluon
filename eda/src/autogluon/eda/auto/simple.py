@@ -2,8 +2,6 @@ import logging
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
-import shap
-from shap.plots._waterfall import waterfall_legacy as waterfall_plot
 
 from autogluon.common.utils.log_utils import verbosity2loglevel
 from autogluon.tabular import TabularPredictor
@@ -15,9 +13,11 @@ from ..analysis import (
     AutoGluonModelQuickFit,
     Correlation,
     DistributionFit,
+    FastShapAnalysis,
     FeatureInteraction,
     MissingValuesAnalysis,
     ProblemTypeControl,
+    ShapAnalysis,
     TrainValidationSplit,
     XShiftDetector,
 )
@@ -38,6 +38,8 @@ from ..visualization import (
     CorrelationVisualization,
     DatasetStatistics,
     DatasetTypeMismatch,
+    ExplainForcePlot,
+    ExplainWaterfallPlot,
     FeatureImportance,
     FeatureInteractionVisualization,
     LabelInsightsVisualization,
@@ -50,7 +52,6 @@ from ..visualization import (
 )
 from ..visualization.base import AbstractVisualization
 from ..visualization.interaction import FeatureDistanceAnalysisVisualization
-from ..visualization.jupyter import JupyterMixin
 from ..visualization.layouts import SimpleVerticalLinearLayout
 
 logger = logging.getLogger(__name__)
@@ -942,33 +943,15 @@ def missing_values_analysis(
     )
 
 
-class _ShapAutogluonWrapper:
-    def __init__(self, predictor, feature_names, target_class=None):
-        self.ag_model = predictor
-        self.feature_names = feature_names
-        self.target_class = target_class
-        if target_class is None and predictor.problem_type != "regression":
-            print("Since target_class not specified, SHAP will explain predictions for each class")
-
-    def predict_proba(self, X):
-        if isinstance(X, pd.Series):
-            X = X.values.reshape(1, -1)
-        if not isinstance(X, pd.DataFrame):
-            X = pd.DataFrame(X, columns=self.feature_names)
-        preds = self.ag_model.predict_proba(X)
-        if self.ag_model.problem_type == "regression" or self.target_class is None:
-            return preds
-        else:
-            return preds[self.target_class]
-
-
 def explain_rows(
     train_data: pd.DataFrame,
     model: TabularPredictor,
     rows: pd.DataFrame,
     display_rows: bool = False,
     waterfall: bool = False,
+    use_fast_shap: bool = True,
     baseline_sample: int = 100,
+    return_state: bool = False,
     **kwargs,
 ) -> None:
     """
@@ -995,6 +978,8 @@ def explain_rows(
         The background dataset size to use for integrating out features. To determine the impact
         of a feature, that feature is set to "missing" and the change in the model output
         is observed.
+    return_state: bool, default = False
+        return state if `True`
     kwargs
 
     See Also
@@ -1003,17 +988,12 @@ def explain_rows(
 
     """
     assert baseline_sample >= 30
-    baseline = train_data.sample(baseline_sample, random_state=0)
-    for _, row in rows.iterrows():
-        target_class = row[model.label] if model.problem_type != "regression" else None
-        ag_wrapper = _ShapAutogluonWrapper(model, train_data.columns, target_class)
-        explainer = shap.KernelExplainer(ag_wrapper.predict_proba, baseline)
-        _row = pd.DataFrame([row])
-        if display_rows:
-            JupyterMixin.display_obj(_row)
-        shap_values = explainer.shap_values(_row[train_data.columns], silent=True)
-        if waterfall:
-            waterfall_plot(explainer.expected_value, shap_values[0], row[train_data.columns], **kwargs)
-        else:
-            _kwargs = {**dict(text_rotation=45, matplotlib=True), **kwargs}
-            shap.force_plot(explainer.expected_value, shap_values[0], row[train_data.columns], **_kwargs)
+    anlz_cls = FastShapAnalysis if use_fast_shap else ShapAnalysis
+    viz_cls = ExplainWaterfallPlot if waterfall else ExplainForcePlot
+    analyze(
+        train_data=train_data,
+        model=model,
+        return_state=return_state,
+        anlz_facets=[anlz_cls(rows)],
+        viz_facets=[viz_cls(display_rows=display_rows, **kwargs)],
+    )

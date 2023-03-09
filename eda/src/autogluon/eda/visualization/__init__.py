@@ -1,4 +1,5 @@
 from .dataset import DatasetStatistics, DatasetTypeMismatch, LabelInsightsVisualization
+from .explain import ExplainForcePlot, ExplainWaterfallPlot
 from .interaction import (
     CorrelationSignificanceVisualization,
     CorrelationVisualization,
