@@ -704,14 +704,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         time_end = time.time()
         ensemble.fit_time = time_end - time_start
 
-        evaluator = TimeSeriesEvaluator(
-            eval_metric=self.eval_metric,
-            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
-            prediction_length=self.prediction_length,
-            target_column=self.target,
-        )
-        forecasts = ensemble.predict({n: model_preds[n] for n in ensemble.model_names})
-        ensemble.val_score = evaluator(val_data, forecasts) * evaluator.coefficient
+        predictions = ensemble.predict({n: model_preds[n] for n in ensemble.model_names})
+        ensemble.val_score = self.score_with_predictions(val_data, predictions)
 
         predict_time = 0
         for m in ensemble.model_names:
