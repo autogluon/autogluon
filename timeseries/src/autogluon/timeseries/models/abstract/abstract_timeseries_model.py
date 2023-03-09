@@ -336,7 +336,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         metric = self.eval_metric if metric is None else metric
 
         past_data, known_covariates = self.slice_data_for_scoring(data)
-        predictions = self.predict(data=past_data, known_covariates=known_covariates)
+        predictions = self.predict(past_data, known_covariates=known_covariates)
 
         evaluator = TimeSeriesEvaluator(
             eval_metric=metric,
