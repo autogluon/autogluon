@@ -72,13 +72,11 @@ def test_when_fit_called_then_models_train_and_all_scores_can_be_computed(
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("prediction_length", [1, 5])
-def test_when_predict_for_scoring_called_then_model_receives_truncated_data(
-    model_class, prediction_length, trained_models
-):
+def test_when_score_called_then_model_receives_truncated_data(model_class, prediction_length, trained_models):
     model = trained_models[(prediction_length, repr(model_class))]
 
     with mock.patch.object(model, "predict") as patch_method:
-        _ = model.predict_for_scoring(DUMMY_TS_DATAFRAME)
+        _ = model.score(DUMMY_TS_DATAFRAME)
 
         (call_df,) = patch_method.call_args[0]
 

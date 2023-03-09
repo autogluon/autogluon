@@ -711,7 +711,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             target_column=self.target,
         )
         forecasts = ensemble.predict({n: model_preds[n] for n in ensemble.model_names})
-        ensemble.val_score = evaluator(data=val_data, predictions=forecasts) * evaluator.coefficient
+        ensemble.val_score = evaluator(val_data, forecasts) * evaluator.coefficient
 
         predict_time = 0
         for m in ensemble.model_names:
@@ -747,17 +747,18 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 "Additional data provided, testing on additional data. Resulting leaderboard "
                 "will be sorted according to test score (`score_test`)."
             )
+            past_data, known_covariates = self.slice_data_for_scoring(data)
             for model_name in model_names:
                 try:
-                    # TODO: time only prediction and not score for pred_time_val and pred_time_test
                     time_start_test_score = time.time()
-                    model_info[model_name]["score_test"] = self.score(data, model_name)
+                    predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model_name)
                     model_info[model_name]["pred_time_test"] = time.time() - time_start_test_score
+                    model_info[model_name]["score_test"] = self.score_with_predictions(data, predictions)
                 except Exception as e:  # noqa
                     logger.error(f"Cannot score with model {model_name}. An error occurred: {str(e)}")
                     logger.debug(traceback.format_exc())
-                    model_info[model_name]["score_test"] = float("nan")
                     model_info[model_name]["pred_time_test"] = float("nan")
+                    model_info[model_name]["score_test"] = float("nan")
 
         df = pd.DataFrame(model_info.values())
 
@@ -820,6 +821,32 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 logger.info(f"\tYou can call predict(data, model) with one of other available models: {other_models}")
             return None
 
+    def slice_data_for_scoring(
+        self, data: TimeSeriesDataFrame
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        past_data = data.slice_by_timestep(None, -self.prediction_length)
+        if len(self.metadata.known_covariates_real) > 0:
+            future_data = data.slice_by_timestep(-self.prediction_length, None)
+            known_covariates = future_data[self.metadata.known_covariates_real]
+        else:
+            known_covariates = None
+        return past_data, known_covariates
+
+    def score_with_predictions(
+        self,
+        data: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        metric: Optional[str] = None,
+    ):
+        eval_metric = self.eval_metric if metric is None else metric
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=eval_metric,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
+        )
+        return evaluator(data, predictions) * evaluator.coefficient
+
     def score(
         self,
         data: TimeSeriesDataFrame,
@@ -827,31 +854,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         metric: Optional[str] = None,
     ) -> float:
         model = self._get_model_for_prediction(model)
-        eval_metric = self.eval_metric if metric is None else metric
-
-        if isinstance(model, AbstractTimeSeriesEnsembleModel):
-            evaluator = TimeSeriesEvaluator(
-                eval_metric=eval_metric,
-                eval_metric_seasonal_period=self.eval_metric_seasonal_period,
-                prediction_length=self.prediction_length,
-                target_column=self.target,
-            )
-            model_preds = {}
-            base_models = self.get_minimum_model_set(model, include_self=False)
-            for base_model in base_models:
-                try:
-                    base_model_loaded = self._get_model_for_prediction(base_model)
-                    model_preds[base_model] = base_model_loaded.predict_for_scoring(
-                        data, quantile_levels=self.quantile_levels
-                    )
-                except Exception:
-                    model_preds[base_model] = None
-            forecasts = model.predict(model_preds)
-
-            model_score = evaluator(data, forecasts) * evaluator.coefficient
-            return model_score
-
-        return model.score(data, metric=eval_metric)
+        past_data, known_covariates = self.slice_data_for_scoring(data)
+        predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model)
+        return self.score_with_predictions(data=data, predictions=predictions, metric=metric)
 
     def _predict_model(
         self,

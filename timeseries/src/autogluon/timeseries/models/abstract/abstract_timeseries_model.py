@@ -2,7 +2,7 @@ import copy
 import logging
 import os
 import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import autogluon.core as ag
 from autogluon.common.loaders import load_pkl
@@ -277,29 +277,27 @@ class AbstractTimeSeriesModel(AbstractModel):
         """
         raise NotImplementedError
 
-    def predict_for_scoring(self, data: TimeSeriesDataFrame, **kwargs):
-        """Given a dataset, truncate the last `self.prediction_length` time steps and forecast these
-        steps with previous history. This method produces predictions for the *last* `self.prediction_length`
-        steps of the *given* time series, in order to be used for validation or scoring.
+    def slice_data_for_scoring(
+        self, data: TimeSeriesDataFrame
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        """Truncate the last `self.prediction_length` time steps of each time series.
+
+        When the output of this method is fed to `predict`, the model will generate predictions for the last
+        `prediction_length` time steps of each time series. These predictions can then be used to evaluate the model.
+
 
         Parameters
         ----------
-        data: TimeSeriesDataFrame
-            The dataset where each time series is the "context" for predictions.
-
-        Other Parameters
-        ----------------
-        quantile_levels
-            Quantiles of probabilistic forecasts, if probabilistic forecasts are implemented by the
-            corresponding subclass. If None, `self.quantile_levels` will be used instead,
-            if provided during initialization.
+        data : TimeSeriesDataFrame
+            The dataset used for evaluating the model.
 
         Returns
         -------
-        predictions: TimeSeriesDataFrame
-            pandas data frames with a timestamp index, where each input item from the input
-            data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
-            of input items.
+        past_data : TimeSeriesDataFrame
+            Dataset consisting of truncated time series. This is used as "context" for the generating the predictions.
+        known_covariates: TimeSeriesDataFrame or None
+            Values of the known covariates during the forecast horizon, if `known_covariates` are present in the models
+            metadata. If `known_covariates` are absent, this value is equal to `None`.
         """
         past_data = data.slice_by_timestep(None, -self.prediction_length)
         if len(self.metadata.known_covariates_real) > 0:
@@ -307,7 +305,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             known_covariates = future_data[self.metadata.known_covariates_real]
         else:
             known_covariates = None
-        return self.predict(past_data, known_covariates=known_covariates, **kwargs)
+        return past_data, known_covariates
 
     def score(self, data: TimeSeriesDataFrame, metric: str = None, **kwargs) -> float:
         """Return the evaluation scores for given metric and dataset. The last
@@ -336,13 +334,16 @@ class AbstractTimeSeriesModel(AbstractModel):
             time steps of each time series.
         """
         metric = self.eval_metric if metric is None else metric
+
+        past_data, known_covariates = self.slice_data_for_scoring(data)
+        predictions = self.predict(data=past_data, known_covariates=known_covariates)
+
         evaluator = TimeSeriesEvaluator(
             eval_metric=metric,
             eval_metric_seasonal_period=self.eval_metric_seasonal_period,
             prediction_length=self.prediction_length,
             target_column=self.target,
         )
-        predictions = self.predict_for_scoring(data)
         metric_value = evaluator(data, predictions)
 
         return metric_value * evaluator.coefficient
@@ -457,8 +458,9 @@ class AbstractTimeSeriesModel(AbstractModel):
         if self.val_score is not None or self.predict_time is not None:
             raise ValueError(f"score_on_val_data_and_cache should only be called once for {self.name}.")
 
+        past_data, known_covariates = self.slice_data_for_scoring(val_data)
         pred_start_time = time.time()
-        val_predictions = self.predict_for_scoring(data=val_data)
+        val_predictions = self.predict(past_data, known_covariates=known_covariates)
         self.predict_time = time.time() - pred_start_time
 
         # Cache val_predictions for later reuse
@@ -466,6 +468,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         evaluator = TimeSeriesEvaluator(
             eval_metric=self.eval_metric,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
             prediction_length=self.prediction_length,
             target_column=self.target,
         )
