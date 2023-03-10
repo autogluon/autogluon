@@ -342,7 +342,8 @@ def tokenize_ner_text(text, tokenizer):
     )
     offset_mapping = np.array(col_tokens.offset_mapping, dtype=np.int32)
     if len(words_with_offsets) > 1:
-        word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
+        if offset_mapping.shape[0] > len(words):
+            word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
         # token to word mappings: it will tell us which token belongs to which word.
         token_to_word_mappings = [i if i != None else -1 for i in col_tokens.word_ids()]
         if len(set(token_to_word_mappings)) != len(words) + 1:
