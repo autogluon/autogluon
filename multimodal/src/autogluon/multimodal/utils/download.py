@@ -162,7 +162,7 @@ def download(
         with open(filename, mode="rb") as f:
             # Disable bandit check because we are using sha1sum for evaluating the checksums.
             # It is not used for hosting credentials.
-            d = hashlib.new("sha1", usedforsecurity=False)  # nosec(sxjscience)
+            d = hashlib.new("sha1", usedforsecurity=False)  # nosec
             for buf in iter(functools.partial(f.read, 1024 * 100), b""):
                 d.update(buf)
         return d.hexdigest()
@@ -224,7 +224,7 @@ def download(
                     else:
                         s3.meta.client.download_file(s3_bucket_name, s3_key, tmp_path)
                 else:
-                    r = requests.get(url, stream=True, verify=verify_ssl)
+                    r = requests.get(url, stream=True, verify=verify_ssl, timeout=(10, 10000))
                     if r.status_code != 200:
                         raise RuntimeError("Failed downloading url {}".format(url))
                     # create uuid for temporary files
