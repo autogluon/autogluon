@@ -31,7 +31,7 @@ class _AbstractExplainPlot(AbstractVisualization, JupyterMixin, ABC):
 
     @abstractmethod
     def _render_internal(self, expected_value, shap_values, features, feature_names, **kwargs):
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
 
 class ExplainForcePlot(_AbstractExplainPlot):

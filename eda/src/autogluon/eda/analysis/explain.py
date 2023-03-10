@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional
 
 import pandas as pd
@@ -9,6 +10,8 @@ from autogluon.eda.analysis.base import AbstractAnalysis
 
 __all__ = ["ShapAnalysis", "FastShapAnalysis"]
 
+logger = logging.getLogger(__name__)
+
 
 class _ShapAutogluonWrapper:
     def __init__(self, predictor, feature_names, target_class=None):
@@ -16,7 +19,7 @@ class _ShapAutogluonWrapper:
         self.feature_names = feature_names
         self.target_class = target_class
         if target_class is None and predictor.problem_type != "regression":
-            print("Since target_class not specified, SHAP will explain predictions for each class")
+            logging.warning("Since target_class not specified, SHAP will explain predictions for each class")
 
     def predict_proba(self, X):
         if isinstance(X, pd.Series):
@@ -45,20 +48,25 @@ class ShapAnalysis(AbstractAnalysis):
     ) -> None:
         super().__init__(parent, children, state, **kwargs)
         self.rows = rows
-        assert baseline_sample >= 30
         self.baseline_sample = baseline_sample
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return self.all_keys_must_be_present(args, "model", "train_data")
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
-        baseline = args.train_data.sample(self.baseline_sample, random_state=0)
+        if self.baseline_sample <= len(args.train_data):
+            _baseline_sample = self.baseline_sample
+        else:
+            _baseline_sample = len(args.train_data)
+
+        baseline = args.train_data.sample(_baseline_sample, random_state=0)
         shap_data = []
         for _, row in self.rows.iterrows():
             _row = pd.DataFrame([row])
-            predicted_class = (
-                0 if args.model.problem_type == "regression" else args.model.predict_proba(_row)[0].argmax()
-            )
+            if args.model.problem_type == "regression":
+                predicted_class = 0
+            else:
+                predicted_class = args.model.predict(_row).iloc[0]
             ag_wrapper = _ShapAutogluonWrapper(args.model, args.train_data.columns, predicted_class)
             explainer = shap.KernelExplainer(ag_wrapper.predict_proba, baseline)
             ke_shap_values = explainer.shap_values(_row[args.train_data.columns], silent=True)
@@ -93,7 +101,11 @@ class FastShapAnalysis(AbstractAnalysis):
         return self.all_keys_must_be_present(args, "model", "train_data")
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
-        baseline = args.train_data.sample(self.baseline_sample, random_state=0)
+        if self.baseline_sample <= len(args.train_data):
+            _baseline_sample = self.baseline_sample
+        else:
+            _baseline_sample = len(args.train_data)
+        baseline = args.train_data.sample(_baseline_sample, random_state=0)
         data = baseline.drop(columns=args.model.label)
 
         def predict_fn(x):
@@ -118,15 +130,13 @@ class FastShapAnalysis(AbstractAnalysis):
                 shap_values = ke_shap_values[0][:-1, predicted_class]
 
             features = _row[data.columns].to_numpy()[0]
-            feature_names = data.columns
-
             shap_data.append(
                 AnalysisState(
                     row=_row,
                     expected_value=expected_value,
                     shap_values=shap_values,
                     features=features,
-                    feature_names=feature_names,
+                    feature_names=list(data.columns),
                 )
             )
         state.explain = {"shapley": shap_data}

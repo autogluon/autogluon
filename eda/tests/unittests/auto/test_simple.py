@@ -10,7 +10,7 @@ import pytest
 
 import autogluon.eda as eda
 from autogluon.eda import AnalysisState
-from autogluon.eda.analysis import Namespace
+from autogluon.eda.analysis import FastShapAnalysis, Namespace, ShapAnalysis
 from autogluon.eda.analysis.base import BaseAnalysis
 from autogluon.eda.auto import (
     analyze,
@@ -31,6 +31,8 @@ from autogluon.eda.visualization import (
     CorrelationVisualization,
     DatasetStatistics,
     DatasetTypeMismatch,
+    ExplainForcePlot,
+    ExplainWaterfallPlot,
     FeatureImportance,
     FeatureInteractionVisualization,
     LabelInsightsVisualization,
@@ -42,7 +44,6 @@ from autogluon.eda.visualization import (
 )
 from autogluon.eda.visualization.base import AbstractVisualization
 from autogluon.eda.visualization.interaction import FeatureDistanceAnalysisVisualization
-from autogluon.eda.visualization.jupyter import JupyterMixin
 
 RESOURCE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources"))
 
@@ -439,72 +440,59 @@ def test_target_analysis__regression(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "label,expected_task_type",
+    "backend, plot",
     [
-        ("class", "binary"),
-        ("fnlwgt", "regression"),
+        ("shap", "force"),
+        ("fastshap", "force"),
+        ("shap", "waterfall"),
+        ("fastshap", "waterfall"),
+        ("shap", None),
+        ("fastshap", None),
     ],
 )
-def test_explain_rows(label, expected_task_type, monkeypatch):
-    df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
-    with tempfile.TemporaryDirectory() as path:
-        state = quick_fit(
-            estimator_args=dict(path=path),
-            train_data=df_train,
-            label=label,
+def test_explain_rows(backend, plot, monkeypatch):
+    train_data = MagicMock()
+    model = MagicMock()
+    rows = MagicMock()
+    with monkeypatch.context() as m:
+        call_analyze = MagicMock(return_value="result")
+        m.setattr(eda.auto.simple, "analyze", call_analyze)
+
+        result = explain_rows(
+            train_data=train_data,
+            model=model,
+            rows=rows,
+            backend=backend,
+            plot=plot,
             return_state=True,
-            save_model_to_state=True,
-            render_analysis=False,
+            baseline_sample=300,
+            other_arg="other_arg",
+        )
+        assert result == "result"
+
+        call_analyze.assert_called_with(
+            train_data=train_data,
+            model=model,
+            return_state=True,
+            anlz_facets=ANY,
+            viz_facets=ANY,
         )
 
-        assert state.model.problem_type == expected_task_type
+        expected_backend = {
+            "shap": ShapAnalysis,
+            "fastshap": FastShapAnalysis,
+        }.get(backend)
+        anlz_facet = call_analyze.call_args.kwargs["anlz_facets"][0]
+        assert type(anlz_facet) is expected_backend
+        assert anlz_facet.rows == rows
+        assert anlz_facet.baseline_sample == 300
 
-        with monkeypatch.context() as m:
-            call_shap_force_plot = MagicMock()
-            call_shap_waterfall_plot = MagicMock()
-            m.setattr("shap.force_plot", call_shap_force_plot)
-            m.setattr(eda.auto.simple, "waterfall_plot", call_shap_waterfall_plot)
-
-            # --- force_plot
-
-            call_display_obj = MagicMock()
-            m.setattr(JupyterMixin, "display_obj", call_display_obj)
-            explain_rows(
-                train_data=df_train,
-                model=state.model,
-                rows=state.model_evaluation.highest_error[:2],
-                text_rotation=40,
-                display_rows=True,
-                other_arg="a",
-            )
-            expected_calls = [
-                call(ANY, ANY, ANY, text_rotation=40, matplotlib=True, other_arg="a"),
-                call(ANY, ANY, ANY, text_rotation=40, matplotlib=True, other_arg="a"),
-            ]
-
-            expected_rows = [state.model_evaluation.highest_error.iloc[i][df_train.columns] for i in range(2)]
-
-            assert call_display_obj.call_count == 2
-            call_shap_force_plot.assert_has_calls(expected_calls)
-
-            for c, er in zip(call_shap_force_plot.call_args_list, expected_rows):
-                assert er.equals(c.args[2])
-
-            # --- waterfall_plot
-
-            call_display_obj = MagicMock()
-            m.setattr(JupyterMixin, "display_obj", call_display_obj)
-            explain_rows(
-                train_data=df_train,
-                model=state.model,
-                rows=state.model_evaluation.highest_error[2:4],
-                waterfall=True,
-            )
-
-            expected_rows = [state.model_evaluation.highest_error.iloc[i][df_train.columns] for i in range(2, 4)]
-
-            call_display_obj.assert_not_called()
-            assert call_shap_waterfall_plot.call_count == 2
-
-            for c, er in zip(call_shap_waterfall_plot.call_args_list, expected_rows):
-                assert er.equals(c.args[2])
+        expected_plot = {
+            "force": ExplainForcePlot,
+            "waterfall": ExplainWaterfallPlot,
+        }.get(plot, None)
+        viz_facet = call_analyze.call_args.kwargs["viz_facets"]
+        if expected_plot is None:
+            assert viz_facet is None
+        else:
+            assert type(viz_facet[0]) is expected_plot

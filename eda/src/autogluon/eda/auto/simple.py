@@ -948,12 +948,12 @@ def explain_rows(
     model: TabularPredictor,
     rows: pd.DataFrame,
     display_rows: bool = False,
-    waterfall: bool = False,
-    use_fast_shap: bool = True,
+    backend: str = "shap",
+    plot: Optional[str] = "force",
     baseline_sample: int = 100,
     return_state: bool = False,
     **kwargs,
-) -> None:
+) -> Optional[AnalysisState]:
     """
     Kernel SHAP is a method that uses a special weighted linear regression
     to compute the importance of each feature. The computed importance values
@@ -972,8 +972,15 @@ def explain_rows(
         rows to explain
     display_rows: bool, default = False
         if `True` then display the row before the explanation chart
-    waterfall: bool, default = False
-        render the analysis as waterfall plot instead of force plot
+    backend: str, default = 'shap'
+        type backend to use for Shapley values calculations. Supported keys:
+        - `shap` - use :py:class:`~autogluon.eda.analysis.explain.ShapAnalysis` backend based on `shap` package
+        - `fastshap` - use :py:class:`~autogluon.eda.analysis.explain.FastShapAnalysis` backend based on `fastshap` package
+    plot: Optional[str], default = 'force'
+        type of plot to visualize the Shapley values. Supported keys:
+        - `force`
+        - `waterfall`
+        - `None` - do not use any visualization
     baseline_sample: int, default = 100
         The background dataset size to use for integrating out features. To determine the impact
         of a feature, that feature is set to "missing" and the change in the model output
@@ -985,15 +992,36 @@ def explain_rows(
     See Also
     --------
     :py:class:`~shap.KernelExplainer`
+    :py:class:`~autogluon.eda.analysis.explain.ShapAnalysis`
+    :py:class:`~autogluon.eda.analysis.explain.FastShapAnalysis`
 
     """
-    assert baseline_sample >= 30
-    anlz_cls = FastShapAnalysis if use_fast_shap else ShapAnalysis
-    viz_cls = ExplainWaterfallPlot if waterfall else ExplainForcePlot
-    analyze(
+
+    supported_backends = {
+        "shap": ShapAnalysis,
+        "fastshap": FastShapAnalysis,
+    }
+    anlz_cls = supported_backends.get(backend, None)
+    assert anlz_cls is not None, f"backend must be one of the following values: {','.join(supported_backends.keys())}"
+
+    if plot is None:
+        viz_facets = None
+    else:
+        supported_plots = {
+            "force": ExplainForcePlot,
+            "waterfall": ExplainWaterfallPlot,
+        }
+        viz_cls = supported_plots.get(plot, None)
+        assert viz_cls is not None, (
+            f"backend must be one of the following values: {','.join(supported_plots.keys())}. "
+            f"If no visualization required, then `None` can be passed."
+        )
+        viz_facets = [viz_cls(display_rows=display_rows, **kwargs)]
+
+    return analyze(
         train_data=train_data,
         model=model,
         return_state=return_state,
-        anlz_facets=[anlz_cls(rows)],
-        viz_facets=[viz_cls(display_rows=display_rows, **kwargs)],
+        anlz_facets=[anlz_cls(rows, baseline_sample=baseline_sample)],  # type: ignore
+        viz_facets=viz_facets,  # type: ignore
     )
