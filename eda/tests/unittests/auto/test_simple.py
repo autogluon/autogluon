@@ -10,7 +10,7 @@ import pytest
 
 import autogluon.eda as eda
 from autogluon.eda import AnalysisState
-from autogluon.eda.analysis import FastShapAnalysis, Namespace, ShapAnalysis
+from autogluon.eda.analysis import Namespace, ShapAnalysis
 from autogluon.eda.analysis.base import BaseAnalysis
 from autogluon.eda.auto import (
     analyze,
@@ -440,17 +440,14 @@ def test_target_analysis__regression(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "backend, plot",
+    "plot",
     [
-        ("shap", "force"),
-        ("fastshap", "force"),
-        ("shap", "waterfall"),
-        ("fastshap", "waterfall"),
-        ("shap", None),
-        ("fastshap", None),
+        ("force"),
+        ("waterfall"),
+        (None),
     ],
 )
-def test_explain_rows(backend, plot, monkeypatch):
+def test_explain_rows(plot, monkeypatch):
     train_data = MagicMock()
     model = MagicMock()
     rows = MagicMock()
@@ -462,7 +459,6 @@ def test_explain_rows(backend, plot, monkeypatch):
             train_data=train_data,
             model=model,
             rows=rows,
-            backend=backend,
             plot=plot,
             return_state=True,
             baseline_sample=300,
@@ -478,12 +474,8 @@ def test_explain_rows(backend, plot, monkeypatch):
             viz_facets=ANY,
         )
 
-        expected_backend = {
-            "shap": ShapAnalysis,
-            "fastshap": FastShapAnalysis,
-        }.get(backend)
         anlz_facet = call_analyze.call_args.kwargs["anlz_facets"][0]
-        assert type(anlz_facet) is expected_backend
+        assert type(anlz_facet) is ShapAnalysis
         assert anlz_facet.rows == rows
         assert anlz_facet.baseline_sample == 300
 

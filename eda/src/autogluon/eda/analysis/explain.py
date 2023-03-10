@@ -3,12 +3,11 @@ from typing import List, Optional
 
 import pandas as pd
 import shap
-from fastshap import KernelExplainer
 
 from autogluon.eda import AnalysisState
 from autogluon.eda.analysis.base import AbstractAnalysis
 
-__all__ = ["ShapAnalysis", "FastShapAnalysis"]
+__all__ = ["ShapAnalysis"]
 
 logger = logging.getLogger(__name__)
 
@@ -122,111 +121,6 @@ class ShapAnalysis(AbstractAnalysis):
                     shap_values=ke_shap_values[0],
                     features=row[args.train_data.columns],
                     feature_names=None,
-                )
-            )
-        state.explain = {"shapley": shap_data}
-
-
-class FastShapAnalysis(AbstractAnalysis):
-    """
-    Perform Shapley values calculation using `fastshap` package for the given rows.
-
-    Parameters
-    ----------
-    rows: pd.DataFrame,
-        rows to explain
-    baseline_sample: int, default = 100
-        The background dataset size to use for integrating out features. To determine the impact
-        of a feature, that feature is set to "missing" and the change in the model output
-        is observed.
-    parent: Optional[AbstractAnalysis], default = None
-        parent Analysis
-    children: List[AbstractAnalysis], default = []
-        wrapped analyses; these will receive sampled `args` during `fit` call
-    state: AnalysisState
-        state to be updated by this fit function
-    kwargs
-
-    Examples
-    --------
-    >>> import autogluon.eda.analysis as eda
-    >>> import autogluon.eda.visualization as viz
-    >>> import autogluon.eda.auto as auto
-    >>>
-    >>> auto.analyze(
-    >>>     train_data=..., model=...,
-    >>>     anlz_facets=[
-    >>>         eda.explain.FastShapAnalysis(rows, baseline_sample=200),
-    >>>     ],
-    >>>     viz_facets=[
-    >>>         # Visualize the given SHAP values with an additive force layout
-    >>>         viz.explain.ExplainForcePlot(),
-    >>>         # Visualize the given SHAP values with a waterfall layout
-    >>>         viz.explain.ExplainWaterfallPlot(),
-    >>>     ]
-    >>> )
-
-    See Also
-    --------
-    :py:class:`~fastshap.KernelExplainer.KernelExplainer`
-    :py:class:`~autogluon.eda.visualization.explain.ExplainForcePlot`
-    :py:class:`~autogluon.eda.visualization.explain.ExplainWaterfallPlot`
-    """
-
-    def __init__(
-        self,
-        rows: pd.DataFrame,
-        baseline_sample: int = 100,
-        parent: Optional[AbstractAnalysis] = None,
-        children: Optional[List[AbstractAnalysis]] = None,
-        state: Optional[AnalysisState] = None,
-        **kwargs,
-    ) -> None:
-        super().__init__(parent, children, state, **kwargs)
-        self.rows = rows
-        assert baseline_sample >= 30
-        self.baseline_sample = baseline_sample
-
-    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
-        return self.all_keys_must_be_present(args, "model", "train_data")
-
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
-        if self.baseline_sample <= len(args.train_data):
-            _baseline_sample = self.baseline_sample
-        else:
-            _baseline_sample = len(args.train_data)
-        baseline = args.train_data.sample(_baseline_sample, random_state=0)
-        data = baseline.drop(columns=args.model.label)
-
-        def predict_fn(x):
-            if args.model.problem_type == "regression":
-                preds = args.model.predict(x, as_pandas=False)
-            else:
-                preds = args.model.predict_proba(x, as_pandas=False)
-            return preds
-
-        shap_data = []
-
-        for _, row in self.rows.iterrows():
-            _row = pd.DataFrame([row])
-            ke = KernelExplainer(predict_fn, data)
-            ke_shap_values = ke.calculate_shap_values(_row[data.columns], verbose=False)
-            if args.model.problem_type == "regression":
-                expected_value = ke_shap_values[0][-1]
-                shap_values = ke_shap_values[0][:-1]
-            else:
-                predicted_class = ke_shap_values[0][-1].argmax()
-                expected_value = ke_shap_values[0][-1][predicted_class]
-                shap_values = ke_shap_values[0][:-1, predicted_class]
-
-            features = _row[data.columns].to_numpy()[0]
-            shap_data.append(
-                AnalysisState(
-                    row=_row,
-                    expected_value=expected_value,
-                    shap_values=shap_values,
-                    features=features,
-                    feature_names=list(data.columns),
                 )
             )
         state.explain = {"shapley": shap_data}

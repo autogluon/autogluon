@@ -68,9 +68,7 @@ class ExplainForcePlot(_AbstractExplainPlot):
     See Also
     --------
     :py:class:`~shap.KernelExplainer`
-    :py:class:`~fastshap.KernelExplainer.KernelExplainer`
     :py:class:`~autogluon.eda.analysis.explain.ShapAnalysis`
-    :py:class:`~autogluon.eda.analysis.explain.FastShapAnalysis`
     """
 
     def _render_internal(self, expected_value, shap_values, features, feature_names, **kwargs):
@@ -112,9 +110,7 @@ class ExplainWaterfallPlot(_AbstractExplainPlot):
     See Also
     --------
     :py:class:`~shap.KernelExplainer`
-    :py:class:`~fastshap.KernelExplainer.KernelExplainer`
     :py:class:`~autogluon.eda.analysis.explain.ShapAnalysis`
-    :py:class:`~autogluon.eda.analysis.explain.FastShapAnalysis`
     """
 
     def _render_internal(self, expected_value, shap_values, features, feature_names, **kwargs):

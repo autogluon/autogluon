@@ -13,7 +13,6 @@ from ..analysis import (
     AutoGluonModelQuickFit,
     Correlation,
     DistributionFit,
-    FastShapAnalysis,
     FeatureInteraction,
     MissingValuesAnalysis,
     ProblemTypeControl,
@@ -948,7 +947,6 @@ def explain_rows(
     model: TabularPredictor,
     rows: pd.DataFrame,
     display_rows: bool = False,
-    backend: str = "shap",
     plot: Optional[str] = "force",
     baseline_sample: int = 100,
     return_state: bool = False,
@@ -972,10 +970,6 @@ def explain_rows(
         rows to explain
     display_rows: bool, default = False
         if `True` then display the row before the explanation chart
-    backend: str, default = 'shap'
-        type backend to use for Shapley values calculations. Supported keys:
-        - `shap` - use :py:class:`~autogluon.eda.analysis.explain.ShapAnalysis` backend based on `shap` package
-        - `fastshap` - use :py:class:`~autogluon.eda.analysis.explain.FastShapAnalysis` backend based on `fastshap` package
     plot: Optional[str], default = 'force'
         type of plot to visualize the Shapley values. Supported keys:
         - `force` - Visualize the given SHAP values with an additive force layout
@@ -992,19 +986,10 @@ def explain_rows(
     See Also
     --------
     :py:class:`~shap.KernelExplainer`
-    :py:class:`~fastshap.KernelExplainer.KernelExplainer`
     :py:class:`~autogluon.eda.analysis.explain.ShapAnalysis`
-    :py:class:`~autogluon.eda.analysis.explain.FastShapAnalysis`
     :py:class:`~autogluon.eda.visualization.explain.ExplainForcePlot`
     :py:class:`~autogluon.eda.visualization.explain.ExplainWaterfallPlot`
     """
-
-    supported_backends = {
-        "shap": ShapAnalysis,
-        "fastshap": FastShapAnalysis,
-    }
-    anlz_cls = supported_backends.get(backend, None)
-    assert anlz_cls is not None, f"backend must be one of the following values: {','.join(supported_backends.keys())}"
 
     if plot is None:
         viz_facets = None
@@ -1015,7 +1000,7 @@ def explain_rows(
         }
         viz_cls = supported_plots.get(plot, None)
         assert viz_cls is not None, (
-            f"backend must be one of the following values: {','.join(supported_plots.keys())}. "
+            f"plot must be one of the following values: {','.join(supported_plots.keys())}. "
             f"If no visualization required, then `None` can be passed."
         )
         viz_facets = [viz_cls(display_rows=display_rows, **kwargs)]
@@ -1024,6 +1009,6 @@ def explain_rows(
         train_data=train_data,
         model=model,
         return_state=return_state,
-        anlz_facets=[anlz_cls(rows, baseline_sample=baseline_sample)],  # type: ignore
+        anlz_facets=[ShapAnalysis(rows, baseline_sample=baseline_sample)],  # type: ignore
         viz_facets=viz_facets,  # type: ignore
     )
