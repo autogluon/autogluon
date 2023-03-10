@@ -165,7 +165,7 @@ def test_trivialaugment():
     "train_transforms,val_transforms",
     [
         (
-            ["resize_shorter_side", "center_crop", "horizontal_flip", "color_jitter"],
+            ["resize_shorter_side", "center_crop", "random_horizontal_flip", "color_jitter"],
             ["resize_shorter_side", "center_crop"],
         ),
         (
@@ -195,7 +195,7 @@ def test_customizing_predictor_image_aug(train_transforms, val_transforms):
     "train_transforms,val_transforms",
     [
         (
-            ["resize_shorter_side", "center_crop", "horizontal_flip", "color_jitter"],
+            ["resize_shorter_side", "center_crop", "random_horizontal_flip", "color_jitter"],
             ["resize_shorter_side", "center_crop"],
         ),
         (

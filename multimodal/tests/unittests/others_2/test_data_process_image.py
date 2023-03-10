@@ -28,8 +28,8 @@ ALL_DATASETS = {
             "model.timm_image.train_transform_types": [
                 "resize_shorter_side",
                 "center_crop",
-                "horizontal_flip",
-                "vertical_flip",
+                "random_horizontal_flip",
+                "random_vertical_flip",
             ],
             "model.timm_image.val_transform_types": ["resize_shorter_side", "center_crop"],
         },
@@ -88,8 +88,8 @@ def test_data_process_image(augmentations):
     model = TimmAutoModelForImagePrediction(prefix="timm_image", checkpoint_name="swin_base_patch4_window7_224")
     image_processor = ImageProcessor(
         model=model,
-        train_transform_types=augmentations["model.timm_image.train_transform_types"],
-        val_transform_types=augmentations["model.timm_image.val_transform_types"],
+        train_transforms=augmentations["model.timm_image.train_transform_types"],
+        val_transforms=augmentations["model.timm_image.val_transform_types"],
         size=224,
         norm_type="imagenet",
     )

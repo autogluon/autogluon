@@ -352,7 +352,8 @@ class ImageProcessor:
             self.train_transforms = self.train_transform_types
         if "val_transform_types" in state:
             self.val_transforms = self.val_transform_types
-
+        print(f"self.train_transforms: {self.train_transforms}")
+        print(f"type(self.train_transforms): {type(self.train_transforms)}")
         self.train_processor = construct_image_processor(
             image_transforms=self.train_transforms,
             size=self.size,
