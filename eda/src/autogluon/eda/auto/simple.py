@@ -978,8 +978,8 @@ def explain_rows(
         - `fastshap` - use :py:class:`~autogluon.eda.analysis.explain.FastShapAnalysis` backend based on `fastshap` package
     plot: Optional[str], default = 'force'
         type of plot to visualize the Shapley values. Supported keys:
-        - `force`
-        - `waterfall`
+        - `force` - Visualize the given SHAP values with an additive force layout
+        - `waterfall` - Visualize the given SHAP values with a waterfall layout
         - `None` - do not use any visualization
     baseline_sample: int, default = 100
         The background dataset size to use for integrating out features. To determine the impact
@@ -992,9 +992,11 @@ def explain_rows(
     See Also
     --------
     :py:class:`~shap.KernelExplainer`
+    :py:class:`~fastshap.KernelExplainer.KernelExplainer`
     :py:class:`~autogluon.eda.analysis.explain.ShapAnalysis`
     :py:class:`~autogluon.eda.analysis.explain.FastShapAnalysis`
-
+    :py:class:`~autogluon.eda.visualization.explain.ExplainForcePlot`
+    :py:class:`~autogluon.eda.visualization.explain.ExplainWaterfallPlot`
     """
 
     supported_backends = {

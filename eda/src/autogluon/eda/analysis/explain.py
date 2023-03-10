@@ -37,6 +37,51 @@ class _ShapAutogluonWrapper:
 
 
 class ShapAnalysis(AbstractAnalysis):
+    """
+    Perform Shapley values calculation using `shap` package for the given rows.
+
+    Parameters
+    ----------
+    rows: pd.DataFrame,
+        rows to explain
+    baseline_sample: int, default = 100
+        The background dataset size to use for integrating out features. To determine the impact
+        of a feature, that feature is set to "missing" and the change in the model output
+        is observed.
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: List[AbstractAnalysis], default = []
+        wrapped analyses; these will receive sampled `args` during `fit` call
+    state: AnalysisState
+        state to be updated by this fit function
+    kwargs
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.visualization as viz
+    >>> import autogluon.eda.auto as auto
+    >>>
+    >>> auto.analyze(
+    >>>     train_data=..., model=...,
+    >>>     anlz_facets=[
+    >>>         eda.explain.ShapAnalysis(rows, baseline_sample=200),
+    >>>     ],
+    >>>     viz_facets=[
+    >>>         # Visualize the given SHAP values with an additive force layout
+    >>>         viz.explain.ExplainForcePlot(),
+    >>>         # Visualize the given SHAP values with a waterfall layout
+    >>>         viz.explain.ExplainWaterfallPlot(),
+    >>>     ]
+    >>> )
+
+    See Also
+    --------
+    :py:class:`~shap.KernelExplainer`
+    :py:class:`~autogluon.eda.visualization.explain.ExplainForcePlot`
+    :py:class:`~autogluon.eda.visualization.explain.ExplainWaterfallPlot`
+    """
+
     def __init__(
         self,
         rows: pd.DataFrame,
@@ -83,6 +128,51 @@ class ShapAnalysis(AbstractAnalysis):
 
 
 class FastShapAnalysis(AbstractAnalysis):
+    """
+    Perform Shapley values calculation using `fastshap` package for the given rows.
+
+    Parameters
+    ----------
+    rows: pd.DataFrame,
+        rows to explain
+    baseline_sample: int, default = 100
+        The background dataset size to use for integrating out features. To determine the impact
+        of a feature, that feature is set to "missing" and the change in the model output
+        is observed.
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: List[AbstractAnalysis], default = []
+        wrapped analyses; these will receive sampled `args` during `fit` call
+    state: AnalysisState
+        state to be updated by this fit function
+    kwargs
+
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.visualization as viz
+    >>> import autogluon.eda.auto as auto
+    >>>
+    >>> auto.analyze(
+    >>>     train_data=..., model=...,
+    >>>     anlz_facets=[
+    >>>         eda.explain.FastShapAnalysis(rows, baseline_sample=200),
+    >>>     ],
+    >>>     viz_facets=[
+    >>>         # Visualize the given SHAP values with an additive force layout
+    >>>         viz.explain.ExplainForcePlot(),
+    >>>         # Visualize the given SHAP values with a waterfall layout
+    >>>         viz.explain.ExplainWaterfallPlot(),
+    >>>     ]
+    >>> )
+
+    See Also
+    --------
+    :py:class:`~fastshap.KernelExplainer.KernelExplainer`
+    :py:class:`~autogluon.eda.visualization.explain.ExplainForcePlot`
+    :py:class:`~autogluon.eda.visualization.explain.ExplainWaterfallPlot`
+    """
+
     def __init__(
         self,
         rows: pd.DataFrame,
