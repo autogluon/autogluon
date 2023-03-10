@@ -181,25 +181,27 @@ def test_onnx_optimize_for_inference(dataset_name, model_names, text_backbone, i
     tail_df = dataset.test_df.tail(2)
 
     # Load a refresh predictor and optimize it for inference
-    predictor_trt = MultiModalPredictor.load(path=model_path)
-    predictor_trt.optimize_for_inference()
+    for providers in [None, ["TensorrtExecutionProvider"], ["CUDAExecutionProvider"], ["CPUExecutionProvider"]]:
+        predictor_opt = MultiModalPredictor.load(path=model_path)
+        predictor_opt.optimize_for_inference(providers=providers)
 
-    # Check existence of the exported onnx model file and tensorrt cache files
-    onnx_path = os.path.join(predictor_trt.path, "model.onnx")
-    assert os.path.exists(onnx_path), f"onnx model file not found at {onnx_path}"
-    trt_cache_dir = os.path.join(predictor_trt.path, "model_trt")
-    assert len(os.listdir(trt_cache_dir)) >= 2, f"tensorrt cache model files are not found in {trt_cache_dir}"
-    assert isinstance(
-        predictor_trt._model, OnnxModule
-    ), f"invalid onnx module type, expected to be OnnxModule, but the model type is {type(predictor._model)}"
+        # Check existence of the exported onnx model file and tensorrt cache files
+        onnx_path = os.path.join(predictor_opt.path, "model.onnx")
+        assert os.path.exists(onnx_path), f"onnx model file not found at {onnx_path}"
+        if providers == None or providers == ["TensorrtExecutionProvider"]:
+            trt_cache_dir = os.path.join(predictor_opt.path, "model_trt")
+            assert len(os.listdir(trt_cache_dir)) >= 2, f"tensorrt cache model files are not found in {trt_cache_dir}"
+        assert isinstance(
+            predictor_opt._model, OnnxModule
+        ), f"invalid onnx module type, expected to be OnnxModule, but the model type is {type(predictor._model)}"
 
-    # We should support dynamic shape
-    for batch_size in [2, 4, 8]:
-        test_df = dataset.test_df.head(batch_size)
-        if dataset.problem_type == REGRESSION:
-            y_pred = predictor.predict(test_df)
-            y_pred_trt = predictor_trt.predict(test_df)
-        else:
-            y_pred = predictor.predict_proba(test_df)
-            y_pred_trt = predictor_trt.predict_proba(test_df)
-        numpy.testing.assert_allclose(y_pred, y_pred_trt, rtol=0.01, atol=0.01)
+        # We should support dynamic shape
+        for batch_size in [2, 4, 8]:
+            test_df = dataset.test_df.head(batch_size)
+            if dataset.problem_type == REGRESSION:
+                y_pred = predictor.predict(test_df)
+                y_pred_trt = predictor_opt.predict(test_df)
+            else:
+                y_pred = predictor.predict_proba(test_df)
+                y_pred_trt = predictor_opt.predict_proba(test_df)
+            numpy.testing.assert_allclose(y_pred, y_pred_trt, rtol=0.01, atol=0.01)
