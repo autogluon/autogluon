@@ -7,14 +7,14 @@ from typing import Dict, List, Optional, Union
 import pandas as pd
 import torch
 
-from ..constants import HF_TEXT, MMDET_IMAGE, TEXT, TIMM_IMAGE
+from ..constants import CATEGORICAL, HF_TEXT, IMAGE_PATH, MMDET_IMAGE, NULL, NUMERICAL, TEXT, TIMM_IMAGE
 from ..models.fusion import AbstractMultimodalFusionModel
 from ..models.huggingface_text import HFAutoModelForTextPrediction
 from ..models.mmdet_image import MMDetAutoModelForObjectDetection
 from ..models.timm_image import TimmAutoModelForImagePrediction
 from .environment import compute_num_gpus, get_precision_context, infer_precision, move_to_device
 from .inference import process_batch
-from .onnx import onnx_get_dynamic_axes
+from .onnx import OnnxModule, onnx_get_dynamic_axes
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ class ExportMixin:
 
     def export_onnx(
         self,
-        data: pd.DataFrame,
+        data: Union[dict, pd.DataFrame],
         path: Optional[str] = None,
         batch_size: Optional[int] = None,
         verbose: Optional[bool] = False,
@@ -153,49 +153,61 @@ class ExportMixin:
 
         return onnx_path
 
-    def export_tensorrt(
+    def optimize_for_inference(
         self,
-        data: Optional[pd.DataFrame] = None,
-        path: Optional[str] = None,
-        batch_size: Optional[int] = None,
+        providers: Optional[Union[dict, List[str]]] = None,
     ):
         """
-        Export this predictor's model to ONNX file.
+        Optimize the predictor's model for inference.
+
+        Under the hood, the implementation would convert the PyTorch module into an ONNX module, so that
+        we can leverage efficient execution providers in onnxruntime for faster inference.
 
         Parameters
         ----------
         data
             Raw data used to trace and export the model.
             If this is None, will check if a processed batch is provided.
-        path
-            The export path of onnx model.
-        batch_size
-            The batch_size of export model's input.
-            Normally the batch_size is a dynamic axis, so we could use a small value for faster export.
+        providers : dict or str, default=None
+            A list of execution providers for model prediction in onnxruntime.
+
+            By default, the providers argument is None. The method would generate an ONNX module that
+            would perform model inference with TensorrtExecutionProvider in onnxruntime, if tensorrt
+            package is properly installed. Otherwise, the onnxruntime would fallback to use CUDA or CPU
+            execution providers instead.
 
         Returns
         -------
-        trt_module : OnnxModule
+        onnx_module : OnnxModule
             The onnx-based module that can be used to replace predictor._model for model inference.
         """
-        import onnx
-        import torch
+        data_dict = {}
+        for col_name, col_type in self._column_types.items():
+            if col_type in [NUMERICAL, CATEGORICAL, NULL]:
+                data_dict[col_name] = [0, 1]
+            elif col_type == TEXT:
+                data_dict[col_name] = ["some text", "some other text"]
+            elif col_type in [IMAGE_PATH]:
+                data_dict[col_name] = ["/not-exist-dir/xxx.jpg", "/not-exist-dir/yyy.jpg"]
+            else:
+                raise ValueError(f"unsupported column type: {col_type}")
+        data = pd.DataFrame.from_dict(data_dict)
 
-        from .onnx import OnnxModule
+        onnx_path = self.export_onnx(data=data, path=self.path, truncate_long_and_double=True)
+        onnx_module = OnnxModule(onnx_path, providers)
+        onnx_module.input_keys = self._model.input_keys
+        onnx_module.prefix = self._model.prefix
+        onnx_module.get_output_dict = self._model.get_output_dict
 
-        truncate_long_and_double = False
-        onnx_path = self.export_onnx(
-            data=data, path=path, batch_size=batch_size, truncate_long_and_double=truncate_long_and_double
-        )
+        # To use the TensorRT module for prediction, simply replace the _model in the predictor
+        self._model = onnx_module
 
-        logger.info("Loading ONNX file from path {}...".format(onnx_path))
-        onnx_model = onnx.load(onnx_path)
+        # Evaluate and cache TensorRT engine files
+        logger.info("Compiling ... (this may take a few minutes)")
+        _ = self.predict(data)
+        logger.info("Finished compilation!")
 
-        trt_module = OnnxModule(onnx_model)
-        trt_module.input_keys = self._model.input_keys
-        trt_module.prefix = self._model.prefix
-        trt_module.get_output_dict = self._model.get_output_dict
-        return trt_module
+        return onnx_module
 
     def get_processed_batch_for_deployment(
         self,
