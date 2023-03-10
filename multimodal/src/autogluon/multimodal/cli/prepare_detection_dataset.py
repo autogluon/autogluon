@@ -32,7 +32,7 @@ def download_one_url(url, root_dir, fname=None):
     output_path = os.path.join(root_dir, fname)
     print(f"Downloading {fname}...")
 
-    r = requests.get(url)
+    r = requests.get(url, timeout=(10, 1000))
     with open(output_path, "wb") as f:
         f.write(r.content)
 
