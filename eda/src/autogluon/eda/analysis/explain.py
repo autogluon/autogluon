@@ -4,6 +4,7 @@ from typing import List, Optional
 import pandas as pd
 import shap
 
+from autogluon.core.constants import REGRESSION
 from autogluon.eda import AnalysisState
 from autogluon.eda.analysis.base import AbstractAnalysis
 
@@ -17,7 +18,7 @@ class _ShapAutogluonWrapper:
         self.ag_model = predictor
         self.feature_names = feature_names
         self.target_class = target_class
-        if target_class is None and predictor.problem_type != "regression":
+        if target_class is None and predictor.problem_type != REGRESSION:
             logging.warning("Since target_class not specified, SHAP will explain predictions for each class")
 
     def predict_proba(self, X):
@@ -25,11 +26,11 @@ class _ShapAutogluonWrapper:
             X = X.values.reshape(1, -1)
         if not isinstance(X, pd.DataFrame):
             X = pd.DataFrame(X, columns=self.feature_names)
-        if self.ag_model.problem_type == "regression":
+        if self.ag_model.problem_type == REGRESSION:
             preds = self.ag_model.predict(X)
         else:
             preds = self.ag_model.predict_proba(X)
-        if self.ag_model.problem_type == "regression" or self.target_class is None:
+        if self.ag_model.problem_type == REGRESSION or self.target_class is None:
             return preds
         else:
             return preds[self.target_class]
@@ -107,7 +108,7 @@ class ShapAnalysis(AbstractAnalysis):
         shap_data = []
         for _, row in self.rows.iterrows():
             _row = pd.DataFrame([row])
-            if args.model.problem_type == "regression":
+            if args.model.problem_type == REGRESSION:
                 predicted_class = 0
             else:
                 predicted_class = args.model.predict(_row).iloc[0]
