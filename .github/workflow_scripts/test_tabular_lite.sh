@@ -9,7 +9,7 @@ export AUTOGLUON_PACKAGE_NAME="autogluon-lite"
 
 build_all
 
-PYODIDE_DIR=/pyodide
+PYODIDE_DIR=pyodide
 
 DIST_DST=$PYODIDE_DIR/wheels
 mkdir -p $DIST_DST
