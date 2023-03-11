@@ -5,7 +5,7 @@ from pytest_pyodide import run_in_pyodide, spawn_web_server
 DEMO_PATH = Path(__file__).parent / "test_data"
 WHL_PATH = Path(__file__).parent / "wheels"
 
-WHL_PREFIX = "autogluon-lite"
+WHL_PREFIX = "autogluon_lite"
 
 AG_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}-*-py3-none-any.whl")]
 assert len(AG_WHL_NAME) == 1
