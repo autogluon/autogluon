@@ -9,7 +9,9 @@ export AUTOGLUON_PACKAGE_NAME="autogluon-lite"
 
 build_all
 
-DIST_DST=pyodide/wheels
+PYODIDE_DIR=/pyodide
+
+DIST_DST=$PYODIDE_DIR/wheels
 mkdir -p $DIST_DST
 cp -f autogluon/dist/*.whl $DIST_DST/
 cp -f common/dist/*.whl $DIST_DST/
@@ -17,8 +19,8 @@ cp -f core/dist/*.whl $DIST_DST/
 cp -f features/dist/*.whl $DIST_DST/
 cp -f tabular/dist/*.whl $DIST_DST/
 
-cp -f tabular/tests/regressiontests/test_tabular_lite.py pyodide/
+cp -f tabular/tests/regressiontests/test_tabular_lite.py $PYODIDE_DIR/
 
-cd pyodide
+cd $PYODIDE_DIR
 tools/pytest_wrapper.py test_tabular_lite -v \
   --runtime 'firefox' --runner 'playwright' --junitxml=results.xml
