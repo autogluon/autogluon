@@ -22,5 +22,5 @@ cp -f tabular/dist/*.whl $DIST_DST/
 cp -f tabular/tests/regressiontests/test_tabular_lite.py $PYODIDE_DIR/
 
 cd $PYODIDE_DIR
-tools/pytest_wrapper.py test_tabular_lite.py -v \
+tools/pytest_wrapper.py test_tabular_lite2.py -v \
   --runtime 'firefox' --runner 'playwright' --junitxml=results.xml
