@@ -385,25 +385,6 @@ def selenium_standalone_micropip(selenium_standalone):
 def test_load_data(selenium_standalone_micropip):
     @run_in_pyodide(packages=["xgboost", "pandas", "numpy", "scipy", "scikit-learn", "lightgbm"])
     async def run(selenium, test, train_data, test_data):
-        # with open("train-5k.csv", "wb") as f:
-        #     f.write(data_train)
-        # with open("test-5k.csv", "wb") as f:
-        #     f.write(data_test)
-
-        expected_score_range = {
-            'ExtraTreesEntr': (0.822, 0.001),
-            'ExtraTreesGini': (0.82, 0.001),
-            'KNeighborsDist': (0.726, 0.001),
-            'KNeighborsUnif': (0.763, 0.001),
-            'LightGBM': (0.836, 0.001),
-            'LightGBMLarge': (0.827, 0.001),
-            'LightGBMXT': (0.833, 0.001),
-            'RandomForestEntr': (0.832, 0.001),
-            'RandomForestGini': (0.83, 0.001),
-            'WeightedEnsemble_L2': (0.831, 0.001),
-            'XGBoost': (0.831, 0.001),
-        }
-
         expected_score_range = test['expected_score_range']
         expected_score_range = {k: (v[0], 0.02) for k, v in expected_score_range.items() if k not in [
             'CatBoost', 'NeuralNetFastAI', 'NeuralNetTorch',
@@ -415,7 +396,6 @@ def test_load_data(selenium_standalone_micropip):
         # subsample_size = 500  # subsample subset of data for faster demo, try setting this to much larger values
         # train_data = train_data.sample(n=subsample_size, random_state=0)
         print(train_data.head())
-        label = 'class'
         label = 'label'
         print("Summary of class variable: \n", train_data[label].describe())
         save_path = 'agModels-predictClass'  # specifies folder to store trained models
