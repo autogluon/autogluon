@@ -8,7 +8,7 @@ import pickle
 from autogluon.core.utils import try_import
 import sys
 import time
-from typing import Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -24,7 +24,7 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from .model_trial import model_trial, skip_hpo
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
 from ... import metrics, Space
-from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
+from ...constants import AG_ARG_PREFIX, AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.constants import RAY_BACKEND, CUSTOM_BACKEND
@@ -137,27 +137,77 @@ class AbstractModel:
         self.compile_time = None  # Time taken to compile the model in seconds
         self.val_score = None  # Score with eval_metric (Validation data)
 
+        self._user_params, self._user_params_aux = self._init_user_params(params=hyperparameters)
+
         self.params = {}
         self.params_aux = {}
-
-        if hyperparameters is not None:
-            hyperparameters = hyperparameters.copy()
-        if hyperparameters is not None and AG_ARGS_FIT in hyperparameters:
-            self._user_params_aux = hyperparameters.pop(AG_ARGS_FIT)  # TODO: Delete after initialization?
-        else:
-            self._user_params_aux = None
-        if self._user_params_aux is None:
-            self._user_params_aux = dict()
-        self._user_params = hyperparameters  # TODO: Delete after initialization?
-        if self._user_params is None:
-            self._user_params = dict()
-
         self.params_trained = dict()
         self._is_initialized = False
         self._is_fit_metadata_registered = False
         self._fit_metadata = dict()
 
         self._compiler = None
+
+    @classmethod
+    def _init_user_params(cls, params: Optional[Dict[str, Any]], ag_args_fit: str = AG_ARGS_FIT, ag_arg_prefix: str = AG_ARG_PREFIX) -> (Dict[str, Any], Dict[str, Any]):
+        """
+        Given the user-specified hyperparameters, split into `params` and `params_aux`.
+
+        Parameters
+        ----------
+        params : Optional[Dict[str, Any]]
+            The model hyperparameters dictionary
+        ag_args_fit : str, default = "ag_args_fit"
+            The params key to look for that contains params_aux.
+            If the key is present, the value is used for params_aux and popped from params.
+            If no such key is found, then initialize params_aux as an empty dictionary.
+        ag_arg_prefix : str, default = "ag."
+            The key prefix to look for that indicates a parameter is intended for params_aux.
+            If None, this logic is skipped.
+            If a key starts with this prefix, it is popped from params and added to params_aux with the prefix removed.
+            For example:
+                input:  params={'ag.foo': 2, 'abc': 7}, params_aux={'bar': 3}, and ag_arg_prefix='.ag',
+                output: params={'abc': 7}, params_aux={'bar': 3, 'foo': 2}
+            In cases where the key is specified multiple times, the value of the key with the prefix will always take priority.
+            A warning will be logged if a key is present multiple times.
+            For example, given the most complex scenario:
+                input:  params={'ag.foo': 1, 'foo': 2, 'ag_args_fit': {'ag.foo': 3, 'foo': 4}}
+                output: params={'foo': 2}, params_aux={'foo': 1}
+
+        Returns
+        -------
+        params, params_aux : (Dict[str, Any], Dict[str, Any])
+            params will contain the native model hyperparameters
+            params_aux will contain special auxiliary hyperparameters
+        """
+        params = copy.deepcopy(params) if params is not None else dict()
+        assert isinstance(params, dict), f"Invalid dtype of params! Expected dict, but got {type(params)}"
+        params_aux = params.pop(ag_args_fit, dict())
+        if params_aux is None:
+            params_aux = dict()
+        assert isinstance(params_aux, dict), f"Invalid dtype of params_aux! Expected dict, but got {type(params_aux)}"
+        if ag_arg_prefix is not None:
+            param_aux_keys = list(params_aux.keys())
+            for k in param_aux_keys:
+                if isinstance(k, str) and k.startswith(ag_arg_prefix):
+                    k_no_prefix = k[len(ag_arg_prefix):]
+                    if k_no_prefix in params_aux:
+                        logger.warning(f'Warning: {cls.__name__} hyperparameter "{k}" is present '
+                                       f'in `ag_args_fit` as both "{k}" and "{k_no_prefix}". '
+                                       f'Will use "{k}" and ignore "{k_no_prefix}".')
+                    params_aux[k_no_prefix] = params_aux[k]
+                    params_aux.pop(k)
+            param_keys = list(params.keys())
+            for k in param_keys:
+                if isinstance(k, str) and k.startswith(ag_arg_prefix):
+                    k_no_prefix = k[len(ag_arg_prefix):]
+                    if k_no_prefix in params_aux:
+                        logger.warning(f'Warning: {cls.__name__} hyperparameter "{k}" is present '
+                                       f'in both `ag_args_fit` and `hyperparameters`. '
+                                       f'Will use `hyperparameters` value.')
+                    params_aux[k_no_prefix] = params[k]
+                    params.pop(k)
+        return params, params_aux
 
     def _init_params(self):
         """Initializes model hyperparameters"""
@@ -1435,28 +1485,85 @@ class AbstractModel:
             'num_cpus': 1,
         }
 
-    def _estimate_memory_usage(self, X, **kwargs) -> int:
+    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         """
-        This method simply provides a default implementation. Each model should consider implementing custom memory estimate logic.
+        Estimates the peak memory usage during model fitting.
+        This method simply provides a default implementation. Each model should consider implementing custom memory estimation logic.
+
+        Parameters
+        ----------
+        X : pd.DataFrame,
+            The training data intended to fit the model with.
+        **kwargs : dict,
+            The `.fit` kwargs.
+            Can optionally be used by custom implementations to better estimate memory usage.
+            To best understand what kwargs are available, enter a debugger and put a breakpoint in this method to manually inspect the keys.
+
+        Returns
+        -------
+        The estimated peak memory usage in bytes during model fit.
         """
         return 4 * get_approximate_df_mem_usage(X).sum()
 
     @disable_if_lite_mode()
-    def _validate_fit_memory_usage(self, **kwargs):
+    def _validate_fit_memory_usage(self, mem_error_threshold: float = 0.9, mem_warning_threshold: float = 0.75, mem_size_threshold: int = None, **kwargs):
+        """
+        Asserts that enough memory is available to fit the model
+
+        If not enough memory, will raise NotEnoughMemoryError
+        Memory thresholds depend on the `params_aux` hyperparameter `max_memory_usage_ratio`, which generally defaults to 1.
+        if `max_memory_usage_ratio=None`, all memory checks are skipped.
+
+        Parameters
+        ----------
+        mem_error_threshold : float, default = 0.9
+            A multiplier to max_memory_usage_ratio to get the max_memory_usage_error_ratio
+            If expected memory usage is >max_memory_usage_error_ratio, raise NotEnoughMemoryError
+        mem_warning_threshold : float, default = 0.75
+            A multiplier to max_memory_usage_ratio to get the max_memory_usage_warning_ratio
+            If expected memory usage is >max_memory_usage_error_ratio, raise NotEnoughMemoryError
+        mem_size_threshold : int, default = None
+            If not None, skips checking available memory if the expected model size is less than `mem_size_threshold` bytes.
+            This is used to speed-up training by avoiding the check in cases where the machine almost certainly has sufficient memory.
+        **kwargs : dict,
+            Fit time kwargs, including X, y, X_val, and y_val.
+            Can be used to customize estimation of memory usage.
+        """
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
+        if max_memory_usage_ratio is None:
+            return  # Skip memory check
+
         approx_mem_size_req = self.estimate_memory_usage(**kwargs)
+        if mem_size_threshold is not None and approx_mem_size_req < (mem_size_threshold * min(max_memory_usage_ratio, 1)):
+            return  # Model is smaller than the min threshold to check available mem
+
         available_mem = ResourceManager.get_available_virtual_mem()
         ratio = approx_mem_size_req / available_mem
-        if ratio > (0.9 * max_memory_usage_ratio):
-            logger.warning('\tWarning: Not enough memory to safely train model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
-            raise NotEnoughMemoryError
-        elif ratio > (0.6 * max_memory_usage_ratio):
-            logger.warning('\tWarning: Potentially not enough memory to safely train model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+        min_error_memory_ratio = ratio / mem_error_threshold
+        min_warning_memory_ratio = ratio / mem_warning_threshold
+        max_memory_usage_error_ratio = mem_error_threshold * max_memory_usage_ratio
+        max_memory_usage_warning_ratio = mem_warning_threshold * max_memory_usage_ratio
 
-    # Removes non-essential objects from the model to reduce memory and disk footprint.
-    # If `remove_fit=True`, enables the removal of variables which are required for fitting the model. If the model is already fully trained, then it is safe to remove these.
-    # If `remove_info=True`, enables the removal of variables which are used during model.get_info(). The values will be None when calling model.get_info().
-    # If `requires_save=True`, enables the removal of variables which are part of the model.pkl object, requiring an overwrite of the model to disk if it was previously persisted.
+        log_user_guideline = f'Roughly requires {round(approx_mem_size_req / 1e9, 3)} GB, ' \
+                             f'but only {round(available_mem / 1e9, 3)} GB is available... ' \
+                             f'({round(max_memory_usage_error_ratio*100, 3)}% of avail memory is the max safe size ' \
+                             f'compared to estimated size {round(min_error_memory_ratio*100, 3)}%)'
+        if min_error_memory_ratio > max_memory_usage_error_ratio:
+            log_user_guideline += f'\n\tTo force training the model, specify the model hyperparameter "ag.max_memory_usage_ratio" to a larger value ' \
+                                  f'(currently {max_memory_usage_ratio}, set to >{round(min_error_memory_ratio + 0.05, 2)} to avoid the error)'
+            if min_error_memory_ratio >= 1:
+                log_user_guideline += f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. ' \
+                                      f'You may consider using a machine with more memory as a safer alternative.'
+            logger.warning(f'\tWarning: Not enough memory to safely train model. {log_user_guideline}')
+            raise NotEnoughMemoryError
+        elif min_warning_memory_ratio > max_memory_usage_warning_ratio:
+            log_user_guideline += f'\n\tTo avoid this warning, specify the model hyperparameter "ag.max_memory_usage_ratio" to a larger value ' \
+                                  f'(currently {max_memory_usage_ratio}, set to >{round(min_warning_memory_ratio + 0.05, 2)} to avoid the warning)'
+            if min_warning_memory_ratio >= 1:
+                log_user_guideline += f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. ' \
+                                      f'You may consider using a machine with more memory as a safer alternative.'
+            logger.warning(f'\tWarning: Potentially not enough memory to safely train model. {log_user_guideline}')
+
     def reduce_memory_size(self, remove_fit=True, remove_info=False, requires_save=True, **kwargs):
         """
         Removes non-essential objects from the model to reduce memory and disk footprint.
@@ -1570,27 +1677,29 @@ class AbstractModel:
         stopping_metric = metrics.get_metric(stopping_metric, self.problem_type, 'stopping_metric')
         return stopping_metric
 
+    # TODO: v1.0 Move params_aux to params, separate logic as in _get_ag_params, keep `ag.` prefix for ag_args_fit params
+    #  This will allow to hyperparameter tune ag_args_fit hyperparameters.
+    #  Also delete `self.params_aux` entirely, make it a method instead.
     def _get_params(self) -> dict:
         """Gets all params."""
         return self.params.copy()
 
     def _get_ag_params(self) -> dict:
-        """Gets params that are not passed to the inner model, but are used by the wrapper."""
+        """
+        Gets params that are not passed to the inner model, but are used by the wrapper.
+        These params should exist in `self.params_aux`.
+        """
         ag_param_names = self._ag_params()
         if ag_param_names:
-            return {key: val for key, val in self.params.items() if key in ag_param_names}
+            return {key: val for key, val in self.params_aux.items() if key in ag_param_names}
         else:
             return dict()
 
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""
-        ag_param_names = self._ag_params()
-        if ag_param_names:
-            return {key: val for key, val in self.params.items() if key not in ag_param_names}
-        else:
-            return self._get_params()
+        return self._get_params()
 
-    # TODO: Add documentation for valid args for each model. Currently only `ag.early_stop`
+    # TODO: Add documentation for valid args for each model. Currently only `early_stop`
     def _ag_params(self) -> set:
         """
         Set of params that are not passed to self.model, but are used by the wrapper.
@@ -1602,7 +1711,7 @@ class AbstractModel:
 
         Possible params:
 
-        ag.early_stop : int, str, or tuple
+        early_stop : int, str, or tuple
             generic name for early stopping logic. Typically can be an int or a str preset/strategy.
             Also possible to pass tuple of (class, kwargs) to construct a custom early stopping object.
                 Refer to `autogluon.core.utils.early_stopping` for examples.
