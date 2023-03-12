@@ -2,7 +2,6 @@ from pathlib import Path
 import pytest
 from pytest_pyodide import run_in_pyodide, spawn_web_server
 
-DEMO_PATH = Path(__file__).parent / "test_data"
 WHL_PATH = Path(__file__).parent / "wheels"
 
 WHL_PREFIX = "autogluon_lite"
@@ -303,6 +302,7 @@ tests = [
 ]
 
 
+"""
 def make_dataset(request, seed):
     import random
     import numpy as np
@@ -349,6 +349,7 @@ def make_dataset(request, seed):
     dftest = pd.concat([x_test, y_test], axis=1)
 
     return (dftrain, dftest)
+"""
 
 
 @pytest.fixture
@@ -440,5 +441,6 @@ def test_load_data(selenium_standalone_micropip):
             # TODO: check "score_val"
 
     test_case = tests[-1]
+    from .utils import make_dataset
     DATA_TRAIN, DATA_TEST = make_dataset(request=test_case, seed=0)
     run(selenium_standalone_micropip, test_case, DATA_TRAIN, DATA_TEST)
