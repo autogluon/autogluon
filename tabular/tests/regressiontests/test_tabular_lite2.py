@@ -2,7 +2,8 @@ from pathlib import Path
 import pytest
 from pytest_pyodide import run_in_pyodide, spawn_web_server
 
-WHL_PATH = Path(__file__).parent / "wheels"
+WHL_PATH = Path(__file__).parent.parent.parent.parent / "wheels"
+print(WHL_PATH)
 
 WHL_PREFIX = "autogluon_lite"
 

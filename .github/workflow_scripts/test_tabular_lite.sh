@@ -12,7 +12,7 @@ build_all
 
 PYODIDE_DIR=/src/pyodide
 
-DIST_DST=$PYODIDE_DIR/wheels
+DIST_DST=wheels
 mkdir -p $DIST_DST
 cp -f autogluon/dist/*.whl $DIST_DST/
 cp -f common/dist/*.whl $DIST_DST/
