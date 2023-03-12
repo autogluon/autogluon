@@ -15,14 +15,10 @@ function setup_build_contrib_env {
     export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in AutoMMPredictor
 }
 
-function setup_mxnet_gpu {
-    python3 -m pip install mxnet-cu113==1.9.*
-    export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-}
-
 function setup_torch_gpu {
     # Security-patched torch.
     python3 -m pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
+    python3 -m pip install tensorrt==8.5.3.1 --timeout 60
 }
 
 function setup_torch_cpu {

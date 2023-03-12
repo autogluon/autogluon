@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -134,7 +134,7 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
             Mapping the named entities to task specific labels.
         word_offsets : torch.Tensor
             Locations of the named entities.
-        text_column_names : list of torch.Tensor, optional
+        text_column_names : list of str, optional
             Names of the text columns.
         text_column_indices : list of torch.Tensor, optional
             Start and stop indices of the text columns.
@@ -210,8 +210,8 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
         logits_label: torch.Tensor,
         token_word_mapping: torch.Tensor,
         word_offsets: torch.Tensor,
-        column_features: Optional[List[torch.Tensor]] = None,
-        column_feature_masks: Optional[List[torch.Tensor]] = None,
+        column_features: Optional[Dict[str, torch.Tensor]] = None,
+        column_feature_masks: Optional[Dict[str, torch.Tensor]] = None,
     ):
         ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
         if column_features != None:

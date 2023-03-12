@@ -13,13 +13,13 @@ def test_feature_metadata(data_helper):
         ('category', ()): ['cat'],
         ('datetime', ()): ['datetime'],
         ('float', ()): ['float'],
-        ('int', ()): ['int'],
+        ('int', ()): ['int_bool', 'int'],
         ('object', ()): ['obj'],
         ('object', ('datetime_as_object',)): ['datetime_as_object'],
         ('object', ('text',)): ['text']
     }
 
-    expected_feature_metadata_get_features = ['int', 'float', 'obj', 'cat', 'datetime', 'text', 'datetime_as_object']
+    expected_feature_metadata_get_features = ['int_bool', 'int', 'float', 'obj', 'cat', 'datetime', 'text', 'datetime_as_object']
 
     expected_type_map_raw = {
         'cat': 'category',
@@ -27,6 +27,7 @@ def test_feature_metadata(data_helper):
         'datetime_as_object': 'object',
         'float': 'float',
         'int': 'int',
+        'int_bool': 'int',
         'obj': 'object',
         'text': 'object'
     }
@@ -40,7 +41,7 @@ def test_feature_metadata(data_helper):
         ('category', ()): ['cat'],
         ('datetime', ()): ['datetime'],
         ('float', ()): ['obj'],
-        ('int', ()): ['int_renamed'],
+        ('int', ()): ['int_bool', 'int_renamed'],
         ('object', ()): ['float'],
         ('object', ('datetime_as_object',)): ['datetime_as_object'],
         ('object', ('text',)): ['text_renamed']
@@ -51,6 +52,7 @@ def test_feature_metadata(data_helper):
         ('custom_raw_type', ('custom_special_type',)): ['new_feature'],
         ('datetime', ()): ['datetime'],
         ('float', ()): ['float'],
+        ('int', ()): ['int_bool'],
         ('int', ('custom_special_type',)): ['int'],
         ('object', ()): ['obj'],
         ('object', ('datetime_as_object',)): ['datetime_as_object'],

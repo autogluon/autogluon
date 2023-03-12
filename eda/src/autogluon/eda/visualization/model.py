@@ -151,8 +151,16 @@ class RegressionEvaluation(AbstractVisualization, JupyterMixin):
     def _render(self, state: AnalysisState) -> None:
         self.render_header_if_needed(state, "Prediction vs Target")
         data = pd.DataFrame({"y_true": state.model_evaluation.y_true, "y_pred": state.model_evaluation.y_pred})
+
         fig, ax = plt.subplots(**self.fig_args)
-        sns.regplot(ax=ax, data=data, x="y_true", y="y_pred", **self._kwargs)
+        label = "test" if "y_true_val" in state.model_evaluation else "validation"
+        sns.regplot(ax=ax, data=data, x="y_true", y="y_pred", label=label, **self._kwargs)
+        if "y_true_val" in state.model_evaluation:
+            data = pd.DataFrame(
+                {"y_true": state.model_evaluation.y_true_val, "y_pred": state.model_evaluation.y_pred_val}
+            )
+            sns.regplot(ax=ax, data=data, x="y_true", y="y_pred", label="validation", **self._kwargs)
+            plt.legend()
         plt.show(fig)
 
 

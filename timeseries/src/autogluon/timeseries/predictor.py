@@ -61,6 +61,10 @@ class TimeSeriesPredictor:
         - ``"RMSE"``: root mean squared error
 
         For more information about these metrics, see https://docs.aws.amazon.com/forecast/latest/dg/metrics.html.
+    eval_metric_seasonal_period : int, optional
+        Seasonal period used to compute the mean absolute scaled error (MASE) evaluation metric. This parameter is only
+        used if ``eval_metric="MASE"`. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for more details.
+        Defaults to ``None``, in which case the seasonal period is computed based on the data frequency.
     known_covariates_names: List[str], optional
         Names of the covariates that are known in advance for all time steps in the forecast horizon. These are also
         known as dynamic features, exogenous variables, additional regressors or related time series. Examples of such
@@ -122,6 +126,7 @@ class TimeSeriesPredictor:
         known_covariates_names: Optional[List[str]] = None,
         prediction_length: int = 1,
         eval_metric: Optional[str] = None,
+        eval_metric_seasonal_period: Optional[int] = None,
         path: Optional[str] = None,
         verbosity: int = 2,
         quantile_levels: Optional[List[float]] = None,
@@ -152,6 +157,7 @@ class TimeSeriesPredictor:
 
         self.prediction_length = prediction_length
         self.eval_metric = eval_metric
+        self.eval_metric_seasonal_period = eval_metric_seasonal_period
         self.quantile_levels = quantile_levels or kwargs.get(
             "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         )
@@ -175,6 +181,7 @@ class TimeSeriesPredictor:
             dict(
                 path_context=self.path,
                 eval_metric=eval_metric,
+                eval_metric_seasonal_period=eval_metric_seasonal_period,
                 target=self.target,
                 known_covariates_names=self.known_covariates_names,
                 prediction_length=self.prediction_length,
@@ -333,7 +340,7 @@ class TimeSeriesPredictor:
 
             Available presets:
 
-            - ``"fast_training"``: fit simple "local" statistical models (``ETS``, ``ARIMA``, ``Theta``, ``Naive``, ``SeasonalNaive``). These models are fast to train, but cannot capture more complex patters in the data.
+            - ``"fast_training"``: fit simple "local" statistical models (``ETS``, ``ARIMA``, ``Theta``, ``Naive``, ``SeasonalNaive``). These models are fast to train, but cannot capture more complex patterns in the data.
             - ``"medium_quality"``: all models mentioned above + tree-based model ``AutoGluonTabular`` + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
             - ``"high_quality"``: all models mentioned above + hyperparameter optimization for local statistical models + deep learning models ``TemporalFusionTransformerMXNet`` (if MXNet is available) and ``SimpleFeedForward``. Usually more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: all models mentioned above + deep learning model ``TransformerMXNet`` (if MXNet is available) + hyperparameter optimization for deep learning models. Usually better than ``high_quality``, but takes much longer to train.

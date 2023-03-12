@@ -14,6 +14,7 @@ from timm.data.constants import (
     IMAGENET_INCEPTION_MEAN,
     IMAGENET_INCEPTION_STD,
 )
+from tokenizers import pre_tokenizers
 from torchvision import transforms
 
 from ..constants import CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, IDENTIFIER, IMAGE, MMLAB_MODELS
@@ -326,7 +327,7 @@ def tokenize_ner_text(text, tokenizer):
     The output of tokenizer and word offsets.
     """
     # pre-tokenization is required for NER token-level label generation.
-    words_with_offsets = tokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+    words_with_offsets = pre_tokenizers.BertPreTokenizer().pre_tokenize_str(text)
     words_with_offsets = is_space_counted(words_with_offsets) if len(words_with_offsets) > 1 else words_with_offsets
     words = [word for word, offset in words_with_offsets]
     word_offsets = np.array([[offset[0], offset[1]] for word, offset in words_with_offsets], dtype=np.int32)
@@ -341,7 +342,8 @@ def tokenize_ner_text(text, tokenizer):
     )
     offset_mapping = np.array(col_tokens.offset_mapping, dtype=np.int32)
     if len(words_with_offsets) > 1:
-        word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
+        if offset_mapping.shape[0] > len(words):
+            word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
         # token to word mappings: it will tell us which token belongs to which word.
         token_to_word_mappings = [i if i != None else -1 for i in col_tokens.word_ids()]
         if len(set(token_to_word_mappings)) != len(words) + 1:

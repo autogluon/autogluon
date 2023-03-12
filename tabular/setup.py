@@ -50,7 +50,8 @@ extras_require = {
         f'{ag.PACKAGE_NAME}.core[all]=={version}',
     ],
     'skex': [
-        'scikit-learn-intelex>=2021.6,<2021.8',
+        # Note: 2021.7 released on Sep 2022, version 2022.x doesn't exist (went directly from 2021.7 to 2023.0)
+        'scikit-learn-intelex>=2021.7,<2023.1',
     ],
     'imodels': [
         'imodels>=1.3.10,<1.4.0',  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
@@ -65,7 +66,8 @@ extras_require = {
         # Therefore, we install onnxruntime explicitly here just for macOS.
         'onnxruntime>=1.13.0,<1.14.0'
     ] if sys.platform == 'darwin' else [
-        'skl2onnx>=1.13.0,<1.14.0'
+        'skl2onnx>=1.13.0,<1.14.0',
+        'onnxruntime-gpu>=1.13.0,<1.14.0'
     ]
 }
 

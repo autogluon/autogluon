@@ -4,6 +4,7 @@ import warnings
 from io import BytesIO
 from typing import Any, Dict, List, Optional, Union
 
+import fitz
 import numpy as np
 import PIL
 import pytesseract
@@ -14,7 +15,7 @@ from torch import nn
 from torchvision import transforms
 from transformers import AutoTokenizer
 
-from ..constants import AUTOMM, BBOX
+from ..constants import AUTOMM, BBOX, DOCUMENT_PDF
 from .collator import PadCollator, StackCollator
 from .utils import construct_image_processor, image_mean_std
 
@@ -188,7 +189,6 @@ class DocumentProcessor:
         """
         results = {}
         width, height = doc_image.size
-
         # apply ocr to the document image.
         ocr_df = pytesseract.image_to_data(doc_image, output_type="data.frame")
         float_cols = ocr_df.select_dtypes("float").columns
@@ -220,6 +220,35 @@ class DocumentProcessor:
         results[BBOX] = boxes
         return results
 
+    def get_ocr_features(self, doc_path, doc_image):
+        """
+        Get the OCR features, and avoid running OCR multiple times.
+
+        Parameters
+        ----------
+        doc_path
+            The document path.
+        doc_image
+            The document image.
+
+        Returns
+        -------
+        Extracted words, image pixel features, and bounding boxes.
+        """
+        # The OCR process is time-consuming, so apply OCR on each image only once.
+        if doc_path not in self.documents:
+            ocr_res = self.apply_ocr(doc_image)
+            # store the ocr results.
+            self.documents.update({doc_path: ocr_res})
+        else:
+            # reuse the ocr results.
+            ocr_res = self.documents[doc_path]
+
+        words = ocr_res["words"]
+        normalized_word_boxes = ocr_res[BBOX]
+
+        return words, normalized_word_boxes
+
     def process_one_sample(
         self,
         document_features: Dict[str, Union[NDArray, list]],
@@ -248,25 +277,28 @@ class DocumentProcessor:
         """
         ret = {}
         for per_col_name, per_col_image_features in document_features.items():
-            # Open the document image.
             try:
-                with PIL.Image.open(per_col_image_features[0]) as doc_image:
-                    # The OCR process is time-consuming, so apply OCR on each image only once.
-                    if per_col_image_features[0] not in self.documents:
-                        ocr_res = self.apply_ocr(doc_image)
-                        # store the ocr results.
-                        self.documents.update({per_col_image_features[0]: ocr_res})
-                    else:
-                        # reuse the ocr results.
-                        ocr_res = self.documents[per_col_image_features[0]]
+                # Process PDF documents.
+                if feature_modalities[per_col_name] == DOCUMENT_PDF:
+                    # Load the pdf file.
+                    pdf_doc = fitz.open(per_col_image_features[0])
+                    first_page = pdf_doc.load_page(0)
+                    pix = first_page.get_pixmap(matrix=fitz.Matrix(1, 1))
+                    # Convert pdf into PIL images.
+                    with PIL.Image.frombytes(image_mode, [pix.width, pix.height], pix.samples) as doc_image:
+                        doc_image = doc_image.convert(image_mode)
+                        words, normalized_word_boxes = self.get_ocr_features(per_col_image_features[0], doc_image)
+                else:
+                    # Process document image.
+                    with PIL.Image.open(per_col_image_features[0]) as doc_image:
+                        doc_image = doc_image.convert(image_mode)
+                        words, normalized_word_boxes = self.get_ocr_features(per_col_image_features[0], doc_image)
 
-                    words = ocr_res["words"]
-                    doc_image = doc_image.convert(image_mode)
-                    normalized_word_boxes = ocr_res[BBOX]
             except Exception as e:
                 if self.missing_value_strategy.lower() == "zero":
                     logger.debug(f"Using a zero image due to '{e}'")
                     doc_image = PIL.Image.new(image_mode, (self.size, self.size), color=0)
+                    doc_image = doc_image.convert(image_mode)
                     words = ""  # empty words
                     normalized_word_boxes = [self.pad_token_box]
                 else:
@@ -282,7 +314,7 @@ class DocumentProcessor:
                 token_boxes = []
                 all_tokens = []
                 for word, box in zip(words, normalized_word_boxes):
-                    # Tokenize bounding box seperately.
+                    # Tokenize bounding box separately.
                     word_tokens = self.tokenizer.tokenize(word)
                     all_tokens.append(word_tokens)
                     token_boxes.extend([box] * len(word_tokens))
@@ -302,6 +334,8 @@ class DocumentProcessor:
                 token_boxes += [self.pad_token_box] * padding_length
 
             else:
+                if not isinstance(words, list):
+                    words = [words]
                 encoding = self.tokenizer(
                     words,
                     boxes=normalized_word_boxes,

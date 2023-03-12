@@ -6,8 +6,6 @@ import uuid
 
 import numpy.testing as npt
 import pytest
-import timm
-import transformers
 from omegaconf import OmegaConf
 from torch import nn
 
@@ -100,7 +98,7 @@ def verify_no_redundant_model_configs(predictor):
     [
         (
             "petfinder",
-            ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+            ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "fusion_mlp"],
             "nlpaueb/legal-bert-small-uncased",
             "swin_tiny_patch4_window7_224",
             GREEDY_SOUP,
@@ -118,7 +116,7 @@ def verify_no_redundant_model_configs(predictor):
         ),
         (
             "hateful_memes",
-            ["timm_image", "t_few", "clip", "fusion_mlp"],
+            ["timm_image", "t_few", "fusion_mlp"],
             "t5-small",
             "mobilenetv3_small_100",
             BEST,
@@ -127,7 +125,7 @@ def verify_no_redundant_model_configs(predictor):
         ),
         (
             "hateful_memes_bytearray",
-            ["timm_image", "hf_text", "clip", "fusion_mlp"],
+            ["timm_image", "hf_text", "fusion_mlp"],
             "monsoon-nlp/hindi-bert",
             "mobilenetv3_small_100",
             UNIFORM_SOUP,
@@ -298,7 +296,7 @@ def test_standalone():  # test standalone feature in MultiModalPredictor.save()
 
     hyperparameters = {
         "optimization.max_epochs": 1,
-        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp", "t_few"],
+        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "fusion_mlp", "t_few"],
         "model.hf_text.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
         "model.t_few.checkpoint_name": "t5-small",
@@ -700,3 +698,13 @@ def test_image_bytearray():
     npt.assert_array_equal(
         [prediction_prob_1, prediction_prob_2, prediction_prob_3, prediction_prob_4], [prediction_prob_1] * 4
     )
+
+
+def test_fit_with_data_path():
+    download_dir = "./"
+    train_csv_file = "shopee_train_data.csv"
+    train_data, _ = shopee_dataset(download_dir=download_dir)
+    train_data.to_csv(train_csv_file)
+    predictor = MultiModalPredictor(label="label")
+    predictor.fit(train_data=train_csv_file, time_limit=0)
+    predictor.fit(train_data=train_csv_file, tuning_data=train_csv_file, time_limit=0)

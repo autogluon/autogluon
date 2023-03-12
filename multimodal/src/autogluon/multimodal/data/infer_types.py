@@ -16,6 +16,7 @@ from ..constants import (
     CLASSIFICATION,
     DOCUMENT,
     DOCUMENT_IMAGE,
+    DOCUMENT_PDF,
     ENTITY_GROUP,
     IDENTIFIER,
     IMAGE,
@@ -238,6 +239,46 @@ def is_image_column(
         return False
 
 
+def is_document_pdf_column(
+    data: pd.Series,
+    col_name: str,
+    sample_m: Optional[int] = 500,
+) -> bool:
+    """
+    Identify if a column is a pdf document column.
+
+    Parameters
+    ----------
+    data
+        One column of a multimodal pd.DataFrame for training.
+    col_name
+        Name of column.
+    sample_m
+        Number of sample images used to check if images are documents images.
+
+    Returns
+    -------
+    Whether the column is a pdf document column.
+    """
+
+    if len(data) > sample_m:
+        # Sample to speed-up type inference
+        data = data.sample(n=sample_m, random_state=0)
+
+    for docs in data:
+        try:
+            if not isinstance(docs, list):
+                docs = [docs]
+            for per_doc in docs:
+                # If there is non-pdf document, return False
+                if not per_doc.endswith(".pdf"):
+                    return False
+        except:
+            return False
+
+    return True
+
+
 def is_document_image_column(
     data: pd.Series,
     col_name: str,
@@ -283,7 +324,6 @@ def is_document_image_column(
                     words = pytesseract.image_to_string(doc_image)
                     words_len.append(len(words))
             except Exception as e:
-                logger.debug(f"Exception {e} found dealing with {per_image}.")
                 words_len.append(0)
                 success = False
                 break
@@ -506,6 +546,8 @@ def infer_column_types(
                 column_types[col_name] = DOCUMENT_IMAGE
             else:
                 column_types[col_name] = IMAGE_PATH
+        elif is_document_pdf_column(data[col_name], col_name=col_name):
+            column_types[col_name] = DOCUMENT_PDF
         elif is_text_column(data[col_name]):  # Infer text column
             column_types[col_name] = TEXT
         elif is_image_column(

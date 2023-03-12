@@ -1,3 +1,4 @@
+import logging
 import os
 import warnings
 from collections import defaultdict, namedtuple
@@ -6,14 +7,16 @@ from typing import Dict, List, Optional, Union
 import pandas as pd
 import torch
 
-from ..constants import HF_TEXT, MMDET_IMAGE, TEXT, TIMM_IMAGE
+from ..constants import CATEGORICAL, HF_TEXT, IMAGE_PATH, MMDET_IMAGE, NULL, NUMERICAL, TEXT, TIMM_IMAGE
 from ..models.fusion import AbstractMultimodalFusionModel
 from ..models.huggingface_text import HFAutoModelForTextPrediction
 from ..models.mmdet_image import MMDetAutoModelForObjectDetection
 from ..models.timm_image import TimmAutoModelForImagePrediction
 from .environment import compute_num_gpus, get_precision_context, infer_precision, move_to_device
 from .inference import process_batch
-from .onnx import get_onnx_input
+from .onnx import OnnxModule, onnx_get_dynamic_axes
+
+logger = logging.getLogger(__name__)
 
 
 class ExportMixin:
@@ -73,22 +76,23 @@ class ExportMixin:
 
     def export_onnx(
         self,
-        data: Optional[pd.DataFrame] = None,
-        onnx_path: Optional[str] = None,
+        data: Union[dict, pd.DataFrame],
+        path: Optional[str] = None,
         batch_size: Optional[int] = None,
         verbose: Optional[bool] = False,
         opset_version: Optional[int] = 16,
+        truncate_long_and_double: Optional[bool] = False,
     ):
         """
         Export this predictor's model to ONNX file.
 
         Parameters
         ----------
-        onnx_path
-            The export path of onnx model.
         data
             Raw data used to trace and export the model.
             If this is None, will check if a processed batch is provided.
+        path
+            The export path of onnx model.
         batch_size
             The batch_size of export model's input.
             Normally the batch_size is a dynamic axis, so we could use a small value for faster export.
@@ -96,95 +100,123 @@ class ExportMixin:
             verbose flag in torch.onnx.export.
         opset_version
             opset_version flag in torch.onnx.export.
+        truncate_long_and_double: bool, default False
+            Truncate weights provided in int64 or double (float64) to int32 and float32
+
+        Returns
+        -------
+        trt_module : OnnxModule
+            The onnx-based module that can be used to replace predictor._model for model inference.
         """
-        # TODO: Support CLIP
-        # TODO: Add test
+
         import torch.jit
 
+        from ..models.fusion.fusion_mlp import MultimodalFusionMLP
         from ..models.huggingface_text import HFAutoModelForTextPrediction
         from ..models.timm_image import TimmAutoModelForImagePrediction
 
-        supported_models = (TimmAutoModelForImagePrediction, HFAutoModelForTextPrediction)
+        supported_models = (TimmAutoModelForImagePrediction, HFAutoModelForTextPrediction, MultimodalFusionMLP)
         if not isinstance(self._model, supported_models):
             raise NotImplementedError(f"export_onnx doesn't support model type {type(self._model)}")
         warnings.warn("Currently, the functionality of exporting to ONNX is experimental.")
 
-        valid_input, dynamic_axes, default_onnx_path, batch = get_onnx_input(
-            pipeline=self._problem_type, config=self._config
+        # Data preprocessing, loading, and filtering
+        batch = self.get_processed_batch_for_deployment(
+            data=data,
+            onnx_tracing=True,
+            batch_size=batch_size,
+            truncate_long_and_double=truncate_long_and_double,
         )
+        input_keys = self._model.input_keys
+        input_vec = [batch[k] for k in input_keys]
 
-        if not batch_size:
-            batch_size = 2  # batch_size should be a dynamic_axis, so we could use a small value for faster export
-        if data is not None:
-            batch = self.get_processed_batch_for_deployment(
-                data=data,
-                valid_input=valid_input,
-                onnx_tracing=True,
-                batch_size=batch_size,
-            )
+        # Infer default onnx path, and create parent directory if needed
+        if not path:
+            path = self.path
+        onnx_path = os.path.join(path, "model.onnx")
+        dirname = os.path.dirname(os.path.abspath(onnx_path))
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
 
-        if not onnx_path:
-            onnx_path = os.path.join(self.path, default_onnx_path)
-
-        device_type = "cuda" if torch.cuda.is_available() else "cpu"
-        device = torch.device(device_type)
-
-        self._model.eval()
-
-        strategy = "dp"  # default used in inference.
-        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
-        precision = infer_precision(
-            num_gpus=num_gpus,
-            precision=self._config.env.precision,
-            cpu_only_warning=False,
-        )
-        precision_context = get_precision_context(precision=precision, device_type=device_type)
-
-        InputBatch = namedtuple("InputBatch", self._model.input_keys)
-
-        # Perform tracing on cpu, since we're facing an error when tracing with cuda device:
-        #     ERROR: Tensor-valued Constant nodes differed in value across invocations.
-        #     This often indicates that the tracer has encountered untraceable code.
-        #     Comparison exception:   The values for attribute 'shape' do not match: torch.Size([]) != torch.Size([384]).
-        #     from https://github.com/rwightman/pytorch-image-models/blob/3aa31f537d5fbf6be8f1aaf5a36f6bbb4a55a726/timm/models/swin_transformer.py#L112
-        device = "cpu"
-        num_gpus = 0
-        dtype = infer_precision(
-            num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False, as_torch=True
-        )
-        for key in self._model.input_keys:
-            inp = batch[key]
-            # support mixed precision on floating point inputs, and leave integer inputs (for language models) untouched.
-            if inp.dtype.is_floating_point:
-                batch[key] = inp.to(device, dtype=dtype)
-            else:
-                batch[key] = inp.to(device)
-        self._model.to(device)
-        input_vec = InputBatch(**batch)
-
-        with precision_context, torch.no_grad():
-            traced_model = torch.jit.trace(self._model, input_vec)
-        torch.jit.save(traced_model, "traced_model.pt")
-        traced_model = torch.jit.load("traced_model.pt")
+        # Infer dynamic dimensions
+        dynamic_axes = onnx_get_dynamic_axes(input_keys)
 
         torch.onnx.export(
-            traced_model,
-            args=input_vec,
+            self._model.eval(),
+            args=tuple(input_vec),
             f=onnx_path,
             opset_version=opset_version,
             verbose=verbose,
-            input_names=valid_input,
+            input_names=input_keys,
             dynamic_axes=dynamic_axes,
         )
+
+        return onnx_path
+
+    def optimize_for_inference(
+        self,
+        providers: Optional[Union[dict, List[str]]] = None,
+    ):
+        """
+        Optimize the predictor's model for inference.
+
+        Under the hood, the implementation would convert the PyTorch module into an ONNX module, so that
+        we can leverage efficient execution providers in onnxruntime for faster inference.
+
+        Parameters
+        ----------
+        data
+            Raw data used to trace and export the model.
+            If this is None, will check if a processed batch is provided.
+        providers : dict or str, default=None
+            A list of execution providers for model prediction in onnxruntime.
+
+            By default, the providers argument is None. The method would generate an ONNX module that
+            would perform model inference with TensorrtExecutionProvider in onnxruntime, if tensorrt
+            package is properly installed. Otherwise, the onnxruntime would fallback to use CUDA or CPU
+            execution providers instead.
+
+        Returns
+        -------
+        onnx_module : OnnxModule
+            The onnx-based module that can be used to replace predictor._model for model inference.
+        """
+        data_dict = {}
+        for col_name, col_type in self._column_types.items():
+            if col_type in [NUMERICAL, CATEGORICAL, NULL]:
+                data_dict[col_name] = [0, 1]
+            elif col_type == TEXT:
+                data_dict[col_name] = ["some text", "some other text"]
+            elif col_type in [IMAGE_PATH]:
+                data_dict[col_name] = ["/not-exist-dir/xxx.jpg", "/not-exist-dir/yyy.jpg"]
+            else:
+                raise ValueError(f"unsupported column type: {col_type}")
+        data = pd.DataFrame.from_dict(data_dict)
+
+        onnx_path = self.export_onnx(data=data, path=self.path, truncate_long_and_double=True)
+        onnx_module = OnnxModule(onnx_path, providers)
+        onnx_module.input_keys = self._model.input_keys
+        onnx_module.prefix = self._model.prefix
+        onnx_module.get_output_dict = self._model.get_output_dict
+
+        # To use the TensorRT module for prediction, simply replace the _model in the predictor
+        self._model = onnx_module
+
+        # Evaluate and cache TensorRT engine files
+        logger.info("Compiling ... (this may take a few minutes)")
+        _ = self.predict(data)
+        logger.info("Finished compilation!")
+
+        return onnx_module
 
     def get_processed_batch_for_deployment(
         self,
         data: Union[pd.DataFrame, dict],
-        valid_input: Optional[List] = None,
         onnx_tracing: bool = False,
         batch_size: int = None,
         to_numpy: bool = True,
         requires_label: bool = False,
+        truncate_long_and_double: bool = False,
     ):
         """
         Get the processed batch of raw data given.
@@ -193,8 +225,6 @@ class ExportMixin:
         ----------
         data
             The raw data to process
-        valid_input
-            Used to filter valid data. No filter happens if it is empty.
         onnx_tracing
             If the output is used for onnx tracing.
         batch_size
@@ -202,6 +232,8 @@ class ExportMixin:
             If onnx_tracing, it will only output one mini-batch, and all int tensor values will be converted to long.
         to_numpy
             Output numpy array if True. Only valid if not onnx_tracing.
+        require_label
+            Whether do we put label data into the output batch
 
         Returns
         -------
@@ -219,9 +251,37 @@ class ExportMixin:
             data_processors=data_processors,
         )
 
+        input_keys = self._model.input_keys
+
+        # Perform tracing on cpu
+        device_type = "cpu"
+        num_gpus = 0
+        strategy = "dp"  # default used in inference.
+        device = torch.device(device_type)
+        dtype = infer_precision(
+            num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False, as_torch=True
+        )
+
+        # Move model data to the specified device
+        for key in input_keys:
+            inp = batch[key]
+            # support mixed precision on floating point inputs, and leave integer inputs (for language models) untouched.
+            if inp.dtype.is_floating_point:
+                batch[key] = inp.to(device, dtype=dtype)
+            else:
+                batch[key] = inp.to(device)
+        self._model.to(device)
+
+        # Truncate input data types for TensorRT (only support: bool, int32, half, float)
+        if truncate_long_and_double:
+            for k in batch:
+                if batch[k].dtype == torch.int64:
+                    batch[k] = batch[k].to(torch.int32)
+
+        # Data filtering
         ret = {}
         for k in batch:
-            if valid_input and k not in valid_input:
+            if input_keys and k not in input_keys:
                 continue
             if onnx_tracing:
                 ret[k] = batch[k].long() if isinstance(batch[k], torch.IntTensor) else batch[k]

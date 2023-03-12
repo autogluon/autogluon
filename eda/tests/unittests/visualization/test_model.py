@@ -91,7 +91,7 @@ def test_RegressionEvaluation(monkeypatch):
         viz.render(state)
     call_plt_subplots.assert_called_with(a=1, b=2)
     call_plt_show.assert_called_with("fig")
-    call_sns_regplot.assert_called_with(ax="ax", data=ANY, x="y_true", y="y_pred", some_kwarg=123)
+    call_sns_regplot.assert_called_with(ax="ax", data=ANY, x="y_true", y="y_pred", label="validation", some_kwarg=123)
     call_render_markdown.assert_called_with("**Prediction vs Target**")
 
 

@@ -23,7 +23,6 @@ known_third_party = [
     "timm",
     "torch",
     "torchvision",
-    "torchtext",
     "fairscale",
     "scikit-image",
     "smart_open",

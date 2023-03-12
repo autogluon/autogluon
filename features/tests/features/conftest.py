@@ -171,6 +171,22 @@ class DataHelper:
         return pd.to_datetime(DataHelper.generate_datetime_as_object_feature(), errors='coerce')
 
     @staticmethod
+    def generate_bool_feature_int(name='int_bool') -> DataFrame:
+        return Series([0, 1, 1, 0, 0, 0, 1, 0, 1], name=name).to_frame()
+
+    @staticmethod
+    def generate_bool_feature_with_nan() -> DataFrame:
+        return Series([None, 5, None, 5], name='edgecase_with_nan_bool').to_frame()
+
+    @staticmethod
+    def generate_bool_feature_edgecase() -> DataFrame:
+        return Series([None, None, None, np.nan, np.nan, np.nan, None, None, None], name='edgecase_bool').to_frame()
+
+    @staticmethod
+    def generate_bool_feature_extreme_edgecase() -> DataFrame:
+        return Series([5, "5", 5, 5, "5"], name='edgecase_extreme_bool').to_frame()
+
+    @staticmethod
     def generate_multi_feature_standard() -> DataFrame:
         df = pd.concat(
             [
@@ -183,6 +199,42 @@ class DataHelper:
             axis=1,
         )
         df.columns = ['int', 'float', 'obj', 'cat', 'datetime']
+        return df
+
+    @staticmethod
+    def generate_useless_category() -> DataFrame:
+        return Series(
+            [
+                'a',
+                'b',
+                'c',
+                'd',
+                'e',
+                'f',
+                'g',
+                'h',
+                'i',
+            ], name='cat_useless').to_frame()
+
+    @staticmethod
+    def generate_duplicate() -> DataFrame:
+        df_bool_dupes = []
+        for i in range(20):
+            df_bool_dupes.append(DataHelper.generate_bool_feature_int(name=f'int_bool_dup_{i+1}'),)
+
+        df_to_concat = [
+            DataHelper.generate_bool_feature_int(),
+            DataHelper.generate_multi_feature_special(),
+            DataHelper.generate_useless_category(),
+            DataHelper.generate_multi_feature_standard(),
+        ] + df_bool_dupes + [
+            DataHelper.generate_bool_feature_int(name='int_bool_dup_final'),
+        ]
+
+        df = pd.concat(
+            df_to_concat,
+            axis=1,
+        )
         return df
 
     @staticmethod
@@ -201,6 +253,7 @@ class DataHelper:
     def generate_multi_feature_full() -> DataFrame:
         df = pd.concat(
             [
+                DataHelper.generate_bool_feature_int(),
                 DataHelper.generate_multi_feature_standard(),
                 DataHelper.generate_multi_feature_special(),
             ],

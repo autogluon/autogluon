@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Dict, List, Optional, Tuple, Union
 
 from torch import tensor
@@ -7,99 +8,137 @@ from ..constants import AUTOMM, FEATURE_EXTRACTION, MULTICLASS
 
 logger = logging.getLogger(__name__)
 
+# TODO: Try a better workaround to lazy import tensorrt package.
+tensorrt_imported = False
+if not tensorrt_imported:
+    try:
+        import tensorrt  # Unused but required by TensorrtExecutionProvider
 
-def get_onnx_input(pipeline: str, config: Optional[Dict] = None):
-    """
-    Get information for a predictor to export its model in onnx format.
+        tensorrt_imported = True
+    except:
+        # We silently omit the import failure here to avoid overwhelming warning messages in case of multi-gpu.
+        tensorrt_imported = False
 
-    Parameters
-    ----------
-    pipeline
-        The predictor's pipeline.
-    config
-        The predictor's config.
 
-    Returns
-    -------
-    valid_input
-        The valid keys for the input batch.
-    dynamic_axes
-        By default the exported model will have the shapes of all input and output tensors
-        set to exactly match those given in ``args``. To specify axes of tensors as
-        dynamic (i.e. known only at run-time), set ``dynamic_axes`` to a dict with schema:
-            * KEY (str): an input or output name. Each name must also be provided in ``input_names`` or
-              ``output_names``.
-            * VALUE (dict or list): If a dict, keys are axis indices and values are axis names. If a
-              list, each element is an axis index.
-        See torch.onnx.export for more explanations.
-    default_onnx_path
-        The default path of the export onnx model.
-    default_batch
-        The default batch to help trace and export the model.
+def onnx_get_dynamic_axes(input_keys: List[str]):
+    dynamic_axes = {}
+    for k in input_keys:
+        if "token_ids" in k or "segment_ids" in k:
+            dynamic_axes[k] = {0: "batch_size", 1: "seq_length"}
+        elif "valid_length" in k or k.startswith("numerical") or k.startswith("timm_image"):
+            dynamic_axes[k] = {0: "batch_size"}
 
-    """
-    default_onnx_path = None
-    if pipeline == FEATURE_EXTRACTION:
-        valid_input = [
-            "hf_text_text_token_ids",
-            "hf_text_text_segment_ids",
-            "hf_text_text_valid_length",
-        ]
-        dynamic_axes = {
-            "hf_text_text_token_ids": {
-                0: "batch_size",
-                1: "sentence_length",
-            },
-            "hf_text_text_valid_length": {
-                0: "batch_size",
-            },
-            "hf_text_text_segment_ids": {
-                0: "batch_size",
-                1: "sentence_length",
-            },
-        }
-        if config:
-            default_onnx_path = config["model"]["hf_text"]["checkpoint_name"].replace("/", "_") + ".onnx"
-        default_batch = {
-            "hf_text_text_token_ids": tensor(
-                [
-                    [101, 1037, 2158, 2003, 2652, 2858, 1012, 102, 0, 0, 0, 0, 0, 0],
-                    [101, 1037, 2158, 2003, 2652, 1037, 2858, 1012, 102, 0, 0, 0, 0, 0],
-                    [101, 1037, 2158, 2003, 2652, 1037, 2858, 1012, 102, 0, 0, 0, 0, 0],
-                    [101, 1037, 2158, 2003, 6276, 2019, 20949, 1012, 102, 0, 0, 0, 0, 0],
-                    [101, 1037, 2158, 2003, 9670, 1012, 102, 0, 0, 0, 0, 0, 0, 0],
-                    [101, 1037, 2158, 2003, 26514, 2330, 1037, 3869, 1012, 102, 0, 0, 0, 0],
-                    [101, 1037, 2158, 2003, 26514, 1037, 20856, 1012, 102, 0, 0, 0, 0, 0],
-                    [101, 1037, 2158, 2003, 2652, 1037, 2858, 1012, 102, 0, 0, 0, 0, 0],
-                ],
-            ),
-            "hf_text_text_valid_length": tensor(
-                [8, 9, 9, 9, 7, 10, 9, 9],
-            ),
-            "hf_text_text_segment_ids": tensor(
-                [
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                ],
-            ),
-        }
-    elif pipeline == MULTICLASS:
-        valid_input = ["timm_image_image", "timm_image_image_valid_num"]
-        dynamic_axes = {
-            "timm_image_image": {
-                0: "batch_size",
-            },
-            "timm_image_image_valid_num": {},
-        }
-        default_onnx_path = "./model.onnx"
-        default_batch = None
+    return dynamic_axes
+
+
+def get_provider_name(provider_config: Union[str, tuple]) -> str:
+    if isinstance(provider_config, tuple):
+        provider_name = provider_config[0]
     else:
-        raise ValueError(f"ONNX export is not supported in current pipeline {pipeline}")
+        assert isinstance(provider_config, str), "input provider config is expected to be either str or tuple"
+        provider_name = provider_config
+    return provider_name
 
-    return valid_input, dynamic_axes, default_onnx_path, default_batch
+
+class OnnxModule(object):
+    """
+    OnnxModule is as a replacement of torch.nn.Module for running forward pass with onnxruntime.
+
+    The module can be generated with MultiModalPredictor.export_tensorrt(),
+    so that we can predict with TensorRT by simply replacing predictor._model with OnnxModule.
+    """
+
+    def __init__(self, onnx_path: str, providers: Optional[Union[dict, List[str]]] = None):
+        """
+        Parameters
+        ----------
+        onnx_path : str
+            The file path of the onnx model that need to be executed in onnxruntime.
+        providers : dict or str, default=None
+            A list of execution providers for model prediction in onnxruntime.
+        """
+        import onnx
+        import onnxruntime as ort
+
+        if not os.path.exists(onnx_path):
+            raise FileNotFoundError(f"failed to located onnx file at {onnx_path}")
+
+        logger.info("Loading ONNX file from path {}...".format(onnx_path))
+        onnx_model = onnx.load(onnx_path)
+
+        if providers == None:
+            dirname = os.path.dirname(os.path.abspath(onnx_path))
+            cache_path = os.path.join(dirname, "model_trt")
+            providers = [
+                (
+                    "TensorrtExecutionProvider",
+                    {
+                        "device_id": 0,
+                        "trt_max_workspace_size": 2147483648,
+                        "trt_fp16_enable": True,
+                        "trt_engine_cache_path": cache_path,
+                        "trt_engine_cache_enable": True,
+                    },
+                ),
+                (
+                    "CUDAExecutionProvider",
+                    {
+                        "device_id": 0,
+                        "arena_extend_strategy": "kNextPowerOfTwo",
+                        "gpu_mem_limit": 2 * 1024 * 1024 * 1024,
+                        "cudnn_conv_algo_search": "EXHAUSTIVE",
+                        "do_copy_in_default_stream": True,
+                    },
+                ),
+                ("CPUExecutionProvider", {}),
+            ]
+
+        if len(providers) == 1 and get_provider_name(providers[0]) == "TensorrtExecutionProvider":
+            if not tensorrt_imported:
+                raise ImportError(
+                    "tensorrt package is not installed. The package can be install via `pip install tensorrt`."
+                )
+
+        self.sess = ort.InferenceSession(onnx_model.SerializeToString(), providers=providers)
+
+        if get_provider_name(providers[0]) == "TensorrtExecutionProvider" and tensorrt_imported:
+            assert "TensorrtExecutionProvider" in self.sess.get_providers(), (
+                f"unexpected TensorRT compilation failure: TensorrtExecutionProvider not in providers ({self.sess.get_providers()}). "
+                "Make sure onnxruntime package gets lazy imported everywhere."
+            )
+
+        inputs = self.sess.get_inputs()
+        outputs = self.sess.get_outputs()
+        self.input_names = [i.name for i in inputs]
+        self.output_names = [i.name for i in outputs]
+
+    def __call__(self, *args):
+        """
+        Make the module callable like torch.nn.Module, while runnning forward pass with onnxruntime.
+
+        Parameters
+        ----------
+        args : list of torch.Tensor
+            A list of torch.Tensor that are inputs of the model.
+
+        Returns
+        -------
+        onnx_outputs : list of torch.Tensor
+            A list of torch.Tensor that are outputs of the model.
+        """
+        import torch
+
+        input_dict = {k: args[i].cpu().numpy() for i, k in enumerate(self.input_names)}
+        onnx_outputs = self.sess.run(self.output_names, input_dict)
+        onnx_outputs = onnx_outputs[:3]
+        onnx_outputs = [torch.from_numpy(out) for out in onnx_outputs]
+        return onnx_outputs
+
+    def to(self, *args):
+        """A dummy function that act as torch.nn.Module.to() function"""
+
+        class DummyModel:
+            def eval():
+                pass
+
+        return DummyModel

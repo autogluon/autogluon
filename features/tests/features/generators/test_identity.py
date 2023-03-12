@@ -14,7 +14,7 @@ def test_identity_feature_generator(generator_helper, data_helper):
         ('category', ()): ['cat'],
         ('datetime', ()): ['datetime'],
         ('float', ()): ['float'],
-        ('int', ()): ['int'],
+        ('int', ()): ['int_bool', 'int'],
         ('object', ()): ['obj'],
         ('object', ('datetime_as_object',)): ['datetime_as_object'],
         ('object', ('text',)): ['text']
@@ -41,7 +41,7 @@ def test_identity_feature_generator_int_float(generator_helper, data_helper):
 
     expected_feature_metadata_in_full = {
         ('float', ()): ['float'],
-        ('int', ()): ['int']
+        ('int', ()): ['int_bool', 'int']
     }
 
     expected_feature_metadata_full = expected_feature_metadata_in_full
@@ -67,10 +67,12 @@ def test_identity_feature_generator_int_float_with_banned_features(generator_hel
     )
 
     expected_feature_metadata_in_full = {
-        ('int', ('my_valid_feature_type',)): ['int'],
+        ('int', ()): ['int_bool'],
+        ('int', ('my_valid_feature_type',)): ['int']
     }
 
     expected_feature_metadata_full = {
+        ('int', ()): ['int_bool'],
         ('int', ('my_valid_feature_type',)): ['int']
     }
 

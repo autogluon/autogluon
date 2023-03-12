@@ -120,19 +120,27 @@ class MultimodalFusionMLP(AbstractMultimodalFusionModel):
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
     @property
+    def input_keys(self):
+        input_keys = []
+        for m in self.model:
+            assert hasattr(m, "input_keys"), f"invalid model {type(m)}, which doesn't have a 'input_keys' attribute"
+            input_keys += m.input_keys
+        return input_keys
+
+    @property
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
 
     def forward(
         self,
-        batch: dict,
+        *args,
     ):
         """
 
         Parameters
         ----------
-        batch
-            A dictionary containing the input mini-batch data. The fusion model doesn't need to
+        *args
+            A list of torch.Tensor(s) containing the input mini-batch data. The fusion model doesn't need to
             directly access the mini-batch data since it aims to fuse the individual models'
             output features.
 
@@ -143,18 +151,24 @@ class MultimodalFusionMLP(AbstractMultimodalFusionModel):
         including the fusion model's.
         """
         multimodal_features = []
-        output = {}
+        multimodal_logits = []
+        offset = 0
         for per_model, per_adapter in zip(self.model, self.adapter):
+            per_model_args = args[offset : offset + len(per_model.input_keys)]
+            batch = dict(zip(per_model.input_keys, per_model_args))
             per_output = run_model(per_model, batch)
-            multimodal_features.append(per_adapter(per_output[per_model.prefix][FEATURES]))
-            if self.loss_weight is not None:
-                per_output[per_model.prefix].update(
-                    {WEIGHT: torch.tensor(self.loss_weight).to(multimodal_features[0])}
-                )
-                output.update(per_output)
+            multimodal_features.append(
+                per_adapter(per_output[per_model.prefix][FEATURES].to(per_adapter.weight.dtype))
+            )
+            multimodal_logits.append(per_output[per_model.prefix][LOGITS])
+            offset += len(per_model.input_keys)
 
         features = self.fusion_mlp(torch.cat(multimodal_features, dim=1))
         logits = self.head(features)
+
+        return features, logits, multimodal_logits
+
+    def get_output_dict(self, features: torch.Tensor, logits: torch.Tensor, multimodal_logits: List[torch.Tensor]):
         fusion_output = {
             self.prefix: {
                 LOGITS: logits,
@@ -162,6 +176,12 @@ class MultimodalFusionMLP(AbstractMultimodalFusionModel):
             }
         }
         if self.loss_weight is not None:
+            output = {}
+            for per_model, per_logits in zip(self.model, multimodal_logits):
+                per_output = {per_model.prefix: {}}
+                per_output[per_model.prefix][WEIGHT] = torch.tensor(self.loss_weight).to(per_logits.dtype)
+                per_output[per_model.prefix][LOGITS] = per_logits
+            output.update(per_output)
             fusion_output[self.prefix].update({WEIGHT: torch.tensor(1.0).to(logits)})
             output.update(fusion_output)
             return output

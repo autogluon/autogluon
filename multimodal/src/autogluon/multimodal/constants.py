@@ -11,6 +11,7 @@ IMAGE_BYTEARRAY = "image_bytearray"
 IDENTIFIER = "identifier"
 DOCUMENT = "document"
 DOCUMENT_IMAGE = "document_image"
+DOCUMENT_PDF = "document_pdf"
 
 # Problem types
 CLASSIFICATION = "classification"
@@ -278,6 +279,11 @@ RESPONSE = "response"
 QUERY_RESPONSE = f"{QUERY}_{RESPONSE}"
 PAIR = "pair"
 TRIPLET = "triplet"
+
+# mmdet
+XYWH = "xywh"
+XYXY = "xyxy"
+BBOX_FORMATS = [XYWH, XYXY]
 
 # presets
 DEFAULT = "default"

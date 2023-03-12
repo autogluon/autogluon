@@ -35,6 +35,7 @@ from .environment import (
     check_if_packages_installed,
     compute_inference_batch_size,
     compute_num_gpus,
+    get_available_devices,
     get_precision_context,
     infer_precision,
     is_interactive,
@@ -44,7 +45,7 @@ from .export import ExportMixin
 from .hpo import hyperparameter_tune
 from .inference import extract_from_output, infer_batch, predict, process_batch, use_realtime
 from .load import CustomUnpickler, load_text_tokenizers
-from .log import LogFilter, apply_log_filter, make_exp_dir
+from .log import LogFilter, apply_log_filter, get_fit_complete_message, get_fit_start_message, make_exp_dir
 from .map import MeanAveragePrecision
 from .matcher import compute_semantic_similarity, convert_data_for_ranking, create_siamese_model, semantic_search
 from .metric import compute_ranking_score, compute_score, get_minmax_mode, get_stopping_threshold, infer_metrics
@@ -55,6 +56,7 @@ from .object_detection import (
     COCODataset,
     bbox_xyxy_to_xywh,
     cocoeval,
+    convert_pred_to_xywh,
     evaluate_coco,
     from_coco,
     from_coco_or_voc,
@@ -62,6 +64,7 @@ from .object_detection import (
     from_voc,
     get_detection_classes,
     object_detection_data_to_df,
+    object_detection_df_to_coco,
     save_result_coco_format,
     save_result_df,
     save_result_voc_format,
@@ -69,6 +72,5 @@ from .object_detection import (
     visualize_detection,
 )
 from .object_detection_visualizer import Visualizer
-from .onnx import get_onnx_input
 from .pipeline import init_pretrained, init_pretrained_matcher
 from .save import process_save_path, save_text_tokenizers, setup_save_path

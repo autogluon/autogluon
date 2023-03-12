@@ -1,7 +1,5 @@
 from typing import List, Optional
 
-from ray import tune
-
 from .constants import (
     BEST_QUALITY,
     BINARY,
@@ -20,18 +18,24 @@ from .registry import Registry
 automm_presets = Registry("automm_presets")
 matcher_presets = Registry("matcher_presets")
 
-default_hyperparameter_tune_kwargs = {
-    "searcher": "bayes",
-    "scheduler": "ASHA",
-    "num_trials": 512,
-}
 
-default_tunable_hyperparameters = {
-    "optimization.learning_rate": tune.loguniform(1e-5, 1e-2),
-    "optimization.optim_type": tune.choice(["adamw", "sgd"]),
-    "optimization.max_epochs": tune.choice(list(range(5, 31))),
-    "env.batch_size": tune.choice([16, 32, 64, 128, 256]),
-}
+def get_default_hpo_setup():
+    from ray import tune
+
+    default_hyperparameter_tune_kwargs = {
+        "searcher": "bayes",
+        "scheduler": "ASHA",
+        "num_trials": 512,
+    }
+
+    default_tunable_hyperparameters = {
+        "optimization.learning_rate": tune.loguniform(1e-5, 1e-2),
+        "optimization.optim_type": tune.choice(["adamw", "sgd"]),
+        "optimization.max_epochs": tune.choice(list(range(5, 31))),
+        "env.batch_size": tune.choice([16, 32, 64, 128, 256]),
+    }
+
+    return default_tunable_hyperparameters, default_hyperparameter_tune_kwargs
 
 
 def parse_presets_str(presets: str):
@@ -74,11 +78,14 @@ def default(presets: str = DEFAULT):
 
     presets, use_hpo = parse_presets_str(presets)
     if use_hpo:
+        default_tunable_hyperparameters, default_hyperparameter_tune_kwargs = get_default_hpo_setup()
         hyperparameters.update(default_tunable_hyperparameters)
         hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     if presets in [HIGH_QUALITY, DEFAULT]:
         if use_hpo:
+            from ray import tune
+
             hyperparameters.update(
                 {
                     "model.hf_text.checkpoint_name": tune.choice(
@@ -110,6 +117,8 @@ def default(presets: str = DEFAULT):
             )
     elif presets == MEDIUM_QUALITY:
         if use_hpo:
+            from ray import tune
+
             hyperparameters.update(
                 {
                     "model.hf_text.checkpoint_name": tune.choice(
@@ -139,6 +148,8 @@ def default(presets: str = DEFAULT):
     elif presets == BEST_QUALITY:
         hyperparameters.update({"env.per_gpu_batch_size": 1})
         if use_hpo:
+            from ray import tune
+
             hyperparameters.update(
                 {
                     "model.hf_text.checkpoint_name": tune.choice(
@@ -225,6 +236,7 @@ def few_shot_text_classification(presets: str = DEFAULT):
 
     presets, use_hpo = parse_presets_str(presets)
     if use_hpo:
+        default_tunable_hyperparameters, default_hyperparameter_tune_kwargs = get_default_hpo_setup()
         hyperparameters.update(default_tunable_hyperparameters)
         hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
@@ -299,50 +311,66 @@ def object_detection(presets: str = DEFAULT):
     """
     hyperparameters = {
         "model.names": ["mmdet_image"],
+        "model.mmdet_image.checkpoint_name": "yolox_s_8x8_300e_coco",
         "env.eval_batch_size_ratio": 1,
         "env.precision": 32,
         "env.strategy": "ddp",
         "env.auto_select_gpus": False,  # Have to turn off for detection!
-        "optimization.lr_decay": 0.95,
+        "env.num_gpus": -1,
+        "env.per_gpu_batch_size": 8,  # Works on 8G GPU
+        "env.num_workers": 2,
+        "optimization.learning_rate": 1e-4,
+        "optimization.lr_decay": 0.90,
         "optimization.lr_mult": 100,
         "optimization.lr_choice": "two_stages",
         "optimization.top_k": 1,
         "optimization.top_k_average_method": "best",
         "optimization.warmup_steps": 0.0,
         "optimization.patience": 10,
+        "optimization.val_metric": "map",
+        "optimization.val_check_interval": 0.5,
+        "optimization.check_val_every_n_epoch": 1,
     }
     hyperparameter_tune_kwargs = {}
 
     presets, use_hpo = parse_presets_str(presets)
     if use_hpo:
+        default_tunable_hyperparameters, default_hyperparameter_tune_kwargs = get_default_hpo_setup()
         hyperparameters.update(default_tunable_hyperparameters)
         hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
-    if presets in [DEFAULT, MEDIUM_QUALITY]:
+    if presets == MEDIUM_QUALITY:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
-                "optimization.learning_rate": 1e-4,
-                "optimization.max_epochs": 10,
-                "optimization.val_metric": "direct_loss",
+                "optimization.max_epochs": 30,
+                "optimization.lr_decay": 0.95,
+                "optimization.patience": 3,
+                "optimization.val_check_interval": 1.0,
+                "optimization.check_val_every_n_epoch": 3,
             }
         )
-    elif presets == HIGH_QUALITY:
+    elif presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "yolov3_d53_mstrain-416_273e_coco",
-                "optimization.learning_rate": 1e-5,
-                "optimization.max_epochs": 20,
-                "optimization.val_metric": "map",
+                "model.mmdet_image.checkpoint_name": "yolox_l_8x8_300e_coco",
+                "env.per_gpu_batch_size": 2,  # Works on 8G GPU
+                "optimization.learning_rate": 5e-5,
+                "optimization.lr_decay": 0.95,
+                "optimization.patience": 3,
+                "optimization.max_epochs": 50,
+                "optimization.val_check_interval": 1.0,
+                "optimization.check_val_every_n_epoch": 3,
             }
         )
     elif presets == BEST_QUALITY:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "vfnet_x101_64x4d_fpn_mdconv_c3-c5_mstrain_2x_coco",
+                "model.mmdet_image.checkpoint_name": "yolox_x_8x8_300e_coco",
+                "env.per_gpu_batch_size": 1,  # Works on 8G GPU
                 "optimization.learning_rate": 1e-5,
-                "optimization.max_epochs": 30,
-                "optimization.val_metric": "map",
+                "optimization.lr_decay": 0.95,
+                "optimization.patience": 20,
+                "optimization.max_epochs": 50,
             }
         )
     else:
@@ -379,6 +407,7 @@ def ocr_text_detection(presets: str = DEFAULT):
 
     presets, use_hpo = parse_presets_str(presets)
     if use_hpo:
+        default_tunable_hyperparameters, default_hyperparameter_tune_kwargs = get_default_hpo_setup()
         hyperparameters.update(default_tunable_hyperparameters)
         hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
@@ -412,6 +441,7 @@ def ocr_text_recognition(presets: str = DEFAULT):
     hyperparameter_tune_kwargs = {}
     presets, use_hpo = parse_presets_str(presets)
     if use_hpo:
+        default_tunable_hyperparameters, default_hyperparameter_tune_kwargs = get_default_hpo_setup()
         hyperparameters.update(default_tunable_hyperparameters)
         hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
@@ -471,6 +501,7 @@ def image_similarity(presets: str = DEFAULT):
 
     presets, use_hpo = parse_presets_str(presets)
     if use_hpo:
+        default_tunable_hyperparameters, default_hyperparameter_tune_kwargs = get_default_hpo_setup()
         hyperparameters.update(default_tunable_hyperparameters)
         hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
@@ -526,6 +557,7 @@ def text_similarity(presets: str = DEFAULT):
 
     presets, use_hpo = parse_presets_str(presets)
     if use_hpo:
+        default_tunable_hyperparameters, default_hyperparameter_tune_kwargs = get_default_hpo_setup()
         hyperparameters.update(default_tunable_hyperparameters)
         hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
@@ -580,6 +612,7 @@ def image_text_similarity(presets: str = DEFAULT):
 
     presets, use_hpo = parse_presets_str(presets)
     if use_hpo:
+        default_tunable_hyperparameters, default_hyperparameter_tune_kwargs = get_default_hpo_setup()
         hyperparameters.update(default_tunable_hyperparameters)
         hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
@@ -640,6 +673,7 @@ def ner(presets: str = DEFAULT):
 
     presets, use_hpo = parse_presets_str(presets)
     if use_hpo:
+        default_tunable_hyperparameters, default_hyperparameter_tune_kwargs = get_default_hpo_setup()
         hyperparameters.update(default_tunable_hyperparameters)
         hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 

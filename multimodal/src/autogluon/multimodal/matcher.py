@@ -20,7 +20,7 @@ from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
+from autogluon.core.utils.loaders import load_pd
 
 from . import version as ag_version
 from .constants import (
@@ -80,7 +80,10 @@ from .utils import (
     data_to_df,
     extract_from_output,
     filter_hyperparameters,
+    get_available_devices,
     get_config,
+    get_fit_complete_message,
+    get_fit_start_message,
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_stopping_threshold,
@@ -377,6 +380,11 @@ class MultiModalMatcher:
             warn_if_exist=False,
             fit_called=fit_called,
         )
+
+        if isinstance(train_data, str):
+            train_data = load_pd.load(train_data)
+        if isinstance(tuning_data, str):
+            tuning_data = load_pd.load(tuning_data)
 
         train_data, tuning_data = split_train_tuning_data(
             train_data=train_data,
@@ -889,8 +897,11 @@ class MultiModalMatcher:
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else None,
-                devices=num_gpus if num_gpus > 0 else None,
-                auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
+                devices=get_available_devices(
+                    num_gpus=num_gpus,
+                    auto_select_gpus=config.env.auto_select_gpus,
+                    use_ray_lightning=use_ray_lightning,
+                ),
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
@@ -1235,8 +1246,7 @@ class MultiModalMatcher:
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else None,
-                devices=num_gpus if num_gpus > 0 else None,
-                auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
+                devices=get_available_devices(num_gpus=num_gpus, auto_select_gpus=self._config.env.auto_select_gpus),
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
