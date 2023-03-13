@@ -3,7 +3,7 @@ import json
 import logging
 import os
 import warnings
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from omegaconf import DictConfig, OmegaConf
 from packaging import version
@@ -777,17 +777,33 @@ def filter_hyperparameters(
 
 
 def split_hyperparameters(hyperparameters: Dict):
+    """
+    Split out some advanced hyperparameters whose values are complex objects instead of strings or numbers.
+
+    Parameters
+    ----------
+    hyperparameters
+        The user provided hyperparameters.
+
+    Returns
+    -------
+    Hyperparameters and advanced hyperparameters.
+    """
     if not hyperparameters:
         return dict(), dict()
 
     advanced_hyperparameters = dict()
     for k, v in hyperparameters.items():
         if k in [
-            "model.timm_image.train_transforms",
+            "model.timm_image.train_transforms",  # here we can use `timm_image` without worrying about its variants because this happens before getting the config.
             "model.timm_image.val_transforms",
         ]:
-            if not all([isinstance(trans, str) for trans in hyperparameters[k]]):
+            if all([isinstance(trans, str) for trans in hyperparameters[k]]):
+                pass
+            elif all([isinstance(trans, Callable) for trans in hyperparameters[k]]):
                 advanced_hyperparameters[k] = copy.deepcopy(v)
-                hyperparameters[k] = []
+                hyperparameters[k] = str(v)  # get the objects' class strings
+            else:
+                raise ValueError(f"transform_types {v} contain neither all strings nor all callable objects.")
 
     return hyperparameters, advanced_hyperparameters

@@ -448,7 +448,21 @@ def get_text_token_max_len(provided_max_len, config, tokenizer, checkpoint_name)
     return max_len
 
 
-def get_image_transform_funcs(transform_types: Union[List[str], ListConfig], size: int):
+def get_image_transform_funcs(transform_types: Union[List[str], ListConfig, List[Callable]], size: int):
+    """
+    Parse a list of transform strings into callable objects.
+
+    Parameters
+    ----------
+    transform_types
+        A list of transforms, which can be strings or callable objects.
+    size
+        Image size.
+
+    Returns
+    -------
+    A list of transform objects.
+    """
     image_transforms = []
 
     if not transform_types:
@@ -459,8 +473,12 @@ def get_image_transform_funcs(transform_types: Union[List[str], ListConfig], siz
     elif not isinstance(transform_types, list):
         transform_types = [transform_types]
 
-    if not all([isinstance(trans_type, str) for trans_type in transform_types]):
+    if all([isinstance(trans_type, str) for trans_type in transform_types]):
+        pass
+    elif all([isinstance(trans_type, Callable) for trans_type in transform_types]):
         return copy.copy(transform_types)
+    else:
+        raise ValueError(f"transform_types {transform_types} contain neither all strings nor all callable objects.")
 
     for trans_type in transform_types:
         args = None
@@ -534,7 +552,7 @@ def construct_image_processor(
 
     Returns
     -------
-    A torchvision transform.
+    A transforms.Compose object.
     """
     image_transforms = get_image_transform_funcs(transform_types=image_transforms, size=size)
     if not any([isinstance(trans, transforms.ToTensor) for trans in image_transforms]):

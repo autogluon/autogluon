@@ -665,7 +665,24 @@ def get_detected_data_types(column_types: Dict):
     return data_types
 
 
-def get_image_transforms(model_config, model_name, advanced_hyperparameters):
+def get_image_transforms(model_config: DictConfig, model_name: str, advanced_hyperparameters: Dict):
+    """
+    Get the image transforms of one image-related model.
+    Use the transforms in advanced_hyperparameters with higher priority.
+
+    Parameters
+    ----------
+    model_config
+        Config of one model.
+    model_name
+        Name of one model.
+    advanced_hyperparameters
+        The advanced hyperparameters whose values are complex objects.
+
+    Returns
+    -------
+    The image transforms used in training and validation.
+    """
     train_transform_key = f"model.{model_name}.train_transforms"
     val_transform_key = f"model.{model_name}.val_transforms"
     if advanced_hyperparameters and train_transform_key in advanced_hyperparameters:
