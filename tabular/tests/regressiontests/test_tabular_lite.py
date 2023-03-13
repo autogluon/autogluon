@@ -15,7 +15,7 @@ def selenium_standalone_micropip(selenium_standalone):
         f"{WHL_PREFIX}.features-*-py3-none-any.whl",
         f"{WHL_PREFIX}.tabular-*-py3-none-any.whl",
     ]:
-        wheel_name = [w.name for w in regex_path_str]
+        wheel_name = [w.name for w in WHL_PATH.glob(regex_path_str)]
         assert len(wheel_name) == 1
         wheel_name = wheel_name[0]
         wheel_paths.append(wheel_name)
