@@ -4,26 +4,6 @@ import pytest
 WHL_PATH = Path(__file__).parent.parent / "wheels"
 WHL_PREFIX = "autogluon_lite"
 
-AG_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}-*-py3-none-any.whl")]
-assert len(AG_WHL_NAME) == 1
-AG_WHL_NAME = AG_WHL_NAME[0]
-
-AG_COMMON_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}.common-*-py3-none-any.whl")]
-assert len(AG_COMMON_WHL_NAME) == 1
-AG_COMMON_WHL_NAME = AG_COMMON_WHL_NAME[0]
-
-AG_CORE_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}.core-*-py3-none-any.whl")]
-assert len(AG_CORE_WHL_NAME) == 1
-AG_CORE_WHL_NAME = AG_CORE_WHL_NAME[0]
-
-AG_FEATURE_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}.features-*-py3-none-any.whl")]
-assert len(AG_FEATURE_WHL_NAME) == 1
-AG_FEATURE_WHL_NAME = AG_FEATURE_WHL_NAME[0]
-
-AG_TAB_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}.tabular-*-py3-none-any.whl")]
-assert len(AG_TAB_WHL_NAME) == 1
-AG_TAB_WHL_NAME = AG_TAB_WHL_NAME[0]
-
 import numpy as np
 tests = [
     #
@@ -302,6 +282,26 @@ tests = [
 
 @pytest.fixture
 def selenium_standalone_micropip(selenium_standalone):
+    AG_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}-*-py3-none-any.whl")]
+    assert len(AG_WHL_NAME) == 1
+    AG_WHL_NAME = AG_WHL_NAME[0]
+
+    AG_COMMON_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}.common-*-py3-none-any.whl")]
+    assert len(AG_COMMON_WHL_NAME) == 1
+    AG_COMMON_WHL_NAME = AG_COMMON_WHL_NAME[0]
+
+    AG_CORE_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}.core-*-py3-none-any.whl")]
+    assert len(AG_CORE_WHL_NAME) == 1
+    AG_CORE_WHL_NAME = AG_CORE_WHL_NAME[0]
+
+    AG_FEATURE_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}.features-*-py3-none-any.whl")]
+    assert len(AG_FEATURE_WHL_NAME) == 1
+    AG_FEATURE_WHL_NAME = AG_FEATURE_WHL_NAME[0]
+
+    AG_TAB_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}.tabular-*-py3-none-any.whl")]
+    assert len(AG_TAB_WHL_NAME) == 1
+    AG_TAB_WHL_NAME = AG_TAB_WHL_NAME[0]
+
     from pytest_pyodide import spawn_web_server
     with spawn_web_server(WHL_PATH) as server:
         server_hostname, server_port, _ = server
