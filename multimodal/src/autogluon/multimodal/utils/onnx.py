@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Dict, List, Optional, Tuple, Union
 
 from torch import tensor
@@ -7,13 +8,16 @@ from ..constants import AUTOMM, FEATURE_EXTRACTION, MULTICLASS
 
 logger = logging.getLogger(__name__)
 
-try:
-    import tensorrt  # Unused but required by TensorrtExecutionProvider
-except:
-    logger.warning(
-        "Failed to import tensorrt package. "
-        "onnxruntime would fallback to CUDAExecutionProvider instead of using TensorrtExecutionProvider."
-    )
+# TODO: Try a better workaround to lazy import tensorrt package.
+tensorrt_imported = False
+if not tensorrt_imported:
+    try:
+        import tensorrt  # Unused but required by TensorrtExecutionProvider
+
+        tensorrt_imported = True
+    except:
+        # We silently omit the import failure here to avoid overwhelming warning messages in case of multi-gpu.
+        tensorrt_imported = False
 
 
 def onnx_get_dynamic_axes(input_keys: List[str]):
@@ -27,6 +31,15 @@ def onnx_get_dynamic_axes(input_keys: List[str]):
     return dynamic_axes
 
 
+def get_provider_name(provider_config: Union[str, tuple]) -> str:
+    if isinstance(provider_config, tuple):
+        provider_name = provider_config[0]
+    else:
+        assert isinstance(provider_config, str), "input provider config is expected to be either str or tuple"
+        provider_name = provider_config
+    return provider_name
+
+
 class OnnxModule(object):
     """
     OnnxModule is as a replacement of torch.nn.Module for running forward pass with onnxruntime.
@@ -35,18 +48,27 @@ class OnnxModule(object):
     so that we can predict with TensorRT by simply replacing predictor._model with OnnxModule.
     """
 
-    def __init__(self, model, providers: Optional[Union[dict, List[str]]] = None):
+    def __init__(self, onnx_path: str, providers: Optional[Union[dict, List[str]]] = None):
         """
         Parameters
         ----------
-        model : onnx.ModelProto
-            The onnx model that need to be executed in onnxruntime.
+        onnx_path : str
+            The file path of the onnx model that need to be executed in onnxruntime.
         providers : dict or str, default=None
             A list of execution providers for model prediction in onnxruntime.
         """
+        import onnx
         import onnxruntime as ort
 
+        if not os.path.exists(onnx_path):
+            raise FileNotFoundError(f"failed to located onnx file at {onnx_path}")
+
+        logger.info("Loading ONNX file from path {}...".format(onnx_path))
+        onnx_model = onnx.load(onnx_path)
+
         if providers == None:
+            dirname = os.path.dirname(os.path.abspath(onnx_path))
+            cache_path = os.path.join(dirname, "model_trt")
             providers = [
                 (
                     "TensorrtExecutionProvider",
@@ -54,6 +76,8 @@ class OnnxModule(object):
                         "device_id": 0,
                         "trt_max_workspace_size": 2147483648,
                         "trt_fp16_enable": True,
+                        "trt_engine_cache_path": cache_path,
+                        "trt_engine_cache_enable": True,
                     },
                 ),
                 (
@@ -68,7 +92,21 @@ class OnnxModule(object):
                 ),
                 ("CPUExecutionProvider", {}),
             ]
-        self.sess = ort.InferenceSession(model.SerializeToString(), providers=providers)
+
+        if len(providers) == 1 and get_provider_name(providers[0]) == "TensorrtExecutionProvider":
+            if not tensorrt_imported:
+                raise ImportError(
+                    "tensorrt package is not installed. The package can be install via `pip install tensorrt`."
+                )
+
+        self.sess = ort.InferenceSession(onnx_model.SerializeToString(), providers=providers)
+
+        if get_provider_name(providers[0]) == "TensorrtExecutionProvider" and tensorrt_imported:
+            assert "TensorrtExecutionProvider" in self.sess.get_providers(), (
+                f"unexpected TensorRT compilation failure: TensorrtExecutionProvider not in providers ({self.sess.get_providers()}). "
+                "Make sure onnxruntime package gets lazy imported everywhere."
+            )
+
         inputs = self.sess.get_inputs()
         outputs = self.sess.get_outputs()
         self.input_names = [i.name for i in inputs]

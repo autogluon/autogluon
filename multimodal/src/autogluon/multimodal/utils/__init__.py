@@ -46,7 +46,7 @@ from .export import ExportMixin
 from .hpo import hyperparameter_tune
 from .inference import extract_from_output, infer_batch, predict, process_batch, use_realtime
 from .load import CustomUnpickler, load_text_tokenizers
-from .log import LogFilter, apply_log_filter, make_exp_dir
+from .log import LogFilter, apply_log_filter, get_fit_complete_message, get_fit_start_message, make_exp_dir
 from .map import MeanAveragePrecision
 from .matcher import compute_semantic_similarity, convert_data_for_ranking, create_siamese_model, semantic_search
 from .metric import compute_ranking_score, compute_score, get_minmax_mode, get_stopping_threshold, infer_metrics

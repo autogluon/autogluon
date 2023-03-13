@@ -6,8 +6,6 @@ import uuid
 
 import numpy.testing as npt
 import pytest
-import timm
-import transformers
 from omegaconf import OmegaConf
 from torch import nn
 
@@ -700,3 +698,13 @@ def test_image_bytearray():
     npt.assert_array_equal(
         [prediction_prob_1, prediction_prob_2, prediction_prob_3, prediction_prob_4], [prediction_prob_1] * 4
     )
+
+
+def test_fit_with_data_path():
+    download_dir = "./"
+    train_csv_file = "shopee_train_data.csv"
+    train_data, _ = shopee_dataset(download_dir=download_dir)
+    train_data.to_csv(train_csv_file)
+    predictor = MultiModalPredictor(label="label")
+    predictor.fit(train_data=train_csv_file, time_limit=0)
+    predictor.fit(train_data=train_csv_file, tuning_data=train_csv_file, time_limit=0)

@@ -26,8 +26,7 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.multimodal.utils import object_detection_data_to_df, save_result_df, setup_detection_train_tuning_data
-from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
+from autogluon.core.utils.loaders import load_pd
 
 from . import version as ag_version
 from .constants import (
@@ -126,6 +125,8 @@ from .utils import (
     get_available_devices,
     get_config,
     get_detection_classes,
+    get_fit_complete_message,
+    get_fit_start_message,
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_mixup,
@@ -677,6 +678,11 @@ class MultiModalPredictor(ExportMixin):
             train_data, tuning_data = setup_detection_train_tuning_data(
                 self, max_num_tuning_data, seed, train_data, tuning_data
             )
+
+        if isinstance(train_data, str):
+            train_data = load_pd.load(train_data)
+        if isinstance(tuning_data, str):
+            tuning_data = load_pd.load(tuning_data)
 
         pl.seed_everything(seed, workers=True)
 
@@ -2772,53 +2778,3 @@ class AutoMMPredictor(MultiModalPredictor):
             "raise an exception starting in v0.7."
         )
         super(AutoMMPredictor, self).__init__(**kwargs)
-
-
-class MultiModalOnnxPredictor:
-    def __init__(self, base_predictor, model, providers=None):
-        if providers == None:
-            providers = ["CPUExecutionProvider"]
-        self._predictor = base_predictor
-        import onnxruntime as ort
-
-        self.sess = ort.InferenceSession(model.SerializeToString(), providers=providers)
-
-    def predict(self, data: Union[pd.DataFrame, dict, list, str]):
-        raise NotImplementedError()
-
-    def predict_proba(self, data: Union[pd.DataFrame, dict, list, str]):
-        data, df_preprocessor, data_processors = self._predictor._on_predict_start(
-            data=data,
-            requires_label=False,
-        )
-        data = process_batch(
-            data=data,
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-        )
-
-        inputs = self.sess.get_inputs()
-        outputs = self.sess.get_outputs()
-        input_names = [i.name for i in inputs]
-        input_dict = {k: data[k].numpy() for k in input_names}
-
-        # Taking second output, since outputs are (feature, logits)
-        # TODO: Make output consistent. Currently relying on keys of the output dict.
-        assert len(outputs) == 2, "expecting two outputs from the model."
-        label_name = outputs[1].name
-        onnx_logits = self.sess.run([label_name], input_dict)[0]
-        onnx_proba = logits_to_prob(onnx_logits)
-
-        return onnx_proba
-
-    @staticmethod
-    def load(path, providers=None):
-        import onnx
-
-        if providers == None:
-            providers = ["CPUExecutionProvider"]
-        base_predictor = MultiModalPredictor.load(path=path)
-        onnx_path = os.path.join(path, "model.onnx")
-        onnx_bytes = onnx.load(onnx_path)
-
-        return MultiModalOnnxPredictor(base_predictor=base_predictor, model=onnx_bytes, providers=providers)
