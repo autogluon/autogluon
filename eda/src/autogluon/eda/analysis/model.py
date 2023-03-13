@@ -228,13 +228,17 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
         undecided = None
         if predictor.problem_type in [BINARY, MULTICLASS]:
             y_proba = predictor.predict_proba(val_data)
-            highest_error = y_proba[y_true_val != y_pred_val].max(axis=1)
+
+            misclassified = y_proba[y_true_val != y_pred_val]
+            expected_value = misclassified.join(y_true_val).apply(lambda row: row.loc[row[label]], axis=1)
+            predicted_value = misclassified.max(axis=1)
+            highest_error = predicted_value - expected_value
             highest_error.name = "error"
 
-            scores = np.sort(y_proba.values, axis=1)
-            diff = scores[:, -1] - scores[:, -2]
-            undecided = pd.Series(index=y_pred_val.index, data=diff, name="score_diff").sort_values(ascending=True)
-            undecided = val_data.join(y_proba).join(undecided).sort_values(by="score_diff")
+            scores = np.sort(misclassified.values, axis=1)
+            diff = scores[:, -1] - expected_value
+            undecided = pd.Series(index=y_pred_val.index, data=diff, name="error").sort_values(ascending=True)
+            undecided = val_data.join(y_proba).join(undecided).sort_values(by="error")
             highest_error = (
                 val_data.join(y_proba, rsuffix="_pred")
                 .join(highest_error, how="inner")
