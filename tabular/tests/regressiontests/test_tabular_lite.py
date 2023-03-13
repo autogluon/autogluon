@@ -7,49 +7,36 @@ WHL_PREFIX = "autogluon_lite"
 
 @pytest.fixture
 def selenium_standalone_micropip(selenium_standalone):
-    # for regex_str in [
-    #
-    # ]
-    AG_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}-*-py3-none-any.whl")]
-    assert len(AG_WHL_NAME) == 1
-    AG_WHL_NAME = AG_WHL_NAME[0]
-
-    AG_COMMON_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}.common-*-py3-none-any.whl")]
-    assert len(AG_COMMON_WHL_NAME) == 1
-    AG_COMMON_WHL_NAME = AG_COMMON_WHL_NAME[0]
-
-    AG_CORE_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}.core-*-py3-none-any.whl")]
-    assert len(AG_CORE_WHL_NAME) == 1
-    AG_CORE_WHL_NAME = AG_CORE_WHL_NAME[0]
-
-    AG_FEATURE_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}.features-*-py3-none-any.whl")]
-    assert len(AG_FEATURE_WHL_NAME) == 1
-    AG_FEATURE_WHL_NAME = AG_FEATURE_WHL_NAME[0]
-
-    AG_TAB_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}.tabular-*-py3-none-any.whl")]
-    assert len(AG_TAB_WHL_NAME) == 1
-    AG_TAB_WHL_NAME = AG_TAB_WHL_NAME[0]
+    wheel_paths = []
+    for regex_path_str in [
+        f"{WHL_PREFIX}-*-py3-none-any.whl",
+        f"{WHL_PREFIX}.common-*-py3-none-any.whl",
+        f"{WHL_PREFIX}.core-*-py3-none-any.whl",
+        f"{WHL_PREFIX}.features-*-py3-none-any.whl",
+        f"{WHL_PREFIX}.tabular-*-py3-none-any.whl",
+    ]:
+        wheel_name = [w.name for w in regex_path_str]
+        assert len(wheel_name) == 1
+        wheel_name = wheel_name[0]
+        wheel_paths.append(wheel_name)
 
     from pytest_pyodide import spawn_web_server
     with spawn_web_server(WHL_PATH) as server:
         server_hostname, server_port, _ = server
         base_url = f"http://{server_hostname}:{server_port}/"
-        url_ag = base_url + AG_WHL_NAME
-        url_ag_common = base_url + AG_COMMON_WHL_NAME
-        url_ag_core = base_url + AG_CORE_WHL_NAME
-        url_ag_features = base_url + AG_FEATURE_WHL_NAME
-        url_ag_tab = base_url + AG_TAB_WHL_NAME
+        # url_ag = base_url + AG_WHL_NAME
+        # url_ag_common = base_url + AG_COMMON_WHL_NAME
+        # url_ag_core = base_url + AG_CORE_WHL_NAME
+        # url_ag_features = base_url + AG_FEATURE_WHL_NAME
+        # url_ag_tab = base_url + AG_TAB_WHL_NAME
+        run_script = [f"await micropip.install('{base_url + path}')" for path in wheel_paths]
+        run_script = "import micropip\n" + "\n".join(run_script)
         selenium_standalone.run_js(
             f"""
             await pyodide.loadPackage("micropip");
             pyodide.runPython("import micropip");
             await pyodide.runPythonAsync(`
-                import micropip
-                await micropip.install('{url_ag_common}')
-                await micropip.install('{url_ag_core}')
-                await micropip.install('{url_ag_features}')
-                await micropip.install('{url_ag_tab}')
-                await micropip.install('{url_ag}')
+            {run_script}
             `);
             """
         )
