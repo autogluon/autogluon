@@ -13,7 +13,7 @@ __all__ = ["ShapAnalysis"]
 logger = logging.getLogger(__name__)
 
 
-class _ShapAutogluonWrapper:
+class _ShapAutoGluonWrapper:
     def __init__(self, predictor, feature_names, target_class=None):
         self.ag_model = predictor
         self.feature_names = feature_names
@@ -54,6 +54,8 @@ class ShapAnalysis(AbstractAnalysis):
         wrapped analyses; these will receive sampled `args` during `fit` call
     state: AnalysisState
         state to be updated by this fit function
+    random_state: int, default = 0
+        random state for sampling
     kwargs
 
     Examples
@@ -89,11 +91,13 @@ class ShapAnalysis(AbstractAnalysis):
         parent: Optional[AbstractAnalysis] = None,
         children: Optional[List[AbstractAnalysis]] = None,
         state: Optional[AnalysisState] = None,
+        random_state: int = 0,
         **kwargs,
     ) -> None:
         super().__init__(parent, children, state, **kwargs)
         self.rows = rows
         self.baseline_sample = baseline_sample
+        self.random_state = random_state
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return self.all_keys_must_be_present(args, "model", "train_data")
@@ -104,15 +108,15 @@ class ShapAnalysis(AbstractAnalysis):
         else:
             _baseline_sample = len(args.train_data)
 
-        baseline = args.train_data.sample(_baseline_sample, random_state=0)
+        baseline = args.train_data.sample(_baseline_sample, random_state=self.random_state)
         shap_data = []
         for _, row in self.rows.iterrows():
             _row = pd.DataFrame([row])
             if args.model.problem_type == REGRESSION:
-                predicted_class = 0
+                predicted_class = None
             else:
                 predicted_class = args.model.predict(_row).iloc[0]
-            ag_wrapper = _ShapAutogluonWrapper(args.model, args.train_data.columns, predicted_class)
+            ag_wrapper = _ShapAutoGluonWrapper(args.model, args.train_data.columns, predicted_class)
             explainer = shap.KernelExplainer(ag_wrapper.predict_proba, baseline)
             ke_shap_values = explainer.shap_values(_row[args.train_data.columns], silent=True)
             shap_data.append(
