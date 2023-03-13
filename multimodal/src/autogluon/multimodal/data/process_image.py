@@ -7,6 +7,7 @@ from typing import Callable, Dict, List, Optional, Union
 import numpy as np
 import PIL
 import torch
+from omegaconf import ListConfig
 from PIL import ImageFile
 from torch import nn
 from torchvision import transforms
@@ -349,11 +350,10 @@ class ImageProcessor:
     def __setstate__(self, state):
         self.__dict__ = state
         if "train_transform_types" in state:  # backward compatible
-            self.train_transforms = self.train_transform_types
+            self.train_transforms = list(self.train_transform_types)
         if "val_transform_types" in state:
-            self.val_transforms = self.val_transform_types
-        print(f"self.train_transforms: {self.train_transforms}")
-        print(f"type(self.train_transforms): {type(self.train_transforms)}")
+            self.val_transforms = list(self.val_transform_types)
+
         self.train_processor = construct_image_processor(
             image_transforms=self.train_transforms,
             size=self.size,

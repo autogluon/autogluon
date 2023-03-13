@@ -7,6 +7,7 @@ from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
+from omegaconf import ListConfig
 from text_unidecode import unidecode
 from timm.data.constants import (
     IMAGENET_DEFAULT_MEAN,
@@ -446,13 +447,15 @@ def get_text_token_max_len(provided_max_len, config, tokenizer, checkpoint_name)
     return max_len
 
 
-def get_image_transform_funcs(transform_types: List[str], size: int):
+def get_image_transform_funcs(transform_types: Union[List[str], ListConfig], size: int):
     image_transforms = []
 
     if not transform_types:
         return image_transforms
 
-    if not isinstance(transform_types, list):
+    if isinstance(transform_types, ListConfig):
+        transform_types = list(transform_types)
+    elif not isinstance(transform_types, list):
         transform_types = [transform_types]
 
     if not all([isinstance(trans_type, str) for trans_type in transform_types]):

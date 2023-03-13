@@ -21,8 +21,8 @@ def test_variable_input_size_backbone(checkpoint_name, provided_size, expected_s
     download_dir = "./ag_automm_tutorial_imgcls"
     train_df, test_df = shopee_dataset(download_dir)
 
-    train_transform_types = ["resize_shorter_side", "center_crop", "trivial_augment"]
-    val_transform_types = ["resize_shorter_side", "center_crop"]
+    train_transforms = ["resize_shorter_side", "center_crop", "trivial_augment"]
+    val_transforms = ["resize_shorter_side", "center_crop"]
 
     timm_model = TimmAutoModelForImagePrediction(
         prefix="timm_image", checkpoint_name=checkpoint_name, pretrained=False
@@ -30,8 +30,8 @@ def test_variable_input_size_backbone(checkpoint_name, provided_size, expected_s
 
     image_processor = ImageProcessor(
         model=timm_model,
-        train_transform_types=train_transform_types,
-        val_transform_types=val_transform_types,
+        train_transforms=train_transforms,
+        val_transforms=val_transforms,
         size=provided_size,
     )
     ret = image_processor.process_one_sample(
