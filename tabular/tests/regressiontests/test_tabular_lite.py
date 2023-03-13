@@ -29,8 +29,8 @@ def selenium_standalone_micropip(selenium_standalone):
         # url_ag_core = base_url + AG_CORE_WHL_NAME
         # url_ag_features = base_url + AG_FEATURE_WHL_NAME
         # url_ag_tab = base_url + AG_TAB_WHL_NAME
-        run_script = [f"await micropip.install('{base_url + path}')" for path in wheel_paths]
-        run_script = "import micropip\n" + "\n".join(run_script)
+        run_script = [f"\tawait micropip.install('{base_url + path}')" for path in wheel_paths]
+        run_script = "\timport micropip\n" + "\n".join(run_script)
         selenium_standalone.run_js(
             f"""
             await pyodide.loadPackage("micropip");
