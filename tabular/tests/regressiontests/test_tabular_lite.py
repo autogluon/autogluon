@@ -24,13 +24,6 @@ def selenium_standalone_micropip(selenium_standalone):
     with spawn_web_server(WHL_PATH) as server:
         server_hostname, server_port, _ = server
         base_url = f"http://{server_hostname}:{server_port}/"
-        # url_ag = base_url + AG_WHL_NAME
-        # url_ag_common = base_url + AG_COMMON_WHL_NAME
-        # url_ag_core = base_url + AG_CORE_WHL_NAME
-        # url_ag_features = base_url + AG_FEATURE_WHL_NAME
-        # url_ag_tab = base_url + AG_TAB_WHL_NAME
-        # run_script = [f"\tawait micropip.install('{base_url + path}')" for path in wheel_paths]
-        # run_script = "\timport micropip\n" + "\n".join(run_script)
         selenium_standalone.run_js(
             f"""
             await pyodide.loadPackage("micropip");
@@ -71,7 +64,7 @@ def test_train_classifier(selenium_standalone_micropip):
         y_test = test_data[label]  # values to predict
         test_data_nolab = test_data.drop(columns=[label])  # delete label column to prove we're not cheating
         test_data_nolab.head()
-        predictor = TabularPredictor.load(save_path)  # unnecessary, just demonstrates how to load previously-trained predictor from file
+        predictor = TabularPredictor.load(save_path)
 
         y_pred = predictor.predict(test_data_nolab)
         print("Predictions:  \n", y_pred)
@@ -88,5 +81,5 @@ def test_train_classifier(selenium_standalone_micropip):
 
     from .utils import tests, make_dataset
     test_case = tests[-1]
-    DATA_TRAIN, DATA_TEST = make_dataset(request=test_case, seed=0)
-    run(selenium_standalone_micropip, test_case, DATA_TRAIN, DATA_TEST)
+    data_train, data_test = make_dataset(request=test_case, seed=0)
+    run(selenium_standalone_micropip, test_case, data_train, data_test)
