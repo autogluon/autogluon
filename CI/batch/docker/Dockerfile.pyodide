@@ -1,37 +1,21 @@
 FROM pyodide/pyodide-env:20221102-chrome107-firefox106
 
-# compile pyodide via root
-RUN cd / \
-    && git clone https://github.com/pyodide/pyodide \
+WORKDIR /src
+
+# compile pyodide
+RUN git clone --depth 1 --branch 0.22.0 https://github.com/pyodide/pyodide.git \
     && cd pyodide \
-    && git checkout 4a1913d3adc672680f5a02c385841e303f6254ee \
     && pip install -r requirements.txt \
     && make  \
     && PYODIDE_PACKAGES='*,!bcrypt,!sparseqr,!cryptography,!libmpfr,!pyerfa' make \
     && cd pyodide-build && pip install -e '.[test]' && cd .. \
-    && pip install 'playwright<1.23.0' && python -m playwright install
-
-RUN adduser --disabled-password --disabled-login ci
-WORKDIR /home/ci
+    && pip install 'playwright<1.23.0' && python3 -m playwright install \
+    && cd ..
 
 #  add autogluon_job script
 ADD autogluon_job.sh .
-RUN chmod +x autogluon_job.sh; chown ci autogluon_job.sh
+RUN chmod +x autogluon_job.sh
 
-# transfer pyodide to ci user
-RUN mv /pyodide .
-RUN chown -R ci pyodide
-
-USER ci
-
-ENV VIRTUAL_ENV=/home/ci/opt/venv
-RUN python3 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
-RUN cd pyodide \
-    && pip install -r requirements.txt \
-    && cd pyodide-build && pip install -e '.[test]' && cd .. \
-    && pip install 'playwright<1.23.0' && python -m playwright install \
-    && cd ..
+RUN python3 -m pip install numpy pandas scikit-learn
 
 CMD ["/bin/bash"]

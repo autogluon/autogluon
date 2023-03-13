@@ -33,11 +33,11 @@ def pytest_configure(config):
 def pytest_collection_modifyitems(config, items):
     skip_slow = pytest.mark.skip(reason="need --runslow option to run")
     skip_regression = pytest.mark.skip(reason="need --runregression option to run")
-    skip_lite = pytest.mark.skip(reason="skip autogluon-lite tests")
+    skip_pyodide = pytest.mark.skip(reason="skip autogluon-lite via pyodide tests")
     custom_markers = dict(
         slow=skip_slow,
         regression=skip_regression,
-        lite=skip_lite
+        pyodide=skip_pyodide
     )
     if config.getoption("--runslow"):
         # --runslow given in cli: do not skip slow tests

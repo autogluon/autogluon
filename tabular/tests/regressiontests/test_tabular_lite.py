@@ -274,7 +274,7 @@ tests = [
                   'RandomForestEntr': (0.607, 0.001),
                   'RandomForestGini': (0.582, 0.001),
                   'WeightedEnsemble_L2': (0.61, 0.001),
-                  'XGBoost': (0.58, 0.001),
+                  'XGBoost': (0.78, 0.001),
         }
     },
 ]
@@ -282,6 +282,9 @@ tests = [
 
 @pytest.fixture
 def selenium_standalone_micropip(selenium_standalone):
+    # for regex_str in [
+    #
+    # ]
     AG_WHL_NAME = [w.name for w in WHL_PATH.glob(f"{WHL_PREFIX}-*-py3-none-any.whl")]
     assert len(AG_WHL_NAME) == 1
     AG_WHL_NAME = AG_WHL_NAME[0]
@@ -330,8 +333,8 @@ def selenium_standalone_micropip(selenium_standalone):
 
 @pytest.mark.skip_refcount_check
 @pytest.mark.driver_timeout(60)
-@pytest.mark.lite
-def test_load_data(selenium_standalone_micropip):
+@pytest.mark.pyodide
+def test_train_classifier(selenium_standalone_micropip):
     from pytest_pyodide import run_in_pyodide
     @run_in_pyodide(packages=["xgboost", "pandas", "numpy", "scipy", "scikit-learn", "lightgbm"])
     async def run(selenium, test, train_data, test_data):
