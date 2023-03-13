@@ -9,11 +9,11 @@ WHL_PREFIX = "autogluon_lite"
 def selenium_standalone_micropip(selenium_standalone):
     wheel_paths = []
     for regex_path_str in [
-        f"{WHL_PREFIX}-*-py3-none-any.whl",
         f"{WHL_PREFIX}.common-*-py3-none-any.whl",
         f"{WHL_PREFIX}.core-*-py3-none-any.whl",
         f"{WHL_PREFIX}.features-*-py3-none-any.whl",
         f"{WHL_PREFIX}.tabular-*-py3-none-any.whl",
+        f"{WHL_PREFIX}-*-py3-none-any.whl",
     ]:
         wheel_name = [w.name for w in WHL_PATH.glob(regex_path_str)]
         assert len(wheel_name) == 1
@@ -29,14 +29,19 @@ def selenium_standalone_micropip(selenium_standalone):
         # url_ag_core = base_url + AG_CORE_WHL_NAME
         # url_ag_features = base_url + AG_FEATURE_WHL_NAME
         # url_ag_tab = base_url + AG_TAB_WHL_NAME
-        run_script = [f"\tawait micropip.install('{base_url + path}')" for path in wheel_paths]
-        run_script = "\timport micropip\n" + "\n".join(run_script)
+        # run_script = [f"\tawait micropip.install('{base_url + path}')" for path in wheel_paths]
+        # run_script = "\timport micropip\n" + "\n".join(run_script)
         selenium_standalone.run_js(
             f"""
             await pyodide.loadPackage("micropip");
             pyodide.runPython("import micropip");
             await pyodide.runPythonAsync(`
-            {run_script}
+                import micropip
+                await micropip.install('{base_url + wheel_paths[0]}')
+                await micropip.install('{base_url + wheel_paths[1]}')
+                await micropip.install('{base_url + wheel_paths[2]}')
+                await micropip.install('{base_url + wheel_paths[3]}')
+                await micropip.install('{base_url + wheel_paths[4]}')
             `);
             """
         )
