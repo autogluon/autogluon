@@ -26,8 +26,8 @@ mkdir -p $TEST_SCRIPT_DIR
 # copy test scripts to a separate dir to avoid pytest picking up test settings that conflict with pyodide.
 cp -f tabular/tests/regressiontests/*.py $TEST_SCRIPT_DIR/
 
-#cd $PYODIDE_DIR
+cd $PYODIDE_DIR
 #tools/pytest_wrapper.py $TEST_SCRIPT_DIR/test_tabular_lite.py -v \
 #  --runtime 'firefox' --runner 'playwright' --junitxml=results.xml
-tools/pytest_wrapper.py tabular/tests/regressiontests/test_tabular_lite.py -v \
+tools/pytest_wrapper.py src/autogluon/tabular/tests/regressiontests/test_tabular_lite.py -v \
   --runtime 'firefox' --runner 'playwright' --junitxml=results.xml
