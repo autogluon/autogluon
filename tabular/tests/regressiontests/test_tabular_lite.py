@@ -9,11 +9,11 @@ WHL_PREFIX = "autogluon_lite"
 def selenium_standalone_micropip(selenium_standalone):
     wheel_paths = []
     for regex_path_str in [
-        ("common", f"{WHL_PREFIX}.common-*-py3-none-any.whl"),
-        ("core", f"{WHL_PREFIX}.core-*-py3-none-any.whl"),
-        ("features", f"{WHL_PREFIX}.features-*-py3-none-any.whl"),
-        ("tabular", f"{WHL_PREFIX}.tabular-*-py3-none-any.whl"),
-        ("autogluon", f"{WHL_PREFIX}-*-py3-none-any.whl"),
+        ("common", f"{WHL_PREFIX}.common-*.whl"),
+        ("core", f"{WHL_PREFIX}.core-*.whl"),
+        ("features", f"{WHL_PREFIX}.features-*.whl"),
+        ("tabular", f"{WHL_PREFIX}.tabular-*.whl"),
+        ("autogluon", f"{WHL_PREFIX}-*.whl"),
     ]:
         wheel_path = [f"{regex_path_str[0]}/dist/{w.name}"
                       for w in (ROOT_PATH / regex_path_str[0] / "dist").glob(regex_path_str[1])]
