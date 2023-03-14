@@ -32,5 +32,5 @@ cd $PYODIDE_DIR
 #  --runtime 'firefox' --runner 'playwright' --junitxml=results.xml
 tools/pytest_wrapper.py /src/autogluon/tabular/tests/regressiontests/test_tabular_lite.py -v \
   -p no:$(pwd)/tabular/tests/conftest.py \
-  --dist-dir /src/pyodide/dist \
+  --dist-dir /src/pyodide \
   --runtime 'firefox' --runner 'playwright' --junitxml=results.xml --runpyodide
