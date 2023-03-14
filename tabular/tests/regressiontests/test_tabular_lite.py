@@ -1,3 +1,7 @@
+""" Test autogluon.tabular on pyodide.
+    The test needs to be run via pyodide/tools/pytest_wrapper.py,
+    and using conftest.py from pyodide root directory.
+"""
 from pathlib import Path
 import pytest
 
