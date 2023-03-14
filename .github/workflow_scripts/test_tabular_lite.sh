@@ -7,7 +7,7 @@ source $(dirname "$0")/env_setup.sh
 setup_build_env
 export AUTOGLUON_PACKAGE_NAME="autogluon-lite"
 
-#install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/[all,tests]"
+install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/[all,tests]"
 build_all
 
 PYODIDE_DIR=/src/pyodide
