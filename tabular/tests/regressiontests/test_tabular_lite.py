@@ -1,7 +1,7 @@
 from pathlib import Path
 import pytest
 
-ROOT_PATH = Path(__file__).parent.parent.parent
+ROOT_PATH = Path(__file__).parent.parent.parent.parent
 WHL_PREFIX = "autogluon_lite"
 
 
