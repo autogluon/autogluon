@@ -1,7 +1,6 @@
 FROM pyodide/pyodide-env:20221102-chrome107-firefox106
 
 WORKDIR /src
-
 # compile pyodide
 RUN git clone --depth 1 --branch 0.22.0 https://github.com/pyodide/pyodide.git \
     && cd pyodide \
@@ -17,5 +16,7 @@ ADD autogluon_job.sh .
 RUN chmod +x autogluon_job.sh
 
 RUN python3 -m pip install numpy pandas scikit-learn
+
+WORKDIR /src/pyodide
 
 CMD ["/bin/bash"]
