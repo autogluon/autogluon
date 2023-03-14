@@ -11,12 +11,11 @@ RUN git clone --depth 1 --branch 0.22.0 https://github.com/pyodide/pyodide.git \
     && pip install 'playwright<1.23.0' && python3 -m playwright install \
     && cd ..
 
+WORKDIR /src/pyodide
 #  add autogluon_job script
 ADD autogluon_job.sh .
 RUN chmod +x autogluon_job.sh
 
 RUN python3 -m pip install numpy pandas scikit-learn
-
-WORKDIR /src/pyodide
 
 CMD ["/bin/bash"]
