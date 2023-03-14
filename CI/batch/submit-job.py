@@ -20,7 +20,7 @@ job_type_info = {
         'job_queue': 'CI-GPU'
     },
     'CI-WASM': {
-        'job_definition': 'autogluon-ci-wasm:2',
+        'job_definition': 'autogluon-ci-wasm:1',
         'job_queue': 'CI-CPU'
     },
     'CI-CPU-PUSH': {
