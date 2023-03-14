@@ -1,8 +1,7 @@
 from pathlib import Path
 import pytest
 
-# WHL_PATH = Path(__file__).parent.parent / "wheels"
-WHL_PATH = Path("/src/pyodide/autogluon/wheels")
+ROOT_PATH = Path(__file__).parent.parent.parent
 WHL_PREFIX = "autogluon_lite"
 
 
@@ -10,19 +9,20 @@ WHL_PREFIX = "autogluon_lite"
 def selenium_standalone_micropip(selenium_standalone):
     wheel_paths = []
     for regex_path_str in [
-        f"{WHL_PREFIX}.common-*-py3-none-any.whl",
-        f"{WHL_PREFIX}.core-*-py3-none-any.whl",
-        f"{WHL_PREFIX}.features-*-py3-none-any.whl",
-        f"{WHL_PREFIX}.tabular-*-py3-none-any.whl",
-        f"{WHL_PREFIX}-*-py3-none-any.whl",
+        ("common", f"{WHL_PREFIX}.common-*-py3-none-any.whl"),
+        ("core", f"{WHL_PREFIX}.core-*-py3-none-any.whl"),
+        ("features", f"{WHL_PREFIX}.features-*-py3-none-any.whl"),
+        ("tabular", f"{WHL_PREFIX}.tabular-*-py3-none-any.whl"),
+        ("autogluon", f"{WHL_PREFIX}-*-py3-none-any.whl"),
     ]:
-        wheel_name = [w.name for w in WHL_PATH.glob(regex_path_str)]
-        assert len(wheel_name) == 1
-        wheel_name = wheel_name[0]
-        wheel_paths.append(wheel_name)
+        wheel_path = [f"{regex_path_str[0]}/dist/{w.name}"
+                      for w in (ROOT_PATH / regex_path_str[0] / "dist").glob(regex_path_str[1])]
+        assert len(wheel_path) == 1
+        wheel_path = wheel_path[0]
+        wheel_paths.append(wheel_path)
 
     from pytest_pyodide import spawn_web_server
-    with spawn_web_server(WHL_PATH) as server:
+    with spawn_web_server(ROOT_PATH) as server:
         server_hostname, server_port, _ = server
         base_url = f"http://{server_hostname}:{server_port}/"
         selenium_standalone.run_js(
