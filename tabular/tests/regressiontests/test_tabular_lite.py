@@ -2,7 +2,7 @@ from pathlib import Path
 import pytest
 
 # WHL_PATH = Path(__file__).parent.parent / "wheels"
-WHL_PATH = Path("/src/autogluon/wheels")
+WHL_PATH = Path("/src/pyodide/autogluon/wheels")
 WHL_PREFIX = "autogluon_lite"
 
 

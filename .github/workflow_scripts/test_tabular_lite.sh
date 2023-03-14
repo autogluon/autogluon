@@ -14,7 +14,7 @@ PYODIDE_DIR=/src/pyodide
 
 # copy wheels to one dir to be easier loaded by pyodide.
 #WHEEL_DST=$PYODIDE_DIR/wheels
-WHEEL_DST=./wheels
+WHEEL_DST=$PYODIDE_DIR/autogluon/wheels
 mkdir -p $WHEEL_DST
 cp -f autogluon/dist/*.whl $WHEEL_DST/
 cp -f common/dist/*.whl $WHEEL_DST/
