@@ -31,4 +31,4 @@ cd $PYODIDE_DIR
 #tools/pytest_wrapper.py $TEST_SCRIPT_DIR/test_tabular_lite.py -v \
 #  --runtime 'firefox' --runner 'playwright' --junitxml=results.xml
 tools/pytest_wrapper.py /src/autogluon/tabular/tests/regressiontests/test_tabular_lite.py -v \
-  --runtime 'firefox' --runner 'playwright' --junitxml=results.xml
+  --runtime 'firefox' --runner 'playwright' --junitxml=results.xml --runpyodide
