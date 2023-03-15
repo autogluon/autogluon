@@ -16,8 +16,7 @@ REMOTE=$6
 SAFE_TO_USE_SCRIPT=$7
 
 # Copy the workflow from master branch
-# FIXME: remove branch ci_pyodide
-git clone https://github.com/autogluon/autogluon.git -b ci_pyodide
+git clone https://github.com/autogluon/autogluon.git
 WORKFLOW_SCRIPTS=autogluon/.github/workflow_scripts
 if [ -d "$WORKFLOW_SCRIPTS" ]; then
     cp -R autogluon/.github/workflow_scripts .
