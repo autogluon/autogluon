@@ -32,7 +32,7 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
     config_num_gpus
         The gpu number provided by config.
     strategy
-        A lightning trainer's strategy such as "ddp", "ddp_spawn", and "dp".
+        A lightning trainer's strategy such as "ddp" and "ddp_spawn".
 
     Returns
     -------
@@ -194,8 +194,8 @@ def compute_inference_batch_size(
     else:
         batch_size = per_gpu_batch_size * eval_batch_size_ratio
 
-    if num_gpus > 1 and strategy == "dp":
-        # If using 'dp', the per_gpu_batch_size would be split by all GPUs.
+    if num_gpus > 1 and strategy == "ddp":
+        # If using 'ddp', the per_gpu_batch_size would be split by all GPUs.
         # So, we need to use the GPU number as a multiplier to compute the batch size.
         batch_size = batch_size * num_gpus
 

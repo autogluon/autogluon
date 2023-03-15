@@ -256,7 +256,7 @@ class ExportMixin:
         # Perform tracing on cpu
         device_type = "cpu"
         num_gpus = 0
-        strategy = "dp"  # default used in inference.
+        strategy = "ddp"  # default used in inference.
         device = torch.device(device_type)
         dtype = infer_precision(
             num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False, as_torch=True
