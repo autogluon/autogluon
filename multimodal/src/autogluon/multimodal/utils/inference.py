@@ -475,7 +475,7 @@ def predict(
             requires_label=requires_label,
         )
 
-    strategy = "dp"  # default used in inference.
+    strategy = "ddp"  # default used in inference.
 
     num_gpus = compute_num_gpus(config_num_gpus=predictor._config.env.num_gpus, strategy=strategy)
 
