@@ -33,6 +33,7 @@ def test_AutoGluonModelEvaluator_regression():
 
         state = auto.analyze(
             model=predictor,
+            train_data=df_train,
             val_data=df_test,
             return_state=True,
             anlz_facets=[eda.model.AutoGluonModelEvaluator(normalize="true")],
@@ -61,6 +62,7 @@ def test_AutoGluonModelEvaluator_regression__with_test_data():
 
         state = auto.analyze(
             model=predictor,
+            train_data=df_train,
             val_data=df_val,
             test_data=df_test,
             return_state=True,
@@ -89,6 +91,7 @@ def test_AutoGluonModelEvaluator_classification():
 
         state = auto.analyze(
             model=predictor,
+            train_data=df_train,
             val_data=df_test,
             return_state=True,
             anlz_facets=[eda.model.AutoGluonModelEvaluator(normalize="true")],
