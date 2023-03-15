@@ -1416,13 +1416,33 @@ class TabularPredictor:
         """
         self._assert_is_fit('predict_proba')
         data = self.__get_dataset(data)
-        if self.problem_type in [REGRESSION, QUANTILE]:
+        if not self.can_predict_proba:
             warnings.warn(
                 f'Calling `predictor.predict_proba` when problem_type={self.problem_type} will raise an AssertionError starting in AutoGluon v0.8. '
-                'Please call `predictor.predict` instead.',
+                'Please call `predictor.predict` instead. You can check the value of `predictor.can_predict_proba` to tell if predict_proba is valid.',
                 category=FutureWarning
             )
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass, transform_features=transform_features)
+
+    # TODO: Ensure this is correct as new problem_types are added.
+    #  Consider making problem_type a class object to be able to look this up easier.
+    @property
+    def _is_classification(self) -> bool:
+        """
+        Return True if problem_type is classification, otherwise return False.
+        Raises an AssertionError if `self.problem_type` is None.
+        """
+        assert self.problem_type is not None, "problem_type cannot be None when determining if the predictor is solving a classification problem"
+        return self.problem_type not in [REGRESSION, QUANTILE]
+
+    @property
+    def can_predict_proba(self) -> bool:
+        """
+        Return True if predictor can return prediction probabilities via `.predict_proba`, otherwise return False.
+        Raises an AssertionError if called before fitting.
+        """
+        self._assert_is_fit('can_predict_proba')
+        return self._is_classification
 
     def evaluate(self, data, model=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
         """
@@ -1453,12 +1473,15 @@ class TabularPredictor:
         """
         self._assert_is_fit('evaluate')
         data = self.__get_dataset(data)
-        y_pred_proba = self.predict_proba(data=data, model=model)
+        if self.can_predict_proba:
+            y_pred = self.predict_proba(data=data, model=model)
+        else:
+            y_pred = self.predict(data=data, model=model)
         if self.sample_weight is not None and self.weight_evaluation and self.sample_weight in data:
             sample_weight = data[self.sample_weight]
         else:
             sample_weight = None
-        return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred_proba, sample_weight=sample_weight, silent=silent,
+        return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred, sample_weight=sample_weight, silent=silent,
                                          auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
     def evaluate_predictions(self, y_true, y_pred, sample_weight=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
