@@ -123,6 +123,7 @@ jobs:
           job-name: AutoGluon-Tabular
           command: chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh
   test_tabular_lite:
+    needs: lint_check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
