@@ -149,13 +149,13 @@ class AbstractModel:
         self._compiler = None
 
     @classmethod
-    def _init_user_params(cls, params: Optional[Dict[str, Any]], ag_args_fit: str = AG_ARGS_FIT, ag_arg_prefix: str = AG_ARG_PREFIX) -> (Dict[str, Any], Dict[str, Any]):
+    def _init_user_params(cls, params: Optional[Dict[str, Any]] = None, ag_args_fit: str = AG_ARGS_FIT, ag_arg_prefix: str = AG_ARG_PREFIX) -> (Dict[str, Any], Dict[str, Any]):
         """
         Given the user-specified hyperparameters, split into `params` and `params_aux`.
 
         Parameters
         ----------
-        params : Optional[Dict[str, Any]]
+        params : Optional[Dict[str, Any]], default = None
             The model hyperparameters dictionary
         ag_args_fit : str, default = "ag_args_fit"
             The params key to look for that contains params_aux.
