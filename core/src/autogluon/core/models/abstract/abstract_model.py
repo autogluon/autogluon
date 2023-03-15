@@ -182,6 +182,11 @@ class AbstractModel:
         """
         params = copy.deepcopy(params) if params is not None else dict()
         assert isinstance(params, dict), f"Invalid dtype of params! Expected dict, but got {type(params)}"
+        for k in params.keys():
+            if not isinstance(k, str):
+                logger.warning(f'Warning: Specified {cls.__name__} hyperparameter key is not of type str: {k} (type={type(k)}). '
+                               f'There might be a bug in your configuration.')
+
         params_aux = params.pop(ag_args_fit, dict())
         if params_aux is None:
             params_aux = dict()
@@ -744,7 +749,7 @@ class AbstractModel:
         kwargs = self.initialize(**kwargs)  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
         kwargs = self._preprocess_fit_args(**kwargs)
         if 'time_limit' in kwargs and kwargs['time_limit'] is not None and kwargs['time_limit'] <= 0:
-            logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
+            logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
             raise TimeLimitExceeded
 
         self._register_fit_metadata(**kwargs)
@@ -1547,12 +1552,12 @@ class AbstractModel:
         log_ag_args_fit_example = '`predictor.fit(..., ag_args_fit={"ag.max_memory_usage_ratio": VALUE})`'
         log_ag_args_fit_example = f'\n\t\tTo set the same value for all models, do the following when calling predictor.fit: {log_ag_args_fit_example}'
 
-        log_user_guideline = f'Estimated to require {round(approx_mem_size_req / 1e9, 3)} GB ' \
-                             f'out of {round(available_mem / 1e9, 3)} GB available memory ({round(min_error_memory_ratio*100, 3)}%)... ' \
-                             f'({round(max_memory_usage_error_ratio*100, 3)}% of avail memory is the max safe size)'
+        log_user_guideline = f'Estimated to require {approx_mem_size_req / 1e9:.3f} GB ' \
+                             f'out of {available_mem / 1e9:.3f} GB available memory ({min_error_memory_ratio*100:.3f}%)... ' \
+                             f'({max_memory_usage_error_ratio*100:.3f}% of avail memory is the max safe size)'
         if min_error_memory_ratio > max_memory_usage_error_ratio:
             log_user_guideline += f'\n\tTo force training the model, specify the model hyperparameter "ag.max_memory_usage_ratio" to a larger value ' \
-                                  f'(currently {max_memory_usage_ratio}, set to >={round(min_error_memory_ratio + 0.05, 2)} to avoid the error)' \
+                                  f'(currently {max_memory_usage_ratio}, set to >={min_error_memory_ratio + 0.05:.2f} to avoid the error)' \
                                   f'{log_ag_args_fit_example}'
             if min_error_memory_ratio >= 1:
                 log_user_guideline += f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. ' \
@@ -1561,7 +1566,7 @@ class AbstractModel:
             raise NotEnoughMemoryError
         elif min_warning_memory_ratio > max_memory_usage_warning_ratio:
             log_user_guideline += f'\n\tTo avoid this warning, specify the model hyperparameter "ag.max_memory_usage_ratio" to a larger value ' \
-                                  f'(currently {max_memory_usage_ratio}, set to >={round(min_warning_memory_ratio + 0.05, 2)} to avoid the warning)' \
+                                  f'(currently {max_memory_usage_ratio}, set to >={min_warning_memory_ratio + 0.05:.2f} to avoid the warning)' \
                                   f'{log_ag_args_fit_example}'
             if min_warning_memory_ratio >= 1:
                 log_user_guideline += f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. ' \
