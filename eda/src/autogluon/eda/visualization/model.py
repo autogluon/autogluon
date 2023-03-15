@@ -165,6 +165,7 @@ class RegressionEvaluation(AbstractVisualization, JupyterMixin):
 
         if fig_args is None:
             fig_args = {}
+        fig_args = {**{"figsize": (12, 6)}, **fig_args}
         self.fig_args = fig_args
 
     def can_handle(self, state: AnalysisState) -> bool:

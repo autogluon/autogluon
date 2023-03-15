@@ -92,7 +92,7 @@ def test_RegressionEvaluation(monkeypatch):
         viz.residuals_plot = call_residuals_plot
         viz.render_markdown = call_render_markdown
         viz.render(state)
-    call_plt_subplots.assert_called_with(a=1, b=2)
+    call_plt_subplots.assert_called_with(figsize=(12, 6), a=1, b=2)
     call_plt_show.assert_called_with("fig")
     call_residuals_plot.assert_called_with(
         ANY,
@@ -136,9 +136,10 @@ def test_RegressionEvaluation__can_handle():
     assert RegressionEvaluation().can_handle(AnalysisState({"some_args": {}})) is False
 
 
-def test_ConfusionMatrix__handle_None_fig_args():
-    assert RegressionEvaluation(fig_args={"abc": 1}).fig_args == {"abc": 1}
-    assert RegressionEvaluation(fig_args=None).fig_args == {}
+def test_RegressionEvaluation__handle_None_fig_args():
+    assert RegressionEvaluation(fig_args={"abc": 1}).fig_args == {"abc": 1, "figsize": (12, 6)}
+    assert RegressionEvaluation(fig_args=None).fig_args == {"figsize": (12, 6)}
+    assert RegressionEvaluation(fig_args={"figsize": (6, 6)}).fig_args == {"figsize": (6, 6)}
 
 
 def test_FeatureImportance__can_handle():
