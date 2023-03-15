@@ -189,6 +189,8 @@ def test_customizing_predictor_image_aug(train_transforms, val_transforms):
 
     assert str(train_transforms) == str(predictor._data_processors["image"][0].train_transforms)
     assert str(val_transforms) == str(predictor._data_processors["image"][0].val_transforms)
+    assert len(predictor._data_processors["image"][0].train_processor.transforms) == len(train_transforms) + 2
+    assert len(predictor._data_processors["image"][0].val_processor.transforms) == len(val_transforms) + 2
 
 
 @pytest.mark.parametrize(
@@ -231,3 +233,5 @@ def test_customizing_matcher_image_aug(train_transforms, val_transforms):
     assert str(train_transforms) == str(matcher._matcher._response_processors["image"][0].train_transforms)
     assert str(val_transforms) == str(matcher._matcher._query_processors["image"][0].val_transforms)
     assert str(val_transforms) == str(matcher._matcher._response_processors["image"][0].val_transforms)
+    assert len(matcher._matcher._query_processors["image"][0].train_processor.transforms) == len(train_transforms) + 2
+    assert len(matcher._matcher._query_processors["image"][0].val_processor.transforms) == len(val_transforms) + 2

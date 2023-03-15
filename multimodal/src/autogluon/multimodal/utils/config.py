@@ -1,7 +1,7 @@
 import copy
-import json
 import logging
 import os
+import re
 import warnings
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
@@ -280,7 +280,8 @@ def customize_model_names(
     """
     Customize attribute names of `config` with the provided names.
     A valid customized name string should start with one available name
-    string in `config`.
+    string in `config`. Customizing the model names in advanced_hyperparameters
+    is only used for matcher query and response models currently.
 
     Parameters
     ----------
@@ -293,6 +294,8 @@ def customize_model_names(
         the corresponding attribute names. For example, if `customized_names` is
         ["timm_image_123", "hf_text_abc"], then `config.timm_image` and `config.hf_text`
         are changed to `config.timm_image_123` and `config.hf_text_abc`.
+    advanced_hyperparameters
+        The hyperparameters whose values are compelx objects, which can't be stored in config.
 
     Returns
     -------
@@ -647,6 +650,8 @@ def update_hyperparameters(
 ):
     """
     Update preset hyperparameters hyperparameter_tune_kwargs by the provided.
+    Currently, this is mainly used for HPO presets, which define some searchable hyperparameters.
+    We need to combine these searchable hyperparameters with ones provided by users.
 
     Parameters
     ----------
@@ -675,7 +680,7 @@ def update_hyperparameters(
     if hyperparameter_tune_kwargs:
         if provided_hyperparameters:
             hyperparameters.update(provided_hyperparameters)
-    else:  # use the provided hyperparameters if no hpo.
+    else:  # use the provided hyperparameters if no hpo. The preset hyperparameters will be also used later in get_config.
         hyperparameters = provided_hyperparameters
 
     if hyperparameter_tune_kwargs:
@@ -794,10 +799,7 @@ def split_hyperparameters(hyperparameters: Dict):
 
     advanced_hyperparameters = dict()
     for k, v in hyperparameters.items():
-        if k in [
-            "model.timm_image.train_transforms",  # here we can use `timm_image` without worrying about its variants because this happens before getting the config.
-            "model.timm_image.val_transforms",
-        ]:
+        if re.search("^model.*train_transforms$", k) or re.search("^model.*val_transforms$", k):
             if all([isinstance(trans, str) for trans in hyperparameters[k]]):
                 pass
             elif all([isinstance(trans, Callable) for trans in hyperparameters[k]]):

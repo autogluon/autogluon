@@ -5,6 +5,7 @@ import pytest
 from omegaconf import OmegaConf
 from ray import tune
 from sklearn.preprocessing import LabelEncoder
+from torchvision import transforms
 from transformers import AutoTokenizer
 
 from autogluon.multimodal.constants import (
@@ -31,6 +32,7 @@ from autogluon.multimodal.utils import (
     is_url,
     merge_bio_format,
     parse_dotlist_conf,
+    split_hyperparameters,
     try_to_infer_pos_label,
     visualize_ner,
 )
@@ -408,3 +410,30 @@ def test_filter_hyperparameters(hyperparameters, column_types, model_in_config, 
         )
 
         assert filtered_hyperparameters == result
+
+
+@pytest.mark.parametrize(
+    "train_transforms,val_transforms,empty_advanced_hyperparameters",
+    [
+        (
+            ["resize_shorter_side", "center_crop", "random_horizontal_flip", "color_jitter"],
+            ["resize_shorter_side", "center_crop"],
+            True,
+        ),
+        (
+            [transforms.RandomResizedCrop(224), transforms.RandomHorizontalFlip()],
+            [transforms.Resize(256), transforms.CenterCrop(224)],
+            False,
+        ),
+    ],
+)
+def test_split_hyperparameters(train_transforms, val_transforms, empty_advanced_hyperparameters):
+    hyperparameters = {
+        "model.timm_image.train_transforms": train_transforms,
+        "model.timm_image.val_transforms": val_transforms,
+    }
+    hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
+    if empty_advanced_hyperparameters:
+        assert not advanced_hyperparameters
+    else:
+        assert advanced_hyperparameters

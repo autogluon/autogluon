@@ -13,7 +13,7 @@ import sys
 import time
 import warnings
 from datetime import timedelta
-from typing import Callable, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
