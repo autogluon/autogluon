@@ -19,7 +19,7 @@ from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
-from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
+from autogluon.timeseries.models.multi_window.multi_window_model import MultiWindowModel
 from autogluon.timeseries.models.presets import contains_searchspace
 from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.warning_filters import disable_tqdm
@@ -336,6 +336,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         self.models = models
 
+    def get_model_oof_predictions(self, model_name: str) -> TimeSeriesDataFrame:
+        model_path = self.get_model_attribute(model=model_name, attribute="path")
+        model_type = self.get_model_attribute(model=model_name, attribute="type")
+        return model_type.load_oof_predictions(path=model_path)
+
     def _add_model(
         self,
         model: AbstractTimeSeriesModel,
@@ -478,8 +483,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
     ) -> List[str]:
-        """Fit and save the given model on given training and validation data and save the
-        trained model.
+        """Fit and save the given model on given training and validation data and save the trained model.
 
         Returns
         -------
@@ -495,17 +499,14 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
             model = self._train_single(train_data, model, val_data=val_data, time_limit=time_limit)
             fit_end_time = time.time()
-
-            val_score = model.score(val_data) if val_data is not None else None
-            model.val_score = val_score
-
-            pred_end_time = time.time()
-
             model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
-            if model.predict_time is None:
-                model.predict_time = None if val_score is None else (pred_end_time - fit_end_time)
 
-            self._log_scores_and_times(val_score, model.fit_time, model.predict_time)
+            if val_data is not None:
+                model.score_and_cache_oof(val_data)
+
+            self._log_scores_and_times(
+                val_score=model.val_score, fit_time=model.fit_time, predict_time=model.predict_time
+            )
 
             self.save_model(model=model)
         except (Exception, MemoryError) as err:
@@ -545,6 +546,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         time_limit: Optional[float] = None,
+        num_val_windows: int = 1,
     ) -> List[str]:
 
         logger.info(f"\nStarting training. Start time is {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -577,6 +579,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         model_names_trained = []
         for i, model in enumerate(models):
+            if num_val_windows >= 1:
+                assert (
+                    val_data is None
+                ), "val_data should not be passed to {self.__class__.__name__}._train_multi if num_val_windows >= 1"
+                model = MultiWindowModel(model_base=model, num_val_windows=num_val_windows)
+
             if hyperparameter_tune_kwargs is not None:
                 time_left = time_limit_model_split
 
@@ -644,6 +652,16 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 )
             else:
                 try:
+                    if val_data is None:
+                        # Stack validation data for all windows into a single dataframe
+                        val_data = pd.concat(
+                            [
+                                train_data.train_test_split(
+                                    self.prediction_length, window_idx, suffix=f"_fold_{window_idx}"
+                                )[1]
+                                for window_idx in range(num_val_windows)
+                            ]
+                        )
                     model_names_trained.append(
                         self.fit_ensemble(
                             val_data=val_data,
@@ -685,11 +703,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         model_preds = {}
         for model_name in model_names:
-            model: AbstractGluonTSModel = self.load_model(model_name=model_name)
-
-            # FIXME: This differs from predictions made to calc val_score for the models. Try to align.
-            #  Can either seed for deterministic results or cache the pred during val_score calc and reuse.
-            model_preds[model_name] = model.predict_for_scoring(data=val_data, quantile_levels=self.quantile_levels)
+            model_preds[model_name] = self.get_model_oof_predictions(model_name=model_name)
 
         time_start = time.time()
         ensemble = self.ensemble_model_type(
@@ -707,14 +721,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         time_end = time.time()
         ensemble.fit_time = time_end - time_start
 
-        evaluator = TimeSeriesEvaluator(
-            eval_metric=self.eval_metric,
-            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
-            prediction_length=self.prediction_length,
-            target_column=self.target,
-        )
-        forecasts = ensemble.predict({n: model_preds[n] for n in ensemble.model_names})
-        ensemble.val_score = evaluator(val_data, forecasts) * evaluator.coefficient
+        predictions = ensemble.predict({n: model_preds[n] for n in ensemble.model_names})
+        ensemble.val_score = self.score_with_predictions(val_data, predictions)
 
         predict_time = 0
         for m in ensemble.model_names:
@@ -746,21 +754,23 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             }
 
         if data is not None:
+            past_data, known_covariates = self.slice_data_for_scoring(data)
             logger.info(
                 "Additional data provided, testing on additional data. Resulting leaderboard "
                 "will be sorted according to test score (`score_test`)."
             )
+            # TODO: Cache predictions for all models using `model_pred_proba_dict` as in Tabular
             for model_name in model_names:
                 try:
-                    # TODO: time only prediction and not score for pred_time_val and pred_time_test
-                    time_start_test_score = time.time()
-                    model_info[model_name]["score_test"] = self.score(data, model_name)
-                    model_info[model_name]["pred_time_test"] = time.time() - time_start_test_score
+                    pred_start_time = time.time()
+                    predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model_name)
+                    model_info[model_name]["pred_time_test"] = time.time() - pred_start_time
+                    model_info[model_name]["score_test"] = self.score_with_predictions(data, predictions)
                 except Exception as e:  # noqa
                     logger.error(f"Cannot score with model {model_name}. An error occurred: {str(e)}")
                     logger.debug(traceback.format_exc())
-                    model_info[model_name]["score_test"] = float("nan")
                     model_info[model_name]["pred_time_test"] = float("nan")
+                    model_info[model_name]["score_test"] = float("nan")
 
         df = pd.DataFrame(model_info.values())
 
@@ -823,6 +833,34 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 logger.info(f"\tYou can call predict(data, model) with one of other available models: {other_models}")
             return None
 
+    def slice_data_for_scoring(
+        self, data: TimeSeriesDataFrame
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        """Prepare model inputs necessary to predict the last `prediction_length` timesteps of each time series."""
+        past_data = data.slice_by_timestep(None, -self.prediction_length)
+        if len(self.metadata.known_covariates_real) > 0:
+            future_data = data.slice_by_timestep(-self.prediction_length, None)
+            known_covariates = future_data[self.metadata.known_covariates_real]
+        else:
+            known_covariates = None
+        return past_data, known_covariates
+
+    def score_with_predictions(
+        self,
+        data: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        metric: Optional[str] = None,
+    ) -> float:
+        """Compute the score measuring how well the predictions align with the data."""
+        eval_metric = self.eval_metric if metric is None else metric
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=eval_metric,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
+        )
+        return evaluator(data, predictions) * evaluator.coefficient
+
     def score(
         self,
         data: TimeSeriesDataFrame,
@@ -830,31 +868,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         metric: Optional[str] = None,
     ) -> float:
         model = self._get_model_for_prediction(model)
-        eval_metric = self.eval_metric if metric is None else metric
-
-        if isinstance(model, AbstractTimeSeriesEnsembleModel):
-            evaluator = TimeSeriesEvaluator(
-                eval_metric=eval_metric,
-                eval_metric_seasonal_period=self.eval_metric_seasonal_period,
-                prediction_length=self.prediction_length,
-                target_column=self.target,
-            )
-            model_preds = {}
-            base_models = self.get_minimum_model_set(model, include_self=False)
-            for base_model in base_models:
-                try:
-                    base_model_loaded = self._get_model_for_prediction(base_model)
-                    model_preds[base_model] = base_model_loaded.predict_for_scoring(
-                        data, quantile_levels=self.quantile_levels
-                    )
-                except Exception:
-                    model_preds[base_model] = None
-            forecasts = model.predict(model_preds)
-
-            model_score = evaluator(data, forecasts) * evaluator.coefficient
-            return model_score
-
-        return model.score(data, metric=eval_metric)
+        past_data, known_covariates = self.slice_data_for_scoring(data)
+        predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model)
+        return self.score_with_predictions(data=data, predictions=predictions, metric=metric)
 
     def _predict_model(
         self,

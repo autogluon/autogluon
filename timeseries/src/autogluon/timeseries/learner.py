@@ -80,6 +80,7 @@ class TimeSeriesLearner(AbstractLearner):
         hyperparameters: Union[str, Dict] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         time_limit: Optional[int] = None,
+        num_val_windows: int = 1,
         **kwargs,
     ) -> None:
         self._time_limit = time_limit
@@ -101,15 +102,15 @@ class TimeSeriesLearner(AbstractLearner):
         if val_data is not None:
             val_data = self.feature_generator.transform(val_data, data_frame_name="tuning_data")
 
-        # Train / validation split
-        if val_data is None:
-            logger.warning(
-                "tuning_data is None. "
-                + self.validation_splitter.describe_validation_strategy(prediction_length=self.prediction_length)
-            )
-            train_data, val_data = self.validation_splitter.split(
-                ts_dataframe=train_data, prediction_length=self.prediction_length
-            )
+        # # Train / validation split
+        # if val_data is None:
+        #     logger.warning(
+        #         "tuning_data is None. "
+        #         + self.validation_splitter.describe_validation_strategy(prediction_length=self.prediction_length)
+        #     )
+        #     train_data, val_data = self.validation_splitter.split(
+        #         ts_dataframe=train_data, prediction_length=self.prediction_length
+        #     )
 
         trainer_init_kwargs = kwargs.copy()
         trainer_init_kwargs.update(
@@ -135,6 +136,7 @@ class TimeSeriesLearner(AbstractLearner):
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             time_limit=time_limit,
+            num_val_windows=num_val_windows,
         )
         self.save_trainer(trainer=self.trainer)
 

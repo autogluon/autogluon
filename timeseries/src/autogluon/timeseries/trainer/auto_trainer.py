@@ -35,6 +35,7 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         time_limit: float = None,
+        num_val_windows: int = 1,
     ):
         """
         Fit a set of timeseries models specified by the `hyperparameters`
@@ -61,4 +62,5 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             time_limit=time_limit,
+            num_val_windows=num_val_windows,
         )

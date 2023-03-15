@@ -269,6 +269,7 @@ class TimeSeriesPredictor:
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         enable_ensemble: bool = True,
         random_seed: Optional[int] = None,
+        num_val_windows: int = 1,
         **kwargs,
     ) -> "TimeSeriesPredictor":
         """Fit probabilistic forecasting models to the given time series dataset.
@@ -439,13 +440,6 @@ class TimeSeriesPredictor:
         train_data = self._check_and_prepare_data_frame(train_data)
         tuning_data = self._check_and_prepare_data_frame(tuning_data)
 
-        if (train_data.num_timesteps_per_item() <= 2 * self.prediction_length).any():
-            warnings.warn(
-                "Detected short time series in train_data. "
-                "For best performance, all training time series should have length >= 2 * prediction_length + 1"
-                f"(at least {2 * self.prediction_length + 1})."
-            )
-
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity)
 
@@ -458,6 +452,7 @@ class TimeSeriesPredictor:
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             enable_ensemble=enable_ensemble,
             random_seed=random_seed,
+            num_val_windows=num_val_windows,
             **kwargs,
         )
         logger.info("================ TimeSeriesPredictor ================")
@@ -474,8 +469,25 @@ class TimeSeriesPredictor:
             logger.info(
                 f"Provided tuning data set with {len(tuning_data)} rows, {tuning_data.num_items} items. "
                 f"Average time series length is {len(tuning_data) / tuning_data.num_items:.1f}."
+                f"Multi-window backtesting is disabled (setting num_val_windows = 0)"
             )
-        logger.info(f"Training artifacts will be saved to: {Path(self.path).resolve()}")
+            num_val_windows = 0
+
+        max_num_train_test_splits = train_data.max_num_train_test_splits(self.prediction_length)
+        if num_val_windows > max_num_train_test_splits:
+            if max_num_train_test_splits == 0:
+                raise ValueError(
+                    "All time series in train_data should have length at least > 2 * prediction_length "
+                    f"(at least {2 * self.prediction_length + 1}). "
+                    "Please reduce prediction_length or provide longer time series as train_data."
+                )
+            else:
+                logger.info(
+                    f"\nTime series in train_data are too short for the given num_val_windows = {num_val_windows}. "
+                    f"Setting num_val_windows = {max_num_train_test_splits}"
+                )
+                num_val_windows = max_num_train_test_splits
+
         logger.info("=====================================================")
 
         if random_seed is not None:
@@ -490,6 +502,7 @@ class TimeSeriesPredictor:
             time_limit=time_left,
             verbosity=verbosity,
             enable_ensemble=enable_ensemble,
+            num_val_windows=num_val_windows,
         )
 
         self.save()

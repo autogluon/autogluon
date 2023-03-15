@@ -4,7 +4,7 @@ import copy
 import itertools
 import warnings
 from collections.abc import Iterable
-from typing import Any, Optional, Tuple, Type
+from typing import Any, Optional, Tuple, Type, Union, List
 
 import numpy as np
 import pandas as pd
@@ -788,3 +788,35 @@ class TimeSeriesDataFrame(pd.DataFrame):
         # (used inside dropna) is not supported for TimeSeriesDataFrame
         dropped_df = pd.DataFrame(self).dropna(how=how)
         return TimeSeriesDataFrame(dropped_df, static_features=self.static_features)
+
+    def train_test_split(
+        self,
+        prediction_length: int,
+        window_idx: int = 0,
+        suffix: Optional[str] = None,
+    ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
+        data = self.copy(deep=False)
+        if suffix is not None:
+            new_item_id = data.index.levels[0].astype(str) + suffix
+            data.index = data.index.set_levels(levels=new_item_id, level=0)
+
+        if window_idx >= self.max_num_train_test_splits(prediction_length):
+            raise ValueError("Time series in the dataset are too short for the chosen split.")
+
+        train_end_idx = -(window_idx + 1) * prediction_length
+        train_data = data.slice_by_timestep(None, train_end_idx)
+        test_end_idx = None if window_idx == 0 else -window_idx * prediction_length
+        test_data = data.slice_by_timestep(None, test_end_idx)
+        return train_data, test_data
+
+    def max_num_train_test_splits(self, prediction_length: int) -> int:
+        """Maximum number of train/test splits that can be made with given ``prediction_length``.
+
+        This is the highest integer such that after the split all training series have length of at least
+        ``prediction_length``.
+        """
+        shortest_ts_length = self.num_timesteps_per_item().min()
+        if shortest_ts_length < prediction_length + 3:
+            return 0
+        else:
+            return int(shortest_ts_length / prediction_length)
