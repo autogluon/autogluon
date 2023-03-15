@@ -259,7 +259,7 @@ def quick_fit(
     sample: Union[None, int, float] = None,
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
-    save_model_to_state: bool = False,
+    save_model_to_state: bool = True,
     verbosity: int = 0,
     show_feature_importance_barplots: bool = False,
     estimator_args: Optional[Dict[str, Dict[str, Any]]] = None,
