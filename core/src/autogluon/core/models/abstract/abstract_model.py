@@ -1544,13 +1544,16 @@ class AbstractModel:
         max_memory_usage_error_ratio = mem_error_threshold * max_memory_usage_ratio
         max_memory_usage_warning_ratio = mem_warning_threshold * max_memory_usage_ratio
 
-        log_user_guideline = f'Roughly requires {round(approx_mem_size_req / 1e9, 3)} GB, ' \
-                             f'but only {round(available_mem / 1e9, 3)} GB is available... ' \
-                             f'({round(max_memory_usage_error_ratio*100, 3)}% of avail memory is the max safe size ' \
-                             f'compared to estimated size {round(min_error_memory_ratio*100, 3)}%)'
+        log_ag_args_fit_example = '`predictor.fit(..., ag_args_fit={"ag.max_memory_usage_ratio": VALUE})`'
+        log_ag_args_fit_example = f'\n\t\tTo set the same value for all models, do the following when calling predictor.fit: {log_ag_args_fit_example}'
+
+        log_user_guideline = f'Estimated to require {round(approx_mem_size_req / 1e9, 3)} GB ' \
+                             f'out of {round(available_mem / 1e9, 3)} GB available memory ({round(min_error_memory_ratio*100, 3)}%)... ' \
+                             f'({round(max_memory_usage_error_ratio*100, 3)}% of avail memory is the max safe size)'
         if min_error_memory_ratio > max_memory_usage_error_ratio:
             log_user_guideline += f'\n\tTo force training the model, specify the model hyperparameter "ag.max_memory_usage_ratio" to a larger value ' \
-                                  f'(currently {max_memory_usage_ratio}, set to >{round(min_error_memory_ratio + 0.05, 2)} to avoid the error)'
+                                  f'(currently {max_memory_usage_ratio}, set to >={round(min_error_memory_ratio + 0.05, 2)} to avoid the error)' \
+                                  f'{log_ag_args_fit_example}'
             if min_error_memory_ratio >= 1:
                 log_user_guideline += f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. ' \
                                       f'You may consider using a machine with more memory as a safer alternative.'
@@ -1558,7 +1561,8 @@ class AbstractModel:
             raise NotEnoughMemoryError
         elif min_warning_memory_ratio > max_memory_usage_warning_ratio:
             log_user_guideline += f'\n\tTo avoid this warning, specify the model hyperparameter "ag.max_memory_usage_ratio" to a larger value ' \
-                                  f'(currently {max_memory_usage_ratio}, set to >{round(min_warning_memory_ratio + 0.05, 2)} to avoid the warning)'
+                                  f'(currently {max_memory_usage_ratio}, set to >={round(min_warning_memory_ratio + 0.05, 2)} to avoid the warning)' \
+                                  f'{log_ag_args_fit_example}'
             if min_warning_memory_ratio >= 1:
                 log_user_guideline += f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. ' \
                                       f'You may consider using a machine with more memory as a safer alternative.'
