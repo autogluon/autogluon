@@ -101,17 +101,17 @@ class _YellowbrickAutoGluonWrapper(ContribEstimator):
     _estimator_type = REGRESSOR
 
     def score(self, y_pred, y_true, **kwargs):
-        # note: it's this is not conventional use of API: we pass y_pred since we already have predictions done
+        # note: this is not conventional use of API: we pass y_pred since we already have predictions done
         return self.estimator.evaluate_predictions(y_pred, y_true)["r2"]
 
     def predict(self, y_pred, **kwargs):
-        # note: it's this is not conventional use of API: we pass y_pred since we already have predictions done
+        # note: this is not conventional use of API: we pass y_pred since we already have predictions done
         return y_pred
 
 
 class RegressionEvaluation(AbstractVisualization, JupyterMixin):
     """
-    The residuals plot shows the difference between residuals on the vertical axis and the dependent variable on
+    This plot shows residuals on the vertical axis vs prediction on horizontal axis.
 
     This visualization depends on :py:class:`~autogluon.eda.analysis.model.AutoGluonModelEvaluator` analysis.
 
