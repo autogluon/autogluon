@@ -72,6 +72,8 @@ def test_RegressionEvaluation(monkeypatch):
         {
             "model_evaluation": {
                 "problem_type": "regression",
+                "y_true_train": pd.Series([0, 1, 0, 0]),
+                "y_pred_train": pd.Series([1, 0, 1, 1]),
                 "y_true": pd.Series([0, 1, 0, 1]),
                 "y_pred": pd.Series([1, 0, 1, 0]),
             }
@@ -80,18 +82,29 @@ def test_RegressionEvaluation(monkeypatch):
 
     call_plt_subplots = MagicMock(return_value=("fig", "ax"))
     call_plt_show = MagicMock()
-    call_sns_regplot = MagicMock()
+    call_residuals_plot = MagicMock()
     call_render_markdown = MagicMock()
     with monkeypatch.context() as m:
         m.setattr(plt, "subplots", call_plt_subplots)
         m.setattr(plt, "show", call_plt_show)
-        m.setattr(sns, "regplot", call_sns_regplot)
+        m.setattr("autogluon.eda.visualization.model.residuals_plot", call_residuals_plot)
         viz = RegressionEvaluation(headers=True, fig_args=dict(a=1, b=2), some_kwarg=123)
+        viz.residuals_plot = call_residuals_plot
         viz.render_markdown = call_render_markdown
         viz.render(state)
     call_plt_subplots.assert_called_with(a=1, b=2)
     call_plt_show.assert_called_with("fig")
-    call_sns_regplot.assert_called_with(ax="ax", data=ANY, x="y_true", y="y_pred", label="validation", some_kwarg=123)
+    call_residuals_plot.assert_called_with(
+        ANY,
+        state.model_evaluation.y_pred_train,
+        state.model_evaluation.y_true_train,
+        state.model_evaluation.y_pred,
+        state.model_evaluation.y_true,
+        show=False,
+        ax="ax",
+        hist=False,
+        qqplot=True,
+    )
     call_render_markdown.assert_called_with("**Prediction vs Target**")
 
 

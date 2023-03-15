@@ -295,6 +295,8 @@ def quick_fit(
     ----------
     train_data: DataFrame
         training dataset
+    test_data: DataFrame
+        test dataset
     label: str
         target variable
     path: Optional[str], default = None,
@@ -390,7 +392,7 @@ def quick_fit(
             ),
             RegressionEvaluation(
                 fig_args=fig_args.get("regression_eval", {}),
-                **chart_args.get("regression_eval", dict(marker="o", scatter_kws={"s": 5})),
+                **chart_args.get("regression_eval", {}),
             ),
             MarkdownSectionComponent(markdown="### Model Leaderboard"),
             ModelLeaderboard(),
