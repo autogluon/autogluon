@@ -200,8 +200,7 @@ class AbstractModel:
                         logger.warning(f'Warning: {cls.__name__} hyperparameter "{k}" is present '
                                        f'in `ag_args_fit` as both "{k}" and "{k_no_prefix}". '
                                        f'Will use "{k}" and ignore "{k_no_prefix}".')
-                    params_aux[k_no_prefix] = params_aux[k]
-                    params_aux.pop(k)
+                    params_aux[k_no_prefix] = params_aux.pop(k)
             param_keys = list(params.keys())
             for k in param_keys:
                 if isinstance(k, str) and k.startswith(ag_arg_prefix):
@@ -210,8 +209,7 @@ class AbstractModel:
                         logger.warning(f'Warning: {cls.__name__} hyperparameter "{k}" is present '
                                        f'in both `ag_args_fit` and `hyperparameters`. '
                                        f'Will use `hyperparameters` value.')
-                    params_aux[k_no_prefix] = params[k]
-                    params.pop(k)
+                    params_aux[k_no_prefix] = params.pop(k)
         return params, params_aux
 
     def _init_params(self):
