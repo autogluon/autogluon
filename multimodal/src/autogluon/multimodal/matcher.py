@@ -647,7 +647,7 @@ class MultiModalMatcher:
         if self._query_config is None:
             query_config = copy.deepcopy(config)
             # customize config model names to make them consistent with model prefixes.
-            query_config.model = customize_model_names(
+            query_config.model, _ = customize_model_names(
                 config=query_config.model, customized_names=[f"{n}_{QUERY}" for n in query_config.model.names]
             )
         else:
@@ -656,7 +656,7 @@ class MultiModalMatcher:
         if self._response_config is None:
             response_config = copy.deepcopy(config)
             # customize config model names to make them consistent with model prefixes.
-            response_config.model = customize_model_names(
+            response_config.model, _ = customize_model_names(
                 config=response_config.model,
                 customized_names=[f"{n}_{RESPONSE}" for n in response_config.model.names],
             )

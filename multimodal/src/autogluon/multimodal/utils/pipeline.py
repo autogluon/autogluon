@@ -3,7 +3,7 @@ import logging
 from typing import Dict, List, Optional, Tuple, Union
 
 from ..constants import AUTOMM, QUERY, RESPONSE
-from .config import customize_model_names, get_config
+from .config import customize_model_names, get_config, split_hyperparameters
 from .data import create_fusion_data_processors
 from .matcher import create_siamese_model
 from .model import create_fusion_model
@@ -88,6 +88,9 @@ def init_pretrained_matcher(
     response_processors
         The data processors associated with the response model.
     """
+    # split out the hyperparameters whose values are complex objects
+    hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
+
     config = get_config(
         problem_type=pipeline,
         presets=presets,
@@ -100,15 +103,18 @@ def init_pretrained_matcher(
 
     query_config = copy.deepcopy(config)
     # customize config model names to make them consistent with model prefixes.
-    query_config.model = customize_model_names(
-        config=query_config.model, customized_names=[f"{n}_{QUERY}" for n in query_config.model.names]
+    query_config.model, query_advanced_hyperparameters = customize_model_names(
+        config=query_config.model,
+        customized_names=[f"{n}_{QUERY}" for n in query_config.model.names],
+        advanced_hyperparameters=advanced_hyperparameters,
     )
 
     response_config = copy.deepcopy(config)
     # customize config model names to make them consistent with model prefixes.
-    response_config.model = customize_model_names(
+    response_config.model, response_advanced_hyperparameters = customize_model_names(
         config=response_config.model,
         customized_names=[f"{n}_{RESPONSE}" for n in response_config.model.names],
+        advanced_hyperparameters=advanced_hyperparameters,
     )
 
     query_model, response_model = create_siamese_model(
@@ -121,6 +127,7 @@ def init_pretrained_matcher(
         config=query_config,
         requires_label=False,
         requires_data=True,
+        advanced_hyperparameters=query_advanced_hyperparameters,
     )
 
     response_processors = create_fusion_data_processors(
@@ -128,6 +135,7 @@ def init_pretrained_matcher(
         config=response_config,
         requires_label=False,
         requires_data=True,
+        advanced_hyperparameters=response_advanced_hyperparameters,
     )
 
     return config, query_config, response_config, query_model, response_model, query_processors, response_processors

@@ -1,9 +1,9 @@
 import copy
-import json
 import logging
 import os
+import re
 import warnings
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from omegaconf import DictConfig, OmegaConf
 from packaging import version
@@ -200,7 +200,7 @@ def get_config(
         overrides = copy.deepcopy(overrides)
         # apply customized model names
         overrides = parse_dotlist_conf(overrides)  # convert to a dict
-        config.model = customize_model_names(
+        config.model, _ = customize_model_names(
             config=config.model,
             customized_names=overrides.get("model.names", None),
         )
@@ -275,11 +275,13 @@ def get_name_prefix(
 def customize_model_names(
     config: DictConfig,
     customized_names: Union[str, List[str]],
+    advanced_hyperparameters: Optional[Dict] = None,
 ):
     """
     Customize attribute names of `config` with the provided names.
     A valid customized name string should start with one available name
-    string in `config`.
+    string in `config`. Customizing the model names in advanced_hyperparameters
+    is only used for matcher query and response models currently.
 
     Parameters
     ----------
@@ -292,16 +294,23 @@ def customize_model_names(
         the corresponding attribute names. For example, if `customized_names` is
         ["timm_image_123", "hf_text_abc"], then `config.timm_image` and `config.hf_text`
         are changed to `config.timm_image_123` and `config.hf_text_abc`.
+    advanced_hyperparameters
+        The hyperparameters whose values are compelx objects, which can't be stored in config.
 
     Returns
     -------
         A new config with its first-level attributes customized by the provided names.
     """
     if not customized_names:
-        return config
+        return config, advanced_hyperparameters
 
     if isinstance(customized_names, str):
         customized_names = OmegaConf.from_dotlist([f"names={customized_names}"]).names
+
+    if advanced_hyperparameters:
+        new_advanced_hyperparameters = copy.deepcopy(advanced_hyperparameters)
+    else:
+        new_advanced_hyperparameters = dict()
 
     new_config = OmegaConf.create()
     new_config.names = []
@@ -316,6 +325,13 @@ def customize_model_names(
             per_config = getattr(config, per_prefix)
             setattr(new_config, per_name, copy.deepcopy(per_config))
             new_config.names.append(per_name)
+
+            if advanced_hyperparameters:
+                for k, v in advanced_hyperparameters.items():
+                    if k.startswith(f"{MODEL}.{per_prefix}"):
+                        new_k = k.replace(f"{MODEL}.{per_prefix}", f"{MODEL}.{per_name}")
+                        new_advanced_hyperparameters.pop(k)
+                        new_advanced_hyperparameters[new_k] = v
         else:
             logger.debug(f"Removing {per_name}, which doesn't start with any of these prefixes: {available_prefixes}.")
 
@@ -324,7 +340,7 @@ def customize_model_names(
             f"No customized name in `{customized_names}` starts with name prefixes in `{available_prefixes}`."
         )
 
-    return new_config
+    return new_config, new_advanced_hyperparameters
 
 
 def save_pretrained_model_configs(
@@ -634,6 +650,8 @@ def update_hyperparameters(
 ):
     """
     Update preset hyperparameters hyperparameter_tune_kwargs by the provided.
+    Currently, this is mainly used for HPO presets, which define some searchable hyperparameters.
+    We need to combine these searchable hyperparameters with ones provided by users.
 
     Parameters
     ----------
@@ -662,7 +680,7 @@ def update_hyperparameters(
     if hyperparameter_tune_kwargs:
         if provided_hyperparameters:
             hyperparameters.update(provided_hyperparameters)
-    else:  # use the provided hyperparameters if no hpo.
+    else:  # use the provided hyperparameters if no hpo. The preset hyperparameters will be also used later in get_config.
         hyperparameters = provided_hyperparameters
 
     if hyperparameter_tune_kwargs:
@@ -761,3 +779,33 @@ def filter_hyperparameters(
         hyperparameters = {k: v for k, v in hyperparameters.items() if not k.startswith(key)}
 
     return hyperparameters
+
+
+def split_hyperparameters(hyperparameters: Dict):
+    """
+    Split out some advanced hyperparameters whose values are complex objects instead of strings or numbers.
+
+    Parameters
+    ----------
+    hyperparameters
+        The user provided hyperparameters.
+
+    Returns
+    -------
+    Hyperparameters and advanced hyperparameters.
+    """
+    if not hyperparameters:
+        return dict(), dict()
+
+    advanced_hyperparameters = dict()
+    for k, v in hyperparameters.items():
+        if re.search("^model.*train_transforms$", k) or re.search("^model.*val_transforms$", k):
+            if all([isinstance(trans, str) for trans in hyperparameters[k]]):
+                pass
+            elif all([isinstance(trans, Callable) for trans in hyperparameters[k]]):
+                advanced_hyperparameters[k] = copy.deepcopy(v)
+                hyperparameters[k] = str(v)  # get the objects' class strings
+            else:
+                raise ValueError(f"transform_types {v} contain neither all strings nor all callable objects.")
+
+    return hyperparameters, advanced_hyperparameters
