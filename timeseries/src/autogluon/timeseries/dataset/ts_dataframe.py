@@ -795,28 +795,36 @@ class TimeSeriesDataFrame(pd.DataFrame):
         window_idx: int = 0,
         suffix: Optional[str] = None,
     ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
+        """Generate a train/test split from the given dataset.
+
+        This method can be used to easily generate splits for multi-window backtesting.
+
+        Parameters
+        ----------
+        prediction_length : int
+            Number of time steps in a single evaluation window.
+        window_idx : int
+            Index of the backtesting window, starting from the end of each time series. For example, 0 corresponds to
+            reserving the last ``prediction_length`` time steps for evaluation.
+        suffix : str, optional
+            Suffix appended to all entries in the ``item_id`` index level.
+
+        Returns
+        -------
+        train_data : TimeSeriesDataFrame
+            Train portion of the data. The last ``(window_idx + 1) * prediction_length`` entries are removed from each
+            time series in the original dataset.
+        test_data : TimeSeriesDataFrame
+            Test portion of the data. The last ``window_idx * prediction_length`` entries are removed from each time
+            series in the original dataset.
+        """
         data = self.copy(deep=False)
         if suffix is not None:
             new_item_id = data.index.levels[0].astype(str) + suffix
             data.index = data.index.set_levels(levels=new_item_id, level=0)
-
-        if window_idx >= self.max_num_train_test_splits(prediction_length):
-            raise ValueError("Time series in the dataset are too short for the chosen split.")
 
         train_end_idx = -(window_idx + 1) * prediction_length
         train_data = data.slice_by_timestep(None, train_end_idx)
         test_end_idx = None if window_idx == 0 else -window_idx * prediction_length
         test_data = data.slice_by_timestep(None, test_end_idx)
         return train_data, test_data
-
-    def max_num_train_test_splits(self, prediction_length: int) -> int:
-        """Maximum number of train/test splits that can be made with given ``prediction_length``.
-
-        This is the highest integer such that after the split all training series have length of at least
-        ``prediction_length``.
-        """
-        shortest_ts_length = self.num_timesteps_per_item().min()
-        if shortest_ts_length < prediction_length + 3:
-            return 0
-        else:
-            return int(shortest_ts_length / prediction_length)
