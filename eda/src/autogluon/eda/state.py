@@ -1,8 +1,8 @@
 import logging
 
-__all__ = ["AnalysisState", "StateCheckMixin"]
+__all__ = ["AnalysisState", "StateCheckMixin", "is_key_present_in_state", "expand_nested_args_into_nested_maps"]
 
-from typing import Any
+from typing import Any, Dict
 
 
 class AnalysisState(dict):
@@ -87,10 +87,54 @@ class StateCheckMixin:
         return can_handle
 
 
-def is_key_present_in_state(state, key):
+def is_key_present_in_state(state: AnalysisState, key: str):
+    """
+    Check if the nested key represented with dot notation (`a.b.c`) is present in the state
+    Parameters
+    ----------
+    state: AnalysisState
+        state to check the key in
+    key: str
+        the key to check for presence
+
+
+    Returns
+    -------
+    `True` if the key is present
+
+    """
     path = state
     for p in key.split("."):
         if p not in path:
             return False
         path = path[p]
     return True
+
+
+def expand_nested_args_into_nested_maps(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Expands flat args with nested keys in dot notation into nested map (`{a.b.c: value} -> {'a': {'b': {'c': value}}}`)
+
+    Parameters
+    ----------
+    args: Dict[str, Any]
+        args to expand
+
+    Returns
+    -------
+    nested expanded map
+
+    """
+    result: Dict[str, Any] = {}
+    for k, v in args.items():
+        sub_keys = k.split(".")
+        curr_pointer = result
+        if len(sub_keys) > 1:
+            for subkey in sub_keys[:-1]:
+                if subkey not in curr_pointer:
+                    curr_pointer[subkey] = {}
+                curr_pointer = curr_pointer[subkey]
+        if type(curr_pointer) is not dict:
+            raise ValueError(f"{k} canot be added - the key is already present")
+        curr_pointer[sub_keys[-1]] = v
+    return result

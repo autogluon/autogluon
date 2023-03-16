@@ -30,7 +30,7 @@ from ..analysis.dataset import (
     VariableTypeAnalysis,
 )
 from ..analysis.interaction import FeatureDistanceAnalysis
-from ..state import is_key_present_in_state
+from ..state import expand_nested_args_into_nested_maps, is_key_present_in_state
 from ..utils.defaults import QuickFitDefaults
 from ..visualization import (
     ConfusionMatrix,
@@ -290,7 +290,6 @@ def quick_fit(
         - regression_eval - regression predictor results chart
         - feature_importance - feature importance barplot chart
 
-
     Parameters
     ----------
     train_data: DataFrame
@@ -328,11 +327,13 @@ def quick_fit(
     estimator_args: Optional[Dict[str, Dict[str, Any]]], default = None,
         args to pass into the estimator constructor
     fit_args: Optional[Dict[str, Dict[str, Any]]], default = None,
-        kwargs to pass into `TabularPredictor` fit
+        kwargs to pass into `TabularPredictor` fit.
     fig_args: Optional[Dict[str, Any]], default = None,
-        figures args for vizualizations; key == component; value = dict of kwargs for component figure
+        figures args for vizualizations; key == component; value = dict of kwargs for component figure. The args are supporting nested
+        dot syntax: 'a.b.c'.
     chart_args: Optional[Dict[str, Any]], default = None,
-        figures args for vizualizations; key == component; value = dict of kwargs for component chart
+        figures args for vizualizations; key == component; value = dict of kwargs for component chart. The args are supporting nested
+        dot syntax: 'a.b.c'.
     render_analysis: bool, default = True
         if `False`, then don't render any visualizations; this can be used if user just needs to train a model. It is recommended to use this option
         with `save_model_to_state=True` and `return_state=True` options.
@@ -349,6 +350,8 @@ def quick_fit(
     >>> state = auto.quick_fit(
     >>>     train_data=..., label=...,
     >>>     return_state=True,  # return state object from call
+    >>>     fig_args={"regression_eval.figsize": (8,6)},  # customize regression evaluation `figsize`
+    >>>     chart_args={"regression_eval.residuals_plot_mode": "hist"}  # customize regression evaluation `residuals_plot_mode`
     >>>     hyperparameters={'GBM': {}}  # train specific model
     >>> )
     >>>
@@ -370,8 +373,8 @@ def quick_fit(
     if not isinstance(state, AnalysisState):
         state = AnalysisState(state)
 
-    fig_args = get_empty_dict_if_none(fig_args)
-    chart_args = get_empty_dict_if_none(chart_args)
+    fig_args = expand_nested_args_into_nested_maps(get_empty_dict_if_none(fig_args))
+    chart_args = expand_nested_args_into_nested_maps(get_empty_dict_if_none(chart_args))
 
     estimator_args = get_empty_dict_if_none(estimator_args)
     fit_args = get_default_estimator_if_not_specified(fit_args)
@@ -464,7 +467,6 @@ def dataset_overview(
     Supported `fig_args`/`chart_args` keys:
         - feature_distance - feature distance dendrogram chart
 
-
     Parameters
     ----------
     train_data: Optional[DataFrame], default = None
@@ -495,8 +497,8 @@ def dataset_overview(
     >>>
     >>> auto.dataset_overview(
     >>>     train_data=df_train, test_data=df_test, label=target_col,
-    >>>     chart_args={'feature_distance': dict(orientation='left')},
-    >>>     fig_args={'feature_distance': dict(figsize=(6,6))},
+    >>>     chart_args={'feature_distance.orientation': 'left'},
+    >>>     fig_args={'feature_distance.figsize': (6,6)},
     >>> )
 
     See Also
@@ -510,8 +512,8 @@ def dataset_overview(
 
     """
 
-    fig_args = get_empty_dict_if_none(fig_args)
-    chart_args = get_empty_dict_if_none(chart_args)
+    fig_args = expand_nested_args_into_nested_maps(get_empty_dict_if_none(fig_args))
+    chart_args = expand_nested_args_into_nested_maps(get_empty_dict_if_none(chart_args))
 
     state = analyze(
         train_data=train_data,
@@ -572,6 +574,8 @@ def covariate_shift_detection(
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
     verbosity: int = 0,
+    fig_args: Optional[Dict[str, Any]] = None,
+    chart_args: Optional[Dict[str, Any]] = None,
     **fit_args,
 ):
     """
@@ -607,6 +611,14 @@ def covariate_shift_detection(
         where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
     fit_args
         kwargs to pass into `TabularPredictor` fit
+    fig_args: Optional[Dict[str, Any]], default = None,
+        figures args for vizualizations; key == component; value = dict of kwargs for component figure. The args are supporting nested
+        dot syntax: 'a.b.c'. Charts args are following the convention of `<variable_name>.<param>`
+        (i.e. `PassengerId.figsize` will result in setting `figsize` on `PassengerId` figure.
+    chart_args: Optional[Dict[str, Any]], default = None,
+        figures args for vizualizations; key == component; value = dict of kwargs for component chart. The args are supporting nested
+        dot syntax: 'a.b.c'. Charts args are following the convention of `<variable_name>.<param>`
+        (i.e. `PassengerId.fill` will result in setting `fill` on `PassengerId` chart.
 
     Returns
     -------
@@ -629,6 +641,8 @@ def covariate_shift_detection(
 
     """
     fit_args = get_default_estimator_if_not_specified(fit_args)
+    fig_args = expand_nested_args_into_nested_maps(get_empty_dict_if_none(fig_args))
+    chart_args = expand_nested_args_into_nested_maps(get_empty_dict_if_none(chart_args))
 
     state = analyze(
         train_data=train_data,
@@ -638,7 +652,9 @@ def covariate_shift_detection(
         state=state,
         return_state=True,
         anlz_facets=[
-            XShiftDetector(classifier_kwargs=dict(path=path, verbosity=verbosity), classifier_fit_kwargs=fit_args)
+            RawTypesAnalysis(),
+            VariableTypeAnalysis(),
+            XShiftDetector(classifier_kwargs=dict(path=path, verbosity=verbosity), classifier_fit_kwargs=fit_args),
         ],
         viz_facets=[XShiftSummary()],
     )
@@ -657,15 +673,24 @@ def covariate_shift_detection(
             df_all = pd.concat([_train_data, _test_data], ignore_index=True)
 
             for var in vars_to_plot:
-                pvalue = fi.loc[var]["p_value"]
-                analyze(
-                    viz_facets=[
-                        MarkdownSectionComponent(
-                            f"**`{var}` values distribution between datasets; p-value: `{pvalue:.4f}`**"
-                        )
-                    ]
-                )
-                analyze_interaction(train_data=df_all, state=state, x=var, hue="__dataset__")
+                if state.variable_type.train_data[var] != "category":  # type: ignore
+                    pvalue = fi.loc[var]["p_value"]
+                    analyze(
+                        viz_facets=[
+                            MarkdownSectionComponent(
+                                f"**`{var}` values distribution between datasets; p-value: `{pvalue:.4f}`**"
+                            )
+                        ]
+                    )
+
+                    analyze_interaction(
+                        train_data=df_all,
+                        state=state,
+                        x=var,
+                        hue="__dataset__",
+                        fig_args=fig_args.get(var, {}),
+                        chart_args=chart_args.get(var, {}),
+                    )
 
     return state if return_state else None
 
@@ -1007,7 +1032,7 @@ def explain_rows(
         viz_facets = [viz_cls(display_rows=display_rows, **kwargs)]
 
     return analyze(
-        train_data=train_data,
+        train_data=train_data[model.original_features],
         model=model,
         return_state=return_state,
         anlz_facets=[ShapAnalysis(rows, baseline_sample=baseline_sample)],  # type: ignore
