@@ -124,7 +124,7 @@ class ShapAnalysis(AbstractAnalysis):
                     row=_row,
                     expected_value=explainer.expected_value,
                     shap_values=ke_shap_values[0],
-                    features=row[args.train_data.columns],
+                    features=row[args.model.original_features],
                     feature_names=None,
                 )
             )
