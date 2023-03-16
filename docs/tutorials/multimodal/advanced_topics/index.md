@@ -46,6 +46,12 @@
   How to use focal loss in AutoMM.
 :::
 
+:::{grid-item-card} Faster Prediction with TensorRT
+  :link: tensorrt.html
+
+  How to use TensorRT in accelerating AutoMM model inference.
+:::
+
 ::::
 
 ```{toctree}
@@ -61,4 +67,5 @@ efficient_finetuning_basic
 few_shot_learning
 focal_loss
 presets
+tensorrt
 ```
