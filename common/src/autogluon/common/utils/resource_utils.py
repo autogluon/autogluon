@@ -127,7 +127,7 @@ class ResourceManager:
 
     
 class RayResourceManager:
-    """Manager that fetches ray cluster resources info."""
+    """Manager that fetches ray cluster resources info. This class should only be used within a ray cluster."""
 
     @staticmethod
     def _init_ray():

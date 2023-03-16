@@ -422,7 +422,6 @@ class BaggedEnsembleModel(AbstractModel):
             logger.warning(warning_msg)
             fold_fitting_strategy = 'sequential_local'
         assert fold_fitting_strategy in ['parallel_distributed', 'parallel_local', 'sequential_local']
-        print(fold_fitting_strategy)
         return fold_fitting_strategy
 
     def _fit_folds(self,
