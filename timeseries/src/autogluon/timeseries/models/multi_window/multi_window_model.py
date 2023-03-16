@@ -1,8 +1,9 @@
 import copy
+import inspect
 import logging
 import os
 import time
-from typing import Optional
+from typing import Dict, Optional, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -20,13 +21,22 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
     Parameters
     ----------
-    model_base : AbstractModel
-        The base model to repeatedly train.
+    model_base : Union[AbstractTimeSeriesModel, Type[AbstractTimeSeriesModel]]
+        The base model to repeatedly train. If a AbstractTimeSeriesModel class, then also provide model_base_kwargs
+        which will be used to initialize the model via model_base(**model_base_kwargs).
+    model_base_kwargs : Dict[str, any], default = None
+        kwargs used to initialize model_base if model_base is a class.
     num_val_windows : int, default = 1
         Number of windows to use for backtesting, starting from the end of the training data.
     """
 
-    def __init__(self, model_base: AbstractTimeSeriesModel, num_val_windows: int = 1, **kwargs):
+    def __init__(
+        self,
+        model_base: Union[AbstractTimeSeriesModel, Type[AbstractTimeSeriesModel]],
+        num_val_windows: int = 1,
+        model_base_kwargs: Optional[Dict[str, any]] = None,
+        **kwargs,
+    ):
         super().__init__(
             freq=model_base.freq,
             name=model_base.name,
@@ -36,6 +46,17 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             eval_metric=model_base.eval_metric,
             eval_metric_seasonal_period=model_base.eval_metric_seasonal_period,
         )
+        if inspect.isclass(model_base):
+            if model_base_kwargs is None:
+                model_base_kwargs = dict()
+            self.model_base: AbstractTimeSeriesModel = model_base(**model_base_kwargs)
+        elif model_base_kwargs is not None:
+            raise AssertionError(
+                f"model_base_kwargs must be None if model_base was passed as an object! "
+                f"(model_base: {model_base}, model_base_kwargs: {model_base_kwargs})"
+            )
+        else:
+            self.model_base: AbstractTimeSeriesModel = model_base
         self.model_base = model_base
         self.num_val_windows = num_val_windows
         self.most_recent_model: AbstractTimeSeriesModel = None

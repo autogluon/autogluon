@@ -167,28 +167,31 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self.num_past_feat_dynamic_real = 0
         self.feat_static_cat_cardinality: List[int] = []
 
-    def save(self, path: str = None, **kwargs) -> str:
-        if path is None:
-            path = self.path
-        path = Path(path)
-        path.mkdir(exist_ok=True)
-
+    def save(self, path: str = None, verbose: bool = True) -> str:
+        # The GluonTS predictor will be serialized using custom logic
         predictor = self.gts_predictor
         self.gts_predictor = None
+        path = Path(super().save(path=path, verbose=verbose))
 
         with disable_root_logger():
             if predictor:
                 Path.mkdir(path / self.gluonts_model_path, exist_ok=True)
                 predictor.serialize(path / self.gluonts_model_path)
 
-        save_pkl.save(path=str(path / self.model_file_name), object=self)
         self.gts_predictor = predictor
 
         return str(path)
 
     @classmethod
-    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "AbstractGluonTSModel":
-        model = super().load(path, reset_paths, verbose)
+    def load(
+        cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
+    ) -> "AbstractGluonTSModel":
+        model = super().load(
+            path=path,
+            reset_paths=reset_paths,
+            load_oof=load_oof,
+            verbose=verbose,
+        )
         model.gts_predictor = GluonTSPredictor.deserialize(Path(path) / cls.gluonts_model_path)
         return model
 
