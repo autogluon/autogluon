@@ -794,8 +794,11 @@ def split_hyperparameters(hyperparameters: Dict):
     -------
     Hyperparameters and advanced hyperparameters.
     """
+    if not isinstance(hyperparameters, dict):  # only support complex objects in dict.
+        return hyperparameters, dict()
+
     if not hyperparameters:
-        return dict(), dict()
+        return hyperparameters, dict()
 
     advanced_hyperparameters = dict()
     for k, v in hyperparameters.items():
