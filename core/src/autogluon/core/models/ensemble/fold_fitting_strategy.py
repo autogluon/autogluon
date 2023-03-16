@@ -389,6 +389,7 @@ def _ray_fit(
     fold_model.fit_time = time_train_end_fold - time_start_fold
     fold_model, pred_proba = _ray_predict_oof(fold_model, X_val_fold, y_val_fold,
                                               time_train_end_fold, resources['num_cpus'], save_bag_folds)
+    model_save_path = None
     if model_sync_path is not None:
         model_save_path = model_sync_path + f"{fold_model.name}/"
     fold_model.save(model_save_path)
