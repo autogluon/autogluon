@@ -83,7 +83,6 @@ from .data.datamodule import BaseDataModule
 from .data.infer_types import (
     infer_column_types,
     infer_label_column_type_by_problem_type,
-    infer_ner_column_type,
     infer_problem_type_output_shape,
     infer_rois_column_type,
     is_image_column,
@@ -710,9 +709,8 @@ class MultiModalPredictor(ExportMixin):
             valid_data=tuning_data,
             label_columns=self._label_column,
             provided_column_types=column_types,
+            problem_type=self._problem_type,
         )
-        if self._problem_type == NER:
-            column_types = infer_ner_column_type(column_types=column_types)
 
         column_types = infer_label_column_type_by_problem_type(
             column_types=column_types,

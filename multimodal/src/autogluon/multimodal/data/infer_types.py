@@ -462,6 +462,7 @@ def infer_column_types(
     allowable_column_types: Optional[List[str]] = None,
     fallback_column_type: Optional[str] = None,
     id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
+    problem_type: Optional[str] = None,
 ) -> Dict:
     """
     Infer the column types of a multimodal pd.DataFrame.
@@ -484,6 +485,8 @@ def infer_column_types(
     id_mappings
         Id-to-content mappings. The contents can be text, image, etc.
         This is used when the dataframe contains the query/response indexes instead of their contents.
+    problem_type
+        The problem type used to update some column types.
 
     Returns
     -------
@@ -560,6 +563,8 @@ def infer_column_types(
             allowable_column_types=allowable_column_types,
             fallback_column_type=fallback_column_type,
         )
+    if problem_type == NER:
+        column_types = infer_ner_column_type(column_types=column_types)
 
     return column_types
 
