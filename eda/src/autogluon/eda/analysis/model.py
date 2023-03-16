@@ -177,7 +177,8 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
         val_data = args.val_data
         problem_type = predictor.problem_type
         label = predictor.label
-        y_true_val, y_pred_val, highest_error, undecided = self._predict(problem_type, label, predictor, val_data)
+        y_true_train, y_pred_train, _, _ = self._predict(problem_type, predictor, args.train_data)
+        y_true_val, y_pred_val, highest_error, undecided = self._predict(problem_type, predictor, val_data)
         test_data = val_data
         test_data_present = args.test_data is not None and label in args.test_data.columns
 
@@ -185,9 +186,7 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
         y_pred_test = None
         if test_data_present:
             test_data = args.test_data
-            y_true_test, y_pred_test, highest_error, undecided = self._predict(
-                problem_type, label, predictor, test_data
-            )
+            y_true_test, y_pred_test, highest_error, undecided = self._predict(problem_type, predictor, test_data)
 
         importance = predictor.feature_importance(test_data.reset_index(drop=True), silent=True)
         leaderboard = predictor.leaderboard(test_data, silent=True)
@@ -198,6 +197,8 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
             "importance": importance,
             "leaderboard": leaderboard,
             "labels": labels,
+            "y_true_train": y_true_train,
+            "y_pred_train": y_pred_train,
         }
 
         if test_data_present:
@@ -221,7 +222,8 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
 
         state.model_evaluation = s
 
-    def _predict(self, problem_type, label, predictor, val_data):
+    def _predict(self, problem_type, predictor, val_data):
+        label = predictor.label
         y_true_val = val_data[label]
         y_pred_val = predictor.predict(val_data)
         highest_error = None

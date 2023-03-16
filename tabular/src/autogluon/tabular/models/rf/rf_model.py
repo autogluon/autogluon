@@ -131,13 +131,11 @@ class RFModel(AbstractModel):
         expected_min_memory_usage = bytes_per_estimator * n_estimators_minimum
         return expected_min_memory_usage
 
-    def _validate_fit_memory_usage(self, **kwargs):
-        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
-        available_mem = ResourceManager.get_available_virtual_mem()
-        expected_min_memory_usage = self.estimate_memory_usage(**kwargs) / available_mem
-        if expected_min_memory_usage > (0.5 * max_memory_usage_ratio):  # if minimum estimated size is greater than 50% memory
-            logger.warning(f'\tWarning: Model is expected to require {round(expected_min_memory_usage * 100, 2)}% of available memory (Estimated before training)...')
-            raise NotEnoughMemoryError
+    def _validate_fit_memory_usage(self, mem_error_threshold: float = 0.5, mem_warning_threshold: float = 0.4, mem_size_threshold: int = 1e7, **kwargs):
+        return super()._validate_fit_memory_usage(mem_error_threshold=mem_error_threshold,
+                                                  mem_warning_threshold=mem_warning_threshold,
+                                                  mem_size_threshold=mem_size_threshold,
+                                                  **kwargs)
 
     def _expected_mem_usage(self, n_estimators_final, bytes_per_estimator):
         available_mem = ResourceManager.get_available_virtual_mem()

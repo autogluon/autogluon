@@ -30,6 +30,7 @@ install_requires = [
     'seaborn>=0.12.0,<0.13',
     'ipywidgets>=7.7.1,<9.0',  # min versions guidance: 7.7.1 collab/kaggle
     'shap>=0.41,<0.42',
+    'yellowbrick>=1.5,<1.6',
     f'autogluon.core=={version}',
     f'autogluon.common=={version}',
     f'autogluon.features=={version}',
