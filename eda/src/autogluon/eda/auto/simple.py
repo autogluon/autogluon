@@ -286,9 +286,9 @@ def quick_fit(
         - samples with the least distance from the other class - candidates for labeling
 
     Supported `fig_args`/`chart_args` keys:
-        - confusion_matrix - confusion matrix chart for classification predictor
-        - regression_eval - regression predictor results chart
-        - feature_importance - feature importance barplot chart
+        - `confusion_matrix.<property>` - confusion matrix chart for classification predictor
+        - `regression_eval.<property>` - regression predictor results chart
+        - `feature_importance.<property> - feature importance barplot chart
 
     Parameters
     ----------
@@ -465,7 +465,8 @@ def dataset_overview(
     Shortcut to perform high-level datasets summary overview (counts, frequencies, missing statistics, types info).
 
     Supported `fig_args`/`chart_args` keys:
-        - feature_distance - feature distance dendrogram chart
+        - `feature_distance.<property>` - feature distance dendrogram chart
+        - `chart.<variable>.<property>` - near-duplicate groups visualizations chart. If chart is labeled as a relationship <A>/<B>, then <variable> is <B>
 
     Parameters
     ----------
@@ -551,7 +552,13 @@ def dataset_overview(
             for n in nodes[1:]:
                 if state.variable_type.train_data[n] != "category":  # type: ignore
                     interactions.append(MarkdownSectionComponent(f"Feature interaction between `{nodes[0]}`/`{n}`"))
-                    interactions.append(FeatureInteractionVisualization(key=f"{nodes[0]}:{n}"))
+                    interactions.append(
+                        FeatureInteractionVisualization(
+                            key=f"{nodes[0]}:{n}",
+                            fig_args=fig_args.get("chart", {}).get(n, {}),
+                            **chart_args.get("chart", {}).get(n, {}),
+                        )
+                    )
 
             analyze(
                 train_data=train_data,
@@ -585,6 +592,9 @@ def covariate_shift_detection(
     if your training set is not representative of your test set distribution.  This is done with a Classifier 2
     Sample Test.
 
+    Supported `fig_args`/`chart_args` keys:
+        - `chart.<variable_name>.<property>` - properties for charts rendered during the analysis
+
     Parameters
     ----------
     train_data: Optional[DataFrame]
@@ -614,11 +624,11 @@ def covariate_shift_detection(
     fig_args: Optional[Dict[str, Any]], default = None,
         figures args for vizualizations; key == component; value = dict of kwargs for component figure. The args are supporting nested
         dot syntax: 'a.b.c'. Charts args are following the convention of `<variable_name>.<param>`
-        (i.e. `PassengerId.figsize` will result in setting `figsize` on `PassengerId` figure.
+        (i.e. `chart.PassengerId.figsize` will result in setting `figsize` on `PassengerId` figure.
     chart_args: Optional[Dict[str, Any]], default = None,
         figures args for vizualizations; key == component; value = dict of kwargs for component chart. The args are supporting nested
         dot syntax: 'a.b.c'. Charts args are following the convention of `<variable_name>.<param>`
-        (i.e. `PassengerId.fill` will result in setting `fill` on `PassengerId` chart.
+        (i.e. `chart.PassengerId.fill` will result in setting `fill` on `PassengerId` chart.
 
     Returns
     -------
@@ -688,8 +698,8 @@ def covariate_shift_detection(
                         state=state,
                         x=var,
                         hue="__dataset__",
-                        fig_args=fig_args.get(var, {}),
-                        chart_args=chart_args.get(var, {}),
+                        fig_args=fig_args.get("chart", {}).get(var, {}),
+                        chart_args=chart_args.get("chart", {}).get(var, {}),
                     )
 
     return state if return_state else None
@@ -731,6 +741,8 @@ def target_analysis(
     sample: Union[None, int, float] = None,
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
+    fig_args: Optional[Dict[str, Any]] = None,
+    chart_args: Optional[Dict[str, Any]] = None,
 ) -> Optional[AnalysisState]:
     """
     Target variable composite analysis.
@@ -739,6 +751,12 @@ def target_analysis(
      - basic summary stats
      - feature values distribution charts; adds fitted distributions for numeric targets
      - target correlations analysis; with interaction charts of target vs high-correlated features
+
+    Supported `fig_args`/`chart_args` keys:
+        - `correlation.<property>` - properties for correlation heatmap
+        - `chart.<variable_name>.<property>` - properties for charts rendered during the analysis.
+        If <variable_name> is matching `label` value, then this will modify the top chart; all other values will be affecting label/<variable_name>
+        interaction charts
 
     Parameters
     ----------
@@ -762,6 +780,14 @@ def target_analysis(
         See also :func:`autogluon.eda.analysis.dataset.Sampler`
     return_state: bool, default = False
         return state if `True`
+    fig_args: Optional[Dict[str, Any]], default = None,
+        figures args for vizualizations; key == component; value = dict of kwargs for component figure. The args are supporting nested
+        dot syntax: 'a.b.c'. Charts args are following the convention of `<variable_name>.<param>`
+        (i.e. `chart.PassengerId.figsize` will result in setting `figsize` on `<target>`/`PassengerId` figure.
+    chart_args: Optional[Dict[str, Any]], default = None,
+        figures args for vizualizations; key == component; value = dict of kwargs for component chart. The args are supporting nested
+        dot syntax: 'a.b.c'. Charts args are following the convention of `<variable_name>.<param>`
+        (i.e. `chart.PassengerId.fill` will result in setting `fill` on `<target>`/`PassengerId` chart.
 
     Returns
     -------
@@ -776,6 +802,9 @@ def target_analysis(
     """
 
     assert label in train_data.columns, f"label `{label}` is not in `train_data` columns: `{train_data.columns}`"
+
+    fig_args = expand_nested_args_into_nested_maps(get_empty_dict_if_none(fig_args))
+    chart_args = expand_nested_args_into_nested_maps(get_empty_dict_if_none(chart_args))
 
     if (test_data is not None) and (label in test_data.columns):
         _test_data = test_data[[label]]
@@ -817,16 +846,20 @@ def target_analysis(
         state=state,
         return_state=True,
         fit_distributions=fit_distributions,
+        fig_args=fig_args.get("chart", {}).get(label, {}),
+        chart_args=chart_args.get("chart", {}).get(label, {}),
     )
 
     state = _render_distribution_fit_information_if_available(state, label)
-    state = _render_correlation_analysis(state, train_data, label, sample)
-    state = _render_features_highly_correlated_with_target(state, train_data, label, sample)
+    state = _render_correlation_analysis(state, train_data, label, sample, fig_args, chart_args)
+    state = _render_features_highly_correlated_with_target(state, train_data, label, sample, fig_args, chart_args)
 
     return state if return_state else None
 
 
-def _render_features_highly_correlated_with_target(state, train_data, label, sample) -> AnalysisState:
+def _render_features_highly_correlated_with_target(
+    state, train_data, label, sample, fig_args, chart_args
+) -> AnalysisState:
     fields = state.correlations_focus_high_corr.train_data.index.tolist()  # type: ignore
     analyze(
         train_data=train_data,
@@ -834,12 +867,20 @@ def _render_features_highly_correlated_with_target(state, train_data, label, sam
         sample=sample,
         return_state=True,
         anlz_facets=[FeatureInteraction(key=f"{f}:{label}", x=f, y=label) for f in fields],
-        viz_facets=[FeatureInteractionVisualization(headers=True, key=f"{f}:{label}") for f in fields],
+        viz_facets=[
+            FeatureInteractionVisualization(
+                headers=True,
+                key=f"{f}:{label}",
+                fig_args=fig_args.get("chart", {}).get(f, {}),
+                **chart_args.get("chart", {}).get(f, {}),
+            )
+            for f in fields
+        ],
     )
     return state
 
 
-def _render_correlation_analysis(state, train_data, label, sample) -> AnalysisState:
+def _render_correlation_analysis(state, train_data, label, sample, fig_args, chart_args) -> AnalysisState:
     state = analyze(
         train_data=train_data,
         sample=sample,
@@ -858,7 +899,9 @@ def _render_correlation_analysis(state, train_data, label, sample) -> AnalysisSt
         state=state,
         viz_facets=[
             MarkdownSectionComponent("\n".join(corr_info)),
-            CorrelationVisualization(headers=True),
+            CorrelationVisualization(
+                headers=True, fig_args=fig_args.get("correlation", {}), **chart_args.get("correlation", {})
+            ),
         ],
     )
     return state
@@ -976,6 +1019,7 @@ def explain_rows(
     plot: Optional[str] = "force",
     baseline_sample: int = 100,
     return_state: bool = False,
+    fit_args: Optional[Dict[str, Any]] = None,
     **kwargs,
 ) -> Optional[AnalysisState]:
     """
@@ -1007,6 +1051,8 @@ def explain_rows(
         is observed.
     return_state: bool, default = False
         return state if `True`
+    fit_args: Optional[Dict[str, Any]], default = None,
+        kwargs for `ShapAnalysis`.
     kwargs
 
     See Also
@@ -1016,6 +1062,9 @@ def explain_rows(
     :py:class:`~autogluon.eda.visualization.explain.ExplainForcePlot`
     :py:class:`~autogluon.eda.visualization.explain.ExplainWaterfallPlot`
     """
+
+    if fit_args is None:
+        fit_args = {}
 
     if plot is None:
         viz_facets = None
@@ -1035,6 +1084,6 @@ def explain_rows(
         train_data=train_data[model.original_features],
         model=model,
         return_state=return_state,
-        anlz_facets=[ShapAnalysis(rows, baseline_sample=baseline_sample)],  # type: ignore
+        anlz_facets=[ShapAnalysis(rows, baseline_sample=baseline_sample, **fit_args)],  # type: ignore
         viz_facets=viz_facets,  # type: ignore
     )
