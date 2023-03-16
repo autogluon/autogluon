@@ -1,4 +1,5 @@
 import json
+from collections import OrderedDict
 
 import pandas as pd
 import pytest
@@ -16,11 +17,13 @@ from autogluon.multimodal.constants import (
     IMAGE_PATH,
     MODEL,
     MULTICLASS,
+    NER_ANNOTATION,
     NUMERICAL,
     OPTIMIZATION,
     TEXT,
+    TEXT_NER,
 )
-from autogluon.multimodal.data.preprocess_dataframe import MultiModalFeaturePreprocessor
+from autogluon.multimodal.data.infer_types import infer_ner_column_type
 from autogluon.multimodal.data.utils import process_ner_annotations
 from autogluon.multimodal.utils import (
     apply_omegaconf_overrides,
@@ -437,3 +440,61 @@ def test_split_hyperparameters(train_transforms, val_transforms, empty_advanced_
         assert not advanced_hyperparameters
     else:
         assert advanced_hyperparameters
+
+
+@pytest.mark.parametrize(
+    "column_types,gt_column_types",
+    [
+        (
+            {
+                "abc": TEXT,
+                "label": NER_ANNOTATION,
+            },
+            {
+                "abc": TEXT_NER,
+                "label": NER_ANNOTATION,
+            },
+        ),
+        (
+            {
+                "abc": TEXT_NER,
+                "label": NER_ANNOTATION,
+            },
+            {
+                "abc": TEXT_NER,
+                "label": NER_ANNOTATION,
+            },
+        ),
+        (
+            {
+                "abc": TEXT,
+                "xyz": TEXT,
+                "label": NER_ANNOTATION,
+            },
+            {
+                "abc": TEXT_NER,
+                "xyz": TEXT,
+                "label": NER_ANNOTATION,
+            },
+        ),
+        (
+            {
+                "abc": TEXT,
+                "xyz": TEXT,
+                "efg": IMAGE_PATH,
+                "label": NER_ANNOTATION,
+            },
+            {
+                "abc": TEXT_NER,
+                "xyz": TEXT,
+                "efg": IMAGE_PATH,
+                "label": NER_ANNOTATION,
+            },
+        ),
+    ],
+)
+def test_infer_ner_column_type(column_types, gt_column_types):
+    column_types = OrderedDict(column_types)
+    gt_column_types = OrderedDict(gt_column_types)
+    column_types = infer_ner_column_type(column_types)
+    assert column_types == gt_column_types

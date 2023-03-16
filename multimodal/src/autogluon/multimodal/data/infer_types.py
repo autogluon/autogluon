@@ -765,10 +765,31 @@ def set_fallback_column_type(column_types: Dict, allowable_column_types: List[st
     return column_types
 
 
-def infer_ner_column_type(data: pd.DataFrame, column_types: Dict):
-    for column in data.columns:
-        if column_types[column] == TEXT:
-            column_types[column] = TEXT_NER
+def infer_ner_column_type(column_types: Dict):
+    """
+    Replace the first text with text_ner for the ner problem type
+    because no text_ner is detected in infer_column_types.
+
+    Parameters
+    ----------
+    column_types
+        The column types of a dataframe.
+
+    Returns
+    -------
+    The columns types with one text_ner inside it.
+    """
+    # if there is already one column has type text_ner, no action is taken.
+    if any([col_type.startswith(TEXT_NER) for col_type in column_types.values()]):
+        return column_types
+
+    for (
+        column
+    ) in (
+        column_types.keys()
+    ):  # column_types is an ordered dict, so column_types.keys() returns the keys in the order of insertions.
+        if column_types[column].startswith(TEXT):
+            column_types[column] = column_types[column].replace(TEXT, TEXT_NER)
             break
 
     return column_types
