@@ -27,7 +27,6 @@ def test_ShapAnalysis(label, expected_task_type, monkeypatch):
             train_data=df_train,
             label=label,
             return_state=True,
-            save_model_to_state=True,
             render_analysis=False,
         )
         assert state.model.problem_type == expected_task_type

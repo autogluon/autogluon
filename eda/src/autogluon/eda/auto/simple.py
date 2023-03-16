@@ -315,7 +315,7 @@ def quick_fit(
         pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
     return_state: bool, default = False
         return state if `True`
-    save_model_to_state: bool, default = False,
+    save_model_to_state: bool, default = True,
         save fitted model into `state` under `model` key.
         This functionality might be helpful in cases when the fitted model could be usable for other purposes (i.e. imputers)
     verbosity: int, default = 0
@@ -349,7 +349,6 @@ def quick_fit(
     >>> state = auto.quick_fit(
     >>>     train_data=..., label=...,
     >>>     return_state=True,  # return state object from call
-    >>>     save_model_to_state=True,  # store fitted model into the state
     >>>     hyperparameters={'GBM': {}}  # train specific model
     >>> )
     >>>
