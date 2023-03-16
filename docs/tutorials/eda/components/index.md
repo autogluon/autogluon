@@ -41,6 +41,12 @@ The section contains a reference for low-level components.
    Transformations APIs
 :::
 
+:::{grid-item-card} autogluon.eda.explain
+   :link: autogluon.eda.explain.html
+
+   Explainability APIs
+:::
+
 ::::
 
 ```{toctree}
