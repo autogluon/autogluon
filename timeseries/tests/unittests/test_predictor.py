@@ -386,17 +386,6 @@ def test_when_predictor_called_and_loaded_back_then_ignore_time_index_persists(t
     assert loaded_predictor.ignore_time_index == ignore_time_index
 
 
-@pytest.mark.parametrize(
-    "splitter_string, expected_splitter_class",
-    [("last_window", LastWindowSplitter), ("multi_window", MultiWindowSplitter)],
-)
-def test_when_passing_magic_string_as_validation_splitter_then_correct_splitter_object_is_created(
-    splitter_string, expected_splitter_class
-):
-    predictor = TimeSeriesPredictor(validation_splitter=splitter_string)
-    assert isinstance(predictor.validation_splitter, expected_splitter_class)
-
-
 def test_given_enable_ensemble_true_when_predictor_called_then_ensemble_is_fitted(temp_model_path):
     predictor = TimeSeriesPredictor(
         path=temp_model_path,

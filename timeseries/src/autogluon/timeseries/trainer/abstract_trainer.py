@@ -19,7 +19,7 @@ from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
-from autogluon.timeseries.models.multi_window.multi_window_model import MultiWindowModel
+from autogluon.timeseries.models.multi_window.multi_window_model import MultiWindowBacktestingModel
 from autogluon.timeseries.models.presets import contains_searchspace
 from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.warning_filters import disable_tqdm
@@ -583,7 +583,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 assert (
                     val_data is None
                 ), "val_data should not be passed to {self.__class__.__name__}._train_multi if num_val_windows >= 1"
-                model = MultiWindowModel(model_base=model, num_val_windows=num_val_windows)
+                model = MultiWindowBacktestingModel(model_base=model, num_val_windows=num_val_windows)
 
             if hyperparameter_tune_kwargs is not None:
                 time_left = time_limit_model_split

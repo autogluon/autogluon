@@ -4,7 +4,7 @@ import copy
 import itertools
 import warnings
 from collections.abc import Iterable
-from typing import Any, Optional, Tuple, Type, Union, List
+from typing import Any, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd

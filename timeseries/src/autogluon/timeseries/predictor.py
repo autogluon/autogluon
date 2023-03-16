@@ -482,7 +482,7 @@ class TimeSeriesPredictor:
         logger.info(
             f"Provided training data set with {len(train_data)} rows, {train_data.num_items} items (item = single time series). "
             f"Average time series length is {len(train_data) / train_data.num_items:.1f}. "
-            f"Data frequency is '{train_data.freq}'"
+            f"Data frequency is '{train_data.freq}'."
         )
         if tuning_data is not None:
             logger.info(
