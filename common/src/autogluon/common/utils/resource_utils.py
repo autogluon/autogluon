@@ -1,4 +1,5 @@
 import multiprocessing
+import logging
 import os
 import shutil
 import subprocess
@@ -123,3 +124,31 @@ class ResourceManager:
         gpu_count = cudaDeviceGetCount()
         cudaShutdown()
         return gpu_count
+
+    
+class RayResourceManager:
+    """Manager that fetches ray cluster resources info."""
+
+    @staticmethod
+    def _init_ray():
+        import ray
+        if not ray.is_initialized():
+            ray.init(
+                address="auto",  # Force ray to connect to an existing cluster. There should be one. Otherwise, something went wrong
+                log_to_driver=False,
+                logging_level=logging.ERROR
+            )
+    
+    @staticmethod
+    def _get_cluster_sources(key, default_val=0):
+        import ray
+        RayResourceManager._init_ray()
+        return ray.cluster_resources().get(key, default_val)
+
+    @staticmethod
+    def get_cpu_count():
+        return RayResourceManager._get_cluster_sources("CPU")
+
+    @staticmethod
+    def get_gpu_count_all():
+        return RayResourceManager._get_cluster_sources("GPU")

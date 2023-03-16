@@ -14,7 +14,7 @@ import pandas as pd
 
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.log_utils import DuplicateFilter
-from .fold_fitting_strategy import AbstractFoldFittingStrategy, SequentialLocalFoldFittingStrategy, ParallelLocalFoldFittingStrategy
+from .fold_fitting_strategy import AbstractFoldFittingStrategy, SequentialLocalFoldFittingStrategy, ParallelFoldFittingStrategy, ParallelLocalFoldFittingStrategy, ParallelDistributedFoldFittingStrategy
 from ..abstract.abstract_model import AbstractModel
 from ..abstract.model_trial import model_trial, skip_hpo
 from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL_SUFFIX
@@ -411,28 +411,18 @@ class BaggedEnsembleModel(AbstractModel):
         self._bagged_mode = False
 
     def _get_default_fold_fitting_strategy(self):
-        # ray not working properly on macos: https://github.com/ray-project/ray/issues/20084
-        # TODO: re-enable macos once this issue is addressed
-        os_fitting_strategy_map = dict(
-            Darwin='sequential_local',
-            Windows='parallel_local',
-            Linux='parallel_local',
-        )
-        current_os = platform.system()
-        fold_fitting_strategy = os_fitting_strategy_map.get(current_os, 'sequential_local')
-        if fold_fitting_strategy == 'sequential_local':
-            warning_msg = f'\tWill use sequential fold fitting strategy because {current_os} OS does not yet support parallel folding.'
+        try:
+            try_import_ray()
+            fold_fitting_strategy = "parallel_local"
+            if os.environ.get("AG_DISTRIBUTED_MODE", False):
+                fold_fitting_strategy = "parallel_distributed"
+        except Exception as e:
+            warning_msg = f'Will use sequential fold fitting strategy because import of ray failed. Reason: {str(e)}'
             dup_filter.attach_filter_targets(warning_msg)
             logger.warning(warning_msg)
-        else:
-            try:
-                try_import_ray()
-            except Exception as e:
-                warning_msg = f'Will use sequential fold fitting strategy because import of ray failed. Reason: {str(e)}'
-                dup_filter.attach_filter_targets(warning_msg)
-                logger.warning(warning_msg)
-                fold_fitting_strategy = 'sequential_local'
-        assert fold_fitting_strategy in ['parallel_local', 'sequential_local']
+            fold_fitting_strategy = 'sequential_local'
+        assert fold_fitting_strategy in ['parallel_distributed', 'parallel_local', 'sequential_local']
+        print(fold_fitting_strategy)
         return fold_fitting_strategy
 
     def _fit_folds(self,
@@ -464,12 +454,14 @@ class BaggedEnsembleModel(AbstractModel):
             fold_fitting_strategy = self._get_default_fold_fitting_strategy()
         num_folds_parallel = self.params.get('num_folds_parallel', 'auto')
         disable_parallel_fitting = self.params.get('_disable_parallel_fitting', False)
-        if fold_fitting_strategy == 'parallel_local':
+        if fold_fitting_strategy in ['parallel_local', "parallel_distributed"]:
+            if fold_fitting_strategy == "parallel_local":
+                fold_fitting_strategy = ParallelLocalFoldFittingStrategy
+            else:
+                fold_fitting_strategy = ParallelDistributedFoldFittingStrategy
             if disable_parallel_fitting:
                 fold_fitting_strategy = SequentialLocalFoldFittingStrategy
                 logger.log(20, f'\t{model_base.__class__.__name__} does not support parallel folding yet. Will use sequential folding instead')
-            else:
-                fold_fitting_strategy = ParallelLocalFoldFittingStrategy
         elif fold_fitting_strategy == 'sequential_local':
             fold_fitting_strategy = SequentialLocalFoldFittingStrategy
         else:
@@ -519,9 +511,11 @@ class BaggedEnsembleModel(AbstractModel):
             save_folds=save_folds, num_cpus=num_cpus, num_gpus=num_gpus
         )
         # noinspection PyCallingNonCallable
-        if fold_fitting_strategy == ParallelLocalFoldFittingStrategy:
+        if issubclass(fold_fitting_strategy, ParallelFoldFittingStrategy):
             fold_fitting_strategy_args['num_jobs'] = num_folds
             fold_fitting_strategy_args['num_folds_parallel'] = num_folds_parallel
+        if fold_fitting_strategy == ParallelDistributedFoldFittingStrategy:
+            fold_fitting_strategy_args['model_sync_path'] = os.environ.get("AG_MODEL_SYNC_PATH")
         fold_fitting_strategy = fold_fitting_strategy(**fold_fitting_strategy_args)
 
         if type(fold_fitting_strategy) == ParallelLocalFoldFittingStrategy and not fold_fitting_strategy.is_mem_sufficient():

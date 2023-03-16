@@ -19,7 +19,7 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
-from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.resource_utils import ResourceManager, RayResourceManager
 
 from .model_trial import model_trial, skip_hpo
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
@@ -563,8 +563,11 @@ class AbstractModel:
             enforced_num_gpus = kwargs.get('num_gpus', None)
             assert enforced_num_cpus is not None and enforced_num_cpus != 'auto' and enforced_num_gpus is not None and enforced_num_gpus != 'auto'
             return kwargs
-        system_num_cpus = ResourceManager.get_cpu_count()
-        system_num_gpus = ResourceManager.get_gpu_count_all()
+        resource_manager = ResourceManager
+        if os.environ.get("AG_DISTRIBUTED_MODE", False):
+            resource_manager = RayResourceManager
+        system_num_cpus = resource_manager.get_cpu_count()
+        system_num_gpus = resource_manager.get_gpu_count_all()
         if total_resources is None:
             total_resources = {}
         num_cpus = total_resources.get('num_cpus', 'auto')

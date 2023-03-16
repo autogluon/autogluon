@@ -29,3 +29,47 @@ def delete_s3_prefix(bucket, prefix):
 
     if len(delete_keys['Objects']) != 0:
         s3.meta.client.delete_objects(Bucket=bucket, Delete=delete_keys)
+        
+
+def download_s3_folder(bucket, prefix, local_path="."):
+    """
+    This util function downloads a s3 folder and maintain its structure.
+    For example, assuming bucket = bar and prefix = foo, and the bucket structure looks like this
+        .
+        └── bar/
+            ├── test.txt
+            └── foo/
+                ├── test2.txt
+                └── temp/
+                    └── test3.txt
+    This util will download foo to `local_path` and maintain the structure:
+        .
+        └── local_path/
+            └── foo/
+                ├── test2.txt
+                └── temp/
+                    └── test3.txt
+    """
+    import boto3
+    import os
+
+    s3 = boto3.resource("s3")
+    bucket = s3.Bucket(bucket)
+    objs = list(bucket.objects.filter(Prefix=prefix))
+    irrelevent_dirname = os.path.dirname(os.path.normpath(prefix))
+
+    for obj in objs:
+        if obj.key.endswith("/"):
+            # A directory not a file
+            continue
+        # remove the file name from the object key
+        obj_dir = os.path.dirname(obj.key)[len(irrelevent_dirname)+1:]
+        obj_dir = os.path.join(local_path, obj_dir)
+        # remove irrelevent parent folder along the path
+        obj_path = os.path.join(obj_dir, os.path.basename(obj.key))
+
+        # create nested directory structure
+        os.makedirs(obj_dir, exist_ok=True)
+
+        # save file with full path locally
+        bucket.download_file(obj.key, obj_path)
