@@ -86,6 +86,7 @@ from .data.infer_types import (
     infer_problem_type_output_shape,
     infer_rois_column_type,
     is_image_column,
+    infer_ner_column_type,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from .matcher import MultiModalMatcher
@@ -710,6 +711,9 @@ class MultiModalPredictor(ExportMixin):
             label_columns=self._label_column,
             provided_column_types=column_types,
         )
+        if self._problem_type == NER:
+            column_types = infer_ner_column_type(data=train_data, column_types=column_types)
+
         column_types = infer_label_column_type_by_problem_type(
             column_types=column_types,
             label_columns=self._label_column,
@@ -794,7 +798,7 @@ class MultiModalPredictor(ExportMixin):
         hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
 
         hpo_mode = True if hyperparameter_tune_kwargs else False
-        if hpo_mode and self._problem_type != NER:  # TODO: support ner.
+        if hpo_mode:
             hyperparameters = filter_hyperparameters(
                 hyperparameters=hyperparameters,
                 column_types=column_types,

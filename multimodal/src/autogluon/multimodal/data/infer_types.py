@@ -10,20 +10,16 @@ import PIL
 import pytesseract
 
 from ..constants import (
-    AUTOMM,
     BINARY,
     CATEGORICAL,
     CLASSIFICATION,
-    DOCUMENT,
     DOCUMENT_IMAGE,
     DOCUMENT_PDF,
-    ENTITY_GROUP,
     IDENTIFIER,
     IMAGE,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
     MULTICLASS,
-    NAMED_ENTITY_RECOGNITION,
     NER,
     NER_ANNOTATION,
     NULL,
@@ -32,6 +28,7 @@ from ..constants import (
     REGRESSION,
     ROIS,
     TEXT,
+    TEXT_NER,
 )
 from .utils import is_rois_input
 
@@ -764,5 +761,14 @@ def set_fallback_column_type(column_types: Dict, allowable_column_types: List[st
     for col_name, col_type in column_types.items():
         if not col_type.startswith(tuple(allowable_column_types)):
             column_types[col_name] = fallback_column_type
+
+    return column_types
+
+
+def infer_ner_column_type(data: pd.DataFrame, column_types: Dict):
+    for column in data.columns:
+        if column_types[column] == TEXT:
+            column_types[column] = TEXT_NER
+            break
 
     return column_types
