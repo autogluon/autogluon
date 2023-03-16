@@ -818,13 +818,16 @@ class TimeSeriesDataFrame(pd.DataFrame):
             Test portion of the data. The last ``window_idx * prediction_length`` entries are removed from each time
             series in the original dataset.
         """
-        data = self.copy(deep=False)
-        if suffix is not None:
-            new_item_id = data.index.levels[0].astype(str) + suffix
-            data.index = data.index.set_levels(levels=new_item_id, level=0)
-
         train_end_idx = -(window_idx + 1) * prediction_length
-        train_data = data.slice_by_timestep(None, train_end_idx)
+        train_data = self.slice_by_timestep(None, train_end_idx)
         test_end_idx = None if window_idx == 0 else -window_idx * prediction_length
-        test_data = data.slice_by_timestep(None, test_end_idx)
+        test_data = self.slice_by_timestep(None, test_end_idx)
+
+        if suffix is not None:
+            for data in [train_data, test_data]:
+                new_item_id = data.index.levels[0].astype(str) + suffix
+                data.index = data.index.set_levels(levels=new_item_id, level=0)
+                if data.static_features is not None:
+                    data.static_features.index = data.static_features.index.astype(str)
+                    data.static_features.index += suffix
         return train_data, test_data

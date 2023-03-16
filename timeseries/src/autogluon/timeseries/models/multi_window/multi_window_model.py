@@ -64,10 +64,9 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
                 window_idx=window_idx,
                 suffix=f"_fold_{window_idx}",
             )
-            model = copy.deepcopy(self.model_base)
-            model.path = self.path + f"W{window_idx + 1}" + os.sep
 
             logger.debug(f"\tWindow {window_idx + 1}")
+            model = self.get_child_model(window_idx)
             model_fit_start_time = time.time()
             model.fit(
                 train_data=train_fold,
@@ -103,6 +102,11 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         info = super().get_info()
         info["info_per_val_window"] = self.info_per_val_window
         return info
+
+    def get_child_model(self, window_idx: int) -> AbstractTimeSeriesModel:
+        model = copy.deepcopy(self.model_base)
+        model.path = self.path + f"W{window_idx + 1}" + os.sep
+        return model
 
     def predict(
         self,
