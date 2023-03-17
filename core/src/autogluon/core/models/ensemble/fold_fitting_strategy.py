@@ -493,7 +493,11 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self.jobs.append(fold_ctx)
         
     def _get_ray_init_args(self):
-        return {"address": "auto"}
+        return dict(
+            address="auto",
+            logging_level=logging.ERROR,
+            log_to_driver=False
+        )
 
     def after_all_folds_scheduled(self):
         if not self.ray.is_initialized():
@@ -739,7 +743,7 @@ class ParallelLocalFoldFittingStrategy(ParallelFoldFittingStrategy):
     def _get_ray_init_args(self):
         ray_init_args = dict(
             log_to_driver=True,
-            logging_level=logging.ERROR,  # https://github.com/ray-project/ray/issues/29216
+            logging_level=logging.ERROR,
             num_cpus=self.num_cpus
         )
         if self.num_gpus > 0:
