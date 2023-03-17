@@ -43,6 +43,7 @@ def trained_models():
         )
 
         model.fit(train_data=DUMMY_TS_DATAFRAME)
+        model.score_and_cache_oof(DUMMY_TS_DATAFRAME)
         models[(prediction_length, repr(model_class))] = model
         model_paths.append(temp_model_path)
 
@@ -68,6 +69,26 @@ def test_when_fit_called_then_models_train_and_all_scores_can_be_computed(
     score = model.score(DUMMY_TS_DATAFRAME, metric)
 
     assert isinstance(score, float)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 5])
+def test_when_score_and_cache_oof_called_then_attributes_are_saved(model_class, prediction_length, temp_model_path):
+    model = trained_models[(prediction_length, repr(model_class))]
+    assert isinstance(model.val_score, float)
+    assert isinstance(model.predict_time, float)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 5])
+def test_when_score_and_cache_oof_called_then_oof_predictions_are_saved(
+    model_class, prediction_length, temp_model_path
+):
+    model = trained_models[(prediction_length, repr(model_class))]
+    oof_predictions = model.get_oof_predictions()
+    assert isinstance(oof_predictions, TimeSeriesDataFrame)
+    oof_score = model.score_with_predictions(DUMMY_TS_DATAFRAME, oof_predictions)
+    assert isinstance(oof_score, float)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -100,6 +121,7 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, trained_models, 
     assert dict_equal_primitive(model.params, loaded_model.params)
     assert dict_equal_primitive(model.params_aux, loaded_model.params_aux)
     assert model.metadata == loaded_model.metadata
+    assert model.get_oof_predictions().equals(loaded_model.get_oof_predictions())
 
 
 @flaky

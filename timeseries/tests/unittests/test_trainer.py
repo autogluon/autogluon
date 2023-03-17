@@ -321,6 +321,31 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
         assert not np.any(np.isnan(predictions))
 
 
+def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_model_path):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE", prediction_length=2)
+    trainer.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters={
+            "Naive": {},
+            "ETS": {},
+            "AutoETS": {"n_jobs": 1},
+            "AutoGluonTabular": {},
+            "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
+        },
+        val_data=DUMMY_TS_DATAFRAME,
+    )
+    model_names = copy.copy(trainer.get_model_names())
+    trainer.save()
+    del trainer
+
+    loaded_trainer = AutoTimeSeriesTrainer.load(path=temp_model_path)
+
+    for m in model_names:
+        oof_predictions = loaded_trainer.get_model_oof_predictions(m)
+        assert isinstance(oof_predictions, TimeSeriesDataFrame)
+        loaded_trainer.score(DUMMY_TS_DATAFRAME, oof_predictions)
+
+
 @pytest.mark.parametrize("failing_model", ["NaiveModel", "SeasonalNaiveModel"])
 def test_given_base_model_fails_when_trainer_predicts_then_weighted_ensemble_can_predict(
     temp_model_path, failing_model

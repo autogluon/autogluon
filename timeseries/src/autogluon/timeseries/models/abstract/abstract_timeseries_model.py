@@ -114,13 +114,18 @@ class AbstractTimeSeriesModel(AbstractModel):
         return self.name
 
     def save(self, path: str = None, verbose=True) -> str:
-        if self._oof_predictions is not None:
+        oof_predictions = self._oof_predictions
+        self._oof_predictions = None
+        # Save self._oof_predictions as a separate file, if present
+        if oof_predictions is not None:
             save_pkl.save(
                 path=os.path.join(self.path + "utils", self._oof_filename),
                 object=self._oof_predictions,
                 verbose=verbose,
             )
-        return super().save(path=path, verbose=verbose)
+        save_path = super().save(path=path, verbose=verbose)
+        self._oof_predictions = oof_predictions
+        return save_path
 
     @classmethod
     def load(
