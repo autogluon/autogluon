@@ -132,7 +132,7 @@ def get_param_multiclass(framework, num_classes):
 
 
 def get_param_regression(framework):
-        return get_param_binary(framework)  # Use same hyperparameters as for binary classification for now.
+    return get_param_binary(framework)  # Use same hyperparameters as for binary classification for now.
 
 
 def get_param_quantile(framework):
