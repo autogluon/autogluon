@@ -131,3 +131,8 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         weights = weights / np.sum(weights)
 
         return sum(pred * w for pred, w in zip(model_preds, weights) if pred is not None)
+
+    def get_info(self) -> dict:
+        info = super().get_info()
+        info["model_weights"] = self.model_to_weight
+        return info
