@@ -266,7 +266,7 @@ def get_preset_models(
             model = model_type(name=f"{name_stem}_{increment}", **model_type_kwargs)
 
         if multi_window:
-            model = MultiWindowBacktestingModel(model_base=model, name=model.name + "_MW", **model_type_kwargs)
+            model = MultiWindowBacktestingModel(model_base=model, name=model.name, **model_type_kwargs)
         all_assigned_names.add(model.name)
         models.append(model)
 
