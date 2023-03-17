@@ -680,7 +680,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         """Stack validation data for all windows into a single dataframe"""
         return pd.concat(
             [
-                train_data.train_test_split(self.prediction_length, window_idx, suffix=f"_F{window_idx}")[1]
+                train_data.train_test_split(self.prediction_length, window_idx, suffix=f"_W{window_idx + 1}")[1]
                 for window_idx in range(self.num_val_windows)
             ]
         )

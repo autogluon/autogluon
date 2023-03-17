@@ -73,7 +73,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             train_fold, val_fold = train_data.train_test_split(
                 prediction_length=self.prediction_length,
                 window_idx=window_idx,
-                suffix=f"_F{window_idx}",
+                suffix=f"_W{window_idx + 1}",
             )
 
             logger.debug(f"\tWindow {window_idx + 1}")
@@ -127,7 +127,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     ) -> TimeSeriesDataFrame:
         if self.most_recent_model is None:
             raise ValueError(f"{self.name} must be fit before predicting")
-        return self.most_recent_model.predict(data, known_covariates, **kwargs)
+        return self.most_recent_model.predict(data, known_covariates=known_covariates, **kwargs)
 
     def score_and_cache_oof(self, val_data: TimeSeriesDataFrame) -> None:
         # self.val_score, self.predict_time, self._oof_predictions already saved during _fit()

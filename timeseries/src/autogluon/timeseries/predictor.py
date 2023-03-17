@@ -271,7 +271,7 @@ class TimeSeriesPredictor:
             )
             num_val_windows = max_possible_num_val_windows
         if num_val_windows == 0 and tuning_data is None:
-            raise ValueError("Training is impossible since all time series in the dataset are too short")
+            raise ValueError("Training is impossible because num_val_windows = 0 and no tuning_data is provided")
 
         return num_val_windows
 
