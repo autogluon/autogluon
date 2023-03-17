@@ -3,6 +3,8 @@ from typing import Any, Dict, Optional
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from yellowbrick.contrib.wrapper import REGRESSOR, ContribEstimator
+from yellowbrick.regressor import residuals_plot
 
 from autogluon.core.constants import REGRESSION
 
@@ -95,14 +97,32 @@ class ConfusionMatrix(AbstractVisualization, JupyterMixin):
         plt.show(fig)
 
 
+class _YellowbrickAutoGluonWrapper(ContribEstimator):
+    _estimator_type = REGRESSOR
+
+    def score(self, y_pred, y_true, **kwargs):
+        # note: this is not conventional use of API: we pass y_pred since we already have predictions done
+        return self.estimator.evaluate_predictions(y_pred, y_true)["r2"]
+
+    def predict(self, y_pred, **kwargs):
+        # note: this is not conventional use of API: we pass y_pred since we already have predictions done
+        return y_pred
+
+
 class RegressionEvaluation(AbstractVisualization, JupyterMixin):
     """
-    Render predictions vs ground truth chart for regressor.
+    This plot shows residuals on the vertical axis vs prediction on horizontal axis.
 
     This visualization depends on :py:class:`~autogluon.eda.analysis.model.AutoGluonModelEvaluator` analysis.
 
     Parameters
     ----------
+    residuals_plot_mode: Optional[str], default = 'qoq'
+        Additional plot to render to the right of the main plot. The supported values:
+        - `qoq` (default) - Q-Q plot, which is a common way to check that residuals are normally distributed. If the residuals are normally distributed,
+        then their quantiles when plotted against quantiles of normal distribution should form a straight line.
+        - `hist` - display histogram that our error is normally distributed around zero, which also generally indicates a well fitted model
+        - any other value - don't render additional details
     headers: bool, default = False
         if `True` then render headers
     namespace: str, default = None
@@ -133,6 +153,7 @@ class RegressionEvaluation(AbstractVisualization, JupyterMixin):
 
     def __init__(
         self,
+        residuals_plot_mode: Optional[str] = "qoq",
         fig_args: Optional[Dict[str, Any]] = None,
         headers: bool = False,
         namespace: Optional[str] = None,
@@ -140,27 +161,40 @@ class RegressionEvaluation(AbstractVisualization, JupyterMixin):
     ) -> None:
         super().__init__(namespace, **kwargs)
         self.headers = headers
+        self.residuals_analysis_mode = residuals_plot_mode
 
         if fig_args is None:
             fig_args = {}
+        fig_args = {**{"figsize": (12, 6)}, **fig_args}
         self.fig_args = fig_args
 
     def can_handle(self, state: AnalysisState) -> bool:
         return "model_evaluation" in state and state.model_evaluation.problem_type == REGRESSION
 
+    def _get_plot_mode(self):
+        res_plot_kwargs = {
+            "hist": dict(hist=True, qqplot=False),
+            "qoq": dict(hist=False, qqplot=True),
+        }.get(
+            self.residuals_analysis_mode, dict(hist=False, qqplot=False)  # type: ignore
+        )
+        return res_plot_kwargs
+
     def _render(self, state: AnalysisState) -> None:
         self.render_header_if_needed(state, "Prediction vs Target")
-        data = pd.DataFrame({"y_true": state.model_evaluation.y_true, "y_pred": state.model_evaluation.y_pred})
-
+        ev = state.model_evaluation
+        res_plot_kwargs = self._get_plot_mode()
         fig, ax = plt.subplots(**self.fig_args)
-        label = "test" if "y_true_val" in state.model_evaluation else "validation"
-        sns.regplot(ax=ax, data=data, x="y_true", y="y_pred", label=label, **self._kwargs)
-        if "y_true_val" in state.model_evaluation:
-            data = pd.DataFrame(
-                {"y_true": state.model_evaluation.y_true_val, "y_pred": state.model_evaluation.y_pred_val}
-            )
-            sns.regplot(ax=ax, data=data, x="y_true", y="y_pred", label="validation", **self._kwargs)
-            plt.legend()
+        residuals_plot(
+            _YellowbrickAutoGluonWrapper(state.model),
+            ev.y_pred_train,
+            ev.y_true_train,
+            ev.y_pred,
+            ev.y_true,
+            show=False,
+            ax=ax,
+            **res_plot_kwargs,
+        )
         plt.show(fig)
 
 

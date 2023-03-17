@@ -109,3 +109,23 @@ def test_predictor_skip_final_val():
     )
     predictor_new = MultiModalPredictor.load(path=save_path)
     assert isinstance(predictor_new._model, TimmAutoModelForImagePrediction)
+
+
+def test_hyperparameters_in_terminal_format():
+    download_dir = "./"
+    train_df, tune_df = shopee_dataset(download_dir=download_dir)
+    predictor = MultiModalPredictor(label="label")
+    hyperparameters = [
+        "model.names=[timm_image]",
+        "model.timm_image.checkpoint_name=ghostnet_100",
+        "env.num_workers=0",
+        "env.num_workers_evaluation=0",
+        "optimization.top_k_average_method=best",
+        "optimization.val_check_interval=1.0",
+    ]
+    predictor.fit(
+        train_data=train_df,
+        tuning_data=tune_df,
+        hyperparameters=hyperparameters,
+        time_limit=2,
+    )

@@ -270,7 +270,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                     self.render_markdown(
                         f"Interaction {features} is not rendered due to `{f}` "
                         f"having too many categories (`{df[f].nunique()}` > `{self.max_categories_to_consider_render}`) "
-                        f"for comfortable read."
+                        f"to place on plot axis."
                     )
                     return
 
