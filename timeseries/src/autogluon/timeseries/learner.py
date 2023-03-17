@@ -78,7 +78,6 @@ class TimeSeriesLearner(AbstractLearner):
         hyperparameters: Union[str, Dict] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         time_limit: Optional[int] = None,
-        num_val_windows: int = 1,
         **kwargs,
     ) -> None:
         self._time_limit = time_limit
@@ -112,6 +111,7 @@ class TimeSeriesLearner(AbstractLearner):
                 verbosity=kwargs.get("verbosity", 2),
                 enable_ensemble=kwargs.get("enable_ensemble", True),
                 metadata=self.feature_generator.covariate_metadata,
+                num_val_windows=kwargs.get("num_val_windows", 1),
             )
         )
         self.trainer = self.trainer_type(**trainer_init_kwargs)
@@ -124,7 +124,6 @@ class TimeSeriesLearner(AbstractLearner):
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             time_limit=time_limit,
-            num_val_windows=num_val_windows,
         )
         self.save_trainer(trainer=self.trainer)
 

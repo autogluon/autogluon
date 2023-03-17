@@ -392,6 +392,9 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         return metric_value * evaluator.coefficient
 
+    def _update_hpo_train_fn_kwargs(self, train_fn_kwargs: dict) -> dict:
+        return train_fn_kwargs
+
     def _hyperparameter_tune(
         self,
         train_data: TimeSeriesDataFrame,
@@ -419,7 +422,9 @@ class AbstractTimeSeriesModel(AbstractModel):
         val_path = os.path.join(self.path, dataset_val_filename)
         save_pkl.save(path=val_path, object=val_data)
 
-        fit_kwargs = dict()
+        fit_kwargs = dict(
+            num_val_windows=kwargs.get("num_val_windows", 1),
+        )
         train_fn_kwargs = dict(
             model_cls=self.__class__,
             init_params=self.get_params(),
@@ -430,6 +435,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             val_path=val_path,
             hpo_executor=hpo_executor,
         )
+        train_fn_kwargs = self._update_hpo_train_fn_kwargs(train_fn_kwargs)
 
         model_estimate_memory_usage = None
         if self.estimate_memory_usage is not None:

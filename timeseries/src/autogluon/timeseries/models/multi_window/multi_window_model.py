@@ -33,19 +33,9 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def __init__(
         self,
         model_base: Union[AbstractTimeSeriesModel, Type[AbstractTimeSeriesModel]],
-        num_val_windows: int = 1,
         model_base_kwargs: Optional[Dict[str, any]] = None,
         **kwargs,
     ):
-        super().__init__(
-            freq=model_base.freq,
-            name=model_base.name,
-            prediction_length=model_base.prediction_length,
-            path=model_base.path_root,
-            metadata=model_base.metadata,
-            eval_metric=model_base.eval_metric,
-            eval_metric_seasonal_period=model_base.eval_metric_seasonal_period,
-        )
         if inspect.isclass(model_base):
             if model_base_kwargs is None:
                 model_base_kwargs = dict()
@@ -57,16 +47,16 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             )
         else:
             self.model_base: AbstractTimeSeriesModel = model_base
-        self.model_base = model_base
-        self.num_val_windows = num_val_windows
         self.most_recent_model: AbstractTimeSeriesModel = None
         self.info_per_val_window = []
+        super().__init__(**kwargs)
 
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[int] = None,
+        num_val_windows: int = 1,
         **kwargs,
     ):
         # TODO: use incremental training for GluonTS models?
@@ -79,11 +69,11 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
         trained_models = []
         global_fit_start_time = time.time()
-        for window_idx in range(self.num_val_windows):
+        for window_idx in range(num_val_windows):
             train_fold, val_fold = train_data.train_test_split(
                 prediction_length=self.prediction_length,
                 window_idx=window_idx,
-                suffix=f"_fold_{window_idx}",
+                suffix=f"_F{window_idx}",
             )
 
             logger.debug(f"\tWindow {window_idx + 1}")
@@ -126,7 +116,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
     def get_child_model(self, window_idx: int) -> AbstractTimeSeriesModel:
         model = copy.deepcopy(self.model_base)
-        model.path = self.path + f"W{window_idx + 1}" + os.sep
+        model.set_contexts(self.path + f"W{window_idx + 1}" + os.sep)
         return model
 
     def predict(
@@ -142,3 +132,19 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def score_and_cache_oof(self, val_data: TimeSeriesDataFrame) -> None:
         # self.val_score, self.predict_time, self._oof_predictions already saved during _fit()
         pass
+
+    def get_user_params(self) -> dict:
+        return self.model_base.get_user_params()
+
+    def _get_search_space(self):
+        return self.model_base._get_search_space()
+
+    def _initialize(self, **kwargs) -> None:
+        super()._initialize(**kwargs)
+        self.model_base.initialize(**kwargs)
+
+    def _update_hpo_train_fn_kwargs(self, train_fn_kwargs: dict) -> dict:
+        train_fn_kwargs["is_bagged_model"] = True
+        train_fn_kwargs["init_params"]["model_base"] = self.model_base.__class__
+        train_fn_kwargs["init_params"]["model_base_kwargs"] = self.get_params()
+        return train_fn_kwargs

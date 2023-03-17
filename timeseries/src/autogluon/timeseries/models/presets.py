@@ -20,6 +20,7 @@ from . import (
     ThetaModel,
 )
 from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
+from .multi_window.multi_window_model import MultiWindowBacktestingModel
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +193,7 @@ def get_preset_models(
     hyperparameters: Union[str, Dict],
     hyperparameter_tune: bool,
     invalid_model_names: List[str],
+    multi_window: bool = False,
     **kwargs,
 ):
     """
@@ -263,6 +265,8 @@ def get_preset_models(
             increment += 1
             model = model_type(name=f"{name_stem}_{increment}", **model_type_kwargs)
 
+        if multi_window:
+            model = MultiWindowBacktestingModel(model_base=model, name=model.name + "_MW", **model_type_kwargs)
         all_assigned_names.add(model.name)
         models.append(model)
 

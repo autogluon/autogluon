@@ -277,6 +277,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         save_data: bool = True,
         enable_ensemble: bool = True,
         verbosity: int = 2,
+        num_val_windows: int = 1,
         **kwargs,
     ):
         super().__init__(path=path, save_data=save_data, low_memory=True, **kwargs)
@@ -303,6 +304,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self._model_full_dict_val_score = {}
         self.eval_metric = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
+        self.num_val_windows = num_val_windows
         self.hpo_results = {}
 
     def save_train_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
@@ -417,6 +419,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             val_data=val_data,
             time_limit=time_limit,
             verbosity=self.verbosity,
+            num_val_windows=self.num_val_windows,
         )
         return model
 
@@ -442,6 +445,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 time_limit=time_limit,
                 default_num_trials=default_num_trials,
+                num_val_windows=self.num_val_windows,
             )
         total_tuning_time = time.time() - tuning_start_time
 
@@ -546,7 +550,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         time_limit: Optional[float] = None,
-        num_val_windows: int = 1,
     ) -> List[str]:
 
         logger.info(f"\nStarting training. Start time is {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -569,8 +572,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 hyperparameters=hyperparameters,
                 hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
                 freq=train_data.freq,
+                multi_window=self.num_val_windows > 0,
             )
-
         logger.info(f"Models that will be trained: {list(m.name for m in models)}")
 
         time_limit_model_split = time_limit
@@ -579,12 +582,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         model_names_trained = []
         for i, model in enumerate(models):
-            if num_val_windows >= 1:
-                assert (
-                    val_data is None
-                ), "val_data should not be passed to {self.__class__.__name__}._train_multi if num_val_windows >= 1"
-                model = MultiWindowBacktestingModel(model_base=model, num_val_windows=num_val_windows)
-
             if hyperparameter_tune_kwargs is not None:
                 time_left = time_limit_model_split
 
@@ -653,15 +650,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             else:
                 try:
                     if val_data is None:
-                        # Stack validation data for all windows into a single dataframe
-                        val_data = pd.concat(
-                            [
-                                train_data.train_test_split(
-                                    self.prediction_length, window_idx, suffix=f"_fold_{window_idx}"
-                                )[1]
-                                for window_idx in range(num_val_windows)
-                            ]
-                        )
+                        val_data = self._get_ensemble_oof_data(train_data)
                     model_names_trained.append(
                         self.fit_ensemble(
                             val_data=val_data,
@@ -686,6 +675,15 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             logger.error(str(e))
 
         return model_names_trained
+
+    def _get_ensemble_oof_data(self, train_data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+        """Stack validation data for all windows into a single dataframe"""
+        return pd.concat(
+            [
+                train_data.train_test_split(self.prediction_length, window_idx, suffix=f"_F{window_idx}")[1]
+                for window_idx in range(self.num_val_windows)
+            ]
+        )
 
     def _get_ensemble_model_name(self) -> str:
         """Ensure we don't have name collisions in the ensemble model name"""
@@ -952,7 +950,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         return copy.deepcopy(self.model_full_dict)
 
     def construct_model_templates(
-        self, hyperparameters: Union[str, Dict[str, Any]], **kwargs
+        self, hyperparameters: Union[str, Dict[str, Any]], multi_window: bool = False, **kwargs
     ) -> List[AbstractTimeSeriesModel]:
         """Constructs a list of unfit models based on the hyperparameters dict."""
         raise NotImplementedError
