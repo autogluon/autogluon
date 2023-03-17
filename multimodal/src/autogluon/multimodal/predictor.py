@@ -709,7 +709,9 @@ class MultiModalPredictor(ExportMixin):
             valid_data=tuning_data,
             label_columns=self._label_column,
             provided_column_types=column_types,
+            problem_type=self._problem_type,
         )
+
         column_types = infer_label_column_type_by_problem_type(
             column_types=column_types,
             label_columns=self._label_column,
@@ -794,7 +796,7 @@ class MultiModalPredictor(ExportMixin):
         hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
 
         hpo_mode = True if hyperparameter_tune_kwargs else False
-        if hpo_mode and self._problem_type != NER:  # TODO: support ner.
+        if hpo_mode:
             hyperparameters = filter_hyperparameters(
                 hyperparameters=hyperparameters,
                 column_types=column_types,
