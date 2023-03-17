@@ -454,8 +454,11 @@ pearsonr = make_scorer('pearsonr',
                        greater_is_better=True)
 
 
-def rmse_func(y_true, y_pred):
-    return np.sqrt(((y_true - y_pred) ** 2).mean())
+def rmse_func(y_true, y_pred, **kwargs):
+    if kwargs:
+        return sklearn.metrics.mean_squared_error(y_true, y_pred, squared=False, **kwargs)
+    else:
+        return np.sqrt(((y_true - y_pred) ** 2).mean())
 
 
 root_mean_squared_error = make_scorer('root_mean_squared_error',
