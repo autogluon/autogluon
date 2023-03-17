@@ -2,6 +2,7 @@ from math import isclose
 
 import numpy as np
 import pytest
+import sklearn
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
 from autogluon.core.metrics import METRICS, Scorer, rmse_func
