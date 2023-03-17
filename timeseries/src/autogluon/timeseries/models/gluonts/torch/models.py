@@ -140,6 +140,7 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
             forecast_keys=forecast_keys,
             item_id=str(forecast.item_id),
         )
+
         if isinstance(forecast.start_date, pd.Timestamp):  # GluonTS version is <0.10
             forecast_init_args.update({"freq": forecast.freq})
         return QuantileForecast(**forecast_init_args)
