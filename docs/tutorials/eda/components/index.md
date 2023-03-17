@@ -59,4 +59,5 @@ missing <autogluon.eda.missing.md>
 model <autogluon.eda.model.md>
 shift <autogluon.eda.shift.md>
 transform <autogluon.eda.transform.md>
+explain <autogluon.eda.explain.md>
 ```

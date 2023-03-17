@@ -288,7 +288,7 @@ def quick_fit(
     Supported `fig_args`/`chart_args` keys:
         - `confusion_matrix.<property>` - confusion matrix chart for classification predictor
         - `regression_eval.<property>` - regression predictor results chart
-        - `feature_importance.<property> - feature importance barplot chart
+        - `feature_importance.<property>` - feature importance barplot chart
 
     Parameters
     ----------
