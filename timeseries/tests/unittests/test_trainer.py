@@ -343,7 +343,7 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
     for m in model_names:
         oof_predictions = loaded_trainer.get_model_oof_predictions(m)
         assert isinstance(oof_predictions, TimeSeriesDataFrame)
-        loaded_trainer.score(DUMMY_TS_DATAFRAME, oof_predictions)
+        loaded_trainer.score_with_predictions(DUMMY_TS_DATAFRAME, oof_predictions)
 
 
 @pytest.mark.parametrize("failing_model", ["NaiveModel", "SeasonalNaiveModel"])
