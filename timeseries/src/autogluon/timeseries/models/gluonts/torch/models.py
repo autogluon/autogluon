@@ -130,21 +130,16 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
         forecast: DistributionForecast, quantile_levels: List[float]
     ) -> QuantileForecast:
         forecast_arrays = [forecast.mean]
+        forecast_keys = ["mean"]
 
-        quantile_keys = [str(q) for q in quantile_levels]
-        if isinstance(forecast.distribution, AffineTransformed):
-            # FIXME: Fix a bug where distribution parameters aren't moved to CPU
-            affine_transform = forecast.distribution.transforms[-1]
-            affine_transform.scale = affine_transform.scale.cpu()
-            affine_transform.loc = affine_transform.loc.cpu()
+        for q in quantile_levels:
+            forecast_arrays.append(forecast.quantile(q))
+            forecast_keys.append(str(q))
 
-        q_transformed = [forecast.quantile(q) for q in quantile_keys]
-
-        forecast_arrays.extend(q_transformed)
         forecast_init_args = dict(
             forecast_arrays=np.array(forecast_arrays),
             start_date=forecast.start_date,
-            forecast_keys=["mean"] + quantile_keys,
+            forecast_keys=forecast_keys,
             item_id=str(forecast.item_id),
         )
         if isinstance(forecast.start_date, pd.Timestamp):  # GluonTS version is <0.10
