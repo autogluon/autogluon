@@ -95,7 +95,10 @@ class CorrelationVisualization(_AbstractCorrelationChart):
         return "correlations" in state
 
     def _render(self, state: AnalysisState) -> None:
-        args = {"vmin": 0 if state.correlations_method == "phik" else -1, "vmax": 1, "center": 0, "cmap": "Spectral"}
+        args = {
+            **{"vmin": 0 if state.correlations_method == "phik" else -1, "vmax": 1, "center": 0, "cmap": "Spectral"},
+            **self._kwargs,
+        }
         self._render_internal(state, "correlations", "correlation matrix", args)
 
 
