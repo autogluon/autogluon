@@ -177,7 +177,8 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
         val_data = args.val_data
         problem_type = predictor.problem_type
         label = predictor.label
-        y_true_val, y_pred_val, highest_error, undecided = self._predict(problem_type, label, predictor, val_data)
+        y_true_train, y_pred_train, _, _ = self._predict(problem_type, predictor, args.train_data)
+        y_true_val, y_pred_val, highest_error, undecided = self._predict(problem_type, predictor, val_data)
         test_data = val_data
         test_data_present = args.test_data is not None and label in args.test_data.columns
 
@@ -185,9 +186,7 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
         y_pred_test = None
         if test_data_present:
             test_data = args.test_data
-            y_true_test, y_pred_test, highest_error, undecided = self._predict(
-                problem_type, label, predictor, test_data
-            )
+            y_true_test, y_pred_test, highest_error, undecided = self._predict(problem_type, predictor, test_data)
 
         importance = predictor.feature_importance(test_data.reset_index(drop=True), silent=True)
         leaderboard = predictor.leaderboard(test_data, silent=True)
@@ -198,6 +197,8 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
             "importance": importance,
             "leaderboard": leaderboard,
             "labels": labels,
+            "y_true_train": y_true_train,
+            "y_pred_train": y_pred_train,
         }
 
         if test_data_present:
@@ -221,20 +222,25 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
 
         state.model_evaluation = s
 
-    def _predict(self, problem_type, label, predictor, val_data):
+    def _predict(self, problem_type, predictor, val_data):
+        label = predictor.label
         y_true_val = val_data[label]
         y_pred_val = predictor.predict(val_data)
         highest_error = None
         undecided = None
         if predictor.problem_type in [BINARY, MULTICLASS]:
             y_proba = predictor.predict_proba(val_data)
-            highest_error = y_proba[y_true_val != y_pred_val].max(axis=1)
+
+            misclassified = y_proba[y_true_val != y_pred_val]
+            expected_value = misclassified.join(y_true_val).apply(lambda row: row.loc[row[label]], axis=1)
+            predicted_value = misclassified.max(axis=1)
+            highest_error = predicted_value - expected_value
             highest_error.name = "error"
 
-            scores = np.sort(y_proba.values, axis=1)
-            diff = scores[:, -1] - scores[:, -2]
-            undecided = pd.Series(index=y_pred_val.index, data=diff, name="score_diff").sort_values(ascending=True)
-            undecided = val_data.join(y_proba).join(undecided).sort_values(by="score_diff")
+            scores = np.sort(misclassified.values, axis=1)
+            diff = scores[:, -1] - expected_value
+            undecided = pd.Series(index=y_pred_val.index, data=diff, name="error").sort_values(ascending=True)
+            undecided = val_data.join(y_proba).join(undecided).sort_values(by="error")
             highest_error = (
                 val_data.join(y_proba, rsuffix="_pred")
                 .join(highest_error, how="inner")

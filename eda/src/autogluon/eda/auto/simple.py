@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 import pandas as pd
 
 from autogluon.common.utils.log_utils import verbosity2loglevel
+from autogluon.tabular import TabularPredictor
 
 from .. import AnalysisState
 from ..analysis import (
@@ -15,6 +16,7 @@ from ..analysis import (
     FeatureInteraction,
     MissingValuesAnalysis,
     ProblemTypeControl,
+    ShapAnalysis,
     TrainValidationSplit,
     XShiftDetector,
 )
@@ -35,6 +37,8 @@ from ..visualization import (
     CorrelationVisualization,
     DatasetStatistics,
     DatasetTypeMismatch,
+    ExplainForcePlot,
+    ExplainWaterfallPlot,
     FeatureImportance,
     FeatureInteractionVisualization,
     LabelInsightsVisualization,
@@ -49,6 +53,8 @@ from ..visualization.base import AbstractVisualization
 from ..visualization.interaction import FeatureDistanceAnalysisVisualization
 from ..visualization.layouts import SimpleVerticalLinearLayout
 
+logger = logging.getLogger(__name__)
+
 __all__ = [
     "analyze",
     "analyze_interaction",
@@ -57,6 +63,7 @@ __all__ = [
     "missing_values_analysis",
     "quick_fit",
     "target_analysis",
+    "explain_rows",
 ]
 
 
@@ -252,12 +259,13 @@ def quick_fit(
     sample: Union[None, int, float] = None,
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
-    save_model_to_state: bool = False,
+    save_model_to_state: bool = True,
     verbosity: int = 0,
     show_feature_importance_barplots: bool = False,
     estimator_args: Optional[Dict[str, Dict[str, Any]]] = None,
     fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
     chart_args: Optional[Dict[str, Dict[str, Any]]] = None,
+    render_analysis: bool = True,
     **fit_args,
 ):
     """
@@ -287,6 +295,8 @@ def quick_fit(
     ----------
     train_data: DataFrame
         training dataset
+    test_data: DataFrame
+        test dataset
     label: str
         target variable
     path: Optional[str], default = None,
@@ -323,6 +333,9 @@ def quick_fit(
         figures args for vizualizations; key == component; value = dict of kwargs for component figure
     chart_args: Optional[Dict[str, Any]], default = None,
         figures args for vizualizations; key == component; value = dict of kwargs for component chart
+    render_analysis: bool, default = True
+        if `False`, then don't render any visualizations; this can be used if user just needs to train a model. It is recommended to use this option
+        with `save_model_to_state=True` and `return_state=True` options.
 
     Returns
     -------
@@ -370,6 +383,42 @@ def quick_fit(
     if (test_data is not None) and (label not in test_data.columns):
         test_data = None
 
+    if render_analysis:
+        viz = [
+            MarkdownSectionComponent(markdown=f"### Model Prediction for {label}"),
+            ConfusionMatrix(
+                fig_args=fig_args.get("confusion_matrix", {}),
+                **chart_args.get("confusion_matrix", dict(annot_kws={"size": 12})),
+            ),
+            RegressionEvaluation(
+                fig_args=fig_args.get("regression_eval", {}),
+                **chart_args.get("regression_eval", {}),
+            ),
+            MarkdownSectionComponent(markdown="### Model Leaderboard"),
+            ModelLeaderboard(),
+            MarkdownSectionComponent(markdown="### Feature Importance for Trained Model"),
+            FeatureImportance(
+                show_barplots=show_feature_importance_barplots,
+                fig_args=fig_args.get("feature_importance", {}),
+                **chart_args.get("feature_importance", {}),
+            ),
+            MarkdownSectionComponent(markdown="### Rows with the highest prediction error"),
+            MarkdownSectionComponent(markdown="Rows in this category worth inspecting for the causes of the error"),
+            PropertyRendererComponent("model_evaluation.highest_error", transform_fn=(lambda df: df.head(10))),
+            MarkdownSectionComponent(
+                condition_fn=(lambda state: is_key_present_in_state(state, "model_evaluation.undecided")),
+                markdown="### Rows with the least distance vs other class",
+            ),
+            MarkdownSectionComponent(
+                condition_fn=(lambda state: is_key_present_in_state(state, "model_evaluation.undecided")),
+                markdown="Rows in this category are the closest to the decision boundary vs the other class "
+                "and are good candidates for additional labeling",
+            ),
+            PropertyRendererComponent("model_evaluation.undecided", transform_fn=(lambda df: df.head(10))),
+        ]
+    else:
+        viz = []
+
     return analyze(
         train_data=train_data,
         test_data=test_data,
@@ -395,38 +444,7 @@ def quick_fit(
                 ],
             ),
         ],
-        viz_facets=[
-            MarkdownSectionComponent(markdown=f"### Model Prediction for {label}"),
-            ConfusionMatrix(
-                fig_args=fig_args.get("confusion_matrix", {}),
-                **chart_args.get("confusion_matrix", dict(annot_kws={"size": 12})),
-            ),
-            RegressionEvaluation(
-                fig_args=fig_args.get("regression_eval", {}),
-                **chart_args.get("regression_eval", dict(marker="o", scatter_kws={"s": 5})),
-            ),
-            MarkdownSectionComponent(markdown="### Model Leaderboard"),
-            ModelLeaderboard(),
-            MarkdownSectionComponent(markdown="### Feature Importance for Trained Model"),
-            FeatureImportance(
-                show_barplots=show_feature_importance_barplots,
-                fig_args=fig_args.get("feature_importance", {}),
-                **chart_args.get("feature_importance", {}),
-            ),
-            MarkdownSectionComponent(markdown="### Rows with the highest prediction error"),
-            MarkdownSectionComponent(markdown="Rows in this category worth inspecting for the causes of the error"),
-            PropertyRendererComponent("model_evaluation.highest_error", transform_fn=(lambda df: df.head(10))),
-            MarkdownSectionComponent(
-                condition_fn=(lambda state: is_key_present_in_state(state, "model_evaluation.undecided")),
-                markdown="### Rows with the least distance vs other class",
-            ),
-            MarkdownSectionComponent(
-                condition_fn=(lambda state: is_key_present_in_state(state, "model_evaluation.undecided")),
-                markdown="Rows in this category are the closest to the decision boundary vs the other class "
-                "and are good candidates for additional labeling",
-            ),
-            PropertyRendererComponent("model_evaluation.undecided", transform_fn=(lambda df: df.head(10))),
-        ],
+        viz_facets=viz,
     )
 
 
@@ -923,4 +941,76 @@ def missing_values_analysis(
             DatasetStatistics(),
             MissingValues(graph_type=graph_type, **chart_args),
         ],
+    )
+
+
+def explain_rows(
+    train_data: pd.DataFrame,
+    model: TabularPredictor,
+    rows: pd.DataFrame,
+    display_rows: bool = False,
+    plot: Optional[str] = "force",
+    baseline_sample: int = 100,
+    return_state: bool = False,
+    **kwargs,
+) -> Optional[AnalysisState]:
+    """
+    Kernel SHAP is a method that uses a special weighted linear regression
+    to compute the importance of each feature. The computed importance values
+    are Shapley values from game theory and also coefficients from a local linear
+    regression values analysis for the given rows.
+
+    The results are rendered either as force plot or waterfall plot.
+
+    Parameters
+    ----------
+    train_data: DataFrame
+        training dataset
+    model: TabularPredictor
+        trained AutoGluon predictor
+    rows: pd.DataFrame,
+        rows to explain
+    display_rows: bool, default = False
+        if `True` then display the row before the explanation chart
+    plot: Optional[str], default = 'force'
+        type of plot to visualize the Shapley values. Supported keys:
+        - `force` - Visualize the given SHAP values with an additive force layout
+        - `waterfall` - Visualize the given SHAP values with a waterfall layout
+        - `None` - do not use any visualization
+    baseline_sample: int, default = 100
+        The background dataset size to use for integrating out features. To determine the impact
+        of a feature, that feature is set to "missing" and the change in the model output
+        is observed.
+    return_state: bool, default = False
+        return state if `True`
+    kwargs
+
+    See Also
+    --------
+    :py:class:`~shap.KernelExplainer`
+    :py:class:`~autogluon.eda.analysis.explain.ShapAnalysis`
+    :py:class:`~autogluon.eda.visualization.explain.ExplainForcePlot`
+    :py:class:`~autogluon.eda.visualization.explain.ExplainWaterfallPlot`
+    """
+
+    if plot is None:
+        viz_facets = None
+    else:
+        supported_plots = {
+            "force": ExplainForcePlot,
+            "waterfall": ExplainWaterfallPlot,
+        }
+        viz_cls = supported_plots.get(plot, None)
+        assert viz_cls is not None, (
+            f"plot must be one of the following values: {','.join(supported_plots.keys())}. "
+            f"If no visualization required, then `None` can be passed."
+        )
+        viz_facets = [viz_cls(display_rows=display_rows, **kwargs)]
+
+    return analyze(
+        train_data=train_data,
+        model=model,
+        return_state=return_state,
+        anlz_facets=[ShapAnalysis(rows, baseline_sample=baseline_sample)],  # type: ignore
+        viz_facets=viz_facets,  # type: ignore
     )

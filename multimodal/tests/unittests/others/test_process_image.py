@@ -1,3 +1,4 @@
+import PIL
 import pytest
 import torch as th
 
@@ -21,8 +22,8 @@ def test_variable_input_size_backbone(checkpoint_name, provided_size, expected_s
     download_dir = "./ag_automm_tutorial_imgcls"
     train_df, test_df = shopee_dataset(download_dir)
 
-    train_transform_types = ["resize_shorter_side", "center_crop", "trivial_augment"]
-    val_transform_types = ["resize_shorter_side", "center_crop"]
+    train_transforms = ["resize_shorter_side", "center_crop", "trivial_augment"]
+    val_transforms = ["resize_shorter_side", "center_crop"]
 
     timm_model = TimmAutoModelForImagePrediction(
         prefix="timm_image", checkpoint_name=checkpoint_name, pretrained=False
@@ -30,8 +31,8 @@ def test_variable_input_size_backbone(checkpoint_name, provided_size, expected_s
 
     image_processor = ImageProcessor(
         model=timm_model,
-        train_transform_types=train_transform_types,
-        val_transform_types=val_transform_types,
+        train_transforms=train_transforms,
+        val_transforms=val_transforms,
         size=provided_size,
     )
     ret = image_processor.process_one_sample(
@@ -41,4 +42,93 @@ def test_variable_input_size_backbone(checkpoint_name, provided_size, expected_s
     out = timm_model(
         th.unsqueeze(ret[timm_model.image_key], dim=0),
         th.unsqueeze(th.Tensor(ret[timm_model.image_valid_num_key]), dim=0),
+    )
+
+
+@pytest.mark.parametrize(
+    "augmentations",
+    [
+        {
+            "model.timm_image.train_transforms": ["resize_to_square", "center_crop"],
+            "model.timm_image.val_transforms": ["resize_shorter_side", "center_crop"],
+        },
+        {
+            "model.timm_image.train_transforms": ["resize_shorter_side", "center_crop"],
+            "model.timm_image.val_transforms": ["resize_shorter_side", "center_crop"],
+        },
+        {
+            "model.timm_image.train_transforms": [
+                "resize_shorter_side",
+                "center_crop",
+                "random_horizontal_flip",
+                "random_vertical_flip",
+            ],
+            "model.timm_image.val_transforms": ["resize_shorter_side", "center_crop"],
+        },
+        {
+            "model.timm_image.train_transforms": [
+                "resize_shorter_side",
+                "center_crop",
+                "affine",
+                "color_jitter",
+                "randaug",
+            ],
+            "model.timm_image.val_transforms": ["resize_shorter_side", "center_crop"],
+        },
+        {
+            "model.timm_image.train_transforms": [
+                "resize_shorter_side",
+                "center_crop",
+                "affine(15, (0.1, 0.1), (0.9, 1.1))",
+            ],
+            "model.timm_image.val_transforms": ["resize_shorter_side", "center_crop"],
+        },
+        {
+            "model.timm_image.train_transforms": [
+                "resize_shorter_side",
+                "center_crop",
+                "affine({'degrees': 15,'translate': (0.1, 0.1), 'scale': (0.9, 1.1)})",
+            ],
+            "model.timm_image.val_transforms": ["resize_shorter_side", "center_crop"],
+        },
+        {
+            "model.timm_image.train_transforms": [
+                "resize_shorter_side",
+                "center_crop",
+                "color_jitter(0.2, 0.1, 0.1)",
+            ],
+            "model.timm_image.val_transforms": ["resize_shorter_side", "center_crop"],
+        },
+        {
+            "model.timm_image.train_transforms": [
+                "resize_shorter_side",
+                "center_crop",
+                "color_jitter({'brightness': 0.2, 'contrast': 0.1, 'saturation': 0.1})",
+            ],
+            "model.timm_image.val_transforms": ["resize_shorter_side", "center_crop"],
+        },
+        {
+            "model.timm_image.train_transforms": ["resize_shorter_side", "center_crop", "randaug(2, 7)"],
+            "model.timm_image.val_transforms": ["resize_shorter_side", "center_crop"],
+        },
+    ],
+)
+def test_data_process_image(augmentations):
+    download_dir = "./ag_automm_tutorial_imgcls"
+    train_df, test_df = shopee_dataset(download_dir)
+    image = PIL.Image.open(train_df["image"][0]).convert("RGB")
+
+    model = TimmAutoModelForImagePrediction(prefix="timm_image", checkpoint_name="swin_tiny_patch4_window7_224")
+    image_processor = ImageProcessor(
+        model=model,
+        train_transforms=augmentations["model.timm_image.train_transforms"],
+        val_transforms=augmentations["model.timm_image.val_transforms"],
+        size=224,
+        norm_type="imagenet",
+    )
+
+    transformed_image = image_processor.train_processor(image)
+
+    assert (
+        len(image_processor.train_processor.transforms) == len(augmentations["model.timm_image.train_transforms"]) + 2
     )

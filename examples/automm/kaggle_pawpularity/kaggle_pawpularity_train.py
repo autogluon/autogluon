@@ -28,7 +28,7 @@ def get_args():
     parser.add_argument("--timm_image_checkpoint_name", type=str,
                         help="The name of model for images in timm.",
                         default="swin_large_patch4_window7_224")
-    parser.add_argument("--image_train_transform_types", type=str,
+    parser.add_argument("--image_train_transforms", type=str,
                         help="The types for transforming images.",
                         default="['resize_shorter_side','center_crop','randaug']")
     parser.add_argument("--categorical_convert_to_text", type=bool,
@@ -163,7 +163,7 @@ if __name__ == "__main__":
             hyperparameters={
                 "model.names": args.model_names,
                 "model.timm_image.checkpoint_name": args.timm_image_checkpoint_name,
-                "model.timm_image.train_transform_types": args.image_train_transform_types,
+                "model.timm_image.train_transforms": args.image_train_transforms,
                 "data.categorical.convert_to_text": args.categorical_convert_to_text,
                 "env.per_gpu_batch_size": args.per_gpu_batch_size,
                 "env.precision": args.precision,

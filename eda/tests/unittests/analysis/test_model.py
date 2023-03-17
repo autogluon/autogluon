@@ -6,6 +6,7 @@ import pytest
 
 import autogluon.eda.analysis as eda
 import autogluon.eda.auto as auto
+from autogluon.core.constants import REGRESSION
 from autogluon.tabular import TabularPredictor
 
 RESOURCE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources"))
@@ -32,12 +33,13 @@ def test_AutoGluonModelEvaluator_regression():
 
         state = auto.analyze(
             model=predictor,
+            train_data=df_train,
             val_data=df_test,
             return_state=True,
             anlz_facets=[eda.model.AutoGluonModelEvaluator(normalize="true")],
         )
 
-    assert state.model_evaluation.problem_type == "regression"
+    assert state.model_evaluation.problem_type == REGRESSION
     assert len(state.model_evaluation.y_true) == len(df_test)
     assert len(state.model_evaluation.y_pred) == len(df_test)
     expected = [c for c in df_train.columns if c not in ["Street", "Utilities", "SalePrice"]]
@@ -60,13 +62,14 @@ def test_AutoGluonModelEvaluator_regression__with_test_data():
 
         state = auto.analyze(
             model=predictor,
+            train_data=df_train,
             val_data=df_val,
             test_data=df_test,
             return_state=True,
             anlz_facets=[eda.model.AutoGluonModelEvaluator(normalize="true")],
         )
 
-    assert state.model_evaluation.problem_type == "regression"
+    assert state.model_evaluation.problem_type == REGRESSION
     assert len(state.model_evaluation.y_true) == len(df_test)
     assert len(state.model_evaluation.y_pred) == len(df_test)
     assert len(state.model_evaluation.y_true_val) == len(df_val)
@@ -88,6 +91,7 @@ def test_AutoGluonModelEvaluator_classification():
 
         state = auto.analyze(
             model=predictor,
+            train_data=df_train,
             val_data=df_test,
             return_state=True,
             anlz_facets=[eda.model.AutoGluonModelEvaluator(normalize="true")],
