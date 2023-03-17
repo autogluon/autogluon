@@ -3,7 +3,6 @@ Module including wrappers for PyTorch implementations of models in GluonTS
 """
 import logging
 import shutil
-import warnings
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type
@@ -14,7 +13,6 @@ import pandas as pd
 import torch
 from gluonts.core.component import from_hyperparameters
 from gluonts.model.forecast import QuantileForecast
-from gluonts.torch.distributions import AffineTransformed
 from gluonts.torch.model.deepar import DeepAREstimator
 from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
 from gluonts.torch.model.forecast import DistributionForecast
