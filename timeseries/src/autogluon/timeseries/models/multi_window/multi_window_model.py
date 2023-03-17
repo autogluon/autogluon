@@ -47,8 +47,11 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             )
         else:
             self.model_base: AbstractTimeSeriesModel = model_base
-        self.most_recent_model: AbstractTimeSeriesModel = None
+        self.model_base_type = type(self.model_base)
         self.info_per_val_window = []
+
+        self.most_recent_model: AbstractTimeSeriesModel = None
+        self.most_recent_model_path: str = None
         super().__init__(**kwargs)
 
     def _fit(
@@ -104,6 +107,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
         # Only the model trained on most recent data is saved & used for prediction
         self.most_recent_model = trained_models[0]
+        self.most_recent_model_path = trained_models[0].path
         self.predict_time = self.most_recent_model.predict_time
         self.fit_time = time.time() - global_fit_start_time - self.predict_time
         self._oof_predictions = pd.concat([model.get_oof_predictions() for model in trained_models])
@@ -148,3 +152,26 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         train_fn_kwargs["init_params"]["model_base"] = self.model_base.__class__
         train_fn_kwargs["init_params"]["model_base_kwargs"] = self.get_params()
         return train_fn_kwargs
+
+    def save(self, path: str = None, verbose=True) -> str:
+        most_recent_model = self.most_recent_model
+        self.most_recent_model = None
+        save_path = super().save(path, verbose)
+
+        self.most_recent_model = most_recent_model
+        if most_recent_model is not None:
+            most_recent_model._oof_predictions = None
+            most_recent_model.save()
+        return save_path
+
+    @classmethod
+    def load(
+        cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
+    ) -> "AbstractTimeSeriesModel":
+        model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
+        model.most_recent_model = model.model_base_type.load(
+            model.most_recent_model_path,
+            reset_paths=reset_paths,
+            verbose=verbose,
+        )
+        return model
