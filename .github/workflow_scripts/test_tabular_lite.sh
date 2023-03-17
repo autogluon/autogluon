@@ -8,7 +8,7 @@ setup_build_env
 export AUTOGLUON_PACKAGE_NAME="autogluon-lite"
 
 install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/[all,tests]"
-build_all
+build_pkg "common" "core" "features" "tabular"
 
 PYODIDE_DIR=/src/pyodide
 

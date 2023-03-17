@@ -19,3 +19,4 @@ RUN chmod +x autogluon_job.sh
 RUN python3 -m pip install numpy pandas scikit-learn
 
 CMD ["/bin/bash"]
+
