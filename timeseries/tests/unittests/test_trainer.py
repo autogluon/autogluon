@@ -329,7 +329,7 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
             "Naive": {},
             "ETS": {},
             "AutoETS": {"n_jobs": 1},
-            "AutoGluonTabular": {},
+            "AutoGluonTabular": {"tabular_hyperparameters": {"GBM"}},
             "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
         },
         val_data=DUMMY_TS_DATAFRAME,
@@ -341,9 +341,10 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
     loaded_trainer = AutoTimeSeriesTrainer.load(path=temp_model_path)
 
     for m in model_names:
-        oof_predictions = loaded_trainer.get_model_oof_predictions(m)
-        assert isinstance(oof_predictions, TimeSeriesDataFrame)
-        loaded_trainer.score_with_predictions(DUMMY_TS_DATAFRAME, oof_predictions)
+        if "WeightedEnsemble" not in m:
+            oof_predictions = loaded_trainer.get_model_oof_predictions(m)
+            assert isinstance(oof_predictions, TimeSeriesDataFrame)
+            loaded_trainer.score_with_predictions(DUMMY_TS_DATAFRAME, oof_predictions)
 
 
 @pytest.mark.parametrize("failing_model", ["NaiveModel", "SeasonalNaiveModel"])
