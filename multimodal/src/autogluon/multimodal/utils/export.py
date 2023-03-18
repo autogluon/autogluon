@@ -193,7 +193,9 @@ class ExportMixin:
                 raise ValueError(f"unsupported column type: {col_type}")
         data = pd.DataFrame.from_dict(data_dict)
 
-        onnx_path = self.export_onnx(data=data, path=self.path, truncate_long_and_double=True)
+        onnx_path = self.export_onnx(
+            data=data, path=os.path.join("/tmp", os.path.basename(self.path)), truncate_long_and_double=True
+        )
         onnx_module = OnnxModule(onnx_path, providers)
         onnx_module.input_keys = self._model.input_keys
         onnx_module.prefix = self._model.prefix

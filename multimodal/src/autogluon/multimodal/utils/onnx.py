@@ -142,3 +142,19 @@ class OnnxModule(object):
                 pass
 
         return DummyModel
+
+    def parameters(self, *args):
+        """A dummy function that act as torch.nn.Module.parameters() function"""
+        return {}
+
+    def buffers(self, *args):
+        """A dummy function that act as torch.nn.Module.buffers() function"""
+        return {}
+
+    def children(self, *args):
+        """A dummy function that act as torch.nn.Module.children() function"""
+        return []
+
+    def modules(self, *args):
+        """A dummy function that act as torch.nn.Module.modules() function"""
+        return []
