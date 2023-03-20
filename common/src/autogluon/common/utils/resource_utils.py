@@ -4,6 +4,8 @@ import os
 import shutil
 import subprocess
 
+from typing import Union
+
 from .utils import bytes_to_mega_bytes
 from .lite import disable_if_lite_mode
 
@@ -131,6 +133,7 @@ class RayResourceManager:
 
     @staticmethod
     def _init_ray():
+        """Initialize ray runtime if not already initialized. Will force the existance of a cluster already being spinned up"""
         import ray
         if not ray.is_initialized():
             ray.init(
@@ -140,15 +143,28 @@ class RayResourceManager:
             )
     
     @staticmethod
-    def _get_cluster_sources(key, default_val=0):
+    def _get_cluster_resources(key: str, default_val: Union[int, float]=0):
+        """
+        Get value of resources available in the cluster.
+        
+        Parameter
+        ---------
+        key: str
+            The key of the value you want to get, i.e. CPU
+        default_val: Union[int, float]
+            Default value to get if key not available in the cluster
+        """
         import ray
         RayResourceManager._init_ray()
         return ray.cluster_resources().get(key, default_val)
 
     @staticmethod
     def get_cpu_count():
-        return RayResourceManager._get_cluster_sources("CPU")
+        """Get number of cpu cores (virtual) available in the cluster"""
+        return RayResourceManager._get_cluster_resources("CPU")
 
     @staticmethod
+    # TODO: find a better naming, "all" sounds unnecessary
     def get_gpu_count_all():
-        return RayResourceManager._get_cluster_sources("GPU")
+        """Get number of gpus available in the cluster"""
+        return RayResourceManager._get_cluster_resources("GPU")
