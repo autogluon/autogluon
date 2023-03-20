@@ -84,12 +84,12 @@ class DocumentProcessor:
         self.val_transform_types = val_transform_types
         self.mean, self.std = image_mean_std(norm_type)
         self.normalization = transforms.Normalize(self.mean, self.std)
-        self.train_processor = construct_image_processor(size=self.size, 
-                                                        normalization=self.normalization, 
-                                                        image_transforms=self.train_transform_types)
-        self.val_processor = construct_image_processor(size=self.size, 
-                                                    normalization=self.normalization, 
-                                                    image_transforms=self.val_transform_types)
+        self.train_processor = construct_image_processor(
+            size=self.size, normalization=self.normalization, image_transforms=self.train_transform_types
+        )
+        self.val_processor = construct_image_processor(
+            size=self.size, normalization=self.normalization, image_transforms=self.val_transform_types
+        )
 
         self.missing_value_strategy = missing_value_strategy
 
