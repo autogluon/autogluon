@@ -19,6 +19,10 @@ job_type_info = {
         'job_definition': 'autogluon-ci-gpu:3',
         'job_queue': 'CI-GPU'
     },
+    'CI-WASM': {
+        'job_definition': 'autogluon-ci-wasm:1',
+        'job_queue': 'CI-CPU'
+    },
     'CI-CPU-PUSH': {
         'job_definition': 'autogluon-ci-cpu-push:3',
         'job_queue': 'CI-CPU'
@@ -26,6 +30,10 @@ job_type_info = {
     'CI-GPU-PUSH': {
         'job_definition': 'autogluon-ci-gpu-push:4',
         'job_queue': 'CI-GPU'
+    },
+    'CI-WASM-PUSH': {
+        'job_definition': 'autogluon-ci-wasm-push:2',
+        'job_queue': 'CI-CPU'
     },
 }
 

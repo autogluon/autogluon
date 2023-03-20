@@ -95,7 +95,10 @@ class CorrelationVisualization(_AbstractCorrelationChart):
         return "correlations" in state
 
     def _render(self, state: AnalysisState) -> None:
-        args = {"vmin": 0 if state.correlations_method == "phik" else -1, "vmax": 1, "center": 0, "cmap": "Spectral"}
+        args = {
+            **{"vmin": 0 if state.correlations_method == "phik" else -1, "vmax": 1, "center": 0, "cmap": "Spectral"},
+            **self._kwargs,
+        }
         self._render_internal(state, "correlations", "correlation matrix", args)
 
 
@@ -270,7 +273,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                     self.render_markdown(
                         f"Interaction {features} is not rendered due to `{f}` "
                         f"having too many categories (`{df[f].nunique()}` > `{self.max_categories_to_consider_render}`) "
-                        f"for comfortable read."
+                        f"to place on plot axis."
                     )
                     return
 

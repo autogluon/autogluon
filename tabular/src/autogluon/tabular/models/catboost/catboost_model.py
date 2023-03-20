@@ -9,9 +9,8 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
-from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils import try_import_catboost
-from autogluon.common.utils.lite import disable_if_lite_mode
 
 from .callbacks import EarlyStoppingCallback, MemoryCheckCallback, TimeCheckCallback
 from .catboost_utils import get_catboost_metric_from_ag_metric
@@ -106,7 +105,7 @@ class CatBoostModel(AbstractModel):
             X_val = self.preprocess(X_val)
             X_val = Pool(data=X_val, label=y_val, cat_features=cat_features, weight=sample_weight_val)
             eval_set = X_val
-            early_stopping_rounds = ag_params.get('ag.early_stop', 'adaptive')
+            early_stopping_rounds = ag_params.get('early_stop', 'adaptive')
             if isinstance(early_stopping_rounds, (str, tuple, list)):
                 early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
 
@@ -284,21 +283,14 @@ class CatBoostModel(AbstractModel):
         return get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=strategy)
 
     def _ag_params(self) -> set:
-        return {'ag.early_stop'}
+        return {'early_stop'}
 
-    @disable_if_lite_mode()
-    def _validate_fit_memory_usage(self, **kwargs):
-        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
-        approx_mem_size_req = self.estimate_memory_usage(**kwargs)
-        if approx_mem_size_req > 1e9:  # > 1 GB
-            available_mem = ResourceManager.get_available_virtual_mem()
-            ratio = approx_mem_size_req / available_mem
-            if ratio > (1 * max_memory_usage_ratio):
-                logger.warning('\tWarning: Not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
-                raise NotEnoughMemoryError
-            elif ratio > (0.75 * max_memory_usage_ratio):
-                logger.warning('\tWarning: Potentially not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
-                
+    def _validate_fit_memory_usage(self, mem_error_threshold: float = 1, mem_warning_threshold: float = 0.75, mem_size_threshold: int = 1e9, **kwargs):
+        return super()._validate_fit_memory_usage(mem_error_threshold=mem_error_threshold,
+                                                  mem_warning_threshold=mem_warning_threshold,
+                                                  mem_size_threshold=mem_size_threshold,
+                                                  **kwargs)
+
     def get_minimum_resources(self, is_gpu_available=False):
         minimum_resources = {
             'num_cpus': 1,

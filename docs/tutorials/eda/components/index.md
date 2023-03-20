@@ -41,6 +41,12 @@ The section contains a reference for low-level components.
    Transformations APIs
 :::
 
+:::{grid-item-card} autogluon.eda.explain
+   :link: autogluon.eda.explain.html
+
+   Explainability APIs
+:::
+
 ::::
 
 ```{toctree}
@@ -53,4 +59,5 @@ missing <autogluon.eda.missing.md>
 model <autogluon.eda.model.md>
 shift <autogluon.eda.shift.md>
 transform <autogluon.eda.transform.md>
+explain <autogluon.eda.explain.md>
 ```

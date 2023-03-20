@@ -10,20 +10,16 @@ import PIL
 import pytesseract
 
 from ..constants import (
-    AUTOMM,
     BINARY,
     CATEGORICAL,
     CLASSIFICATION,
-    DOCUMENT,
     DOCUMENT_IMAGE,
     DOCUMENT_PDF,
-    ENTITY_GROUP,
     IDENTIFIER,
     IMAGE,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
     MULTICLASS,
-    NAMED_ENTITY_RECOGNITION,
     NER,
     NER_ANNOTATION,
     NULL,
@@ -32,6 +28,7 @@ from ..constants import (
     REGRESSION,
     ROIS,
     TEXT,
+    TEXT_NER,
 )
 from .utils import is_rois_input
 
@@ -465,6 +462,7 @@ def infer_column_types(
     allowable_column_types: Optional[List[str]] = None,
     fallback_column_type: Optional[str] = None,
     id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
+    problem_type: Optional[str] = None,
 ) -> Dict:
     """
     Infer the column types of a multimodal pd.DataFrame.
@@ -487,6 +485,8 @@ def infer_column_types(
     id_mappings
         Id-to-content mappings. The contents can be text, image, etc.
         This is used when the dataframe contains the query/response indexes instead of their contents.
+    problem_type
+        The problem type used to update some column types.
 
     Returns
     -------
@@ -563,6 +563,8 @@ def infer_column_types(
             allowable_column_types=allowable_column_types,
             fallback_column_type=fallback_column_type,
         )
+    if problem_type == NER:
+        column_types = infer_ner_column_type(column_types=column_types)
 
     return column_types
 
@@ -764,5 +766,35 @@ def set_fallback_column_type(column_types: Dict, allowable_column_types: List[st
     for col_name, col_type in column_types.items():
         if not col_type.startswith(tuple(allowable_column_types)):
             column_types[col_name] = fallback_column_type
+
+    return column_types
+
+
+def infer_ner_column_type(column_types: Dict):
+    """
+    Replace the first text with text_ner for the ner problem type
+    because no text_ner is detected in infer_column_types.
+
+    Parameters
+    ----------
+    column_types
+        The column types of a dataframe.
+
+    Returns
+    -------
+    The columns types with one text_ner inside it.
+    """
+    # if there is already one column has type text_ner, no action is taken.
+    if any([col_type.startswith(TEXT_NER) for col_type in column_types.values()]):
+        return column_types
+
+    for (
+        column
+    ) in (
+        column_types.keys()
+    ):  # column_types is an ordered dict, so column_types.keys() returns the keys in the order of insertions.
+        if column_types[column].startswith(TEXT):
+            column_types[column] = column_types[column].replace(TEXT, TEXT_NER)
+            break
 
     return column_types

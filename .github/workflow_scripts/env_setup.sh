@@ -68,11 +68,15 @@ function install_all_no_tests {
     install_local_packages "autogluon/"
 }
 
-function build_all {
-    for module in common core features tabular multimodal timeseries autogluon eda
-    do
-        cd "$module"/
+function build_pkg {
+    while(($#)) ; do
+        cd "$1"/
         python setup.py sdist bdist_wheel
         cd ..
+        shift
     done
+}
+
+function build_all {
+    build_pkg "common" "core" "features" "tabular" "multimodal" "timeseries" "autogluon" "eda"
 }

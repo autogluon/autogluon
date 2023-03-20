@@ -122,6 +122,26 @@ jobs:
           job-type: CI-GPU
           job-name: AutoGluon-Tabular
           command: chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh
+  test_tabular_lite:
+    needs: lint_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
+      - name: Test AutoGluonLite package via Pyodide on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-WASM
+          job-name: AutoGluon-Lite
+          command: chmod +x ./.github/workflow_scripts/test_tabular_lite.sh && ./.github/workflow_scripts/test_tabular_lite.sh
   test_eda:
     needs: lint_check
     runs-on: ubuntu-latest
@@ -243,7 +263,7 @@ jobs:
           job-name: AutoGluon-Install
           command: chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
   build_tabular_prediction_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_tabular_lite, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

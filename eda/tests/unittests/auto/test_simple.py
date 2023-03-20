@@ -467,7 +467,7 @@ def test_explain_rows(plot, monkeypatch):
         assert result == "result"
 
         call_analyze.assert_called_with(
-            train_data=train_data,
+            train_data=train_data[model.original_features],
             model=model,
             return_state=True,
             anlz_facets=ANY,
