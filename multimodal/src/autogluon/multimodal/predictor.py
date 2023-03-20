@@ -845,6 +845,7 @@ class MultiModalPredictor(ExportMixin):
             label_columns=self._label_column,
             provided_column_types=column_types,
             valid_data=tuning_data,
+            problem_type=self._problem_type,
         )
         column_types = infer_label_column_type_by_problem_type(
             column_types=column_types,
