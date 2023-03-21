@@ -15,10 +15,10 @@ from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitte
 
 from .common import DUMMY_TS_DATAFRAME
 
-TEST_HYPERPARAMETER_SETTINGS = [
-    {"SimpleFeedForward": {"epochs": 1}},
-    {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
-]
+SINGLE_MODEL_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}}
+TWO_MODELS_HYPERPARAMETERS = {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}}
+
+TEST_HYPERPARAMETER_SETTINGS = [SINGLE_MODEL_HYPERPARAMETERS, TWO_MODELS_HYPERPARAMETERS]
 
 
 def test_predictor_can_be_initialized(temp_model_path):
@@ -31,7 +31,7 @@ def test_when_predictor_called_then_training_is_performed(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MAPE")
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        hyperparameters=SINGLE_MODEL_HYPERPARAMETERS,
         tuning_data=DUMMY_TS_DATAFRAME,
     )
     assert "SimpleFeedForward" in predictor.get_model_names()
@@ -307,7 +307,7 @@ def test_given_irregular_time_series_and_no_tuning_when_predictor_called_with_ig
     )
     predictor.fit(
         train_data=df,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        hyperparameters=SINGLE_MODEL_HYPERPARAMETERS,
     )
     assert "SimpleFeedForward" in predictor.get_model_names()
 
@@ -324,7 +324,7 @@ def test_given_irregular_time_series_when_predictor_called_without_ignore_then_t
     with pytest.raises(ValueError):
         predictor.fit(
             train_data=df,
-            hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+            hyperparameters=SINGLE_MODEL_HYPERPARAMETERS,
         )
 
 
@@ -339,7 +339,7 @@ def test_given_irregular_time_series_when_predictor_called_with_ignore_then_pred
     )
     predictor.fit(
         train_data=df,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        hyperparameters=SINGLE_MODEL_HYPERPARAMETERS,
     )
     predictions = predictor.predict(df)
 
@@ -362,7 +362,7 @@ def test_given_irregular_time_series_when_predictor_called_without_ignore_then_p
     )
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME.get_reindexed_view(),
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        hyperparameters=SINGLE_MODEL_HYPERPARAMETERS,
     )
     with pytest.raises(ValueError, match="irregularly sampled"):
         _ = predictor.predict(df)
@@ -377,7 +377,7 @@ def test_when_predictor_called_and_loaded_back_then_ignore_time_index_persists(t
     )
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        hyperparameters=SINGLE_MODEL_HYPERPARAMETERS,
     )
     predictor.save()
     del predictor
@@ -401,14 +401,11 @@ def test_given_enable_ensemble_true_when_predictor_called_then_ensemble_is_fitte
     predictor = TimeSeriesPredictor(
         path=temp_model_path,
         eval_metric="MAPE",
-        enable_ensemble=True,
     )
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={
-            "SimpleFeedForward": {"epochs": 1},
-            "DeepAR": {"epochs": 1},
-        },
+        hyperparameters=TWO_MODELS_HYPERPARAMETERS,
+        enable_ensemble=True,
     )
     assert any("ensemble" in n.lower() for n in predictor.get_model_names())
 
@@ -419,11 +416,11 @@ def test_given_enable_ensemble_true_and_only_one_model_when_predictor_called_the
     predictor = TimeSeriesPredictor(
         path=temp_model_path,
         eval_metric="MAPE",
-        enable_ensemble=True,
     )
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        hyperparameters=SINGLE_MODEL_HYPERPARAMETERS,
+        enable_ensemble=True,
     )
     assert not any("ensemble" in n.lower() for n in predictor.get_model_names())
 
@@ -432,11 +429,11 @@ def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_not_
     predictor = TimeSeriesPredictor(
         path=temp_model_path,
         eval_metric="MAPE",
-        enable_ensemble=False,
     )
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        hyperparameters=TWO_MODELS_HYPERPARAMETERS,
+        enable_ensemble=False,
     )
     assert not any("ensemble" in n.lower() for n in predictor.get_model_names())
 
@@ -445,7 +442,6 @@ def test_given_model_fails_when_predictor_predicts_then_exception_is_caught_by_l
     predictor = TimeSeriesPredictor(
         path=temp_model_path,
         eval_metric="MAPE",
-        enable_ensemble=False,
     )
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
@@ -460,11 +456,11 @@ def test_given_model_fails_when_predictor_predicts_then_exception_is_caught_by_l
 def test_given_no_searchspace_and_hyperparameter_tune_kwargs_when_predictor_fits_then_exception_is_raised(
     temp_model_path,
 ):
-    predictor = TimeSeriesPredictor(path=temp_model_path, enable_ensemble=False)
+    predictor = TimeSeriesPredictor(path=temp_model_path)
     with pytest.raises(ValueError, match="no model contains a hyperparameter search space"):
         predictor.fit(
             train_data=DUMMY_TS_DATAFRAME,
-            hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+            hyperparameters=SINGLE_MODEL_HYPERPARAMETERS,
             hyperparameter_tune_kwargs="random",
         )
 
@@ -472,7 +468,7 @@ def test_given_no_searchspace_and_hyperparameter_tune_kwargs_when_predictor_fits
 def test_given_searchspace_and_no_hyperparameter_tune_kwargs_when_predictor_fits_then_exception_is_raised(
     temp_model_path,
 ):
-    predictor = TimeSeriesPredictor(path=temp_model_path, enable_ensemble=False)
+    predictor = TimeSeriesPredictor(path=temp_model_path)
     with pytest.raises(
         ValueError, match="Hyperparameter tuning not specified, so hyperparameters must have fixed values"
     ):
@@ -485,7 +481,7 @@ def test_given_searchspace_and_no_hyperparameter_tune_kwargs_when_predictor_fits
 def test_given_mixed_searchspace_and_hyperparameter_tune_kwargs_when_predictor_fits_then_no_exception_is_raised(
     temp_model_path,
 ):
-    predictor = TimeSeriesPredictor(path=temp_model_path, enable_ensemble=False)
+    predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters={"SimpleFeedForward": {"epochs": ag.space.Categorical(1, 2), "ETS": {}}},
@@ -501,21 +497,21 @@ def test_given_mixed_searchspace_and_hyperparameter_tune_kwargs_when_predictor_f
 def test_when_target_included_in_known_covariates_then_exception_is_raised(temp_model_path, target_column):
     with pytest.raises(ValueError, match="cannot be one of the known covariates"):
         predictor = TimeSeriesPredictor(
-            path_context=temp_model_path, target=target_column, known_covariates_names=["Y", target_column, "X"]
+            path=temp_model_path, target=target_column, known_covariates_names=["Y", target_column, "X"]
         )
 
 
 @pytest.mark.parametrize(
     "hyperparameters, num_models",
     [
-        ({"Naive": {}}, 1),
-        ({"Naive": {}, "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}}, 3),  # + 1 for ensemble
+        (SINGLE_MODEL_HYPERPARAMETERS, 1),
+        (TWO_MODELS_HYPERPARAMETERS, 3),  # + 1 for ensemble
     ],
 )
 def test_when_fit_summary_is_called_then_all_keys_and_models_are_included(
     temp_model_path, hyperparameters, num_models
 ):
-    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
     expected_keys = [
         "model_types",
@@ -538,12 +534,12 @@ def test_when_fit_summary_is_called_then_all_keys_and_models_are_included(
 @pytest.mark.parametrize(
     "hyperparameters, num_models",
     [
-        ({"Naive": {}}, 1),
-        ({"Naive": {}, "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}}, 3),  # + 1 for ensemble
+        (SINGLE_MODEL_HYPERPARAMETERS, 1),
+        (TWO_MODELS_HYPERPARAMETERS, 3),  # + 1 for ensemble
     ],
 )
 def test_when_info_is_called_then_all_keys_and_models_are_included(temp_model_path, hyperparameters, num_models):
-    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
     expected_keys = [
         "path",
@@ -563,7 +559,7 @@ def test_when_info_is_called_then_all_keys_and_models_are_included(temp_model_pa
 
 
 def test_when_train_data_contains_nans_then_exception_is_raised(temp_model_path):
-    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    predictor = TimeSeriesPredictor(path=temp_model_path)
     df = DUMMY_TS_DATAFRAME.copy()
     df.iloc[5] = np.nan
     with pytest.raises(ValueError, match="missing values"):
@@ -571,7 +567,7 @@ def test_when_train_data_contains_nans_then_exception_is_raised(temp_model_path)
 
 
 def test_when_prediction_data_contains_nans_then_exception_is_raised(temp_model_path):
-    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
     df = DUMMY_TS_DATAFRAME.copy()
     df.iloc[5] = np.nan
@@ -581,7 +577,7 @@ def test_when_prediction_data_contains_nans_then_exception_is_raised(temp_model_
 
 def test_given_data_is_in_dataframe_format_then_predictor_works(temp_model_path):
     df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
-    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(df, hyperparameters={"Naive": {}})
     predictor.leaderboard(df)
     predictor.score(df)
@@ -593,6 +589,30 @@ def test_given_data_is_in_dataframe_format_then_predictor_works(temp_model_path)
 def test_given_data_cannot_be_interpreted_as_tsdf_then_exception_raised(temp_model_path, rename_columns):
     df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
     df = df.rename(columns=rename_columns)
-    predictor = TimeSeriesPredictor(path_context=temp_model_path)
+    predictor = TimeSeriesPredictor(path=temp_model_path)
     with pytest.raises(ValueError, match="cannot be automatically converted to a TimeSeriesDataFrame"):
         predictor.fit(df, hyperparameters={"Naive": {}})
+
+
+@pytest.mark.parametrize(
+    "arg_1, arg_2, value",
+    [
+        ("quantile_levels", "quantiles", [0.1, 0.4]),
+        ("target", "label", "custom_target"),
+    ],
+)
+def test_when_both_argument_aliases_are_passed_to_init_then_exception_is_raised(temp_model_path, arg_1, arg_2, value):
+    init_kwargs = {arg_1: value, arg_2: value}
+    with pytest.raises(ValueError, match="Please specify at most one of these arguments"):
+        predictor = TimeSeriesPredictor(path=temp_model_path, **init_kwargs)
+
+
+def test_when_invalid_argument_passed_to_init_then_exception_is_raised(temp_model_path):
+    with pytest.raises(TypeError, match="unexpected keyword argument 'invalid_argument'"):
+        predictor = TimeSeriesPredictor(path=temp_model_path, invalid_argument=23)
+
+
+def test_when_invalid_argument_passed_to_fit_then_exception_is_raised(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    with pytest.raises(TypeError, match="unexpected keyword argument 'invalid_argument'"):
+        predictor.fit(DUMMY_TS_DATAFRAME, invalid_argument=23)
