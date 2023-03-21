@@ -9,7 +9,7 @@ from abc import abstractmethod
 
 from numpy import ndarray
 from pandas import DataFrame, Series
-from typing import Union, Optional
+from typing import Any, Dict, Union, Optional
 
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
@@ -17,6 +17,7 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.s3_utils import download_s3_folder, s3_path_to_bucket_prefix
 
+from ..abstract.abstract_model import AbstractModel
 from ...ray.resources_calculator import ResourceCalculatorFactory
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NotEnoughCudaMemoryError
 
@@ -342,18 +343,18 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
 
 
 def _ray_fit(
-    model_base,
-    bagged_ensemble_model_path,
-    X,
-    y,
-    X_pseudo,
-    y_pseudo,
-    fold_ctx,
-    time_limit_fold,
-    save_bag_folds, 
-    resources,
-    kwargs_fold,
-    model_sync_path=None
+    model_base: AbstractModel,
+    bagged_ensemble_model_path: str,
+    X: Union[str, pd.DataFrame],
+    y: Union[str, pd.DataFrame],
+    X_pseudo: Union[str, pd.DataFrame],
+    y_pseudo: Union[str, pd.DataFrame],
+    fold_ctx: Dict[str, Any],
+    time_limit_fold: float,
+    save_bag_folds: bool, 
+    resources: Dict[str, Any],
+    kwargs_fold: Dict[str, Any],
+    model_sync_path: Optional[str] = None
 ):
     logger.log(10, 'ray worker training')
     time_start_fold = time.time()
@@ -389,10 +390,8 @@ def _ray_fit(
     fold_model.fit_time = time_train_end_fold - time_start_fold
     fold_model, pred_proba = _ray_predict_oof(fold_model, X_val_fold, y_val_fold,
                                               time_train_end_fold, resources['num_cpus'], save_bag_folds)
-    model_save_path = None
-    if model_sync_path is not None:
-        model_save_path = model_sync_path + f"{fold_model.name}/"
-    fold_model.save(model_save_path)
+    model_save_path = model_sync_path + f"{fold_model.name}/" if model_sync_path is not None else None
+    fold_model.save(path=model_save_path)
     return fold_model.name, pred_proba, time_start_fold, \
         time_train_end_fold, fold_model.predict_time, fold_model.predict_1_time
 
@@ -492,7 +491,11 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
     def schedule_fold_model_fit(self, fold_ctx):
         self.jobs.append(fold_ctx)
         
-    def _get_ray_init_args(self):
+    def _get_ray_init_args(self) -> Dict[str: Any]:
+        """
+        Get the arguments needed to init ray runtime.
+        This could differ in different context, i.e. distributed vs local
+        """
         return dict(
             address="auto",
             logging_level=logging.ERROR,
@@ -556,7 +559,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 # Terminate all ray tasks because a fold failed
                 self.terminate_all_unfinished_tasks(unfinished)
                 raise processed_exception
-        self._sync_model_artifact(
+        self.sync_model_artifact(
             local_path=os.path.dirname(os.path.normpath(self.bagged_ensemble_model.path)),
             model_sync_path=self.model_sync_path
         )
@@ -734,7 +737,21 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             e = NotEnoughCudaMemoryError
         return e
     
-    def _sync_model_artifact(self, local_path, model_sync_path):
+    def sync_model_artifact(self, local_path: str, model_sync_path: str):
+        """
+        Sync model artifacts being uploaded to `model_sync_path` to `local_path`
+        This method is expected to be called on the head node in the cluster to collect model artifacts after training
+        
+        Parameters
+        ----------
+        local_path: str
+            local path to download artifacts
+        model_sync_path: str
+            remote path to download model artifacts from
+        """
+        self._sync_model_artifact(local_path=local_path, model_sync_path=model_sync_path)
+    
+    def _sync_model_artifact(self, **kwargs):
         pass
     
     

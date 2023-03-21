@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.utils.try_import import try_import_ray
+from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.log_utils import DuplicateFilter
 from .fold_fitting_strategy import AbstractFoldFittingStrategy, SequentialLocalFoldFittingStrategy, ParallelFoldFittingStrategy, ParallelLocalFoldFittingStrategy, ParallelDistributedFoldFittingStrategy
 from ..abstract.abstract_model import AbstractModel
@@ -413,15 +414,41 @@ class BaggedEnsembleModel(AbstractModel):
     def _get_default_fold_fitting_strategy(self):
         try:
             try_import_ray()
-            fold_fitting_strategy = "parallel_local"
-            if os.environ.get("AG_DISTRIBUTED_MODE", False):
-                fold_fitting_strategy = "parallel_distributed"
+            fold_fitting_strategy = "parallel_distributed" if DistributedContext.is_distributed_mode else "parallel_local"
         except Exception as e:
             warning_msg = f'Will use sequential fold fitting strategy because import of ray failed. Reason: {str(e)}'
             dup_filter.attach_filter_targets(warning_msg)
             logger.warning(warning_msg)
             fold_fitting_strategy = 'sequential_local'
         assert fold_fitting_strategy in ['parallel_distributed', 'parallel_local', 'sequential_local']
+        return fold_fitting_strategy
+    
+    def _get_fold_fitting_strategy(self, model_base, num_gpus):
+        fold_fitting_strategy = self.params.get('fold_fitting_strategy', 'auto')
+        if num_gpus is not None and not isinstance(num_gpus, str):
+            # Use a specialized fitting strategy for CPU or GPU models if specified.
+            if num_gpus > 0:
+                fold_fitting_strategy = self.params.get('fold_fitting_strategy_gpu', fold_fitting_strategy)
+            else:
+                fold_fitting_strategy = self.params.get('fold_fitting_strategy_cpu', fold_fitting_strategy)
+        if fold_fitting_strategy == 'auto':
+            fold_fitting_strategy = self._get_default_fold_fitting_strategy()
+        disable_parallel_fitting = self.params.get('_disable_parallel_fitting', False)
+        if fold_fitting_strategy in ['parallel_local', "parallel_distributed"]:
+            if fold_fitting_strategy == "parallel_local":
+                fold_fitting_strategy = ParallelLocalFoldFittingStrategy
+            else:
+                fold_fitting_strategy = ParallelDistributedFoldFittingStrategy
+            if disable_parallel_fitting:
+                fold_fitting_strategy = SequentialLocalFoldFittingStrategy
+                logger.log(20, f'\t{model_base.__class__.__name__} does not support parallel folding yet. Will use sequential folding instead')
+        elif fold_fitting_strategy == 'sequential_local':
+            fold_fitting_strategy = SequentialLocalFoldFittingStrategy
+        else:
+            raise ValueError(
+                f'{fold_fitting_strategy} is not a valid option for fold_fitting_strategy'
+                'Valid options are: parallel_local and sequential_local'
+            )
         return fold_fitting_strategy
 
     def _fit_folds(self,
@@ -442,33 +469,7 @@ class BaggedEnsembleModel(AbstractModel):
                    num_cpus=None,
                    num_gpus=None,
                    **kwargs):
-        fold_fitting_strategy = self.params.get('fold_fitting_strategy', 'auto')
-        if num_gpus is not None and not isinstance(num_gpus, str):
-            # Use a specialized fitting strategy for CPU or GPU models if specified.
-            if num_gpus > 0:
-                fold_fitting_strategy = self.params.get('fold_fitting_strategy_gpu', fold_fitting_strategy)
-            else:
-                fold_fitting_strategy = self.params.get('fold_fitting_strategy_cpu', fold_fitting_strategy)
-        if fold_fitting_strategy == 'auto':
-            fold_fitting_strategy = self._get_default_fold_fitting_strategy()
-        num_folds_parallel = self.params.get('num_folds_parallel', 'auto')
-        disable_parallel_fitting = self.params.get('_disable_parallel_fitting', False)
-        if fold_fitting_strategy in ['parallel_local', "parallel_distributed"]:
-            if fold_fitting_strategy == "parallel_local":
-                fold_fitting_strategy = ParallelLocalFoldFittingStrategy
-            else:
-                fold_fitting_strategy = ParallelDistributedFoldFittingStrategy
-            if disable_parallel_fitting:
-                fold_fitting_strategy = SequentialLocalFoldFittingStrategy
-                logger.log(20, f'\t{model_base.__class__.__name__} does not support parallel folding yet. Will use sequential folding instead')
-        elif fold_fitting_strategy == 'sequential_local':
-            fold_fitting_strategy = SequentialLocalFoldFittingStrategy
-        else:
-            raise ValueError(
-                f'{fold_fitting_strategy} is not a valid option for fold_fitting_strategy'
-                'Valid options are: parallel_local and sequential_local'
-            )
-
+        fold_fitting_strategy = self._get_fold_fitting_strategy(model_base=model_base, num_gpus=num_gpus)
         # TODO: Preprocess data here instead of repeatedly
         # FIXME: Raise exception if multiclass/binary and a single val fold contains all instances of a class. (Can happen if custom groups is specified)
         time_start = time.time()
@@ -500,6 +501,7 @@ class BaggedEnsembleModel(AbstractModel):
         models = []
 
         num_folds = len(fold_fit_args_list)
+        num_folds_parallel = self.params.get('num_folds_parallel', 'auto')
         if num_folds_parallel == 'auto':
             num_folds_parallel = num_folds
         fold_fitting_strategy_args = dict(
@@ -514,7 +516,7 @@ class BaggedEnsembleModel(AbstractModel):
             fold_fitting_strategy_args['num_jobs'] = num_folds
             fold_fitting_strategy_args['num_folds_parallel'] = num_folds_parallel
         if fold_fitting_strategy == ParallelDistributedFoldFittingStrategy:
-            fold_fitting_strategy_args['model_sync_path'] = os.environ.get("AG_MODEL_SYNC_PATH")
+            fold_fitting_strategy_args['model_sync_path'] = DistributedContext.model_sync_path
         fold_fitting_strategy = fold_fitting_strategy(**fold_fitting_strategy_args)
 
         if type(fold_fitting_strategy) == ParallelLocalFoldFittingStrategy and not fold_fitting_strategy.is_mem_sufficient():

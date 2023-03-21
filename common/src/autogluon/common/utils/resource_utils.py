@@ -6,6 +6,7 @@ import subprocess
 
 from typing import Union
 
+from .distribute_utils import DistributedContext
 from .utils import bytes_to_mega_bytes
 from .lite import disable_if_lite_mode
 
@@ -168,3 +169,8 @@ class RayResourceManager:
     def get_gpu_count_all():
         """Get number of gpus available in the cluster"""
         return RayResourceManager._get_cluster_resources("GPU")
+    
+    
+def get_resource_manager():
+    """Get resource manager class based on the training context"""
+    resource_manager = RayResourceManager if DistributedContext.is_distributed_mode else ResourceManager
