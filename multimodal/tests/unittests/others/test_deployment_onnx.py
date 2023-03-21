@@ -185,13 +185,7 @@ def test_onnx_optimize_for_inference(dataset_name, model_names, text_backbone, i
         predictor_opt = MultiModalPredictor.load(path=model_path)
         predictor_opt.optimize_for_inference(providers=providers)
 
-        # Check existence of the exported onnx model file and tensorrt cache files
-        export_path = os.path.join("/tmp", os.path.basename(predictor_opt.path))
-        onnx_path = os.path.join(export_path, "model.onnx")
-        assert os.path.exists(onnx_path), f"onnx model file not found at {onnx_path}"
-        if providers == None or providers == ["TensorrtExecutionProvider"]:
-            trt_cache_dir = os.path.join(export_path, "model_trt")
-            assert len(os.listdir(trt_cache_dir)) >= 2, f"tensorrt cache model files are not found in {trt_cache_dir}"
+        # Check module type of optimized predictor
         assert isinstance(
             predictor_opt._model, OnnxModule
         ), f"invalid onnx module type, expected to be OnnxModule, but the model type is {type(predictor._model)}"

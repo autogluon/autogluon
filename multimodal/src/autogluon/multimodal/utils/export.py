@@ -1,5 +1,6 @@
 import logging
 import os
+import tempfile
 import warnings
 from collections import defaultdict, namedtuple
 from typing import Dict, List, Optional, Union
@@ -193,16 +194,17 @@ class ExportMixin:
                 raise ValueError(f"unsupported column type: {col_type}")
         data = pd.DataFrame.from_dict(data_dict)
 
-        onnx_path = self.export_onnx(
-            data=data, path=os.path.join("/tmp", os.path.basename(self.path)), truncate_long_and_double=True
-        )
-        onnx_module = OnnxModule(onnx_path, providers)
-        onnx_module.input_keys = self._model.input_keys
-        onnx_module.prefix = self._model.prefix
-        onnx_module.get_output_dict = self._model.get_output_dict
+        onnx_module = None
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            onnx_path = self.export_onnx(data=data, path=tmpdirname, truncate_long_and_double=True)
 
-        # To use the TensorRT module for prediction, simply replace the _model in the predictor
-        self._model = onnx_module
+            onnx_module = OnnxModule(onnx_path, providers)
+            onnx_module.input_keys = self._model.input_keys
+            onnx_module.prefix = self._model.prefix
+            onnx_module.get_output_dict = self._model.get_output_dict
+
+            # To use the TensorRT module for prediction, simply replace the _model in the predictor
+            self._model = onnx_module
 
         # Evaluate and cache TensorRT engine files
         logger.info("Compiling ... (this may take a few minutes)")
