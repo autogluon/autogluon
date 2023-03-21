@@ -159,6 +159,12 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
 
   How to use MultiModalPredictor to build a scanned document classifier.
 :::
+
+:::{grid-item-card} Classifying PDF Documents with AutoMM
+  :link: document/pdf_classification.html
+
+  How to use MultiModalPredictor to build a PDF document classifier.
+:::
 ::::
 
 

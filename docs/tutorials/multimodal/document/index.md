@@ -38,6 +38,12 @@ For additional support, please refer to official instructions for [tesseract](ht
 
   How to use MultiModalPredictor to build a scanned document classifier.
 :::
+
+:::{grid-item-card} Classifying PDF Documents with AutoMM
+  :link: pdf_classification.html
+
+  How to use MultiModalPredictor to build a PDF document classifier.
+:::
 ::::
 
 ```{toctree}
@@ -48,4 +54,5 @@ hidden: true
 ---
 
 document_classification
+pdf_classification
 ```
