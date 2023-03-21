@@ -1,4 +1,3 @@
-import boto3
 import logging
 import os
 import shutil
@@ -27,6 +26,7 @@ def s3_bucket_prefix_to_path(bucket, prefix, version='s3'):
 
 
 def delete_s3_prefix(bucket, prefix):
+    import boto3
     s3 = boto3.resource('s3')
     objects_to_delete = s3.meta.client.list_objects(Bucket=bucket, Prefix=prefix)
 
@@ -81,7 +81,7 @@ def download_s3_folder(
     verbose: bool
         Whether to log detailed loggings
     """
-
+    import boto3
     s3 = boto3.resource("s3")
     bucket = s3.Bucket(bucket)
     objs = list(bucket.objects.filter(Prefix=prefix))
