@@ -44,6 +44,7 @@ def download_s3_folder(
     bucket: str,
     prefix: str,
     local_path: str,
+    keep_root_dir: bool = False,
     error_if_exists: bool = True,
     delete_if_exists: bool = False,
     dry_run: bool = False,
@@ -62,10 +63,17 @@ def download_s3_folder(
     This util will download foo to `local_path` and maintain the structure:
         .
         └── local_path/
+            └── test2.txt/
+                └── temp/
+                    └── test3.txt
+    If `keep_root_dir` is set to True, then the root directory of the s3 folder will also be downloaded
+        .
+        └── local_path/
             └── foo/
                 ├── test2.txt
                 └── temp/
                     └── test3.txt
+    
                     
     Parameters
     ----------
@@ -89,7 +97,13 @@ def download_s3_folder(
     s3 = boto3.resource("s3")
     bucket = s3.Bucket(bucket)
     objs = list(bucket.objects.filter(Prefix=prefix))
-    local_paths = _get_local_paths_to_download_objs_with_common_root(s3_objs=[obj.key for obj in objs], local_path=local_path)
+    if not keep_root_dir:
+        objs = [obj for obj in objs if obj.key != prefix]
+    local_paths = _get_local_paths_to_download_objs_with_common_root(
+        s3_objs=[obj.key for obj in objs],
+        local_path=local_path,
+        keep_root_dir=keep_root_dir
+    )
     objs_no_folder = [path for path in local_paths if not path.endswith("/")]
     if verbose:
         logger.log(20, f"Will download {len(objs_no_folder)} objects from s3://{bucket}/{prefix} to {local_path}")
@@ -108,6 +122,7 @@ def download_s3_folder(
             os.makedirs(obj_dir, exist_ok=True)
         else:
             logger.log(20, f"Will create directory {obj_dir}")
+    
     for obj, local_path in zip(objs, local_paths):
         if local_path.endswith("/"):
             continue
@@ -117,10 +132,10 @@ def download_s3_folder(
             logger.log(20, f"Will download {obj.key} to {local_path}")
             
             
-def _get_local_paths_to_download_objs_with_common_root(s3_objs: List[str], local_path: str) -> List[str]:
+def _get_local_paths_to_download_objs_with_common_root(s3_objs: List[str], local_path: str, keep_root_dir: bool = False) -> List[str]:
     """
     Generate the local path to download objs to for each object.
-    The local path will maintain the folder structure starting the common root of the `s3_objs`
+    The local path will maintain the folder structure starting the the first sub-layer of common root of the `s3_objs`
     For example, assuming bucket = bar and the bucket structure looks like this
         .
         └── bar/
@@ -129,8 +144,9 @@ def _get_local_paths_to_download_objs_with_common_root(s3_objs: List[str], local
                 ├── test2.txt
                 └── temp/
                     └── test3.txt
-    assuming `s3_objs = ["foo/temp/", "foo/temp/test3.txt"]`, and `local_path = "."`
-    This function will return ["./temp/", "./temp/test3.txt"]
+    assuming `s3_objs = ["foo/temp/", "foo/temp/test3.txt"]`, `local_path = "."` and `keep_root_dir = False`
+    This function will return ["test3.txt"]
+    Given the same example, if `keep_root_dir = True`, then the function will return ["./temp/", "./temp/test3.txt"]
     
     Parameters
     ----------
@@ -139,6 +155,8 @@ def _get_local_paths_to_download_objs_with_common_root(s3_objs: List[str], local
         str ends with "/" are recognized as directory.
     local_path: str
         Local path to download the objects to
+    keep_root_dir: bool
+        Whether to keep the common root inside the local folder structure
     
     Return
     ------
@@ -148,7 +166,11 @@ def _get_local_paths_to_download_objs_with_common_root(s3_objs: List[str], local
         return []
     common_path = os.path.commonpath(s3_objs)
     assert len(common_path) > 0, "Please pass in a list of objects with a common root folder"
-    irrelevant_common_prefix = os.path.dirname(os.path.normpath(common_path))
+    if keep_root_dir:
+        irrelevant_common_prefix = os.path.dirname(os.path.normpath(common_path))
+    else:
+        irrelevant_common_prefix = os.path.normpath(common_path)
     normalized_local_paths = [obj[len(irrelevant_common_prefix)+1:] if len(irrelevant_common_prefix) > 0 else obj for obj in s3_objs]
+    normalized_local_paths = [path for path in normalized_local_paths if len(path) > 0]
 
     return [os.path.join(local_path, path)for path in normalized_local_paths]
