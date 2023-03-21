@@ -491,7 +491,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
     def schedule_fold_model_fit(self, fold_ctx):
         self.jobs.append(fold_ctx)
         
-    def _get_ray_init_args(self) -> Dict[str: Any]:
+    def _get_ray_init_args(self) -> Dict[str, Any]:
         """
         Get the arguments needed to init ray runtime.
         This could differ in different context, i.e. distributed vs local
@@ -560,7 +560,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 self.terminate_all_unfinished_tasks(unfinished)
                 raise processed_exception
         self.sync_model_artifact(
-            local_path=os.path.dirname(os.path.normpath(self.bagged_ensemble_model.path)),
+            local_path=self.bagged_ensemble_model.path,
             model_sync_path=self.model_sync_path
         )
         self.fit_time = 0
@@ -777,4 +777,4 @@ class ParallelDistributedFoldFittingStrategy(ParallelFoldFittingStrategy):
 
     def _sync_model_artifact(self, local_path, model_sync_path):
         bucket, path = s3_path_to_bucket_prefix(model_sync_path)
-        download_s3_folder(bucket, path, local_path)
+        download_s3_folder(bucket, path, local_path, keep_root_dir=True, error_if_exists=False)

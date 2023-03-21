@@ -414,7 +414,7 @@ class BaggedEnsembleModel(AbstractModel):
     def _get_default_fold_fitting_strategy(self):
         try:
             try_import_ray()
-            fold_fitting_strategy = "parallel_distributed" if DistributedContext.is_distributed_mode else "parallel_local"
+            fold_fitting_strategy = "parallel_distributed" if DistributedContext.is_distributed_mode() else "parallel_local"
         except Exception as e:
             warning_msg = f'Will use sequential fold fitting strategy because import of ray failed. Reason: {str(e)}'
             dup_filter.attach_filter_targets(warning_msg)
@@ -516,7 +516,7 @@ class BaggedEnsembleModel(AbstractModel):
             fold_fitting_strategy_args['num_jobs'] = num_folds
             fold_fitting_strategy_args['num_folds_parallel'] = num_folds_parallel
         if fold_fitting_strategy == ParallelDistributedFoldFittingStrategy:
-            fold_fitting_strategy_args['model_sync_path'] = DistributedContext.model_sync_path
+            fold_fitting_strategy_args['model_sync_path'] = DistributedContext.get_model_sync_path()
         fold_fitting_strategy = fold_fitting_strategy(**fold_fitting_strategy_args)
 
         if type(fold_fitting_strategy) == ParallelLocalFoldFittingStrategy and not fold_fitting_strategy.is_mem_sufficient():

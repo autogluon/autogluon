@@ -1,30 +1,21 @@
-from autogluon.common.utils.s3_utils import _get_local_paths_to_download_objs_with_common_root
+from autogluon.common.utils.s3_utils import _get_local_path_to_download_objs_and_local_dir_to_create
 
 import pytest
 
 @pytest.mark.parametrize(
-    "s3_objs,keep_root_dir,expected_value",
+    "s3_objs,prefix,local_path,expected_objs,expected_dirs",
     [
-        ([], True, []),
-        ([], False, []),
-        (["foo/"], True, ["./foo/"]),
-        (["foo/"], False, []),
-        (["foo/temp/"], True, ["./temp/"]),
-        (["foo/temp/"], False, []),
-        (["foo/temp/", "foo/temp/test.txt"], True, ["./temp/", "./temp/test.txt"]),
-        (["foo/temp/", "foo/temp/test.txt"], False, ["./test.txt"]),
-        (["foo/temp/", "foo/test/"], True, ["./foo/temp/", "./foo/test/"]),
-        (["foo/temp/", "foo/test/"], False, ["./temp/", "./test/"]),
-        (["bar/foo/", "bar/foo/temp/test.txt", "bar/foo/test2.txt"], True, ["./foo/", "./foo/temp/test.txt", "./foo/test2.txt"]),
-        (["bar/foo/", "bar/foo/temp/test.txt", "bar/foo/test2.txt"], False, ["./temp/test.txt", "./test2.txt"]),
-        (["foo/", "bar/"], True, "raise"),
-        (["foo/", "bar/"], False, "raise")
+        (["foo/"], "foo", ".", [], []),
+        (["foo/", "foo/test.txt"], "foo", ".", ["test.txt"], []),
+        (["foo/test.txt", "foo/test2.txt"], "foo", ".", ["test.txt", "test2.txt"], []),
+        (["foo/temp/", "foo/test.txt"], "foo", ".", ["test.txt"], ["temp"]),
+        (["foo/temp/test.txt", "foo/test2.txt"], "foo", ".", ["temp/test.txt", "test2.txt"], ["temp"]),
+        (["foo/temp/test.txt"], "foo", ".", ["temp/test.txt"], ["temp"]),
+        (["foo/temp/temp2/test.txt"], "foo", ".", ["temp/temp2/test.txt"], ["temp/temp2"]),
+        (["foo/temp/temp2/test.txt", "foo/temp/temp3/test.txt"], "foo", ".", ["temp/temp2/test.txt", "temp/temp3/test.txt"], ["temp/temp2", "temp/temp3"]),
     ]
 )
-def test_get_local_paths_to_download_objs_with_common_root(s3_objs, keep_root_dir, expected_value):
-    if not expected_value == "raise":
-        paths = _get_local_paths_to_download_objs_with_common_root(s3_objs=s3_objs, local_path=".", keep_root_dir=keep_root_dir)
-        assert paths == expected_value
-    else:
-        with pytest.raises(Exception):
-            _get_local_paths_to_download_objs_with_common_root(s3_objs=s3_objs, local_path=".", keep_root_dir=keep_root_dir)
+def test_get_local_path_to_download_objs_and_local_dir_to_create(s3_objs, prefix, local_path, expected_objs, expected_dirs):
+    objs, dirs = _get_local_path_to_download_objs_and_local_dir_to_create(s3_objs=s3_objs, prefix=prefix, local_path=local_path)
+    assert sorted(objs) == sorted(expected_objs)
+    assert sorted(dirs) == sorted(expected_dirs)

@@ -173,4 +173,4 @@ class RayResourceManager:
     
 def get_resource_manager():
     """Get resource manager class based on the training context"""
-    resource_manager = RayResourceManager if DistributedContext.is_distributed_mode else ResourceManager
+    return RayResourceManager if DistributedContext.is_distributed_mode() else ResourceManager
