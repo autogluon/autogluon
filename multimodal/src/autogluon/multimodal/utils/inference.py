@@ -482,7 +482,7 @@ def predict(
     if predictor._problem_type == OBJECT_DETECTION:
         strategy = "ddp"
 
-    if strategy == "ddp" and predictor._fit_called:
+    if strategy == "ddp" and predictor._fit_called and predictor._problem_type == OBJECT_DETECTION:
         num_gpus = 1  # While using DDP, we can only use single gpu after fit is called
 
     if num_gpus <= 1:
