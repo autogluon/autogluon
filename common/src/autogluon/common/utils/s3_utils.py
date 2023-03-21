@@ -1,4 +1,9 @@
+import boto3
 import logging
+import os
+import shutil
+
+from typing import List
 
 
 logger = logging.getLogger(__name__)
@@ -23,7 +28,6 @@ def s3_bucket_prefix_to_path(bucket, prefix, version='s3'):
 
 
 def delete_s3_prefix(bucket, prefix):
-    import boto3
     s3 = boto3.resource('s3')
     objects_to_delete = s3.meta.client.list_objects(Bucket=bucket, Prefix=prefix)
 
@@ -41,6 +45,8 @@ def download_s3_folder(
     prefix: str,
     local_path: str,
     error_if_exists: bool = True,
+    delete_if_exists: bool = False,
+    dry_run: bool = False,
     verbose: bool = True
 ):
     """
@@ -71,29 +77,78 @@ def download_s3_folder(
         The local path to download the object/folder into
     error_if_exists: bool
         Whether to raise an error if the root folder exists already
+    delete_if_exists: bool
+        Whether to delete the root folder and all contents within if the root folder exists already
+    dry_run: bool
+        Whether to perform the directory creation and file downloading.
+        If True, will isntead log every file that will be downloaded and every directory that will be created
     verbose: bool
         Whether to log detailed loggings
     """
-    import boto3
-    import os
 
     s3 = boto3.resource("s3")
     bucket = s3.Bucket(bucket)
     objs = list(bucket.objects.filter(Prefix=prefix))
-    irrelevent_dirname = os.path.dirname(os.path.normpath(prefix))
-    objs_no_folder = [obj for obj in objs if not obj.key.endswith("/")]
-    logger.log(20, f"Will download {len(objs_no_folder)} objects from s3://{bucket}/{prefix} to {local_path}")
+    local_paths = _get_local_paths_to_download_objs_with_common_root(s3_objs=[obj.key for obj in objs], local_path=local_path)
+    objs_no_folder = [path for path in local_paths if not path.endswith("/")]
+    if verbose:
+        logger.log(20, f"Will download {len(objs_no_folder)} objects from s3://{bucket}/{prefix} to {local_path}")
+    
+    # make directory
+    local_rootdir = os.path.commonpath(local_paths)
+    if os.path.isdir(local_rootdir) and not dry_run:
+        if error_if_exists:
+            raise ValueError(f"Directory {local_rootdir} already exsists. Please pass in a different `local_path` or set `error_if_exsits` to `False`")
+        if delete_if_exists:
+            logger.warning(f"Will delete {local_rootdir} and all its content within because this folder already exsists and `delete_if_exists` = `True`")
+            shutil.rmtree(local_rootdir)
+    local_obj_dirs = [path for path in local_paths if path.endswith("/")]
+    for obj_dir in local_obj_dirs:
+        if not dry_run:
+            os.makedirs(obj_dir, exist_ok=True)
+        else:
+            logger.log(20, f"Will create directory {obj_dir}")
+    for obj, local_path in zip(objs, local_paths):
+        if local_path.endswith("/"):
+            continue
+        if not dry_run:
+            bucket.download_file(obj.key, local_path)
+        else:
+            logger.log(20, f"Will download {obj.key} to {local_path}")
+            
+            
+def _get_local_paths_to_download_objs_with_common_root(s3_objs: List[str], local_path: str) -> List[str]:
+    """
+    Generate the local path to download objs to for each object.
+    The local path will maintain the folder structure starting the common root of the `s3_objs`
+    For example, assuming bucket = bar and the bucket structure looks like this
+        .
+        └── bar/
+            ├── test.txt
+            └── foo/
+                ├── test2.txt
+                └── temp/
+                    └── test3.txt
+    assuming `s3_objs = ["foo/temp/", "foo/temp/test3.txt"]`, and `local_path = "."`
+    This function will return ["./temp/", "./temp/test3.txt"]
+    
+    Parameters
+    ----------
+    s3_objs: List[str]
+        List of objects to download from s3. This list should have a common prefix (having the same root direcory)
+        str ends with "/" are recognized as directory.
+    local_path: str
+        Local path to download the objects to
+    
+    Return
+    ------
+        A list representing local object paths, including directory, to download to.
+    """
+    if len(s3_objs) == 0:
+        return []
+    common_path = os.path.commonpath(s3_objs)
+    assert len(common_path) > 0, "Please pass in a list of objects with a common root folder"
+    irrelevant_common_prefix = os.path.dirname(os.path.normpath(common_path))
+    normalized_local_paths = [obj[len(irrelevant_common_prefix)+1:] if len(irrelevant_common_prefix) > 0 else obj for obj in s3_objs]
 
-    for obj in objs:
-        # remove the file name from the object key and remove irrelevent parent folder along the path
-        obj_dir = os.path.relpath(os.path.dirname(obj.key), irrelevent_dirname)
-        obj_dir = os.path.join(local_path, obj_dir)
-        # get the full object path
-        obj_path = os.path.join(obj_dir, os.path.basename(obj.key))
-
-        # create nested directory structure
-        os.makedirs(obj_dir, exist_ok=True)
-
-        # save file with full path locally
-        if not obj.key.endswith("/"):
-            bucket.download_file(obj.key, obj_path)
+    return [os.path.join(local_path, path)for path in normalized_local_paths]
