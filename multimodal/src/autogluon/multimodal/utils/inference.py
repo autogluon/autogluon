@@ -153,7 +153,7 @@ def infer_batch(
     device = torch.device(device_type)
     batch_size = len(batch[next(iter(batch))])
     if 1 < num_gpus <= batch_size:
-        model = nn.DataParallel(model)
+        model = nn.parallel.DistributedDataParallel(model)
     model.to(device).eval()
     batch = move_to_device(batch, device=device)
     precision_context = get_precision_context(precision=precision, device_type=device_type)
@@ -162,7 +162,7 @@ def infer_batch(
         if model_postprocess_fn:
             output = model_postprocess_fn(output)
 
-    if isinstance(model, nn.DataParallel):
+    if isinstance(model, nn.parallel.DistributedDataParallel):
         model = model.module
     else:
         model = model
