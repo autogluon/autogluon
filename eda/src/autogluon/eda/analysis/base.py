@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Generator, List, Optional, Tuple
+from typing import Dict, Generator, List, Optional, Tuple
 
 from pandas import DataFrame
 
@@ -213,3 +213,42 @@ class Namespace(AbstractAnalysis):
         if self.namespace not in state:
             state[self.namespace] = {}
         return state[self.namespace]
+
+
+class SaveArgsToState(AbstractAnalysis):
+    """
+    Helper to copy parameters from args to state.
+
+    Can be helpful if some other transformation were performed on the args (i.e. feature generator)
+    and the modified args has to be stored for other purposes
+
+    Parameters
+    ----------
+    params_mapping: Dict[str, str]
+        mapping between args and state keys to be copied. I.e. `{'a': 'b'}` means `state.b = args.a`
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: Optional[List[AbstractAnalysis]], default None
+        wrapped analyses; these will receive sampled `args` during `fit` call
+    state: AnalysisState
+        state to be updated by this fit function
+    kwargs
+    """
+
+    def __init__(
+        self,
+        params_mapping: Dict[str, str],
+        parent: Optional[AbstractAnalysis] = None,
+        children: Optional[List[AbstractAnalysis]] = None,
+        state: Optional[AnalysisState] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(parent, children, state, **kwargs)
+        self.params_mapping = params_mapping
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return self.all_keys_must_be_present(args, *self.params_mapping.keys())
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
+        for key_args, key_state in self.params_mapping.items():
+            state[key_state] = args[key_args]

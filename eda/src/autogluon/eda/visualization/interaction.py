@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,6 +7,7 @@ import pandas as pd
 import seaborn as sns
 from scipy import stats
 from scipy.cluster import hierarchy as hc
+from sklearn.inspection import PartialDependenceDisplay
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_DATETIME, R_FLOAT, R_INT, R_OBJECT
 
@@ -161,13 +162,11 @@ class FeatureDistanceAnalysisVisualization(AbstractVisualization, JupyterMixin):
 
     def __init__(
         self,
-        headers: bool = False,
         namespace: Optional[str] = None,
         fig_args: Optional[Dict[str, Any]] = None,
         **kwargs,
     ) -> None:
         super().__init__(namespace, **kwargs)
-        self.headers = headers
         if fig_args is None:
             fig_args = {}
         self.fig_args = fig_args
@@ -449,3 +448,81 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
     class _LinePlotRenderer(_AbstractFeatureInteractionPlotRenderer):
         def _render(self, state, ds, params, param_types, ax, data, chart_args):
             sns.lineplot(ax=ax, data=data, **chart_args)
+
+
+class PDPInteractions(AbstractVisualization, JupyterMixin):
+    MAX_CHARTS_PER_ROW = 2
+
+    def __init__(
+        self,
+        features: Union[str, List[str]],
+        target: Optional[Any] = None,
+        namespace: Optional[str] = None,
+        fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
+        sample: Optional[Union[float, int]] = 300,
+        headers: bool = False,
+        **kwargs,
+    ) -> None:
+        super().__init__(namespace, **kwargs)
+        self.features = features
+        self.target = target
+        self.fig_args = fig_args
+        self.sample = sample
+        self.headers = headers
+
+    def can_handle(self, state: AnalysisState) -> bool:
+        return self.all_keys_must_be_present(state, "model", "pdp_data")
+
+    def _render(self, state: AnalysisState) -> None:
+        n = len(self.features)
+        cols = self.MAX_CHARTS_PER_ROW if n > self.MAX_CHARTS_PER_ROW else n
+        rows = int(np.ceil(n / cols))
+
+        if self.fig_args is None:
+            self.fig_args = {}
+        fig_args = {**dict(nrows=rows, ncols=cols, figsize=(12, 3 * rows)), **self.fig_args}
+
+        if self.headers:
+            self.render_header_if_needed(state, "Partial Dependence Plots")
+
+        fig, axs = plt.subplots(**fig_args)
+        kwargs = {"pd_line_kw": {"color": "red"}, "ice_lines_kw": {"color": "blue"}, **self._kwargs}
+        chart = PartialDependenceDisplay.from_estimator(
+            _SklearnAutoGluonWrapper(state.model),
+            state.pdp_data,
+            self.features,
+            kind="both",
+            ax=axs.ravel()[:n],
+            target=self.target,
+            subsample=self.sample,
+            **kwargs,
+        )
+        plt.tight_layout(h_pad=0.3, w_pad=0.5)
+        plt.show(chart)
+        plt.show()
+
+
+class _SklearnAutoGluonWrapper:
+    def __init__(self, estimator):
+        self.estimator = estimator
+        self.estimator_type = "regressor" if estimator.problem_type == "regression" else "classifier"
+
+    @property
+    def _estimator_type(self):
+        return self.estimator_type
+
+    def __sklearn_is_fitted__(self):
+        return True
+
+    def fit(self, X, Y=None):
+        self.estimator.fit(X)
+
+    def predict(self, X):
+        return self.estimator.predict(X)
+
+    def predict_proba(self, X):
+        return self.estimator.predict_proba(X)
+
+    @property
+    def classes_(self):
+        return self.estimator.class_labels
