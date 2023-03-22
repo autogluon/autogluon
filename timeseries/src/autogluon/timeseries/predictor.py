@@ -109,9 +109,9 @@ class TimeSeriesPredictor:
         Keyword arguments to send to the learner (for advanced users only). Options include ``trainer_type``, a
         class inheriting from ``AbstractTrainer`` which controls training of multiple models.
         If ``path`` and ``eval_metric`` are re-specified within ``learner_kwargs``, these are ignored.
-    label : str
+    label : str, optional
         Alias for :attr:`target`.
-    quantiles : List[float]
+    quantiles : List[float], optional
         Alias for :attr:`quantile_levels`.
     """
 
