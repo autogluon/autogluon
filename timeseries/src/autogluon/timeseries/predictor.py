@@ -102,18 +102,15 @@ class TimeSeriesPredictor:
         - ``"last_window"``: use last ``prediction_length`` time steps of each time series for validation.
         - ``"multi_window"``: use last 3 non-overlapping windows of length ``prediction_length`` of each time series for validation.
         - object of type :class:`~autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` implementing a custom splitting strategy (for advanced users only).
-
-    Other Parameters
-    ----------------
     learner_type : AbstractLearner, default = TimeSeriesLearner
         A class which inherits from ``AbstractLearner``. The learner specifies the inner logic of the
         ``TimeSeriesPredictor``.
-    label : str
-        Alias for :attr:`target`.
     learner_kwargs : dict, optional
         Keyword arguments to send to the learner (for advanced users only). Options include ``trainer_type``, a
         class inheriting from ``AbstractTrainer`` which controls training of multiple models.
         If ``path`` and ``eval_metric`` are re-specified within ``learner_kwargs``, these are ignored.
+    label : str
+        Alias for :attr:`target`.
     quantiles : List[float]
         Alias for :attr:`quantile_levels`.
     """
