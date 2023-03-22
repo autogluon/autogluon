@@ -31,6 +31,7 @@ class AbstractVisualization(ABC, StateCheckMixin):
     --------
     :py:class:`~autogluon.eda.analysis.base.Namespace`
     """
+
     def __init__(self, namespace: Optional[str] = None, **kwargs) -> None:
         super().__init__()
         self.namespace: List[str] = []
