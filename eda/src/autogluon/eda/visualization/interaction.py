@@ -149,6 +149,10 @@ class CorrelationSignificanceVisualization(_AbstractCorrelationChart):
 
 class FeatureDistanceAnalysisVisualization(AbstractVisualization, JupyterMixin):
     """
+    Feature distance visualization.
+
+    This component renders graphical representations of distances between features to highlight features that can be
+    either simplified or completely removed.
 
     Parameters
     ----------
@@ -452,6 +456,33 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
 
 
 class PDPInteractions(AbstractVisualization, JupyterMixin):
+    """
+    Display Partial Dependence Plots (PDP) with Individual Conditional Expectation (ICE)
+
+    ICE plots complement PDP by showing the relationship between a feature and the model's output for each individual instance in the dataset.
+    ICE lines (blue) can be overlaid on PDPs (red) to provide a more detailed view of how the model behaves for specific instances.
+
+    Parameters
+    ----------
+    features: Union[str, List[str]]
+        feature to display on the plots
+    target: Optional[Any], default = None
+        In a multiclass setting, specifies the class for which the PDPs should be computed.
+        Ignored in binary classification or classical regression settings
+    namespace: Optional[str], default = None
+        namespace to use; can be nested like `ns_a.ns_b.ns_c`
+    fig_args: Optional[Dict[str, Any]] = None,
+        kwargs to pass into chart figure
+    headers: bool, default = False
+        if `True` then render headers
+    sample: Union[None, int, float], default = None
+        sample size; if `int`, then row number is used;
+        `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
+        `None` means no sampling
+        See also :func:`autogluon.eda.analysis.dataset.Sampler`
+    kwargs
+    """
+
     MAX_CHARTS_PER_ROW = 2
 
     def __init__(

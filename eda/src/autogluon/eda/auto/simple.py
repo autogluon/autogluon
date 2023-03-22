@@ -1094,6 +1094,7 @@ def explain_rows(
 def partial_dependence_plots(
     train_data: pd.DataFrame,
     label: str,
+    target: Optional[Any] = None,
     features: Optional[Union[str, List[str]]] = None,
     path: Optional[str] = None,
     max_ice_lines: int = 300,
@@ -1139,9 +1140,11 @@ def partial_dependence_plots(
     ----------
     train_data: DataFrame
         training dataset
-    train_data
     label: str
         target variable
+    target: Optional[Any], default = None
+        In a multiclass setting, specifies the class for which the PDPs should be computed.
+        Ignored in binary classification or classical regression settings
     features: Optional[Union[str, List[str]]], default = None
         feature to display on the plots
     path: Optional[str], default = None
@@ -1167,7 +1170,11 @@ def partial_dependence_plots(
 
     Returns
     -------
+    state after `fit` call if `return_state` is `True`; `None` otherwise
 
+    See Also
+    --------
+    :py:class:`~autogluon.eda.visualization.interaction.PDPInteractions`
     """
 
     chart_args, fig_args, features = _validate_and_normalize_pdp_args(
@@ -1222,7 +1229,7 @@ def partial_dependence_plots(
                 "If the ICE lines change significantly when comparing two features, this might suggest an interaction effect.",
                 condition_fn=lambda _: show_help_text,
             ),
-            PDPInteractions(features=features, fig_args=fig_args, sample=max_ice_lines, **chart_args),  # type: ignore
+            PDPInteractions(features=features, fig_args=fig_args, sample=max_ice_lines, target=target, **chart_args),  # type: ignore
             MarkdownSectionComponent(
                 f"The following variable(s) are categorical: {cats}. They are represented as the numbers in the figures above. "
                 f"Mappings are available in `state.pdp_id_to_category_mappings`. The`state` can be returned from this call via adding `return_state=True`.",
