@@ -86,6 +86,8 @@ class DefaultLearner(AbstractTabularLearner):
                        f'Disk Space Avail:   {disk_free_gb:.2f} GB / {disk_total_gb:.2f} GB '
                        f'({disk_proportion_avail * 100:.1f}%){disk_log_extra}')
         except Exception as e:
+            # Note: using a broad exception catch as it is unknown what scenarios an exception would be raised, and what exception type would be used.
+            #  The broad exception ensures that we don't completely break AutoGluon for users who may be running on strange hardware or environments.
             logger.log(30,
                        f'Disk Space Avail:   WARNING, an exception ({e.__class__.__name__}) occurred while attempting to get available disk space. '
                        f'Consider opening a GitHub Issue.')
