@@ -128,13 +128,18 @@ class AbstractTimeSeriesModel(AbstractModel):
         pass
 
     def save(self, path: str = None, verbose=True) -> str:
+        # Save self._oof_predictions as a separate file, not model attribute
         if self._oof_predictions is not None:
             save_pkl.save(
                 path=os.path.join(self.path + "utils", self._oof_filename),
                 object=self._oof_predictions,
                 verbose=verbose,
             )
-        return super().save(path=path, verbose=verbose)
+        oof_predictions = self._oof_predictions
+        self._oof_predictions = None
+        save_path = super().save(path=path, verbose=verbose)
+        self._oof_predictions = oof_predictions
+        return save_path
 
     @classmethod
     def load(
@@ -253,24 +258,6 @@ class AbstractTimeSeriesModel(AbstractModel):
                 "as hyperparameters when initializing or use `hyperparameter_tune` instead."
             )
 
-    def score_and_cache_oof(self, val_data: TimeSeriesDataFrame) -> None:
-        """Compute val_score, predict_time and cache out-of-fold (OOF) predictions."""
-        if self.val_score is not None or self.predict_time is not None or self._oof_predictions is not None:
-            raise ValueError(f"Model {self.name} has already been scored on OOF data!")
-
-        past_data, known_covariates = self.slice_data_for_scoring(val_data)
-        predict_start_time = time.time()
-        self._oof_predictions = self.predict(past_data, known_covariates=known_covariates)
-        self.predict_time = time.time() - predict_start_time
-
-        evaluator = TimeSeriesEvaluator(
-            eval_metric=self.eval_metric,
-            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
-            prediction_length=self.prediction_length,
-            target_column=self.target,
-        )
-        self.val_score = evaluator(val_data, self._oof_predictions) * evaluator.coefficient
-
     def _check_predict_inputs(
         self,
         data: TimeSeriesDataFrame,
@@ -353,6 +340,22 @@ class AbstractTimeSeriesModel(AbstractModel):
             known_covariates = None
         return past_data, known_covariates
 
+    def score_with_predictions(
+        self,
+        data: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        metric: Optional[str] = None,
+    ) -> float:
+        """Compute the score measuring how well the predictions align with the data."""
+        eval_metric = self.eval_metric if metric is None else metric
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=eval_metric,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
+        )
+        return evaluator(data, predictions) * evaluator.coefficient
+
     def score(self, data: TimeSeriesDataFrame, metric: str = None, **kwargs) -> float:
         """Return the evaluation scores for given metric and dataset. The last
         `self.prediction_length` time steps of each time series in the input data set
@@ -379,18 +382,20 @@ class AbstractTimeSeriesModel(AbstractModel):
             The computed forecast evaluation score on the last `self.prediction_length`
             time steps of each time series.
         """
-        metric = self.eval_metric if metric is None else metric
-        evaluator = TimeSeriesEvaluator(
-            eval_metric=metric,
-            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
-            prediction_length=self.prediction_length,
-            target_column=self.target,
-        )
         past_data, known_covariates = self.slice_data_for_scoring(data)
         predictions = self.predict(past_data, known_covariates=known_covariates)
-        metric_value = evaluator(data, predictions)
+        return self.score_with_predictions(data=data, predictions=predictions, metric=metric)
 
-        return metric_value * evaluator.coefficient
+    def score_and_cache_oof(self, val_data: TimeSeriesDataFrame) -> None:
+        """Compute val_score, predict_time and cache out-of-fold (OOF) predictions."""
+        if self.val_score is not None or self.predict_time is not None or self._oof_predictions is not None:
+            raise ValueError(f"Model {self.name} has already been scored on OOF data!")
+
+        past_data, known_covariates = self.slice_data_for_scoring(val_data)
+        predict_start_time = time.time()
+        self._oof_predictions = self.predict(past_data, known_covariates=known_covariates)
+        self.predict_time = time.time() - predict_start_time
+        self.val_score = self.score_with_predictions(val_data, self._oof_predictions)
 
     def _update_hpo_train_fn_kwargs(self, train_fn_kwargs: dict) -> dict:
         return train_fn_kwargs
