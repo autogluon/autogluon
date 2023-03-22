@@ -75,6 +75,7 @@ and **val_data** arguments in the scope of calling children's **fit()**.
    :nosignatures:
 
    AbstractAnalysis
+   BaseAnalysis
    Namespace
 ```
 
@@ -84,6 +85,13 @@ and **val_data** arguments in the scope of calling children's **fit()**.
 .. autoclass:: AbstractAnalysis
    :members:
    :inherited-members:
+```
+
+### {hidden}`BaseAnalysis`
+
+```{eval-rst}
+.. autoclass:: BaseAnalysis
+   :members: init
 ```
 
 ### {hidden}`Namespace`

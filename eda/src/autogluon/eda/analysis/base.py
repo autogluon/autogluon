@@ -12,6 +12,43 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractAnalysis(ABC, StateCheckMixin):
+    """
+    Base class for analysis functionality.
+
+    Provides basic functionality for state/args management in analysis hierarchy
+    and helper method to access frequently-used methods.
+
+    Analyses can be nested; the hierarchical relationships can be navigated via `parent` and `children` properties.
+
+    The main entry method of analysis is `fit` function. This `_fit` method is designed to be overridden
+    by the component developer and should encapsulate all the outputs into `state` object provided.
+    When called, the execution flow is the following:
+    - gather `args` from the parent levels of analysis hierarchy; this is done to avoid referencing same args on each
+        nested component (i.e. `train_data` can be specified at the top and all the children will be able to access it
+        via `args` on all levels (unless overriden by one of the components in the hierarchy)
+    - call `_fit` function for each component that returned `True` from `can_handle` call
+
+    Please note: `state` is shared across the whole analysis hierarchy. If two components change the same space, then
+    it will be overridden by each consecutive update. If same component have to be reused and requires writing different
+    outputs, please use :py:class:`~autogluon.eda.analysis.base.Namespace` wrapper to isolate the components.
+
+    Parameters
+    ----------
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: Optional[List[AbstractAnalysis]], default None
+        wrapped analyses; these will receive sampled `args` during `fit` call
+    state: Optional[AnalysisState], default = None
+        state object to perform check on; if not provided a new state will be created during the `fit` call
+    kwargs
+        arguments to pass into the component
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.base.Namespace`
+
+    """
+
     def __init__(
         self,
         parent: Optional[AbstractAnalysis] = None,
@@ -133,6 +170,23 @@ class AbstractAnalysis(ABC, StateCheckMixin):
 
 
 class BaseAnalysis(AbstractAnalysis):
+    """
+    Simple implementation of :py:class:`~autogluon.eda.analysis.base.AbstractAnalysis`
+
+    Parameters
+    ----------
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: Optional[List[AbstractAnalysis]], default None
+        wrapped analyses; these will receive sampled `args` during `fit` call
+    kwargs
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.base.AbstractAnalysis`
+
+    """
+
     def __init__(
         self, parent: Optional[AbstractAnalysis] = None, children: Optional[List[AbstractAnalysis]] = None, **kwargs
     ) -> None:
