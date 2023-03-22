@@ -114,21 +114,6 @@ class ResourceManager:
         """
         return shutil.disk_usage(path=path)
 
-    @classmethod
-    def get_disk_usage_free(cls, path: str) -> int:
-        """Get free disk space in bytes"""
-        return cls.get_disk_usage(path=path).free
-
-    @classmethod
-    def get_disk_usage_used(cls, path: str) -> int:
-        """Get used disk space in bytes"""
-        return cls.get_disk_usage(path=path).used
-
-    @classmethod
-    def get_disk_usage_total(cls, path: str) -> int:
-        """Get total disk space in bytes"""
-        return cls.get_disk_usage(path=path).total
-
     @staticmethod
     def _get_gpu_count_cuda():
         # FIXME: Sometimes doesn't detect GPU on Windows
