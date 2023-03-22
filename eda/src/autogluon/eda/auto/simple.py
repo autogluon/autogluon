@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 
@@ -1170,16 +1170,10 @@ def partial_dependence_plots(
 
     """
 
-    fig_args = get_empty_dict_if_none(fig_args)
-    chart_args = get_empty_dict_if_none(chart_args)
-
-    if features is None and len(train_data.columns) > col_number_warning:
-        logger.warning(
-            f"This visualization will render {len(train_data.columns)} charts. "
-            f"This can take a while. This warning can be disabled by setting `col_number_warning` to a higher value."
-        )
-
-    pdp_data, state, id_to_category_mappings = _prepare_pdp_data(train_data, label, sample)
+    chart_args, fig_args, features = _validate_and_normalize_pdp_args(
+        train_data, features, fig_args, chart_args, col_number_warning
+    )
+    pdp_data, state, id_to_category_mappings = _prepare_pdp_data(train_data, label, sample, features)
 
     state = quick_fit(
         path=path,
@@ -1195,8 +1189,6 @@ def partial_dependence_plots(
 
     if features is None:
         features = state.model_evaluation.importance.index.tolist()
-    elif type(features) is not list:
-        features = [features]  # type: ignore
 
     if len(id_to_category_mappings) > 0:
         cats = ", ".join([f"`{c}`" for c in id_to_category_mappings.keys()])
@@ -1244,7 +1236,38 @@ def partial_dependence_plots(
     return s if return_state else None
 
 
-def _prepare_pdp_data(train_data, label, sample):
+def _validate_and_normalize_pdp_args(
+    train_data: pd.DataFrame,
+    features: Optional[Union[str, List[str]]] = None,
+    fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
+    chart_args: Optional[Dict[str, Dict[str, Any]]] = None,
+    col_number_warning: int = 20,
+) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[List[str]]]:
+    fig_args = get_empty_dict_if_none(fig_args)
+    chart_args = get_empty_dict_if_none(chart_args)
+
+    if features is not None:
+        if type(features) is not list:
+            features = [features]  # type: ignore
+        features_not_present = [f for f in features if f not in train_data.columns]
+        assert (
+            len(features_not_present) == 0
+        ), f"Features {', '.join(features_not_present)} are not present in train_data: {', '.join(train_data.columns)}"
+    if features is None and len(train_data.columns) > col_number_warning:
+        print("qqq")
+        logger.warning(
+            f"This visualization will render {len(train_data.columns)} charts. "
+            f"This can take a while. This warning can be disabled by setting `col_number_warning` to a higher value."
+        )
+    return chart_args, fig_args, features
+
+
+def _prepare_pdp_data(
+    train_data: pd.DataFrame,
+    label: str,
+    sample: Optional[Union[int, float]] = None,
+    features: Optional[List[str]] = None,
+) -> Tuple[pd.DataFrame, AnalysisState, Dict[str, Dict[int, str]]]:
     apply_gen = ApplyFeatureGenerator(
         category_to_numbers=True,
         children=[
@@ -1263,10 +1286,14 @@ def _prepare_pdp_data(train_data, label, sample):
         sample=sample,
     )
     pdp_data = state.pdp_train_data  # type: ignore
-    id_to_category_mappings = {}
+    id_to_category_mappings: Dict[str, Dict[int, str]] = {}
     for gen in [item for sublist in apply_gen.feature_generator.generators for item in sublist]:
         if type(gen) is CategoryFeatureGenerator:
             id_to_category_mappings = {
                 k: {i: v for i, v in enumerate(v.tolist())} for k, v in gen.category_map.items()
             }
-    return pdp_data, state, id_to_category_mappings
+
+    if features is not None:
+        id_to_category_mappings = {k: v for k, v in id_to_category_mappings.items() if k in features}
+
+    return pdp_data, state, id_to_category_mappings  # type: ignore
