@@ -20,6 +20,7 @@ __all__ = [
     "CorrelationSignificanceVisualization",
     "FeatureInteractionVisualization",
     "FeatureDistanceAnalysisVisualization",
+    "PDPInteractions",
 ]
 
 
