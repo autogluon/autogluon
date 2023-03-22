@@ -22,6 +22,7 @@
     CorrelationVisualization
     CorrelationSignificanceVisualization
     FeatureInteractionVisualization
+    PDPInteractions
 ```
 
 ### {hidden}`CorrelationVisualization`
