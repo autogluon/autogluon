@@ -383,9 +383,9 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         name_to_value = {}
         for name, _ in self.named_parameters():
             n = name
-            n = n.replace("backbone","0")
-            n = n.replace("neck","1")
-            n = n.replace("bbox_head","2")
+            n = n.replace("backbone", "0")
+            n = n.replace("neck", "1")
+            n = n.replace("bbox_head", "2")
 
             # backbone
             n = n.replace("stem", "0")
@@ -409,7 +409,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             n = n.replace("multi_level_conv_reg", "1")
             n = n.replace("multi_level_conv_obj", "1")
 
-            value = int(''.join(c for c in n if c.isdigit()).ljust(8, '0'))
+            value = int("".join(c for c in n if c.isdigit()).ljust(8, "0"))
             name_to_value[name] = value
 
         values = list(set(name_to_value.values()))
