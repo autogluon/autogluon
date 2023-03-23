@@ -71,14 +71,14 @@ def download_s3_folder(
         The prefix of the object/folder to be downloaded
     local_path: str
         The local path to download the object/folder into
-    error_if_exists: bool
+    error_if_exists: bool, default = True
         Whether to raise an error if the root folder exists already
-    delete_if_exists: bool
+    delete_if_exists: bool, default = False
         Whether to delete the root folder and all contents within if the root folder exists already
-    dry_run: bool
+    dry_run: bool, default = False
         Whether to perform the directory creation and file downloading.
         If True, will isntead log every file that will be downloaded and every directory that will be created
-    verbose: bool
+    verbose: bool, default = True
         Whether to log detailed loggings
     """
     import boto3

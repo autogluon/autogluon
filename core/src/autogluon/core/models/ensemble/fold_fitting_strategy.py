@@ -343,6 +343,7 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
 
 
 def _ray_fit(
+    *,
     model_base: AbstractModel,
     bagged_ensemble_model_path: str,
     X: Union[str, pd.DataFrame],
@@ -390,7 +391,7 @@ def _ray_fit(
     fold_model.fit_time = time_train_end_fold - time_start_fold
     fold_model, pred_proba = _ray_predict_oof(fold_model, X_val_fold, y_val_fold,
                                               time_train_end_fold, resources['num_cpus'], save_bag_folds)
-    model_save_path = model_sync_path + f"{fold_model.name}/" if model_sync_path is not None else None
+    model_save_path = model_sync_path + f"{fold_model.name}/" if model_sync_path is not None else None  # s3 path hence need "/" as the saperator
     fold_model.save(path=model_save_path)
     return fold_model.name, pred_proba, time_start_fold, \
         time_train_end_fold, fold_model.predict_time, fold_model.predict_1_time
@@ -590,9 +591,20 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 kwargs_fold['sample_weight'] = self.sample_weight[train_index]
                 kwargs_fold['sample_weight_val'] = self.sample_weight[val_index]
         return self._ray_fit.options(**resources) \
-            .remote(model_base_ref, self.bagged_ensemble_model.path,
-                    X_ref, y_ref, X_pseudo_ref, y_pseudo_ref, fold_ctx_ref, time_limit_fold,
-                    save_bag_folds, resources, kwargs_fold, model_sync_path=self.model_sync_path)
+            .remote(
+                model_base=model_base_ref,
+                bagged_ensemble_model_path=self.bagged_ensemble_model.path,
+                X=X_ref,
+                y=y_ref,
+                X_pseudo=X_pseudo_ref,
+                y_pseudo=y_pseudo_ref,
+                fold_ctx=fold_ctx_ref,
+                time_limit_fold=time_limit_fold,
+                save_bag_folds=save_bag_folds,
+                resources=resources,
+                kwargs_fold=kwargs_fold,
+                model_sync_path=self.model_sync_path
+            )
 
     def _update_bagged_ensemble(self, fold_model, pred_proba, time_start_fit,
                                 time_end_fit, predict_time, predict_1_time, fold_ctx):
@@ -777,4 +789,4 @@ class ParallelDistributedFoldFittingStrategy(ParallelFoldFittingStrategy):
 
     def _sync_model_artifact(self, local_path, model_sync_path):
         bucket, path = s3_path_to_bucket_prefix(model_sync_path)
-        download_s3_folder(bucket, path, local_path, keep_root_dir=True, error_if_exists=False)
+        download_s3_folder(bucket, path, local_path, error_if_exists=False)
