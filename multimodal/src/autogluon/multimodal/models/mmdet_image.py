@@ -383,7 +383,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         name_to_value = {}
         for name, _ in self.named_parameters():
             n = name
-            #print(n)
             n = n.replace("backbone","0")
             n = n.replace("neck","1")
             n = n.replace("bbox_head","2")
