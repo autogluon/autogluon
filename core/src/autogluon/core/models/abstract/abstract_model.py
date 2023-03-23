@@ -5,7 +5,6 @@ import logging
 import math
 import os
 import pickle
-from autogluon.core.utils import try_import
 import sys
 import time
 from typing import Any, Dict, Optional, Union
@@ -15,6 +14,7 @@ import pandas as pd
 import scipy
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.common.utils.lite import disable_if_lite_mode
@@ -37,7 +37,6 @@ from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMem
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
-from ...utils.try_import import try_import_ray
 
 
 logger = logging.getLogger(__name__)

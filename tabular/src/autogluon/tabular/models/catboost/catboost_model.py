@@ -10,7 +10,7 @@ from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, S
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.core.utils import try_import_catboost
+from autogluon.common.utils.try_import import try_import_catboost
 
 from .callbacks import EarlyStoppingCallback, MemoryCheckCallback, TimeCheckCallback
 from .catboost_utils import get_catboost_metric_from_ag_metric

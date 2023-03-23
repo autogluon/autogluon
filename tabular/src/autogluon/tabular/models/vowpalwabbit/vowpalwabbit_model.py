@@ -6,7 +6,7 @@ import pandas as pd
 
 from autogluon.core.models import AbstractModel
 from autogluon.common.features.types import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT, S_IMAGE_PATH, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL
-from autogluon.core.utils.try_import import try_import_vowpalwabbit
+from autogluon.common.utils.try_import import try_import_vowpalwabbit
 from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS, \
     PROBLEM_TYPES_CLASSIFICATION, PROBLEM_TYPES_REGRESSION
 from autogluon.core.utils.exceptions import TimeLimitExceeded

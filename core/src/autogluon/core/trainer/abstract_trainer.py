@@ -15,6 +15,7 @@ from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
 from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.try_import import try_import_torch
 
 from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
@@ -29,7 +30,6 @@ from ..utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidF
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
 from ..utils.feature_selection import FeatureSelector
-from ..utils.try_import import try_import_torch
 
 logger = logging.getLogger(__name__)
 
