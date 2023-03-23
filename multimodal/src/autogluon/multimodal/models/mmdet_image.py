@@ -345,6 +345,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             "bbox_head.convs_pred",
             "bbox_head.cls_branches",
             "bbox_head.multi_level_conv_cls",
+            "bbox_head.multi_level_conv_reg",
+            "bbox_head.multi_level_conv_obj",
             "bbox_head.vfnet_cls",
             "bbox_head.heatmap_head",
             "bbox_head.atss_cls",
@@ -354,12 +356,15 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         default_head_layers_patterns = ["bbox_head"]
 
         head_registered = False
+        is_yolox = False
         for n, _ in self.named_parameters():
             name_to_id[n] = 1
             for pattern in registered_head_layers_patterns:
                 if pattern in n:
                     name_to_id[n] = 0
                     head_registered = True
+                if "bbox_head.multi_level_conv_cls" in n:
+                    is_yolox = True
 
         if not head_registered:
             for n, _ in self.named_parameters():
@@ -368,4 +373,51 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                     if pattern in n:
                         name_to_id[n] = 0
 
+        if is_yolox:
+            name_to_id = self.get_yolox_layer_ids()
+
+        return name_to_id
+
+    def get_yolox_layer_ids(self):
+        # logic not straight forward, need to print out the model to understand
+        name_to_value = {}
+        for name, _ in self.named_parameters():
+            n = name
+            #print(n)
+            n = n.replace("backbone","0")
+            n = n.replace("neck","1")
+            n = n.replace("bbox_head","2")
+
+            # backbone
+            n = n.replace("stem", "0")
+
+            # neck
+            n = n.replace("reduce_layers", "0")
+            n = n.replace("top_down_blocks", "1")
+            n = n.replace("downsamples", "2")
+            n = n.replace("bottom_up_blocks", "3")
+            n = n.replace("out_convs", "4")
+
+            n = n.replace("main_conv", "0")
+            n = n.replace("short_conv", "1")
+            n = n.replace("final_conv", "2")
+            n = n.replace("blocks", "3")
+
+            # bbox_head
+            n = n.replace("multi_level_cls_convs", "0")
+            n = n.replace("multi_level_reg_convs", "0")
+            n = n.replace("multi_level_conv_cls", "1")
+            n = n.replace("multi_level_conv_reg", "1")
+            n = n.replace("multi_level_conv_obj", "1")
+
+            value = int(''.join(c for c in n if c.isdigit()).ljust(8, '0'))
+            name_to_value[name] = value
+
+        values = list(set(name_to_value.values()))
+        values.sort(reverse=True)
+        value_to_id = dict(zip(values, range(len(values))))
+
+        name_to_id = {}
+        for n, _ in self.named_parameters():
+            name_to_id[n] = value_to_id[name_to_value[n]]
         return name_to_id
