@@ -74,7 +74,8 @@ def download_s3_folder(
     error_if_exists: bool, default = True
         Whether to raise an error if the root folder exists already
     delete_if_exists: bool, default = False
-        Whether to delete the root folder and all contents within if the root folder exists already
+        Whether to delete the local root folder and all contents within if the root folder exists already
+        If `error_if_exists=True`, deletion will not occur.
     dry_run: bool, default = False
         Whether to perform the directory creation and file downloading.
         If True, will isntead log every file that will be downloaded and every directory that will be created
