@@ -1146,7 +1146,7 @@ def partial_dependence_plots(
         In a multiclass setting, specifies the class for which the PDPs should be computed.
         Ignored in binary classification or classical regression settings
     features: Optional[Union[str, List[str]]], default = None
-        feature to display on the plots
+        feature subset to display; `None` means all features will be rendered.
     path: Optional[str], default = None
         location to store the model trained for this task
     max_ice_lines: int, default = 300
@@ -1261,7 +1261,6 @@ def _validate_and_normalize_pdp_args(
             len(features_not_present) == 0
         ), f"Features {', '.join(features_not_present)} are not present in train_data: {', '.join(train_data.columns)}"
     if features is None and len(train_data.columns) > col_number_warning:
-        print("qqq")
         logger.warning(
             f"This visualization will render {len(train_data.columns)} charts. "
             f"This can take a while. This warning can be disabled by setting `col_number_warning` to a higher value."
