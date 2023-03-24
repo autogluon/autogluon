@@ -144,8 +144,8 @@ def _load_multipart_s3(bucket, prefix, columns_to_keep=None, dtype=None, sample_
     if prefix[-1] == '/':
         prefix = prefix[:-1]
     prefix_multipart = prefix + '/part-'
-    # banned_contains=['/'] to disallow loading files like 's3://bucket/prefix/part-directory/some_file.abc'
-    files = list_bucket_prefix_suffix_contains_s3(bucket=bucket, prefix=prefix_multipart, banned_contains=['/'])
+    # exclude_contains=['/'] to disallow loading files like 's3://bucket/prefix/part-directory/some_file.abc'
+    files = list_bucket_prefix_suffix_contains_s3(bucket=bucket, prefix=prefix_multipart, exclude_contains=['/'])
     paths_full = [s3_utils.s3_bucket_prefix_to_path(bucket=bucket, prefix=file, version='s3') for file in files]
     if sample_count is not None:
         logger.log(15, 'Load multipart s3 taking sample of ' + str(sample_count) + ' out of ' + str(len(paths_full)) + ' files to load')

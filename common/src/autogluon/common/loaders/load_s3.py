@@ -2,7 +2,7 @@ import logging
 import os
 import pathlib
 
-from typing import List, Union
+from typing import List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +30,16 @@ def download(input_bucket, input_prefix, local_path):
 
 
 # TODO: Expand to support arbitrary list of candidate file paths
-# TODO: add local file path support
+# TODO: add local file path support as a more general function
 # TODO: Consider renaming and deprecating old name
+# TODO: consider using a single parameter supporting wildcards or regex - this will solve all possible use cases for filtering
+#   list_bucket_prefix_suffix_contains_s3(..., exclude=['**/*.bak', '**/data/*_excl.csv'])
 def list_bucket_prefix_suffix_contains_s3(bucket: str,
                                           prefix: str,
-                                          suffix: Union[str, List[str]] = None,
-                                          banned_suffixes: List[str] = None,
-                                          contains: Union[str, List[str]] = None,
-                                          banned_contains: List[str] = None) -> List[str]:
+                                          suffix: Optional[Union[str, List[str]]] = None,
+                                          exclude_suffix: Optional[List[str]] = None,
+                                          contains: Optional[Union[str, List[str]]] = None,
+                                          exclude_contains: Optional[List[str]] = None) -> List[str]:
     """
     Returns a list of file paths within an S3 bucket that satisfies the constraints.
 
@@ -53,13 +55,13 @@ def list_bucket_prefix_suffix_contains_s3(bucket: str,
     suffix : str or List[str], default = None
         If specified, filters files to ensure their paths end with the specified suffix (if str)
         or at least one element of `suffix` (if list) in the post-prefix string path.
-    banned_suffixes : List[str], default = None
+    exclude_suffix : List[str], default = None
         If specified, filters files to ensure their paths do not end with any element in `banned_suffixes`.
     contains : str or List[str], default = None
         If specified, will filter any result that doesn't contain `contains` (if str)
         or at least one element of `contains` (if list) in the post-prefix string path.
-    banned_contains : List[str], default = None
-        If specified, filters files to ensure their paths do not contain any element in `banned_contains`.
+    exclude_contains : List[str], default = None
+        If specified, filters files to ensure their paths do not contain any element in `exclude_contains`.
 
     Returns
     -------
@@ -67,10 +69,10 @@ def list_bucket_prefix_suffix_contains_s3(bucket: str,
 
     """
     import boto3
-    if banned_suffixes is None:
-        banned_suffixes = []
-    if banned_contains is None:
-        banned_contains = []
+    if exclude_suffix is None:
+        exclude_suffix = []
+    if exclude_contains is None:
+        exclude_contains = []
     if suffix is not None and not isinstance(suffix, list):
         suffix = [suffix]
     if contains is not None and not isinstance(contains, list):
@@ -83,13 +85,13 @@ def list_bucket_prefix_suffix_contains_s3(bucket: str,
     for object_summary in my_bucket.objects.filter(Prefix=prefix):
         suffix_full = object_summary.key.split(prefix, 1)[1]
         is_banned = False
-        for banned_s in banned_suffixes:
+        for banned_s in exclude_suffix:
             if suffix_full.endswith(banned_s):
                 is_banned = True
                 break
         if is_banned:
             continue
-        for banned_c in banned_contains:
+        for banned_c in exclude_contains:
             if banned_c in suffix_full:
                 is_banned = True
                 break

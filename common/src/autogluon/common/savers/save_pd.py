@@ -3,6 +3,7 @@ import logging
 import multiprocessing
 import os
 from io import StringIO
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -23,11 +24,11 @@ def save(path: str,
          df: pd.DataFrame,
          index: bool = False,
          verbose: bool = True,
-         type: str = None,
+         type: Optional[str] = None,
          sep: str = ',',
          compression: str = 'gzip',
          header: bool = True,
-         json_dump_columns: list = None):
+         json_dump_columns: Optional[List[str]] = None):
     """
     Save pandas DataFrame to the file path.
     If local path, directories will be created autmatically if necessary to save the file.
