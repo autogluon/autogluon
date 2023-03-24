@@ -10,7 +10,7 @@ from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY
     S_TEXT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.core.utils import try_import_autogluon_multimodal
+from autogluon.common.utils.try_import import try_import_autogluon_multimodal
 from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)

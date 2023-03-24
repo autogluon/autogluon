@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..utils import try_import_torch
+from autogluon.common.utils.try_import import try_import_torch
 
 
 def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_val: float = 1, max_iter: int = 1000,

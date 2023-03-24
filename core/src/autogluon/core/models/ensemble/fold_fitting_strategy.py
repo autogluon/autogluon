@@ -14,10 +14,10 @@ from typing import Union
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.try_import import try_import_ray
 
 from ...ray.resources_calculator import ResourceCalculatorFactory
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NotEnoughCudaMemoryError
-from ...utils.try_import import try_import_ray
 
 logger = logging.getLogger(__name__)
 

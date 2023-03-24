@@ -12,6 +12,7 @@ from typing import Dict, Type, Union
 import numpy as np
 import pandas as pd
 
+from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.log_utils import DuplicateFilter
 from .fold_fitting_strategy import AbstractFoldFittingStrategy, SequentialLocalFoldFittingStrategy, ParallelLocalFoldFittingStrategy
 from ..abstract.abstract_model import AbstractModel
@@ -21,7 +22,6 @@ from ...hpo.exceptions import EmptySearchSpace
 from ...utils.exceptions import TimeLimitExceeded
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
-from ...utils.try_import import try_import_ray
 from ...utils.utils import CVSplitter, _compute_fi_with_stddev
 
 

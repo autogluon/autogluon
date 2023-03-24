@@ -1,7 +1,7 @@
 import logging
 
 from autogluon.core.constants import REGRESSION, SOFTCLASS
-from autogluon.core.utils.try_import import try_import_rapids_cuml
+from autogluon.common.utils.try_import import try_import_rapids_cuml
 
 from .rf_model import RFModel
 from .._utils.rapids_utils import RapidsModelMixin
