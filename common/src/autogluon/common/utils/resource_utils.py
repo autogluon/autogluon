@@ -6,6 +6,8 @@ import subprocess
 
 from typing import Union
 
+from autogluon.common.utils.try_import import try_import_ray
+
 from .distribute_utils import DistributedContext
 from .utils import bytes_to_mega_bytes
 from .lite import disable_if_lite_mode
@@ -135,6 +137,7 @@ class RayResourceManager:
     @staticmethod
     def _init_ray():
         """Initialize ray runtime if not already initialized. Will force the existance of a cluster already being spinned up"""
+        try_import_ray()
         import ray
         if not ray.is_initialized():
             ray.init(
@@ -155,6 +158,7 @@ class RayResourceManager:
         default_val: Union[int, float]
             Default value to get if key not available in the cluster
         """
+        try_import_ray()
         import ray
         RayResourceManager._init_ray()
         return ray.cluster_resources().get(key, default_val)
