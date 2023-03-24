@@ -335,7 +335,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         self.models = models
 
-    def get_model_oof_predictions(self, model_name: str) -> TimeSeriesDataFrame:
+    def _get_model_oof_predictions(self, model_name: str) -> TimeSeriesDataFrame:
         model_path = self.get_model_attribute(model=model_name, attribute="path")
         model_type = self.get_model_attribute(model=model_name, attribute="type")
         return model_type.load_oof_predictions(path=model_path)
@@ -683,7 +683,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         model_preds = {}
         for model_name in model_names:
-            model_preds[model_name] = self.get_model_oof_predictions(model_name=model_name)
+            model_preds[model_name] = self._get_model_oof_predictions(model_name=model_name)
 
         time_start = time.time()
         ensemble = self.ensemble_model_type(
