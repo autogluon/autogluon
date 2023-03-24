@@ -4,6 +4,8 @@ import shutil
 
 from typing import List, Tuple
 
+from ..loaders.load_s3 import list_bucket_prefix_suffix_contains_s3
+
 
 logger = logging.getLogger(__name__)
 
@@ -84,9 +86,10 @@ def download_s3_folder(
     """
     import boto3
     s3 = boto3.resource("s3")
-    bucket = s3.Bucket(bucket)
-    objs = list(bucket.objects.filter(Prefix=prefix))
-    objs = [obj.key for obj in objs]
+    s3_bucket = s3.Bucket(bucket)
+    # objs = list(bucket.objects.filter(Prefix=prefix))
+    # objs = [obj.key for obj in objs]
+    objs = list_bucket_prefix_suffix_contains_s3(bucket=bucket, prefix=prefix)
     local_obj_paths, folder_to_create = _get_local_path_to_download_objs_and_local_dir_to_create(
         s3_objs=objs,
         prefix=prefix,
@@ -110,7 +113,7 @@ def download_s3_folder(
         if dry_run:
             logger.log(20, f"Will download {obj} to {local_obj_path}")
         else:
-            bucket.download_file(obj, local_obj_path)
+            s3_bucket.download_file(obj, local_obj_path)
             
             
 def _get_local_path_to_download_objs_and_local_dir_to_create(s3_objs: List[str], prefix: str, local_path: str) -> Tuple[List[str], List[str]]:
