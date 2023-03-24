@@ -22,6 +22,8 @@
     CorrelationVisualization
     CorrelationSignificanceVisualization
     FeatureInteractionVisualization
+    FeatureDistanceAnalysisVisualization
+    PDPInteractions
 ```
 
 ### {hidden}`CorrelationVisualization`
@@ -44,6 +46,22 @@
 
 ```{eval-rst}
 .. autoclass:: FeatureInteractionVisualization
+   :members: init
+
+```
+
+### {hidden}`FeatureDistanceAnalysisVisualization`
+
+```{eval-rst}
+.. autoclass:: FeatureDistanceAnalysisVisualization
+   :members: init
+
+```
+
+### {hidden}`PDPInteractions`
+
+```{eval-rst}
+.. autoclass:: PDPInteractions
    :members: init
 
 ```

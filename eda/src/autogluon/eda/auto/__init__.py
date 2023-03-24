@@ -5,6 +5,7 @@ from .simple import (
     dataset_overview,
     explain_rows,
     missing_values_analysis,
+    partial_dependence_plots,
     quick_fit,
     target_analysis,
 )

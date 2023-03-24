@@ -5,7 +5,7 @@ import pytest
 
 from autogluon.eda import AnalysisState
 from autogluon.eda.analysis import Namespace
-from autogluon.eda.analysis.base import BaseAnalysis
+from autogluon.eda.analysis.base import AbstractAnalysis, BaseAnalysis, SaveArgsToState
 
 
 def test_abstractanalysis_parameter_shadowing():
@@ -115,3 +115,27 @@ def test_namespaces():
     state = BaseAnalysis(state=state, children=[Namespace(namespace="ns2", children=[inner_analysis])]).fit(op="fit3")
 
     assert state == {"ns1": {"upd": {"op": "fit1"}}, "ns2": {"upd": {"op": "fit3"}}}
+
+
+def test_SaveArgsToState():
+    train_data = list("abc")
+
+    class SomeTransform(AbstractAnalysis):
+        def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+            return True
+
+        def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
+            print(args)
+            self.args["train_data"] = [c.upper() for c in args["train_data"]]
+
+    state = BaseAnalysis(
+        train_data=train_data,
+        children=[SomeTransform(children=[SaveArgsToState(params_mapping={"train_data": "result_arg"})])],
+    ).fit()
+
+    assert state.result_arg == ["A", "B", "C"]
+
+
+def test_SaveArgsToState__no_key():
+    state = BaseAnalysis(children=[SaveArgsToState(params_mapping={"train_data": "result_arg"})]).fit()
+    assert state.result_arg is None
