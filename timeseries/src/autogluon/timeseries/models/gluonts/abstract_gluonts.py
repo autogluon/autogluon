@@ -168,7 +168,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self.feat_static_cat_cardinality: List[int] = []
 
     def save(self, path: str = None, verbose: bool = True) -> str:
-        # The GluonTS predictor will be serialized using custom logic
+        # The GluonTS predictor is serialized using custom logic
         predictor = self.gts_predictor
         self.gts_predictor = None
         path = Path(super().save(path=path, verbose=verbose))

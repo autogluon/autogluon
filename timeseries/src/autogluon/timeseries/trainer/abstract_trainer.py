@@ -501,7 +501,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
 
             if val_data is not None:
-                model.score_and_cache_oof(val_data)
+                model.score_and_cache_oof(val_data, store_val_score=True, store_predict_time=True)
 
             self._log_scores_and_times(model.val_score, model.fit_time, model.predict_time)
 
@@ -707,7 +707,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         ensemble.predict_time = predict_time
 
         predictions = ensemble.predict({n: model_preds[n] for n in ensemble.model_names})
-        ensemble.val_score = self.score_with_predictions(val_data, predictions)
+        ensemble.val_score = self._score_with_predictions(val_data, predictions)
 
         self._log_scores_and_times(
             val_score=ensemble.val_score,
@@ -734,7 +734,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             }
 
         if data is not None:
-            past_data, known_covariates = self.slice_data_for_scoring(data)
+            past_data, known_covariates = data.get_model_inputs_for_scoring(
+                prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+            )
             logger.info(
                 "Additional data provided, testing on additional data. Resulting leaderboard "
                 "will be sorted according to test score (`score_test`)."
@@ -745,7 +747,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     pred_start_time = time.time()
                     predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model_name)
                     model_info[model_name]["pred_time_test"] = time.time() - pred_start_time
-                    model_info[model_name]["score_test"] = self.score_with_predictions(data, predictions)
+                    model_info[model_name]["score_test"] = self._score_with_predictions(data, predictions)
                 except Exception as e:  # noqa
                     logger.error(f"Cannot score with model {model_name}. An error occurred: {str(e)}")
                     logger.debug(traceback.format_exc())
@@ -813,19 +815,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 logger.info(f"\tYou can call predict(data, model) with one of other available models: {other_models}")
             return None
 
-    def slice_data_for_scoring(
-        self, data: TimeSeriesDataFrame
-    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
-        """Prepare model inputs necessary to predict the last `prediction_length` timesteps of each time series."""
-        past_data = data.slice_by_timestep(None, -self.prediction_length)
-        if len(self.metadata.known_covariates_real) > 0:
-            future_data = data.slice_by_timestep(-self.prediction_length, None)
-            known_covariates = future_data[self.metadata.known_covariates_real]
-        else:
-            known_covariates = None
-        return past_data, known_covariates
-
-    def score_with_predictions(
+    def _score_with_predictions(
         self,
         data: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
@@ -847,9 +837,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         metric: Optional[str] = None,
     ) -> float:
-        past_data, known_covariates = self.slice_data_for_scoring(data)
+        past_data, known_covariates = data.get_model_inputs_for_scoring(
+            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+        )
         predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model)
-        return self.score_with_predictions(data=data, predictions=predictions, metric=metric)
+        return self._score_with_predictions(data=data, predictions=predictions, metric=metric)
 
     def _predict_model(
         self,

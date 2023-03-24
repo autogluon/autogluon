@@ -311,37 +311,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         """
         raise NotImplementedError
 
-    def slice_data_for_scoring(
-        self, data: TimeSeriesDataFrame
-    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
-        """Truncate the last `self.prediction_length` time steps of each time series.
-
-        When the output of this method is fed to `predict`, the model will generate predictions for the last
-        `prediction_length` time steps of each time series. These predictions can then be used to evaluate the model.
-
-        Parameters
-        ----------
-        data : TimeSeriesDataFrame
-            The dataset used for evaluating the model.
-
-        Returns
-        -------
-        past_data : TimeSeriesDataFrame
-            Dataset consisting of truncated time series. This is used as "context" for the generating the predictions.
-        known_covariates : TimeSeriesDataFrame or None
-            Values of the known covariates during the forecast horizon, if `known_covariates` are present in the models
-            metadata. If `known_covariates` are absent, this value is equal to `None`.
-        """
-
-        past_data = data.slice_by_timestep(None, -self.prediction_length)
-        if len(self.metadata.known_covariates_real) > 0:
-            future_data = data.slice_by_timestep(-self.prediction_length, None)
-            known_covariates = future_data[self.metadata.known_covariates_real]
-        else:
-            known_covariates = None
-        return past_data, known_covariates
-
-    def score_with_predictions(
+    def _score_with_predictions(
         self,
         data: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
@@ -383,20 +353,31 @@ class AbstractTimeSeriesModel(AbstractModel):
             The computed forecast evaluation score on the last `self.prediction_length`
             time steps of each time series.
         """
-        past_data, known_covariates = self.slice_data_for_scoring(data)
+        past_data, known_covariates = data.get_model_inputs_for_scoring(
+            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+        )
         predictions = self.predict(past_data, known_covariates=known_covariates)
-        return self.score_with_predictions(data=data, predictions=predictions, metric=metric)
+        return self._score_with_predictions(data=data, predictions=predictions, metric=metric)
 
-    def score_and_cache_oof(self, val_data: TimeSeriesDataFrame) -> None:
+    def score_and_cache_oof(
+        self,
+        val_data: TimeSeriesDataFrame,
+        store_val_score: bool = False,
+        store_predict_time: bool = False,
+    ) -> None:
         """Compute val_score, predict_time and cache out-of-fold (OOF) predictions."""
         if self.val_score is not None or self.predict_time is not None or self._oof_predictions is not None:
             raise ValueError(f"Model {self.name} has already been scored on OOF data!")
 
-        past_data, known_covariates = self.slice_data_for_scoring(val_data)
+        past_data, known_covariates = val_data.get_model_inputs_for_scoring(
+            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+        )
         predict_start_time = time.time()
         self._oof_predictions = self.predict(past_data, known_covariates=known_covariates)
-        self.predict_time = time.time() - predict_start_time
-        self.val_score = self.score_with_predictions(val_data, self._oof_predictions)
+        if store_predict_time:
+            self.predict_time = time.time() - predict_start_time
+        if store_val_score:
+            self.val_score = self._score_with_predictions(val_data, self._oof_predictions)
 
     def _hyperparameter_tune(
         self,

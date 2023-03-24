@@ -43,7 +43,7 @@ def trained_models():
         )
 
         model.fit(train_data=DUMMY_TS_DATAFRAME)
-        model.score_and_cache_oof(DUMMY_TS_DATAFRAME)
+        model.score_and_cache_oof(DUMMY_TS_DATAFRAME, store_val_score=True, store_predict_time=True)
         models[(prediction_length, repr(model_class))] = model
         model_paths.append(temp_model_path)
 
@@ -87,7 +87,7 @@ def test_when_score_and_cache_oof_called_then_oof_predictions_are_saved(
     model = trained_models[(prediction_length, repr(model_class))]
     oof_predictions = model.get_oof_predictions()
     assert isinstance(oof_predictions, TimeSeriesDataFrame)
-    oof_score = model.score_with_predictions(DUMMY_TS_DATAFRAME, oof_predictions)
+    oof_score = model._score_with_predictions(DUMMY_TS_DATAFRAME, oof_predictions)
     assert isinstance(oof_score, float)
 
 
