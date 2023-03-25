@@ -1096,6 +1096,7 @@ def partial_dependence_plots(
     label: str,
     target: Optional[Any] = None,
     features: Optional[Union[str, List[str]]] = None,
+    two_way: bool = False,
     path: Optional[str] = None,
     max_ice_lines: int = 300,
     sample: Optional[Union[int, float]] = None,
@@ -1107,7 +1108,10 @@ def partial_dependence_plots(
     **fit_args,
 ):
     """
-    Display Partial Dependence Plots (PDP) with Individual Conditional Expectation (ICE)
+
+    The visualizations have two modes:
+    - Display Partial Dependence Plots (PDP) with Individual Conditional Expectation (ICE) - this is the default mode of operation
+    - Two-Way PDP plots - this mode can be selected via passing two `features` and setting `two_way = True`
 
     ICE plots complement PDP by showing the relationship between a feature and the model's output for each individual instance in the dataset.
     ICE lines (blue) can be overlaid on PDPs (red) to provide a more detailed view of how the model behaves for specific instances.
@@ -1135,6 +1139,21 @@ def partial_dependence_plots(
         By comparing PDPs and ICE plots for different features, you may detect potential interactions between features.
         If the ICE lines change significantly when comparing two features, this might suggest an interaction effect.
 
+    Two-way PDP can visualize potential interactions between any two features. Here are a few cases when two-way PDP can give good results:
+
+    - `Suspected interactions`: Even if two features are not highly correlated, they may still interact in the context of the model.
+        If you suspect that there might be interactions between any two features, two-way PDP can help to verify the hypotheses.
+    - `Moderate to high correlation`: If two features have a moderate to high correlation,
+        a two-way PDP can show how the combined effect of these features influences the model's predictions.
+        In this case, the plot can help reveal whether the relationship between the features is additive, multiplicative, or more complex.
+    - `Complementary features`: If two features provide complementary information, a two-way PDP can help illustrate how the joint effect
+        of these features impacts the model's predictions.
+        For example, if one feature measures the length of an object and another measures its width, a two-way PDP could show how the
+        combination of these features affects the predicted outcome.
+    - `Domain knowledge`: If domain knowledge suggests that the relationship between two features might be important for the model's output,
+        a two-way PDP can help to explore and validate these hypotheses.
+    - `Feature importance`: If feature importance analysis ranks both features high in the leaderboard, it might be beneficial
+        to examine their joint effect on the model's predictions.
 
     Parameters
     ----------
@@ -1147,6 +1166,8 @@ def partial_dependence_plots(
         Ignored in binary classification or classical regression settings
     features: Optional[Union[str, List[str]]], default = None
         feature subset to display; `None` means all features will be rendered.
+    two_way: bool, default = False
+        render two-way PDP; this mode works only when two `features` are specified
     path: Optional[str], default = None
         location to store the model trained for this task
     max_ice_lines: int, default = 300
@@ -1206,7 +1227,23 @@ def partial_dependence_plots(
         model=state.model,
         state=state,
         viz_facets=[
-            MarkdownSectionComponent("### Partial Dependence Plots"),
+            MarkdownSectionComponent("### Two-way Partial Dependence Plots", condition_fn=lambda _: two_way),
+            MarkdownSectionComponent(
+                "Two-Way partial dependence plots (PDP) are useful for visualizing the relationship between a pair of features and the predicted outcome "
+                "in a machine learning model. There are several things to look for when exploring the two-way plot:\n\n"
+                "* **Shape of the interaction**: Look at the shape of the plot to understand the nature of the interaction. "
+                "It could be linear, non-linear, or more complex.\n"
+                "* **Feature value range**: Observe the range of the feature values on both axes to understand the domain of the interaction. "
+                "This can help you identify whether the model is making predictions within reasonable bounds or if there are extrapolations "
+                "beyond the training data.\n"
+                "* **Areas of high uncertainty**: Look for areas in the plot where the predictions are less certain, which may be indicated by "
+                "larger confidence intervals, higher variance, or fewer data points. These areas may require further investigation or additional data.\n"
+                "* **Outliers and anomalies**: Check for any outliers or anomalies in the plot that may indicate issues with the model or the data. "
+                "These could be regions of the plot with unexpected patterns or values that do not align with the overall trend.\n"
+                "* **Sensitivity to feature values**: Assess how sensitive the predicted outcome is to changes in the feature values.",
+                condition_fn=lambda _: show_help_text and two_way,
+            ),
+            MarkdownSectionComponent("### Partial Dependence Plots", condition_fn=lambda _: not two_way),
             MarkdownSectionComponent(
                 "Individual Conditional Expectation (ICE) plots complement Partial Dependence Plots (PDP) by showing the "
                 "relationship between a feature and the model's output for each individual instance in the dataset. ICE lines (blue) "
@@ -1227,9 +1264,9 @@ def partial_dependence_plots(
                 "a less certain relationship between the feature and the model's output, while narrower intervals suggest a more robust relationship.\n"
                 "* **Interactions**: By comparing PDPs and ICE plots for different features, you may detect potential interactions between features. "
                 "If the ICE lines change significantly when comparing two features, this might suggest an interaction effect.",
-                condition_fn=lambda _: show_help_text,
+                condition_fn=lambda _: show_help_text and not two_way,
             ),
-            PDPInteractions(features=features, fig_args=fig_args, sample=max_ice_lines, target=target, **chart_args),  # type: ignore
+            PDPInteractions(features=features, two_way=two_way, fig_args=fig_args, sample=max_ice_lines, target=target, **chart_args),  # type: ignore
             MarkdownSectionComponent(
                 f"The following variable(s) are categorical: {cats}. They are represented as the numbers in the figures above. "
                 f"Mappings are available in `state.pdp_id_to_category_mappings`. The`state` can be returned from this call via adding `return_state=True`.",
