@@ -70,7 +70,8 @@ def download_s3_folder(
     bucket: str
         The name of the bucket
     prefix: str
-        The prefix of the object/folder to be downloaded
+        The prefix of the folder to be downloaded
+        To check all files in the bucket, specify `prefix=''` (empty string)
     local_path: str
         The local path to download the object/folder into
     error_if_exists: bool, default = True
@@ -84,6 +85,8 @@ def download_s3_folder(
     verbose: bool, default = True
         Whether to log detailed loggings
     """
+    if len(prefix) > 0:
+        assert prefix.endswith("/"), "Please provide a prefix to a folder and end it with '/'"
     import boto3
     s3 = boto3.resource("s3")
     s3_bucket = s3.Bucket(bucket)

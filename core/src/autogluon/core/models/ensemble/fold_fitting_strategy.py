@@ -789,4 +789,9 @@ class ParallelDistributedFoldFittingStrategy(ParallelFoldFittingStrategy):
 
     def _sync_model_artifact(self, local_path, model_sync_path):
         bucket, path = s3_path_to_bucket_prefix(model_sync_path)
-        download_s3_folder(bucket, path, local_path, error_if_exists=False)
+        download_s3_folder(
+            bucket=bucket,
+            prefix=path,
+            local_path=local_path,
+            error_if_exists=False
+        )
