@@ -38,7 +38,6 @@ def trained_trainers():
         )
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
-            val_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hp,
         )
         trainers[repr(hp)] = trainer
@@ -73,7 +72,6 @@ def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
     )
     leaderboard = trainer.leaderboard()
 
@@ -159,7 +157,6 @@ def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(temp_mod
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
     )
 
     for model_name in trainer.get_model_names():
@@ -178,7 +175,6 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
-            val_data=DUMMY_TS_DATAFRAME,
             hyperparameter_tune_kwargs={
                 "num_trials": 2,
                 "searcher": "random",
@@ -216,7 +212,6 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
     )
     leaderboard = trainer.leaderboard()
 
@@ -269,7 +264,6 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hp,
-            val_data=DUMMY_TS_DATAFRAME,
         )
 
     model_names = trainer.get_model_names()
@@ -298,7 +292,6 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
     )
     model_names = copy.copy(trainer.get_model_names())
     trainer.save()
@@ -332,7 +325,6 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
             "AutoGluonTabular": {"tabular_hyperparameters": {"GBM"}},
             "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
         },
-        val_data=DUMMY_TS_DATAFRAME,
     )
     model_names = copy.copy(trainer.get_model_names())
     trainer.save()

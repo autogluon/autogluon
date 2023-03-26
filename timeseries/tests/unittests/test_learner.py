@@ -147,7 +147,6 @@ def test_given_hyperparameters_and_custom_models_when_learner_called_then_leader
     learner.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
     )
     leaderboard = learner.leaderboard()
 
@@ -169,7 +168,6 @@ def test_given_hyperparameters_when_learner_called_and_loaded_back_then_all_mode
     learner.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
     )
     learner.save()
     del learner
@@ -194,7 +192,7 @@ def test_when_static_features_in_tuning_data_are_missing_then_exception_is_raise
     val_data = get_data_frame_with_variable_lengths({"B": 25, "A": 20}, static_features=None)
     learner = TimeSeriesLearner(path_context=temp_model_path)
     with pytest.raises(ValueError, match="Provided tuning_data must contain static_features"):
-        learner.fit(train_data=train_data, val_data=val_data)
+        learner.fit(train_data=train_data, val_data=val_data, num_val_windows=0)
 
 
 def test_when_static_features_columns_in_tuning_data_are_missing_then_exception_is_raised(temp_model_path):
@@ -206,7 +204,7 @@ def test_when_static_features_columns_in_tuning_data_are_missing_then_exception_
     )
     learner = TimeSeriesLearner(path_context=temp_model_path)
     with pytest.raises(KeyError, match="required columns are missing from the provided"):
-        learner.fit(train_data=train_data, val_data=val_data)
+        learner.fit(train_data=train_data, val_data=val_data, num_val_windows=0)
 
 
 def test_when_train_data_has_no_static_features_but_val_data_has_static_features_then_val_data_features_get_removed(

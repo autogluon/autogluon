@@ -19,6 +19,7 @@ from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
+from autogluon.timeseries.models.multi_window.multi_window_model import MultiWindowBacktestingModel
 from autogluon.timeseries.models.presets import contains_searchspace
 from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.warning_filters import disable_tqdm
@@ -276,6 +277,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         save_data: bool = True,
         enable_ensemble: bool = True,
         verbosity: int = 2,
+        num_val_windows: int = 1,
         **kwargs,
     ):
         super().__init__(path=path, save_data=save_data, low_memory=True, **kwargs)
@@ -302,6 +304,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self._model_full_dict_val_score = {}
         self.eval_metric = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
+        self.num_val_windows = num_val_windows
         self.hpo_results = {}
 
     def save_train_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
@@ -416,6 +419,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             val_data=val_data,
             time_limit=time_limit,
             verbosity=self.verbosity,
+            num_val_windows=self.num_val_windows,
         )
         return model
 
@@ -441,6 +445,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 time_limit=time_limit,
                 default_num_trials=default_num_trials,
+                num_val_windows=self.num_val_windows,
             )
         total_tuning_time = time.time() - tuning_start_time
 
@@ -482,7 +487,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
     ) -> List[str]:
-        """Fit and save the given model on given training and validation data.
+        """Fit and save the given model on given training and validation data and save the trained model.
 
         Returns
         -------
@@ -565,6 +570,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 hyperparameters=hyperparameters,
                 hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
                 freq=train_data.freq,
+                multi_window=self.num_val_windows > 0,
             )
 
         logger.info(f"Models that will be trained: {list(m.name for m in models)}")
@@ -642,6 +648,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 )
             else:
                 try:
+                    if val_data is None:
+                        val_data = self._get_ensemble_oof_data(train_data)
                     model_names_trained.append(
                         self.fit_ensemble(
                             val_data=val_data,
@@ -666,6 +674,15 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             logger.error(str(e))
 
         return model_names_trained
+
+    def _get_ensemble_oof_data(self, train_data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+        """Stack validation data for all windows into a single dataframe"""
+        return pd.concat(
+            [
+                train_data.train_test_split(self.prediction_length, window_idx, suffix=f"_W{window_idx}")[1]
+                for window_idx in range(self.num_val_windows)
+            ]
+        )
 
     def _get_ensemble_model_name(self) -> str:
         """Ensure we don't have name collisions in the ensemble model name"""
@@ -923,7 +940,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         return copy.deepcopy(self.model_full_dict)
 
     def construct_model_templates(
-        self, hyperparameters: Union[str, Dict[str, Any]], **kwargs
+        self, hyperparameters: Union[str, Dict[str, Any]], multi_window: bool = False, **kwargs
     ) -> List[AbstractTimeSeriesModel]:
         """Constructs a list of unfit models based on the hyperparameters dict."""
         raise NotImplementedError

@@ -31,7 +31,6 @@ class TimeSeriesLearner(AbstractLearner):
         eval_metric: Optional[str] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         prediction_length: int = 1,
-        validation_splitter: AbstractTimeSeriesSplitter = LastWindowSplitter(),
         ignore_time_index: bool = False,
         **kwargs,
     ):
@@ -46,7 +45,6 @@ class TimeSeriesLearner(AbstractLearner):
             "quantile_levels",
             kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
-        self.validation_splitter = validation_splitter
         self.ignore_time_index = ignore_time_index
 
         self.feature_generator = TimeSeriesFeatureGenerator(
@@ -80,6 +78,7 @@ class TimeSeriesLearner(AbstractLearner):
         hyperparameters: Union[str, Dict] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         time_limit: Optional[int] = None,
+        num_val_windows: int = 1,
         **kwargs,
     ) -> None:
         self._time_limit = time_limit
@@ -101,16 +100,6 @@ class TimeSeriesLearner(AbstractLearner):
         if val_data is not None:
             val_data = self.feature_generator.transform(val_data, data_frame_name="tuning_data")
 
-        # Train / validation split
-        if val_data is None:
-            logger.warning(
-                "tuning_data is None. "
-                + self.validation_splitter.describe_validation_strategy(prediction_length=self.prediction_length)
-            )
-            train_data, val_data = self.validation_splitter.split(
-                ts_dataframe=train_data, prediction_length=self.prediction_length
-            )
-
         trainer_init_kwargs = kwargs.copy()
         trainer_init_kwargs.update(
             dict(
@@ -123,6 +112,7 @@ class TimeSeriesLearner(AbstractLearner):
                 verbosity=kwargs.get("verbosity", 2),
                 enable_ensemble=kwargs.get("enable_ensemble", True),
                 metadata=self.feature_generator.covariate_metadata,
+                num_val_windows=num_val_windows,
             )
         )
         self.trainer = self.trainer_type(**trainer_init_kwargs)

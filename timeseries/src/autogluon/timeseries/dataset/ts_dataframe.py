@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import itertools
-import warnings
 from collections.abc import Iterable
 from typing import Any, List, Optional, Tuple, Type
 
@@ -817,3 +816,45 @@ class TimeSeriesDataFrame(pd.DataFrame):
         else:
             known_covariates = None
         return past_data, known_covariates
+
+    def train_test_split(
+        self,
+        prediction_length: int,
+        window_idx: int = 0,
+        suffix: Optional[str] = None,
+    ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
+        """Generate a train/test split from the given dataset.
+        This method can be used to generate splits for multi-window backtesting.
+
+        Parameters
+        ----------
+        prediction_length : int
+            Number of time steps in a single evaluation window.
+        window_idx : int
+            Index of the backtesting window, starting from the end of each time series. For example, 0 corresponds to
+            reserving the last ``prediction_length`` time steps for evaluation.
+        suffix : str, optional
+            Suffix appended to all entries in the ``item_id`` index level.
+
+        Returns
+        -------
+        train_data : TimeSeriesDataFrame
+            Train portion of the data. The last ``(window_idx + 1) * prediction_length`` entries are removed from each
+            time series in the original dataset.
+        test_data : TimeSeriesDataFrame
+            Test portion of the data. The last ``window_idx * prediction_length`` entries are removed from each time
+            series in the original dataset.
+        """
+        train_end_idx = -(window_idx + 1) * prediction_length
+        train_data = self.slice_by_timestep(None, train_end_idx)
+        test_end_idx = None if window_idx == 0 else -window_idx * prediction_length
+        test_data = self.slice_by_timestep(None, test_end_idx)
+
+        if suffix is not None:
+            for data in [train_data, test_data]:
+                new_item_id = data.index.levels[0].astype(str) + suffix
+                data.index = data.index.set_levels(levels=new_item_id, level=0)
+                if data.static_features is not None:
+                    data.static_features.index = data.static_features.index.astype(str)
+                    data.static_features.index += suffix
+        return train_data, test_data
