@@ -19,12 +19,14 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     """
     A meta-model that trains the base model multiple times using different train/validation splits.
 
+    Follows the logic of autogluon.core.models.ensembles.BaggedEnsembleModel.
+
     Parameters
     ----------
     model_base : Union[AbstractTimeSeriesModel, Type[AbstractTimeSeriesModel]]
         The base model to repeatedly train. If a AbstractTimeSeriesModel class, then also provide model_base_kwargs
         which will be used to initialize the model via model_base(**model_base_kwargs).
-    model_base_kwargs : Dict[str, any], default = None
+    model_base_kwargs : Optional[Dict[str, any]], default = None
         kwargs used to initialize model_base if model_base is a class.
     num_val_windows : int, default = 1
         Number of windows to use for backtesting, starting from the end of the training data.
@@ -69,6 +71,8 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
         if val_data is not None:
             raise ValueError(f"val_data should not be passed to {self.name}.fit()")
+        if num_val_windows == 0:
+            raise ValueError("MultiWindowBacktestingModel can only be trained with num_val_windows > 0")
 
         trained_models = []
         global_fit_start_time = time.time()
@@ -79,7 +83,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
                 suffix=f"_W{window_idx}",
             )
 
-            logger.debug(f"\tWindow {window_idx + 1}")
+            logger.debug(f"\tWindow {window_idx}")
             model = self.get_child_model(window_idx)
             model_fit_start_time = time.time()
             model.fit(
@@ -89,7 +93,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
                 **kwargs,
             )
             model.fit_time = time.time() - model_fit_start_time
-            model.score_and_cache_oof(val_fold)
+            model.score_and_cache_oof(val_fold, store_val_score=True, store_predict_time=True)
             trained_models.append(model)
 
             logger.debug(f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({model.eval_metric})")
@@ -120,7 +124,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
     def get_child_model(self, window_idx: int) -> AbstractTimeSeriesModel:
         model = copy.deepcopy(self.model_base)
-        model.set_contexts(self.path + f"W{window_idx + 1}" + os.sep)
+        model.set_contexts(self.path + f"W{window_idx}" + os.sep)
         return model
 
     def predict(
@@ -133,9 +137,18 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             raise ValueError(f"{self.name} must be fit before predicting")
         return self.most_recent_model.predict(data, known_covariates=known_covariates, **kwargs)
 
-    def score_and_cache_oof(self, val_data: TimeSeriesDataFrame) -> None:
+    def score_and_cache_oof(
+        self,
+        val_data: TimeSeriesDataFrame,
+        store_val_score: bool = False,
+        store_predict_time: bool = False,
+    ) -> None:
         # self.val_score, self.predict_time, self._oof_predictions already saved during _fit()
-        pass
+        assert self._oof_predictions is not None
+        if store_val_score:
+            assert self.val_score is not None
+        if store_predict_time:
+            assert self.predict_time is not None
 
     def get_user_params(self) -> dict:
         return self.model_base.get_user_params()

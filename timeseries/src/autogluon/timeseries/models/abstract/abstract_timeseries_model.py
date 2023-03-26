@@ -380,6 +380,10 @@ class AbstractTimeSeriesModel(AbstractModel):
             self.val_score = self._score_with_predictions(val_data, self._oof_predictions)
 
     def _update_hpo_train_fn_kwargs(self, train_fn_kwargs: dict) -> dict:
+        """Update kwargs passed to model_trial depending on the model configuration.
+
+        These kwargs need to be updated, for example, by MultiWindowBacktestingModel.
+        """
         return train_fn_kwargs
 
     def _hyperparameter_tune(
