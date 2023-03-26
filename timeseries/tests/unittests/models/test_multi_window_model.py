@@ -1,8 +1,9 @@
 import pytest
-from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
-from autogluon.timeseries.models import DeepARModel, ETSModel
 
-from ..common import dict_equal_primitive, DUMMY_TS_DATAFRAME
+from autogluon.timeseries.models import DeepARModel, ETSModel
+from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
+
+from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive
 
 
 def get_multi_window_deepar(hyperparameters=None, **kwargs):
