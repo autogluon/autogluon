@@ -22,7 +22,6 @@ from . import (
 from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
 
-
 logger = logging.getLogger(__name__)
 
 # define the model zoo with their aliases
