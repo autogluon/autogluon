@@ -8,7 +8,7 @@ from omegaconf import DictConfig, OmegaConf
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 from autogluon.features import CategoryFeatureGenerator
 
@@ -30,6 +30,7 @@ from ..constants import (
     TEXT,
     TEXT_NER,
 )
+from .label_encoder import CustomLabelEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         label_column
             Name of the label column in pd.DataFrame. Can be None to support zero-short learning.
         label_generator
-            A sklearn LabelEncoder instance, or a customized encoder, e.g. NerPreprocessor.
+            A sklearn CustomLabelEncoder instance, or a customized encoder, e.g. NerPreprocessor.
         """
         self._column_types = column_types
         self._label_column = label_column
@@ -67,7 +68,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         if label_column:
             if label_generator is None:
-                self._label_generator = LabelEncoder()
+                self._label_generator = CustomLabelEncoder(
+                    pos_label=OmegaConf.select(config, "pos_label", default=None)
+                )
             else:
                 self._label_generator = label_generator
 
@@ -640,7 +643,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         df: pd.DataFrame,
     ) -> Tuple[Dict[str, NDArray], Dict[str, str]]:
         """
-        Preprocess ground-truth labels by using LabelEncoder to generate class labels for
+        Preprocess ground-truth labels by using CustomLabelEncoder to generate class labels for
         classification tasks or using StandardScaler to standardize numerical values
         (z = (x - mean) / std) for regression tasks. This function needs to be called
         preceding the label processor in "process_label.py".

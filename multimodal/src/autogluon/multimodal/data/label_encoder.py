@@ -7,6 +7,7 @@ import jsonschema
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
+from sklearn.preprocessing import LabelEncoder
 
 from ..constants import AUTOMM, END_OFFSET, ENTITY_GROUP, NER_ANNOTATION, PROBABILITY, START_OFFSET
 from .utils import process_ner_annotations
@@ -193,3 +194,20 @@ class NerLabelEncoder:
             pred_with_offset.append(temp_offset)
             pred_with_proba.append(temp_proba)
         return pred_label_only, pred_with_offset, pred_with_proba
+
+
+class CustomLabelEncoder(LabelEncoder):
+    def __init__(self, pos_label=None, **kwargs):
+        super().__init__(**kwargs)
+        self.pos_label = pos_label
+
+    def fit(self, y):
+        super().fit(y)
+
+        if self.pos_label:
+            assert self.pos_label in self.classes_
+
+        if self.pos_label:
+            self.classes_ = np.array([c for c in self.classes_ if c != self.pos_label] + [self.pos_label])
+
+        return self

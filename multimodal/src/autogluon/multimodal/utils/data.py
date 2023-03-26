@@ -9,7 +9,6 @@ import pandas as pd
 import PIL
 from omegaconf import DictConfig, OmegaConf
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
 from autogluon.core.utils.loaders import load_pd
@@ -367,43 +366,6 @@ def turn_on_off_feature_column_info(
             # label processor doesn't have requires_column_info.
             if hasattr(per_model_processor, "requires_column_info"):
                 per_model_processor.requires_column_info = flag
-
-
-def try_to_infer_pos_label(
-    data_config: DictConfig,
-    label_encoder: LabelEncoder,
-    problem_type: str,
-):
-    """
-    Try to infer positive label for binary classification, which is used in computing some metrics, e.g., roc_auc.
-    If positive class is not provided, then use pos_label=1 by default.
-    If the problem type is not binary classification, then return None.
-
-    Parameters
-    ----------
-    data_config
-        A DictConfig object containing only the data configurations.
-    label_encoder
-        The label encoder of classification tasks.
-    problem_type
-        Type of problem.
-
-    Returns
-    -------
-
-    """
-    if problem_type != BINARY:
-        return None
-
-    pos_label = OmegaConf.select(data_config, "pos_label", default=None)
-    if pos_label is not None:
-        logger.debug(f"pos_label: {pos_label}\n")
-        pos_label = label_encoder.transform([pos_label]).item()
-    else:
-        pos_label = 1
-
-    logger.debug(f"pos_label: {pos_label}")
-    return pos_label
 
 
 def get_mixup(

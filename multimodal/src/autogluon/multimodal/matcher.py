@@ -100,7 +100,6 @@ from .utils import (
     select_model,
     setup_save_path,
     split_train_tuning_data,
-    try_to_infer_pos_label,
     update_hyperparameters,
     upgrade_config,
 )
@@ -699,20 +698,11 @@ class MultiModalMatcher:
             label_processors_count = {k: len(v) for k, v in label_processors.items()}
             logger.debug(f"label_processors_count: {label_processors_count}")
 
-        if label_df_preprocessor:
-            pos_label = try_to_infer_pos_label(
-                data_config=response_config.data,
-                label_encoder=label_df_preprocessor.label_generator,
-                problem_type=self._problem_type,
-            )
-        else:
-            pos_label = None
-
         validation_metric, custom_metric_func = get_metric(
             metric_name=validation_metric_name,
             num_classes=self._output_shape,
-            pos_label=pos_label,
             is_matching=self._pipeline in matcher_presets.list_keys(),
+            problem_type=self._problem_type,
         )
         logger.debug(f"validation_metric_name: {validation_metric_name}")
         logger.debug(f"validation_metric: {validation_metric}")
@@ -1405,17 +1395,11 @@ class MultiModalMatcher:
         if isinstance(metrics, str):
             metrics = [metrics]
 
-        pos_label = try_to_infer_pos_label(
-            data_config=self._response_config.data,
-            label_encoder=self._label_df_preprocessor.label_generator,
-            problem_type=self._problem_type,
-        )
         results = {}
         for per_metric in metrics:
             score = compute_score(
                 metric_data=metric_data,
                 metric_name=per_metric.lower(),
-                pos_label=pos_label,
             )
             results[per_metric] = score
 
@@ -1625,12 +1609,7 @@ class MultiModalMatcher:
 
         if not as_multiclass:
             if self._problem_type == BINARY:
-                pos_label = try_to_infer_pos_label(
-                    data_config=self._response_config.data,
-                    label_encoder=self._label_df_preprocessor.label_generator,
-                    problem_type=self._problem_type,
-                )
-                prob = prob[:, pos_label]
+                prob = prob[:, 1]
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             prob = self._as_pandas(data=data, to_be_converted=prob)

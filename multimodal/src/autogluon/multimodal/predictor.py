@@ -155,7 +155,6 @@ from .utils import (
     split_hyperparameters,
     split_train_tuning_data,
     tensor_to_ndarray,
-    try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
     update_hyperparameters,
@@ -1071,16 +1070,11 @@ class MultiModalPredictor(ExportMixin):
         data_processors_count = {k: len(v) for k, v in data_processors.items()}
         logger.debug(f"data_processors_count: {data_processors_count}")
 
-        pos_label = try_to_infer_pos_label(
-            data_config=config.data,
-            label_encoder=df_preprocessor.label_generator,
-            problem_type=self._problem_type,
-        )
         if validation_metric_name is not None:
             validation_metric, custom_metric_func = get_metric(
                 metric_name=validation_metric_name,
                 num_classes=self._output_shape,
-                pos_label=pos_label,
+                problem_type=self._problem_type,
             )
         else:
             validation_metric, custom_metric_func = (None, None)
@@ -1956,15 +1950,9 @@ class MultiModalPredictor(ExportMixin):
                     results = score  # If the results dict is empty, return all scores.
         else:
             for per_metric in metrics:
-                pos_label = try_to_infer_pos_label(
-                    data_config=self._config.data,
-                    label_encoder=self._df_preprocessor.label_generator,
-                    problem_type=self._problem_type,
-                )
                 score = compute_score(
                     metric_data=metric_data,
                     metric_name=per_metric.lower(),
-                    pos_label=pos_label,
                 )
                 results[per_metric] = score
 
@@ -2224,12 +2212,7 @@ class MultiModalPredictor(ExportMixin):
 
         if not as_multiclass:
             if self._problem_type == BINARY:
-                pos_label = try_to_infer_pos_label(
-                    data_config=self._config.data,
-                    label_encoder=self._df_preprocessor.label_generator,
-                    problem_type=self._problem_type,
-                )
-                prob = prob[:, pos_label]
+                prob = prob[:, 1]
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             prob = self._as_pandas(data=data, to_be_converted=prob)
