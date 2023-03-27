@@ -232,4 +232,4 @@ def test_when_static_and_dynamic_covariates_present_then_model_trains_normally(m
 
     model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=gen.covariate_metadata)
     model.fit(train_data=df)
-    model.predict_for_scoring(df)
+    model.score_and_cache_oof(df)

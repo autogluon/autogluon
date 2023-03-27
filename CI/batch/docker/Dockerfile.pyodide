@@ -1,0 +1,22 @@
+FROM pyodide/pyodide-env:20221102-chrome107-firefox106
+
+WORKDIR /src
+# compile pyodide
+RUN git clone --depth 1 --branch 0.22.0 https://github.com/pyodide/pyodide.git \
+    && cd pyodide \
+    && pip install -r requirements.txt \
+    && make  \
+    && PYODIDE_PACKAGES='*,!bcrypt,!sparseqr,!cryptography,!libmpfr,!pyerfa' make \
+    && cd pyodide-build && pip install -e '.[test]' && cd .. \
+    && pip install 'playwright<1.23.0' && python3 -m playwright install \
+    && cd ..
+
+WORKDIR /src/pyodide
+#  add autogluon_job script
+ADD autogluon_job.sh .
+RUN chmod +x autogluon_job.sh
+
+RUN python3 -m pip install numpy pandas scikit-learn
+
+CMD ["/bin/bash"]
+

@@ -2,7 +2,7 @@ import os
 import re
 import tempfile
 from sys import platform
-from unittest.mock import MagicMock, call
+from unittest.mock import ANY, MagicMock, call
 
 import numpy as np
 import pandas as pd
@@ -10,18 +10,22 @@ import pytest
 
 import autogluon.eda as eda
 from autogluon.eda import AnalysisState
-from autogluon.eda.analysis import Namespace
+from autogluon.eda.analysis import Namespace, ShapAnalysis
 from autogluon.eda.analysis.base import BaseAnalysis
 from autogluon.eda.auto import (
     analyze,
     analyze_interaction,
     covariate_shift_detection,
     dataset_overview,
+    explain_rows,
+    partial_dependence_plots,
     quick_fit,
     target_analysis,
 )
 from autogluon.eda.auto.simple import (
     _is_single_numeric_variable,
+    _prepare_pdp_data,
+    _validate_and_normalize_pdp_args,
     get_default_estimator_if_not_specified,
     get_empty_dict_if_none,
 )
@@ -30,6 +34,8 @@ from autogluon.eda.visualization import (
     CorrelationVisualization,
     DatasetStatistics,
     DatasetTypeMismatch,
+    ExplainForcePlot,
+    ExplainWaterfallPlot,
     FeatureImportance,
     FeatureInteractionVisualization,
     LabelInsightsVisualization,
@@ -40,7 +46,7 @@ from autogluon.eda.visualization import (
     XShiftSummary,
 )
 from autogluon.eda.visualization.base import AbstractVisualization
-from autogluon.eda.visualization.interaction import FeatureDistanceAnalysisVisualization
+from autogluon.eda.visualization.interaction import FeatureDistanceAnalysisVisualization, PDPInteractions
 
 RESOURCE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources"))
 
@@ -153,7 +159,8 @@ def test_quick_fit(monkeypatch):
 
 def test_dataset_overview(monkeypatch):
     df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
-    df_train["near_duplicate"] = df_train["education-num"] + 1
+    df_train["education-num"] = df_train["education-num"] + np.random.rand(len(df_train)) / 100
+    df_train["near_duplicate"] = df_train["education-num"] + 0.1
 
     call_ds_render = MagicMock()
     call_dtm_render = MagicMock()
@@ -173,7 +180,6 @@ def test_dataset_overview(monkeypatch):
     call_md_render.assert_has_calls(
         [
             call("### Feature Distance"),
-            call("**Near duplicate group analysis: `education-num`, `near_duplicate` - distance `0.0000`**"),
             call("Feature interaction between `education-num`/`near_duplicate`"),
         ]
     )
@@ -434,3 +440,163 @@ def test_target_analysis__regression(monkeypatch):
         "skewnorm",
         "weibull_min",
     ]
+
+
+@pytest.mark.parametrize(
+    "plot",
+    [
+        ("force"),
+        ("waterfall"),
+        (None),
+    ],
+)
+def test_explain_rows(plot, monkeypatch):
+    train_data = MagicMock()
+    model = MagicMock()
+    rows = MagicMock()
+    with monkeypatch.context() as m:
+        call_analyze = MagicMock(return_value="result")
+        m.setattr(eda.auto.simple, "analyze", call_analyze)
+
+        result = explain_rows(
+            train_data=train_data,
+            model=model,
+            rows=rows,
+            plot=plot,
+            return_state=True,
+            baseline_sample=300,
+            other_arg="other_arg",
+        )
+        assert result == "result"
+
+        call_analyze.assert_called_with(
+            train_data=train_data[model.original_features],
+            model=model,
+            return_state=True,
+            anlz_facets=ANY,
+            viz_facets=ANY,
+        )
+
+        anlz_facet = call_analyze.call_args.kwargs["anlz_facets"][0]
+        assert type(anlz_facet) is ShapAnalysis
+        assert anlz_facet.rows == rows
+        assert anlz_facet.baseline_sample == 300
+
+        expected_plot = {
+            "force": ExplainForcePlot,
+            "waterfall": ExplainWaterfallPlot,
+        }.get(plot, None)
+        viz_facet = call_analyze.call_args.kwargs["viz_facets"]
+        if expected_plot is None:
+            assert viz_facet is None
+        else:
+            assert type(viz_facet[0]) is expected_plot
+
+
+def test_partial_dependence_plots__prepare_pdp_data():
+    train_data = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
+    train_data = train_data.drop(
+        columns=["marital-status", "education", "occupation", "relationship", "workclass", "race"]
+    )
+    assert sorted(train_data["native-country"].unique().tolist()) == [
+        " ?",
+        " Canada",
+        " Cuba",
+        " El-Salvador",
+        " Haiti",
+        " Mexico",
+        " Philippines",
+        " Puerto-Rico",
+        " United-States",
+    ]
+    pdp_data, state, id_to_category_mappings = _prepare_pdp_data(train_data, label="class", sample=1000)
+    assert id_to_category_mappings == {
+        "native-country": {0: " ?", 1: " Mexico", 2: " United-States"},
+    }
+    assert state.pdp_train_data is not None
+    assert sorted(pdp_data["native-country"].unique().tolist()) == [-1, 0, 1, 2]
+
+
+def test_partial_dependence_plots__prepare_pdp_data__features_specified():
+    train_data = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
+    pdp_data, state, id_to_category_mappings = _prepare_pdp_data(
+        train_data, label="class", features=["native-country"], sample=1000
+    )
+    assert id_to_category_mappings == {
+        "native-country": {0: " ?", 1: " Mexico", 2: " United-States"},
+    }
+
+
+@pytest.mark.parametrize("col_number_warning", [5, 20])
+def test_partial_dependence_plots__validate_and_normalize_pdp_args__none_args(col_number_warning):
+    train_data = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv"))
+    chart_args, fig_args, features = _validate_and_normalize_pdp_args(
+        train_data, features=None, fig_args=None, chart_args=None, col_number_warning=col_number_warning
+    )
+    assert chart_args == {}
+    assert fig_args == {}
+    assert features is None
+
+
+def test_partial_dependence_plots__validate_and_normalize_pdp_args__single_feature():
+    train_data = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv"))
+    chart_args, fig_args, features = _validate_and_normalize_pdp_args(train_data, features="education")
+    assert chart_args == {}
+    assert fig_args == {}
+    assert features == ["education"]
+
+
+def test_partial_dependence_plots__validate_and_normalize_pdp_args__wrong_features():
+    train_data = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv"))
+    with pytest.raises(AssertionError):
+        _validate_and_normalize_pdp_args(train_data, features=["not_present_1", "not_present_1"])
+
+
+def test_partial_dependence_plots__validate_and_normalize_pdp_args():
+    train_data = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv"))
+    chart_args, fig_args, features = _validate_and_normalize_pdp_args(
+        train_data,
+        features=["education", "occupation"],
+        fig_args={"fig_arg": 1},
+        chart_args={"chart_arg": 2},
+    )
+    assert chart_args == {"chart_arg": 2}
+    assert fig_args == {"fig_arg": 1}
+    assert features == ["education", "occupation"]
+
+
+def test_partial_dependence_plots(monkeypatch):
+    train_data = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
+
+    call_md_render = MagicMock()
+    call_pdp_interaction_render = MagicMock()
+    with monkeypatch.context() as m:
+        m.setattr(MarkdownSectionComponent, "render", call_md_render)
+        m.setattr(PDPInteractions, "render", call_pdp_interaction_render)
+
+        with tempfile.TemporaryDirectory() as path:
+            state = partial_dependence_plots(
+                train_data, label="class", features=["education", "native-country"], return_state=True, path=path
+            )
+
+            assert state == {
+                "pdp_id_to_category_mappings": {
+                    "education": {
+                        0: " 10th",
+                        1: " 11th",
+                        2: " 12th",
+                        3: " 7th-8th",
+                        4: " Assoc-acdm",
+                        5: " Assoc-voc",
+                        6: " Bachelors",
+                        7: " HS-grad",
+                        8: " Masters",
+                        9: " Prof-school",
+                        10: " Some-college",
+                    },
+                    "native-country": {0: " ?", 1: " Mexico", 2: " United-States"},
+                }
+            }
+
+    call_pdp_interaction_render.assert_called_once()
+    call_md_render.assert_called()

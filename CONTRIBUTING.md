@@ -49,9 +49,9 @@ Be sure to select the *Source* option from the installation preferences.
 
 - We recommend developing on Linux as this is the only OS where all features are currently 100% functional. Avoid introducing changes that will only work on a particular OS, as we're currently working to support MacOSX and Windows. Changes to existing code that improve cross-platform compatibility are most welcome!
 
-- Use Python 3.7, 3.8 or 3.9 for development, as these are the only versions where AutoGluon is fully functional.
+- Use Python 3.8, 3.9 or 3.10 for development, as these are the only versions where AutoGluon is fully functional.
 
-- Please try to avoid introducing additional dependencies on 3rd party packages. We are currently working to reduce the number of external dependencies of our package. For now, we recommend [lazy-import](https://github.com/autogluon/autogluon/blob/master/core/src/autogluon/core/utils/try_import.py) of external package if you are adding functionality that you believe will only be used by small fraction users.
+- Please try to avoid introducing additional dependencies on 3rd party packages. We are currently working to reduce the number of external dependencies of our package. For now, we recommend [lazy-import](https://github.com/autogluon/autogluon/blob/master/common/src/autogluon/common/utils/try_import.py) of external package if you are adding functionality that you believe will only be used by small fraction users.
 
 - All code should adhere to the [PEP8 style](https://www.python.org/dev/peps/pep-0008/).
 

@@ -35,7 +35,6 @@ class AutoGluonModelQuickFit(AbstractAnalysis):
     >>> state = auto.quick_fit(
     >>>     train_data=..., label=...,
     >>>     return_state=True,  # return state object from call
-    >>>     save_model_to_state=True,  # store fitted model into the state
     >>>     hyperparameters={'GBM': {}}  # train specific model
     >>> )
     >>>
@@ -50,7 +49,7 @@ class AutoGluonModelQuickFit(AbstractAnalysis):
         auto means it will be Auto-detected using AutoGluon methods.
     estimator_args: Optional[Dict[str, Any]], default = None,
         kwargs to pass into estimator constructor (`TabularPredictor`)
-    save_model_to_state: bool, default = False,
+    save_model_to_state: bool, default = True,
         save fitted model into `state` under `model` key.
         This functionality might be helpful in cases when the fitted model could be usable for other purposes (i.e. imputers)
     parent: Optional[AbstractAnalysis], default = None
@@ -73,7 +72,7 @@ class AutoGluonModelQuickFit(AbstractAnalysis):
         estimator_args: Optional[Dict[str, Any]] = None,
         parent: Optional[AbstractAnalysis] = None,
         children: Optional[List[AbstractAnalysis]] = None,
-        save_model_to_state: bool = False,
+        save_model_to_state: bool = True,
         **kwargs,
     ) -> None:
         super().__init__(parent, children, **kwargs)
@@ -177,54 +176,81 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
         val_data = args.val_data
         problem_type = predictor.problem_type
         label = predictor.label
-        y_true = val_data[label]
-        y_pred = predictor.predict(val_data)
+        y_true_train, y_pred_train, _, _ = self._predict(problem_type, predictor, args.train_data)
+        y_true_val, y_pred_val, highest_error, undecided = self._predict(problem_type, predictor, val_data)
+        test_data = val_data
+        test_data_present = args.test_data is not None and label in args.test_data.columns
 
-        highest_error = None
-        undecided = None
-        if predictor.problem_type in [BINARY, MULTICLASS]:
-            y_proba = predictor.predict_proba(val_data)
-            highest_error = y_proba[y_true != y_pred].max(axis=1)
-            highest_error.name = "error"
+        y_true_test = None
+        y_pred_test = None
+        if test_data_present:
+            test_data = args.test_data
+            y_true_test, y_pred_test, highest_error, undecided = self._predict(problem_type, predictor, test_data)
 
-            scores = np.sort(y_proba.values, axis=1)
-            diff = scores[:, -1] - scores[:, -2]
-            undecided = pd.Series(index=y_pred.index, data=diff, name="score_diff").sort_values(ascending=True)
-            undecided = val_data.join(y_proba).join(undecided).sort_values(by="score_diff")
-            highest_error = (
-                val_data.join(y_proba, rsuffix="_pred")
-                .join(highest_error, how="inner")
-                .sort_values(by="error", ascending=False)
-            )
-        elif problem_type == REGRESSION:
-            highest_error = np.abs(y_pred - y_true).sort_values(ascending=False)
-            highest_error.name = "error"
-            highest_error = (
-                val_data.join(y_pred, rsuffix="_pred")
-                .join(highest_error, how="inner")
-                .sort_values(by="error", ascending=False)
-            )
-
-        importance = predictor.feature_importance(val_data.reset_index(drop=True), silent=True)
-        leaderboard = predictor.leaderboard(val_data, silent=True)
+        importance = predictor.feature_importance(test_data.reset_index(drop=True), silent=True)
+        leaderboard = predictor.leaderboard(test_data, silent=True)
 
         labels = predictor.class_labels
         s = {
             "problem_type": predictor.problem_type,
-            "y_true": y_true,
-            "y_pred": y_pred,
             "importance": importance,
             "leaderboard": leaderboard,
             "labels": labels,
+            "y_true_train": y_true_train,
+            "y_pred_train": y_pred_train,
         }
+
+        if test_data_present:
+            s["y_true_val"] = y_true_val
+            s["y_pred_val"] = y_pred_val
+            s["y_true"] = y_true_test
+            s["y_pred"] = y_pred_test
+        else:
+            s["y_true"] = y_true_val
+            s["y_pred"] = y_pred_val
+
         if undecided is not None:
             s["undecided"] = undecided
         if highest_error is not None:
             s["highest_error"] = highest_error
 
         if problem_type in [BINARY, MULTICLASS]:
-            cm = confusion_matrix(y_true, y_pred, normalize=self.normalize, labels=labels)
+            cm = confusion_matrix(y_true_val, y_pred_val, normalize=self.normalize, labels=labels)
             s["confusion_matrix_normalized"] = self.normalize is not None
             s["confusion_matrix"] = cm
 
         state.model_evaluation = s
+
+    def _predict(self, problem_type, predictor, val_data):
+        label = predictor.label
+        y_true_val = val_data[label]
+        y_pred_val = predictor.predict(val_data)
+        highest_error = None
+        undecided = None
+        if predictor.problem_type in [BINARY, MULTICLASS]:
+            y_proba = predictor.predict_proba(val_data)
+
+            misclassified = y_proba[y_true_val != y_pred_val]
+            expected_value = misclassified.join(y_true_val).apply(lambda row: row.loc[row[label]], axis=1)
+            predicted_value = misclassified.max(axis=1)
+            highest_error = predicted_value - expected_value
+            highest_error.name = "error"
+
+            scores = np.sort(misclassified.values, axis=1)
+            diff = scores[:, -1] - expected_value
+            undecided = pd.Series(index=y_pred_val.index, data=diff, name="error").sort_values(ascending=True)
+            undecided = val_data.join(y_proba).join(undecided).sort_values(by="error")
+            highest_error = (
+                val_data.join(y_proba, rsuffix="_pred")
+                .join(highest_error, how="inner")
+                .sort_values(by="error", ascending=False)
+            )
+        elif problem_type == REGRESSION:
+            highest_error = np.abs(y_pred_val - y_true_val).sort_values(ascending=False)
+            highest_error.name = "error"
+            highest_error = (
+                val_data.join(y_pred_val, rsuffix="_pred")
+                .join(highest_error, how="inner")
+                .sort_values(by="error", ascending=False)
+            )
+        return y_true_val, y_pred_val, highest_error, undecided

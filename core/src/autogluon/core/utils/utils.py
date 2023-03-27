@@ -205,17 +205,22 @@ def augment_rare_classes(X, label, threshold):
         return X
 
     missing_classes = []
-    for clss, n_clss in class_counts_invalid.iteritems():
+    for clss, n_clss in class_counts_invalid.items():
         if n_clss == 0:
             missing_classes.append(clss)
     if missing_classes:
-        logger.warning(f'WARNING: Classes were found that have 0 training examples, and may lead to downstream issues. '
+        logger.warning(f'WARNING: {len(missing_classes)} classes were found that have 0 training examples, '
+                       f'and may lead to downstream issues. '
                        f'Consider either providing data for these classes or removing them from the class categories. '
                        f'These classes will be ignored: {missing_classes}')
         class_counts_invalid = class_counts_invalid[~class_counts_invalid.index.isin(set(missing_classes))]
 
+    if len(class_counts_invalid) == 0:
+        # This avoids crash when the only invalid classes were those that appeared 0 times
+        return X
+
     aug_df = None
-    for clss, n_clss in class_counts_invalid.iteritems():
+    for clss, n_clss in class_counts_invalid.items():
         n_toadd = threshold - n_clss
         clss_df = X.loc[X[label] == clss]
         if aug_df is None:
@@ -227,8 +232,8 @@ def augment_rare_classes(X, label, threshold):
         while duplicate_times > 0:
             logger.debug(f"Duplicating data from rare class: {clss}")
             duplicate_times -= 1
-            new_df = new_df.append(clss_df.copy())
-        aug_df = aug_df.append(new_df.copy())
+            new_df = pd.concat([new_df, clss_df], axis=0)
+        aug_df = pd.concat([aug_df, new_df], axis=0)
 
     # Ensure new samples generated via augmentation have unique indices
     aug_df = aug_df.reset_index(drop=True)
@@ -239,7 +244,7 @@ def augment_rare_classes(X, label, threshold):
 
     logger.log(20, f"Duplicated {len(aug_df)} samples from {len(class_counts_invalid)} rare classes in training set because eval_metric requires all classes have at least {threshold} samples.")
 
-    X = X.append(aug_df)
+    X = pd.concat([X, aug_df], axis=0)
     class_counts = X[label].value_counts()
     class_counts_invalid = class_counts[class_counts < threshold]
     class_counts_invalid = class_counts_invalid[~class_counts_invalid.index.isin(set(missing_classes))]

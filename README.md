@@ -10,8 +10,8 @@
 [![Latest Release](https://img.shields.io/github/v/release/autogluon/autogluon)](https://github.com/autogluon/autogluon/releases)
 [![Continuous Integration](https://github.com/autogluon/autogluon/actions/workflows/continuous_integration.yml/badge.svg)](https://github.com/autogluon/autogluon/actions/workflows/continuous_integration.yml)
 [![Platform Tests](https://github.com/autogluon/autogluon/actions/workflows/platform_tests-command.yml/badge.svg?event=schedule)](https://github.com/autogluon/autogluon/actions/workflows/platform_tests-command.yml)
-[![Python Versions](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue)](https://pypi.org/project/autogluon/)
-[![GitHub license](docs/static/apache2.svg)](./LICENSE)
+[![Python Versions](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue)](https://pypi.org/project/autogluon/)
+[![GitHub license](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 [![Downloads](https://pepy.tech/badge/autogluon/month)](https://pepy.tech/project/autogluon)
 [![Twitter](https://img.shields.io/twitter/follow/autogluon?style=social)](https://twitter.com/autogluon)
 
@@ -25,7 +25,7 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 # First install package from terminal:
 # pip install -U pip
 # pip install -U setuptools wheel
-# pip install autogluon  # autogluon==0.6.2
+# pip install autogluon  # autogluon==0.7.0
 
 from autogluon.tabular import TabularDataset, TabularPredictor
 train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')

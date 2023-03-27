@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import torch
 from timm import create_model, models
@@ -138,13 +138,13 @@ class TimmAutoModelForImagePrediction(nn.Module):
         """
         Parameters
         ----------
-        images
+        images : torch.FloatTensor
             A tensor in [N, C, H, W] layout to represent the images.
-        image_valid_num
+        image_valid_num : torch.Tensor
             A tensor that describes valid number of input images.
-        image_column_names
+        image_column_names : list of str, optional
             A list of strings that indicates names of the image columns.
-        image_column_indices
+        image_column_indices : list of torch.Tensor, optional
             A list of tensors that indicates start and stop indices of the image columns.
 
         Returns
@@ -179,7 +179,8 @@ class TimmAutoModelForImagePrediction(nn.Module):
             }
             if image_column_names:
                 assert len(image_column_names) == len(image_column_indices), "invalid image column inputs"
-                batch.update(**dict(zip(image_column_names, image_column_indices)))
+                for idx, name in enumerate(image_column_names):
+                    batch[name] = image_column_indices[idx]
 
             # collect features by image column names
             column_features, column_feature_masks = get_column_features(
@@ -208,8 +209,8 @@ class TimmAutoModelForImagePrediction(nn.Module):
         self,
         features: torch.Tensor,
         logits: torch.Tensor,
-        column_features: Optional[List[torch.Tensor]] = None,
-        column_feature_masks: Optional[List[torch.Tensor]] = None,
+        column_features: Optional[Dict[str, torch.Tensor]] = None,
+        column_feature_masks: Optional[Dict[str, torch.Tensor]] = None,
     ):
         ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
 

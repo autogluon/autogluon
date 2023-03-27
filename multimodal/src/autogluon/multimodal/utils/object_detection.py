@@ -1569,3 +1569,14 @@ def setup_detection_train_tuning_data(predictor, max_num_tuning_data, seed, trai
     else:
         raise TypeError(f"Expected train_data to have type str or pd.DataFrame, but got type: {type(train_data)}")
     return train_data, tuning_data
+
+
+def convert_pred_to_xywh(pred: Optional[List]):
+    if not pred:
+        return pred
+    num_images = len(pred)
+    num_categories = len(pred[0])
+    for i in range(num_images):
+        for j in range(num_categories):
+            pred[i][j][:, :4] = bbox_xyxy_to_xywh(pred[i][j][:, :4])
+    return pred

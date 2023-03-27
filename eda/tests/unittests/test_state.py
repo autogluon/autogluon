@@ -1,4 +1,6 @@
-from autogluon.eda.state import AnalysisState, StateCheckMixin
+import pytest
+
+from autogluon.eda.state import AnalysisState, StateCheckMixin, expand_nested_args_into_nested_maps
 
 
 def test_analysis_state():
@@ -53,3 +55,18 @@ def test_statecheckmixin_all_keys_must_be_present():
     assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), "w") is True
     assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), "q", "w") is True
     assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), "q", "missing") is False
+
+
+def test_expand_nested_args_into_nested_maps():
+    assert expand_nested_args_into_nested_maps({"a": 1, "b.a": 3, "c.a.b": 4}) == {
+        "a": 1,
+        "b": {"a": 3},
+        "c": {"a": {"b": 4}},
+    }
+
+
+def test_expand_nested_args_into_nested_maps__namespaces_overlap():
+    with pytest.raises(ValueError):
+        expand_nested_args_into_nested_maps({"a": 1, "a.b": 2})
+    with pytest.raises(ValueError):
+        expand_nested_args_into_nested_maps({"a.b": 1, "a.b.c": 2})

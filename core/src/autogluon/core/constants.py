@@ -19,6 +19,7 @@ REFIT_FULL_SUFFIX = "_FULL"  # suffix appended to model name for refit_single_fu
 AG_ARGS = 'ag_args'  # Contains arguments to control model name, model priority, and the valid configurations which it can be used in.
 AG_ARGS_FIT = 'ag_args_fit'  # Contains arguments that impact model training, such as early stopping rounds, #cores, #gpus, max time limit, max memory usage  # TODO
 AG_ARGS_ENSEMBLE = 'ag_args_ensemble'  # Contains arguments that impact model ensembling, such as if an ensemble model is allowed to use the original features.  # TODO: v0.1 add to documentation
+AG_ARG_PREFIX = 'ag.'  # Prefix to add to a hyperparameter to indicate it is an aux param for ag_args_fit.
 
 OBJECTIVES_TO_NORMALIZE = ['log_loss', 'pac_score', 'soft_log_loss']  # do not like predicted probabilities = 0
 

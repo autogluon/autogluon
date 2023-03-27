@@ -5,11 +5,10 @@ from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.try_import import try_import_xgboost
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
-from autogluon.core.utils import try_import_xgboost
-from autogluon.core.utils.exceptions import NotEnoughMemoryError
 
 from . import xgboost_utils
 from .hyperparameters.parameters import get_param_baseline
@@ -110,7 +109,7 @@ class XGBoostModel(AbstractModel):
         else:
             X_val = self.preprocess(X_val, is_train=False)
             eval_set.append((X_val, y_val))
-            early_stopping_rounds = ag_params.get('ag.early_stop', 'adaptive')
+            early_stopping_rounds = ag_params.get('early_stop', 'adaptive')
             if isinstance(early_stopping_rounds, (str, tuple, list)):
                 early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
 
@@ -176,7 +175,7 @@ class XGBoostModel(AbstractModel):
         return num_classes
 
     def _ag_params(self) -> set:
-        return {'ag.early_stop'}
+        return {'early_stop'}
 
     def _estimate_memory_usage(self, X, **kwargs):
         num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
@@ -184,18 +183,12 @@ class XGBoostModel(AbstractModel):
         approx_mem_size_req = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
         return approx_mem_size_req
 
-    def _validate_fit_memory_usage(self, **kwargs):
-        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
-        approx_mem_size_req = self.estimate_memory_usage(**kwargs)
-        if approx_mem_size_req > 1e9:  # > 1 GB
-            available_mem = ResourceManager.get_available_virtual_mem()
-            ratio = approx_mem_size_req / available_mem
-            if ratio > (1 * max_memory_usage_ratio):
-                logger.warning('\tWarning: Not enough memory to safely train XGBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
-                raise NotEnoughMemoryError
-            elif ratio > (0.75 * max_memory_usage_ratio):
-                logger.warning('\tWarning: Potentially not enough memory to safely train XGBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
-                
+    def _validate_fit_memory_usage(self, mem_error_threshold: float = 1.0, mem_warning_threshold: float = 0.75, mem_size_threshold: int = 1e9, **kwargs):
+        return super()._validate_fit_memory_usage(mem_error_threshold=mem_error_threshold,
+                                                  mem_warning_threshold=mem_warning_threshold,
+                                                  mem_size_threshold=mem_size_threshold,
+                                                  **kwargs)
+
     def get_minimum_resources(self, is_gpu_available=False):
         minimum_resources = {
             'num_cpus': 1,

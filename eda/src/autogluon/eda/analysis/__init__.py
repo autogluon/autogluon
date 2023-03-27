@@ -8,6 +8,7 @@ from .dataset import (
     TrainValidationSplit,
     VariableTypeAnalysis,
 )
+from .explain import ShapAnalysis
 from .interaction import Correlation, CorrelationSignificance, DistributionFit, FeatureInteraction
 from .missing import MissingValuesAnalysis
 from .model import AutoGluonModelEvaluator, AutoGluonModelQuickFit

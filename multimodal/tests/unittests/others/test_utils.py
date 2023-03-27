@@ -1,10 +1,12 @@
 import json
+from collections import OrderedDict
 
 import pandas as pd
 import pytest
 from omegaconf import OmegaConf
 from ray import tune
 from sklearn.preprocessing import LabelEncoder
+from torchvision import transforms
 from transformers import AutoTokenizer
 
 from autogluon.multimodal.constants import (
@@ -15,11 +17,13 @@ from autogluon.multimodal.constants import (
     IMAGE_PATH,
     MODEL,
     MULTICLASS,
+    NER_ANNOTATION,
     NUMERICAL,
     OPTIMIZATION,
     TEXT,
+    TEXT_NER,
 )
-from autogluon.multimodal.data.preprocess_dataframe import MultiModalFeaturePreprocessor
+from autogluon.multimodal.data.infer_types import infer_ner_column_type
 from autogluon.multimodal.data.utils import process_ner_annotations
 from autogluon.multimodal.utils import (
     apply_omegaconf_overrides,
@@ -31,6 +35,7 @@ from autogluon.multimodal.utils import (
     is_url,
     merge_bio_format,
     parse_dotlist_conf,
+    split_hyperparameters,
     try_to_infer_pos_label,
     visualize_ner,
 )
@@ -229,7 +234,7 @@ def test_process_ner_annotations():
     tokenizer = AutoTokenizer.from_pretrained("microsoft/deberta-v3-small")
     tokenizer.model_max_length = 512
     res = process_ner_annotations(annotation, text, entity_map, tokenizer, is_eval=True)[0]
-    assert res == [3, 4, 1, 1, 1, 1, 5, 6, 7, 8], "Labelling is wrong!"
+    assert res == [3, 4, 1, 1, 1, 1, 1, 5, 6, 1, 1, 1, 7, 8, 8, 8], "Labelling is wrong!"
 
 
 @pytest.mark.parametrize(
@@ -408,3 +413,88 @@ def test_filter_hyperparameters(hyperparameters, column_types, model_in_config, 
         )
 
         assert filtered_hyperparameters == result
+
+
+@pytest.mark.parametrize(
+    "train_transforms,val_transforms,empty_advanced_hyperparameters",
+    [
+        (
+            ["resize_shorter_side", "center_crop", "random_horizontal_flip", "color_jitter"],
+            ["resize_shorter_side", "center_crop"],
+            True,
+        ),
+        (
+            [transforms.RandomResizedCrop(224), transforms.RandomHorizontalFlip()],
+            [transforms.Resize(256), transforms.CenterCrop(224)],
+            False,
+        ),
+    ],
+)
+def test_split_hyperparameters(train_transforms, val_transforms, empty_advanced_hyperparameters):
+    hyperparameters = {
+        "model.timm_image.train_transforms": train_transforms,
+        "model.timm_image.val_transforms": val_transforms,
+    }
+    hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
+    if empty_advanced_hyperparameters:
+        assert not advanced_hyperparameters
+    else:
+        assert advanced_hyperparameters
+
+
+@pytest.mark.parametrize(
+    "column_types,gt_column_types",
+    [
+        (
+            {
+                "abc": TEXT,
+                "label": NER_ANNOTATION,
+            },
+            {
+                "abc": TEXT_NER,
+                "label": NER_ANNOTATION,
+            },
+        ),
+        (
+            {
+                "abc": TEXT_NER,
+                "label": NER_ANNOTATION,
+            },
+            {
+                "abc": TEXT_NER,
+                "label": NER_ANNOTATION,
+            },
+        ),
+        (
+            {
+                "abc": TEXT,
+                "xyz": TEXT,
+                "label": NER_ANNOTATION,
+            },
+            {
+                "abc": TEXT_NER,
+                "xyz": TEXT,
+                "label": NER_ANNOTATION,
+            },
+        ),
+        (
+            {
+                "abc": TEXT,
+                "xyz": TEXT,
+                "efg": IMAGE_PATH,
+                "label": NER_ANNOTATION,
+            },
+            {
+                "abc": TEXT_NER,
+                "xyz": TEXT,
+                "efg": IMAGE_PATH,
+                "label": NER_ANNOTATION,
+            },
+        ),
+    ],
+)
+def test_infer_ner_column_type(column_types, gt_column_types):
+    column_types = OrderedDict(column_types)
+    gt_column_types = OrderedDict(gt_column_types)
+    column_types = infer_ner_column_type(column_types)
+    assert column_types == gt_column_types

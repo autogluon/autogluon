@@ -54,7 +54,7 @@ def get_hyper_params(framework):
         'proc.max_category_levels': 100,  # maximum number of allowed levels per categorical feature
         # Options: [10, 100, 200, 300, 400, 500, 1000, 10000]
         'proc.skew_threshold': 0.99,  # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
-        # Options: [0.2, 0.3, 0.5, 0.8, 1.0, 10.0, 100.0]
+        # Options: [0.2, 0.3, 0.5, 0.8, 0.9, 0.99, 0.999, 1.0, 10.0, 100.0]
         'use_ngram_features': False,  # If False, will drop automatically generated ngram features from language features. This results in worse model quality but far faster inference and training times.
         # Options: [True, False]
     }
@@ -66,7 +66,7 @@ def get_hyper_params(framework):
         'numeric_embed_dim': None,  # Size of joint embedding for all numeric+one-hot features.
         # Options: integer values between 10-10000
         'batch_size': 512,  # batch-size used for NN training
-        # Options: [32, 64, 128. 256, 512, 1024, 2048]
+        # Options: [32, 64, 128, 256, 512, 1024, 2048]
         'use_batchnorm': True,  # whether or not to utilize batch normalization
         # Options: [True, False]
         'clip_gradient': 100.0,  # gradient clipping threshold (float > 0)
@@ -132,7 +132,7 @@ def get_param_multiclass(framework, num_classes):
 
 
 def get_param_regression(framework):
-        return get_param_binary(framework)  # Use same hyperparameters as for binary classification for now.
+    return get_param_binary(framework)  # Use same hyperparameters as for binary classification for now.
 
 
 def get_param_quantile(framework):

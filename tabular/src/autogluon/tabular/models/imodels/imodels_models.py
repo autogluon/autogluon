@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 
+from autogluon.common.utils.try_import import try_import_imodels
 from autogluon.core.models import AbstractModel
-from autogluon.core.utils.try_import import try_import_imodels
 
 
 class _IModelsModel(AbstractModel):

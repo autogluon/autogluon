@@ -18,8 +18,8 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+from autogluon.common.utils.try_import import try_import_mxboard, try_import_mxnet
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-from autogluon.core.utils import try_import_mxboard, try_import_mxnet
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 

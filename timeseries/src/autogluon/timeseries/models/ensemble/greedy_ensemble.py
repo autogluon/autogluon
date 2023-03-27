@@ -82,6 +82,7 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
     ):
         evaluator = TimeSeriesEvaluator(
             eval_metric=self.eval_metric,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
             prediction_length=self.prediction_length,
             target_column=self.target,
         )
@@ -130,3 +131,8 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         weights = weights / np.sum(weights)
 
         return sum(pred * w for pred, w in zip(model_preds, weights) if pred is not None)
+
+    def get_info(self) -> dict:
+        info = super().get_info()
+        info["model_weights"] = self.model_to_weight
+        return info

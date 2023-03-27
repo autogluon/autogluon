@@ -8,14 +8,31 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractVisualization(ABC, StateCheckMixin):
+    """
+    Base class for visualization functionality.
+
+    Provides basic functionality for namespace management and helper method to access frequently-used methods.
+
+    Specifying namespace would narrow visibility scope to specific subspace of `state`. Namespaces
+    can be specified in a nested form: `ns_a.ns_b.ns_c`. Please see :py:class:`~autogluon.eda.analysis.base.Namespace`
+    wrapper on how to create namespaces.
+
+    The main entry method of analysis is `render` function. When called, the execution flow is the following:
+    - narrow `state` scope to specified `namespace`
+    - call `_render` function for each component that returned `True` from `can_handle` call
+
+    Parameters
+    ----------
+    namespace: str
+        namespace to use; can be nested like `ns_a.ns_b.ns_c`
+    kwargs
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.base.Namespace`
+    """
+
     def __init__(self, namespace: Optional[str] = None, **kwargs) -> None:
-        """
-        Parameters
-        ----------
-        namespace: str
-            namespace to use; can be nested like `ns_a.ns_b.ns_c`
-        kwargs
-        """
         super().__init__()
         self.namespace: List[str] = []
         self._kwargs = kwargs

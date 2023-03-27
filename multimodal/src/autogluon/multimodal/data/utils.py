@@ -1,12 +1,13 @@
 import ast
 import codecs
-import random
+import copy
 import re
 import warnings
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
+from omegaconf import ListConfig
 from text_unidecode import unidecode
 from timm.data.constants import (
     IMAGENET_DEFAULT_MEAN,
@@ -14,6 +15,7 @@ from timm.data.constants import (
     IMAGENET_INCEPTION_MEAN,
     IMAGENET_INCEPTION_STD,
 )
+from tokenizers import pre_tokenizers
 from torchvision import transforms
 
 from ..constants import CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, IDENTIFIER, IMAGE, MMLAB_MODELS
@@ -326,7 +328,7 @@ def tokenize_ner_text(text, tokenizer):
     The output of tokenizer and word offsets.
     """
     # pre-tokenization is required for NER token-level label generation.
-    words_with_offsets = tokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+    words_with_offsets = pre_tokenizers.BertPreTokenizer().pre_tokenize_str(text)
     words_with_offsets = is_space_counted(words_with_offsets) if len(words_with_offsets) > 1 else words_with_offsets
     words = [word for word, offset in words_with_offsets]
     word_offsets = np.array([[offset[0], offset[1]] for word, offset in words_with_offsets], dtype=np.int32)
@@ -341,7 +343,8 @@ def tokenize_ner_text(text, tokenizer):
     )
     offset_mapping = np.array(col_tokens.offset_mapping, dtype=np.int32)
     if len(words_with_offsets) > 1:
-        word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
+        if offset_mapping.shape[0] > len(words):
+            word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
         # token to word mappings: it will tell us which token belongs to which word.
         token_to_word_mappings = [i if i != None else -1 for i in col_tokens.word_ids()]
         if len(set(token_to_word_mappings)) != len(words) + 1:
@@ -445,24 +448,38 @@ def get_text_token_max_len(provided_max_len, config, tokenizer, checkpoint_name)
     return max_len
 
 
-def construct_image_processor(
-    size,
-    normalization,
-    transform_types: List[str],
-) -> transforms.Compose:
+def get_image_transform_funcs(transform_types: Union[List[str], ListConfig, List[Callable]], size: int):
     """
-    Build up an image processor from the provided list of transform types.
+    Parse a list of transform strings into callable objects.
 
     Parameters
     ----------
     transform_types
-        A list of image transform types.
+        A list of transforms, which can be strings or callable objects.
+    size
+        Image size.
 
     Returns
     -------
-    A torchvision transform.
+    A list of transform objects.
     """
-    processor = []
+    image_transforms = []
+
+    if not transform_types:
+        return image_transforms
+
+    if isinstance(transform_types, ListConfig):
+        transform_types = list(transform_types)
+    elif not isinstance(transform_types, list):
+        transform_types = [transform_types]
+
+    if all([isinstance(trans_type, str) for trans_type in transform_types]):
+        pass
+    elif all([isinstance(trans_type, Callable) for trans_type in transform_types]):
+        return copy.copy(transform_types)
+    else:
+        raise ValueError(f"transform_types {transform_types} contain neither all strings nor all callable objects.")
+
     for trans_type in transform_types:
         args = None
         kargs = None
@@ -476,44 +493,73 @@ def construct_image_processor(
             trans_mode = trans_type
 
         if trans_mode == "resize_to_square":
-            processor.append(transforms.Resize((size, size), interpolation=BICUBIC))
+            image_transforms.append(transforms.Resize((size, size), interpolation=BICUBIC))
         elif trans_mode == "resize_shorter_side":
-            processor.append(transforms.Resize(size, interpolation=BICUBIC))
+            image_transforms.append(transforms.Resize(size, interpolation=BICUBIC))
         elif trans_mode == "center_crop":
-            processor.append(transforms.CenterCrop(size))
-        elif trans_mode == "horizontal_flip":
-            processor.append(transforms.RandomHorizontalFlip())
-        elif trans_mode == "vertical_flip":
-            processor.append(transforms.RandomVerticalFlip())
+            image_transforms.append(transforms.CenterCrop(size))
+        elif trans_mode == "random_resize_crop":
+            image_transforms.append(transforms.RandomResizedCrop(size))
+        elif trans_mode == "random_horizontal_flip":
+            image_transforms.append(transforms.RandomHorizontalFlip())
+        elif trans_mode == "random_vertical_flip":
+            image_transforms.append(transforms.RandomVerticalFlip())
         elif trans_mode == "color_jitter":
             if kargs is not None:
-                processor.append(transforms.ColorJitter(**kargs))
+                image_transforms.append(transforms.ColorJitter(**kargs))
             elif args is not None:
-                processor.append(transforms.ColorJitter(*args))
+                image_transforms.append(transforms.ColorJitter(*args))
             else:
-                processor.append(transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1))
+                image_transforms.append(transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1))
         elif trans_mode == "affine":
             if kargs is not None:
-                processor.append(transforms.RandomAffine(**kargs))
+                image_transforms.append(transforms.RandomAffine(**kargs))
             elif args is not None:
-                processor.append(transforms.RandomAffine(*args))
+                image_transforms.append(transforms.RandomAffine(*args))
             else:
-                processor.append(transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)))
+                image_transforms.append(transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)))
         elif trans_mode == "randaug":
             if kargs is not None:
-                processor.append(RandAugment(**kargs))
+                image_transforms.append(RandAugment(**kargs))
             elif args is not None:
-                processor.append(RandAugment(*args))
+                image_transforms.append(RandAugment(*args))
             else:
-                processor.append(RandAugment(2, 9))
+                image_transforms.append(RandAugment(2, 9))
         elif trans_mode == "trivial_augment":
-            processor.append(TrivialAugment(IMAGE, 30))
+            image_transforms.append(TrivialAugment(IMAGE, 30))
         else:
             raise ValueError(f"unknown transform type: {trans_mode}")
 
-    processor.append(transforms.ToTensor())
-    processor.append(normalization)
-    return transforms.Compose(processor)
+    return image_transforms
+
+
+def construct_image_processor(
+    image_transforms: Union[List[Callable], List[str]],
+    size: int,
+    normalization,
+) -> transforms.Compose:
+    """
+    Build up an image processor from the provided list of transform types.
+
+    Parameters
+    ----------
+    image_transforms
+        A list of image transform types.
+    size
+        Image size.
+    normalization
+        A transforms.Normalize object.
+
+    Returns
+    -------
+    A transforms.Compose object.
+    """
+    image_transforms = get_image_transform_funcs(transform_types=image_transforms, size=size)
+    if not any([isinstance(trans, transforms.ToTensor) for trans in image_transforms]):
+        image_transforms.append(transforms.ToTensor())
+    if not any([isinstance(trans, transforms.Normalize) for trans in image_transforms]):
+        image_transforms.append(normalization)
+    return transforms.Compose(image_transforms)
 
 
 def image_mean_std(norm_type: str):

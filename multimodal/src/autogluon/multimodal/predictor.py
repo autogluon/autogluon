@@ -26,7 +26,8 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.multimodal.utils import object_detection_data_to_df, save_result_df, setup_detection_train_tuning_data
+from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
+from autogluon.core.utils.loaders import load_pd
 from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from . import version as ag_version
@@ -43,6 +44,7 @@ from .constants import (
     DEEPSPEED_OFFLOADING,
     DEEPSPEED_STRATEGY,
     DEPRECATED_ZERO_SHOT,
+    DOCUMENT,
     FEATURE_EXTRACTION,
     FEATURES,
     FEW_SHOT,
@@ -73,6 +75,7 @@ from .constants import (
     TEXT,
     TEXT_NER,
     UNIFORM_SOUP,
+    XYWH,
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
@@ -114,14 +117,18 @@ from .utils import (
     check_if_packages_installed,
     compute_num_gpus,
     compute_score,
+    convert_pred_to_xywh,
     create_fusion_data_processors,
     create_fusion_model,
     data_to_df,
     evaluate_coco,
     extract_from_output,
     filter_hyperparameters,
+    get_available_devices,
     get_config,
     get_detection_classes,
+    get_fit_complete_message,
+    get_fit_start_message,
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_mixup,
@@ -147,7 +154,7 @@ from .utils import (
     select_model,
     setup_detection_train_tuning_data,
     setup_save_path,
-    split_train_tuning_data,
+    split_hyperparameters,
     tensor_to_ndarray,
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
@@ -527,7 +534,7 @@ class MultiModalPredictor(ExportMixin):
         column_types: Optional[dict] = None,
         holdout_frac: Optional[float] = None,
         teacher_predictor: Union[str, MultiModalPredictor] = None,
-        seed: Optional[int] = 123,
+        seed: Optional[int] = 0,
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[dict] = None,
         clean_ckpts: Optional[bool] = True,
@@ -616,6 +623,7 @@ class MultiModalPredictor(ExportMixin):
             knowledge to a student predictor, i.e., the current predictor.
         seed
             The random seed to use for this training run.
+            Defaults to 0
         standalone
             Whether to save the enire model for offline deployment or only trained parameters of parameter-efficient fine-tuning strategy.
         hyperparameter_tune_kwargs
@@ -673,7 +681,22 @@ class MultiModalPredictor(ExportMixin):
                 self, max_num_tuning_data, seed, train_data, tuning_data
             )
 
+        if isinstance(train_data, str):
+            train_data = load_pd.load(train_data)
+        if isinstance(tuning_data, str):
+            tuning_data = load_pd.load(tuning_data)
+
         pl.seed_everything(seed, workers=True)
+
+        if self._presets is not None:
+            # FIXME: Silently ignoring user input, there should be a warning
+            presets = self._presets
+        else:
+            self._presets = presets
+
+        if self._config is not None:  # continuous training
+            # FIXME: Silently ignoring user input, there should be a warning
+            config = self._config
 
         self._save_path = setup_save_path(
             resume=self._resume,
@@ -684,45 +707,24 @@ class MultiModalPredictor(ExportMixin):
             fit_called=fit_called,
         )
 
-        train_data, tuning_data = split_train_tuning_data(
-            train_data=train_data,
-            tuning_data=tuning_data,
-            holdout_frac=holdout_frac,
-            is_classification=self.problem_property and self.problem_property.is_classification,
-            label_column=self._label_column,
-            seed=seed,
+        self._problem_type = self._infer_problem_type(train_data=train_data, column_types=column_types)
+
+        if tuning_data is None:
+            train_data, tuning_data = self._split_train_tuning(
+                data=train_data, holdout_frac=holdout_frac, random_state=seed
+            )
+
+        column_types = self._infer_column_types(
+            train_data=train_data, tuning_data=tuning_data, column_types=column_types
         )
 
-        column_types = infer_column_types(
-            data=train_data,
-            valid_data=tuning_data,
-            label_columns=self._label_column,
-            provided_column_types=column_types,
-        )
-        column_types = infer_label_column_type_by_problem_type(
-            column_types=column_types,
-            label_columns=self._label_column,
-            problem_type=self._problem_type,
-            data=train_data,
-            valid_data=tuning_data,
-        )
-
-        if self._presets is not None:
-            presets = self._presets
-        else:
-            self._presets = presets
-
-        if self._config is not None:  # continuous training
-            config = self._config
-
-        problem_type, output_shape = infer_problem_type_output_shape(
+        # FIXME: separate infer problem_type with output_shape, should be logically distinct
+        _, output_shape = infer_problem_type_output_shape(
             label_column=self._label_column,
             column_types=column_types,
             data=train_data,
             provided_problem_type=self._problem_type,
         )
-        if problem_type is not None:
-            self._problem_type = problem_type  # In case problem type isn't provided in __init__().
 
         # Determine data scarcity mode, i.e. a few-shot scenario
         scarcity_mode = infer_scarcity_mode_by_data_size(
@@ -755,7 +757,7 @@ class MultiModalPredictor(ExportMixin):
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
-                problem_type=problem_type,
+                problem_type=self._problem_type,
                 eval_metric_name=self._eval_metric_name,
                 validation_metric_name=self._validation_metric_name,
             )
@@ -779,8 +781,11 @@ class MultiModalPredictor(ExportMixin):
             provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             teacher_predictor=teacher_predictor,
         )
+        # split out the hyperparameters whose values are complex objects
+        hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
+
         hpo_mode = True if hyperparameter_tune_kwargs else False
-        if hpo_mode and self._problem_type != NER:  # TODO: support ner.
+        if hpo_mode:
             hyperparameters = filter_hyperparameters(
                 hyperparameters=hyperparameters,
                 column_types=column_types,
@@ -801,6 +806,7 @@ class MultiModalPredictor(ExportMixin):
             presets=presets,
             config=config,
             hyperparameters=hyperparameters,
+            advanced_hyperparameters=advanced_hyperparameters,
             teacher_predictor=teacher_predictor,
             standalone=standalone,
             hpo_mode=hpo_mode,  # skip average checkpoint if in hpo mode
@@ -829,6 +835,88 @@ class MultiModalPredictor(ExportMixin):
         logger.info(get_fit_complete_message(self._save_path))
 
         return self
+
+    # FIXME: Avoid having separate logic for inferring features and label column that is combined together
+    def _infer_column_types(
+        self, train_data: pd.DataFrame, tuning_data: pd.DataFrame = None, column_types: dict = None
+    ) -> dict:
+        column_types = infer_column_types(
+            data=train_data,
+            label_columns=self._label_column,
+            provided_column_types=column_types,
+            valid_data=tuning_data,
+            problem_type=self._problem_type,
+        )
+        column_types = infer_label_column_type_by_problem_type(
+            column_types=column_types,
+            label_columns=self._label_column,
+            problem_type=self._problem_type,
+            data=train_data,
+            valid_data=tuning_data,
+        )
+        return column_types
+
+    # FIXME: Align logic with Tabular,
+    #  don't combine output_shape and problem_type detection, make them separate
+    #  Use autogluon.core.utils.utils.infer_problem_type
+    def _infer_problem_type(self, train_data: pd.DataFrame, column_types: dict = None) -> str:
+        column_types_label = self._infer_column_types(
+            train_data=train_data[[self._label_column]], column_types=column_types
+        )
+
+        problem_type, _ = infer_problem_type_output_shape(
+            label_column=self._label_column,
+            column_types=column_types_label,
+            data=train_data,
+            provided_problem_type=self._problem_type,
+        )
+        return problem_type
+
+    def _split_train_tuning(
+        self, data: pd.DataFrame, holdout_frac: float = None, random_state: int = 0
+    ) -> (pd.DataFrame, pd.DataFrame):
+        """
+        Splits `data` into `train_data` and `tuning_data`.
+        If the problem_type is one of ['binary', 'multiclass']:
+            The split will be done with stratification on the label column.
+            Will guarantee at least 1 sample of every class in `data` will be present in `train_data`.
+                If only 1 sample of a class exists, it will always be put in `train_data` and not `tuning_data`.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The data to be split
+        holdout_frac : float, default = None
+            The ratio of data to use as validation.
+            If 0.2, 20% of the data will be used for validation, and 80% for training.
+            If None, the ratio is automatically determined,
+            ranging from 0.2 for small row count to 0.01 for large row count.
+        random_state : int, default = 0
+            The random state to use when splitting the data, to make the splitting process deterministic.
+            If None, a random value is used.
+
+        Returns
+        -------
+        Tuple of (train_data, tuning_data) of the split `data`
+        """
+        if holdout_frac is None:
+            holdout_frac = default_holdout_frac(num_train_rows=len(data), hyperparameter_tune=False)
+
+        # TODO: Hack since the recognized problem types are only binary, multiclass, and regression
+        #  Problem types used for purpose of stratification, so regression = no stratification
+        if self._problem_type in [BINARY, MULTICLASS]:
+            problem_type_for_split = self._problem_type
+        else:
+            problem_type_for_split = REGRESSION
+
+        train_data, tuning_data = generate_train_test_split_combined(
+            data=data,
+            label=self.label,
+            test_size=holdout_frac,
+            problem_type=problem_type_for_split,
+            random_state=random_state,
+        )
+        return train_data, tuning_data
 
     def _verify_inference_ready(self):
         if not self._fit_called:
@@ -978,6 +1066,7 @@ class MultiModalPredictor(ExportMixin):
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+        advanced_hyperparameters: Optional[Dict] = None,
         teacher_predictor: Union[str, MultiModalPredictor] = None,
         hpo_mode: bool = False,
         standalone: bool = True,
@@ -1045,6 +1134,7 @@ class MultiModalPredictor(ExportMixin):
             data_processors = create_fusion_data_processors(
                 config=config,
                 model=model,
+                advanced_hyperparameters=advanced_hyperparameters,
             )
         else:  # continuing training
             data_processors = self._data_processors
@@ -1342,10 +1432,11 @@ class MultiModalPredictor(ExportMixin):
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else None,
-                devices=num_gpus
-                if not use_ray_lightning and num_gpus > 0
-                else None,  # ray lightning requires not specifying gpus
-                auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
+                devices=get_available_devices(
+                    num_gpus=num_gpus,
+                    auto_select_gpus=config.env.auto_select_gpus,
+                    use_ray_lightning=use_ray_lightning,
+                ),
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
@@ -1653,8 +1744,7 @@ class MultiModalPredictor(ExportMixin):
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else None,
-                devices=num_gpus if num_gpus > 0 else None,
-                auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
+                devices=get_available_devices(num_gpus=num_gpus, auto_select_gpus=self._config.env.auto_select_gpus),
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
@@ -2051,6 +2141,7 @@ class MultiModalPredictor(ExportMixin):
 
         if self._problem_type == NER:
             ret_type = NER_RET
+
         if candidate_data:
             pred = self._match_queries_and_candidates(
                 query_data=data,
@@ -2087,6 +2178,11 @@ class MultiModalPredictor(ExportMixin):
 
             if self._problem_type == NER:
                 pred = merge_bio_format(data[self._df_preprocessor.ner_feature_names[0]], pred)
+
+            if self._problem_type == OBJECT_DETECTION:
+                if self._model.output_bbox_format == XYWH:
+                    pred = convert_pred_to_xywh(pred)
+
         if save_results:
             ## Dumping Result for detection only now
             assert (
@@ -2315,7 +2411,14 @@ class MultiModalPredictor(ExportMixin):
         strict: bool = True,
     ):
         if state_dict is None:
-            state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
+            if os.path.isdir(path + "-dir"):  # deepspeed save checkpoints into a directory
+                from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
+
+                convert_zero_checkpoint_to_fp32_state_dict(path + "-dir", path)
+                shutil.rmtree(path + "-dir")
+                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
+            else:
+                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
         load_result = model.load_state_dict(state_dict, strict=strict)
         assert (
@@ -2375,6 +2478,12 @@ class MultiModalPredictor(ExportMixin):
                     text_processors=data_processors[modality],
                     path=path,
                 )
+
+        # Clear the documents cache dictionary before saving.
+        for modality in [DOCUMENT]:
+            if modality in data_processors:
+                for p in data_processors[modality]:
+                    p.documents.clear()
 
         with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
             pickle.dump(data_processors, fp)
@@ -2742,53 +2851,3 @@ class AutoMMPredictor(MultiModalPredictor):
             "raise an exception starting in v0.7."
         )
         super(AutoMMPredictor, self).__init__(**kwargs)
-
-
-class MultiModalOnnxPredictor:
-    def __init__(self, base_predictor, model, providers=None):
-        if providers == None:
-            providers = ["CPUExecutionProvider"]
-        self._predictor = base_predictor
-        import onnxruntime as ort
-
-        self.sess = ort.InferenceSession(model.SerializeToString(), providers=providers)
-
-    def predict(self, data: Union[pd.DataFrame, dict, list, str]):
-        raise NotImplementedError()
-
-    def predict_proba(self, data: Union[pd.DataFrame, dict, list, str]):
-        data, df_preprocessor, data_processors = self._predictor._on_predict_start(
-            data=data,
-            requires_label=False,
-        )
-        data = process_batch(
-            data=data,
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-        )
-
-        inputs = self.sess.get_inputs()
-        outputs = self.sess.get_outputs()
-        input_names = [i.name for i in inputs]
-        input_dict = {k: data[k].numpy() for k in input_names}
-
-        # Taking second output, since outputs are (feature, logits)
-        # TODO: Make output consistent. Currently relying on keys of the output dict.
-        assert len(outputs) == 2, "expecting two outputs from the model."
-        label_name = outputs[1].name
-        onnx_logits = self.sess.run([label_name], input_dict)[0]
-        onnx_proba = logits_to_prob(onnx_logits)
-
-        return onnx_proba
-
-    @staticmethod
-    def load(path, providers=None):
-        import onnx
-
-        if providers == None:
-            providers = ["CPUExecutionProvider"]
-        base_predictor = MultiModalPredictor.load(path=path)
-        onnx_path = os.path.join(path, "model.onnx")
-        onnx_bytes = onnx.load(onnx_path)
-
-        return MultiModalOnnxPredictor(base_predictor=base_predictor, model=onnx_bytes, providers=providers)

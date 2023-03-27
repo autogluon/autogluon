@@ -2,9 +2,10 @@ from math import isclose
 
 import numpy as np
 import pytest
+import sklearn
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
-from autogluon.core.metrics import METRICS, Scorer
+from autogluon.core.metrics import METRICS, Scorer, rmse_func
 
 
 BINARY_METRICS = list(METRICS[BINARY].keys())
@@ -175,3 +176,23 @@ def _assert_imperfect_score(scorer: Scorer, abs_tol=1e-5):
     assert score < scorer.optimum
     assert not isclose(error, 0, abs_tol=abs_tol)
     assert not isclose(score, scorer.optimum, abs_tol=abs_tol)
+
+
+@pytest.mark.parametrize("sample_weight",
+                        [None,
+                        np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.3])])
+def test_rmse_with_sklearn(sample_weight):
+    """
+    Ensure 
+    (1) Without sample_weight, AutoGluon's custom rmse produces the same result as sklearn's rmse
+    (2) With sample_weight, computed wrmse is as expected
+    """
+    y_true = np.array([0, 0, 1, 1, 1, 1, 0])
+    y_pred = np.array([0.13, 0.09, 0.78, 0.43, 0.8, 0.91, 0.32])
+    expected_rmse = sklearn.metrics.mean_squared_error(y_true, y_pred, squared=False, sample_weight=sample_weight)
+
+    kwargs = {"y_true": y_true, "y_pred": y_pred}
+    if sample_weight is not None: kwargs["sample_weight"] = sample_weight
+    computed_rmse = rmse_func(**kwargs)
+
+    assert np.isclose(computed_rmse, expected_rmse)

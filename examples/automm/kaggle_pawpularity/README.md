@@ -35,7 +35,7 @@ Then, you can train the MultiModalPredictor with `.fit()`.
 	    hyperparameters={
 		    "model.names": "['timm_image']",
 		    "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
-		    "model.timm_image.train_transform_types": "['resize_shorter_side','center_crop','randaug']",
+		    "model.timm_image.train_transforms": "['resize_shorter_side','center_crop','randaug']",
 		    "data.categorical.convert_to_text": "False",
 		    "env.per_gpu_batch_size": "16",
 		    "env.per_gpu_batch_size_evaluation": "32",

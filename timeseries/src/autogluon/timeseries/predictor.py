@@ -61,6 +61,10 @@ class TimeSeriesPredictor:
         - ``"RMSE"``: root mean squared error
 
         For more information about these metrics, see https://docs.aws.amazon.com/forecast/latest/dg/metrics.html.
+    eval_metric_seasonal_period : int, optional
+        Seasonal period used to compute the mean absolute scaled error (MASE) evaluation metric. This parameter is only
+        used if ``eval_metric="MASE"`. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for more details.
+        Defaults to ``None``, in which case the seasonal period is computed based on the data frequency.
     known_covariates_names: List[str], optional
         Names of the covariates that are known in advance for all time steps in the forecast horizon. These are also
         known as dynamic features, exogenous variables, additional regressors or related time series. Examples of such
@@ -98,19 +102,16 @@ class TimeSeriesPredictor:
         - ``"last_window"``: use last ``prediction_length`` time steps of each time series for validation.
         - ``"multi_window"``: use last 3 non-overlapping windows of length ``prediction_length`` of each time series for validation.
         - object of type :class:`~autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` implementing a custom splitting strategy (for advanced users only).
-
-    Other Parameters
-    ----------------
     learner_type : AbstractLearner, default = TimeSeriesLearner
         A class which inherits from ``AbstractLearner``. The learner specifies the inner logic of the
         ``TimeSeriesPredictor``.
-    label : str
-        Alias for :attr:`target`.
     learner_kwargs : dict, optional
         Keyword arguments to send to the learner (for advanced users only). Options include ``trainer_type``, a
         class inheriting from ``AbstractTrainer`` which controls training of multiple models.
         If ``path`` and ``eval_metric`` are re-specified within ``learner_kwargs``, these are ignored.
-    quantiles : List[float]
+    label : str, optional
+        Alias for :attr:`target`.
+    quantiles : List[float], optional
         Alias for :attr:`quantile_levels`.
     """
 
@@ -122,21 +123,25 @@ class TimeSeriesPredictor:
         known_covariates_names: Optional[List[str]] = None,
         prediction_length: int = 1,
         eval_metric: Optional[str] = None,
+        eval_metric_seasonal_period: Optional[int] = None,
         path: Optional[str] = None,
         verbosity: int = 2,
         quantile_levels: Optional[List[float]] = None,
         ignore_time_index: bool = False,
         validation_splitter: Union[str, AbstractTimeSeriesSplitter] = "last_window",
-        **kwargs,
+        learner_type: Type[AbstractLearner] = TimeSeriesLearner,
+        learner_kwargs: Optional[dict] = None,
+        label: Optional[str] = None,
+        quantiles: Optional[List[float]] = None,
     ):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
         self.path = setup_outputdir(path)
 
         self.ignore_time_index = ignore_time_index
-        if target is not None and kwargs.get("label") is not None:
+        if target is not None and label is not None:
             raise ValueError("Both `label` and `target` are specified. Please specify at most one of these arguments.")
-        self.target = target or kwargs.get("label", "target")
+        self.target = target or label or "target"
 
         if known_covariates_names is None:
             known_covariates_names = []
@@ -152,9 +157,13 @@ class TimeSeriesPredictor:
 
         self.prediction_length = prediction_length
         self.eval_metric = eval_metric
-        self.quantile_levels = quantile_levels or kwargs.get(
-            "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-        )
+        self.eval_metric_seasonal_period = eval_metric_seasonal_period
+        if quantile_levels is not None and quantiles is not None:
+            raise ValueError(
+                "Both `quantile_levels` and `quantiles` are specified. Please specify at most one of these arguments."
+            )
+        self.quantile_levels = quantile_levels or quantiles or [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+
         if validation_splitter == "last_window":
             splitter = LastWindowSplitter()
         elif validation_splitter == "multi_window":
@@ -168,13 +177,14 @@ class TimeSeriesPredictor:
                 f"(received {validation_splitter} of type {type(validation_splitter)})."
             )
 
-        learner_type = kwargs.pop("learner_type", TimeSeriesLearner)
-        learner_kwargs = kwargs.pop("learner_kwargs", dict())
+        if learner_kwargs is None:
+            learner_kwargs = {}
         learner_kwargs = learner_kwargs.copy()
         learner_kwargs.update(
             dict(
                 path_context=self.path,
                 eval_metric=eval_metric,
+                eval_metric_seasonal_period=eval_metric_seasonal_period,
                 target=self.target,
                 known_covariates_names=self.known_covariates_names,
                 prediction_length=self.prediction_length,
@@ -262,7 +272,7 @@ class TimeSeriesPredictor:
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         enable_ensemble: bool = True,
         random_seed: Optional[int] = None,
-        **kwargs,
+        verbosity: Optional[int] = None,
     ) -> "TimeSeriesPredictor":
         """Fit probabilistic forecasting models to the given time series dataset.
 
@@ -420,6 +430,9 @@ class TimeSeriesPredictor:
         random_seed : int, optional
             If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
             results for most models (except those trained on GPU because of the non-determinism of GPU operations).
+        verbosity : int, optional
+            If provided, overrides the ``verbosity`` value used when creating the ``TimeSeriesPredictor``. See
+            documentation for :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
 
         """
         time_start = time.time()
@@ -439,7 +452,8 @@ class TimeSeriesPredictor:
                 f"(at least {2 * self.prediction_length + 1})."
             )
 
-        verbosity = kwargs.get("verbosity", self.verbosity)
+        if verbosity is None:
+            verbosity = self.verbosity
         set_logger_verbosity(verbosity)
 
         fit_args = dict(
@@ -451,7 +465,7 @@ class TimeSeriesPredictor:
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             enable_ensemble=enable_ensemble,
             random_seed=random_seed,
-            **kwargs,
+            verbosity=verbosity,
         )
         logger.info("================ TimeSeriesPredictor ================")
         logger.info("TimeSeriesPredictor.fit() called")

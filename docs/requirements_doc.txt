@@ -1,18 +1,8 @@
-ipykernel>=4.5.1,<6.0.0
-jupyter-sphinx>=0.3.2
-portalocker
-nose
-docutils<0.16
-mu-notedown
-awscli>=1.18.140
-sphinx==3.2.0
-sphinxcontrib-applehelp==1.0.2
-sphinxcontrib-bibtex==1.0.0
-sphinxcontrib-devhelp==1.0.2
-sphinxcontrib-htmlhelp==1.0.3
-sphinxcontrib-jsmath==1.0.1
-sphinxcontrib-qthelp==1.0.3
-sphinxcontrib-serializinghtml==1.1.4
-sphinxcontrib-svg2pdfconverter==1.1.0
-jinja2>=3.0.3,<3.1
-numpydoc==1.4.0  # 1.5.0 requires sphinx>4.0. Our dependency doesn't ping numpydoc, so we have to ping it.
+furo
+myst_nb
+sphinx
+sphinx-copybutton
+sphinx-design
+sphinx-inline-tabs
+sphinx-togglebutton
+sphinxcontrib-googleanalytics

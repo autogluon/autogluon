@@ -7,18 +7,21 @@ import pandas as pd
 from pandas import DataFrame
 
 from . import load_pointer
-from .load_s3 import list_bucket_prefix_suffix_s3
+from .load_s3 import list_bucket_prefix_suffix_contains_s3
 from ..savers import save_pointer
 from ..utils import multiprocessing_utils, s3_utils
 
 logger = logging.getLogger(__name__)
 
 
+# TODO: v1.0 consider renaming function so it isn't 'load'. Consider instead 'load_pd', or something more descriptive.
+# TODO: Add full docstring
+# TODO: Add full docstring for usage within TabularDataset
 def load(path, delimiter=None, encoding='utf-8', columns_to_keep=None, dtype=None, header=0,
          names=None, format=None, nrows=None, skiprows=None, usecols=None, low_memory=False, converters=None,
          filters=None, sample_count=None, worker_count=None, multiprocessing_method='forkserver') -> DataFrame:
     if isinstance(path, list):
-        return load_multipart(
+        return _load_multipart(
             paths=path, delimiter=delimiter, encoding=encoding, columns_to_keep=columns_to_keep,
             dtype=dtype, header=header, names=names, format=format,
             nrows=nrows, skiprows=skiprows, usecols=usecols, low_memory=low_memory, converters=converters,
@@ -54,7 +57,7 @@ def load(path, delimiter=None, encoding='utf-8', columns_to_keep=None, dtype=Non
                     worker_count=worker_count, multiprocessing_method=multiprocessing_method)
     elif format == 'multipart_s3':
         bucket, prefix = s3_utils.s3_path_to_bucket_prefix(path)
-        return load_multipart_s3(bucket=bucket, prefix=prefix, columns_to_keep=columns_to_keep, dtype=dtype, filters=filters,
+        return _load_multipart_s3(bucket=bucket, prefix=prefix, columns_to_keep=columns_to_keep, dtype=dtype, filters=filters,
                                  sample_count=sample_count, worker_count=worker_count, multiprocessing_method=multiprocessing_method)  # TODO: Add arguments!
     elif format == 'multipart_local':
         paths = [join(path, f) for f in listdir(path) if (isfile(join(path, f))) & (f.startswith('part-'))]
@@ -99,7 +102,7 @@ def load(path, delimiter=None, encoding='utf-8', columns_to_keep=None, dtype=Non
     return df
 
 
-def load_multipart_child(chunk):
+def _load_multipart_child(chunk):
     path, delimiter, encoding, columns_to_keep, dtype, header, names, format, nrows, skiprows, usecols, low_memory, converters, filters = chunk
     df = load(path=path, delimiter=delimiter, encoding=encoding, columns_to_keep=columns_to_keep,
               dtype=dtype, header=header, names=names, format=format,
@@ -108,7 +111,7 @@ def load_multipart_child(chunk):
     return df
 
 
-def load_multipart(paths, delimiter=',', encoding='utf-8', columns_to_keep=None, dtype=None, header=0,
+def _load_multipart(paths, delimiter=',', encoding='utf-8', columns_to_keep=None, dtype=None, header=0,
                    names=None, format=None, nrows=None, skiprows=None, usecols=None, low_memory=False, converters=None,
                    filters=None, worker_count=None, multiprocessing_method='forkserver'):
     cpu_count = multiprocessing.cpu_count()
@@ -124,7 +127,7 @@ def load_multipart(paths, delimiter=',', encoding='utf-8', columns_to_keep=None,
         format, nrows, skiprows, usecols, low_memory, converters, filters
     ] for path in paths]
 
-    df_list = multiprocessing_utils.execute_multiprocessing(workers_count=workers, transformer=load_multipart_child,
+    df_list = multiprocessing_utils.execute_multiprocessing(workers_count=workers, transformer=_load_multipart_child,
                                                             chunks=full_chunks, multiprocessing_method=multiprocessing_method)
 
     df_combined = pd.concat(df_list, axis=0, ignore_index=True)
@@ -136,36 +139,14 @@ def load_multipart(paths, delimiter=',', encoding='utf-8', columns_to_keep=None,
     return df_combined
 
 
-# Loads multiple files and concatenates row-wise (adding columns together)
-def load_multi(path_list, delimiter=',', encoding='utf-8', columns_to_keep_list=None, dtype_list=None):
-    num_files = len(path_list)
-
-    df_list = []
-    for i in range(num_files):
-        columns_to_keep = None
-        dtype = None
-        if dtype_list:
-            dtype = dtype_list[i]
-        if columns_to_keep_list:
-            columns_to_keep = columns_to_keep_list[i]
-        df = load(path_list[i], delimiter=delimiter, encoding=encoding, columns_to_keep=columns_to_keep, dtype=dtype)
-        df_list.append(df)
-
-    df_multi = pd.concat(df_list, axis=1, sort=False)
-
-    column_count = len(list(df_multi.columns.values))
-    row_count = df_multi.shape[0]
-    logger.log(20, "Loaded data from " + str(num_files) + " files | Columns = " + str(column_count) + " | Rows = " + str(row_count))
-    return df_multi
-
-
-def load_multipart_s3(bucket, prefix, columns_to_keep=None, dtype=None, sample_count=None, filters=None,
+def _load_multipart_s3(bucket, prefix, columns_to_keep=None, dtype=None, sample_count=None, filters=None,
                       worker_count=None, multiprocessing_method='forkserver'):
     if prefix[-1] == '/':
         prefix = prefix[:-1]
-    files = list_bucket_prefix_suffix_s3(bucket=bucket, prefix=prefix, suffix='/part-')
-    files_cleaned = [file for file in files if prefix + '/part-' in file]
-    paths_full = [s3_utils.s3_bucket_prefix_to_path(bucket=bucket, prefix=file, version='s3') for file in files_cleaned]
+    prefix_multipart = prefix + '/part-'
+    # exclude_contains=['/'] to disallow loading files like 's3://bucket/prefix/part-directory/some_file.abc'
+    files = list_bucket_prefix_suffix_contains_s3(bucket=bucket, prefix=prefix_multipart, exclude_contains=['/'])
+    paths_full = [s3_utils.s3_bucket_prefix_to_path(bucket=bucket, prefix=file, version='s3') for file in files]
     if sample_count is not None:
         logger.log(15, 'Load multipart s3 taking sample of ' + str(sample_count) + ' out of ' + str(len(paths_full)) + ' files to load')
         paths_full = paths_full[:sample_count]
