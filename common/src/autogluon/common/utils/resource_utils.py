@@ -1,5 +1,6 @@
 import multiprocessing
 import os
+import shutil
 import subprocess
 
 from .utils import bytes_to_mega_bytes
@@ -103,6 +104,15 @@ class ResourceManager:
             return bytes_to_mega_bytes(available_blocks)
         except Exception:
             return None
+
+    @staticmethod
+    def get_disk_usage(path: str):
+        """
+        Gets the disk usage information for the given path
+
+        Returns obj with variables `free`, `total`, `used`, representing bytes as integers.
+        """
+        return shutil.disk_usage(path=path)
 
     @staticmethod
     def _get_gpu_count_cuda():

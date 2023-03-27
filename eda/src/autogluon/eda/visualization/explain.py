@@ -114,6 +114,12 @@ class ExplainWaterfallPlot(_AbstractExplainPlot):
     """
 
     def _render_internal(self, expected_value, shap_values, features, feature_names, **kwargs):
-        shap.plots._waterfall.waterfall_legacy(
-            expected_value, shap_values, features, feature_names=feature_names, **kwargs
-        )
+        shap.plots.waterfall(_ShapInput(expected_value, shap_values, features, feat_names=features.index), **kwargs)
+
+
+class _ShapInput(object):
+    def __init__(self, expectation, shap_values, features, feat_names):
+        self.base_values = expectation
+        self.values = shap_values
+        self.display_data = features.values
+        self.feature_names = list(feat_names)

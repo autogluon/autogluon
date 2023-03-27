@@ -87,12 +87,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         self._available_features: pd.Index = None
         self.quantile_adjustments: Dict[str, float] = {}
 
-        self.tabular_predictor = TabularPredictor(
-            path=self.path,
-            label=self.target,
-            problem_type=ag.constants.REGRESSION,
-            eval_metric=self.TIMESERIES_METRIC_TO_TABULAR_METRIC.get(self.eval_metric),
-        )
+        self.tabular_predictor: TabularPredictor = None
 
     def _get_features_dataframe(
         self,
@@ -280,7 +275,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
     ) -> None:
         self._check_fit_params()
         start_time = time.time()
-        if self.tabular_predictor._learner.is_fit:
+        if self.tabular_predictor is not None:
             raise AssertionError(f"{self.name} predictor has already been fit!")
         verbosity = kwargs.get("verbosity", 2)
         self._target_lag_indices = np.array(get_lags_for_frequency(train_data.freq), dtype=np.int64)
@@ -325,6 +320,14 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         time_elapsed = time.time() - start_time
         autogluon_logger = logging.getLogger("autogluon")
         logging_level = autogluon_logger.level
+
+        self.tabular_predictor = TabularPredictor(
+            path=self.path,
+            label=self.target,
+            problem_type=ag.constants.REGRESSION,
+            eval_metric=self.TIMESERIES_METRIC_TO_TABULAR_METRIC.get(self.eval_metric),
+        )
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             self.tabular_predictor.fit(

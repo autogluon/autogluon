@@ -183,21 +183,29 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 "url": "https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn_1x_voc0712_20220320_192712-54bef0f3.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "voc", "faster_rcnn_r50_fpn_1x_voc0712.py"),
             },
+            "yolox_tiny_8x8_300e_coco": {
+                "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_tiny_8x8_300e_coco/yolox_tiny_8x8_300e_coco_20211124_171234-b4047906.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_tiny_8x8_300e_coco.py"),
+            },
             "yolox_s_8x8_300e_coco": {
                 "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_s_8x8_300e_coco/yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_s_8x8_300e_coco.py"),
+            },
+            "yolox_m_8x8_300e_coco": {
+                "url": "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_m.pth",  # Megvii weight, need more verifications
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_m_8x8_300e_coco.py"),
             },
             "yolox_l_8x8_300e_coco": {
                 "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_l_8x8_300e_coco/yolox_l_8x8_300e_coco_20211126_140236-d3bd2b23.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py"),
             },
-            "yolox_x_8x8_300e_coco": {
-                "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_x_8x8_300e_coco/yolox_x_8x8_300e_coco_20211126_140254-1ef88d67.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_x_8x8_300e_coco.py"),
-            },
             "yolox_l_objects365": {  # TODO: update with better pretrained weights
                 "url": "https://automl-mm-bench.s3.amazonaws.com/object_detection/checkpoints/yolox/yolox_l_objects365_temp.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py"),
+            },
+            "yolox_x_8x8_300e_coco": {
+                "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_x_8x8_300e_coco/yolox_x_8x8_300e_coco_20211126_140254-1ef88d67.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_x_8x8_300e_coco.py"),
             },
         }
 

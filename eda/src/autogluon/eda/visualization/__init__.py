@@ -7,6 +7,7 @@ from .interaction import (
     CorrelationVisualization,
     FeatureDistanceAnalysisVisualization,
     FeatureInteractionVisualization,
+    PDPInteractions,
 )
 from .layouts import (
     MarkdownSectionComponent,

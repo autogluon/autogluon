@@ -2,7 +2,7 @@ import logging
 import os
 import shutil
 
-from ..utils.try_import import try_import_ray
+from autogluon.common.utils.try_import import try_import_ray
 try_import_ray()  # try import ray before importing the remaining contents so we can give proper error messages
 import ray
 
