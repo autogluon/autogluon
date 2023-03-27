@@ -10,7 +10,6 @@ from omegaconf import DictConfig, OmegaConf
 from sklearn.preprocessing import LabelEncoder
 
 from ..constants import AUTOMM, END_OFFSET, ENTITY_GROUP, NER_ANNOTATION, PROBABILITY, START_OFFSET
-from .utils import process_ner_annotations
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +137,8 @@ class NerLabelEncoder:
         transformed_y
             A list of word level annotations.
         """
+        from .utils import process_ner_annotations
+
         all_annotations, _ = self.extract_ner_annotations(y)
         transformed_y = []
         for annotation, text_snippet in zip(all_annotations, x.items()):
