@@ -11,7 +11,7 @@ import pytest
 from flaky import flaky
 
 import autogluon.core as ag
-from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
+from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator, SKTIME_INSTALLED
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
@@ -22,7 +22,11 @@ from .gluonts.test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_autogluon_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
 from .test_multi_window_model import get_multi_window_deepar
-from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
+
+if SKTIME_INSTALLED:
+    from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
+else:
+    SKTIME_TESTABLE_MODELS = []
 
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
 TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + TABULAR_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS + [get_multi_window_deepar]
