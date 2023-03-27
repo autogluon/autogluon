@@ -9,13 +9,15 @@ from abc import abstractmethod
 
 from numpy import ndarray
 from pandas import DataFrame, Series
-from typing import Union
+from typing import Any, Dict, Union, Optional
 
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray
+from autogluon.common.utils.s3_utils import download_s3_folder, s3_path_to_bucket_prefix
 
+from ..abstract.abstract_model import AbstractModel
 from ...ray.resources_calculator import ResourceCalculatorFactory
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NotEnoughCudaMemoryError
 
@@ -51,9 +53,9 @@ class AbstractFoldFittingStrategy():
         """
         Method is called when a fold is ready to be fit
         """
-
-
-class LocalFoldFittingStrategy(AbstractFoldFittingStrategy):
+        
+        
+class FoldFittingStrategy(AbstractFoldFittingStrategy):
     """
     Provides some default implementation for AbstractFoldFittingStrategy
 
@@ -263,7 +265,7 @@ class LocalFoldFittingStrategy(AbstractFoldFittingStrategy):
         return fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix
 
 
-class SequentialLocalFoldFittingStrategy(LocalFoldFittingStrategy):
+class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
     """
     This strategy fits the folds locally in a sequence.
     """
@@ -340,19 +342,31 @@ class SequentialLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         return fold_model
 
 
-def _ray_fit(model_base, bagged_ensemble_model_path,
-             X, y, X_pseudo, y_pseudo,
-             fold_ctx, time_limit_fold, save_bag_folds, 
-             resources, kwargs_fold):
+def _ray_fit(
+    *,
+    model_base: AbstractModel,
+    bagged_ensemble_model_path: str,
+    X: Union[str, pd.DataFrame],
+    y: Union[str, pd.DataFrame],
+    X_pseudo: Union[str, pd.DataFrame],
+    y_pseudo: Union[str, pd.DataFrame],
+    fold_ctx: Dict[str, Any],
+    time_limit_fold: float,
+    save_bag_folds: bool, 
+    resources: Dict[str, Any],
+    kwargs_fold: Dict[str, Any],
+    model_sync_path: Optional[str] = None
+):
     logger.log(10, 'ray worker training')
     time_start_fold = time.time()
     fold, folds_finished, folds_left, \
         folds_to_fit, is_last_fold, \
-        model_name_suffix = LocalFoldFittingStrategy._get_fold_properties(fold_ctx)
+        model_name_suffix = FoldFittingStrategy._get_fold_properties(fold_ctx)
     train_index, val_index = fold
     fold_model = copy.deepcopy(model_base)
     fold_model.name = f'{fold_model.name}{model_name_suffix}'
-    fold_model.set_contexts(bagged_ensemble_model_path + fold_model.name + os.path.sep)
+    fold_model_local_save_path = bagged_ensemble_model_path + fold_model.name + os.path.sep
+    fold_model.set_contexts(fold_model_local_save_path)
     if type(X) == str and type(y) == str:
         with open(X, 'rb') as X_f, open(y, 'rb') as y_f:
             X = pickle.load(X_f)
@@ -377,7 +391,8 @@ def _ray_fit(model_base, bagged_ensemble_model_path,
     fold_model.fit_time = time_train_end_fold - time_start_fold
     fold_model, pred_proba = _ray_predict_oof(fold_model, X_val_fold, y_val_fold,
                                               time_train_end_fold, resources['num_cpus'], save_bag_folds)
-    fold_model.save()
+    model_save_path = model_sync_path + f"{fold_model.name}/" if model_sync_path is not None else None  # s3 path hence need "/" as the saperator
+    fold_model.save(path=model_save_path)
     return fold_model.name, pred_proba, time_start_fold, \
         time_train_end_fold, fold_model.predict_time, fold_model.predict_1_time
 
@@ -395,9 +410,9 @@ def _ray_predict_oof(fold_model, X_val_fold, y_val_fold, time_train_end_fold,
     return fold_model, pred_proba
 
 
-class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
+class ParallelFoldFittingStrategy(FoldFittingStrategy):
     """
-    An implementation of LocalFoldFittingStrategy to train multiple folds in parallel.
+    An implementation of FoldFittingStrategy to train multiple folds in parallel.
     Folds are spread to cpu/gpu cores by ray tasks. 
     Large data are stored in ray object store, which minimizes memory usage and unessary serializations.
     Trained models are saved to disk within each ray task.
@@ -410,6 +425,10 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         max_memory_usage_ratio: float, default=0.8
             The ratio of max memory usage for parallel folding.
             If the estimated usage exceeds this ratio, will fall back to sequential folding.
+        model_sync_path: Optional[str], default=None
+            The path to be used for workers to upload model artifacts and for headers to download
+            Currently supports providing a s3 path.
+            If None, model artifacts will be saved locally meaning no sync is required
     Attributes
     ----------
         num_cpus: int
@@ -435,11 +454,13 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         num_jobs: int,
         num_folds_parallel: int,
         max_memory_usage_ratio: float = 0.8,
+        model_sync_path: Optional[str] = None,
         **kwargs
     ):
         super().__init__(**kwargs)
         self.ray = try_import_ray()
         self.max_memory_usage_ratio = min(max_memory_usage_ratio, 1.0)
+        self.model_sync_path = model_sync_path
         self.time_start_fit = None
         self.time_end_fit = None
         self.fit_time = 0
@@ -470,17 +491,21 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
 
     def schedule_fold_model_fit(self, fold_ctx):
         self.jobs.append(fold_ctx)
+        
+    def _get_ray_init_args(self) -> Dict[str, Any]:
+        """
+        Get the arguments needed to init ray runtime.
+        This could differ in different context, i.e. distributed vs local
+        """
+        return dict(
+            address="auto",
+            logging_level=logging.ERROR,
+            log_to_driver=False
+        )
 
     def after_all_folds_scheduled(self):
         if not self.ray.is_initialized():
-            ray_init_args = dict(
-                log_to_driver=False,
-                runtime_env={"env_vars": {"PL_DISABLE_FORK": "1"}},  # https://github.com/ray-project/ray/issues/28197
-                logging_level=logging.ERROR,  # https://github.com/ray-project/ray/issues/29216
-                num_cpus=self.num_cpus,
-            )
-            if self.num_gpus > 0:
-                ray_init_args['num_gpus'] = self.num_gpus
+            ray_init_args = self._get_ray_init_args()
             self.ray.init(**ray_init_args)
         job_refs = []
         job_fold_map = {}
@@ -535,6 +560,10 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
                 # Terminate all ray tasks because a fold failed
                 self.terminate_all_unfinished_tasks(unfinished)
                 raise processed_exception
+        self.sync_model_artifact(
+            local_path=self.bagged_ensemble_model.path,
+            model_sync_path=self.model_sync_path
+        )
         self.fit_time = 0
         if self.time_start_fit and self.time_end_fit:
             self.fit_time = self.time_end_fit - self.time_start_fit
@@ -562,9 +591,20 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
                 kwargs_fold['sample_weight'] = self.sample_weight[train_index]
                 kwargs_fold['sample_weight_val'] = self.sample_weight[val_index]
         return self._ray_fit.options(**resources) \
-            .remote(model_base_ref, self.bagged_ensemble_model.path,
-                    X_ref, y_ref, X_pseudo_ref, y_pseudo_ref, fold_ctx_ref, time_limit_fold,
-                    save_bag_folds, resources, kwargs_fold)
+            .remote(
+                model_base=model_base_ref,
+                bagged_ensemble_model_path=self.bagged_ensemble_model.path,
+                X=X_ref,
+                y=y_ref,
+                X_pseudo=X_pseudo_ref,
+                y_pseudo=y_pseudo_ref,
+                fold_ctx=fold_ctx_ref,
+                time_limit_fold=time_limit_fold,
+                save_bag_folds=save_bag_folds,
+                resources=resources,
+                kwargs_fold=kwargs_fold,
+                model_sync_path=self.model_sync_path
+            )
 
     def _update_bagged_ensemble(self, fold_model, pred_proba, time_start_fit,
                                 time_end_fit, predict_time, predict_1_time, fold_ctx):
@@ -708,3 +748,50 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
             logger.warning(default_error_msg)
             e = NotEnoughCudaMemoryError
         return e
+    
+    def sync_model_artifact(self, local_path: str, model_sync_path: str):
+        """
+        Sync model artifacts being uploaded to `model_sync_path` to `local_path`
+        This method is expected to be called on the head node in the cluster to collect model artifacts after training
+        
+        Parameters
+        ----------
+        local_path: str
+            local path to download artifacts
+        model_sync_path: str
+            remote path to download model artifacts from
+        """
+        self._sync_model_artifact(local_path=local_path, model_sync_path=model_sync_path)
+    
+    def _sync_model_artifact(self, **kwargs):
+        pass
+    
+    
+class ParallelLocalFoldFittingStrategy(ParallelFoldFittingStrategy):
+    
+    def _get_ray_init_args(self):
+        ray_init_args = dict(
+            log_to_driver=True,
+            logging_level=logging.ERROR,
+            num_cpus=self.num_cpus
+        )
+        if self.num_gpus > 0:
+            ray_init_args['num_gpus'] = self.num_gpus
+        return ray_init_args
+
+    
+class ParallelDistributedFoldFittingStrategy(ParallelFoldFittingStrategy):
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Append bag model name in the path
+        self.model_sync_path = self.model_sync_path + os.path.basename(os.path.normpath(self.bagged_ensemble_model.path)) + "/"
+
+    def _sync_model_artifact(self, local_path, model_sync_path):
+        bucket, path = s3_path_to_bucket_prefix(model_sync_path)
+        download_s3_folder(
+            bucket=bucket,
+            prefix=path,
+            local_path=local_path,
+            error_if_exists=False
+        )
