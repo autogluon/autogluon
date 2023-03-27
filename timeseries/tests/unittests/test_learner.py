@@ -38,7 +38,6 @@ def trained_learners():
         learner.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hp,
-            val_data=DUMMY_TS_DATAFRAME,
         )
         learners[repr(hp)] = learner
         model_paths.append(temp_model_path)
@@ -108,7 +107,6 @@ def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_perfo
         learner.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
-            val_data=DUMMY_TS_DATAFRAME,
             hyperparameter_tune_kwargs={
                 "searcher": "random",
                 "scheduler": "local",
