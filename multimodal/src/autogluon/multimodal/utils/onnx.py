@@ -48,7 +48,7 @@ class OnnxModule(object):
     so that we can predict with TensorRT by simply replacing predictor._model with OnnxModule.
     """
 
-    def __init__(self, onnx_path: str, providers: Optional[Union[dict, List[str]]] = None):
+    def __init__(self, onnx_path: Union[str, bytes], providers: Optional[Union[dict, List[str]]] = None):
         """
         Parameters
         ----------
@@ -60,15 +60,21 @@ class OnnxModule(object):
         import onnx
         import onnxruntime as ort
 
-        if not os.path.exists(onnx_path):
-            raise FileNotFoundError(f"failed to located onnx file at {onnx_path}")
+        if isinstance(onnx_path, bytes):
+            onnx_model = onnx.load_model_from_string(onnx_path)
+        else:
+            if not os.path.exists(onnx_path):
+                raise FileNotFoundError(f"failed to located onnx file at {onnx_path}")
 
-        logger.info("Loading ONNX file from path {}...".format(onnx_path))
-        onnx_model = onnx.load(onnx_path)
+            logger.info("Loading ONNX file from path {}...".format(onnx_path))
+            onnx_model = onnx.load(onnx_path)
 
         if providers == None:
-            dirname = os.path.dirname(os.path.abspath(onnx_path))
-            cache_path = os.path.join(dirname, "model_trt")
+            if isinstance(onnx_path, str):
+                dirname = os.path.dirname(os.path.abspath(onnx_path))
+                cache_path = os.path.join(dirname, "model_trt")
+            else:
+                cache_path = None
             providers = [
                 (
                     "TensorrtExecutionProvider",

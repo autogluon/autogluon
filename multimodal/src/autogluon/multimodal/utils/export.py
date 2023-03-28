@@ -1,6 +1,6 @@
+import io
 import logging
 import os
-import tempfile
 import warnings
 from collections import defaultdict, namedtuple
 from typing import Dict, List, Optional, Union
@@ -131,13 +131,14 @@ class ExportMixin:
         input_keys = self._model.input_keys
         input_vec = [batch[k] for k in input_keys]
 
-        # Infer default onnx path, and create parent directory if needed
+        # Write to BytesIO if path argument is not provided
         if not path:
-            path = self.path
-        onnx_path = os.path.join(path, "model.onnx")
-        dirname = os.path.dirname(os.path.abspath(onnx_path))
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
+            onnx_path = io.BytesIO()
+        else:
+            onnx_path = os.path.join(path, "model.onnx")
+            dirname = os.path.dirname(os.path.abspath(onnx_path))
+            if not os.path.exists(dirname):
+                os.makedirs(dirname)
 
         # Infer dynamic dimensions
         dynamic_axes = onnx_get_dynamic_axes(input_keys)
@@ -151,6 +152,9 @@ class ExportMixin:
             input_names=input_keys,
             dynamic_axes=dynamic_axes,
         )
+
+        if isinstance(onnx_path, io.BytesIO):
+            onnx_path = onnx_path.getvalue()
 
         return onnx_path
 
@@ -195,16 +199,15 @@ class ExportMixin:
         data = pd.DataFrame.from_dict(data_dict)
 
         onnx_module = None
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            onnx_path = self.export_onnx(data=data, path=tmpdirname, truncate_long_and_double=True)
+        onnx_path = self.export_onnx(data=data, truncate_long_and_double=True)
 
-            onnx_module = OnnxModule(onnx_path, providers)
-            onnx_module.input_keys = self._model.input_keys
-            onnx_module.prefix = self._model.prefix
-            onnx_module.get_output_dict = self._model.get_output_dict
+        onnx_module = OnnxModule(onnx_path, providers)
+        onnx_module.input_keys = self._model.input_keys
+        onnx_module.prefix = self._model.prefix
+        onnx_module.get_output_dict = self._model.get_output_dict
 
-            # To use the TensorRT module for prediction, simply replace the _model in the predictor
-            self._model = onnx_module
+        # To use the TensorRT module for prediction, simply replace the _model in the predictor
+        self._model = onnx_module
 
         # Evaluate and cache TensorRT engine files
         logger.info("Compiling ... (this may take a few minutes)")
