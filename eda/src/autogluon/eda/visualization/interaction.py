@@ -459,6 +459,10 @@ class PDPInteractions(AbstractVisualization, JupyterMixin):
     """
     Display Partial Dependence Plots (PDP) with Individual Conditional Expectation (ICE)
 
+    The visualizations have two modes:
+    - regular PDP + ICE plots - this is the default mode of operation
+    - two-way PDP plots - this mode can be selected via passing two `features` and setting `two_way = True`
+
     ICE plots complement PDP by showing the relationship between a feature and the model's output for each individual instance in the dataset.
     ICE lines (blue) can be overlaid on PDPs (red) to provide a more detailed view of how the model behaves for specific instances.
 
@@ -466,6 +470,8 @@ class PDPInteractions(AbstractVisualization, JupyterMixin):
     ----------
     features: Union[str, List[str]]
         feature to display on the plots
+    two_way: bool, default = False
+        render two-way PDP; this mode works only when two `features` are specified
     target: Optional[Any], default = None
         In a multiclass setting, specifies the class for which the PDPs should be computed.
         Ignored in binary classification or classical regression settings
@@ -488,6 +494,7 @@ class PDPInteractions(AbstractVisualization, JupyterMixin):
     def __init__(
         self,
         features: Union[str, List[str]],
+        two_way: bool = False,
         target: Optional[Any] = None,
         namespace: Optional[str] = None,
         fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
@@ -496,42 +503,72 @@ class PDPInteractions(AbstractVisualization, JupyterMixin):
         **kwargs,
     ) -> None:
         super().__init__(namespace, **kwargs)
-        self.features = features
+
+        if type(features) is not list:
+            features = [features]  # type: ignore
+        self.features: list = features
+
         self.target = target
         self.fig_args = fig_args
         self.sample = sample
         self.headers = headers
+        self.two_way = two_way
+
+        if two_way:
+            assert len(self.features) == 2, "`two_way` can only be used if only 2 `features` are passed"
 
     def can_handle(self, state: AnalysisState) -> bool:
         return self.all_keys_must_be_present(state, "model", "pdp_data")
 
     def _render(self, state: AnalysisState) -> None:
-        n = len(self.features)
-        cols = self.MAX_CHARTS_PER_ROW if n > self.MAX_CHARTS_PER_ROW else n
-        rows = int(np.ceil(n / cols))
-
-        if self.fig_args is None:
-            self.fig_args = {}
-        fig_args = {**dict(nrows=rows, ncols=cols, figsize=(12, 3 * rows)), **self.fig_args}
+        additional_kwargs, fig_args, features = self._get_args()
 
         if self.headers:
             self.render_header_if_needed(state, "Partial Dependence Plots")
 
         fig, axs = plt.subplots(**fig_args)
-        kwargs = {"pd_line_kw": {"color": "red"}, "ice_lines_kw": {"color": "blue"}, **self._kwargs}
-        chart = PartialDependenceDisplay.from_estimator(
+
+        kwargs = {**additional_kwargs, **self._kwargs}
+        data = state.pdp_data
+
+        if self.two_way:
+            for f in self.features[:-1]:
+                data = data[data[f].notna()]
+
+        PartialDependenceDisplay.from_estimator(
             _SklearnAutoGluonWrapper(state.model),
-            state.pdp_data,
+            data,
             self.features,
-            kind="both",
-            ax=axs.ravel()[:n],
+            ax=axs.ravel()[: len(features)],
             target=self.target,
             subsample=self.sample,
             **kwargs,
         )
         plt.tight_layout(h_pad=0.3, w_pad=0.5)
-        plt.show(chart)
         plt.show()
+
+    def _get_args(self):
+        n = len(self.features)
+        cols = self.MAX_CHARTS_PER_ROW if n > self.MAX_CHARTS_PER_ROW else n
+        rows = int(np.ceil(n / cols))
+        if self.fig_args is None:
+            self.fig_args = {}
+        kind = "both"
+        additional_kwargs: Dict[str, Any] = {}
+        features = self.features
+
+        if self.two_way:
+            fig_args = {**dict(nrows=1, ncols=3, figsize=(12, 3)), **self.fig_args}
+            if len(self.features) == 2:
+                kind = "average"
+            features.append(features.copy())
+        else:
+            fig_args = {**dict(nrows=rows, ncols=cols, figsize=(12, 3 * rows)), **self.fig_args}
+            additional_kwargs["pd_line_kw"] = {"color": "red"}
+            additional_kwargs["ice_lines_kw"] = {"color": "blue"}
+        additional_kwargs["kind"] = kind
+
+        return additional_kwargs, fig_args, features
 
 
 class _SklearnAutoGluonWrapper:
