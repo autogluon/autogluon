@@ -197,18 +197,63 @@ class NerLabelEncoder:
         return pred_label_only, pred_with_offset, pred_with_proba
 
 
-class CustomLabelEncoder(LabelEncoder):
-    def __init__(self, pos_label=None, **kwargs):
-        super().__init__(**kwargs)
-        self.pos_label = pos_label
+class CustomLabelEncoder:
+    def __init__(self, positive_class=None):
+        self.positive_class = positive_class
+        self._le = LabelEncoder()
+        self._mapping = None
+        self._inverse_mapping = None
+
+    def _set_attributes(self):
+        if self.positive_class:
+            assert self.positive_class in self._le.classes_
+
+        if self.positive_class:
+            classes, class_labels = [], []
+            for i, c in enumerate(self._le.classes_):
+                if c == self.positive_class:
+                    positive_label = i
+                else:
+                    classes.append(c)
+                    class_labels.append(i)
+            classes.append(self.positive_class)
+            class_labels.append(positive_label)
+            self.classes_ = np.array(classes)
+            pairs = {label: i for i, label in enumerate(class_labels)}
+            sorted_pairs = sorted(pairs.items(), key=lambda item: item[0])
+            self._mapping = np.array([item[1] for item in sorted_pairs])
+            sorted_pairs = sorted(pairs.items(), key=lambda item: item[1])
+            self._inverse_mapping = np.array([item[0] for item in sorted_pairs])
+        else:
+            self.classes_ = self._le.classes_
 
     def fit(self, y):
-        super().fit(y)
-
-        if self.pos_label:
-            assert self.pos_label in self.classes_
-
-        if self.pos_label:
-            self.classes_ = np.array([c for c in self.classes_ if c != self.pos_label] + [self.pos_label])
+        self._le.fit(y)
+        self._set_attributes()
 
         return self
+
+    def fit_transform(self, y):
+        y = self._le.fit_transform(y)
+        self._set_attributes()
+
+        if self._mapping is not None:
+            return self._mapping[y]
+        else:
+            return y
+
+    def transform(self, y):
+        y = self._le.transform(y)
+
+        if self._mapping is not None:
+            return self._mapping[y]
+        else:
+            return y
+
+    def inverse_transform(self, y):
+        y = self._le.inverse_transform(y)
+
+        if self._inverse_mapping is not None:
+            return self._inverse_mapping[y]
+        else:
+            return y

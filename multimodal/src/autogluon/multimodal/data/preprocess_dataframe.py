@@ -69,7 +69,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         if label_column:
             if label_generator is None:
                 self._label_generator = CustomLabelEncoder(
-                    pos_label=OmegaConf.select(config, "pos_label", default=None)
+                    positive_class=OmegaConf.select(config, "pos_label", default=None)
                 )
             else:
                 self._label_generator = label_generator
