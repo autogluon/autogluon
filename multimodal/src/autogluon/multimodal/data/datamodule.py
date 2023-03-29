@@ -66,8 +66,8 @@ class BaseDataModule(LightningDataModule):
             This is used when we want to use val_loss as val metric, and thus we'll use data pipeline
             for training instead of for inference during validation.
         model_config
-            Model config used to decided dataset type. e.g. if multi_image_mix_dataset is used in detection model,
-            MultiImageMixDataset will be used instead of BaseDataset
+            Here the model config is used to decided dataset type. e.g. if multi_image_mix_dataset is used
+            in detection model, MultiImageMixDataset will be used instead of BaseDataset
         """
         super().__init__()
         self.prepare_data_per_node = True
@@ -113,6 +113,7 @@ class BaseDataModule(LightningDataModule):
                     data=data_split,
                     preprocessor=self.df_preprocessor,
                     processors=self.data_processors,
+                    model_config=self.model_config,
                     id_mappings=self.id_mappings,
                     is_training=is_training,
                 )

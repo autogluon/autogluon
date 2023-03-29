@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from ...constants import AUTOMM, GET_ITEM_ERROR_RETRY
+from ...constants import AUTOMM, GET_ITEM_ERROR_RETRY, MULTI_IMAGE_MIX_DATASET
 from ..preprocess_dataframe import MultiModalFeaturePreprocessor
 from ..utils import apply_data_processor, apply_df_preprocessor, get_per_sample_features
 
@@ -34,6 +34,7 @@ class MultiImageMixDataset(torch.utils.data.Dataset):
         data: pd.DataFrame,
         preprocessor: List[MultiModalFeaturePreprocessor],
         processors: List[dict],
+        model_config: mmcv.utils.config.Config,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         is_training: bool = False,
     ):
@@ -53,41 +54,28 @@ class MultiImageMixDataset(torch.utils.data.Dataset):
             Whether in training mode. Some data processing may be different between training
             and validation/testing/prediction, e.g., image data augmentation is used only in
             training.
+        model_config
+            Model config used to decided dataset type. e.g. if multi_image_mix_dataset is used in detection model,
+            MultiImageMixDataset will be used instead of BaseDataset
         """
         super().__init__()
         self.processors = processors
         self.is_training = is_training
         self._consecutive_errors = 0
 
-        self.mix_transforms = [
-            Mosaic(
-                img_scale=(640, 640),
-                center_ratio_range=(0.5, 1.5),
-                min_bbox_size=0,
-                bbox_clip_border=True,
-                skip_filter=True,
-                pad_val=114,
-                prob=0.5,
-            ),
-            MixUp(
-                img_scale=(640, 640),
-                ratio_range=(0.8, 1.6),
-                flip_ratio=0.5,
-                pad_val=114,
-                max_iters=15,
-                min_bbox_size=5,
-                min_area_ratio=0.2,
-                max_aspect_ratio=20,
-                bbox_clip_border=True,
-                skip_filter=True,
-                prob=0.5,
-            ),
-        ]  # TODO: remove hardcode
+        mix_config = model_config[MULTI_IMAGE_MIX_DATASET]
 
-        self.mix_transforms_types = ["mosaic", "mixup"]  # TODO: remove hardcode
+        self.mix_transforms = []
+        self.mix_transforms_types = []  # TODO: remove hardcode
+        if "mosaic" in mix_config:
+            self.mix_transforms.append(Mosaic(**mix_config["mosaic"]))
+            self.mix_transforms_types.append("mosaic")
+        if "mixup" in mix_config:
+            self.mix_transforms.append(MixUp(**mix_config["mixup"]))
+            self.mix_transforms_types.append("mixup")
 
-        self._skip_type_keys = None  # TODO: remove hardcode
-        self.max_refetch = 15  # TODO: remove hardcode
+        self._skip_type_keys = None  # TODO: remove hardcode, we need to disable multi image mix in late epochs
+        self.max_refetch = 15  # TODO: remove hardcode (do we need refetch?)
 
         self.lengths = []
 
