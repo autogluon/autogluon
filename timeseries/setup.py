@@ -49,13 +49,9 @@ extras_require = {
         "isort>=5.10",
         "black>=22.3,<23.0",
     ],
-    "sktime": ["sktime>=0.14,<0.16", "pmdarima>=1.8.2,<1.9", "tbats>=1.1,<2"],
 }
 
-all_requires = []
-for extra_package in ["sktime"]:
-    all_requires += extras_require[extra_package]
-extras_require["all"] = list(set(all_requires))
+extras_require["all"] = []
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 

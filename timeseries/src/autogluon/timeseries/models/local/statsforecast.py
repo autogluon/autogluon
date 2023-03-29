@@ -5,8 +5,7 @@ import pandas as pd
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
-from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
-from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
+from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel, hash_ts_dataframe_items
 from autogluon.timeseries.utils.warning_filters import statsmodels_warning_filter
 
 logger = logging.getLogger(__name__)
