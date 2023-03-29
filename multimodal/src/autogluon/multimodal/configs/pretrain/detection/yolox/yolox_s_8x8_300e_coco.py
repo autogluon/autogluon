@@ -27,7 +27,7 @@ loading_pipeline = [
 ]
 
 multi_image_mix_dataset = dict(
-    mosaic = dict(
+    mosaic=dict(
         img_scale=(640, 640),
         center_ratio_range=(0.5, 1.5),
         min_bbox_size=0,
@@ -36,7 +36,7 @@ multi_image_mix_dataset = dict(
         pad_val=114,
         prob=0.5,
     ),
-    mixup = dict(
+    mixup=dict(
         img_scale=(640, 640),
         ratio_range=(0.8, 1.6),
         flip_ratio=0.5,
