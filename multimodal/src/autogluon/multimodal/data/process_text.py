@@ -498,6 +498,7 @@ class TextProcessor:
         texts: Dict[str, str],
         feature_modalities: Dict[str, Union[int, float, list]],
         is_training: bool,
+        load_only: bool = False,
     ) -> Dict:
         """
         Extract one sample's text data, tokenize them, and build one token sequence.
@@ -510,6 +511,8 @@ class TextProcessor:
             The modality of the feature columns.
         is_training
             Whether to do processing in the training mode.
+        load_only
+            Whether to only load the data. Other processing steps may happen in dataset.__getitem__.
 
         Returns
         -------

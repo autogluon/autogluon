@@ -63,6 +63,7 @@ class MMOcrProcessor(MMLabProcessor):
         self,
         image_paths: Dict[str, List[str]],
         is_training: bool,
+        load_only: bool = False,
     ) -> Dict:
         """
         Read images, process them, and stack them. One sample can have multiple images,
@@ -75,6 +76,8 @@ class MMOcrProcessor(MMLabProcessor):
             inside each image column.
         is_training
             Whether to process images in the training mode.
+        load_only
+            Whether to only load the data. Other processing steps may happen in dataset.__getitem__.
 
         Returns
         -------

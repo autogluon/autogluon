@@ -89,6 +89,7 @@ class CategoricalProcessor:
         categorical_features: Dict[str, int],
         feature_modalities: Dict[str, Union[int, float, list]],
         is_training: bool,
+        load_only: bool = False,
     ) -> Dict:
         """
         Extract one sample's categorical features and customize it for a specific model.
@@ -101,6 +102,8 @@ class CategoricalProcessor:
             The modality of the feature columns.
         is_training
             Whether to do processing in the training mode. This unused flag is for the API compatibility.
+        load_only
+            Whether to only load the data. Other processing steps may happen in dataset.__getitem__.
 
         Returns
         -------

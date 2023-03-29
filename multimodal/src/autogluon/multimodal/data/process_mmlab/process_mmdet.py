@@ -171,6 +171,7 @@ class MMDetProcessor(MMLabProcessor):
         images: Dict[str, List[str]],
         feature_modalities: Dict[str, Union[int, float, list]],
         is_training: bool,
+        load_only: bool = False,
     ) -> Dict:
         """
         Obtain one sample's images and customized them for a specific model.
@@ -183,18 +184,15 @@ class MMDetProcessor(MMLabProcessor):
             The modality of the feature columns.
         is_training
             Whether to process images in the training mode.
+        load_only
+            Whether to only load the data. Other processing steps may happen in dataset.__getitem__.
 
         Returns
         -------
         A dictionary containing one sample's processed images and their number.
         """
-        if is_training:
-            if "rois" in images.keys() and len(images.keys()) == 2:  # TODO: use other condition
-                images = {k: [v] if isinstance(v, str) else v for k, v in images.items()}
-                return self.load_one_sample(images, is_training)
-            else:
-                return self.process_one_loaded_sample(images, is_training)
+        images = {k: [v] if isinstance(v, str) else v for k, v in images.items()}
+        if load_only:
+            return self.load_one_sample(images, is_training)
         else:
-            images = {k: [v] if isinstance(v, str) else v for k, v in images.items()}
-
             return self.process_one_sample(images, is_training)

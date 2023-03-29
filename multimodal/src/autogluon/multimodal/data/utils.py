@@ -150,7 +150,7 @@ def apply_df_preprocessor(
 
 
 def apply_data_processor(
-    per_sample_features: Dict, data_processors: Dict, feature_modalities: Dict, is_training: bool
+    per_sample_features: Dict, data_processors: Dict, feature_modalities: Dict, is_training: bool, load_only=False,
 ):
     """
     Process one sample's features.
@@ -163,6 +163,8 @@ def apply_data_processor(
         A dict of data processors.
     is_training
         Whether is training.
+    load_only
+        Whether to only load the data. Other processing steps may happen in dataset.__getitem__.
 
     Returns
     -------
@@ -174,7 +176,7 @@ def apply_data_processor(
             if per_modality in per_sample_features and per_sample_features[per_modality]:
                 sample_features.update(
                     per_model_processor(
-                        per_sample_features[per_modality], feature_modalities[per_modality], is_training=is_training
+                        per_sample_features[per_modality], feature_modalities[per_modality], is_training=is_training, load_only=load_only,
                     )
                 )
 

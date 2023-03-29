@@ -99,7 +99,7 @@ class BaseDataModule(LightningDataModule):
             is_training = split in [TRAIN, VALIDATE]
         else:
             is_training = split == TRAIN
-        if self.dataset_type is None or self.dataset_type == DEFAULT_DATASET:
+        if self.dataset_type == DEFAULT_DATASET:
             dataset = BaseDataset(
                 data=data_split,
                 preprocessor=self.df_preprocessor,

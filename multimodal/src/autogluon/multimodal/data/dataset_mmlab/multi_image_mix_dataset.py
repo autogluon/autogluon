@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from ...constants import AUTOMM, GET_ITEM_ERROR_RETRY, MULTI_IMAGE_MIX_DATASET
+from ...constants import AUTOMM, GET_ITEM_ERROR_RETRY, MULTI_IMAGE_MIX_DATASET, ROIS
 from ..preprocess_dataframe import MultiModalFeaturePreprocessor
 from ..utils import apply_data_processor, apply_df_preprocessor, get_per_sample_features
 
@@ -18,7 +18,7 @@ try:
     from mmdet.core import find_inside_bboxes
     from mmdet.utils import log_img_scale  # inline import to avoid mmdet uninstall error for other tasks
 except:
-    pass  # TODO: print error msg
+    pass
 
 
 class MultiImageMixDataset(torch.utils.data.Dataset):
@@ -64,6 +64,8 @@ class MultiImageMixDataset(torch.utils.data.Dataset):
         self._consecutive_errors = 0
 
         mix_config = model_config[MULTI_IMAGE_MIX_DATASET]
+        self.mix_data_key = "mmdet_image_image"  # the key of the data to mix, TODO: remove hardcoding
+        self.mix_result_key = "mix_results"  # the key of the mix result to store
 
         self.mix_transforms = []
         self.mix_transforms_types = []  # TODO: remove hardcode
@@ -103,7 +105,7 @@ class MultiImageMixDataset(torch.utils.data.Dataset):
         """
         return self.lengths[0]
 
-    def _get_item(self, idx):
+    def _load_item(self, idx):
         """
         Get a single item without mix_results.
         Iterate through all data processors to prepare model inputs. The data processors are
@@ -132,6 +134,7 @@ class MultiImageMixDataset(torch.utils.data.Dataset):
                     data_processors=per_processors_group,
                     feature_modalities=getattr(self, f"modality_types_{group_id}"),
                     is_training=self.is_training,
+                    load_only=True,
                 )
                 ret.update(per_ret)
         except Exception as e:
@@ -159,36 +162,37 @@ class MultiImageMixDataset(torch.utils.data.Dataset):
         -------
         Input data formatted as a dictionary.
         """
-        results = copy.deepcopy(self._get_item(idx))
+        results = copy.deepcopy(self._load_item(idx))
 
         for (transform, transform_type) in zip(self.mix_transforms, self.mix_transforms_types):
+            assert hasattr(transform, "get_indexes")
+
             if self._skip_type_keys is not None and transform_type in self._skip_type_keys:
                 continue
 
-            if hasattr(transform, "get_indexes"):
-                for i in range(self.max_refetch):
-                    # Make sure the results passed the loading pipeline
-                    # of the original dataset is not None.
-                    indexes = transform.get_indexes(self)
-                    if not isinstance(indexes, collections.abc.Sequence):
-                        indexes = [indexes]
-                    mix_results = [copy.deepcopy(self._get_item(index)["mmdet_image_image"]) for index in indexes]
-                    if None not in mix_results:
-                        results["mmdet_image_image"]["mix_results"] = mix_results
-                        break
-                else:
-                    raise RuntimeError(
-                        "The loading pipeline of the original dataset"
-                        " always return None. Please check the correctness "
-                        "of the dataset and its pipeline."
-                    )
+            for i in range(self.max_refetch):
+                # Make sure the results passed the loading pipeline
+                # of the original dataset is not None.
+                indexes = transform.get_indexes(self)
+                if not isinstance(indexes, collections.abc.Sequence):
+                    indexes = [indexes]
+                mix_results = [copy.deepcopy(self._load_item(index)[self.mix_data_key]) for index in indexes]
+                if None not in mix_results:
+                    results[self.mix_data_key][self.mix_result_key] = mix_results
+                    break
+            else:
+                raise RuntimeError(
+                    "The loading pipeline of the original dataset"
+                    " always return None. Please check the correctness "
+                    "of the dataset and its pipeline."
+                )
 
             for i in range(self.max_refetch):
                 # To confirm the results passed the training pipeline
                 # of the wrapper is not None.
-                updated_results = transform(copy.deepcopy(results["mmdet_image_image"]))
+                updated_results = transform(copy.deepcopy(results[self.mix_data_key]))
                 if updated_results is not None:
-                    results["mmdet_image_image"] = updated_results
+                    results[self.mix_data_key] = updated_results
                     break
             else:
                 raise RuntimeError(
@@ -197,15 +201,14 @@ class MultiImageMixDataset(torch.utils.data.Dataset):
                     "of the dataset and its pipeline."
                 )
 
-            if "mix_results" in results["mmdet_image_image"]:
-                results["mmdet_image_image"].pop("mix_results")
+            if self.mix_result_key in results[self.mix_data_key]:
+                results[self.mix_data_key].pop(self.mix_result_key)
 
-        rois_processor = self.processors[0]["rois"][0]  # TODO: remove hardcode
+        rois_processor = self.processors[0][ROIS][0]  # TODO: remove hardcode
         results.update(
-            rois_processor(
+            rois_processor.process_one_loaded_sample(
                 results,
-                None,
-                is_training=True,  # TODO: remove hardcode flags
+                is_training=True,  # This dataset is used only in training
             )
         )
 
