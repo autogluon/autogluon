@@ -234,7 +234,7 @@ def get_metric(
     """
     metric_name = metric_name.lower()
     if metric_name in [ACC, ACCURACY, OVERALL_ACCURACY]:
-        # use MULTICLASS since the head output 2 dim for the binary problem type.
+        # use MULTICLASS since the head output dim is 2 for the binary problem type.
         return torchmetrics.Accuracy(task=MULTICLASS, num_classes=num_classes), None
     elif metric_name == NER_TOKEN_F1:
         return torchmetrics.F1Score(task=MULTICLASS, num_classes=num_classes, ignore_index=1), None

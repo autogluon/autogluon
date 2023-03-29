@@ -498,7 +498,3 @@ def test_infer_ner_column_type(column_types, gt_column_types):
     gt_column_types = OrderedDict(gt_column_types)
     column_types = infer_ner_column_type(column_types)
     assert column_types == gt_column_types
-
-
-if __name__ == "__main__":
-    test_label_encoder(["a", "d", "e", "b"], "d")
