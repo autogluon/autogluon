@@ -189,7 +189,7 @@ class HatefulMeMesDataset:
 
     @property
     def metric(self):
-        return "accuracy"
+        return "roc_auc"
 
     @property
     def problem_type(self):

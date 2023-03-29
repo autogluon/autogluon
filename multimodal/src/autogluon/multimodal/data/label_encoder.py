@@ -198,6 +198,10 @@ class NerLabelEncoder:
 
 
 class CustomLabelEncoder:
+    """
+    A label encoder that supports specifying a positive class on top of sklearn's LabelEncoder.
+    """
+
     def __init__(self, positive_class=None):
         self.positive_class = positive_class
         self._le = LabelEncoder()
@@ -228,12 +232,38 @@ class CustomLabelEncoder:
             self.classes_ = self._le.classes_
 
     def fit(self, y):
+        """
+        Fit label encoder.
+
+        Parameters
+        ----------
+        y : array-like of shape (n_samples,)
+            Target values.
+
+        Returns
+        -------
+        self : returns an instance of self.
+            Fitted label encoder.
+        """
         self._le.fit(y)
         self._set_attributes()
 
         return self
 
     def fit_transform(self, y):
+        """
+        Fit label encoder and return encoded labels.
+
+        Parameters
+        ----------
+        y : array-like of shape (n_samples,)
+            Target values.
+
+        Returns
+        -------
+        y : array-like of shape (n_samples,)
+            Encoded labels.
+        """
         y = self._le.fit_transform(y)
         self._set_attributes()
 
@@ -243,6 +273,19 @@ class CustomLabelEncoder:
             return y
 
     def transform(self, y):
+        """
+        Transform labels to normalized encoding.
+
+        Parameters
+        ----------
+        y : array-like of shape (n_samples,)
+            Target values.
+
+        Returns
+        -------
+        y : array-like of shape (n_samples,)
+            Labels as normalized encodings.
+        """
         y = self._le.transform(y)
 
         if self._mapping is not None:
@@ -251,9 +294,20 @@ class CustomLabelEncoder:
             return y
 
     def inverse_transform(self, y):
-        y = self._le.inverse_transform(y)
+        """
+        Transform labels back to original encoding.
 
+        Parameters
+        ----------
+        y : ndarray of shape (n_samples,)
+            Target values.
+
+        Returns
+        -------
+        y : ndarray of shape (n_samples,)
+            Original encoding.
+        """
         if self._inverse_mapping is not None:
-            return self._inverse_mapping[y]
-        else:
-            return y
+            y = self._inverse_mapping[y]
+
+        return self._le.inverse_transform(y)

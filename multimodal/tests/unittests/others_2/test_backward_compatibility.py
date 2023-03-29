@@ -14,8 +14,7 @@ from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset
 from ..utils.utils import get_home_dir, protected_zip_extraction
 
 
-@pytest.mark.parametrize("cls", [MultiModalPredictor])
-def test_load_old_checkpoint_text_only(cls):
+def test_load_old_checkpoint_text_only():
     dataset = AmazonReviewSentimentCrossLingualDataset()
     sha1_hash = "4ba096cdf6bd76c06386f2c27140db055e59c91b"
     checkpoint_name = "mdeberta-v3-base-checkpoint"
@@ -34,8 +33,8 @@ def test_load_old_checkpoint_text_only(cls):
         sha1_hash=sha1_hash,
         folder=save_path,
     )
-    predictor = cls.load(checkpoint_path)
-    verify_predictor_save_load(predictor, dataset.test_df.sample(4), cls=cls)
+    predictor = MultiModalPredictor.load(checkpoint_path)
+    verify_predictor_save_load(predictor, dataset.test_df.sample(4), cls=MultiModalPredictor)
 
     # continuous training
     predictor.fit(

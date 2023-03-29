@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 from omegaconf import OmegaConf
 from ray import tune
+from sklearn.preprocessing import LabelEncoder
 from torchvision import transforms
 from transformers import AutoTokenizer
 
@@ -108,13 +109,32 @@ def test_apply_omegaconf_overrides():
         ([3, 2, 1, 0], 2),
     ],
 )
-def test_inferring_pos_label(labels, positive_class):
+def test_label_encoder(labels, positive_class):
     label_encoder = CustomLabelEncoder(positive_class=positive_class)
     label_encoder.fit(labels)
+
+    # test encoding positive class
     if positive_class:
         assert label_encoder.transform([positive_class]).item() == len(label_encoder.classes_) - 1
     else:
         assert label_encoder.transform([label_encoder.classes_[-1]]).item() == len(label_encoder.classes_) - 1
+
+    # test encoding
+    sklearn_le = LabelEncoder()
+    sklearn_le.fit(labels)
+    sk_encoded_labels = sklearn_le.transform(labels)
+    our_encoded_labels = label_encoder.transform(labels)
+    if positive_class:
+        sk_pos_label = sklearn_le.transform([positive_class]).item()
+    else:
+        sk_pos_label = len(sklearn_le.classes_) - 1
+    sk_encoded_labels[sk_encoded_labels == sk_pos_label] = len(sklearn_le.classes_)
+    sk_encoded_labels[sk_encoded_labels > sk_pos_label] -= 1
+    sk_encoded_labels[sk_encoded_labels < 0] = 0
+    assert (sk_encoded_labels == our_encoded_labels).all()
+
+    # test inverse encoding
+    assert label_encoder.inverse_transform(our_encoded_labels).tolist() == labels
 
 
 @pytest.mark.parametrize(
@@ -478,3 +498,7 @@ def test_infer_ner_column_type(column_types, gt_column_types):
     gt_column_types = OrderedDict(gt_column_types)
     column_types = infer_ner_column_type(column_types)
     assert column_types == gt_column_types
+
+
+if __name__ == "__main__":
+    test_label_encoder(["a", "d", "e", "b"], "d")

@@ -234,7 +234,8 @@ def get_metric(
     """
     metric_name = metric_name.lower()
     if metric_name in [ACC, ACCURACY, OVERALL_ACCURACY]:
-        return torchmetrics.Accuracy(task=problem_type, num_classes=num_classes), None
+        # use MULTICLASS since the head output 2 dim for the binary problem type.
+        return torchmetrics.Accuracy(task=MULTICLASS, num_classes=num_classes), None
     elif metric_name == NER_TOKEN_F1:
         return torchmetrics.F1Score(task=MULTICLASS, num_classes=num_classes, ignore_index=1), None
     elif metric_name in [RMSE, ROOT_MEAN_SQUARED_ERROR]:
