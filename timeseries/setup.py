@@ -51,7 +51,7 @@ extras_require = {
     ],
 }
 
-extras_require["all"] = list()
+extras_require["all"] = []
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
