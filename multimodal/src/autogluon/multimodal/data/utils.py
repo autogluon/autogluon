@@ -150,7 +150,11 @@ def apply_df_preprocessor(
 
 
 def apply_data_processor(
-    per_sample_features: Dict, data_processors: Dict, feature_modalities: Dict, is_training: bool, load_only=False,
+    per_sample_features: Dict,
+    data_processors: Dict,
+    feature_modalities: Dict,
+    is_training: bool,
+    load_only=False,
 ):
     """
     Process one sample's features.
@@ -176,7 +180,10 @@ def apply_data_processor(
             if per_modality in per_sample_features and per_sample_features[per_modality]:
                 sample_features.update(
                     per_model_processor(
-                        per_sample_features[per_modality], feature_modalities[per_modality], is_training=is_training, load_only=load_only,
+                        per_sample_features[per_modality],
+                        feature_modalities[per_modality],
+                        is_training=is_training,
+                        load_only=load_only,
                     )
                 )
 
@@ -440,7 +447,7 @@ def get_text_token_max_len(provided_max_len, config, tokenizer, checkpoint_name)
         max_len = default_max_len
     else:
         if provided_max_len < default_max_len:
-            if default_max_len < 10**6:  # Larger than this value usually means infinite.
+            if default_max_len < 10 ** 6:  # Larger than this value usually means infinite.
                 warnings.warn(
                     f"provided max length: {provided_max_len} "
                     f"is smaller than {checkpoint_name}'s default: {default_max_len}"
