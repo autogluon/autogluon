@@ -373,10 +373,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                     if pattern in n:
                         name_to_id[n] = 0
 
-        """
-        if is_yolox:
+        if is_yolox and "use_layer_id" in self.config:
             name_to_id = self.get_yolox_layer_ids()
-        """
 
         return name_to_id
 
