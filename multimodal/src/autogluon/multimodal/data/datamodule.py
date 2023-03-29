@@ -24,7 +24,6 @@ class BaseDataModule(LightningDataModule):
         self,
         df_preprocessor: Union[MultiModalFeaturePreprocessor, List[MultiModalFeaturePreprocessor]],
         data_processors: Union[dict, List[dict]],
-        dataset_type: Optional[str],
         per_gpu_batch_size: int,
         num_workers: int,
         train_data: Optional[pd.DataFrame] = None,
@@ -33,6 +32,7 @@ class BaseDataModule(LightningDataModule):
         predict_data: Optional[pd.DataFrame] = None,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         val_use_training_mode: bool = False,
+        model_config: Optional[str] = None,
     ):
         """
         Parameters
@@ -46,10 +46,6 @@ class BaseDataModule(LightningDataModule):
         data_processors
             The data processors to prepare customized data for each model. Each processor is only charge of
             one modality of one model. This helps scale up training arbitrary combinations of models.
-        dataset_type
-            Type of dataset to use. In most cases, it should be None (or equivalently DEFAULT_DATASET). But
-            in some tasks, it requires special indexing for data augmentation,
-            i.e., Mosaic Augmentation in YOLOX.
         per_gpu_batch_size
             Mini-batch size for each GPU.
         num_workers
@@ -63,12 +59,15 @@ class BaseDataModule(LightningDataModule):
         predict_data
             Prediction data. No labels required in it.
         id_mappings
-             Id-to-content mappings. The contents can be text, image, etc.
-             This is used when the dataframe contains the query/response indexes instead of their contents.
+            Id-to-content mappings. The contents can be text, image, etc.
+            This is used when the dataframe contains the query/response indexes instead of their contents.
         val_use_training_mode
-             whether we are triggering is_training when creating the dataset for validation.
-             This is used when we want to use val_loss as val metric, and thus we'll use data pipeline
-             for training instead of for inference during validation.
+            whether we are triggering is_training when creating the dataset for validation.
+            This is used when we want to use val_loss as val metric, and thus we'll use data pipeline
+            for training instead of for inference during validation.
+        model_config
+            Model config used to decided dataset type. e.g. if multi_image_mix_dataset is used in detection model,
+            MultiImageMixDataset will be used instead of BaseDataset
         """
         super().__init__()
         self.prepare_data_per_node = True
@@ -80,7 +79,6 @@ class BaseDataModule(LightningDataModule):
 
         self.df_preprocessor = df_preprocessor
         self.data_processors = data_processors
-        self.dataset_type = dataset_type
         self.per_gpu_batch_size = per_gpu_batch_size
         self.num_workers = num_workers
         self.train_data = train_data
@@ -89,14 +87,19 @@ class BaseDataModule(LightningDataModule):
         self.predict_data = predict_data
         self.id_mappings = id_mappings
         self.val_use_training_mode = val_use_training_mode
+        self.model_config = model_config
 
-    def set_dataset(self, split, dataset_type=None):
+        self.dataset_type = DEFAULT_DATASET
+        if self.model_config is not None and MULTI_IMAGE_MIX_DATASET in self.model_config:
+            self.dataset_type = MULTI_IMAGE_MIX_DATASET
+
+    def set_dataset(self, split):
         data_split = getattr(self, f"{split}_data")
         if self.val_use_training_mode:
             is_training = split in [TRAIN, VALIDATE]
         else:
             is_training = split == TRAIN
-        if dataset_type is None or dataset_type == DEFAULT_DATASET:
+        if self.dataset_type is None or self.dataset_type == DEFAULT_DATASET:
             dataset = BaseDataset(
                 data=data_split,
                 preprocessor=self.df_preprocessor,
@@ -104,7 +107,7 @@ class BaseDataModule(LightningDataModule):
                 id_mappings=self.id_mappings,
                 is_training=is_training,
             )
-        elif dataset_type == MULTI_IMAGE_MIX_DATASET:
+        elif self.dataset_type == MULTI_IMAGE_MIX_DATASET:
             if is_training:
                 dataset = MultiImageMixDataset(
                     data=data_split,
@@ -122,7 +125,7 @@ class BaseDataModule(LightningDataModule):
                     is_training=is_training,
                 )
         else:
-            raise ValueError(f"unknown dataset_type: {dataset_type}")
+            raise ValueError(f"unknown dataset_type: {self.dataset_type}")
 
         setattr(self, f"{split}_dataset", dataset)
 
@@ -141,14 +144,14 @@ class BaseDataModule(LightningDataModule):
                 - predict (For the prediction stage)
         """
         if stage == "fit":
-            self.set_dataset(TRAIN, dataset_type=self.dataset_type)
-            self.set_dataset(VALIDATE, dataset_type=self.dataset_type)
+            self.set_dataset(TRAIN)
+            self.set_dataset(VALIDATE)
         elif stage == "validate":
-            self.set_dataset(VALIDATE, dataset_type=self.dataset_type)
+            self.set_dataset(VALIDATE)
         elif stage == "test":
-            self.set_dataset(TEST, dataset_type=self.dataset_type)
+            self.set_dataset(TEST)
         elif stage == "predict":
-            self.set_dataset(PREDICT, dataset_type=self.dataset_type)
+            self.set_dataset(PREDICT)
         else:
             raise ValueError(f"Unknown stage {stage}")
 

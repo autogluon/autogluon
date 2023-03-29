@@ -1166,7 +1166,10 @@ class MultiModalPredictor(ExportMixin):
             data_processors = [data_processors, teacher_data_processors]
 
         val_use_training_mode = (self._problem_type == OBJECT_DETECTION) and (validation_metric_name != MAP)
-
+        if self._problem_type == OBJECT_DETECTION:
+            model_config = self._model.config
+        else:
+            model_config = None
         train_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
@@ -1175,7 +1178,7 @@ class MultiModalPredictor(ExportMixin):
             train_data=train_df,
             validate_data=val_df,
             val_use_training_mode=val_use_training_mode,
-            dataset_type="multi_image_mix_dataset",  # TODO: remove hardcode before PR
+            model_config=model_config,
         )
         optimization_kwargs = dict(
             optim_type=config.optimization.optim_type,
@@ -1622,14 +1625,17 @@ class MultiModalPredictor(ExportMixin):
             optimization_kwargs = {}
             trainable_param_names = []
 
+        if self._problem_type == OBJECT_DETECTION:
+            model_config = self._model.config
+        else:
+            model_config = None
         predict_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             per_gpu_batch_size=batch_size,
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
-            dataset_type="multi_image_mix_dataset",  # TODO: remove hardcode before PR
-            # dataset_type=None,  # TODO: remove hardcode before PR
+            model_config=model_config,
         )
 
         callbacks = []
