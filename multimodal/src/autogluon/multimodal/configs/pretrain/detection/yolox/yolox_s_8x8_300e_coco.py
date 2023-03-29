@@ -21,9 +21,12 @@ model = dict(
 data_root = "data/coco/"
 dataset_type = "CocoDataset"
 
-train_pipeline = [
+loading_pipeline = [
     dict(type="LoadImageFromFile"),
     dict(type="LoadAnnotations", with_bbox=True),
+]
+
+train_pipeline = [
     dict(type="YOLOXHSVRandomAug"),
     dict(type="RandomFlip", flip_ratio=0.5),
     # According to the official implementation, multi-scale

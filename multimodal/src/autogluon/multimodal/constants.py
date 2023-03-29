@@ -291,3 +291,7 @@ HIGH_QUALITY = "high_quality"
 MEDIUM_QUALITY = "medium_quality"
 BEST_QUALITY = "best_quality"
 ALL_MODEL_QUALITIES = [HIGH_QUALITY, MEDIUM_QUALITY, BEST_QUALITY, DEFAULT]
+
+# datasets
+DEFAULT_DATASET = "default_dataset"
+MULTI_IMAGE_MIX_DATASET = "multi_image_mix_dataset"

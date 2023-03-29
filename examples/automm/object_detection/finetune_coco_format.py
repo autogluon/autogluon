@@ -110,7 +110,7 @@ def tutorial_script_for_finetune_yolox_pothole_in_coco_format():
     test_path = os.path.join(data_dir, "Annotations", "usersplit_test_cocoformat.json")
 
     checkpoint_name = "yolox_l_8x8_300e_coco"
-    num_gpus = 1
+    num_gpus = -1
 
     predictor = MultiModalPredictor(
         hyperparameters={
@@ -130,6 +130,7 @@ def tutorial_script_for_finetune_yolox_pothole_in_coco_format():
             "optimization.learning_rate": 5e-5,  # we use two stage and detection head has 100x lr
             "optimization.max_epochs": 30,
             "env.per_gpu_batch_size": 8,  # decrease it when model is large
+            "optimization.lr_choice": "two_stage",
         },
     )
     end = time.time()
@@ -149,7 +150,7 @@ def tutorial_script_for_finetune_yoloxo365_pothole_in_coco_format():
     val_path = os.path.join(data_dir, "Annotations", "usersplit_val_cocoformat.json")
     test_path = os.path.join(data_dir, "Annotations", "usersplit_test_cocoformat.json")
 
-    num_gpus = 1
+    num_gpus = 4
 
     predictor = MultiModalPredictor(
         hyperparameters={
@@ -166,9 +167,10 @@ def tutorial_script_for_finetune_yoloxo365_pothole_in_coco_format():
         train_path,
         tuning_data=val_path,
         hyperparameters={
-            "optimization.learning_rate": 5e-5,  # we use two stage and detection head has 100x lr
-            "optimization.max_epochs": 30,
+            "optimization.learning_rate": 5e-4,  # we use two stage and detection head has 100x lr
+            "optimization.max_epochs": 60,
             "env.per_gpu_batch_size": 8,  # decrease it when model is large
+            "optimization.lr_choice": "layerwise_decay",
         },
     )
     end = time.time()
@@ -330,4 +332,4 @@ def main():
 
 
 if __name__ == "__main__":
-    tutorial_script_for_finetune_yoloxo365_pothole_in_coco_format()
+    tutorial_script_for_finetune_yolox_pothole_in_coco_format()

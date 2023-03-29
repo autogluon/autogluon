@@ -140,7 +140,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 raise ValueError("Classes need to be specified.")
 
         self.name_to_id = self.get_layer_ids()
-        self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
+        self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id <= 0]
 
     def save(self, save_path: str = "./", tokenizers: Optional[dict] = None):
 
@@ -373,8 +373,10 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                     if pattern in n:
                         name_to_id[n] = 0
 
+        '''
         if is_yolox:
             name_to_id = self.get_yolox_layer_ids()
+        '''
 
         return name_to_id
 

@@ -1175,6 +1175,8 @@ class MultiModalPredictor(ExportMixin):
             train_data=train_df,
             validate_data=val_df,
             val_use_training_mode=val_use_training_mode,
+            #dataset_type="multi_image_mix_dataset",  # TODO: remove hardcode before PR
+            dataset_type=None,  # TODO: remove hardcode before PR
         )
         optimization_kwargs = dict(
             optim_type=config.optimization.optim_type,
@@ -1627,6 +1629,8 @@ class MultiModalPredictor(ExportMixin):
             per_gpu_batch_size=batch_size,
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
+            #dataset_type="multi_image_mix_dataset",  # TODO: remove hardcode before PR
+            dataset_type=None,  # TODO: remove hardcode before PR
         )
 
         callbacks = []

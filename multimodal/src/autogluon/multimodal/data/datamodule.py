@@ -4,8 +4,9 @@ import pandas as pd
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
-from ..constants import PREDICT, TEST, TRAIN, VALIDATE
+from ..constants import DEFAULT_DATASET, MULTI_IMAGE_MIX_DATASET, PREDICT, TEST, TRAIN, VALIDATE
 from .dataset import BaseDataset
+from .dataset_mmlab import MultiImageMixDataset
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from .utils import get_collate_fn
 
@@ -23,6 +24,7 @@ class BaseDataModule(LightningDataModule):
         self,
         df_preprocessor: Union[MultiModalFeaturePreprocessor, List[MultiModalFeaturePreprocessor]],
         data_processors: Union[dict, List[dict]],
+        dataset_type: Optional[str],
         per_gpu_batch_size: int,
         num_workers: int,
         train_data: Optional[pd.DataFrame] = None,
@@ -44,6 +46,10 @@ class BaseDataModule(LightningDataModule):
         data_processors
             The data processors to prepare customized data for each model. Each processor is only charge of
             one modality of one model. This helps scale up training arbitrary combinations of models.
+        dataset_type
+            Type of dataset to use. In most cases, it should be None (or equivalently DEFAULT_DATASET). But
+            in some tasks, it requires special indexing for data augmentation,
+            i.e., Mosaic Augmentation in YOLOX.
         per_gpu_batch_size
             Mini-batch size for each GPU.
         num_workers
@@ -74,6 +80,7 @@ class BaseDataModule(LightningDataModule):
 
         self.df_preprocessor = df_preprocessor
         self.data_processors = data_processors
+        self.dataset_type = dataset_type
         self.per_gpu_batch_size = per_gpu_batch_size
         self.num_workers = num_workers
         self.train_data = train_data
@@ -83,19 +90,39 @@ class BaseDataModule(LightningDataModule):
         self.id_mappings = id_mappings
         self.val_use_training_mode = val_use_training_mode
 
-    def set_dataset(self, split):
+    def set_dataset(self, split, dataset_type=None):
         data_split = getattr(self, f"{split}_data")
         if self.val_use_training_mode:
             is_training = split in [TRAIN, VALIDATE]
         else:
             is_training = split == TRAIN
-        dataset = BaseDataset(
-            data=data_split,
-            preprocessor=self.df_preprocessor,
-            processors=self.data_processors,
-            id_mappings=self.id_mappings,
-            is_training=is_training,
-        )
+        if dataset_type is None or dataset_type == DEFAULT_DATASET:
+            dataset = BaseDataset(
+                data=data_split,
+                preprocessor=self.df_preprocessor,
+                processors=self.data_processors,
+                id_mappings=self.id_mappings,
+                is_training=is_training,
+            )
+        elif dataset_type == MULTI_IMAGE_MIX_DATASET:
+            if is_training:
+                dataset = MultiImageMixDataset(
+                    data=data_split,
+                    preprocessor=self.df_preprocessor,
+                    processors=self.data_processors,
+                    id_mappings=self.id_mappings,
+                    is_training=is_training,
+                )
+            else:
+                dataset = BaseDataset(
+                    data=data_split,
+                    preprocessor=self.df_preprocessor,
+                    processors=self.data_processors,
+                    id_mappings=self.id_mappings,
+                    is_training=is_training,
+                )
+        else:
+            raise ValueError(f"unknown dataset_type: {dataset_type}")
 
         setattr(self, f"{split}_dataset", dataset)
 
@@ -114,14 +141,14 @@ class BaseDataModule(LightningDataModule):
                 - predict (For the prediction stage)
         """
         if stage == "fit":
-            self.set_dataset(TRAIN)
-            self.set_dataset(VALIDATE)
+            self.set_dataset(TRAIN, dataset_type=self.dataset_type)
+            self.set_dataset(VALIDATE, dataset_type=self.dataset_type)
         elif stage == "validate":
-            self.set_dataset(VALIDATE)
+            self.set_dataset(VALIDATE, dataset_type=self.dataset_type)
         elif stage == "test":
-            self.set_dataset(TEST)
+            self.set_dataset(TEST, dataset_type=self.dataset_type)
         elif stage == "predict":
-            self.set_dataset(PREDICT)
+            self.set_dataset(PREDICT, dataset_type=self.dataset_type)
         else:
             raise ValueError(f"Unknown stage {stage}")
 
