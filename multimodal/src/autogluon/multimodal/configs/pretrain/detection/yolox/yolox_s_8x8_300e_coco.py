@@ -27,6 +27,8 @@ loading_pipeline = [
 ]
 
 train_pipeline = [
+    # dict(type="LoadImageFromFile"),
+    # dict(type="LoadAnnotations", with_bbox=True),
     dict(type="YOLOXHSVRandomAug"),
     dict(type="RandomFlip", flip_ratio=0.5),
     # According to the official implementation, multi-scale

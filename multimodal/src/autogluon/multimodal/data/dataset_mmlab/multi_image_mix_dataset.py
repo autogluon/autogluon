@@ -59,8 +59,33 @@ class MultiImageMixDataset(torch.utils.data.Dataset):
         self.is_training = is_training
         self._consecutive_errors = 0
 
-        self.mix_transforms = [Mosaic(), MixUp(ratio_range=(0.8, 1.6))]  # TODO: remove hardcode
+        self.mix_transforms = [
+            Mosaic(
+                img_scale=(640, 640),
+                center_ratio_range=(0.5, 1.5),
+                min_bbox_size=0,
+                bbox_clip_border=True,
+                skip_filter=True,
+                pad_val=114,
+                prob=0.5,
+            ),
+            MixUp(
+                img_scale=(640, 640),
+                ratio_range=(0.8, 1.6),
+                flip_ratio=0.5,
+                pad_val=114,
+                max_iters=15,
+                min_bbox_size=5,
+                min_area_ratio=0.2,
+                max_aspect_ratio=20,
+                bbox_clip_border=True,
+                skip_filter=True,
+                prob=0.5,
+            ),
+        ]  # TODO: remove hardcode
+
         self.mix_transforms_types = ["mosaic", "mixup"]  # TODO: remove hardcode
+
         self._skip_type_keys = None  # TODO: remove hardcode
         self.max_refetch = 15  # TODO: remove hardcode
 
@@ -536,12 +561,14 @@ class MixUp:
         max_aspect_ratio=20,
         bbox_clip_border=True,
         skip_filter=True,
+        prob=1.0,
     ):
         import mmcv
         from mmdet.core import find_inside_bboxes
         from mmdet.utils import log_img_scale  # inline import to avoid mmdet uninstall error for other tasks
 
         assert isinstance(img_scale, tuple)
+        assert 0 <= prob <= 1.0, "The probability should be in range [0,1]. " f"got {prob}."
 
         log_img_scale(img_scale, skip_square=True)
         self.dynamic_scale = img_scale
@@ -554,6 +581,7 @@ class MixUp:
         self.max_aspect_ratio = max_aspect_ratio
         self.bbox_clip_border = bbox_clip_border
         self.skip_filter = skip_filter
+        self.prob = prob
 
     def __call__(self, results):
         """Call function to make a mixup of image.
@@ -564,6 +592,8 @@ class MixUp:
         Returns:
             dict: Result dict with mixup transformed.
         """
+        if np.random.uniform(0, 1) > self.prob:
+            return results
 
         results = self._mixup_transform(results)
         return results

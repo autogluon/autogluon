@@ -188,8 +188,7 @@ class MMDetProcessor(MMLabProcessor):
         -------
         A dictionary containing one sample's processed images and their number.
         """
-        # if is_training:
-        if False:
+        if is_training:
             if "rois" in images.keys() and len(images.keys()) == 2:  # TODO: use other condition
                 images = {k: [v] if isinstance(v, str) else v for k, v in images.items()}
                 return self.load_one_sample(images, is_training)
