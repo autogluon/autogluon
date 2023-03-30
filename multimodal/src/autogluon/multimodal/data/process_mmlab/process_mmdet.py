@@ -63,7 +63,8 @@ class MMDetProcessor(MMLabProcessor):
             requires_column_info=requires_column_info,
         )
 
-        self.load_processor = Compose(self.cfg.loading_pipeline)
+        if "loading_pipeline" in self.cfg.keys():
+            self.load_processor = Compose(self.cfg.loading_pipeline)
 
     def load_one_sample(
         self,
