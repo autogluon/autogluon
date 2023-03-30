@@ -4,7 +4,7 @@ import copy
 import itertools
 import warnings
 from collections.abc import Iterable
-from typing import Any, Optional, Tuple, Type
+from typing import Any, List, Optional, Tuple, Type
 
 import numpy as np
 import pandas as pd
@@ -788,3 +788,32 @@ class TimeSeriesDataFrame(pd.DataFrame):
         # (used inside dropna) is not supported for TimeSeriesDataFrame
         dropped_df = pd.DataFrame(self).dropna(how=how)
         return TimeSeriesDataFrame(dropped_df, static_features=self.static_features)
+
+    def get_model_inputs_for_scoring(
+        self, prediction_length: int, known_covariates_names: Optional[List[str]] = None
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        """Prepare model inputs necessary to predict the last ``prediction_length`` time steps of each time series in the dataset.
+
+        Parameters
+        ----------
+        prediction_length : int
+            The forecast horizon, i.e., How many time steps into the future must be predicted.
+        known_covariates_names : List[str], optional
+            Names of the dataframe columns that contain covariates known in the future.
+            See :attr:`known_covariates_names` of :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
+
+        Returns
+        -------
+        past_data : TimeSeriesDataFrame
+            Data, where the last ``prediction_length`` time steps have been removed from the end of each time series.
+        known_covariates : TimeSeriesDataFrame or None
+            If ``known_covariates_names`` was provided, dataframe with the values of the known covariates during the
+            forecast horizon. Otherwise, ``None``.
+        """
+        past_data = self.slice_by_timestep(None, -prediction_length)
+        if known_covariates_names is not None and len(known_covariates_names) > 0:
+            future_data = self.slice_by_timestep(-prediction_length, None)
+            known_covariates = future_data[known_covariates_names]
+        else:
+            known_covariates = None
+        return past_data, known_covariates

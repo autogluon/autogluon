@@ -5,7 +5,6 @@ import logging
 import math
 import os
 import pickle
-from autogluon.core.utils import try_import
 import sys
 import time
 from typing import Any, Dict, Optional, Union
@@ -15,11 +14,13 @@ import pandas as pd
 import scipy
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
-from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.resource_utils import ResourceManager, RayResourceManager
+from autogluon.common.utils.resource_utils import get_resource_manager
 
 from .model_trial import model_trial, skip_hpo
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
@@ -37,7 +38,6 @@ from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMem
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
-from ...utils.try_import import try_import_ray
 
 
 logger = logging.getLogger(__name__)
@@ -564,8 +564,9 @@ class AbstractModel:
             enforced_num_gpus = kwargs.get('num_gpus', None)
             assert enforced_num_cpus is not None and enforced_num_cpus != 'auto' and enforced_num_gpus is not None and enforced_num_gpus != 'auto'
             return kwargs
-        system_num_cpus = ResourceManager.get_cpu_count()
-        system_num_gpus = ResourceManager.get_gpu_count_all()
+        resource_manager = get_resource_manager()
+        system_num_cpus = resource_manager.get_cpu_count()
+        system_num_gpus = resource_manager.get_gpu_count_all()
         if total_resources is None:
             total_resources = {}
         num_cpus = total_resources.get('num_cpus', 'auto')

@@ -1,7 +1,14 @@
 import multiprocessing
+import logging
 import os
+import shutil
 import subprocess
 
+from typing import Union
+
+from autogluon.common.utils.try_import import try_import_ray
+
+from .distribute_utils import DistributedContext
 from .utils import bytes_to_mega_bytes
 from .lite import disable_if_lite_mode
 
@@ -105,6 +112,15 @@ class ResourceManager:
             return None
 
     @staticmethod
+    def get_disk_usage(path: str):
+        """
+        Gets the disk usage information for the given path
+
+        Returns obj with variables `free`, `total`, `used`, representing bytes as integers.
+        """
+        return shutil.disk_usage(path=path)
+
+    @staticmethod
     def _get_gpu_count_cuda():
         # FIXME: Sometimes doesn't detect GPU on Windows
         # FIXME: Doesn't ensure the GPUs are actually usable by the model (MXNet, PyTorch, etc.)
@@ -113,3 +129,52 @@ class ResourceManager:
         gpu_count = cudaDeviceGetCount()
         cudaShutdown()
         return gpu_count
+
+    
+class RayResourceManager:
+    """Manager that fetches ray cluster resources info. This class should only be used within a ray cluster."""
+
+    @staticmethod
+    def _init_ray():
+        """Initialize ray runtime if not already initialized. Will force the existance of a cluster already being spinned up"""
+        try_import_ray()
+        import ray
+        if not ray.is_initialized():
+            ray.init(
+                address="auto",  # Force ray to connect to an existing cluster. There should be one. Otherwise, something went wrong
+                log_to_driver=False,
+                logging_level=logging.ERROR
+            )
+    
+    @staticmethod
+    def _get_cluster_resources(key: str, default_val: Union[int, float]=0):
+        """
+        Get value of resources available in the cluster.
+        
+        Parameter
+        ---------
+        key: str
+            The key of the value you want to get, i.e. CPU
+        default_val: Union[int, float]
+            Default value to get if key not available in the cluster
+        """
+        try_import_ray()
+        import ray
+        RayResourceManager._init_ray()
+        return ray.cluster_resources().get(key, default_val)
+
+    @staticmethod
+    def get_cpu_count():
+        """Get number of cpu cores (virtual) available in the cluster"""
+        return RayResourceManager._get_cluster_resources("CPU")
+
+    @staticmethod
+    # TODO: find a better naming, "all" sounds unnecessary
+    def get_gpu_count_all():
+        """Get number of gpus available in the cluster"""
+        return RayResourceManager._get_cluster_resources("GPU")
+    
+    
+def get_resource_manager():
+    """Get resource manager class based on the training context"""
+    return RayResourceManager if DistributedContext.is_distributed_mode() else ResourceManager

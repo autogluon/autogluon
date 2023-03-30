@@ -8,6 +8,7 @@ import scipy
 import seaborn as sns
 from hamcrest.library.integration import match_equality
 from pandas import DataFrame
+from sklearn.inspection import PartialDependenceDisplay
 
 import autogluon.eda.auto as auto
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, R_OBJECT
@@ -16,6 +17,7 @@ from autogluon.eda.visualization import (
     CorrelationSignificanceVisualization,
     CorrelationVisualization,
     FeatureInteractionVisualization,
+    PDPInteractions,
 )
 from autogluon.eda.visualization.interaction import FeatureDistanceAnalysisVisualization
 
@@ -551,3 +553,103 @@ def test_FeatureDistanceAnalysisVisualization__happy_path(monkeypatch, has_near_
 
 def test_FeatureInteractionVisualization__no_fig_args():
     assert FeatureDistanceAnalysisVisualization().fig_args == {}
+
+
+__get_args_RESULTS_KWARGS_1 = {"ice_lines_kw": {"color": "blue"}, "kind": "both", "pd_line_kw": {"color": "red"}}
+
+
+def __get_args__figargs(figsize, ncols, nrows):
+    return {"figsize": figsize, "ncols": ncols, "nrows": nrows}
+
+
+@pytest.mark.parametrize(
+    "features, two_way, expected_result",
+    [
+        ("A", False, (__get_args_RESULTS_KWARGS_1, __get_args__figargs((12, 3), 1, 1), ["A"])),
+        (["A"], False, (__get_args_RESULTS_KWARGS_1, __get_args__figargs((12, 3), 1, 1), ["A"])),
+        (["A", "B"], False, (__get_args_RESULTS_KWARGS_1, __get_args__figargs((12, 3), 2, 1), ["A", "B"])),
+        (["A", "B", "C"], False, (__get_args_RESULTS_KWARGS_1, __get_args__figargs((12, 6), 2, 2), ["A", "B", "C"])),
+        ("A", True, AssertionError),
+        (["A"], True, AssertionError),
+        (["A", "B"], True, ({"kind": "average"}, __get_args__figargs((12, 3), 3, 1), ["A", "B", ["A", "B"]])),
+        (["A", "B", "C"], True, AssertionError),
+    ],
+)
+def test_PDPInteractions__get_args(features, two_way, expected_result):
+    if expected_result is AssertionError:
+        with pytest.raises(AssertionError):
+            viz = PDPInteractions(features=features, two_way=two_way)
+            viz._get_args()
+    else:
+        viz = PDPInteractions(features=features, two_way=two_way)
+        assert viz._get_args() == expected_result
+
+
+def test_PDPInteractions(monkeypatch):
+    ax = MagicMock()
+    ax.ravel = MagicMock(return_value=["ax1, ax2"])
+    call_subplots = MagicMock(return_value=("fig", ax))
+    call_from_estimator = MagicMock()
+    model = MagicMock()
+    model.problem_type = "regression"
+    state = AnalysisState(pdp_data="data", model=model)
+    with monkeypatch.context() as m:
+        m.setattr(plt, "subplots", call_subplots)
+        m.setattr(plt, "tight_layout", MagicMock())
+        m.setattr(plt, "show", MagicMock())
+        m.setattr(PartialDependenceDisplay, "from_estimator", call_from_estimator)
+        viz = PDPInteractions(features=["A", "B"], target="target", sample=123)
+        viz.render(state)
+
+    ax.ravel.assert_called_once()
+    call_subplots.assert_called_with(nrows=1, ncols=2, figsize=(12, 3))
+    call_from_estimator.assert_called_with(
+        ANY,
+        "data",
+        ["A", "B"],
+        ax=["ax1, ax2"],
+        target="target",
+        subsample=123,
+        pd_line_kw={"color": "red"},
+        ice_lines_kw={"color": "blue"},
+        kind="both",
+    )
+    wrapper = call_from_estimator.call_args.args[0]
+    assert wrapper.estimator == model
+    assert wrapper.estimator_type == "regressor"
+
+
+def test_PDPInteractions__two_way(monkeypatch):
+    data = pd.DataFrame({"A": ["1", "2", "3", None, None, "6"], "B": ["6", "5", None, "3", None, "1"]})
+
+    ax = MagicMock()
+    ax.ravel = MagicMock(return_value=["ax1, ax2"])
+    call_subplots = MagicMock(return_value=("fig", ax))
+    call_from_estimator = MagicMock()
+    model = MagicMock()
+    model.problem_type = "binary"
+    state = AnalysisState(pdp_data=data, model=model)
+    with monkeypatch.context() as m:
+        m.setattr(plt, "subplots", call_subplots)
+        m.setattr(plt, "tight_layout", MagicMock())
+        m.setattr(plt, "show", MagicMock())
+        m.setattr(PartialDependenceDisplay, "from_estimator", call_from_estimator)
+        viz = PDPInteractions(features=["A", "B"], target="target", two_way=True, sample=123)
+        viz.render(state)
+
+    ax.ravel.assert_called_once()
+    call_subplots.assert_called_with(nrows=1, ncols=3, figsize=(12, 3))
+    call_from_estimator.assert_called_with(
+        ANY,
+        ANY,
+        ["A", "B", ["A", "B"]],
+        ax=["ax1, ax2"],
+        target="target",
+        subsample=123,
+        kind="average",
+    )
+    wrapper = call_from_estimator.call_args.args[0]
+    called_data = call_from_estimator.call_args.args[1]
+    assert wrapper.estimator == model
+    assert wrapper.estimator_type == "classifier"
+    assert called_data.to_dict() == {"A": {0: "1", 1: "2", 5: "6"}, "B": {0: "6", 1: "5", 5: "1"}}

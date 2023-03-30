@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.try_import import try_import_fasttext
 from autogluon.common.features.types import S_TEXT
 from autogluon.core.constants import BINARY, MULTICLASS
 from autogluon.core.models import AbstractModel
@@ -17,15 +18,6 @@ from autogluon.core.models import AbstractModel
 from .hyperparameters.parameters import get_param_baseline
 
 logger = logging.getLogger(__name__)
-
-
-def try_import_fasttext():
-    try:
-        import fasttext
-
-        _ = fasttext.__file__
-    except Exception:
-        raise ImportError('Import fasttext failed. Please run "pip install fasttext"')
 
 
 class FastTextModel(AbstractModel):

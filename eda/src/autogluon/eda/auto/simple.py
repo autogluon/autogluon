@@ -1,9 +1,10 @@
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 
 from autogluon.common.utils.log_utils import verbosity2loglevel
+from autogluon.features import CategoryFeatureGenerator
 from autogluon.tabular import TabularPredictor
 
 from .. import AnalysisState
@@ -20,7 +21,7 @@ from ..analysis import (
     TrainValidationSplit,
     XShiftDetector,
 )
-from ..analysis.base import AbstractAnalysis, BaseAnalysis
+from ..analysis.base import AbstractAnalysis, BaseAnalysis, SaveArgsToState
 from ..analysis.dataset import (
     DatasetSummary,
     LabelInsightsAnalysis,
@@ -50,7 +51,7 @@ from ..visualization import (
     XShiftSummary,
 )
 from ..visualization.base import AbstractVisualization
-from ..visualization.interaction import FeatureDistanceAnalysisVisualization
+from ..visualization.interaction import FeatureDistanceAnalysisVisualization, PDPInteractions
 from ..visualization.layouts import SimpleVerticalLinearLayout
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,7 @@ __all__ = [
     "quick_fit",
     "target_analysis",
     "explain_rows",
+    "partial_dependence_plots",
 ]
 
 
@@ -1087,3 +1089,254 @@ def explain_rows(
         anlz_facets=[ShapAnalysis(rows, baseline_sample=baseline_sample, **fit_args)],  # type: ignore
         viz_facets=viz_facets,  # type: ignore
     )
+
+
+def partial_dependence_plots(
+    train_data: pd.DataFrame,
+    label: str,
+    target: Optional[Any] = None,
+    features: Optional[Union[str, List[str]]] = None,
+    two_way: bool = False,
+    path: Optional[str] = None,
+    max_ice_lines: int = 300,
+    sample: Optional[Union[int, float]] = None,
+    fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
+    chart_args: Optional[Dict[str, Dict[str, Any]]] = None,
+    show_help_text: bool = True,
+    return_state: bool = False,
+    col_number_warning: int = 20,
+    **fit_args,
+):
+    """
+
+    The visualizations have two modes:
+    - Display Partial Dependence Plots (PDP) with Individual Conditional Expectation (ICE) - this is the default mode of operation
+    - Two-Way PDP plots - this mode can be selected via passing two `features` and setting `two_way = True`
+
+    ICE plots complement PDP by showing the relationship between a feature and the model's output for each individual instance in the dataset.
+    ICE lines (blue) can be overlaid on PDPs (red) to provide a more detailed view of how the model behaves for specific instances.
+    Here are some points on how to interpret PDPs with ICE lines:
+
+    - `Central tendency`
+        The PDP line represents the average prediction for different values of the feature of interest.
+        Look for the overall trend of the PDP line to understand the average effect of the feature on the model's output.
+    - `Variability`
+        The ICE lines represent the predicted outcomes for individual instances as the feature of interest changes.
+        Examine the spread of ICE lines around the PDP line to understand the variability in predictions for different instances.
+    - `Non-linear relationships`
+        Look for any non-linear patterns in the PDP and ICE lines.
+        This may indicate that the model captures a non-linear relationship between the feature and the model's output.
+    - `Heterogeneity`
+        Check for instances where ICE lines have widely varying slopes, indicating different relationships between the feature and
+        the model's output for individual instances. This may suggest interactions between the feature of interest and other features.
+    - `Outliers`
+        Look for any ICE lines that are very different from the majority of the lines.
+        This may indicate potential outliers or instances that have unique relationships with the feature of interest.
+    - `Confidence intervals`
+        If available, examine the confidence intervals around the PDP line. Wider intervals may indicate a less certain relationship
+        between the feature and the model's output, while narrower intervals suggest a more robust relationship.
+    - `Interactions`
+        By comparing PDPs and ICE plots for different features, you may detect potential interactions between features.
+        If the ICE lines change significantly when comparing two features, this might suggest an interaction effect.
+
+    Two-way PDP can visualize potential interactions between any two features. Here are a few cases when two-way PDP can give good results:
+
+    - `Suspected interactions`: Even if two features are not highly correlated, they may still interact in the context of the model.
+        If you suspect that there might be interactions between any two features, two-way PDP can help to verify the hypotheses.
+    - `Moderate to high correlation`: If two features have a moderate to high correlation,
+        a two-way PDP can show how the combined effect of these features influences the model's predictions.
+        In this case, the plot can help reveal whether the relationship between the features is additive, multiplicative, or more complex.
+    - `Complementary features`: If two features provide complementary information, a two-way PDP can help illustrate how the joint effect
+        of these features impacts the model's predictions.
+        For example, if one feature measures the length of an object and another measures its width, a two-way PDP could show how the
+        combination of these features affects the predicted outcome.
+    - `Domain knowledge`: If domain knowledge suggests that the relationship between two features might be important for the model's output,
+        a two-way PDP can help to explore and validate these hypotheses.
+    - `Feature importance`: If feature importance analysis ranks both features high in the leaderboard, it might be beneficial
+        to examine their joint effect on the model's predictions.
+
+    Parameters
+    ----------
+    train_data: DataFrame
+        training dataset
+    label: str
+        target variable
+    target: Optional[Any], default = None
+        In a multiclass setting, specifies the class for which the PDPs should be computed.
+        Ignored in binary classification or classical regression settings
+    features: Optional[Union[str, List[str]]], default = None
+        feature subset to display; `None` means all features will be rendered.
+    two_way: bool, default = False
+        render two-way PDP; this mode works only when two `features` are specified
+    path: Optional[str], default = None
+        location to store the model trained for this task
+    max_ice_lines: int, default = 300
+        max number of ice lines to display for each sub-plot
+    sample: Union[None, int, float], default = None
+        sample size; if `int`, then row number is used;
+        `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
+        `None` means no sampling
+        See also :func:`autogluon.eda.analysis.dataset.Sampler`
+    fig_args: Optional[Dict[str, Any]], default = None
+        kwargs to pass into chart figure
+    chart_args: Optional[dict], default = None
+        kwargs to pass into visualization component
+    show_help_text:bool, default = True
+    return_state: bool, default = False
+        return state if `True`
+    col_number_warning: int, default = 20
+        number of features to visualize after which the warning will be displayed to warn about rendering time
+    fit_args: Optional[Dict[str, Dict[str, Any]]], default = None,
+        kwargs to pass into `TabularPredictor` fit.
+
+    Returns
+    -------
+    state after `fit` call if `return_state` is `True`; `None` otherwise
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.visualization.interaction.PDPInteractions`
+    """
+
+    chart_args, fig_args, features = _validate_and_normalize_pdp_args(
+        train_data, features, fig_args, chart_args, col_number_warning
+    )
+    pdp_data, state, id_to_category_mappings = _prepare_pdp_data(train_data, label, sample, features)
+
+    state = quick_fit(
+        path=path,
+        train_data=state.pdp_train_data,
+        label=label,
+        return_state=True,
+        render_analysis=False,
+        sample=sample,
+        **fit_args,
+    )
+    state.pdp_data = pdp_data
+    state.pdp_id_to_category_mappings = id_to_category_mappings
+
+    if features is None:
+        features = state.model_evaluation.importance.index.tolist()
+
+    if len(id_to_category_mappings) > 0:
+        cats = ", ".join([f"`{c}`" for c in id_to_category_mappings.keys()])
+    else:
+        cats = ""
+
+    analyze(
+        model=state.model,
+        state=state,
+        viz_facets=[
+            MarkdownSectionComponent("### Two-way Partial Dependence Plots", condition_fn=lambda _: two_way),
+            MarkdownSectionComponent(
+                "Two-Way partial dependence plots (PDP) are useful for visualizing the relationship between a pair of features and the predicted outcome "
+                "in a machine learning model. There are several things to look for when exploring the two-way plot:\n\n"
+                "* **Shape of the interaction**: Look at the shape of the plot to understand the nature of the interaction. "
+                "It could be linear, non-linear, or more complex.\n"
+                "* **Feature value range**: Observe the range of the feature values on both axes to understand the domain of the interaction. "
+                "This can help you identify whether the model is making predictions within reasonable bounds or if there are extrapolations "
+                "beyond the training data.\n"
+                "* **Areas of high uncertainty**: Look for areas in the plot where the predictions are less certain, which may be indicated by "
+                "larger confidence intervals, higher variance, or fewer data points. These areas may require further investigation or additional data.\n"
+                "* **Outliers and anomalies**: Check for any outliers or anomalies in the plot that may indicate issues with the model or the data. "
+                "These could be regions of the plot with unexpected patterns or values that do not align with the overall trend.\n"
+                "* **Sensitivity to feature values**: Assess how sensitive the predicted outcome is to changes in the feature values.",
+                condition_fn=lambda _: show_help_text and two_way,
+            ),
+            MarkdownSectionComponent("### Partial Dependence Plots", condition_fn=lambda _: not two_way),
+            MarkdownSectionComponent(
+                "Individual Conditional Expectation (ICE) plots complement Partial Dependence Plots (PDP) by showing the "
+                "relationship between a feature and the model's output for each individual instance in the dataset. ICE lines (blue) "
+                "can be overlaid on PDPs (red) to provide a more detailed view of how the model behaves for specific instances. "
+                "Here are some points on how to interpret PDPs with ICE lines:\n\n"
+                "* **Central tendency**: The PDP line represents the average prediction for different values of the feature of interest. "
+                "Look for the overall trend of the PDP line to understand the average effect of the feature on the model's output.\n"
+                "* **Variability**: The ICE lines represent the predicted outcomes for individual instances as the feature of interest changes. "
+                "Examine the spread of ICE lines around the PDP line to understand the variability in predictions for different instances.\n"
+                "* **Non-linear relationships**: Look for any non-linear patterns in the PDP and ICE lines. This may indicate that the model "
+                "captures a non-linear relationship between the feature and the model's output.\n"
+                "* **Heterogeneity**: Check for instances where ICE lines have widely varying slopes, indicating different relationships "
+                "between the feature and the model's output for individual instances. This may suggest interactions between the feature "
+                "of interest and other features.\n"
+                "* **Outliers**: Look for any ICE lines that are very different from the majority of the lines. This may indicate potential "
+                "outliers or instances that have unique relationships with the feature of interest.\n"
+                "* **Confidence** intervals: If available, examine the confidence intervals around the PDP line. Wider intervals may indicate "
+                "a less certain relationship between the feature and the model's output, while narrower intervals suggest a more robust relationship.\n"
+                "* **Interactions**: By comparing PDPs and ICE plots for different features, you may detect potential interactions between features. "
+                "If the ICE lines change significantly when comparing two features, this might suggest an interaction effect.",
+                condition_fn=lambda _: show_help_text and not two_way,
+            ),
+            PDPInteractions(features=features, two_way=two_way, fig_args=fig_args, sample=max_ice_lines, target=target, **chart_args),  # type: ignore
+            MarkdownSectionComponent(
+                f"The following variable(s) are categorical: {cats}. They are represented as the numbers in the figures above. "
+                f"Mappings are available in `state.pdp_id_to_category_mappings`. The`state` can be returned from this call via adding `return_state=True`.",
+                condition_fn=lambda _: len(id_to_category_mappings) > 0,
+            ),
+        ],
+    )
+
+    s = AnalysisState({"pdp_id_to_category_mappings": id_to_category_mappings})
+
+    return s if return_state else None
+
+
+def _validate_and_normalize_pdp_args(
+    train_data: pd.DataFrame,
+    features: Optional[Union[str, List[str]]] = None,
+    fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
+    chart_args: Optional[Dict[str, Dict[str, Any]]] = None,
+    col_number_warning: int = 20,
+) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[List[str]]]:
+    fig_args = get_empty_dict_if_none(fig_args)
+    chart_args = get_empty_dict_if_none(chart_args)
+
+    if features is not None:
+        if type(features) is not list:
+            features = [features]  # type: ignore
+        features_not_present = [f for f in features if f not in train_data.columns]
+        assert (
+            len(features_not_present) == 0
+        ), f"Features {', '.join(features_not_present)} are not present in train_data: {', '.join(train_data.columns)}"
+    if features is None and len(train_data.columns) > col_number_warning:
+        logger.warning(
+            f"This visualization will render {len(train_data.columns)} charts. "
+            f"This can take a while. This warning can be disabled by setting `col_number_warning` to a higher value."
+        )
+    return chart_args, fig_args, features
+
+
+def _prepare_pdp_data(
+    train_data: pd.DataFrame,
+    label: str,
+    sample: Optional[Union[int, float]] = None,
+    features: Optional[List[str]] = None,
+) -> Tuple[pd.DataFrame, AnalysisState, Dict[str, Dict[int, str]]]:
+    apply_gen = ApplyFeatureGenerator(
+        category_to_numbers=True,
+        children=[
+            SaveArgsToState(
+                params_mapping={
+                    "train_data": "pdp_train_data",
+                }
+            )
+        ],
+    )
+    state = analyze(
+        train_data=train_data,
+        label=label,
+        return_state=True,
+        anlz_facets=[apply_gen],
+        sample=sample,
+    )
+    pdp_data = state.pdp_train_data  # type: ignore
+    id_to_category_mappings: Dict[str, Dict[int, str]] = {}
+    for gen in [item for sublist in apply_gen.feature_generator.generators for item in sublist]:
+        if type(gen) is CategoryFeatureGenerator:
+            id_to_category_mappings = {
+                k: {i: v for i, v in enumerate(v.tolist())} for k, v in gen.category_map.items()
+            }
+
+    if features is not None:
+        id_to_category_mappings = {k: v for k, v in id_to_category_mappings.items() if k in features}
+
+    return pdp_data, state, id_to_category_mappings  # type: ignore

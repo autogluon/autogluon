@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock
 
+import numpy as np
+import pandas as pd
 import pytest
 
 from autogluon.eda import AnalysisState
@@ -66,7 +68,7 @@ def test_ExplainWaterfallPlot(display_rows, monkeypatch):
                 row="row",
                 expected_value="expected_value",
                 shap_values="shap_values",
-                features="features",
+                features=pd.DataFrame({"feature_names": ["features"]}),
                 feature_names="feature_names",
             )
         ]
@@ -74,7 +76,7 @@ def test_ExplainWaterfallPlot(display_rows, monkeypatch):
     with monkeypatch.context() as m:
         call_shap_waterfall_plot = MagicMock()
         call_display_obj = MagicMock()
-        m.setattr("shap.plots._waterfall.waterfall_legacy", call_shap_waterfall_plot)
+        m.setattr("shap.plots.waterfall", call_shap_waterfall_plot)
         m.setattr(JupyterMixin, "display_obj", call_display_obj)
 
         ExplainWaterfallPlot(display_rows=display_rows, extra_arg="extra_arg").render(state)
@@ -84,10 +86,10 @@ def test_ExplainWaterfallPlot(display_rows, monkeypatch):
         else:
             call_display_obj.assert_not_called()
 
-        call_shap_waterfall_plot.assert_called_with(
-            "expected_value",
-            "shap_values",
-            "features",
-            feature_names="feature_names",
-            extra_arg="extra_arg",
-        )
+        assert call_shap_waterfall_plot.call_args.args[0].__dict__ == {
+            "base_values": "expected_value",
+            "display_data": np.array([["features"]], dtype=object),
+            "feature_names": [0],
+            "values": "shap_values",
+        }
+        assert call_shap_waterfall_plot.call_args.kwargs == {"extra_arg": "extra_arg"}

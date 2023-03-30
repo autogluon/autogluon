@@ -8,13 +8,13 @@ __all__ = ["XShiftSummary"]
 
 
 class XShiftSummary(AbstractVisualization, JupyterMixin):
-    MAX_FEATURES_TO_DISPLAY = 5
-
     """
     Summarize the results of the XShiftDetector.  It will render the results as markdown in jupyter.
     This will contain the detection status (True if detected), the details of the hypothesis test (test
     statistic, pvalue), and the feature importances for the detection.
     """
+
+    MAX_FEATURES_TO_DISPLAY = 5
 
     def __init__(self, headers: bool = False, namespace: Optional[str] = None, **kwargs) -> None:
         super().__init__(namespace, **kwargs)

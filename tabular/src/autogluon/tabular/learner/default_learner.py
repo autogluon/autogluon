@@ -9,6 +9,7 @@ import pandas as pd
 from pandas import DataFrame
 
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
+from autogluon.common.utils.resource_utils import ResourceManager
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
 from autogluon.core.data import LabelCleaner
@@ -65,6 +66,31 @@ class DefaultLearner(AbstractTabularLearner):
         logger.log(20, f'Operating System:   {platform.system()}')
         logger.log(20, f'Platform Machine:   {platform.machine()}')
         logger.log(20, f'Platform Version:   {platform.version()}')
+        try:
+            # TODO: Make this logic smarter, incorporate training data size and potentially models to train into the logic to define the recommended disk space.
+            #  For example, `best_quality` will require more disk space than `medium_quality`, and HPO would require additional disk space.
+            disk_stats = ResourceManager.get_disk_usage(path=self.path)
+            disk_free_gb = disk_stats.free / 1e9
+            disk_total_gb = disk_stats.total / 1e9
+            disk_proportion_avail = disk_stats.free / disk_stats.total
+            disk_log_extra = ''
+            disk_free_gb_warning_threshold = 10
+            disk_verbosity = 20
+            if disk_free_gb <= disk_free_gb_warning_threshold:
+                disk_log_extra += f'\n\tWARNING: Available disk space is low and there is a risk that ' \
+                                  f'AutoGluon will run out of disk during fit, causing an exception. ' \
+                                  f'\n\tWe recommend a minimum available disk space of {disk_free_gb_warning_threshold} GB, ' \
+                                  f'and large datasets may require more.'
+                disk_verbosity = 30
+            logger.log(disk_verbosity,
+                       f'Disk Space Avail:   {disk_free_gb:.2f} GB / {disk_total_gb:.2f} GB '
+                       f'({disk_proportion_avail * 100:.1f}%){disk_log_extra}')
+        except Exception as e:
+            # Note: using a broad exception catch as it is unknown what scenarios an exception would be raised, and what exception type would be used.
+            #  The broad exception ensures that we don't completely break AutoGluon for users who may be running on strange hardware or environments.
+            logger.log(30,
+                       f'Disk Space Avail:   WARNING, an exception ({e.__class__.__name__}) occurred while attempting to get available disk space. '
+                       f'Consider opening a GitHub Issue.')
         logger.log(20, f'Train Data Rows:    {len(X)}')
         logger.log(20, f'Train Data Columns: {len([column for column in X.columns if column != self.label])}')
         if X_val is not None:
