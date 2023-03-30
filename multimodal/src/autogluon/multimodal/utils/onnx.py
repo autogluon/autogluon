@@ -52,8 +52,8 @@ class OnnxModule(object):
         """
         Parameters
         ----------
-        onnx_path : str
-            The file path of the onnx model that need to be executed in onnxruntime.
+        onnx_path : str or bytes
+            The file path (or bytes) of the onnx model that need to be executed in onnxruntime.
         providers : dict or str, default=None
             A list of execution providers for model prediction in onnxruntime.
         """
@@ -69,7 +69,7 @@ class OnnxModule(object):
             logger.info("Loading ONNX file from path {}...".format(onnx_path))
             onnx_model = onnx.load(onnx_path)
 
-        if providers == None:
+        if providers is None:
             if isinstance(onnx_path, str):
                 dirname = os.path.dirname(os.path.abspath(onnx_path))
                 cache_path = os.path.join(dirname, "model_trt")

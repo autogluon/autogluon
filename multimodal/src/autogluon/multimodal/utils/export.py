@@ -87,13 +87,16 @@ class ExportMixin:
         """
         Export this predictor's model to ONNX file.
 
+        When `path` argument is not provided, the method would not save the model into disk.
+        Instead, it would export the onnx model into BytesIO and return its binary as bytes.
+
         Parameters
         ----------
         data
             Raw data used to trace and export the model.
             If this is None, will check if a processed batch is provided.
-        path
-            The export path of onnx model.
+        path : str, default=None
+            The export path of onnx model. If path is not provided, the method would export model to memory.
         batch_size
             The batch_size of export model's input.
             Normally the batch_size is a dynamic axis, so we could use a small value for faster export.
@@ -106,8 +109,9 @@ class ExportMixin:
 
         Returns
         -------
-        trt_module : OnnxModule
-            The onnx-based module that can be used to replace predictor._model for model inference.
+        onnx_path : str or bytes
+            A string that indicates location of the exported onnx model, if `path` argument is provided.
+            Otherwise, would return the onnx model as bytes.
         """
 
         import torch.jit
@@ -132,7 +136,7 @@ class ExportMixin:
         input_vec = [batch[k] for k in input_keys]
 
         # Write to BytesIO if path argument is not provided
-        if not path:
+        if path is None:
             onnx_path = io.BytesIO()
         else:
             onnx_path = os.path.join(path, "model.onnx")
