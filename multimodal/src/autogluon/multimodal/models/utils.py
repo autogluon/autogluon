@@ -723,7 +723,11 @@ def run_model(model: nn.Module, batch: dict, trt_model: Optional[nn.Module] = No
         if column_names != [] and column_values != []:
             input_vec.append(column_names)
             input_vec.append(column_values)
-        output_vec = model(*tuple(input_vec))
+        if isinstance(pure_model, OnnxModule):
+            # OnnxModule doesn't support multi-gpu yet
+            output_vec = pure_model(*tuple(input_vec))
+        else:
+            output_vec = model(*tuple(input_vec))
 
         output = pure_model.get_output_dict(*output_vec)
     else:

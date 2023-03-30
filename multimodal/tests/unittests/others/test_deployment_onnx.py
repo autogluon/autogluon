@@ -112,8 +112,36 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     # predict
     load_proba = loaded_predictor.predict_proba({"image": [image_path_test]})
 
-    # convert
+    # -------------------------------------------------------
+    # convert (no path)
     onnx_path = loaded_predictor.export_onnx({"image": [image_path_export]})
+    assert isinstance(
+        onnx_path, bytes
+    ), f"export_onnx() method should return onnx bytes directly, if path is not provided."
+
+    # create onnx module for evaluation
+    onnx_module = OnnxModule(onnx_path, providers=["CUDAExecutionProvider"])
+    onnx_module.input_keys = loaded_predictor._model.input_keys
+    onnx_module.prefix = loaded_predictor._model.prefix
+    onnx_module.get_output_dict = loaded_predictor._model.get_output_dict
+
+    # simply replace _model in the loaded predictor to predict with onnxruntime
+    loaded_predictor._model = onnx_module
+    onnx_proba = loaded_predictor.predict_proba({"image": [image_path_test]})
+
+    # assert allclose
+    np.testing.assert_allclose(load_proba, onnx_proba, rtol=1e-3, atol=1e-3)
+
+    # -------------------------------------------------------
+    # convert (with path)
+    loaded_predictor = MultiModalPredictor.load(path=model_path)
+    onnx_path = loaded_predictor.export_onnx({"image": [image_path_export]}, path=model_path)
+
+    # Check existence of the exported onnx model file and tensorrt cache files
+    onnx_path_expected = os.path.join(model_path, "model.onnx")
+    assert isinstance(onnx_path, str), "export_onnx() method should return a string, if path argument is provided."
+    assert onnx_path == onnx_path_expected, "onnx_path mismatch"
+    assert os.path.exists(onnx_path), f"onnx model file not found at {onnx_path}"
 
     # create onnx module for evaluation
     onnx_module = OnnxModule(onnx_path, providers=["CUDAExecutionProvider"])
@@ -185,12 +213,7 @@ def test_onnx_optimize_for_inference(dataset_name, model_names, text_backbone, i
         predictor_opt = MultiModalPredictor.load(path=model_path)
         predictor_opt.optimize_for_inference(providers=providers)
 
-        # Check existence of the exported onnx model file and tensorrt cache files
-        onnx_path = os.path.join(predictor_opt.path, "model.onnx")
-        assert os.path.exists(onnx_path), f"onnx model file not found at {onnx_path}"
-        if providers == None or providers == ["TensorrtExecutionProvider"]:
-            trt_cache_dir = os.path.join(predictor_opt.path, "model_trt")
-            assert len(os.listdir(trt_cache_dir)) >= 2, f"tensorrt cache model files are not found in {trt_cache_dir}"
+        # Check module type of optimized predictor
         assert isinstance(
             predictor_opt._model, OnnxModule
         ), f"invalid onnx module type, expected to be OnnxModule, but the model type is {type(predictor._model)}"
