@@ -447,7 +447,7 @@ def get_text_token_max_len(provided_max_len, config, tokenizer, checkpoint_name)
         max_len = default_max_len
     else:
         if provided_max_len < default_max_len:
-            if default_max_len < 10 ** 6:  # Larger than this value usually means infinite.
+            if default_max_len < 10**6:  # Larger than this value usually means infinite.
                 warnings.warn(
                     f"provided max length: {provided_max_len} "
                     f"is smaller than {checkpoint_name}'s default: {default_max_len}"
