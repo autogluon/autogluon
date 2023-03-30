@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import re
 from multiprocessing import cpu_count
@@ -8,11 +9,24 @@ from joblib import Parallel, delayed
 
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
 from autogluon.timeseries.utils.seasonality import get_seasonality
 from autogluon.timeseries.utils.warning_filters import statsmodels_joblib_warning_filter
 
 logger = logging.getLogger(__name__)
+
+
+def hash_ts_dataframe_items(ts_dataframe: TimeSeriesDataFrame) -> pd.Series:
+    """Hash each time series in the dataset to a 32-character hex string.
+
+    Hash is computed based on the timestamps and values of the time series (item_id is ignored).
+
+    This means that any model that doesn't use static features will make identical predictions for two time series
+    with the same hash value (assuming no collisions).
+    """
+    df_with_timestamp = ts_dataframe.reset_index(level=TIMESTAMP)
+    hash_per_timestep = pd.util.hash_pandas_object(df_with_timestamp, index=False)
+    # groupby preserves the order of the timesteps
+    return hash_per_timestep.groupby(level=ITEMID, sort=False).apply(lambda x: hashlib.md5(x.values).hexdigest())
 
 
 class AbstractLocalModel(AbstractTimeSeriesModel):

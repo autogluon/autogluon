@@ -1,6 +1,6 @@
 import pandas as pd
 
-from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
+from autogluon.timeseries.models.local.abstract_local_model import hash_ts_dataframe_items
 
 from .test_ts_dataset import DATETIME_INDEX, ITEM_IDS, SAMPLE_TS_DATAFRAME, TARGETS, _build_ts_dataframe
 

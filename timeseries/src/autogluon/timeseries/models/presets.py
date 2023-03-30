@@ -60,17 +60,6 @@ if agts.MXNET_INSTALLED:
         )
     )
 
-if agts.SKTIME_INSTALLED:
-    from .sktime import ARIMASktimeModel, AutoARIMASktimeModel, AutoETSSktimeModel
-
-    MODEL_TYPES.update(
-        dict(
-            ARIMASktime=ARIMASktimeModel,
-            AutoARIMASktime=AutoARIMASktimeModel,
-            AutoETSSktime=AutoETSSktimeModel,
-        )
-    )
-
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
     Naive=100,
@@ -87,12 +76,9 @@ DEFAULT_MODEL_PRIORITY = dict(
     AutoETS=70,
     DynamicOptimizedTheta=60,
     # Models below are not included in any presets
-    AutoETSSktime=60,
-    ARIMASktime=50,
     DeepARMXNet=50,
     SimpleFeedForwardMXNet=30,
     TemporalFusionTransformerMXNet=50,
-    AutoARIMASktime=20,
     MQCNNMXNet=10,
     MQRNNMXNet=10,
 )
