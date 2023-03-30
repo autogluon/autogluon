@@ -26,9 +26,7 @@ def hash_ts_dataframe_items(ts_dataframe: TimeSeriesDataFrame) -> pd.Series:
     df_with_timestamp = ts_dataframe.reset_index(level=TIMESTAMP)
     hash_per_timestep = pd.util.hash_pandas_object(df_with_timestamp, index=False)
     # groupby preserves the order of the timesteps
-    return hash_per_timestep.groupby(level=ITEMID, sort=False).apply(
-        lambda x: hashlib.md5(x.values, usedforsecurity=False).hexdigest()
-    )
+    return hash_per_timestep.groupby(level=ITEMID, sort=False).apply(lambda x: hashlib.md5(x.values).hexdigest())
 
 
 class AbstractLocalModel(AbstractTimeSeriesModel):
