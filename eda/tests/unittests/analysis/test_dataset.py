@@ -242,9 +242,10 @@ def test_LabelInsightsAnalysis__classification__low_cardinality_classes(threshol
         assert state == {
             "label_insights": {"low_cardinality_classes": {"instances": {2: 190}, "threshold": 191}},
             "problem_type": "binary",
+            "sample_size": 10000,
         }
     else:
-        assert state == {"problem_type": "binary"}
+        assert state == {"problem_type": "binary", "sample_size": 10000}
 
 
 @pytest.mark.parametrize("n_c1, n_c2, is_warning_expected", [(100, 100, False), (100, 39, True)])
@@ -270,9 +271,10 @@ def test_LabelInsightsAnalysis__classification__class_imbalance(n_c1, n_c2, is_w
                 "minority_class_imbalance": {"majority_class": 1, "minority_class": 2, "ratio": 0.39},
             },
             "problem_type": "binary",
+            "sample_size": 10000,
         }
     else:
-        assert state == {"problem_type": "binary"}
+        assert state == {"problem_type": "binary", "sample_size": 10000}
 
 
 def test_LabelInsightsAnalysis__classification__not_present_in_train():
@@ -292,7 +294,11 @@ def test_LabelInsightsAnalysis__classification__not_present_in_train():
         ],
     )
 
-    assert state == {"label_insights": {"not_present_in_train": {3, 4}}, "problem_type": "binary"}
+    assert state == {
+        "label_insights": {"not_present_in_train": {3, 4}},
+        "problem_type": "binary",
+        "sample_size": 10000,
+    }
 
 
 def test_LabelInsightsAnalysis__regression__no_ood():
@@ -310,7 +316,7 @@ def test_LabelInsightsAnalysis__regression__no_ood():
         ],
     )
 
-    assert state == {"problem_type": "regression"}
+    assert state == {"problem_type": "regression", "sample_size": 10000}
 
 
 @pytest.mark.parametrize("threshold, is_warning_expected", [(None, True), (0.02, False)])
@@ -340,6 +346,7 @@ def test_LabelInsightsAnalysis__regression__ood(threshold, is_warning_expected):
                 "ood": {"count": 12, "test_range": [-15, 1014], "threshold": 0.01, "train_range": [0, 999]}
             },
             "problem_type": "regression",
+            "sample_size": 10000,
         }
     else:
-        assert state == {"problem_type": "regression"}
+        assert state == {"problem_type": "regression", "sample_size": 10000}
