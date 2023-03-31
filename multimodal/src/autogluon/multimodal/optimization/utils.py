@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import torch
 import torchmetrics
 from omegaconf import DictConfig, OmegaConf
+from packaging import version
 from pytorch_metric_learning import distances, losses, miners
 from torch import nn, optim
 from torch.nn import functional as F
@@ -129,48 +130,6 @@ def get_loss_func(
     return loss_func
 
 
-class CustomF1Score(torchmetrics.F1Score):
-    """
-    Support computing the f1 score of one class, specified by `pos_label`,
-    which means the positive label users are interested in.
-
-    """
-
-    def __init__(
-        self,
-        num_classes: Optional[int] = None,
-        threshold: float = 0.5,
-        average: str = "micro",
-        mdmc_average: Optional[str] = None,
-        ignore_index: Optional[int] = None,
-        top_k: Optional[int] = None,
-        multiclass: Optional[bool] = None,
-        pos_label: Optional[int] = None,
-        **kwargs: Any,
-    ) -> None:
-        self.pos_label = pos_label
-        if pos_label is not None:
-            assert isinstance(pos_label, int)
-            average = None
-
-        super().__init__(
-            num_classes=num_classes,
-            threshold=threshold,
-            average=average,
-            mdmc_average=mdmc_average,
-            ignore_index=ignore_index,
-            top_k=top_k,
-            multiclass=multiclass,
-            **kwargs,
-        )
-
-    def compute(self) -> torch.Tensor:
-        f1_score = super().compute()
-        if self.pos_label is not None:
-            f1_score = f1_score[self.pos_label]
-        return f1_score
-
-
 class CustomHitRate(torchmetrics.Metric):
     """
     Compute the hit rate when doing semantic search between two group of embeddings.
@@ -248,8 +207,8 @@ def compute_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
 def get_metric(
     metric_name: str,
     num_classes: Optional[int] = None,
-    pos_label: Optional[int] = None,
     is_matching: Optional[bool] = False,
+    problem_type: Optional[str] = None,
 ):
     """
     Obtain a torchmerics.Metric from its name.
@@ -261,10 +220,10 @@ def get_metric(
         Name of metric.
     num_classes
         Number of classes.
-    pos_label
-        The label (0 or 1) of binary classification's positive class, which is used in some metrics, e.g., AUROC.
     is_matching
         Whether is matching.
+    problem_type
+        Type of problem, e.g., binary and multiclass.
 
     Returns
     -------
@@ -275,22 +234,23 @@ def get_metric(
     """
     metric_name = metric_name.lower()
     if metric_name in [ACC, ACCURACY, OVERALL_ACCURACY]:
-        return torchmetrics.Accuracy(), None
+        # use MULTICLASS since the head output dim is 2 for the binary problem type.
+        return torchmetrics.Accuracy(task=MULTICLASS, num_classes=num_classes), None
     elif metric_name == NER_TOKEN_F1:
-        return torchmetrics.F1Score(ignore_index=1), None
+        return torchmetrics.F1Score(task=MULTICLASS, num_classes=num_classes, ignore_index=1), None
     elif metric_name in [RMSE, ROOT_MEAN_SQUARED_ERROR]:
         return torchmetrics.MeanSquaredError(squared=False), None
     elif metric_name == R2:
         return torchmetrics.R2Score(), None
     elif metric_name == QUADRATIC_KAPPA:
         return (
-            torchmetrics.CohenKappa(num_classes=num_classes, weights="quadratic"),
+            torchmetrics.CohenKappa(task=problem_type, num_classes=num_classes, weights="quadratic"),
             None,
         )
     elif metric_name == ROC_AUC:
-        return torchmetrics.AUROC(pos_label=pos_label), None
+        return torchmetrics.AUROC(task=problem_type, num_classes=num_classes), None
     elif metric_name == AVERAGE_PRECISION:
-        return torchmetrics.AveragePrecision(pos_label=pos_label), None
+        return torchmetrics.AveragePrecision(task=problem_type, num_classes=num_classes)
     elif metric_name in [LOG_LOSS, CROSS_ENTROPY]:
         return torchmetrics.MeanMetric(), functools.partial(F.cross_entropy, reduction="none")
     elif metric_name == COSINE_EMBEDDING_LOSS:
@@ -303,7 +263,7 @@ def get_metric(
         else:
             return torchmetrics.SpearmanCorrCoef(), None
     elif metric_name == F1:
-        return CustomF1Score(num_classes=num_classes, pos_label=pos_label), None
+        return torchmetrics.F1Score(task=problem_type, num_classes=num_classes), None
     elif metric_name in DETECTION_METRICS:
         return (
             MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False),

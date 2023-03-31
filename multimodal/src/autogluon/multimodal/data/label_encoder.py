@@ -7,9 +7,9 @@ import jsonschema
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
+from sklearn.preprocessing import LabelEncoder
 
 from ..constants import AUTOMM, END_OFFSET, ENTITY_GROUP, NER_ANNOTATION, PROBABILITY, START_OFFSET
-from .utils import process_ner_annotations
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +137,8 @@ class NerLabelEncoder:
         transformed_y
             A list of word level annotations.
         """
+        from .utils import process_ner_annotations
+
         all_annotations, _ = self.extract_ner_annotations(y)
         transformed_y = []
         for annotation, text_snippet in zip(all_annotations, x.items()):
@@ -193,3 +195,119 @@ class NerLabelEncoder:
             pred_with_offset.append(temp_offset)
             pred_with_proba.append(temp_proba)
         return pred_label_only, pred_with_offset, pred_with_proba
+
+
+class CustomLabelEncoder:
+    """
+    A label encoder that supports specifying a positive class on top of sklearn's LabelEncoder.
+    """
+
+    def __init__(self, positive_class=None):
+        self.positive_class = positive_class
+        self._le = LabelEncoder()
+        self._mapping = None
+        self._inverse_mapping = None
+
+    def _set_attributes(self):
+        if self.positive_class:
+            assert self.positive_class in self._le.classes_
+
+        if self.positive_class:
+            classes, class_labels = [], []
+            for i, c in enumerate(self._le.classes_):
+                if c == self.positive_class:
+                    positive_label = i
+                else:
+                    classes.append(c)
+                    class_labels.append(i)
+            classes.append(self.positive_class)
+            class_labels.append(positive_label)
+            self.classes_ = np.array(classes)
+            pairs = {label: i for i, label in enumerate(class_labels)}
+            sorted_pairs = sorted(pairs.items(), key=lambda item: item[0])
+            self._mapping = np.array([item[1] for item in sorted_pairs])
+            sorted_pairs = sorted(pairs.items(), key=lambda item: item[1])
+            self._inverse_mapping = np.array([item[0] for item in sorted_pairs])
+        else:
+            self.classes_ = self._le.classes_
+
+    def fit(self, y):
+        """
+        Fit label encoder.
+
+        Parameters
+        ----------
+        y : array-like of shape (n_samples,)
+            Target values.
+
+        Returns
+        -------
+        self : returns an instance of self.
+            Fitted label encoder.
+        """
+        self._le.fit(y)
+        self._set_attributes()
+
+        return self
+
+    def fit_transform(self, y):
+        """
+        Fit label encoder and return encoded labels.
+
+        Parameters
+        ----------
+        y : array-like of shape (n_samples,)
+            Target values.
+
+        Returns
+        -------
+        y : array-like of shape (n_samples,)
+            Encoded labels.
+        """
+        y = self._le.fit_transform(y)
+        self._set_attributes()
+
+        if self._mapping is not None:
+            return self._mapping[y]
+        else:
+            return y
+
+    def transform(self, y):
+        """
+        Transform labels to normalized encoding.
+
+        Parameters
+        ----------
+        y : array-like of shape (n_samples,)
+            Target values.
+
+        Returns
+        -------
+        y : array-like of shape (n_samples,)
+            Labels as normalized encodings.
+        """
+        y = self._le.transform(y)
+
+        if self._mapping is not None:
+            return self._mapping[y]
+        else:
+            return y
+
+    def inverse_transform(self, y):
+        """
+        Transform labels back to original encoding.
+
+        Parameters
+        ----------
+        y : ndarray of shape (n_samples,)
+            Target values.
+
+        Returns
+        -------
+        y : ndarray of shape (n_samples,)
+            Original encoding.
+        """
+        if self._inverse_mapping is not None:
+            y = self._inverse_mapping[y]
+
+        return self._le.inverse_transform(y)

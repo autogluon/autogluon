@@ -6,7 +6,7 @@ from sklearn.metrics import f1_score, log_loss
 from torchmetrics import MeanMetric, RetrievalHitRate
 
 from autogluon.multimodal.constants import MULTICLASS, Y_PRED, Y_TRUE
-from autogluon.multimodal.optimization.utils import CustomF1Score, compute_hit_rate, get_loss_func, get_metric
+from autogluon.multimodal.optimization.utils import compute_hit_rate, get_loss_func, get_metric
 from autogluon.multimodal.utils import compute_score
 
 
@@ -75,43 +75,6 @@ def test_bce_with_logits_loss(problem_type, loss_func_name):
     bceloss = torch.nn.BCELoss()
     score2 = bceloss(input=preds, target=targets)
     assert pytest.approx(score1, 1e-6) == score2
-
-
-@pytest.mark.parametrize(
-    "pos_label",
-    [
-        0,
-        1,
-    ],
-)
-def test_f1(pos_label):
-    y_true = torch.tensor([0, 1, 0, 0, 1, 1])
-    logits = torch.tensor(
-        [
-            [1.6605, -1.4413],
-            [-0.8016, 0.5224],
-            [-0.4859, -0.9226],
-            [-3.1272, -0.0620],
-            [-0.3837, 0.5376],
-            [-0.6448, 1.4258],
-        ]
-    )
-    y_pred = logits.argmax(dim=1)
-    score1 = f1_score(y_true, y_pred, pos_label=pos_label)
-    metric_data = {
-        Y_PRED: y_pred,
-        Y_TRUE: y_true,
-    }
-    score2 = compute_score(
-        metric_data=metric_data,
-        metric_name="f1",
-        pos_label=pos_label,
-    )
-    assert pytest.approx(score1, 1e-6) == score2
-
-    custom_f1 = CustomF1Score(num_classes=2, pos_label=pos_label)
-    custom_f1.update(logits, y_true)
-    assert pytest.approx(score1, 1e-6) == custom_f1.compute().item()
 
 
 def ref_symmetric_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):

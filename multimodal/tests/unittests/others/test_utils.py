@@ -24,6 +24,7 @@ from autogluon.multimodal.constants import (
     TEXT_NER,
 )
 from autogluon.multimodal.data.infer_types import infer_ner_column_type
+from autogluon.multimodal.data.label_encoder import CustomLabelEncoder
 from autogluon.multimodal.data.utils import process_ner_annotations
 from autogluon.multimodal.utils import (
     apply_omegaconf_overrides,
@@ -36,7 +37,6 @@ from autogluon.multimodal.utils import (
     merge_bio_format,
     parse_dotlist_conf,
     split_hyperparameters,
-    try_to_infer_pos_label,
     visualize_ner,
 )
 
@@ -97,44 +97,44 @@ def test_apply_omegaconf_overrides():
 
 
 @pytest.mark.parametrize(
-    "labels,pos_label,problem_type,true_pos_label",
+    "labels,positive_class",
     [
-        ([1, 2, 2], 2, BINARY, 1),
-        ([1, 2, 2], 1, BINARY, 0),
-        ([1, 0, 1, 0, 0], 0, BINARY, 0),
-        ([1, 0, 1, 0, 0], None, BINARY, 1),
-        (["a", "e", "e", "a"], "a", BINARY, 0),
-        (["b", "d", "b", "d"], "d", BINARY, 1),
-        (["a", "d", "e", "b"], "d", MULTICLASS, None),
-        ([3, 2, 1, 0], 2, MULTICLASS, None),
+        ([1, 2, 2], 2),
+        ([1, 2, 2], 1),
+        ([1, 0, 1, 0, 0], 0),
+        ([1, 0, 1, 0, 0], None),
+        (["a", "e", "e", "a"], "a"),
+        (["b", "d", "b", "d"], "d"),
+        (["a", "d", "e", "b"], "d"),
+        ([3, 2, 1, 0], 2),
     ],
 )
-def test_inferring_pos_label(labels, pos_label, problem_type, true_pos_label):
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
-    overrides = {}
-    if pos_label is not None:
-        overrides.update(
-            {
-                "data.pos_label": pos_label,
-            }
-        )
-    config = get_config(
-        config=config,
-        overrides=overrides,
-    )
-    label_encoder = LabelEncoder()
+def test_label_encoder(labels, positive_class):
+    label_encoder = CustomLabelEncoder(positive_class=positive_class)
     label_encoder.fit(labels)
-    pos_label = try_to_infer_pos_label(
-        data_config=config.data,
-        label_encoder=label_encoder,
-        problem_type=problem_type,
-    )
-    assert pos_label == true_pos_label
+
+    # test encoding positive class
+    if positive_class:
+        assert label_encoder.transform([positive_class]).item() == len(label_encoder.classes_) - 1
+    else:
+        assert label_encoder.transform([label_encoder.classes_[-1]]).item() == len(label_encoder.classes_) - 1
+
+    # test encoding
+    sklearn_le = LabelEncoder()
+    sklearn_le.fit(labels)
+    sk_encoded_labels = sklearn_le.transform(labels)
+    our_encoded_labels = label_encoder.transform(labels)
+    if positive_class:
+        sk_pos_label = sklearn_le.transform([positive_class]).item()
+    else:
+        sk_pos_label = len(sklearn_le.classes_) - 1
+    sk_encoded_labels[sk_encoded_labels == sk_pos_label] = len(sklearn_le.classes_)
+    sk_encoded_labels[sk_encoded_labels > sk_pos_label] -= 1
+    sk_encoded_labels[sk_encoded_labels < 0] = 0
+    assert (sk_encoded_labels == our_encoded_labels).all()
+
+    # test inverse encoding
+    assert label_encoder.inverse_transform(our_encoded_labels).tolist() == labels
 
 
 @pytest.mark.parametrize(
