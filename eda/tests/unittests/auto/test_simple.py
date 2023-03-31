@@ -99,18 +99,18 @@ def test_analyze():
 
 
 def test_analyze_return_state():
-    state = {"some_previous_state": {"arg": 1}}
+    state = {"sample_size": 10000, "some_previous_state": {"arg": 1}}
     assert analyze(state=state) is None
     assert analyze(state=state, return_state=True) == state
 
 
 def test_analyze_None_state():
     state = None
-    assert analyze(state=state, return_state=True) == {}
+    assert analyze(state=state, return_state=True) == {"sample_size": 10000}
 
 
 def test_analyze_state_dict_convert():
-    state = {"some_previous_state": {"arg": 1}}
+    state = {"sample_size": 10000, "some_previous_state": {"arg": 1}}
     assert not isinstance(state, AnalysisState)
     _state = analyze(state=state, return_state=True)
     assert _state == state
@@ -356,6 +356,7 @@ def test_target_analysis__classification(monkeypatch):
         "missing_statistics",
         "problem_type",
         "raw_type",
+        "sample_size",
         "special_types",
         "variable_type",
     ]
@@ -426,6 +427,7 @@ def test_target_analysis__regression(monkeypatch):
         "missing_statistics",
         "problem_type",
         "raw_type",
+        "sample_size",
         "special_types",
         "variable_type",
     ]

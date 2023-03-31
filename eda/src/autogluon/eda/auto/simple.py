@@ -68,6 +68,8 @@ __all__ = [
     "partial_dependence_plots",
 ]
 
+DEFAULT_SAMPLE_SIZE = 10000
+
 
 def analyze(
     train_data: Optional[pd.DataFrame] = None,
@@ -76,7 +78,7 @@ def analyze(
     model=None,
     label: Optional[str] = None,
     state: Union[None, dict, AnalysisState] = None,
-    sample: Union[None, int, float] = None,
+    sample: Union[None, int, float] = DEFAULT_SAMPLE_SIZE,
     anlz_facets: Optional[List[AbstractAnalysis]] = None,
     viz_facets: Optional[List[AbstractVisualization]] = None,
     return_state: bool = False,
@@ -101,7 +103,7 @@ def analyze(
         target variable
     state: Union[None, dict, AnalysisState], default = None
         pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
-    sample: Union[None, int, float], default = None
+    sample: Union[None, int, float], default = 10000
         sample size; if `int`, then row number is used;
         `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
         `None` means no sampling
@@ -258,7 +260,7 @@ def quick_fit(
     path: Optional[str] = None,
     val_size: float = 0.3,
     problem_type: str = "auto",
-    sample: Union[None, int, float] = None,
+    sample: Union[None, int, float] = DEFAULT_SAMPLE_SIZE,
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
     save_model_to_state: bool = True,
@@ -305,7 +307,7 @@ def quick_fit(
     problem_type: str, default = 'auto'
         problem type to use. Valid problem_type values include ['auto', 'binary', 'multiclass', 'regression', 'quantile', 'softclass']
         auto means it will be Auto-detected using AutoGluon methods.
-    sample: Union[None, int, float], default = None
+    sample: Union[None, int, float], default = 10000
         sample size; if `int`, then row number is used;
         `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
         `None` means no sampling
@@ -459,7 +461,7 @@ def dataset_overview(
     label: Optional[str] = None,
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
-    sample: Union[None, int, float] = None,
+    sample: Union[None, int, float] = DEFAULT_SAMPLE_SIZE,
     fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
     chart_args: Optional[Dict[str, Dict[str, Any]]] = None,
 ):
@@ -484,7 +486,7 @@ def dataset_overview(
         pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
     return_state: bool, default = False
         return state if `True`
-    sample: Union[None, int, float], default = None
+    sample: Union[None, int, float], default = 10000
         sample size; if `int`, then row number is used;
         `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
         `None` means no sampling
@@ -578,7 +580,7 @@ def covariate_shift_detection(
     train_data: pd.DataFrame,
     test_data: pd.DataFrame,
     label: str,
-    sample: Union[None, int, float] = None,
+    sample: Union[None, int, float] = DEFAULT_SAMPLE_SIZE,
     path: Optional[str] = None,
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
@@ -607,7 +609,7 @@ def covariate_shift_detection(
         target variable
     state: Union[None, dict, AnalysisState], default = None
         pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
-    sample: Union[None, int, float], default = None
+    sample: Union[None, int, float], default = 10000
         sample size; if `int`, then row number is used;
         `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
         `None` means no sampling
@@ -740,7 +742,7 @@ def target_analysis(
     test_data: Optional[pd.DataFrame] = None,
     problem_type: str = "auto",
     fit_distributions: Union[bool, str, List[str]] = True,
-    sample: Union[None, int, float] = None,
+    sample: Union[None, int, float] = DEFAULT_SAMPLE_SIZE,
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
     fig_args: Optional[Dict[str, Any]] = None,
@@ -775,7 +777,7 @@ def target_analysis(
         If `True`, or list of distributions is provided, then fit distributions. Performed only if `y` and `hue` are not present.
     state: Union[None, dict, AnalysisState], default = None
         pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
-    sample: Union[None, int, float], default = None
+    sample: Union[None, int, float], default = 10000
         sample size; if `int`, then row number is used;
         `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
         `None` means no sampling
@@ -938,7 +940,7 @@ def missing_values_analysis(
     val_data: Optional[pd.DataFrame] = None,
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
-    sample: Union[None, int, float] = None,
+    sample: Union[None, int, float] = DEFAULT_SAMPLE_SIZE,
     **chart_args,
 ):
     """
@@ -972,7 +974,7 @@ def missing_values_analysis(
         pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
     return_state: bool, default = False
         return state if `True`
-    sample: Union[None, int, float], default = None
+    sample: Union[None, int, float], default = 10000
         sample size; if `int`, then row number is used;
         `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
         `None` means no sampling
@@ -1099,7 +1101,7 @@ def partial_dependence_plots(
     two_way: bool = False,
     path: Optional[str] = None,
     max_ice_lines: int = 300,
-    sample: Optional[Union[int, float]] = None,
+    sample: Optional[Union[int, float]] = DEFAULT_SAMPLE_SIZE,
     fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
     chart_args: Optional[Dict[str, Dict[str, Any]]] = None,
     show_help_text: bool = True,
@@ -1172,7 +1174,7 @@ def partial_dependence_plots(
         location to store the model trained for this task
     max_ice_lines: int, default = 300
         max number of ice lines to display for each sub-plot
-    sample: Union[None, int, float], default = None
+    sample: Union[None, int, float], default = 10000
         sample size; if `int`, then row number is used;
         `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
         `None` means no sampling
