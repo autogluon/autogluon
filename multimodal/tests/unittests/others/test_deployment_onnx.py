@@ -48,9 +48,27 @@ def evaluate(predictor, df, onnx_session=None):
 def test_onnx_export_hf_text(checkpoint_name):
     # IMPORTANT: lazy import onnxruntime, otherwise onnxruntime won't be able to compile to tensorrt EP.
     import onnxruntime as ort
+    import pandas as pd
 
-    test_df = load_dataset("wietsedv/stsbenchmark", split="test").to_pandas()
-    test_df = test_df.head()  # subsample the data to avoid OOM in tracing
+    # https://huggingface.co/datasets/stsb_multi_mt/viewer/en/test
+    data_dict = {
+        "sentence1": [
+            "A girl is styling her hair.",
+            "A group of men play soccer on the beach.",
+            "One woman is measuring another woman's ankle.",
+            "A man is cutting up a cucumber.",
+            "A man is playing a harp.",
+        ],
+        "sentence2": [
+            "A girl is brushing her hair.",
+            "A group of boys are playing soccer on the beach.",
+            "A woman measures another woman's ankle.",
+            "A man is slicing a cucumber.",
+            "A man is playing a keyboard.",
+        ],
+        "score": [2.5, 3.6, 5, 4.2, 1.5],
+    }
+    test_df = pd.DataFrame.from_dict(data_dict)
 
     predictor = MultiModalPredictor(
         problem_type="feature_extraction",
