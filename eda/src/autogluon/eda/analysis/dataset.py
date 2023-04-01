@@ -81,13 +81,15 @@ class Sampler(AbstractAnalysis):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         if self.sample is not None:
-            state.sample_size = self.sample
             for ds, df in self.available_datasets(args):
                 arg = "n"
                 if self.sample is not None and isinstance(self.sample, float):
                     arg = "frac"
                 if len(df) > self.sample:
                     df = df.sample(**{arg: self.sample}, random_state=0)
+                    if state.sample_size is None:
+                        state.sample_size = {}
+                    state.sample_size[ds] = self.sample
                 self.args[ds] = df
 
 

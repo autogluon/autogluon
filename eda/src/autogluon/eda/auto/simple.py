@@ -167,6 +167,7 @@ def analyze(
 
 
 def analyze_interaction(
+    train_data: pd.DataFrame,
     x: Optional[str] = None,
     y: Optional[str] = None,
     hue: Optional[str] = None,
@@ -180,6 +181,8 @@ def analyze_interaction(
 
     Parameters
     ----------
+    train_data: pd.DataFrame
+        training dataset
     x: Optional[str], default = None
     y: Optional[str], default = None
     hue: Optional[str], default = None
@@ -217,7 +220,12 @@ def analyze_interaction(
 
     _analysis_args = analysis_args.copy()
     _analysis_args.pop("return_state", None)
-    state: AnalysisState = analyze(return_state=True, **_analysis_args, anlz_facets=[RawTypesAnalysis(), VariableTypeAnalysis()])  # type: ignore
+    state: AnalysisState = analyze(
+        train_data=train_data,
+        return_state=True,
+        **_analysis_args,
+        anlz_facets=[RawTypesAnalysis(), VariableTypeAnalysis()],
+    )  # type: ignore
 
     analysis_facets: List[AbstractAnalysis] = [
         FeatureInteraction(key=key, x=x, y=y, hue=hue),
@@ -240,6 +248,7 @@ def analyze_interaction(
     _analysis_args.pop("state", None)
 
     return analyze(
+        train_data=train_data,
         **_analysis_args,
         state=state,
         anlz_facets=analysis_facets,

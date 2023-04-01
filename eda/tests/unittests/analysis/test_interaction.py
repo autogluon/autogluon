@@ -48,7 +48,6 @@ def test_Correlation_spearman():
                 )
             },
             "correlations_method": "spearman",
-            "sample_size": 10000,
         }
     )
     __compare_outputs(expected, state)
@@ -71,7 +70,6 @@ def test_Correlation_pearson():
                 )
             },
             "correlations_method": "pearson",
-            "sample_size": 10000,
         }
     )
     __compare_outputs(expected, state)
@@ -94,7 +92,6 @@ def test_Correlation_kendall():
                 )
             },
             "correlations_method": "kendall",
-            "sample_size": 10000,
         }
     )
     __compare_outputs(expected, state)
@@ -119,7 +116,6 @@ def test_Correlation_phik():
                 )
             },
             "correlations_method": "phik",
-            "sample_size": 10000,
         }
     )
     __compare_outputs(expected, state)
@@ -150,7 +146,6 @@ def test_Correlation_focus():
             "correlations_focus_field": "c",
             "correlations_focus_field_threshold": 0.5,
             "correlations_focus_high_corr": {"train_data": pd.DataFrame(index=list("ad"), data={"c": [0.88, -1.00]})},
-            "sample_size": 10000,
         }
     )
     assert actual.correlations_focus_high_corr.train_data.equals(
@@ -433,5 +428,4 @@ def test_FeatureDistanceAnalysis__happy_path():
             ],
             "near_duplicates_threshold": 0.85,
         },
-        "sample_size": 10000,
     }

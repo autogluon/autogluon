@@ -51,7 +51,7 @@ def test_CorrelationVisualization_phik(monkeypatch):
         state,
         heatmap_args,
         CorrelationVisualization,
-        "**`train_data` - `phik` correlation matrix (sample size: 10000)**",
+        "**`train_data` - `phik` correlation matrix**",
         headers=True,
     )
 
@@ -73,7 +73,7 @@ def test_CorrelationVisualization_focus(monkeypatch):
         state,
         heatmap_args,
         CorrelationVisualization,
-        "**`train_data` - `spearman` correlation matrix; focus: absolute correlation for `c` >= `0.6` (sample size: 10000)**",
+        "**`train_data` - `spearman` correlation matrix; focus: absolute correlation for `c` >= `0.6`**",
         headers=True,
     )
 
@@ -215,11 +215,9 @@ def test_FeatureInteractionVisualization__headers(monkeypatch, is_single, header
     if not header:
         viz.render_markdown.assert_not_called()
     elif is_single:
-        viz.render_markdown.assert_called_with("**`a` in `train_data` (sample size: 10000)**")
+        viz.render_markdown.assert_called_with("**`a` in `train_data`**")
     else:
-        viz.render_markdown.assert_called_with(
-            "**Feature interaction between `a`/`b` in `train_data` (sample size: 10000)**"
-        )
+        viz.render_markdown.assert_called_with("**Feature interaction between `a`/`b` in `train_data`**")
 
 
 def test_FeatureInteractionVisualization__state_different_key(monkeypatch):
