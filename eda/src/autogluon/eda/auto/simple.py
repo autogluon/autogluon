@@ -83,6 +83,7 @@ def analyze(
     viz_facets: Optional[List[AbstractVisualization]] = None,
     return_state: bool = False,
     verbosity: int = 2,
+    **kwargs,
 ) -> Optional[AnalysisState]:
     """
     This helper creates `BaseAnalysis` wrapping passed analyses into
@@ -220,11 +221,19 @@ def analyze_interaction(
 
     _analysis_args = analysis_args.copy()
     _analysis_args.pop("return_state", None)
+
+    pvalue_min = _analysis_args.pop("pvalue_min", 0.01)
+    keep_top_n = _analysis_args.pop("keep_top_n", 5)
+    numeric_as_categorical_threshold = _analysis_args.pop("numeric_as_categorical_threshold", 20)
+
     state: AnalysisState = analyze(
         train_data=train_data,
         return_state=True,
         **_analysis_args,
-        anlz_facets=[RawTypesAnalysis(), VariableTypeAnalysis()],
+        anlz_facets=[
+            RawTypesAnalysis(),
+            VariableTypeAnalysis(numeric_as_categorical_threshold=numeric_as_categorical_threshold),
+        ],
     )  # type: ignore
 
     analysis_facets: List[AbstractAnalysis] = [
@@ -242,7 +251,9 @@ def analyze_interaction(
             else:
                 dists = fit_distributions
 
-            analysis_facets.append(DistributionFit(columns=x, keep_top_n=5, distributions_to_fit=dists))  # type: ignore # x is always present
+            analysis_facets.append(
+                DistributionFit(columns=x, keep_top_n=keep_top_n, pvalue_min=pvalue_min, distributions_to_fit=dists)
+            )  # type: ignore # x is always present
 
     _analysis_args = analysis_args.copy()
     _analysis_args.pop("state", None)
@@ -253,7 +264,12 @@ def analyze_interaction(
         state=state,
         anlz_facets=analysis_facets,
         viz_facets=[
-            FeatureInteractionVisualization(key=key, fig_args=fig_args, **chart_args),
+            FeatureInteractionVisualization(
+                key=key,
+                fig_args=fig_args,
+                numeric_as_categorical_threshold=numeric_as_categorical_threshold,
+                **chart_args,
+            ),
         ],
     )
 
@@ -943,10 +959,10 @@ def _render_distribution_fit_information_if_available(state, label) -> Optional[
 
 
 def missing_values_analysis(
-    graph_type: str = "matrix",
     train_data: Optional[pd.DataFrame] = None,
     test_data: Optional[pd.DataFrame] = None,
     val_data: Optional[pd.DataFrame] = None,
+    graph_type: str = "matrix",
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
     sample: Union[None, int, float] = DEFAULT_SAMPLE_SIZE,
@@ -957,6 +973,12 @@ def missing_values_analysis(
 
     Parameters
     ----------
+    train_data: Optional[DataFrame]
+        training dataset
+    test_data: Optional[DataFrame], default = None
+        test dataset
+    val_data
+        validation dataset
     graph_type: str, default = 'matrix'
         One of the following visualization types:
         - matrix - nullity matrix is a data-dense display which lets you quickly visually pick out patterns in data completion
@@ -973,12 +995,6 @@ def missing_values_analysis(
             against one another by their nullity correlation (measured in terms of binary distance).
             At each step of the tree the variables are split up based on which combination minimizes the distance of the remaining clusters.
             The more monotone the set of variables, the closer their total distance is to zero, and the closer their average distance (the y-axis) is to zero.
-    train_data: Optional[DataFrame]
-        training dataset
-    test_data: Optional[DataFrame], default = None
-        test dataset
-    val_data
-        validation dataset
     state: Union[None, dict, AnalysisState], default = None
         pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
     return_state: bool, default = False
@@ -1006,6 +1022,7 @@ def missing_values_analysis(
     :py:class:`~autogluon.eda.visualization.missing.MissingValues`
 
     """
+    # TODO add null equivalents: i.e. >50% of values are the same (i.e. 0 is frequently used as null equivalent)
     return analyze(
         train_data=train_data,
         test_data=test_data,

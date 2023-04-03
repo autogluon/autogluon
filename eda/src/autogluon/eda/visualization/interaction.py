@@ -372,6 +372,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             ("numeric", "category", "category"): self._KdePlotRenderer,
             ("numeric", "numeric", None): self._RegPlotRenderer,
             ("numeric", "numeric", "category"): self._ScatterPlotRenderer,
+            ("numeric", "numeric", "numeric"): self._ScatterPlotRenderer,
             ("datetime", "numeric", None): self._LinePlotRenderer,
         }
         return types.get((x_type, y_type, hue_type), None)
