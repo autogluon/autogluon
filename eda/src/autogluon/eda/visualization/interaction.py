@@ -401,7 +401,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                 and (state.distributions_fit[ds].get(x, None) is not None)
             )
 
-            if fitted_distributions_present:
+            if "stat" not in chart_args:
                 chart_args["stat"] = "density"
             sns.histplot(ax=ax, data=data, **chart_args)
 
