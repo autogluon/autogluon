@@ -4,15 +4,15 @@ import pickle
 from typing import Dict, List, Optional, Tuple, Union
 
 from ..constants import AUTOMM
-from ..data import NerProcessor, TextProcessor
+from ..data import DocumentProcessor, NerProcessor, TextProcessor
 
 logger = logging.getLogger(__name__)
 
 
 def load_text_tokenizers(
-    text_processors: Union[List[TextProcessor], List[NerProcessor]],
+    text_processors: Union[List[TextProcessor], List[NerProcessor], List[DocumentProcessor]],
     path: str,
-) -> Union[List[TextProcessor], List[NerProcessor]]:
+) -> Union[List[TextProcessor], List[NerProcessor], List[DocumentProcessor]]:
     """
     Load saved text tokenizers. If text/ner processors already have tokenizers,
     then do nothing.
