@@ -96,7 +96,7 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
                 df = self._fix_counts(df, ["missing_count"])
             df = df.fillna("")
 
-            self.render_header_if_needed(state, f"`{ds}` dataset summary")
+            self.render_header_if_needed(state, f"`{ds}` dataset summary", ds=ds)
             if self.sort_by in df.columns:
                 df = df.sort_values(by=self.sort_by, ascending=self.sort_asc)
             with pd.option_context("display.max_rows", 100 if len(df) <= 100 else 20):

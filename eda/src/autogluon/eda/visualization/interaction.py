@@ -53,7 +53,9 @@ class _AbstractCorrelationChart(AbstractVisualization, JupyterMixin, ABC):
                 focus_field_header = f"; focus: absolute correlation for `{state.correlations_focus_field}` >= `{state.correlations_focus_field_threshold}`"
             else:
                 focus_field_header = ""
-            self.render_header_if_needed(state, f"`{ds}` - `{state.correlations_method}` {header}{focus_field_header}")
+            self.render_header_if_needed(
+                state, f"`{ds}` - `{state.correlations_method}` {header}{focus_field_header}", ds=ds
+            )
 
             fig, ax = plt.subplots(**fig_args)
             sns.heatmap(
@@ -295,7 +297,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
 
             if self.headers:
                 prefix = "" if is_single_var else "Feature interaction between "
-                self.render_header_if_needed(state, f"{prefix}{features} in `{ds}`")
+                self.render_header_if_needed(state, f"{prefix}{features} in `{ds}`", ds=ds)
 
             fig_args = self.fig_args.copy()
             if "figsize" not in fig_args:
@@ -370,6 +372,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             ("numeric", "category", "category"): self._KdePlotRenderer,
             ("numeric", "numeric", None): self._RegPlotRenderer,
             ("numeric", "numeric", "category"): self._ScatterPlotRenderer,
+            ("numeric", "numeric", "numeric"): self._ScatterPlotRenderer,
             ("datetime", "numeric", None): self._LinePlotRenderer,
         }
         return types.get((x_type, y_type, hue_type), None)
@@ -399,7 +402,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                 and (state.distributions_fit[ds].get(x, None) is not None)
             )
 
-            if fitted_distributions_present:
+            if "stat" not in chart_args:
                 chart_args["stat"] = "density"
             sns.histplot(ax=ax, data=data, **chart_args)
 

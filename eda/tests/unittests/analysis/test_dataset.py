@@ -33,6 +33,7 @@ def test_Sampler():
         test_data=df_test,
         children=[
             Namespace(namespace="ns_sampler", children=[Sampler(sample=5, children=[SomeAnalysis()])]),
+            Namespace(namespace="ns_sampler_2", children=[Sampler(sample=15, children=[SomeAnalysis()])]),
             Namespace(namespace="ns_sampler_none", children=[Sampler(sample=None, children=[SomeAnalysis()])]),
             Namespace(namespace="ns_no_sampler", children=[SomeAnalysis()]),
         ],
@@ -41,7 +42,11 @@ def test_Sampler():
     state = analysis.fit()
     assert state.ns_sampler.args.train_data.shape == (5, 4)
     assert state.ns_sampler.args.test_data.shape == (5, 4)
-    assert state.ns_sampler.sample_size == 5
+    assert state.ns_sampler.sample_size == {"test_data": 5, "train_data": 5}
+
+    assert state.ns_sampler_2.args.train_data.shape == (10, 4)
+    assert state.ns_sampler_2.args.test_data.shape == (15, 4)
+    assert state.ns_sampler_2.sample_size == {"test_data": 15}
 
     assert state.ns_sampler_none.args.train_data.shape == (10, 4)
     assert state.ns_sampler_none.args.test_data.shape == (20, 4)
@@ -69,7 +74,7 @@ def test_Sampler__window_larger_than_dataset():
     state = analysis.fit()
     assert state.args.train_data.shape == (10, 4)
     assert state.args.test_data.shape == (20, 4)
-    assert state.sample_size == 10000
+    assert state.sample_size is None
 
 
 def test_Sampler_frac():
@@ -83,7 +88,7 @@ def test_Sampler_frac():
     )
 
     state = analysis.fit()
-    assert state.sample_size == 0.5
+    assert state.sample_size == {"test_data": 0.5, "train_data": 0.5}
     assert state.args.train_data.shape == (5, 4)
     assert state.args.test_data.shape == (10, 4)
 
@@ -242,10 +247,9 @@ def test_LabelInsightsAnalysis__classification__low_cardinality_classes(threshol
         assert state == {
             "label_insights": {"low_cardinality_classes": {"instances": {2: 190}, "threshold": 191}},
             "problem_type": "binary",
-            "sample_size": 10000,
         }
     else:
-        assert state == {"problem_type": "binary", "sample_size": 10000}
+        assert state == {"problem_type": "binary"}
 
 
 @pytest.mark.parametrize("n_c1, n_c2, is_warning_expected", [(100, 100, False), (100, 39, True)])
@@ -271,10 +275,9 @@ def test_LabelInsightsAnalysis__classification__class_imbalance(n_c1, n_c2, is_w
                 "minority_class_imbalance": {"majority_class": 1, "minority_class": 2, "ratio": 0.39},
             },
             "problem_type": "binary",
-            "sample_size": 10000,
         }
     else:
-        assert state == {"problem_type": "binary", "sample_size": 10000}
+        assert state == {"problem_type": "binary"}
 
 
 def test_LabelInsightsAnalysis__classification__not_present_in_train():
@@ -297,7 +300,6 @@ def test_LabelInsightsAnalysis__classification__not_present_in_train():
     assert state == {
         "label_insights": {"not_present_in_train": {3, 4}},
         "problem_type": "binary",
-        "sample_size": 10000,
     }
 
 
@@ -316,7 +318,7 @@ def test_LabelInsightsAnalysis__regression__no_ood():
         ],
     )
 
-    assert state == {"problem_type": "regression", "sample_size": 10000}
+    assert state == {"problem_type": "regression"}
 
 
 @pytest.mark.parametrize("threshold, is_warning_expected", [(None, True), (0.02, False)])
@@ -346,7 +348,6 @@ def test_LabelInsightsAnalysis__regression__ood(threshold, is_warning_expected):
                 "ood": {"count": 12, "test_range": [-15, 1014], "threshold": 0.01, "train_range": [0, 999]}
             },
             "problem_type": "regression",
-            "sample_size": 10000,
         }
     else:
-        assert state == {"problem_type": "regression", "sample_size": 10000}
+        assert state == {"problem_type": "regression"}

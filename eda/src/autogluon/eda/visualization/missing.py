@@ -79,7 +79,7 @@ class MissingValues(AbstractVisualization, JupyterMixin):
 
     def _render(self, state: AnalysisState) -> None:
         for ds, ds_state in state.missing_statistics.items():
-            self.render_header_if_needed(state, f"`{ds}` missing values analysis")
+            self.render_header_if_needed(state, f"`{ds}` missing values analysis", ds=ds)
             widget = self._get_operation(self.graph_type)
             self._internal_render(widget, ds_state.data, **self._kwargs)
 

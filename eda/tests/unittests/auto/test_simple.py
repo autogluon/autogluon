@@ -89,7 +89,7 @@ def test_analyze():
         anlz_facets=[Namespace(namespace="ns1", children=[anlz])],
         viz_facets=[viz],
     )
-    assert state.sample_size == 5
+    assert state.sample_size == {"test_data": 5, "train_data": 5, "val_data": 5}
     assert state.some_previous_state == {"arg": 1}
     assert state.ns1.args.train_data.shape == (5, 2)
     assert state.ns1.args.test_data.shape == (5, 2)
@@ -99,18 +99,18 @@ def test_analyze():
 
 
 def test_analyze_return_state():
-    state = {"sample_size": 10000, "some_previous_state": {"arg": 1}}
+    state = {"some_previous_state": {"arg": 1}}
     assert analyze(state=state) is None
     assert analyze(state=state, return_state=True) == state
 
 
 def test_analyze_None_state():
     state = None
-    assert analyze(state=state, return_state=True) == {"sample_size": 10000}
+    assert analyze(state=state, return_state=True) == {}
 
 
 def test_analyze_state_dict_convert():
-    state = {"sample_size": 10000, "some_previous_state": {"arg": 1}}
+    state = {"some_previous_state": {"arg": 1}}
     assert not isinstance(state, AnalysisState)
     _state = analyze(state=state, return_state=True)
     assert _state == state
@@ -356,7 +356,6 @@ def test_target_analysis__classification(monkeypatch):
         "missing_statistics",
         "problem_type",
         "raw_type",
-        "sample_size",
         "special_types",
         "variable_type",
     ]
@@ -427,7 +426,6 @@ def test_target_analysis__regression(monkeypatch):
         "missing_statistics",
         "problem_type",
         "raw_type",
-        "sample_size",
         "special_types",
         "variable_type",
     ]
