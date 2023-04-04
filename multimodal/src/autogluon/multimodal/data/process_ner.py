@@ -158,7 +158,6 @@ class NerProcessor:
         all_features: Dict[str, Union[NDArray, list]],
         feature_modalities: Dict[str, Union[NDArray, list]],
         is_training: bool,
-        load_only: bool = False,
     ) -> Dict:
         """
         Extract one sample's multimodal data.
@@ -169,8 +168,6 @@ class NerProcessor:
             All the raw input data.
         is_training
             Whether to do processing in the training mode.
-        load_only
-            Whether to only load the data. Other processing steps may happen in dataset.__getitem__.
 
         Returns
         -------
