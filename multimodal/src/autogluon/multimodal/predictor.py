@@ -2455,7 +2455,7 @@ class MultiModalPredictor(ExportMixin):
         # Save text tokenizers before saving data processors
         data_processors = copy.deepcopy(self._data_processors)
 
-        for modality in [TEXT, TEXT_NER, NER]:
+        for modality in [TEXT, TEXT_NER, NER, DOCUMENT]:
             if modality in data_processors:
                 data_processors[modality] = save_text_tokenizers(
                     text_processors=data_processors[modality],
