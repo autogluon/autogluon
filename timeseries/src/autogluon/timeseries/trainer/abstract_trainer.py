@@ -565,6 +565,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 self.save_val_data(val_data)
             self.is_data_saved = True
 
+        if self.num_val_windows > 0:
+            assert val_data is None, "val_data shouldn't be provided if num_val_windows > 0"
+        else:
+            assert val_data is not None, "val_data should be provided if num_val_windows > 0"
+
         if models is None:
             models = self.construct_model_templates(
                 hyperparameters=hyperparameters,
@@ -677,12 +682,19 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
     def _get_ensemble_oof_data(self, train_data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         """Stack validation data for all windows into a single dataframe"""
-        return pd.concat(
-            [
-                train_data.train_test_split(self.prediction_length, window_idx, suffix=f"_W{window_idx}")[1]
-                for window_idx in range(self.num_val_windows)
-            ]
-        )
+        split_per_window = []
+        for window_index in range(self.num_val_windows):
+            if window_index == 0:
+                end_index = None
+            else:
+                end_index = -self.prediction_length * window_index
+            _, val_fold = train_data.train_test_split(
+                self.prediction_length,
+                end_index=end_index,
+                suffix=f"_W{window_index}",
+            )
+            split_per_window.append(val_fold)
+        return pd.concat(split_per_window)
 
     def _get_ensemble_model_name(self) -> str:
         """Ensure we don't have name collisions in the ensemble model name"""

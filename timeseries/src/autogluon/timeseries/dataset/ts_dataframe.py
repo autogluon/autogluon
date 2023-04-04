@@ -820,7 +820,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def train_test_split(
         self,
         prediction_length: int,
-        window_idx: int = 0,
+        end_index: Optional[int] = None,
         suffix: Optional[str] = None,
     ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
         """Generate a train/test split from the given dataset.
@@ -830,25 +830,22 @@ class TimeSeriesDataFrame(pd.DataFrame):
         ----------
         prediction_length : int
             Number of time steps in a single evaluation window.
-        window_idx : int
-            Index of the backtesting window, starting from the end of each time series. For example, 0 corresponds to
-            reserving the last ``prediction_length`` time steps for evaluation.
+        end_index : int, optional
+            If given, all time series will be shortened up to ``end_idx`` before the train/test splitting. In other
+            words, test data will include the slice ``[:end_index]`` of each time series, and train data will include
+            the slice ``[:end_index - prediction_length]``.
         suffix : str, optional
             Suffix appended to all entries in the ``item_id`` index level.
 
         Returns
         -------
         train_data : TimeSeriesDataFrame
-            Train portion of the data. The last ``(window_idx + 1) * prediction_length`` entries are removed from each
-            time series in the original dataset.
+            Train portion of the data. Contains the slice ``[:-prediction_length]`` of each time series in ``test_data``.
         test_data : TimeSeriesDataFrame
-            Test portion of the data. The last ``window_idx * prediction_length`` entries are removed from each time
-            series in the original dataset.
+            Test portion of the data. Contains the slice ``[:end_idx]`` of each time series in the original dataset.
         """
-        train_end_idx = -(window_idx + 1) * prediction_length
-        train_data = self.slice_by_timestep(None, train_end_idx)
-        test_end_idx = None if window_idx == 0 else -window_idx * prediction_length
-        test_data = self.slice_by_timestep(None, test_end_idx)
+        test_data = self.slice_by_timestep(None, end_index)
+        train_data = test_data.slice_by_timestep(None, -prediction_length)
 
         if suffix is not None:
             for data in [train_data, test_data]:

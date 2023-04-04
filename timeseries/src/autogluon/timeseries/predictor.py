@@ -268,8 +268,8 @@ class TimeSeriesPredictor:
                 "\nPlease reduce prediction_length or provide longer time series as train_data. "
             )
 
-        # Ensure that after splitting off the last prediction_length timesteps all time series have length > 1
-        max_possible_num_val_windows = int((shortest_ts_length - 1) / self.prediction_length)
+        # Ensure that after splitting off the last prediction_length timesteps all time series have length >= 3
+        max_possible_num_val_windows = int((shortest_ts_length - 3) / self.prediction_length)
         if num_val_windows > max_possible_num_val_windows:
             logger.warning(
                 f"\nTime series in train_data are too short for the given num_val_windows = {num_val_windows}. "
@@ -497,9 +497,10 @@ class TimeSeriesPredictor:
             logger.info(
                 f"Provided tuning data set with {len(tuning_data)} rows, {tuning_data.num_items} items. "
                 f"Average time series length is {len(tuning_data) / tuning_data.num_items:.1f}."
-                f"Multi-window backtesting is disabled (setting num_val_windows = 0)"
             )
-            num_val_windows = 0
+            if num_val_windows > 0:
+                logger.warning("Multi-window backtesting is disabled (setting num_val_windows = 0)")
+                num_val_windows = 0
         num_val_windows = self._validate_num_val_windows(train_data, tuning_data, num_val_windows)
 
         logger.info("=====================================================")

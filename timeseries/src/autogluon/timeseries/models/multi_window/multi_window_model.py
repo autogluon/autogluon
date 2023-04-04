@@ -38,7 +38,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         model_base_kwargs: Optional[Dict[str, any]] = None,
         **kwargs,
     ):
-        if inspect.isclass(model_base):
+        if inspect.isclass(model_base) and issubclass(model_base, AbstractTimeSeriesModel):
             if model_base_kwargs is None:
                 model_base_kwargs = dict()
             self.model_base: AbstractTimeSeriesModel = model_base(**model_base_kwargs)
@@ -47,8 +47,10 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
                 f"model_base_kwargs must be None if model_base was passed as an object! "
                 f"(model_base: {model_base}, model_base_kwargs: {model_base_kwargs})"
             )
-        else:
+        elif isinstance(model_base, AbstractTimeSeriesModel):
             self.model_base: AbstractTimeSeriesModel = model_base
+        else:
+            raise AssertionError(f"model_base must be an instance of AbstractTimeSeriesModel (got {type(model_base)})")
         self.model_base_type = type(self.model_base)
         self.info_per_val_window = []
 
@@ -76,15 +78,19 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
         trained_models = []
         global_fit_start_time = time.time()
-        for window_idx in range(num_val_windows):
+        for window_index in range(num_val_windows):
+            if window_index == 0:
+                end_index = None
+            else:
+                end_index = -self.prediction_length * window_index
             train_fold, val_fold = train_data.train_test_split(
                 prediction_length=self.prediction_length,
-                window_idx=window_idx,
-                suffix=f"_W{window_idx}",
+                end_index=end_index,
+                suffix=f"_W{window_index}",
             )
 
-            logger.debug(f"\tWindow {window_idx}")
-            model = self.get_child_model(window_idx)
+            logger.debug(f"\tWindow {window_index}")
+            model = self.get_child_model(window_index)
             model_fit_start_time = time.time()
             model.fit(
                 train_data=train_fold,
@@ -102,7 +108,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
             self.info_per_val_window.append(
                 {
-                    "window_idx": window_idx,
+                    "window_index": window_index,
                     "fit_time": model.fit_time,
                     "val_score": model.val_score,
                     "predict_time": model.predict_time,
@@ -122,9 +128,9 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         info["info_per_val_window"] = self.info_per_val_window
         return info
 
-    def get_child_model(self, window_idx: int) -> AbstractTimeSeriesModel:
+    def get_child_model(self, window_index: int) -> AbstractTimeSeriesModel:
         model = copy.deepcopy(self.model_base)
-        model.set_contexts(self.path + f"W{window_idx}" + os.sep)
+        model.set_contexts(self.path + f"W{window_index}" + os.sep)
         return model
 
     def predict(
@@ -160,7 +166,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         super()._initialize(**kwargs)
         self.model_base.initialize(**kwargs)
 
-    def _update_hpo_train_fn_kwargs(self, train_fn_kwargs: dict) -> dict:
+    def _get_hpo_train_fn_kwargs(self, **train_fn_kwargs) -> dict:
         train_fn_kwargs["is_bagged_model"] = True
         train_fn_kwargs["init_params"]["model_base"] = self.model_base.__class__
         train_fn_kwargs["init_params"]["model_base_kwargs"] = self.get_params()
