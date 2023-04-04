@@ -285,6 +285,7 @@ def quick_fit(
     path: Optional[str] = None,
     val_size: float = 0.3,
     problem_type: str = "auto",
+    fit_bagging_folds: int = 0,
     sample: Union[None, int, float] = DEFAULT_SAMPLE_SIZE,
     state: Union[None, dict, AnalysisState] = None,
     return_state: bool = False,
@@ -332,6 +333,8 @@ def quick_fit(
     problem_type: str, default = 'auto'
         problem type to use. Valid problem_type values include ['auto', 'binary', 'multiclass', 'regression', 'quantile', 'softclass']
         auto means it will be Auto-detected using AutoGluon methods.
+    fit_bagging_folds: int, default = 0,
+        shortcut to enable training with bagged folds; disabled if 0 (default)
     sample: Union[None, int, float], default = 10000
         sample size; if `int`, then row number is used;
         `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
@@ -406,7 +409,8 @@ def quick_fit(
     chart_args = expand_nested_args_into_nested_maps(get_empty_dict_if_none(chart_args))
 
     estimator_args = get_empty_dict_if_none(estimator_args)
-    fit_args = get_default_estimator_if_not_specified(fit_args)
+    assert fit_bagging_folds >= 0, "fit_bagging_folds must be non-negative"
+    fit_args = get_default_estimator_if_not_specified(fit_args, fit_bagging_folds)
 
     if "path" not in estimator_args:
         estimator_args["path"] = path  # type: ignore
@@ -417,6 +421,14 @@ def quick_fit(
     if render_analysis:
         viz = [
             MarkdownSectionComponent(markdown=f"### Model Prediction for {label}"),
+            MarkdownSectionComponent(
+                condition_fn=(lambda state: is_key_present_in_state(state, "model_evaluation.y_pred_test")),
+                markdown="Using `test_data` for `Test` points",
+            ),
+            MarkdownSectionComponent(
+                condition_fn=(lambda state: not is_key_present_in_state(state, "model_evaluation.y_pred_test")),
+                markdown="Using validation data for `Test` points",
+            ),
             ConfusionMatrix(
                 fig_args=fig_args.get("confusion_matrix", {}),
                 **chart_args.get("confusion_matrix", dict(annot_kws={"size": 12})),
@@ -743,11 +755,15 @@ def _is_lightgbm_available() -> bool:
         return False
 
 
-def get_default_estimator_if_not_specified(fit_args):
+def get_default_estimator_if_not_specified(fit_args, fit_bagging_folds: int = 0):
     if ("hyperparameters" not in fit_args) and ("presets" not in fit_args):
         fit_args = fit_args.copy()
 
         fit_args["fit_weighted_ensemble"] = False
+        if fit_bagging_folds > 0:
+            fit_args = {**dict(num_bag_folds=fit_bagging_folds, num_bag_sets=1, num_stack_levels=0), **fit_args}
+            if ("ag_args_ensemble" not in fit_args) or ("fold_fitting_strategy" not in fit_args["ag_args_ensemble"]):
+                fit_args["ag_args_ensemble"] = {"fold_fitting_strategy": "sequential_local"}
         if _is_lightgbm_available():
             fit_args["hyperparameters"] = QuickFitDefaults.DEFAULT_LGBM_CONFIG
         else:
