@@ -75,9 +75,9 @@ function install_all_no_tests {
 function build_pkg {
     while(($#)) ; do
         if [ -n $WHEEL_DIR ]; then
-            BDIST_DIR="dist"
+            BDIST_DIR=$WHEEL_DIR
         else
-            BDIST_DIR=$(pwd)/$WHEEL_DIR
+            BDIST_DIR="dist"
         fi
         cd "$1"/
         python setup.py sdist bdist_wheel -d $BDIST_DIR

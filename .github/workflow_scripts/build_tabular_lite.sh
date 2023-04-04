@@ -39,13 +39,17 @@ function build_doc_lite {
     LOCAL_IMG_PATH="$BUILD_DIR/_images"
 
     rm -rf "$BUILD_DIR"
-    export WHEEL_DIR="$LOCAL_IMG_PATH/wheel"
+    LITE_DIR="$LOCAL_IMG_PATH/lite"
+    WHEEL_DIR="$LITE_DIR/pypi"
+    mkdir -p $WHEEL_DIR
+    LITE_DIR=$(realpath $LITE_DIR)
+    export WHEEL_DIR=$(realpath $WHEEL_DIR)
     build_tabular_lite
 
     CONTENTS_DIR=$(pwd)/docs/tutorials/tabular
     mkdir -p $LOCAL_IMG_PATH
     cd $LOCAL_IMG_PATH
-    jupyter lite build --content $CONTENTS_DIR --output-dir dist
+    jupyter lite build --contents $CONTENTS_DIR --output-dir dist --lite-dir $LITE_DIR
     cd -
 
     COMMAND_EXIT_CODE=$?
