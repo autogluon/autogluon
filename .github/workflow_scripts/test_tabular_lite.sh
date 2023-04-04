@@ -3,12 +3,10 @@
 set -ex
 
 source $(dirname "$0")/env_setup.sh
+source $(dirname "$0")/build_tabular_lite.sh
 
 setup_build_env
-export AUTOGLUON_PACKAGE_NAME="autogluon-lite"
-
-install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/[all,tests]"
-build_pkg "common" "core" "features" "tabular" "autogluon"
+build_tabular_lite
 
 PYODIDE_DIR=/src/pyodide
 

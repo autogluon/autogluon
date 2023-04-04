@@ -1,0 +1,10 @@
+# Core modules (mandatory)
+jupyterlite-core==0.1.0b21
+jupyterlab~=3.5.1
+
+# Python kernel (optional)
+jupyterlite-pyodide-kernel==0.0.5
+
+# Language support (optional)
+jupyterlab-language-pack-fr-FR
+jupyterlab-language-pack-zh-CN

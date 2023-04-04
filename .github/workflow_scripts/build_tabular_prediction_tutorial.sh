@@ -10,8 +10,10 @@ PR_NUMBER=$4  # For push events, PR_NUMBER will be empty
 
 source $(dirname "$0")/env_setup.sh
 source $(dirname "$0")/build_doc.sh
+source $(dirname "$0")/build_tabular_lite.sh
 
 setup_torch_gpu
 export CUDA_VISIBLE_DEVICES=0
 
 build_doc tabular $BRANCH $GIT_REPO $COMMIT_SHA $PR_NUMBER
+build_doc_lite $BRANCH $GIT_REPO $COMMIT_SHA $PR_NUMBER

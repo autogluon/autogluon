@@ -15,6 +15,11 @@ function setup_build_contrib_env {
     export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in AutoMMPredictor
 }
 
+function setup_build_jupyterlite_env {
+    python3 -m pip install --upgrade pip
+    python3 -m pip install -r $(dirname "$0")/../../docs/requirements_jupyterlite.txt
+}
+
 function setup_torch_gpu {
     # Security-patched torch.
     python3 -m pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
@@ -69,8 +74,13 @@ function install_all_no_tests {
 
 function build_pkg {
     while(($#)) ; do
+        if [ -n $WHEEL_DIR ]; then
+            BDIST_DIR="dist"
+        else
+            BDIST_DIR=$(pwd)/$WHEEL_DIR
+        fi
         cd "$1"/
-        python setup.py sdist bdist_wheel
+        python setup.py sdist bdist_wheel -d $BDIST_DIR
         cd ..
         shift
     done
