@@ -227,7 +227,10 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 checkpoint_file = download(
                     url=AG_CUSTOM_MODELS[checkpoint_name]["url"],
                 )
-                if "source" in AG_CUSTOM_MODELS[checkpoint_name] and AG_CUSTOM_MODELS[checkpoint_name]["source"] == "MegVii":
+                if (
+                    "source" in AG_CUSTOM_MODELS[checkpoint_name]
+                    and AG_CUSTOM_MODELS[checkpoint_name]["source"] == "MegVii"
+                ):
                     checkpoint_file = self.convert_megvii_yolox(checkpoint_file)
             else:
                 # download config and checkpoint files using openmim
@@ -437,7 +440,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         """
         sd = source_path
 
-        model_dict = torch.load(sd, map_location=torch.device('cpu'))
+        model_dict = torch.load(sd, map_location=torch.device("cpu"))
         if "state_dict" in model_dict:
             model_dict = model_dict["state_dict"]
         if "model" in model_dict:
@@ -545,15 +548,15 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
             if "bbox_head.multi_level_conv_cls." in new_k:
                 if self.classes:
-                    new_dict[new_k] = v[:len(self.classes), ...]  # there take the num_classes
+                    new_dict[new_k] = v[: len(self.classes), ...]  # there take the num_classes
                 else:
                     new_dict[new_k] = v
             else:
                 new_dict[new_k] = v
 
-        data = {'state_dict': new_dict}
+        data = {"state_dict": new_dict}
 
-        target_directory = os.path.splitext(sd)[0] + f'_cvt.pth'
+        target_directory = os.path.splitext(sd)[0] + f"_cvt.pth"
         torch.save(data, target_directory)
 
         return target_directory
