@@ -149,7 +149,7 @@ def test_quick_fit(monkeypatch):
         with tempfile.TemporaryDirectory() as path:
             quick_fit(path=path, train_data=df_train, label="class")
 
-    assert call_md_render.call_count == 7
+    assert call_md_render.call_count == 9
     assert call_prc_render.call_count == 2
     call_cm_render.assert_called_once()
     call_reg_render.assert_called_once()

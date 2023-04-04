@@ -74,8 +74,8 @@ def test_RegressionEvaluation(monkeypatch):
                 "problem_type": "regression",
                 "y_true_train": pd.Series([0, 1, 0, 0]),
                 "y_pred_train": pd.Series([1, 0, 1, 1]),
-                "y_true": pd.Series([0, 1, 0, 1]),
-                "y_pred": pd.Series([1, 0, 1, 0]),
+                "y_true_val": pd.Series([0, 1, 0, 1]),
+                "y_pred_val": pd.Series([1, 0, 1, 0]),
             }
         }
     )
@@ -98,14 +98,43 @@ def test_RegressionEvaluation(monkeypatch):
         ANY,
         state.model_evaluation.y_pred_train,
         state.model_evaluation.y_true_train,
-        state.model_evaluation.y_pred,
-        state.model_evaluation.y_true,
+        state.model_evaluation.y_pred_val,
+        state.model_evaluation.y_true_val,
         show=False,
         ax="ax",
         hist=False,
         qqplot=True,
     )
     call_render_markdown.assert_called_with("**Prediction vs Target**")
+
+
+@pytest.mark.parametrize(
+    "train_present, val_present, test_present, expected",
+    [
+        (True, True, True, ("pred_train", "true_train", "pred_test", "true_test")),
+        (False, True, True, ("pred_val", "true_val", "pred_test", "true_test")),
+        (True, False, True, ("pred_train", "true_train", "pred_test", "true_test")),
+        (False, False, True, (None, None, "pred_test", "true_test")),
+        (True, True, False, ("pred_train", "true_train", "pred_val", "true_val")),
+        (False, True, False, ("pred_val", "true_val", None, None)),
+        (True, False, False, ("pred_train", "true_train", None, None)),
+        (False, False, False, (None, None, None, None)),
+    ],
+)
+def test_RegressionEvaluation__repack_parameters(train_present, val_present, test_present, expected):
+    s = {}
+    if train_present:
+        s["y_true_train"] = "true_train"
+        s["y_pred_train"] = "pred_train"
+    if val_present:
+        s["y_true_val"] = "true_val"
+        s["y_pred_val"] = "pred_val"
+    if test_present:
+        s["y_true_test"] = "true_test"
+        s["y_pred_test"] = "pred_test"
+
+    state = AnalysisState(model_evaluation=s)
+    assert RegressionEvaluation._repack_parameters(state.model_evaluation) == expected
 
 
 def test_RegressionEvaluation__can_handle():
