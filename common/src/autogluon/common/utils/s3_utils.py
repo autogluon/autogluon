@@ -2,7 +2,7 @@ import logging
 import os
 import shutil
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from ..loaders.load_s3 import list_bucket_prefix_suffix_contains_s3
 
@@ -37,6 +37,92 @@ def delete_s3_prefix(bucket, prefix):
 
     if len(delete_keys['Objects']) != 0:
         s3.meta.client.delete_objects(Bucket=bucket, Delete=delete_keys)
+        
+
+def upload_file(file_name: str, bucket: str, prefix: Optional[str] = None):
+    """
+    Upload a file to a S3 bucket
+
+    Parameters
+    ----------
+    file_name: str,
+        File to upload
+    bucket: str,
+        Bucket to upload to
+    prefix: Optional[str], default = None
+        S3 prefix. If not specified then will upload to the root of the bucket
+    """
+    import boto3
+    from botocore.exceptions import ClientError
+
+    object_name = os.path.basename(file_name)
+    if len(prefix) == 0:
+        prefix = None
+    if prefix is not None:
+        object_name = prefix + "/" + object_name
+
+    # Upload the file
+    s3_client = boto3.client("s3")
+    try:
+        s3_client.upload_file(file_name, bucket, object_name)
+    except ClientError as e:
+        raise e
+    
+    
+def upload_s3_folder(
+    bucket: str,
+    prefix: str,
+    folder_to_upload: str,
+    dry_run: bool = False,
+    verbose: bool = True
+):
+    """
+    Upload a folder to a S3 bucket and maintain its inner structure
+    For example, assuming bucket = bar and prefix = foo, and folder_to_upload looks like this:
+    .
+    └── folder_to_upload/
+        └── test.txt/
+            └── temp/
+                └── test2.txt
+    After uploading to s3, the bucket would look like this:
+    .
+    └── bar/
+        └── foo/
+            └── test.txt/
+                └── temp/
+                    └── test2.txt
+
+    Parameters
+    ----------
+    bucket: str
+        The name of the bucket
+    prefix: str
+        The prefix to upload to
+        To upload to the root of the bucket, specify `prefix=''` (empty string)
+    folder_to_upload: str
+        The local folder to upload to s3
+    dry_run: bool, default = False
+        Whether to perform uploading
+        If True, will isntead log every file that will be uploaded and the s3 path to be uploaded to
+    verbose: bool, default = True
+        Whether to log detailed loggings
+    """
+    if prefix.endswith("/"):
+        prefix = prefix[:-1]
+    files_to_upload = _get_local_objs_to_upload_and_s3_prefix(folder_to_upload=folder_to_upload)
+    if verbose:
+        logger.log(20, f"Will upload {len(files_to_upload)} objects from {folder_to_upload} to s3://{bucket}/{prefix}")
+    for file_local_path, file_s3_path in files_to_upload:
+        file_prefix = prefix + "/" + file_s3_path if len(prefix) > 0 else file_s3_path
+        if dry_run:
+            logger.log(20, f"Will upload {file_local_path} to s3://{bucket}/{file_prefix}")
+        else:
+            file_prefix = os.path.dirname(file_prefix)
+            upload_file(
+                file_name=file_local_path,
+                bucket=bucket,
+                prefix=file_prefix if len(file_prefix) > 0 else None
+            )
         
 
 def download_s3_folder(
@@ -118,6 +204,28 @@ def download_s3_folder(
         else:
             s3_bucket.download_file(obj, local_obj_path)
             
+            
+def _get_local_objs_to_upload_and_s3_prefix(folder_to_upload: str) -> List[Tuple[str, str]]:
+    """
+    Get paths to all the objects within a folder and it's subfolder and their relative path to maintain the folder structure
+    
+    Parameters
+    ----------
+    folder_to_upload: str
+        The local folder to upload to s3
+        
+    Returns
+    --------
+    List[Tuple[str, str]],
+        where each element is a tuple consisted with the local path to an object and its relative path to maintain the folder structure
+    """
+    files_to_upload = []
+    for root, _, files in os.walk(folder_to_upload):
+        for file in files:
+            file_full_path = os.path.join(root, file)
+            file_relative_path = os.path.relpath(file_full_path, folder_to_upload)
+            files_to_upload.append((file_full_path, file_relative_path))
+    return files_to_upload
             
 def _get_local_path_to_download_objs_and_local_dir_to_create(s3_objs: List[str], prefix: str, local_path: str) -> Tuple[List[str], List[str]]:
     """

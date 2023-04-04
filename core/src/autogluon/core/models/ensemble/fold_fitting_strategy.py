@@ -15,7 +15,7 @@ from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray
-from autogluon.common.utils.s3_utils import download_s3_folder, s3_path_to_bucket_prefix
+from autogluon.common.utils.s3_utils import download_s3_folder, upload_s3_folder, s3_path_to_bucket_prefix
 
 from ..abstract.abstract_model import AbstractModel
 from ...ray.resources_calculator import ResourceCalculatorFactory
@@ -391,8 +391,16 @@ def _ray_fit(
     fold_model.fit_time = time_train_end_fold - time_start_fold
     fold_model, pred_proba = _ray_predict_oof(fold_model, X_val_fold, y_val_fold,
                                               time_train_end_fold, resources['num_cpus'], save_bag_folds)
-    model_save_path = model_sync_path + f"{fold_model.name}/" if model_sync_path is not None else None  # s3 path hence need "/" as the saperator
-    fold_model.save(path=model_save_path)
+    save_path = fold_model.save()
+    if model_sync_path is not None:
+        model_sync_path = model_sync_path + f"{fold_model.name}/"  # s3 path hence need "/" as the saperator
+        bucket, prefix = s3_path_to_bucket_prefix(model_sync_path)
+        upload_s3_folder(
+            bucket=bucket,
+            prefix=prefix,
+            folder_to_upload=save_path,
+            verbose=False
+        )
     return fold_model.name, pred_proba, time_start_fold, \
         time_train_end_fold, fold_model.predict_time, fold_model.predict_1_time
 
@@ -793,5 +801,6 @@ class ParallelDistributedFoldFittingStrategy(ParallelFoldFittingStrategy):
             bucket=bucket,
             prefix=path,
             local_path=local_path,
-            error_if_exists=False
+            error_if_exists=False,
+            verbose=False
         )
