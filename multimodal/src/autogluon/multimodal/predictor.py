@@ -1239,16 +1239,20 @@ class MultiModalPredictor(ExportMixin):
             data_processors = [data_processors, teacher_data_processors]
 
         val_use_training_mode = (self._problem_type == OBJECT_DETECTION) and (validation_metric_name != MAP)
-        if self._problem_type == OBJECT_DETECTION:
-            if self._model.config is not None and MULTI_IMAGE_MIX_DATASET in self._model.config:
-                train_dataset = MultiImageMixDataset(
-                    data=train_df,
-                    preprocessor=df_preprocessor,
-                    processors=data_processors,
-                    model_config=self._model.config,
-                    id_mappings=None,
-                    is_training=True,
-                )
+        train_dataset = None
+        if (
+            self._problem_type == OBJECT_DETECTION
+            and self._model.config is not None
+            and MULTI_IMAGE_MIX_DATASET in self._model.config
+        ):
+            train_dataset = MultiImageMixDataset(
+                data=train_df,
+                preprocessor=df_preprocessor,
+                processors=data_processors,
+                model_config=self._model.config,
+                id_mappings=None,
+                is_training=True,
+            )
         train_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
