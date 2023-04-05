@@ -39,17 +39,25 @@ function build_doc_lite {
     LOCAL_IMG_PATH="$BUILD_DIR/_images"
 
     rm -rf "$BUILD_DIR"
-    LITE_DIR="$LOCAL_IMG_PATH/lite"
+    LITE_DIR="$BUILD_DIR/_lite"
     WHEEL_DIR="$LITE_DIR/pypi"
-    mkdir -p $WHEEL_DIR
+    FILES_DIR="$LITE_DIR/files"
+    mkdir -p $WHEEL_DIR $FILES_DIR
     LITE_DIR=$(realpath $LITE_DIR)
     export WHEEL_DIR=$(realpath $WHEEL_DIR)
     build_tabular_lite
 
     CONTENTS_DIR=$(pwd)/docs/tutorials/tabular
+    SUPPORTED_NOTEBOOKS="tabular-quick-start.ipynb tabular-indepth.ipynb tabular-feature-engineering.ipynb advanced/tabular-custom-metric.ipynb advanced/tabular-custom-model-advanced.ipynb advanced/tabular-custom-model.ipynb advanced/tabular-multilabel.ipynb"
+    for nb in $SUPPORTED_NOTEBOOKS
+    do
+        cp ${CONTENTS_DIR}/$nb ${FILES_DIR}
+    done
+
     mkdir -p $LOCAL_IMG_PATH
     cd $LOCAL_IMG_PATH
-    jupyter lite build --contents $CONTENTS_DIR --output-dir dist --lite-dir $LITE_DIR
+    jupyter lite build --output-dir dist --lite-dir $LITE_DIR
+    rm -f .jupyterlite.doit.db
     cd -
 
     COMMAND_EXIT_CODE=$?
