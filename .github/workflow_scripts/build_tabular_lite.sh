@@ -48,7 +48,7 @@ function build_doc_lite {
     build_tabular_lite
 
     CONTENTS_DIR=$(pwd)/docs/tutorials/tabular
-    SUPPORTED_NOTEBOOKS="tabular-quick-start.ipynb tabular-indepth.ipynb tabular-feature-engineering.ipynb advanced/tabular-custom-metric.ipynb advanced/tabular-custom-model-advanced.ipynb advanced/tabular-custom-model.ipynb advanced/tabular-multilabel.ipynb"
+    SUPPORTED_NOTEBOOKS="tabular-quick-start.ipynb"
     for nb in $SUPPORTED_NOTEBOOKS
     do
         cp ${CONTENTS_DIR}/$nb ${FILES_DIR}
