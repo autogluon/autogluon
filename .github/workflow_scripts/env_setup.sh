@@ -74,7 +74,7 @@ function install_all_no_tests {
 
 function build_pkg {
     while(($#)) ; do
-        if [ -n $WHEEL_DIR ]; then
+        if [[ -n $WHEEL_DIR ]]; then
             BDIST_DIR=$WHEEL_DIR
         else
             BDIST_DIR="dist"
