@@ -154,3 +154,15 @@ def _load_multipart_s3(bucket, prefix, columns_to_keep=None, dtype=None, sample_
     df = load(path=paths_full, columns_to_keep=columns_to_keep, dtype=dtype, filters=filters,
               worker_count=worker_count, multiprocessing_method=multiprocessing_method)
     return df
+
+async def _emscripten_fetch(data_url):
+    import io
+    import sys
+    from js import fetch
+    if sys.platform == "emscripten":
+        res = await fetch(data_url)
+        text = await res.text()
+        df = pd.read_csv(io.StringIO(text))
+    else:
+        df = pd.read_csv(data_url)
+    return df
