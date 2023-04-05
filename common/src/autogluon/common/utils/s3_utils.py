@@ -63,10 +63,7 @@ def upload_file(file_name: str, bucket: str, prefix: Optional[str] = None):
 
     # Upload the file
     s3_client = boto3.client("s3")
-    try:
-        s3_client.upload_file(file_name, bucket, object_name)
-    except ClientError as e:
-        raise e
+    s3_client.upload_file(file_name, bucket, object_name)
     
     
 def upload_s3_folder(
