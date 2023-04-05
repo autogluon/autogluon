@@ -60,6 +60,7 @@ from .constants import (
     MAX,
     MIN,
     MODEL_CHECKPOINT,
+    MULTI_IMAGE_MIX_DATASET,
     MULTICLASS,
     NER,
     NER_RET,
@@ -82,6 +83,7 @@ from .constants import (
     ZERO_SHOT_IMAGE_CLASSIFICATION,
 )
 from .data.datamodule import BaseDataModule
+from .data.dataset_mmlab import MultiImageMixDataset
 from .data.infer_types import (
     infer_column_types,
     infer_label_column_type_by_problem_type,
@@ -1238,9 +1240,15 @@ class MultiModalPredictor(ExportMixin):
 
         val_use_training_mode = (self._problem_type == OBJECT_DETECTION) and (validation_metric_name != MAP)
         if self._problem_type == OBJECT_DETECTION:
-            model_config = self._model.config
-        else:
-            model_config = None
+            if self._model.config is not None and MULTI_IMAGE_MIX_DATASET in self._model.config:
+                train_dataset = MultiImageMixDataset(
+                    data=train_df,
+                    preprocessor=df_preprocessor,
+                    processors=data_processors,
+                    model_config=self._model.config,
+                    id_mappings=None,
+                    is_training=True,
+                )
         train_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
@@ -1249,7 +1257,7 @@ class MultiModalPredictor(ExportMixin):
             train_data=train_df,
             validate_data=val_df,
             val_use_training_mode=val_use_training_mode,
-            model_config=model_config,
+            train_dataset=train_dataset,
         )
         optimization_kwargs = dict(
             optim_type=config.optimization.optim_type,
@@ -1696,17 +1704,12 @@ class MultiModalPredictor(ExportMixin):
             optimization_kwargs = {}
             trainable_param_names = []
 
-        if self._problem_type == OBJECT_DETECTION:
-            model_config = self._model.config
-        else:
-            model_config = None
         predict_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             per_gpu_batch_size=batch_size,
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
-            model_config=model_config,
         )
 
         callbacks = []

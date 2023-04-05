@@ -2,11 +2,10 @@ from typing import Dict, List, Optional, Union
 
 import pandas as pd
 from pytorch_lightning import LightningDataModule
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
-from ..constants import DEFAULT_DATASET, MULTI_IMAGE_MIX_DATASET, PREDICT, TEST, TRAIN, VALIDATE
+from ..constants import DEFAULT_DATASET, PREDICT, TEST, TRAIN, VALIDATE
 from .dataset import BaseDataset
-from .dataset_mmlab import MultiImageMixDataset
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from .utils import get_collate_fn
 
@@ -32,7 +31,7 @@ class BaseDataModule(LightningDataModule):
         predict_data: Optional[pd.DataFrame] = None,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         val_use_training_mode: bool = False,
-        model_config: Optional[str] = None,
+        train_dataset: Optional[Dataset] = None,
     ):
         """
         Parameters
@@ -65,9 +64,6 @@ class BaseDataModule(LightningDataModule):
             whether we are triggering is_training when creating the dataset for validation.
             This is used when we want to use val_loss as val metric, and thus we'll use data pipeline
             for training instead of for inference during validation.
-        model_config
-            Here the model config is used to decided dataset type. e.g. if multi_image_mix_dataset is used
-            in detection model, MultiImageMixDataset will be used instead of BaseDataset
         """
         super().__init__()
         self.prepare_data_per_node = True
@@ -87,11 +83,7 @@ class BaseDataModule(LightningDataModule):
         self.predict_data = predict_data
         self.id_mappings = id_mappings
         self.val_use_training_mode = val_use_training_mode
-        self.model_config = model_config
-
-        self.dataset_type = DEFAULT_DATASET
-        if self.model_config is not None and MULTI_IMAGE_MIX_DATASET in self.model_config:
-            self.dataset_type = MULTI_IMAGE_MIX_DATASET
+        self.train_dataset = train_dataset
 
     def set_dataset(self, split):
         data_split = getattr(self, f"{split}_data")
@@ -99,7 +91,10 @@ class BaseDataModule(LightningDataModule):
             is_training = split in [TRAIN, VALIDATE]
         else:
             is_training = split == TRAIN
-        if self.dataset_type == DEFAULT_DATASET:
+
+        if is_training and self.train_dataset is not None:
+            dataset = self.train_dataset
+        else:
             dataset = BaseDataset(
                 data=data_split,
                 preprocessor=self.df_preprocessor,
@@ -107,26 +102,6 @@ class BaseDataModule(LightningDataModule):
                 id_mappings=self.id_mappings,
                 is_training=is_training,
             )
-        elif self.dataset_type == MULTI_IMAGE_MIX_DATASET:
-            if is_training:
-                dataset = MultiImageMixDataset(
-                    data=data_split,
-                    preprocessor=self.df_preprocessor,
-                    processors=self.data_processors,
-                    model_config=self.model_config,
-                    id_mappings=self.id_mappings,
-                    is_training=is_training,
-                )
-            else:
-                dataset = BaseDataset(
-                    data=data_split,
-                    preprocessor=self.df_preprocessor,
-                    processors=self.data_processors,
-                    id_mappings=self.id_mappings,
-                    is_training=is_training,
-                )
-        else:
-            raise ValueError(f"unknown dataset_type: {self.dataset_type}")
 
         setattr(self, f"{split}_dataset", dataset)
 
