@@ -564,6 +564,9 @@ class AbstractModel:
             enforced_num_cpus = kwargs.get('num_cpus', None)
             enforced_num_gpus = kwargs.get('num_gpus', None)
             assert enforced_num_cpus is not None and enforced_num_cpus != 'auto' and enforced_num_gpus is not None and enforced_num_gpus != 'auto'
+            # The logic below is needed because ray cluster is running some process in the backend even when it's ready to be used
+            # Trying to use all cores on the machine could lead to resource contention situation
+            # TODO: remove this logic if ray team can identify what's going on underneath and how to workaround
             if DistributedContext.is_distributed_mode():
                 minimum_model_resources = self.get_minimum_resources(
                     is_gpu_available=(enforced_num_gpus > 0)
