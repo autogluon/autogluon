@@ -2,7 +2,7 @@ import logging
 import os
 import shutil
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 
 from ..loaders.load_s3 import list_bucket_prefix_suffix_contains_s3
 
@@ -122,10 +122,13 @@ def upload_s3_folder(
             )
         
 
+# TODO: Add remaining arguments from list_bucket_prefix_suffix_contains_s3
 def download_s3_folder(
+    *,
     bucket: str,
     prefix: str,
     local_path: str,
+    suffix: Optional[Union[str, List[str]]] = None,
     error_if_exists: bool = True,
     delete_if_exists: bool = False,
     dry_run: bool = False,
@@ -157,6 +160,9 @@ def download_s3_folder(
         To check all files in the bucket, specify `prefix=''` (empty string)
     local_path: str
         The local path to download the object/folder into
+    suffix : str or List[str], default = None
+        If specified, filters files to ensure their paths end with the specified suffix (if str)
+        or at least one element of `suffix` (if list) in the post-prefix string path.
     error_if_exists: bool, default = True
         Whether to raise an error if the root folder exists already
     delete_if_exists: bool, default = False
@@ -175,7 +181,7 @@ def download_s3_folder(
     s3_bucket = s3.Bucket(bucket)
     # objs = list(bucket.objects.filter(Prefix=prefix))
     # objs = [obj.key for obj in objs]
-    objs = list_bucket_prefix_suffix_contains_s3(bucket=bucket, prefix=prefix)
+    objs = list_bucket_prefix_suffix_contains_s3(bucket=bucket, prefix=prefix, suffix=suffix)
     local_obj_paths, folder_to_create = _get_local_path_to_download_objs_and_local_dir_to_create(
         s3_objs=objs,
         prefix=prefix,
