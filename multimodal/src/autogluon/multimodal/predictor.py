@@ -60,6 +60,7 @@ from .constants import (
     MAX,
     MIN,
     MODEL_CHECKPOINT,
+    MULTI_IMAGE_MIX_DATASET,
     MULTICLASS,
     NER,
     NER_RET,
@@ -82,6 +83,7 @@ from .constants import (
     ZERO_SHOT_IMAGE_CLASSIFICATION,
 )
 from .data.datamodule import BaseDataModule
+from .data.dataset_mmlab import MultiImageMixDataset
 from .data.infer_types import (
     infer_column_types,
     infer_label_column_type_by_problem_type,
@@ -1231,16 +1233,40 @@ class MultiModalPredictor(ExportMixin):
             data_processors = [data_processors, teacher_data_processors]
 
         val_use_training_mode = (self._problem_type == OBJECT_DETECTION) and (validation_metric_name != MAP)
+        train_dataset = None
+        if (
+            self._problem_type == OBJECT_DETECTION
+            and self._model.config is not None
+            and MULTI_IMAGE_MIX_DATASET in self._model.config
+        ):
+            train_dataset = MultiImageMixDataset(
+                data=train_df,
+                preprocessor=[df_preprocessor],
+                processors=[data_processors],
+                model_config=self._model.config,
+                id_mappings=None,
+                is_training=True,
+            )
+            train_dm = BaseDataModule(
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                per_gpu_batch_size=config.env.per_gpu_batch_size,
+                num_workers=config.env.num_workers,
+                train_dataset=train_dataset,
+                validate_data=val_df,
+                val_use_training_mode=val_use_training_mode,
+            )
+        else:
+            train_dm = BaseDataModule(
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                per_gpu_batch_size=config.env.per_gpu_batch_size,
+                num_workers=config.env.num_workers,
+                train_data=train_df,
+                validate_data=val_df,
+                val_use_training_mode=val_use_training_mode,
+            )
 
-        train_dm = BaseDataModule(
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-            per_gpu_batch_size=config.env.per_gpu_batch_size,
-            num_workers=config.env.num_workers,
-            train_data=train_df,
-            validate_data=val_df,
-            val_use_training_mode=val_use_training_mode,
-        )
         optimization_kwargs = dict(
             optim_type=config.optimization.optim_type,
             lr_choice=config.optimization.lr_choice,
