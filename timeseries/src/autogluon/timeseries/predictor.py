@@ -268,8 +268,8 @@ class TimeSeriesPredictor:
                 "\nPlease reduce prediction_length or provide longer time series as train_data. "
             )
 
-        # Ensure that after splitting off the last prediction_length timesteps all time series have length >= 3
-        max_possible_num_val_windows = int((shortest_ts_length - 3) / self.prediction_length)
+        # Ensure that after splitting off the last prediction_length timesteps all time series have length >= 1
+        max_possible_num_val_windows = int((shortest_ts_length - 1) / self.prediction_length)
         if num_val_windows > max_possible_num_val_windows:
             logger.warning(
                 f"\nTime series in train_data are too short for the given num_val_windows = {num_val_windows}. "
