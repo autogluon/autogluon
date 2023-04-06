@@ -70,7 +70,7 @@ class LabelProcessor:
         labels: Dict[str, Union[int, float]],
         feature_modalities: Dict[str, Union[int, float, list]],
         is_training: bool,
-        load_only: bool = False,
+        load_only: bool = False,  # TODO: refactor mmdet_image and remove this
     ) -> Dict:
         """
         Extract one sample's labels and customize them for a specific model.

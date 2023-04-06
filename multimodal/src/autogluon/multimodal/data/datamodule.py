@@ -26,12 +26,12 @@ class BaseDataModule(LightningDataModule):
         per_gpu_batch_size: int,
         num_workers: int,
         train_data: Optional[pd.DataFrame] = None,
+        train_dataset: Optional[Dataset] = None,
         validate_data: Optional[pd.DataFrame] = None,
         test_data: Optional[pd.DataFrame] = None,
         predict_data: Optional[pd.DataFrame] = None,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         val_use_training_mode: bool = False,
-        train_dataset: Optional[Dataset] = None,
     ):
         """
         Parameters
@@ -51,6 +51,8 @@ class BaseDataModule(LightningDataModule):
             Number of workers for Pytorch DataLoader.
         train_data
             Training data.
+        train_dataset
+            Training dataset.
         validate_data
             Validation data.
         test_data
@@ -78,30 +80,30 @@ class BaseDataModule(LightningDataModule):
         self.per_gpu_batch_size = per_gpu_batch_size
         self.num_workers = num_workers
         self.train_data = train_data
+        self.train_dataset = train_dataset
         self.validate_data = validate_data
         self.test_data = test_data
         self.predict_data = predict_data
         self.id_mappings = id_mappings
         self.val_use_training_mode = val_use_training_mode
-        self.train_dataset = train_dataset
 
     def set_dataset(self, split):
-        data_split = getattr(self, f"{split}_data")
         if self.val_use_training_mode:
             is_training = split in [TRAIN, VALIDATE]
         else:
             is_training = split == TRAIN
 
         if is_training and self.train_dataset is not None:
-            dataset = self.train_dataset
-        else:
-            dataset = BaseDataset(
-                data=data_split,
-                preprocessor=self.df_preprocessor,
-                processors=self.data_processors,
-                id_mappings=self.id_mappings,
-                is_training=is_training,
-            )
+            return
+
+        data_split = getattr(self, f"{split}_data")
+        dataset = BaseDataset(
+            data=data_split,
+            preprocessor=self.df_preprocessor,
+            processors=self.data_processors,
+            id_mappings=self.id_mappings,
+            is_training=is_training,
+        )
 
         setattr(self, f"{split}_dataset", dataset)
 
