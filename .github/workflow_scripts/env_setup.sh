@@ -51,7 +51,7 @@ function install_multimodal {
     python3 -m pip install --upgrade pytest-xdist
     install_local_packages "multimodal/$1"
     mim install mmcv-full --timeout 60
-    python3 -m pip install --upgrade mmdet
+    python3 -m pip install --upgrade "mmdet>=2.28, <3.0.0"
     python3 -m pip install --upgrade mmocr
 }
 

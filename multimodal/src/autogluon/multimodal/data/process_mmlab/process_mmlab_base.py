@@ -88,7 +88,7 @@ class MMLabProcessor:
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
         if self.prefix.lower().startswith(MMDET_IMAGE):
-            assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
+            assert mmdet is not None, "Please install MMDetection by: pip install \"mmdet>=2.28, <3.0.0\"."
         else:
             assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
         self.cfg = model.model.cfg
