@@ -7,7 +7,7 @@ try:
     from mmocr.utils.ocr import MMOCR
 except ImportError:
     pytest.skip(
-        "Skip the OCR test because there is no mmocr installed. Try to install it via mim install mmocr",
+        'Skip the OCR test because there is no mmocr installed. Try to install it via mim install "mmocr<1.0"',
         allow_module_level=True,
     )
 

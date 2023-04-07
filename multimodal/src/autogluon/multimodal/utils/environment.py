@@ -275,7 +275,7 @@ def check_if_packages_installed(problem_type: str):
                 import mmocr
             except ImportError as e:
                 raise ValueError(
-                    f"Encountered error while importing mmocr: {e}. Try to install mmocr: pip install mmocr."
+                    f'Encountered error while importing mmocr: {e}. Try to install mmocr: pip install "mmocr<1.0".'
                 )
 
 
