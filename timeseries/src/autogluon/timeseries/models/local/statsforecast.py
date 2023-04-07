@@ -6,7 +6,7 @@ import pandas as pd
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel, hash_ts_dataframe_items
-from autogluon.timeseries.utils.warning_filters import statsmodels_warning_filter
+from autogluon.timeseries.utils.warning_filters import statsmodels_warning_filter, statsmodels_joblib_warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ class AbstractStatsForecastModel(AbstractLocalModel):
             levels = sorted(list(set(levels)))
             chosen_columns = list(new_column_names.values())
 
-            with statsmodels_warning_filter():
+            with statsmodels_warning_filter(), statsmodels_joblib_warning_filter():
                 raw_predictions = sf.forecast(
                     df=self._to_statsforecast_dataframe(data_to_fit),
                     h=self.prediction_length,
@@ -185,6 +185,7 @@ class AutoARIMAModel(AbstractStatsForecastModel):
         "allowmean",
         "seasonal_period",
     ]
+    MAX_TS_LENGTH = 3000
 
     def _update_local_model_args(self, local_model_args: dict, data: TimeSeriesDataFrame) -> dict:
         local_model_args.setdefault("approximation", True)

@@ -200,6 +200,7 @@ class ARIMAModel(AbstractLocalModel):
         "enforce_invertibility",
         "maxiter",
     ]
+    MAX_TS_LENGTH = 3000
 
     def _update_local_model_args(
         self, local_model_args: Dict[str, Any], data: TimeSeriesDataFrame, **kwargs

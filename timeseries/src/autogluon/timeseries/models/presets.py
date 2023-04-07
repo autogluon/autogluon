@@ -28,7 +28,6 @@ MODEL_TYPES = dict(
     SimpleFeedForward=SimpleFeedForwardModel,
     DeepAR=DeepARModel,
     TemporalFusionTransformer=TemporalFusionTransformerModel,
-    # Prophet=ProphetModel,
     ETS=ETSModel,
     ARIMA=ARIMAModel,
     Theta=ThetaModel,
@@ -115,9 +114,7 @@ def get_default_hps(key, prediction_length):
             "ETS": {},
             "AutoETS": {},
             "AutoARIMA": {},
-            "Theta": {
-                "deseasonalize": ag.Categorical(True, False),
-            },
+            "Theta": {},
             "AutoGluonTabular": {},
             "DeepAR": {
                 "context_length": context_length,
@@ -135,9 +132,7 @@ def get_default_hps(key, prediction_length):
             "AutoETS": {},
             "AutoARIMA": {},
             "DynamicOptimizedTheta": {},
-            "Theta": {
-                "deseasonalize": ag.Categorical(True, False),
-            },
+            "Theta": {},
             "AutoGluonTabular": {},
             "DeepAR": {
                 "context_length": context_length,
