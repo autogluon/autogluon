@@ -1,123 +1,169 @@
-from typing import Union, List, Callable
+import builtins as __builtin__
+import contextlib
+from typing import List, Optional
 
-import shap
-from pyod.models import hbos, iforest
-from autogluon.features.generators import AutoMLPipelineFeatureGenerator
+import joblib
+import pandas as pd
+from pyod.models.base import BaseDetector
+from pyod.models.copod import COPOD
+from pyod.models.iforest import IForest
+from pyod.models.lof import LOF
+from pyod.models.suod import SUOD
+
+from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.core.utils import CVSplitter
+
 from .. import AnalysisState
 from .base import AbstractAnalysis
 
+__all__ = ["AnomalyDetector", "AnomalyDetectorAnalysis"]
 
-class AnomalyDetector(AbstractAnalysis):
-    """An anomaly detector for tabular data.  It provides anomaly scores for each row in the test dataframe. The
-    default methods are isolation forests (high quality) and histogram based outlier score (medium quality - faster
-    computation).
 
-    Parameters
-    ----------
-    preset: str, default = 'high_quality'
-        'high_quality' for more powerful but computationally expensive detector, 'medium_quality' otherwise
-    fit_train: bool, default = False
-        True to find anomalies in the training set
-    od_method: Callable, default = None
-        Custom anomaly detector from pyod.models, if you don't want the defaults - will override preset
-    od_kwargs: dict, default = None
-        kwargs for the OD method
-    shap_sub_samp: float or int, default = 0.1
-        The amount of subsampling for shap permutation
-    num_anomalies: int, default = 5
-        The number of top anomalies when returning SHAP features
-
-    State attributes
-    ---------------
-    state.top_test_anomalies: pd.Series
-        The test set anomalies with SHAP results from the pyod anomaly detector
-    state.top_train_anomalies: pd.Series
-        The test set anomalies with SHAP results from the pyod anomaly detector, if fit_train==True
+@contextlib.contextmanager
+def _suod_silent_print(silent=True):
     """
+    Workaround to suppress log clutter
 
-    def __init__(self,
-                 preset: str = 'high_quality',
-                 fit_train: bool = False,
-                 od_method: Callable = None,
-                 od_kwargs: dict = None,
-                 shap_sub_samp: int = 40,
-                 num_anomalies: int = 5,
-                 parent: Union[None, AbstractAnalysis] = None,
-                 children: List[AbstractAnalysis] = [],
-                 **kwargs) -> None:
-        super().__init__(parent, children, **kwargs)
-        preset_list = ['high_quality', 'medium_quality']
-        assert preset in preset_list, 'preset must be one of ' + ', '.join(preset_list)
-        if od_kwargs is None:
-            od_kwargs = {}
-        self.preset = preset
-        self.OD_method = od_method
-        self.OD_kwargs = od_kwargs
-        self.shap_sub_samp = shap_sub_samp
-        self.num_anomalies = num_anomalies
-        self.fit_train = fit_train
+    See Also
+    --------
+    - https://github.com/yzhao062/SUOD/pull/7
+    - https://github.com/yzhao062/SUOD/pull/12
+    """
+    orig_fn = joblib.Parallel._print
+    orig_print = __builtin__.print
 
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
-        if self.OD_method is None:
-            if self.preset == 'high_quality':
-                self.OD_method = iforest.IForest
-            if self.preset == 'medium_quality':
-                self.OD_method = hbos.HBOS
-        x_train = args['train_data'].copy()
-        if args['label'] is not None:
-            if args['label'] in args['train_data'].columns:
-                x_train = x_train.drop(columns=[args['label']])
-        feature_generator = AutoMLPipelineFeatureGenerator()
-        train_trans = feature_generator.fit_transform(X=x_train)
-        if self.fit_train:
-            state.top_train_anomalies = self._fit_train(train_trans, **fit_kwargs)
-        if 'test_data' in args:
-            x_test = args['test_data'].copy()
-            if args['label'] is not None:
-                if args['label'] in args['test_data'].columns:
-                    x_test = x_test.drop(columns=[args['label']])
-            test_trans = feature_generator.transform(x_test)
-            state.top_test_anomalies = self._fit_test(train_trans, test_trans, **fit_kwargs)
+    def silent_print(self, msg, msg_args):
+        return
 
-    def _fit_train(self, train_trans, **fit_kwargs):
-        x_tr_1 = train_trans.sample(frac=0.5)
-        x_tr_2 = train_trans.drop(x_tr_1.index)
-        ano_model_1 = self.OD_method(**self.OD_kwargs).fit(x_tr_1, **fit_kwargs)
-        ano_model_2 = self.OD_method(**self.OD_kwargs).fit(x_tr_2, **fit_kwargs)
-        scores_1 = ano_model_2.decision_function(x_tr_1.values)
-        scores_2 = ano_model_1.decision_function(x_tr_2.values)
-        scores = [(score, 1, i) for i, score in enumerate(scores_1)]
-        scores += [(score, 2, i) for i, score in enumerate(scores_2)]
-        scores.sort(key=lambda x: x[0], reverse=True)
-        scores_top = scores[:self.num_anomalies]
-        top_ano_ids1 = [id for _, s, id in scores_top if s == 1]
-        top_ano_ids2 = [id for _, s, id in scores_top if s == 2]
-        scores_top_1 = [sco for sco, s, id in scores_top if s == 1]
-        scores_top_2 = [sco for sco, s, id in scores_top if s == 2]
-        shap_vals = []
-        if len(top_ano_ids1) > 0:
-            shap_vals += [(a, b, c) for a, (b, c) in zip(scores_top_1,
-                          self._compute_anomaly_shap(ano_model_2, top_ano_ids1, x_tr_1))]
-        if len(top_ano_ids2) > 0:
-            shap_vals += [(a, b, c) for a, (b, c) in zip(scores_top_2,
-                          self._compute_anomaly_shap(ano_model_1, top_ano_ids2, x_tr_2))]
-        return shap_vals
+    @staticmethod
+    def _silent_print():
+        pass
 
-    def _fit_test(self, train_trans, test_trans, **fit_kwargs):
-        clf = self.OD_method(**self.OD_kwargs)
-        clf.fit(train_trans, **fit_kwargs)
-        scores = clf.decision_function(test_trans.values)
-        top_score_ids = scores.argsort()[:-self.num_anomalies-1:-1]
-        scores_top = scores[top_score_ids]
-        return [(a, b, c) for a, (b, c) in zip(scores_top,
-                self._compute_anomaly_shap(clf, top_score_ids, test_trans))]
+    if silent:
+        joblib.Parallel._print = silent_print
+        __builtin__.print = _silent_print
+    try:
+        yield
+    finally:
+        if silent:
+            joblib.Parallel._print = orig_fn
+            __builtin__.print = orig_print
 
-    def _compute_anomaly_shap(self, clf, top_score_ids, test_trans):
-        test_sampler = shap.utils.sample(test_trans.values, self.shap_sub_samp)
-        explainer = shap.Explainer(clf.decision_function, test_sampler)
-        shap_values = explainer(test_trans.values[top_score_ids, :])
-        top_anomalies = [(test_trans.iloc[aid, :], sv) for aid, sv in zip(top_score_ids, shap_values)]
-        return top_anomalies
+
+class AnomalyDetector:
+    def __init__(
+        self,
+        label: str,
+        n_folds: int = 5,
+        detector_list: Optional[List[BaseDetector]] = None,
+        silent: bool = True,
+        **suod_kwargs,
+    ) -> None:
+        self.label = label
+        self.n_folds = n_folds
+        self.silent = silent
+        if detector_list is None:
+            detector_list = [
+                LOF(n_neighbors=15),
+                LOF(n_neighbors=20),
+                LOF(n_neighbors=25),
+                LOF(n_neighbors=35),
+                COPOD(),
+                IForest(n_estimators=100),
+                IForest(n_estimators=200),
+            ]
+        self.detector_list = detector_list
+
+        # Can't go beyond 4 - SUOD is throwing errors
+        num_cpus = min(ResourceManager.get_cpu_count(), 4)
+
+        suod_defaults = dict(base_estimators=self.detector_list, n_jobs=num_cpus, combination="average", verbose=False)
+        self.suod_kwargs = {**suod_defaults, **suod_kwargs}
+        self.detectors = None
+        self.original_features = None
+        self._train_index_to_detector = None
+
+    @property
+    def problem_type(self):
+        return "regression"
+
+    def fit_transform(self, train_data: pd.DataFrame) -> pd.Series:
+        self.detectors = []
+        self._train_index_to_detector = {}
+        splitter = CVSplitter(n_splits=self.n_folds)
+        x, y = train_data.drop(columns=self.label), train_data[self.label]
+        self.original_features = x.columns
+
+        folds_scores = []
+        for i, (train_idx, val_idx) in enumerate(splitter.split(x, y)):
+            x_train = x.iloc[train_idx]
+            x_val = x.iloc[val_idx]
+
+            with _suod_silent_print(self.silent):
+                detector = SUOD(**self.suod_kwargs)
+                self.detectors.append(detector.fit(x_train))
+                self._train_index_to_detector = {**self._train_index_to_detector, **{idx: i for idx in x_train.index}}
+                val_scores = detector.decision_function(x_val)  # outlier scores
+            folds_scores.append(pd.Series(name="score", data=val_scores, index=x_val.index))
+        return pd.concat(folds_scores, axis=0)[x.index]
+
+    def transform(self, x):
+        folds_scores = []
+        for detector in self.detectors:
+            with _suod_silent_print(self.silent):
+                y_test_scores = detector.decision_function(x[self.original_features])
+            folds_scores.append(pd.DataFrame({"score": y_test_scores}, index=x.index))
+        score = pd.concat([df.score for df in folds_scores], axis=1).mean(axis=1)
+        score.name = "score"
+
+        return score[x.index]
+
+    def predict(self, x):
+        return self.transform(x)
+
+
+class AnomalyDetectorAnalysis(AbstractAnalysis):
+    def __init__(
+        self,
+        n_folds: int = 5,
+        parent: Optional[AbstractAnalysis] = None,
+        children: Optional[List[AbstractAnalysis]] = None,
+        state: Optional[AnalysisState] = None,
+        store_explainability_data: bool = False,
+        **kwargs,
+    ) -> None:
+        super().__init__(parent, children, state, **kwargs)
+        self.n_folds = n_folds
+        self.store_explainability_data = store_explainability_data
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
-        return 'train_data' in args
+        args_present = self.all_keys_must_be_present(args, "train_data", "label")
+        no_nans = True
+        if args_present:
+            for ds, df in self.available_datasets(args):
+                cols_with_nas = [c for c in df.columns if df[c].dtype != "object" and df[c].hasnans]
+                if len(cols_with_nas) > 0:
+                    self.logger.warning(
+                        f"{ds}: NaNs are present in the following columns: {cols_with_nas};"
+                        f" please fill them before calling this method."
+                    )
+                    no_nans = False
+
+        return args_present and no_nans
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
+        det = AnomalyDetector(label=args.label, n_folds=self.n_folds)
+        scores = det.fit_transform(args.train_data)
+        s = {"scores": {"train_data": scores}}
+        if self.store_explainability_data:
+            s["detector"] = det
+            s["transformed_features"] = {"train_data": args.train_data}
+
+        for ds, df in self.available_datasets(args):
+            if ds == "train_data":
+                continue
+            s["scores"][ds] = det.transform(df)
+            if self.store_explainability_data:
+                s["transformed_features"][ds] = df
+
+        state["anomaly_detection"] = s

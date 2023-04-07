@@ -1,5 +1,6 @@
 from yellowbrick.style.rcmod import reset_orig
 
+from .anomaly import AnomalyVisualization
 from .dataset import DatasetStatistics, DatasetTypeMismatch, LabelInsightsVisualization
 from .explain import ExplainForcePlot, ExplainWaterfallPlot
 from .interaction import (
@@ -19,7 +20,6 @@ from .layouts import (
 from .missing import MissingValues
 from .model import ConfusionMatrix, FeatureImportance, ModelLeaderboard, RegressionEvaluation
 from .shift import XShiftSummary
-from .anomaly import AnomalyVisualization
 
 # Reset plotting styles back to original style; this is to prevent issues with missing fonts
 reset_orig()
