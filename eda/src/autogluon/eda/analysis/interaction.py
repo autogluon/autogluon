@@ -12,7 +12,13 @@ from scipy.stats import spearmanr
 from .. import AnalysisState
 from .base import AbstractAnalysis
 
-__all__ = ["Correlation", "CorrelationSignificance", "FeatureInteraction", "DistributionFit"]
+__all__ = [
+    "Correlation",
+    "CorrelationSignificance",
+    "FeatureInteraction",
+    "DistributionFit",
+    "FeatureDistanceAnalysis",
+]
 
 from autogluon.common.features.types import R_FLOAT, R_INT
 

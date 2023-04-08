@@ -1,12 +1,15 @@
 from typing import Any, Dict, Optional
 
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 from .. import AnalysisState
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
 
 __all__ = ["AnomalyScoresVisualization"]
+
+from ..utils.common import expand_nested_args_into_nested_maps, get_empty_dict_if_none
 
 
 class AnomalyScoresVisualization(AbstractVisualization, JupyterMixin):
@@ -25,6 +28,7 @@ class AnomalyScoresVisualization(AbstractVisualization, JupyterMixin):
         namespace to use; can be nested like `ns_a.ns_b.ns_c`
     fig_args: Optional[Dict[str, Any]] = None,
         kwargs to pass into visualization component
+        # FIXME: document nested kwargs: normal/anomaly
     chart_args
         kwargs to pass into visualization component
 
@@ -41,10 +45,11 @@ class AnomalyScoresVisualization(AbstractVisualization, JupyterMixin):
     >>> label = 'target'
     >>> threshold_stds = 3  # mark 3 standard deviations score values as anomalies
     >>>
-    >>> auto.analyze(
+    >>> state = auto.analyze(
     >>>     train_data=df_train,
     >>>     test_data=df_test,
     >>>     label=label,
+    >>>     return_state=True,
     >>>     anlz_facets=[
     >>>         eda.dataset.ProblemTypeControl(),
     >>>         eda.transform.ApplyFeatureGenerator(category_to_numbers=True, children=[
@@ -85,7 +90,7 @@ class AnomalyScoresVisualization(AbstractVisualization, JupyterMixin):
         if fig_args is None:
             fig_args = {}
         self.fig_args = fig_args
-        self.chart_args = chart_args
+        self.chart_args = expand_nested_args_into_nested_maps(get_empty_dict_if_none(chart_args))
 
     def can_handle(self, state: AnalysisState) -> bool:
         return self.all_keys_must_be_present(state, "anomaly_detection")
@@ -101,9 +106,15 @@ class AnomalyScoresVisualization(AbstractVisualization, JupyterMixin):
 
             fig, ax = plt.subplots(**self.fig_args)
 
-            chart_args = {**dict(s=5), **self.chart_args, **dict(ax=ax, kind="scatter", x="index", y="score")}
-            ax = data[data.score < threshold].plot(**chart_args)
-            data[data.score >= threshold].plot(**chart_args, c="orange")
+            common_chart_args = dict(ax=ax, x="index", y="score")
+
+            sns.scatterplot(
+                data=data[data.score < threshold], **common_chart_args, **self.chart_args.get("normal", {})
+            )
+            sns.scatterplot(
+                data=data[data.score >= threshold], **common_chart_args, **self.chart_args.get("anomaly", {})
+            )
+
             ax.axhline(
                 y=threshold,
                 color="r",

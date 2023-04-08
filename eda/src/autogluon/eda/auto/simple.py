@@ -9,6 +9,7 @@ from autogluon.tabular import TabularPredictor
 
 from .. import AnalysisState
 from ..analysis import (
+    AnomalyDetectorAnalysis,
     ApplyFeatureGenerator,
     AutoGluonModelEvaluator,
     AutoGluonModelQuickFit,
@@ -31,9 +32,11 @@ from ..analysis.dataset import (
     VariableTypeAnalysis,
 )
 from ..analysis.interaction import FeatureDistanceAnalysis
-from ..state import expand_nested_args_into_nested_maps, is_key_present_in_state
+from ..state import is_key_present_in_state
+from ..utils.common import expand_nested_args_into_nested_maps, get_empty_dict_if_none
 from ..utils.defaults import QuickFitDefaults
 from ..visualization import (
+    AnomalyScoresVisualization,
     ConfusionMatrix,
     CorrelationVisualization,
     DatasetStatistics,
@@ -61,11 +64,12 @@ __all__ = [
     "analyze_interaction",
     "covariate_shift_detection",
     "dataset_overview",
+    "detect_anomalies",
+    "explain_rows",
     "missing_values_analysis",
+    "partial_dependence_plots",
     "quick_fit",
     "target_analysis",
-    "explain_rows",
-    "partial_dependence_plots",
 ]
 
 DEFAULT_SAMPLE_SIZE = 10000
@@ -377,6 +381,7 @@ def quick_fit(
     Examples
     --------
     >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.auto as auto
     >>>
     >>> # Quick fit
     >>> state = auto.quick_fit(
@@ -769,12 +774,6 @@ def get_default_estimator_if_not_specified(fit_args, fit_bagging_folds: int = 0)
         else:
             fit_args["hyperparameters"] = QuickFitDefaults.DEFAULT_RF_CONFIG
     return fit_args
-
-
-def get_empty_dict_if_none(value) -> dict:
-    if value is None:
-        value = {}
-    return value
 
 
 def target_analysis(
@@ -1384,3 +1383,132 @@ def _prepare_pdp_data(
         id_to_category_mappings = {k: v for k, v in id_to_category_mappings.items() if k in features}
 
     return pdp_data, state, id_to_category_mappings  # type: ignore
+
+
+def detect_anomalies(
+    train_data: pd.DataFrame,
+    label: str,
+    test_data: Optional[pd.DataFrame] = None,
+    val_data: Optional[pd.DataFrame] = None,
+    explain_top_n_anomalies: Optional[int] = None,
+    show_top_n_anomalies: Optional[int] = 10,
+    threshold_stds: float = 3,
+    state: Union[None, dict, AnalysisState] = None,
+    sample: Union[None, int, float] = DEFAULT_SAMPLE_SIZE,
+    return_state: bool = False,
+    fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
+    chart_args: Optional[Dict[str, Dict[str, Any]]] = None,
+    **anomaly_detector_kwargs,
+) -> Optional[AnalysisState]:
+    """
+    FIXME: add general documentation here
+    FIXME: add chart_args documentation here
+        chart_args={
+            'normal.color': 'lightgrey',
+            'anomaly.color': 'orange',
+        }
+    FIXME: add documentation to eda.auto doc section
+
+    Parameters
+    ----------
+    train_data: pd.DataFrame
+    label: str
+    test_data: Optional[pd.DataFrame], default = None
+    val_data: Optional[pd.DataFrame], default = None
+    explain_top_n_anomalies: Optional[int], default = None
+    show_top_n_anomalies: Optional[int], default = 10
+    threshold_stds: float, default = 3
+    state: Union[None, dict, AnalysisState], default = None
+    sample: Union[None, int, float] = 10000,
+    return_state: bool, default = False
+    fig_args: Optional[Dict[str, Dict[str, Any]]], default = None
+    chart_args: Optional[Dict[str, Dict[str, Any]]], default = None
+    anomaly_detector_kwargs
+
+    Returns
+    -------
+
+    """
+    fig_args = get_empty_dict_if_none(fig_args).copy()
+    if "figsize" not in fig_args:
+        fig_args["figsize"] = (12, 6)
+
+    chart_args = get_empty_dict_if_none(chart_args).copy()
+
+    store_explainability_data = (explain_top_n_anomalies is not None) and explain_top_n_anomalies > 0
+    state = analyze(
+        train_data=train_data,
+        test_data=test_data,
+        val_data=val_data,
+        label=label,
+        state=state,
+        sample=sample,
+        return_state=True,
+        anlz_facets=[
+            ProblemTypeControl(),
+            ApplyFeatureGenerator(
+                category_to_numbers=True,
+                children=[
+                    AnomalyDetectorAnalysis(
+                        store_explainability_data=store_explainability_data, **anomaly_detector_kwargs
+                    ),
+                ],
+            ),
+        ],
+    )
+
+    analyze(
+        state=state,
+        viz_facets=[
+            MarkdownSectionComponent("### Anomaly Detection Report"),
+            AnomalyScoresVisualization(threshold_stds=threshold_stds, headers=True, fig_args=fig_args, **chart_args),
+        ],
+    )
+
+    # Store anomalies with the scores into the state
+    state.anomaly_detection.anomalies = {}
+    anomaly_score_threshold = state.anomaly_detection.scores.train_data.std() * threshold_stds
+    for ds, df in AbstractAnalysis.available_datasets(
+        AnalysisState({"train_data": train_data, "test_data": test_data, "val_data": val_data})
+    ):
+        anomaly_scores = state.anomaly_detection.scores[ds]
+        anomaly_idx = anomaly_scores[anomaly_scores >= anomaly_score_threshold].sort_values(ascending=False).index
+        state.anomaly_detection.anomalies[ds] = df.iloc[anomaly_idx].join(anomaly_scores)
+
+        if (show_top_n_anomalies is not None) and (show_top_n_anomalies > 0) and (len(anomaly_idx) > 0):
+            analyze(
+                state=state,
+                viz_facets=[
+                    MarkdownSectionComponent(
+                        markdown=f"**Top-{show_top_n_anomalies} `{ds}` anomalies (total: {len(anomaly_idx)})**"
+                    ),
+                    PropertyRendererComponent(
+                        f"anomaly_detection.anomalies.{ds}", transform_fn=(lambda d: d.head(show_top_n_anomalies))
+                    ),
+                ],
+            )
+
+        if store_explainability_data:
+            analyze(
+                state=state,
+                viz_facets=[
+                    MarkdownSectionComponent(
+                        markdown="⚠️ Please note that the feature values shown on the charts below are transformed "
+                        "into an internal representation; they may be encoded or modified based on internal preprocessing. "
+                        "Refer to the original datasets for the actual feature values."
+                    ),
+                    MarkdownSectionComponent(
+                        markdown=f"⚠️ The detector has seen this dataset; the may result in overly optimistic estimates. "
+                        "Although the anomaly score in the explanation might not match, the magnitude of the feature scores "
+                        "can still be utilized to evaluate the impact of the feature on the anomaly score.",
+                        condition_fn=(lambda _: ds == "train_data"),
+                    ),
+                ],
+            )
+
+            explain_rows(
+                **state.anomaly_detection.explain_rows_fns[ds](anomaly_idx[:explain_top_n_anomalies]),
+                plot="waterfall",
+            )
+
+    return state if return_state else None
