@@ -192,7 +192,7 @@ def analyze_interaction(
     chart_args: Optional[dict], default = None
         kwargs to pass into visualization component
     fig_args: Optional[Dict[str, Any]], default = None,
-        kwargs to pass into chart figure
+        kwargs to pass into visualization component
 
     Examples
     --------
