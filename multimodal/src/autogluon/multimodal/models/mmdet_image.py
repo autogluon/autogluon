@@ -120,7 +120,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
     def _load_checkpoint(self, checkpoint_file):
         # build model and load pretrained weights
-        assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
+        assert mmdet is not None, 'Please install MMDetection by: pip install "mmdet>=2.28, <3.0.0".'
         self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
 
         if self.pretrained and checkpoint_file is not None:  # TODO: enable training from scratch

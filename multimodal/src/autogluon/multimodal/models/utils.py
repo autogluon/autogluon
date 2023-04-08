@@ -648,7 +648,7 @@ def get_mmocr_config_and_model(checkpoint_name: str):
         config = mmcv.Config.fromfile(config_file)
 
     # build model and load pretrained weights
-    assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
+    assert mmocr is not None, 'Please install MMOCR by: pip install "mmocr<1.0".'
 
     checkpoint = checkpoints[0]
     model = build_detector(config.model, test_cfg=config.get("test_cfg"))

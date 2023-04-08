@@ -266,14 +266,16 @@ def check_if_packages_installed(problem_type: str):
         try:
             import mmdet
         except ImportError as e:
-            raise ValueError(f"Encountered error while importing mmdet: {e}. Try to install mmdet: pip install mmdet.")
+            raise ValueError(
+                f'Encountered error while importing mmdet: {e}. Try to install mmdet: pip install "mmdet>=2.28, <3.0.0".'
+            )
 
         if OCR in problem_type:
             try:
                 import mmocr
             except ImportError as e:
                 raise ValueError(
-                    f"Encountered error while importing mmocr: {e}. Try to install mmocr: pip install mmocr."
+                    f'Encountered error while importing mmocr: {e}. Try to install mmocr: pip install "mmocr<1.0".'
                 )
 
 
