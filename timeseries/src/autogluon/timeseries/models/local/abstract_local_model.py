@@ -33,6 +33,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
     allowed_local_model_args: List[str] = []
     # Use 50% of the cores since some models rely on parallel ops and are actually slower if n_jobs=-1
     DEFAULT_N_JOBS: Union[float, int] = 0.5
+    MAX_TS_LENGTH: Optional[int] = None
 
     def __init__(
         self,
@@ -110,6 +111,9 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
                 f"{self.name} has frequency '{self.freq}', which doesn't match the frequency "
                 f"of the dataset '{data.freq}'."
             )
+        if self.MAX_TS_LENGTH is not None:
+            logger.debug(f"Shortening all time series to at most {self.MAX_TS_LENGTH}")
+            data = data.groupby(level=ITEMID, sort=False).tail(self.MAX_TS_LENGTH)
 
         self._fit_and_cache_predictions(data, quantile_levels=quantile_levels)
         item_id_to_prediction = {}
