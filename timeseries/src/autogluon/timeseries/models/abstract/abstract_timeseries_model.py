@@ -366,9 +366,6 @@ class AbstractTimeSeriesModel(AbstractModel):
         store_predict_time: bool = False,
     ) -> None:
         """Compute val_score, predict_time and cache out-of-fold (OOF) predictions."""
-        if self.val_score is not None or self.predict_time is not None or self._oof_predictions is not None:
-            raise ValueError(f"Model {self.name} has already been scored on OOF data!")
-
         past_data, known_covariates = val_data.get_model_inputs_for_scoring(
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
         )
@@ -378,6 +375,13 @@ class AbstractTimeSeriesModel(AbstractModel):
             self.predict_time = time.time() - predict_start_time
         if store_val_score:
             self.val_score = self._score_with_predictions(val_data, self._oof_predictions)
+
+    def _get_hpo_train_fn_kwargs(self, **train_fn_kwargs) -> dict:
+        """Update kwargs passed to model_trial depending on the model configuration.
+
+        These kwargs need to be updated, for example, by MultiWindowBacktestingModel.
+        """
+        return train_fn_kwargs
 
     def _hyperparameter_tune(
         self,
@@ -406,8 +410,10 @@ class AbstractTimeSeriesModel(AbstractModel):
         val_path = os.path.join(self.path, dataset_val_filename)
         save_pkl.save(path=val_path, object=val_data)
 
-        fit_kwargs = dict()
-        train_fn_kwargs = dict(
+        fit_kwargs = dict(
+            num_val_windows=kwargs.get("num_val_windows", 1),
+        )
+        train_fn_kwargs = self._get_hpo_train_fn_kwargs(
             model_cls=self.__class__,
             init_params=self.get_params(),
             time_start=time_start,

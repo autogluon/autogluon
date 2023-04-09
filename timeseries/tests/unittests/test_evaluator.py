@@ -22,6 +22,7 @@ def deepar_trained() -> AbstractGluonTSModel:
     pred = TimeSeriesPredictor(prediction_length=2, verbosity=4)
     pred.fit(
         DUMMY_TS_DATAFRAME,
+        tuning_data=DUMMY_TS_DATAFRAME,
         hyperparameters={
             "DeepAR": dict(epochs=2),
         },
@@ -37,6 +38,7 @@ def deepar_trained_zero_data() -> AbstractGluonTSModel:
 
     pred.fit(
         data,
+        tuning_data=data,
         hyperparameters={
             "DeepAR": dict(epochs=2),
         },

@@ -58,14 +58,12 @@ def generate_train_and_test_data(
 @pytest.mark.parametrize("use_static_features_continuous", [True, False])
 @pytest.mark.parametrize("use_static_features_categorical", [True, False])
 @pytest.mark.parametrize("ignore_time_index", [True, False])
-@pytest.mark.parametrize("validation_splitter", ["last_window", "multi_window"])
 def test_predictor_smoke_test(
     use_known_covariates,
     use_past_covariates,
     use_static_features_continuous,
     use_static_features_categorical,
     ignore_time_index,
-    validation_splitter,
 ):
     prediction_length = 5
     hyperparameters = {
@@ -95,7 +93,6 @@ def test_predictor_smoke_test(
         prediction_length=prediction_length,
         known_covariates_names=known_covariates_names if len(known_covariates_names) > 0 else None,
         ignore_time_index=ignore_time_index,
-        validation_splitter=validation_splitter,
     )
     predictor.fit(
         train_data,

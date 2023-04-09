@@ -15,14 +15,18 @@ from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
 from .gluonts.test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_autogluon_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
+from .test_multi_window_model import get_multi_window_deepar
 
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
-TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + TABULAR_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS
+TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + TABULAR_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS + [get_multi_window_deepar]
+
+
 DUMMY_HYPERPARAMETERS = {"epochs": 1, "num_batches_per_epoch": 1, "maxiter": 1, "n_jobs": 1}
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
 MODELS_WITHOUT_HPO = ["AutoGluonTabular", "AutoETS", "AutoARIMA", "DynamicOptimizedTheta"]
@@ -84,6 +88,9 @@ def test_when_score_and_cache_oof_called_then_oof_predictions_are_saved(
     model_class, prediction_length, trained_models
 ):
     model = trained_models[(prediction_length, repr(model_class))]
+    if isinstance(model, MultiWindowBacktestingModel):
+        pytest.skip()
+
     oof_predictions = model.get_oof_predictions()
     assert isinstance(oof_predictions, TimeSeriesDataFrame)
     oof_score = model._score_with_predictions(DUMMY_TS_DATAFRAME, oof_predictions)
@@ -138,6 +145,10 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
     )
     if model.name in MODELS_WITHOUT_HPO:
         pytest.skip(f"{model.name} doesn't support HPO")
+    if isinstance(model, MultiWindowBacktestingModel):
+        val_data = None
+    else:
+        val_data = DUMMY_TS_DATAFRAME
 
     num_trials = 2
 
@@ -145,7 +156,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         hyperparameter_tune_kwargs={"num_trials": num_trials, "scheduler": "local", "searcher": "random"},
         time_limit=300,
         train_data=DUMMY_TS_DATAFRAME,
-        val_data=DUMMY_TS_DATAFRAME,
+        val_data=val_data,
     )
     assert len(hpo_results) == num_trials
     for result in hpo_results.values():

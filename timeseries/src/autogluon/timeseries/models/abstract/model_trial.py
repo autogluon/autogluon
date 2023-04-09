@@ -18,6 +18,7 @@ def model_trial(
     val_path,
     time_start,
     hpo_executor,
+    is_bagged_model=False,
     reporter=None,  # reporter only used by custom strategy, hence optional
     time_limit=None,
     fit_kwargs=None,
@@ -26,7 +27,9 @@ def model_trial(
     `core.models.abstract.model_trial.model_trial` for timeseries models.
     """
     try:
-        model = init_model(args, model_cls, init_params, backend=hpo_executor.executor_type)
+        model = init_model(
+            args, model_cls, init_params, backend=hpo_executor.executor_type, is_bagged_model=is_bagged_model
+        )
         model.set_contexts(path_context=model.path_root + model.name + os.path.sep)
 
         train_data = load_pkl.load(train_path)
