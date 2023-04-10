@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import scipy
 
+from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
@@ -563,6 +564,16 @@ class AbstractModel:
             enforced_num_cpus = kwargs.get('num_cpus', None)
             enforced_num_gpus = kwargs.get('num_gpus', None)
             assert enforced_num_cpus is not None and enforced_num_cpus != 'auto' and enforced_num_gpus is not None and enforced_num_gpus != 'auto'
+            # The logic below is needed because ray cluster is running some process in the backend even when it's ready to be used
+            # Trying to use all cores on the machine could lead to resource contention situation
+            # TODO: remove this logic if ray team can identify what's going on underneath and how to workaround
+            if DistributedContext.is_distributed_mode():
+                minimum_model_resources = self.get_minimum_resources(
+                    is_gpu_available=(enforced_num_gpus > 0)
+                )
+                minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
+                enforced_num_cpus = max(minimum_model_num_cpus, enforced_num_cpus - 2)  # leave some cpu resources for process running by cluster nodes
+                kwargs["num_cpus"] = enforced_num_cpus
             return kwargs
         resource_manager = get_resource_manager()
         system_num_cpus = resource_manager.get_cpu_count()
