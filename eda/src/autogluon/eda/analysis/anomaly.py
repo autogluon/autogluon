@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 @contextlib.contextmanager
-def _suod_silent_print(silent=True):
+def _suod_silent_print(silent=True):  # pragma: no cover
     """
     Workaround to suppress log clutter from SUOD
 
@@ -108,25 +108,29 @@ class AnomalyDetector:
         self.n_folds = n_folds
         self.silent = silent
         if detector_list is None:
-            detector_list = [
-                LOF(n_neighbors=15),
-                LOF(n_neighbors=20),
-                LOF(n_neighbors=25),
-                LOF(n_neighbors=35),
-                COPOD(),
-                IForest(n_estimators=100),
-                IForest(n_estimators=200),
-            ]
+            detector_list = AnomalyDetector._get_default_detector_list()
         self.detector_list = detector_list
 
         # Can't go beyond 4 - SUOD is throwing errors
         num_cpus = min(ResourceManager.get_cpu_count(), 4)
 
         suod_defaults = dict(base_estimators=self.detector_list, n_jobs=num_cpus, combination="average", verbose=False)
-        self.suod_kwargs = {**suod_defaults, **detector_kwargs}
-        self.detectors: Optional[List[BaseDetector]] = None
-        self.original_features: Optional[List[str]] = None
+        self._suod_kwargs = {**suod_defaults, **detector_kwargs}
+        self._detectors: Optional[List[BaseDetector]] = None
         self._train_index_to_detector: Optional[Dict[int, Any]] = None
+        self.original_features: Optional[List[str]] = None
+
+    @staticmethod
+    def _get_default_detector_list():
+        return [
+            LOF(n_neighbors=15),
+            LOF(n_neighbors=20),
+            LOF(n_neighbors=25),
+            LOF(n_neighbors=35),
+            COPOD(),
+            IForest(n_estimators=100),
+            IForest(n_estimators=200),
+        ]
 
     @property
     def problem_type(self):
@@ -147,7 +151,7 @@ class AnomalyDetector:
         out-of-folds anomaly scores for the training data
 
         """
-        self.detectors = []
+        self._detectors = []
         self._train_index_to_detector = {}
         splitter = CVSplitter(n_splits=self.n_folds)
         x, y = train_data.drop(columns=self.label), train_data[self.label]
@@ -159,8 +163,8 @@ class AnomalyDetector:
             x_val = x.iloc[val_idx]
 
             with _suod_silent_print(self.silent):
-                detector = SUOD(**self.suod_kwargs)
-                self.detectors.append(detector.fit(x_train))
+                detector = SUOD(**self._suod_kwargs)
+                self._detectors.append(detector.fit(x_train))
                 self._train_index_to_detector = {**self._train_index_to_detector, **{idx: i for idx in x_train.index}}
                 val_scores = detector.decision_function(x_val)  # outlier scores
             folds_scores.append(pd.Series(name="score", data=val_scores, index=x_val.index))
@@ -180,10 +184,10 @@ class AnomalyDetector:
         -------
         anomaly scores for the passed data
         """
-        assert self.detectors is not None, "Detector is not fit - call `fit_transform` before calling `transform`"
+        assert self._detectors is not None, "Detector is not fit - call `fit_transform` before calling `transform`"
 
         folds_scores = []
-        for detector in self.detectors:
+        for detector in self._detectors:
             with _suod_silent_print(self.silent):
                 y_test_scores = detector.decision_function(x[self.original_features])
             folds_scores.append(pd.DataFrame({"score": y_test_scores}, index=x.index))
@@ -275,7 +279,7 @@ class AnomalyDetectorAnalysis(AbstractAnalysis):
         return args_present and no_nans
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
-        det = AnomalyDetector(label=args.label, n_folds=self.n_folds, **self.args)
+        det = self._create_detector(args)
         scores = det.fit_transform(args.train_data)
         s = {"scores": {"train_data": scores}}
         if self.store_explainability_data:
@@ -291,6 +295,9 @@ class AnomalyDetectorAnalysis(AbstractAnalysis):
                 s["explain_rows_fns"][ds] = partial(AnomalyDetectorAnalysis.explain_rows_fn, args, det, ds)
 
         state["anomaly_detection"] = s
+
+    def _create_detector(self, args) -> AnomalyDetector:
+        return AnomalyDetector(label=args.label, n_folds=self.n_folds, **self.args)
 
     @staticmethod
     def explain_rows_fn(args: AnalysisState, detector: AnomalyDetector, dataset: str, dataset_row_ids: List[Any]):
