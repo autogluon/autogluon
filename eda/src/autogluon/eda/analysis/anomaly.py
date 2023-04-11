@@ -1,8 +1,9 @@
 import builtins as __builtin__
 import contextlib
 import logging
+import sys
 from functools import partial
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import joblib
 import pandas as pd
@@ -33,25 +34,30 @@ def _suod_silent_print(silent=True):
     https://github.com/yzhao062/SUOD/pull/7
     https://github.com/yzhao062/SUOD/pull/12
     """
+
     orig_fn = joblib.Parallel._print
-    orig_print = __builtin__.print
+
+    py310 = sys.version_info >= (3, 10)
+    if py310:
+        orig_print = __builtin__.print
 
     def silent_print(self, msg, msg_args):
         return
 
-    @staticmethod
     def _silent_print():
         pass
 
     if silent:
         joblib.Parallel._print = silent_print
-        __builtin__.print = _silent_print
+        if py310:
+            __builtin__.print = _silent_print  # type: ignore[assignment]
     try:
         yield
     finally:
         if silent:
             joblib.Parallel._print = orig_fn
-            __builtin__.print = orig_print
+            if py310:
+                __builtin__.print = orig_print
 
 
 class AnomalyDetector:
@@ -83,6 +89,7 @@ class AnomalyDetector:
          - COPOD
          - IForest(n_estimators=100)
          - IForest(n_estimators=200)
+        See `pyod <https://pyod.readthedocs.io/en/latest/pyod.models.html>`_ documentation for the full model list.
     silent: bool, default = True
         Suppress SUOD logs if `True`
     detector_kwargs
@@ -117,9 +124,9 @@ class AnomalyDetector:
 
         suod_defaults = dict(base_estimators=self.detector_list, n_jobs=num_cpus, combination="average", verbose=False)
         self.suod_kwargs = {**suod_defaults, **detector_kwargs}
-        self.detectors = None
-        self.original_features = None
-        self._train_index_to_detector = None
+        self.detectors: Optional[List[BaseDetector]] = None
+        self.original_features: Optional[List[str]] = None
+        self._train_index_to_detector: Optional[Dict[int, Any]] = None
 
     @property
     def problem_type(self):
@@ -173,6 +180,8 @@ class AnomalyDetector:
         -------
         anomaly scores for the passed data
         """
+        assert self.detectors is not None, "Detector is not fit - call `fit_transform` before calling `transform`"
+
         folds_scores = []
         for detector in self.detectors:
             with _suod_silent_print(self.silent):
@@ -284,7 +293,7 @@ class AnomalyDetectorAnalysis(AbstractAnalysis):
         state["anomaly_detection"] = s
 
     @staticmethod
-    def explain_rows_fn(args: AnalysisState, detector: AnomalyDetector, dataset: str, dataset_row_ids: List[any]):
+    def explain_rows_fn(args: AnalysisState, detector: AnomalyDetector, dataset: str, dataset_row_ids: List[Any]):
         """
         Prepares arguments for :py:meth:`~autogluon.eda.auto.simple.explain_rows` call to explain anomaly scores contributions
 

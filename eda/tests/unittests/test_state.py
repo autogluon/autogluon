@@ -1,6 +1,7 @@
 import pytest
 
-from autogluon.eda.state import AnalysisState, StateCheckMixin, expand_nested_args_into_nested_maps
+from autogluon.eda.state import AnalysisState, StateCheckMixin
+from autogluon.eda.utils.common import expand_nested_args_into_nested_maps
 
 
 def test_analysis_state():

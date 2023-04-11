@@ -1396,8 +1396,8 @@ def detect_anomalies(
     state: Union[None, dict, AnalysisState] = None,
     sample: Union[None, int, float] = DEFAULT_SAMPLE_SIZE,
     return_state: bool = False,
-    fig_args: Optional[Dict[str, Dict[str, Any]]] = None,
-    chart_args: Optional[Dict[str, Dict[str, Any]]] = None,
+    fig_args: Optional[Dict[str, Any]] = None,
+    chart_args: Optional[Dict[str, Any]] = None,
     **anomaly_detector_kwargs,
 ) -> Optional[AnalysisState]:
     """
@@ -1421,13 +1421,18 @@ def detect_anomalies(
     state: Union[None, dict, AnalysisState], default = None
     sample: Union[None, int, float] = 10000,
     return_state: bool, default = False
-    fig_args: Optional[Dict[str, Dict[str, Any]]], default = None
-    chart_args: Optional[Dict[str, Dict[str, Any]]], default = None
+    fig_args: Optional[Dict[str, Any]] = None,
+    chart_args: Optional[Dict[str, Any]] = None,
     anomaly_detector_kwargs
 
     Returns
     -------
+    state after `fit` call if `return_state` is `True`; `None` otherwise
 
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.anomaly.AnomalyDetectorAnalysis`
+    :py:class:`~autogluon.eda.visualization.anomaly.AnomalyScoresVisualization`
     """
     fig_args = get_empty_dict_if_none(fig_args).copy()
     if "figsize" not in fig_args:
@@ -1436,7 +1441,7 @@ def detect_anomalies(
     chart_args = get_empty_dict_if_none(chart_args).copy()
 
     store_explainability_data = (explain_top_n_anomalies is not None) and explain_top_n_anomalies > 0
-    state = analyze(
+    _state: AnalysisState = analyze(  # type: ignore[assignment]  # always has value: return_state=True
         train_data=train_data,
         test_data=test_data,
         val_data=val_data,
@@ -1458,7 +1463,7 @@ def detect_anomalies(
     )
 
     analyze(
-        state=state,
+        state=_state,
         viz_facets=[
             MarkdownSectionComponent("### Anomaly Detection Report"),
             AnomalyScoresVisualization(threshold_stds=threshold_stds, headers=True, fig_args=fig_args, **chart_args),
@@ -1466,18 +1471,18 @@ def detect_anomalies(
     )
 
     # Store anomalies with the scores into the state
-    state.anomaly_detection.anomalies = {}
-    anomaly_score_threshold = state.anomaly_detection.scores.train_data.std() * threshold_stds
+    _state.anomaly_detection.anomalies = {}
+    anomaly_score_threshold = _state.anomaly_detection.scores.train_data.std() * threshold_stds
     for ds, df in AbstractAnalysis.available_datasets(
         AnalysisState({"train_data": train_data, "test_data": test_data, "val_data": val_data})
     ):
-        anomaly_scores = state.anomaly_detection.scores[ds]
+        anomaly_scores = _state.anomaly_detection.scores[ds]
         anomaly_idx = anomaly_scores[anomaly_scores >= anomaly_score_threshold].sort_values(ascending=False).index
-        state.anomaly_detection.anomalies[ds] = df.iloc[anomaly_idx].join(anomaly_scores)
+        _state.anomaly_detection.anomalies[ds] = df.iloc[anomaly_idx].join(anomaly_scores)
 
         if (show_top_n_anomalies is not None) and (show_top_n_anomalies > 0) and (len(anomaly_idx) > 0):
             analyze(
-                state=state,
+                state=_state,
                 viz_facets=[
                     MarkdownSectionComponent(
                         markdown=f"**Top-{show_top_n_anomalies} `{ds}` anomalies (total: {len(anomaly_idx)})**"
@@ -1490,7 +1495,7 @@ def detect_anomalies(
 
         if store_explainability_data:
             analyze(
-                state=state,
+                state=_state,
                 viz_facets=[
                     MarkdownSectionComponent(
                         markdown="⚠️ Please note that the feature values shown on the charts below are transformed "
@@ -1498,17 +1503,17 @@ def detect_anomalies(
                         "Refer to the original datasets for the actual feature values."
                     ),
                     MarkdownSectionComponent(
-                        markdown=f"⚠️ The detector has seen this dataset; the may result in overly optimistic estimates. "
+                        markdown="⚠️ The detector has seen this dataset; the may result in overly optimistic estimates. "
                         "Although the anomaly score in the explanation might not match, the magnitude of the feature scores "
                         "can still be utilized to evaluate the impact of the feature on the anomaly score.",
-                        condition_fn=(lambda _: ds == "train_data"),
+                        condition_fn=(lambda _: ds == "train_data"),  # noqa: B023
                     ),
                 ],
             )
 
             explain_rows(
-                **state.anomaly_detection.explain_rows_fns[ds](anomaly_idx[:explain_top_n_anomalies]),
+                **_state.anomaly_detection.explain_rows_fns[ds](anomaly_idx[:explain_top_n_anomalies]),
                 plot="waterfall",
             )
 
-    return state if return_state else None
+    return _state if return_state else None
