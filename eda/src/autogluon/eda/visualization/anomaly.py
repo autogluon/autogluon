@@ -27,10 +27,12 @@ class AnomalyScoresVisualization(AbstractVisualization, JupyterMixin):
     namespace: Optional[str], default = None
         namespace to use; can be nested like `ns_a.ns_b.ns_c`
     fig_args: Optional[Dict[str, Any]] = None,
-        kwargs to pass into visualization component
-        # FIXME: document nested kwargs: normal/anomaly
+        kwargs to pass into visualization component.
     chart_args
         kwargs to pass into visualization component
+        The chart contains two scatterpolots combined: normal and anomaly data points; both can be customized via passing
+        additional arguments in `chart_args` - see the example below.
+
 
     Examples
     --------
@@ -44,6 +46,11 @@ class AnomalyScoresVisualization(AbstractVisualization, JupyterMixin):
     >>> df_test = pd.DataFrame(...)
     >>> label = 'target'
     >>> threshold_stds = 3  # mark 3 standard deviations score values as anomalies
+    >>>
+    >>> chart_args={
+    >>>     'normal.color': 'lightgrey',
+    >>>     'anomaly.color': 'orange',
+    >>> }
     >>>
     >>> state = auto.analyze(
     >>>     train_data=df_train,
@@ -59,7 +66,12 @@ class AnomalyScoresVisualization(AbstractVisualization, JupyterMixin):
     >>>         ])
     >>>     ],
     >>>     viz_facets=[
-    >>>         viz.anomaly.AnomalyScoresVisualization(threshold_stds=threshold_stds, headers=True, fig_args=dict(figsize=(8, 4)))
+    >>>         viz.anomaly.AnomalyScoresVisualization(
+    >>>             threshold_stds=threshold_stds,
+    >>>             headers=True,
+    >>>             fig_args=dict(figsize=(8, 4)),
+    >>>             **chart_args, # pass chart args customizations
+    >>>         )
     >>>     ]
     >>> )
     >>>
