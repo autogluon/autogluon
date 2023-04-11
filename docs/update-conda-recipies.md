@@ -54,7 +54,7 @@
 4. Fork the [autogluon.common-feedstock](https://github.com/conda-forge/autogluon.common-feedstock) repo to your GitHub account.
 5. Clone the forked repo to your local machine.
 6. Create a new branch, e.g., `v0.7.0`
-7. Open the `recipe/meta.yaml` file in your favorite text editor. Update the `version`, `sha256` and `number` fields. The `version` field should be the version number of the new release. For example, if the new release is `v0.7.0`, then the `version` field should be `0.7.0`. The `sha256` field should be the hash generated in step 4. The `number` field should be reset to `0` for a new release. If the `version` number stays the same, then the `number` field should be incremented by 1. This is usually the case when you are updating the dependencies of the package but not updating the package version.
+7. Open the `recipe/meta.yaml` file in your favorite text editor. Update the `version`, `sha256` and `number` fields. The `version` field should be the version number of the new release. For example, if the new release is `v0.7.0`, then the `version` field should be `0.7.0`. The `sha256` field should be the hash generated in step 3. The `number` field should be reset to `0` for a new release. If the `version` number stays the same, then the `number` field should be incremented by 1. This is usually the case when you are updating the dependencies of the package but not updating the package version.
 
 ![](https://i.imgur.com/3hvO7z9.png)
 
