@@ -115,13 +115,14 @@ Optionally, you can build the conda-forge packages locally to test if the recipe
 
 ## How to add maintainers to the conda-forge recipes
 
-1. Go to the feedstock repo, e.g., [autogluon.common-feedstock](https://github.com/conda-forge/autogluon-feedstock/issues/new/choose).
-2. Open a new issue and choose the `Bot commands` template. Click on `Get started` to open the issue.
-3. Enter the following text in the title of the issue. Be sure to replace `@username` with the GitHub username of the maintainer you want to add.
+1. Please ask the existing maintainers if you want to be added as a maintainer. Only the existing maintainers can add new maintainers.
+2. The existing maintainer needs to go to the feedstock repo, e.g., [autogluon.common-feedstock](https://github.com/conda-forge/autogluon-feedstock/issues/new/choose).
+3. Open a new issue and choose the `Bot commands` template. Click on `Get started` to open the issue.
+4. Enter the following text in the title of the issue. Be sure to replace `@username` with the GitHub username of the maintainer you want to add.
 
 ```bash
 @conda-forge-admin, please add user @username
 ```
 
-4. Click on `Submit new issue` to submit the issue.
-5. Once the issue is submitted and the CI build is successful, merge the pull request.
+5. Click on `Submit new issue` to submit the issue.
+6. Once the issue is submitted and the CI build is successful, merge the pull request.
