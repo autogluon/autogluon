@@ -539,7 +539,8 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 fold_ctx=fold_ctx,
                 resources=self.resources,
                 head_node_id=head_node_id,
-                kwargs=self.model_base_kwargs)
+                kwargs=self.model_base_kwargs
+            )
             job_fold_map[ref] = fold_ctx
             job_refs.append(ref)
 
