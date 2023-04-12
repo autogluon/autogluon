@@ -1531,7 +1531,8 @@ def detect_anomalies(
     show_top_n_anomalies: Optional[int], default = 10
         display n rows with highest anomaly scores
     threshold_stds: float, default = 3
-        specifies how many standard deviations above mean anomaly score consider as anomalies (only needed for visualization)
+        specifies how many standard deviations above mean anomaly score considered as anomalies
+        (only needed for visualization, does not affect scores calculation)
     show_help_text:bool, default = True
         if `True` shows additional information how to interpret the data
     state: Union[None, dict, AnalysisState], default = None

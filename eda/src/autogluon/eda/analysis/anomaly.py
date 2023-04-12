@@ -1,7 +1,8 @@
+from __future__ import print_function
+
 import builtins as __builtin__
 import contextlib
 import logging
-import sys
 from functools import partial
 from typing import Any, Dict, List, Optional
 
@@ -36,28 +37,24 @@ def _suod_silent_print(silent=True):  # pragma: no cover
     """
 
     orig_fn = joblib.Parallel._print
-
-    py310 = sys.version_info >= (3, 10)
-    if py310:
-        orig_print = __builtin__.print
+    orig_print = __builtin__.print
 
     def silent_print(self, msg, msg_args):
         return
 
-    def _silent_print():
-        pass
+    def _silent_print(*args, **kwargs):
+        if args != () and kwargs != {}:
+            orig_print(*args, **kwargs)
 
     if silent:
         joblib.Parallel._print = silent_print
-        if py310:
-            __builtin__.print = _silent_print  # type: ignore[assignment]
+        __builtin__.print = _silent_print  # type: ignore[assignment]
     try:
         yield
     finally:
         if silent:
             joblib.Parallel._print = orig_fn
-            if py310:
-                __builtin__.print = orig_print
+            __builtin__.print = orig_print
 
 
 class AnomalyDetector:
