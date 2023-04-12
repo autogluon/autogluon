@@ -129,6 +129,21 @@ def analyze(
     -------
     state after `fit` call if `return_state` is `True`; `None` otherwise
 
+    Examples
+    --------
+    >>> import autogluon.eda.analysis as eda
+    >>> import autogluon.eda.visualization as viz
+    >>> import autogluon.eda.auto as auto
+    >>> state = auto.analyze(
+    >>>     train_data=..., label=..., return_state=True,
+    >>>     anlz_facets=[
+    >>>         # Add analysis chain here
+    >>>     ],
+    >>>     viz_facets=[
+    >>>         # Add visualization facets here
+    >>>     ]
+    >>> )
+
     """
 
     if viz_facets is None:
@@ -377,6 +392,21 @@ def quick_fit(
     Returns
     -------
         state after `fit` call if `return_state` is `True`; `None` otherwise
+
+    State attributes
+    ---------------
+    model
+        trained model
+    model_evaluation.importance
+        feature importance calculated using the trained model
+    model_evaluation.leaderboard
+        trained models leaderboard
+    model_evaluation.highest_error
+        misclassified rows with the highest error between prediction and ground truth
+    model_evaluation.undecided (classification only)
+        misclassified rows with the prediction closest to the decision boundary
+    model_evaluation.confusion_matrix (classification only)
+        confusion matrix values
 
     Examples
     --------
@@ -716,6 +746,7 @@ def covariate_shift_detection(
     )
 
     # Plot distribution differences between datasets
+    # TODO: move `vars_to_plot` calculation to analysis
     xshift_results: AnalysisState = state.xshift_results  # type: ignore # state is always present
     if xshift_results.detection_status:
         fi = xshift_results.feature_importance
@@ -1100,6 +1131,27 @@ def explain_rows(
         kwargs for `ShapAnalysis`.
     kwargs
 
+    Examples
+    --------
+    >>> import autogluon.eda.auto as auto
+    >>>
+    >>> state = auto.quick_fit(
+    >>>     train_data=...,
+    >>>     label=...,
+    >>>     return_state=True,
+    >>> )
+    >>>
+    >>> # quick_fit stored model in `state.model`, and can be passed here.
+    >>> # This will visualize 1st row of rows with the highest errors;
+    >>> # these rows are stored under `state.model_evaluation.highest_error`
+    >>> auto.explain_rows(
+    >>>     train_data=...,
+    >>>     model=state.model,
+    >>>     display_rows=True,
+    >>>     rows=state.model_evaluation.highest_error[:1],
+    >>>     plot='waterfall',  # visualize as waterfall plot
+    >>> )
+
     See Also
     --------
     :py:class:`~shap.KernelExplainer`
@@ -1151,6 +1203,10 @@ def partial_dependence_plots(
     **fit_args,
 ):
     """
+    Partial Dependence Plot (PDP)
+
+    Analyze and interpret the relationship between a target variable and a specific feature in a machine learning model.
+    PDP helps in understanding the marginal effect of a feature on the predicted outcome while holding other features constant
 
     The visualizations have two modes:
     - Display Partial Dependence Plots (PDP) with Individual Conditional Expectation (ICE) - this is the default mode of operation
@@ -1225,6 +1281,7 @@ def partial_dependence_plots(
     chart_args: Optional[dict], default = None
         kwargs to pass into visualization component
     show_help_text:bool, default = True
+        if `True` shows additional information how to interpret the data
     return_state: bool, default = False
         return state if `True`
     col_number_warning: int, default = 20
@@ -1232,9 +1289,24 @@ def partial_dependence_plots(
     fit_args: Optional[Dict[str, Dict[str, Any]]], default = None,
         kwargs to pass into `TabularPredictor` fit.
 
+    State attributes
+    ---------------
+    pdp_id_to_category_mappings
+        Categorical are represented in charts as numbers; id to value mappings are available in this property.
+
     Returns
     -------
     state after `fit` call if `return_state` is `True`; `None` otherwise
+
+    Examples
+    --------
+    >>> import autogluon.eda.auto as auto
+    >>>
+    >>> # Plot all features in a grid
+    >>> auto.partial_dependence_plots(train_data=..., label=...)
+    >>>
+    >>> # Plot two-way feature interaction for features `feature_a` and `feature_b`
+    >>> auto.partial_dependence_plots(train_data=..., label=..., features=['feature_a', 'feature_b'], two_way=True)
 
     See Also
     --------
@@ -1283,7 +1355,8 @@ def partial_dependence_plots(
                 "larger confidence intervals, higher variance, or fewer data points. These areas may require further investigation or additional data.\n"
                 "* **Outliers and anomalies**: Check for any outliers or anomalies in the plot that may indicate issues with the model or the data. "
                 "These could be regions of the plot with unexpected patterns or values that do not align with the overall trend.\n"
-                "* **Sensitivity to feature values**: Assess how sensitive the predicted outcome is to changes in the feature values.",
+                "* **Sensitivity to feature values**: Assess how sensitive the predicted outcome is to changes in the feature values.\n\n"
+                "<sub><sup>Use `show_help_text=False` to hide this information when calling this function.</sup></sub>",
                 condition_fn=lambda _: show_help_text and two_way,
             ),
             MarkdownSectionComponent("### Partial Dependence Plots", condition_fn=lambda _: not two_way),
@@ -1306,7 +1379,8 @@ def partial_dependence_plots(
                 "* **Confidence** intervals: If available, examine the confidence intervals around the PDP line. Wider intervals may indicate "
                 "a less certain relationship between the feature and the model's output, while narrower intervals suggest a more robust relationship.\n"
                 "* **Interactions**: By comparing PDPs and ICE plots for different features, you may detect potential interactions between features. "
-                "If the ICE lines change significantly when comparing two features, this might suggest an interaction effect.",
+                "If the ICE lines change significantly when comparing two features, this might suggest an interaction effect.\n\n"
+                "<sub><sup>Use `show_help_text=False` to hide this information when calling this function.</sup></sub>",
                 condition_fn=lambda _: show_help_text and not two_way,
             ),
             PDPInteractions(features=features, two_way=two_way, fig_args=fig_args, sample=max_ice_lines, target=target, **chart_args),  # type: ignore
@@ -1393,6 +1467,7 @@ def detect_anomalies(
     explain_top_n_anomalies: Optional[int] = None,
     show_top_n_anomalies: Optional[int] = 10,
     threshold_stds: float = 3,
+    show_help_text: bool = True,
     state: Union[None, dict, AnalysisState] = None,
     sample: Union[None, int, float] = DEFAULT_SAMPLE_SIZE,
     return_state: bool = False,
@@ -1401,29 +1476,113 @@ def detect_anomalies(
     **anomaly_detector_kwargs,
 ) -> Optional[AnalysisState]:
     """
-    FIXME: add general documentation here
-    FIXME: add chart_args documentation here
-        chart_args={
-            'normal.color': 'lightgrey',
-            'anomaly.color': 'orange',
-        }
-    FIXME: add documentation to eda.auto doc section
+    Anomaly Detection
+
+    This method is used to identify unusual patterns or behaviors in data that deviate significantly from the norm.
+    It's best used when finding outliers, rare events, or suspicious activities that could indicate fraud, defects, or system failures.
+
+    When interpreting anomaly scores, consider:
+
+    - `Threshold`
+        Determine a suitable threshold to separate normal from anomalous data points, based on domain knowledge or statistical methods.
+    - `Context`:
+        Examine the context of anomalies, including time, location, and surrounding data points, to identify possible causes.
+    - `False positives/negatives`:
+        Be aware of the trade-offs between false positives (normal points classified as anomalies) and false negatives (anomalies missed).
+    - `Feature relevance`:
+        Ensure the features used for anomaly detection are relevant and contribute to the model's performance.
+    - `Model performance`:
+        Regularly evaluate and update the model to maintain its accuracy and effectiveness.
+
+    It's important to understand the context and domain knowledge before deciding on an appropriate approach to deal with anomalies.
+    The choice of method depends on the data's nature, the cause of anomalies, and the problem being addressed.
+    The common ways to deal with anomalies:
+
+    - `Removal`
+        If an anomaly is a result of an error, noise, or irrelevance to the analysis, it can be removed from the dataset
+        to prevent it from affecting the model's performance.
+    - `Imputation`
+        Replace anomalous values with appropriate substitutes, such as the mean, median, or mode of the feature,
+        or by using more advanced techniques like regression or k-nearest neighbors.
+    - `Transformation`
+        Apply transformations like log, square root, or z-score to normalize the data and reduce the impact of extreme values.
+        Absolute dates might be transformed into relative features like age of the item.
+    - `Capping`
+        Set upper and lower bounds for a feature, and replace values outside these limits with the bounds themselves.
+        This method is also known as winsorizing.
+    - `Separate modeling`
+        Treat anomalies as a distinct group and build a separate model for them, or use specialized algorithms designed
+        for handling outliers, such as robust regression or one-class SVM.
+    - `Incorporate as a feature`
+        Create a new binary feature indicating the presence of an anomaly, which can be useful if anomalies have predictive value.
 
     Parameters
     ----------
-    train_data: pd.DataFrame
+    train_data: DataFrame
+        training dataset
     label: str
+        target variable
     test_data: Optional[pd.DataFrame], default = None
+        test dataset
     val_data: Optional[pd.DataFrame], default = None
+        validation dataset
     explain_top_n_anomalies: Optional[int], default = None
+        explain the anomaly scores for n rows with the highest scores; don't perform analysis if value is `None` or `0`
     show_top_n_anomalies: Optional[int], default = 10
+        display n rows with highest anomaly scores
     threshold_stds: float, default = 3
+        specifies how many standard deviations above mean anomaly score consider as anomalies (only needed for visualization)
+    show_help_text:bool, default = True
+        if `True` shows additional information how to interpret the data
     state: Union[None, dict, AnalysisState], default = None
-    sample: Union[None, int, float] = 10000,
+        pass prior state if necessary; the object will be updated during `anlz_facets` `fit` call.
+    sample: Union[None, int, float], default = 10000
+        sample size; if `int`, then row number is used;
+        `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
+        `None` means no sampling
+        See also :func:`autogluon.eda.analysis.dataset.Sampler`
     return_state: bool, default = False
-    fig_args: Optional[Dict[str, Any]] = None,
-    chart_args: Optional[Dict[str, Any]] = None,
+        return state if `True`
+    fig_args: Optional[Dict[str, Any]], default = None,
+        kwargs to pass into visualization component
+    chart_args: Optional[dict], default = None
+        kwargs to pass into visualization component
     anomaly_detector_kwargs
+        kwargs to pass into :py:class:`~autogluon.eda.analysis.anomaly.AnomalyDetectorAnalysis`
+
+    State attributes
+    ---------------
+    anomaly_detection.scores.<dataset>
+        scores for each of the datasets passed into analysis (i.e. `train_data`, `test_data`)
+    state.anomaly_detection.anomalies.<dataset>
+        data points considered as anomalies - original rows with added `score` column sorted in descending score order.
+        defined by `threshold_stds` parameter
+    anomaly_detection.anomaly_score_threshold
+        anomaly score threshold above which data points are considered as anomalies;
+        defined by `threshold_stds` parameter
+
+    >>> import autogluon.eda.auto as auto
+    >>>
+    >>> state = auto.detect_anomalies(
+    >>>     train_data=...,
+    >>>     test_data=...,  # optional
+    >>>     label=...,
+    >>>     threshold_stds=3,
+    >>>     show_top_n_anomalies=5,
+    >>>     explain_top_n_anomalies=3,
+    >>>     return_state=True,
+    >>>     chart_args={
+    >>>         'normal.color': 'lightgrey',
+    >>>         'anomaly.color': 'orange',
+    >>>     }
+    >>> )
+    >>>
+    >>> # Getting anomaly scores from the analysis
+    >>> train_anomaly_scores = state.anomaly_detection.scores.train_data
+    >>> test_anomaly_scores = state.anomaly_detection.scores.test_data
+    >>>
+    >>> # Anomaly score threshold for specified level - see `threshold_stds` parameter
+    >>> anomaly_score_threshold = state.anomaly_detection.anomaly_score_threshold
 
     Returns
     -------
@@ -1434,9 +1593,8 @@ def detect_anomalies(
     :py:class:`~autogluon.eda.analysis.anomaly.AnomalyDetectorAnalysis`
     :py:class:`~autogluon.eda.visualization.anomaly.AnomalyScoresVisualization`
     """
-    fig_args = get_empty_dict_if_none(fig_args).copy()
-    if "figsize" not in fig_args:
-        fig_args["figsize"] = (12, 6)
+    fig_args_defaults = {"figsize": (12, 6)}
+    fig_args = {**fig_args_defaults, **get_empty_dict_if_none(fig_args).copy()}
 
     chart_args = get_empty_dict_if_none(chart_args).copy()
 
@@ -1466,6 +1624,33 @@ def detect_anomalies(
         state=_state,
         viz_facets=[
             MarkdownSectionComponent("### Anomaly Detection Report"),
+            MarkdownSectionComponent(
+                "When interpreting anomaly scores, consider:\n"
+                "* **Threshold**: Determine a suitable threshold to separate normal from anomalous data points, "
+                "    based on domain knowledge or statistical methods.\n"
+                "* **Context**: Examine the context of anomalies, including time, location, and surrounding data points, to identify possible causes.\n"
+                "* **False positives/negatives**: Be aware of the trade-offs between false positives (normal points classified as anomalies) "
+                "    and false negatives (anomalies missed).\n"
+                "* **Feature relevance**: Ensure the features used for anomaly detection are relevant and contribute to the model's performance.\n"
+                "* **Model performance**: Regularly evaluate and update the model to maintain its accuracy and effectiveness.\n\n"
+                "It's important to understand the context and domain knowledge before deciding on an appropriate approach to deal with anomalies."
+                "he choice of method depends on the data's nature, the cause of anomalies, and the problem being addressed."
+                "he common ways to deal with anomalies:\n\n"
+                "* **Removal**: If an anomaly is a result of an error, noise, or irrelevance to the analysis, it can be removed from the dataset "
+                "    to prevent it from affecting the model's performance.\n"
+                "* **Imputation**: Replace anomalous values with appropriate substitutes, such as the mean, median, or mode of the feature,"
+                "    or by using more advanced techniques like regression or k-nearest neighbors.\n"
+                "* **Transformation**: Apply transformations like log, square root, or z-score to normalize the data and reduce the impact of extreme values.\n"
+                "    Absolute dates might be transformed into relative features like age of the item."
+                "* **Capping**: Set upper and lower bounds for a feature, and replace values outside these limits with the bounds themselves."
+                "    This method is also known as winsorizing.\n"
+                "* **Separate modeling**: Treat anomalies as a distinct group and build a separate model for them, or use specialized algorithms designed"
+                "    for handling outliers, such as robust regression or one-class SVM.\n"
+                "* **Incorporate as a feature**: Create a new binary feature indicating the presence of an anomaly, "
+                "    which can be useful if anomalies have predictive value.\n\n"
+                "<sub><sup>Use `show_help_text=False` to hide this information when calling this function.</sup></sub>",
+                condition_fn=lambda _: show_help_text,
+            ),
             AnomalyScoresVisualization(threshold_stds=threshold_stds, headers=True, fig_args=fig_args, **chart_args),
         ],
     )
@@ -1473,6 +1658,7 @@ def detect_anomalies(
     # Store anomalies with the scores into the state
     _state.anomaly_detection.anomalies = {}
     anomaly_score_threshold = _state.anomaly_detection.scores.train_data.std() * threshold_stds
+    _state.anomaly_detection.anomaly_score_threshold = anomaly_score_threshold
     for ds, df in AbstractAnalysis.available_datasets(
         AnalysisState({"train_data": train_data, "test_data": test_data, "val_data": val_data})
     ):

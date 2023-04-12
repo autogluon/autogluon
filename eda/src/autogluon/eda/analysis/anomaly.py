@@ -204,6 +204,53 @@ class AnomalyDetector:
 
 
 class AnomalyDetectorAnalysis(AbstractAnalysis):
+    """
+    Anomaly detection analysis.
+
+    The analysis automatically creates cross-validation splits and fits detectors on each of them using
+    `train_data` input. The scores produced for the training data are produced using out-of-folds predictions.
+    All other datasets scores are produced using average of scores from detectors trained on individual folds (bag).
+
+    Please note, the analysis expects the data is ready to for fitting; all numeric columns must not have NaNs.
+    Pre-processing can be performed using :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
+    and :py:class:`~autogluon.eda.analysis.dataset.ProblemTypeControl` (see example for more details).
+
+
+    Parameters
+    ----------
+    n_folds: int, default = 5
+        number of folds to use when training detectors; default is 5 folds.
+    store_explainability_data: bool, default = False
+        if true
+    parent: Optional[AbstractAnalysis], default = None
+        parent Analysis
+    children: List[AbstractAnalysis], default = []
+        wrapped analyses; these will receive sampled `args` during `fit` call
+    state: Optional[AnalysisState], default = None
+        state to be updated by this fit function
+    anomaly_detector_kwargs
+        kwargs for :py:class:`~autogluon.eda.analysis.anomaly.AnomalyDetector`
+
+
+    State attributes
+    ---------------
+    anomaly_detection.scores.<dataset>
+        scores for each of the datasets passed into analysis (i.e. `train_data`, `test_data`)
+    anomaly_detection.explain_rows_fns.<dataset>
+        if `store_explainability_data=True`, then analysis will store helper functions into this
+        variable. The function can be used later via :py:meth:`~autogluon.eda.auto.simple.explain_rows`
+        and automatically pre-populates `train_data`, `model` and `rows` parameters when called
+        (see example for more details)
+
+    See Also
+    --------
+    :py:class:`~autogluon.eda.analysis.anomaly.AnomalyDetector`
+    :py:class:`~autogluon.eda.visualization.anomaly.AnomalyScoresVisualization`
+    :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
+    :py:class:`~autogluon.eda.analysis.dataset.ProblemTypeControl`
+
+    """
+
     def __init__(
         self,
         n_folds: int = 5,
@@ -213,52 +260,6 @@ class AnomalyDetectorAnalysis(AbstractAnalysis):
         state: Optional[AnalysisState] = None,
         **anomaly_detector_kwargs,
     ) -> None:
-        """
-        Anomaly detection analysis.
-
-        The analysis automatically creates cross-validation splits and fits detectors on each of them using
-        `train_data` input. The scores produced for the training data are produced using out-of-folds predictions.
-        All other datasets scores are produced using average of scores from detectors trained on individual folds (bag).
-
-        Please note, the analysis expects the data is ready to for fitting; all numeric columns must not have NaNs.
-        Pre-processing can be performed using :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
-        and :py:class:`~autogluon.eda.analysis.dataset.ProblemTypeControl` (see example for more details).
-
-
-        Parameters
-        ----------
-        n_folds: int, default = 5
-            number of folds to use when training detectors; default is 5 folds.
-        store_explainability_data: bool, default = False
-            if true
-        parent: Optional[AbstractAnalysis], default = None
-            parent Analysis
-        children: List[AbstractAnalysis], default = []
-            wrapped analyses; these will receive sampled `args` during `fit` call
-        state: Optional[AnalysisState], default = None
-            state to be updated by this fit function
-        anomaly_detector_kwargs
-            kwargs for :py:class:`~autogluon.eda.analysis.anomaly.AnomalyDetector`
-
-
-        State attributes
-        ---------------
-        anomaly_detection.scores.<dataset>
-            scores for each of the datasets passed into analysis (i.e. `train_data`, `test_data`)
-        anomaly_detection.explain_rows_fns.<dataset>
-            if `store_explainability_data=True`, then analysis will store helper functions into this
-            variable. The function can be used later via :py:meth:`~autogluon.eda.auto.simple.explain_rows`
-            and automatically pre-populates `train_data`, `model` and `rows` parameters when called
-            (see example for more details)
-
-        See Also
-        --------
-        :py:class:`~autogluon.eda.analysis.anomaly.AnomalyDetector`
-        :py:class:`~autogluon.eda.visualization.anomaly.AnomalyScoresVisualization`
-        :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
-        :py:class:`~autogluon.eda.analysis.dataset.ProblemTypeControl`
-
-        """
         super().__init__(parent, children, state, **anomaly_detector_kwargs)
         self.n_folds = n_folds
         self.store_explainability_data = store_explainability_data
