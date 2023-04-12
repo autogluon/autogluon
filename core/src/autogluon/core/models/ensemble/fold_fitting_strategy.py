@@ -561,7 +561,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                                              predict_time=predict_time,
                                              predict_1_time=predict_1_time,
                                              fold_ctx=fold_ctx)
-                if model_sync_path is not None:
+                if self.model_sync_path is not None:
                     model_sync_path: str = self.model_sync_path + fold_model
                     if not model_sync_path.endswith("/"):
                         model_sync_path += "/"
