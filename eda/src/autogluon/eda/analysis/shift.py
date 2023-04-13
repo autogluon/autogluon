@@ -21,6 +21,16 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
     if your training set is not representative of your test set distribution.  This is done with a Classifier 2
     Sample Test.
 
+    State attributes
+
+    - `state.xshift_results`: outputs the results of XShift detection,
+        dict of
+            - `detection_status`: bool, True if detected
+            - `test_statistic`: float, the C2ST statistic
+            - `pvalue`: float, the p-value using permutation test
+            - `pvalue_threshold`: float, the decision p-value threshold
+            - `feature_importance`: DataFrame, the feature importance dataframe, if computed
+
     Parameters
     ----------
     classifier_class : an AutoGluon predictor, such as autogluon.tabular.TabularPredictor (default)
@@ -43,15 +53,6 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
     test_size_2st: float, default = 0.3
         The size of the test set in the training test split in 2ST
 
-    State attributes
-    ----------------
-    state.xshift_results: outputs the results of XShift detection,
-        dict of
-            - 'detection_status': bool, True if detected
-            - 'test_statistic': float, the C2ST statistic
-            - 'pvalue': float, the p-value using permutation test
-            - 'pvalue_threshold': float, the decision p-value threshold
-            - 'feature_importance': DataFrame, the feature importance dataframe, if computed
     """
 
     def __init__(

@@ -1,8 +1,8 @@
 import logging
 
-__all__ = ["AnalysisState", "StateCheckMixin", "is_key_present_in_state", "expand_nested_args_into_nested_maps"]
+__all__ = ["AnalysisState", "StateCheckMixin", "is_key_present_in_state"]
 
-from typing import Any, Dict
+from typing import Any
 
 
 class AnalysisState(dict):
@@ -57,7 +57,7 @@ class StateCheckMixin:
             True if at least one key from the `keys` list is present in the state
         """
         for k in keys:
-            if k in state:
+            if state.get(k, None) is not None:
                 return True
         self.logger.warning(f"{self.__class__.__name__}: at least one of the following keys must be present: {keys}")
         return False
@@ -77,7 +77,7 @@ class StateCheckMixin:
         -------
             True if all the key from the `keys` list are present in the state
         """
-        keys_not_present = [k for k in keys if k not in state.keys()]
+        keys_not_present = [k for k in keys if state.get(k, None) is None]
         can_handle = len(keys_not_present) == 0
         if not can_handle:
             self.logger.warning(
@@ -109,32 +109,3 @@ def is_key_present_in_state(state: AnalysisState, key: str):
             return False
         path = path[p]
     return True
-
-
-def expand_nested_args_into_nested_maps(args: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Expands flat args with nested keys in dot notation into nested map (`{a.b.c: value} -> {'a': {'b': {'c': value}}}`)
-
-    Parameters
-    ----------
-    args: Dict[str, Any]
-        args to expand
-
-    Returns
-    -------
-    nested expanded map
-
-    """
-    result: Dict[str, Any] = {}
-    for k, v in args.items():
-        sub_keys = k.split(".")
-        curr_pointer = result
-        if len(sub_keys) > 1:
-            for subkey in sub_keys[:-1]:
-                if subkey not in curr_pointer:
-                    curr_pointer[subkey] = {}
-                curr_pointer = curr_pointer[subkey]
-        if type(curr_pointer) is not dict:
-            raise ValueError(f"{k} canot be added - the key is already present")
-        curr_pointer[sub_keys[-1]] = v
-    return result
