@@ -339,6 +339,21 @@ def quick_fit(
         - `regression_eval.<property>` - regression predictor results chart
         - `feature_importance.<property>` - feature importance barplot chart
 
+    State attributes
+
+    - `model`
+        trained model
+    - `model_evaluation.importance`
+        feature importance calculated using the trained model
+    - `model_evaluation.leaderboard`
+        trained models leaderboard
+    - `model_evaluation.highest_error`
+        misclassified rows with the highest error between prediction and ground truth
+    - `model_evaluation.undecided` (classification only)
+        misclassified rows with the prediction closest to the decision boundary
+    - `model_evaluation.confusion_matrix` (classification only)
+        confusion matrix values
+
     Parameters
     ----------
     train_data: DataFrame
@@ -392,21 +407,6 @@ def quick_fit(
     Returns
     -------
         state after `fit` call if `return_state` is `True`; `None` otherwise
-
-    State attributes
-    ---------------
-    model
-        trained model
-    model_evaluation.importance
-        feature importance calculated using the trained model
-    model_evaluation.leaderboard
-        trained models leaderboard
-    model_evaluation.highest_error
-        misclassified rows with the highest error between prediction and ground truth
-    model_evaluation.undecided (classification only)
-        misclassified rows with the prediction closest to the decision boundary
-    model_evaluation.confusion_matrix (classification only)
-        confusion matrix values
 
     Examples
     --------
@@ -1254,6 +1254,11 @@ def partial_dependence_plots(
     - `Feature importance`: If feature importance analysis ranks both features high in the leaderboard, it might be beneficial
         to examine their joint effect on the model's predictions.
 
+    State attributes
+
+    - `pdp_id_to_category_mappings`
+        Categorical are represented in charts as numbers; id to value mappings are available in this property.
+
     Parameters
     ----------
     train_data: DataFrame
@@ -1288,11 +1293,6 @@ def partial_dependence_plots(
         number of features to visualize after which the warning will be displayed to warn about rendering time
     fit_args: Optional[Dict[str, Dict[str, Any]]], default = None,
         kwargs to pass into `TabularPredictor` fit.
-
-    State attributes
-    ---------------
-    pdp_id_to_category_mappings
-        Categorical are represented in charts as numbers; id to value mappings are available in this property.
 
     Returns
     -------
@@ -1483,7 +1483,7 @@ def detect_anomalies(
 
     When interpreting anomaly scores, consider:
 
-    - `Threshold`
+    - `Threshold`:
         Determine a suitable threshold to separate normal from anomalous data points, based on domain knowledge or statistical methods.
     - `Context`:
         Examine the context of anomalies, including time, location, and surrounding data points, to identify possible causes.
@@ -1498,23 +1498,34 @@ def detect_anomalies(
     The choice of method depends on the data's nature, the cause of anomalies, and the problem being addressed.
     The common ways to deal with anomalies:
 
-    - `Removal`
+    - `Removal`:
         If an anomaly is a result of an error, noise, or irrelevance to the analysis, it can be removed from the dataset
         to prevent it from affecting the model's performance.
-    - `Imputation`
+    - `Imputation`:
         Replace anomalous values with appropriate substitutes, such as the mean, median, or mode of the feature,
         or by using more advanced techniques like regression or k-nearest neighbors.
-    - `Transformation`
+    - `Transformation`:
         Apply transformations like log, square root, or z-score to normalize the data and reduce the impact of extreme values.
         Absolute dates might be transformed into relative features like age of the item.
-    - `Capping`
+    - `Capping`:
         Set upper and lower bounds for a feature, and replace values outside these limits with the bounds themselves.
         This method is also known as winsorizing.
-    - `Separate modeling`
+    - `Separate modeling`:
         Treat anomalies as a distinct group and build a separate model for them, or use specialized algorithms designed
         for handling outliers, such as robust regression or one-class SVM.
-    - `Incorporate as a feature`
+    - `Incorporate as a feature`:
         Create a new binary feature indicating the presence of an anomaly, which can be useful if anomalies have predictive value.
+
+    State attributes
+
+    - `anomaly_detection.scores.<dataset>`
+        scores for each of the datasets passed into analysis (i.e. `train_data`, `test_data`)
+    - `state.anomaly_detection.anomalies.<dataset>`
+        data points considered as anomalies - original rows with added `score` column sorted in descending score order.
+        defined by `threshold_stds` parameter
+    - `anomaly_detection.anomaly_score_threshold`
+        anomaly score threshold above which data points are considered as anomalies;
+        defined by `threshold_stds` parameter
 
     Parameters
     ----------
@@ -1550,17 +1561,6 @@ def detect_anomalies(
         kwargs to pass into visualization component
     anomaly_detector_kwargs
         kwargs to pass into :py:class:`~autogluon.eda.analysis.anomaly.AnomalyDetectorAnalysis`
-
-    State attributes
-    ---------------
-    anomaly_detection.scores.<dataset>
-        scores for each of the datasets passed into analysis (i.e. `train_data`, `test_data`)
-    state.anomaly_detection.anomalies.<dataset>
-        data points considered as anomalies - original rows with added `score` column sorted in descending score order.
-        defined by `threshold_stds` parameter
-    anomaly_detection.anomaly_score_threshold
-        anomaly score threshold above which data points are considered as anomalies;
-        defined by `threshold_stds` parameter
 
     >>> import autogluon.eda.auto as auto
     >>>

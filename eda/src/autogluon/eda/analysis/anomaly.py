@@ -212,6 +212,16 @@ class AnomalyDetectorAnalysis(AbstractAnalysis):
     Pre-processing can be performed using :py:class:`~autogluon.eda.analysis.transform.ApplyFeatureGenerator`
     and :py:class:`~autogluon.eda.analysis.dataset.ProblemTypeControl` (see example for more details).
 
+    State attributes
+
+    - `anomaly_detection.scores.<dataset>`
+        scores for each of the datasets passed into analysis (i.e. `train_data`, `test_data`)
+    - `anomaly_detection.explain_rows_fns.<dataset>`
+        if `store_explainability_data=True`, then analysis will store helper functions into this
+        variable. The function can be used later via :py:meth:`~autogluon.eda.auto.simple.explain_rows`
+        and automatically pre-populates `train_data`, `model` and `rows` parameters when called
+        (see example for more details)
+
 
     Parameters
     ----------
@@ -228,16 +238,6 @@ class AnomalyDetectorAnalysis(AbstractAnalysis):
     anomaly_detector_kwargs
         kwargs for :py:class:`~autogluon.eda.analysis.anomaly.AnomalyDetector`
 
-
-    State attributes
-    ---------------
-    anomaly_detection.scores.<dataset>
-        scores for each of the datasets passed into analysis (i.e. `train_data`, `test_data`)
-    anomaly_detection.explain_rows_fns.<dataset>
-        if `store_explainability_data=True`, then analysis will store helper functions into this
-        variable. The function can be used later via :py:meth:`~autogluon.eda.auto.simple.explain_rows`
-        and automatically pre-populates `train_data`, `model` and `rows` parameters when called
-        (see example for more details)
 
     See Also
     --------
