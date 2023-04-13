@@ -8,19 +8,19 @@ This section contains a high-level overview and showcases for exploratory data a
 :::{grid-item-card} Automated Dataset Overview
    :link: eda-auto-dataset-overview.html
 
-   Tool to get a high-level understanding of datasets including basic statistical information and feature information.
+   Get a high-level understanding of datasets including basic statistical information and feature information.
 :::
 
 :::{grid-item-card} Automated Target Variable Analysis
    :link: eda-auto-target-analysis.html
 
-   Automatically analyze and summarize the variable we are trying to predict and it's relationship with other variables.
+   Analyze and summarize the variable we are trying to predict and it's relationship with other variables.
 :::
 
 :::{grid-item-card} Quick Model Fit
    :link: eda-auto-quick-fit.html
 
-   Automatically analyze and summarize the variable we are trying to predict and it's relationship with other variables.
+   Fit a quick model to understand the relationships between the label and the other features in a dataset.
 :::
 
 :::{grid-item-card} Covariate Shift Detection
@@ -33,8 +33,14 @@ This section contains a high-level overview and showcases for exploratory data a
 :::{grid-item-card} Feature Interaction Charts
    :link: eda-auto-analyze-interaction.html
 
-   Simple visualization tool to visualize 1/2/3-way relationships between features.
-   The tool automatically picks a chart type given each property type.
+   Visualize 1/2/3-way relationships between features via chart.
+   The tool automatically picks a chart type given the types of input features.
+:::
+
+:::{grid-item-card} Anomaly Detection
+   :link: eda-auto-anomaly-detection.html
+
+   Explore anomaly detection tools to identify unusual patterns in data and make informed decisions.
 :::
 
 ::::
@@ -113,6 +119,7 @@ eda-auto-target-analysis
 eda-auto-quick-fit
 eda-auto-covariate-shift
 eda-auto-analyze-interaction
+eda-auto-anomaly-detection
 References <references/index>
 Components <components/index>
 ```
