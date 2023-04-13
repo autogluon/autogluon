@@ -57,7 +57,7 @@ class StateCheckMixin:
             True if at least one key from the `keys` list is present in the state
         """
         for k in keys:
-            if k in state and state[k] is not None:
+            if state.get(k, None) is not None:
                 return True
         self.logger.warning(f"{self.__class__.__name__}: at least one of the following keys must be present: {keys}")
         return False
@@ -77,7 +77,7 @@ class StateCheckMixin:
         -------
             True if all the key from the `keys` list are present in the state
         """
-        keys_not_present = [k for k in keys if k not in state.keys() or state[k] is None]
+        keys_not_present = [k for k in keys if state.get(k, None) is None]
         can_handle = len(keys_not_present) == 0
         if not can_handle:
             self.logger.warning(

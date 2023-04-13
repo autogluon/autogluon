@@ -228,7 +228,10 @@ class AnomalyDetectorAnalysis(AbstractAnalysis):
     n_folds: int, default = 5
         number of folds to use when training detectors; default is 5 folds.
     store_explainability_data: bool, default = False
-        if true
+        if `True` analysis will store helper functions into this variable.
+        The function can be used later via :py:meth:`~autogluon.eda.auto.simple.explain_rows`
+        and automatically pre-populates `train_data`, `model` and `rows` parameters when called
+        (see example for more details)
     parent: Optional[AbstractAnalysis], default = None
         parent Analysis
     children: List[AbstractAnalysis], default = []
