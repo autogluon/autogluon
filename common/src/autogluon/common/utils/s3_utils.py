@@ -1,8 +1,9 @@
 import logging
 import os
+import pathlib
 import shutil
 
-from typing import List, Tuple, Optional, Union
+from typing import Dict, List, Tuple, Optional, Union
 
 from ..loaders.load_s3 import list_bucket_prefix_suffix_contains_s3
 
@@ -120,7 +121,7 @@ def upload_s3_folder(
                 bucket=bucket,
                 prefix=file_prefix if len(file_prefix) > 0 else None
             )
-        
+
 
 # TODO: Add remaining arguments from list_bucket_prefix_suffix_contains_s3
 def download_s3_folder(
@@ -174,40 +175,93 @@ def download_s3_folder(
     verbose: bool, default = True
         Whether to log detailed loggings
     """
-    if len(prefix) > 0:
-        assert prefix.endswith("/"), "Please provide a prefix to a folder and end it with '/'"
-    import boto3
-    s3 = boto3.resource("s3")
-    s3_bucket = s3.Bucket(bucket)
-    # objs = list(bucket.objects.filter(Prefix=prefix))
-    # objs = [obj.key for obj in objs]
-    objs = list_bucket_prefix_suffix_contains_s3(bucket=bucket, prefix=prefix, suffix=suffix)
-    local_obj_paths, folder_to_create = _get_local_path_to_download_objs_and_local_dir_to_create(
-        s3_objs=objs,
-        prefix=prefix,
-        local_path=local_path
-    )
+    s3_to_local_tuple_list = get_s3_to_local_tuple_list_from_s3_folder(bucket=bucket,
+                                                                       prefix=prefix,
+                                                                       local_path=local_path,
+                                                                       suffix=suffix)
     if verbose:
-        logger.log(20, f"Will download {len(local_obj_paths)} objects from s3://{bucket}/{prefix} to {local_path}")
+        logger.log(20, f"Will download {len(s3_to_local_tuple_list)} objects from s3://{bucket}/{prefix} to {local_path}")
     if os.path.isdir(local_path) and not dry_run:
         if error_if_exists:
             raise ValueError(f"Directory {local_path} already exsists. Please pass in a different `local_path` or set `error_if_exsits` to `False`")
         if delete_if_exists:
-            logger.warning(f"Will delete {local_path} and all its content within because this folder already exsists and `delete_if_exists` = `True`")
+            logger.warning(f"Will delete {local_path} and all its content within because this folder already exists and `delete_if_exists` = `True`")
             shutil.rmtree(local_path)
-    for folders in folder_to_create:
-        if dry_run:
-            logger.log(20, f"Will create directory {folders}")
-        else:
-            os.makedirs(folders, exist_ok=True)
-    objs_no_folder = [obj for obj in objs if not obj.endswith("/")]  # remove directory so the download obj list can match local_obj_path
-    for obj, local_obj_path in zip(objs_no_folder, local_obj_paths):
-        if dry_run:
-            logger.log(20, f"Will download {obj} to {local_obj_path}")
-        else:
-            s3_bucket.download_file(obj, local_obj_path)
-            
-            
+    download_s3_files(s3_to_local_tuple_list=s3_to_local_tuple_list, dry_run=dry_run)
+
+
+def get_s3_to_local_tuple_list_from_s3_folder(*,
+                                              bucket: str,
+                                              prefix: str,
+                                              local_path: str,
+                                              **kwargs) -> List[Tuple[str, str]]:
+    """
+    Given a s3 bucket and prefix, as well as a target local prefix, return a list of tuples of (s3_path, local_path)
+    indicating the origin to target file path when downloading from S3 for each file.
+
+    This output can be passed directly into `download_s3_files(s3_to_local_tuple_list)` to download the s3 files.
+    """
+    if len(prefix) > 0:
+        assert prefix.endswith("/"), "Please provide a prefix to a folder and end it with '/'"
+    objs = list_bucket_prefix_suffix_contains_s3(bucket=bucket, prefix=prefix, **kwargs)
+    s3_to_local_tuple_list = get_s3_to_local_tuple_list(s3_bucket=bucket,
+                                                        s3_prefix=prefix,
+                                                        local_prefix=local_path,
+                                                        s3_prefixes=objs)
+    return s3_to_local_tuple_list
+
+
+# TODO: Add unit tests
+def get_s3_to_local_tuple_list(*,
+                               s3_bucket: str,
+                               s3_prefix: str,
+                               local_prefix: str,
+                               s3_prefixes: List[str]) -> List[Tuple[str, str]]:
+    """
+    Given a list of s3 objects and a target local prefix, return a list of tuples of (s3_path, local_path)
+    indicating the origin to target file path when downloading from s3.
+
+    This output can be passed directly into `download_s3_files(s3_to_local_tuple_list)` to download the s3 files.
+    """
+    local_paths = _get_local_path_to_download_objs(
+        s3_objs=s3_prefixes,
+        prefix=s3_prefix,
+        local_path=local_prefix
+    )
+    s3_to_local_tuple_list = []
+    for s3_prefix, local_path in zip(s3_prefixes, local_paths):
+        s3_path = s3_bucket_prefix_to_path(bucket=s3_bucket, prefix=s3_prefix)
+        s3_to_local_tuple_list.append((s3_path, local_path))
+    return s3_to_local_tuple_list
+
+
+def download_s3_file(*, s3_path: str, local_path: str, mkdir: bool = True, dry_run: bool = False):
+    """
+    Download a file from s3 to local.
+    """
+    s3_bucket, s3_prefix = s3_path_to_bucket_prefix(s3_path=s3_path)
+    if dry_run:
+        logger.log(20, f'Dry Run: Would download S3 file "{s3_path}" to "{local_path}"')
+    else:
+        import boto3
+        if mkdir:
+            directory = os.path.dirname(local_path)
+            if directory not in ['', '.']:
+                pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
+        s3 = boto3.resource('s3')
+        s3.Bucket(s3_bucket).download_file(s3_prefix, local_path)
+
+
+def download_s3_files(*, s3_to_local_tuple_list: List[Tuple[str, str]], dry_run: bool = False):
+    """
+    For (s3_path, local_path) in `s3_to_local_tuple_list`, call `download_s3_file`.
+    """
+    for s3_path, _ in s3_to_local_tuple_list:
+        assert is_s3_url(path=s3_path), f'S3 path is not a valid S3 URL: "{s3_path}"'
+    for s3_path, local_path in s3_to_local_tuple_list:
+        download_s3_file(s3_path=s3_path, local_path=local_path, mkdir=True, dry_run=dry_run)
+
+
 def _get_local_objs_to_upload_and_s3_prefix(folder_to_upload: str) -> List[Tuple[str, str]]:
     """
     Get paths to all the objects within a folder and it's subfolder and their relative path to maintain the folder structure
@@ -229,16 +283,17 @@ def _get_local_objs_to_upload_and_s3_prefix(folder_to_upload: str) -> List[Tuple
             file_relative_path = os.path.relpath(file_full_path, folder_to_upload)
             files_to_upload.append((file_full_path, file_relative_path))
     return files_to_upload
-            
-def _get_local_path_to_download_objs_and_local_dir_to_create(s3_objs: List[str], prefix: str, local_path: str) -> Tuple[List[str], List[str]]:
+
+
+def _get_local_path_to_download_objs(s3_objs: List[str], prefix: str, local_path: str) -> List[str]:
     """
-    Get a list of paths to download s3 objects to and a list of directories need to be created.
-    The paths and directories will mirror the structure of the s3 folder (prefix)
+    Get a list of paths to download s3 objects to.
+    The paths will mirror the structure of the s3 folder (prefix)
     
     Parameters
     ----------
     s3_objs: List[str]
-        List of objects including folders needs to be downloaded.
+        List of objects needed to be downloaded.
         This list should be contents of a folder in s3
     prefix: str
         The prefix of the s3 folder to download
@@ -247,17 +302,15 @@ def _get_local_path_to_download_objs_and_local_dir_to_create(s3_objs: List[str],
         
     Returns
     -------
-    Tuple[List[str], List[str]]
-        The first element is the local paths of all the objects to be downloaded to
-        The second element is the folders that needs to be created
+    List[str]
+       The local paths of all the objects to be downloaded to
     """
-    objs_no_folder = [obj for obj in s3_objs if not obj.endswith("/")]
-    objs_folder_only = [obj for obj in s3_objs if obj.endswith("/")]
+    for obj in s3_objs:
+        if obj.endswith('/'):
+            raise ValueError(f'Folders are not supported: {obj}')
+        elif obj == '':
+            raise ValueError(f'Cannot have empty path for an s3 object!')
+
     # find the local path to download objs to
-    local_obj_paths = [os.path.normpath(os.path.join(local_path, os.path.relpath(obj, prefix))) for obj in objs_no_folder]
-    # add local path to folders
-    folder_to_create = [os.path.normpath(os.path.join(local_path, os.path.relpath(folder, prefix))) for folder in objs_folder_only]
-    folder_to_create += [os.path.dirname(os.path.normpath(path)) for path in local_obj_paths]
-    folder_to_create = list(set(folder_to_create))
-    folder_to_create = [folder for folder in folder_to_create if folder not in [".", ""]]  # current dir should be removed
-    return local_obj_paths, folder_to_create
+    local_obj_paths = [os.path.normpath(os.path.join(local_path, os.path.relpath(obj, prefix))) for obj in s3_objs]
+    return local_obj_paths
