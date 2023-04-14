@@ -568,6 +568,9 @@ class AbstractModel:
             # Trying to use all cores on the machine could lead to resource contention situation
             # TODO: remove this logic if ray team can identify what's going on underneath and how to workaround
             if DistributedContext.is_distributed_mode():
+                max_num_cpus = self._get_maximum_resources().get("num_cpus", None)
+                if max_num_cpus is not None:
+                    enforced_num_cpus = min(max_num_cpus, enforced_num_cpus)
                 minimum_model_resources = self.get_minimum_resources(
                     is_gpu_available=(enforced_num_gpus > 0)
                 )
@@ -1483,7 +1486,7 @@ class AbstractModel:
             if resources[resource_name] > resource_value:
                 raise AssertionError(f'Specified {resources[resource_name]} {resource_name} to fit, but only {resource_value} are available in total.')
 
-    def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:
+    def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, Union[int, float]]:
         """
         Parameters
         ----------
@@ -1656,6 +1659,15 @@ class AbstractModel:
         json_path = self.path + self.model_info_json_name
         save_json.save(path=json_path, obj=info)
         return info
+    
+    def _get_maximum_resources(self) -> Dict[str, float]:
+        """
+        Get the maximum resources allowed to use for this model.
+        This can be useful when model not scale well with resources, i.e. cpu cores.
+        Return empty dict if no maximum resources needed
+        """
+        return {}
+        
 
     def _get_default_resources(self):
         """

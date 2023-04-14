@@ -3,6 +3,7 @@ import logging
 import time
 from builtins import classmethod
 from pathlib import Path
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -529,6 +530,11 @@ class NNFastAiTabularModel(AbstractModel):
     def _get_hpo_backend(self):
         """Choose which backend(Ray or Custom) to use for hpo"""
         return RAY_BACKEND
+    
+    def _get_maximum_resources(self) -> Dict[str, float]:
+        return {
+            "num_cpus": ResourceManager.get_cpu_count_psutil(logical=False)
+        }
 
     def get_minimum_resources(self, is_gpu_available=False):
         minimum_resources = {
