@@ -7,7 +7,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from typing import Dict
+from typing import Dict, Union
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.common.utils.resource_utils import ResourceManager
@@ -550,7 +550,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def _get_default_stopping_metric(self):
         return self.eval_metric
     
-    def _get_maximum_resources(self) -> Dict[str, float]:
+    def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
         # torch model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
         return {
             "num_cpus": ResourceManager.get_cpu_count_psutil(logical=False)

@@ -550,39 +550,14 @@ class AbstractModel:
             if user_specified_model_level_resource is not None:
                 user_specified_lower_level_resource = min(user_specified_model_level_resource * k_fold, system_resource, user_specified_total_resource)
         return user_specified_lower_level_resource
-
-    def _preprocess_fit_resources(self, silent=False, total_resources=None, parallel_hpo=False, **kwargs):
-        """
-        This function should be called to process user-specified total resources.
-        Sanity checks will be done to user-specified total resources to make sure it's legit.
-        When user-specified resources are not defined, will instead look at model's default resource requirements.
-        """
-        if 'num_cpus' in kwargs and 'num_gpus' in kwargs:
-            # This value will only be passed by autogluon through previous layers(i.e. bagged model to model base).
-            # We respect this value with highest priority
-            # They should always be set to valid values
-            enforced_num_cpus = kwargs.get('num_cpus', None)
-            enforced_num_gpus = kwargs.get('num_gpus', None)
-            assert enforced_num_cpus is not None and enforced_num_cpus != 'auto' and enforced_num_gpus is not None and enforced_num_gpus != 'auto'
-            # The logic below is needed because ray cluster is running some process in the backend even when it's ready to be used
-            # Trying to use all cores on the machine could lead to resource contention situation
-            # TODO: remove this logic if ray team can identify what's going on underneath and how to workaround
-            if DistributedContext.is_distributed_mode():
-                minimum_model_resources = self.get_minimum_resources(
-                    is_gpu_available=(enforced_num_gpus > 0)
-                )
-                minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
-                enforced_num_cpus = max(minimum_model_num_cpus, enforced_num_cpus - 2)  # leave some cpu resources for process running by cluster nodes
-            max_resources = self._get_maximum_resources()
-            max_num_cpus = max_resources.get("num_cpus", None)
-            max_num_gpus = max_resources.get("num_gpus", None)
-            if max_num_cpus is not None:
-                enforced_num_cpus = min(max_num_cpus, enforced_num_cpus)
-            if max_num_gpus is not None:
-                enforced_num_gpus = min(max_num_gpus, enforced_num_gpus)
-            kwargs["num_cpus"] = enforced_num_cpus
-            kwargs["num_gpus"] = enforced_num_gpus
-            return kwargs
+    
+    def _calculate_total_resources(
+        self,
+        silent: bool = False,
+        total_resources: Optional[Dict[str, Union[int, float]]] = None,
+        parallel_hpo: bool = False,
+        **kwargs
+        ):
         resource_manager = get_resource_manager()
         system_num_cpus = resource_manager.get_cpu_count()
         system_num_gpus = resource_manager.get_gpu_count_all()
@@ -676,7 +651,43 @@ class AbstractModel:
         kwargs['num_gpus'] = num_gpus
         if not silent:
             logger.log(15, f"\tFitting {self.name} with 'num_gpus': {kwargs['num_gpus']}, 'num_cpus': {kwargs['num_cpus']}")
+        
         return kwargs
+
+    def _preprocess_fit_resources(self, silent=False, total_resources=None, parallel_hpo=False, **kwargs):
+        """
+        This function should be called to process user-specified total resources.
+        Sanity checks will be done to user-specified total resources to make sure it's legit.
+        When user-specified resources are not defined, will instead look at model's default resource requirements.
+        """
+        if 'num_cpus' in kwargs and 'num_gpus' in kwargs:
+            # This value will only be passed by autogluon through previous layers(i.e. bagged model to model base).
+            # We respect this value with highest priority
+            # They should always be set to valid values
+            enforced_num_cpus = kwargs.get('num_cpus', None)
+            enforced_num_gpus = kwargs.get('num_gpus', None)
+            assert enforced_num_cpus is not None and enforced_num_cpus != 'auto' and enforced_num_gpus is not None and enforced_num_gpus != 'auto'
+            # The logic below is needed because ray cluster is running some process in the backend even when it's ready to be used
+            # Trying to use all cores on the machine could lead to resource contention situation
+            # TODO: remove this logic if ray team can identify what's going on underneath and how to workaround
+            max_resources = self._get_maximum_resources()
+            max_num_cpus = max_resources.get("num_cpus", None)
+            max_num_gpus = max_resources.get("num_gpus", None)
+            if max_num_gpus is not None:
+                enforced_num_gpus = min(max_num_gpus, enforced_num_gpus)
+            if DistributedContext.is_distributed_mode():
+                minimum_model_resources = self.get_minimum_resources(
+                    is_gpu_available=(enforced_num_gpus > 0)
+                )
+                minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
+                enforced_num_cpus = max(minimum_model_num_cpus, enforced_num_cpus - 2)  # leave some cpu resources for process running by cluster nodes
+            if max_num_cpus is not None:
+                enforced_num_cpus = min(max_num_cpus, enforced_num_cpus)
+            kwargs["num_cpus"] = enforced_num_cpus
+            kwargs["num_gpus"] = enforced_num_gpus
+            return kwargs
+        
+        return self._calculate_total_resources(silent=silent, total_resources=total_resources, parallel_hpo=parallel_hpo, **kwargs)
 
     def _register_fit_metadata(self, **kwargs):
         """
@@ -1665,7 +1676,7 @@ class AbstractModel:
         save_json.save(path=json_path, obj=info)
         return info
     
-    def _get_maximum_resources(self) -> Dict[str, Union[int,float]]:
+    def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
         """
         Get the maximum resources allowed to use for this model.
         This can be useful when model not scale well with resources, i.e. cpu cores.
@@ -1673,7 +1684,9 @@ class AbstractModel:
         
         Return
         ------
-        Dict[str, Union[int,float]]
+        Dict[str, Union[int, float]]
+            key, name of the resource, i.e. `num_cpus`, `num_gpus`
+            value, maximum amount of resources
         """
         return {}
         
