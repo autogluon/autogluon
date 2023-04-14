@@ -747,11 +747,10 @@ def covariate_shift_detection(
 
     # Plot distribution differences between datasets
     # TODO: move `vars_to_plot` calculation to analysis
-    xshift_results: AnalysisState = state.xshift_results  # type: ignore # state is always present
-    if xshift_results.detection_status:
-        fi = xshift_results.feature_importance
-        fi = fi[fi.p_value <= xshift_results.pvalue_threshold]
-        vars_to_plot = fi.index.tolist()[: XShiftSummary.MAX_FEATURES_TO_DISPLAY]
+    # type: ignore # state is always present
+    xshift: AnalysisState = state.xshift_results  # type: ignore[union-attr]  # state is not none
+    if xshift.detection_status:
+        vars_to_plot = xshift.shift_features[: XShiftSummary.MAX_FEATURES_TO_DISPLAY]
         if len(vars_to_plot) > 0:
             _train_data = train_data[vars_to_plot].copy()
             _train_data["__dataset__"] = "train_data"
@@ -761,7 +760,7 @@ def covariate_shift_detection(
 
             for var in vars_to_plot:
                 if state.variable_type.train_data[var] != "category":  # type: ignore
-                    pvalue = fi.loc[var]["p_value"]
+                    pvalue = xshift.feature_importance.loc[var]["p_value"]
                     analyze(
                         viz_facets=[
                             MarkdownSectionComponent(

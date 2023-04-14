@@ -46,6 +46,7 @@ def sim_cov_shift(train, test, p_nonmarr=0.75, val=False):
 class TestShift(unittest.TestCase):
     def test_shift(self):
         train, test = load_adult_data()
+        train, test = sim_cov_shift(train, test)
         with tempfile.TemporaryDirectory() as path:
             shft_ana = eda.shift.XShiftDetector(
                 train_data=train,
@@ -53,12 +54,18 @@ class TestShift(unittest.TestCase):
                 label="class",
                 classifier_kwargs={"path": os.path.join(path, "AutogluonModels")},
                 classifier_fit_kwargs={"hyperparameters": {"RF": {}}},
+                pvalue_thresh=0.1,
             )
             shft_ana.fit()
             shft_viz = viz.shift.XShiftSummary(headers=True)
             shft_viz.render(shft_ana.state)
-            res = shft_ana.state.xshift_results
-            assert all(
-                res[k] is not None
-                for k in ["detection_status", "pvalue", "pvalue_threshold", "eval_metric", "feature_importance"]
-            )
+            result = shft_ana.state.xshift_results
+            assert result.pop("feature_importance", None).shape == (14, 6)
+            assert result.pop("pvalue", -100) > 0
+            assert result.pop("test_statistic", -100) > 0
+            assert len(result.pop("shift_features")) > 0
+            assert result == {
+                "detection_status": True,
+                "eval_metric": "roc_auc",
+                "pvalue_threshold": 0.1,
+            }
