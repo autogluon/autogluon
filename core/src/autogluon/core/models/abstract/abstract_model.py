@@ -568,15 +568,15 @@ class AbstractModel:
             # Trying to use all cores on the machine could lead to resource contention situation
             # TODO: remove this logic if ray team can identify what's going on underneath and how to workaround
             if DistributedContext.is_distributed_mode():
-                max_num_cpus = self._get_maximum_resources().get("num_cpus", None)
-                if max_num_cpus is not None:
-                    enforced_num_cpus = min(max_num_cpus, enforced_num_cpus)
                 minimum_model_resources = self.get_minimum_resources(
                     is_gpu_available=(enforced_num_gpus > 0)
                 )
                 minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
                 enforced_num_cpus = max(minimum_model_num_cpus, enforced_num_cpus - 2)  # leave some cpu resources for process running by cluster nodes
-                kwargs["num_cpus"] = enforced_num_cpus
+            max_num_cpus = self._get_maximum_resources().get("num_cpus", None)
+            if max_num_cpus is not None:
+                enforced_num_cpus = min(max_num_cpus, enforced_num_cpus)
+            kwargs["num_cpus"] = enforced_num_cpus
             return kwargs
         resource_manager = get_resource_manager()
         system_num_cpus = resource_manager.get_cpu_count()
