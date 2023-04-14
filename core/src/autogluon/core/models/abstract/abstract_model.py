@@ -573,10 +573,15 @@ class AbstractModel:
                 )
                 minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
                 enforced_num_cpus = max(minimum_model_num_cpus, enforced_num_cpus - 2)  # leave some cpu resources for process running by cluster nodes
-            max_num_cpus = self._get_maximum_resources().get("num_cpus", None)
+            max_resources = self._get_maximum_resources()
+            max_num_cpus = max_resources.get("num_cpus", None)
+            max_num_gpus = max_resources.get("num_gpus", None)
             if max_num_cpus is not None:
                 enforced_num_cpus = min(max_num_cpus, enforced_num_cpus)
+            if max_num_gpus is not None:
+                enforced_num_gpus = min(max_num_gpus, enforced_num_gpus)
             kwargs["num_cpus"] = enforced_num_cpus
+            kwargs["num_gpus"] = enforced_num_gpus
             return kwargs
         resource_manager = get_resource_manager()
         system_num_cpus = resource_manager.get_cpu_count()
@@ -1660,11 +1665,15 @@ class AbstractModel:
         save_json.save(path=json_path, obj=info)
         return info
     
-    def _get_maximum_resources(self) -> Dict[str, float]:
+    def _get_maximum_resources(self) -> Dict[str, Union[int,float]]:
         """
         Get the maximum resources allowed to use for this model.
         This can be useful when model not scale well with resources, i.e. cpu cores.
         Return empty dict if no maximum resources needed
+        
+        Return
+        ------
+        Dict[str, Union[int,float]]
         """
         return {}
         

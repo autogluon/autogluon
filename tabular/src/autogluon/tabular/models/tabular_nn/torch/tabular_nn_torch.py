@@ -551,6 +551,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         return self.eval_metric
     
     def _get_maximum_resources(self) -> Dict[str, float]:
+        # torch model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
         return {
             "num_cpus": ResourceManager.get_cpu_count_psutil(logical=False)
         }
