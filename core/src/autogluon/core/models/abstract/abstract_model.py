@@ -557,7 +557,14 @@ class AbstractModel:
         total_resources: Optional[Dict[str, Union[int, float]]] = None,
         parallel_hpo: bool = False,
         **kwargs
-        ):
+    ) -> Dict[str, Any]:
+        """
+        Process user-specified total resources.
+        Sanity checks will be done to user-specified total resources to make sure it's legit.
+        When user-specified resources are not defined, will instead look at model's default resource requirements.
+        
+        Will set the calculated total resources in kwargs and return it
+        """
         resource_manager = get_resource_manager()
         system_num_cpus = resource_manager.get_cpu_count()
         system_num_gpus = resource_manager.get_gpu_count_all()
@@ -654,11 +661,22 @@ class AbstractModel:
         
         return kwargs
 
-    def _preprocess_fit_resources(self, silent=False, total_resources=None, parallel_hpo=False, **kwargs):
+    def _preprocess_fit_resources(
+        self,
+        silent: bool = False,
+        total_resources: Optional[Dict[str, Union[int, float]]] = None,
+        parallel_hpo: bool = False,
+        **kwargs
+    ) -> Dict[str, Any]:
         """
         This function should be called to process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
         When user-specified resources are not defined, will instead look at model's default resource requirements.
+        
+        When kwargs contains `num_cpus` and `num_gpus` means this total resources has been calculated by previous layers(i.e. bagged model to model base).
+        Will respect this value and check if there's specific maximum resource requirements and enforce those
+        
+        Will set the calculated resources in kwargs and return it
         """
         if 'num_cpus' in kwargs and 'num_gpus' in kwargs:
             # This value will only be passed by autogluon through previous layers(i.e. bagged model to model base).
