@@ -7,26 +7,28 @@ assignees: ''
 
 ---
 
-- [ ] I have checked that this bug exists on the latest stable version of AutoGluon
-- [ ] and/or I have checked that this bug exists on the latest mainline of AutoGluon via source installation
+**Bug Report Checklist**
+<!-- Please ensure at least one of the following to help the developers troubleshoot the problem:  -->
+- [ ] I provided code that demonstrates a minimal reproducible example. <!-- Ideal, especially via source install --> 
+- [ ] I confirmed bug exists on the latest mainline of AutoGluon via source install. <!-- Preferred --> 
+- [ ] I confirmed bug exists on the latest stable version of AutoGluon. <!-- Unnecessary if prior items are checked --> 
 
 **Describe the bug**
-A clear and concise description of what the bug is.
+<!-- A clear and concise description of what the bug is. -->
 
 **Expected behavior**
-A clear and concise description of what you expected to happen.
+<!-- A clear and concise description of what you expected to happen. -->
 
 **To Reproduce**
-A minimal script to reproduce the issue. Links to Colab notebooks or similar tools are encouraged.  
+<!-- A minimal script to reproduce the issue. Links to Colab notebooks or similar tools are encouraged.  
 If the code is too long, feel free to put it in a public gist and link it in the issue: https://gist.github.com.  
-In short, we are going to copy-paste your code to run it and we expect to get the same result as you.
+In short, we are going to copy-paste your code to run it and we expect to get the same result as you. -->
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+**Screenshots / Logs**
+<!-- If applicable, add screenshots or logs to help explain your problem. -->
 
 **Installed Versions**
-Which version of AutoGluon are you are using?  
-If you are using 0.4.0 and newer, please run the following code snippet:
+<!-- Please run the following code snippet: -->
 <details>
 
 ```python
@@ -36,6 +38,3 @@ show_versions()
 ```
 
 </details>
-
-**Additional context**
-Add any other context about the problem here.
