@@ -1488,6 +1488,10 @@ class AbstractTrainer:
                 fit_log_message += f' Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.'
             logger.log(20, fit_log_message)
 
+            if isinstance(model, BaggedEnsembleModel) and not compute_score:
+                # Do not perform OOF predictions when we don't compute a score.
+                model_fit_kwargs['_skip_oof'] = True
+
             # If model is not bagged model and not stacked then pseudolabeled data needs to be incorporated at this level
             # Bagged model does validation on the fit level where as single models do it separately. Hence this if statement
             # is required

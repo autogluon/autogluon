@@ -15,7 +15,7 @@ import pandas as pd
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.log_utils import DuplicateFilter
-from .fold_fitting_strategy import AbstractFoldFittingStrategy, SequentialLocalFoldFittingStrategy, ParallelFoldFittingStrategy, ParallelLocalFoldFittingStrategy, ParallelDistributedFoldFittingStrategy
+from .fold_fitting_strategy import FoldFittingStrategy, SequentialLocalFoldFittingStrategy, ParallelFoldFittingStrategy, ParallelLocalFoldFittingStrategy, ParallelDistributedFoldFittingStrategy
 from ..abstract.abstract_model import AbstractModel
 from ..abstract.model_trial import model_trial, skip_hpo
 from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL_SUFFIX
@@ -176,6 +176,7 @@ class BaggedEnsembleModel(AbstractModel):
              n_repeats=1,
              n_repeat_start=0,
              groups=None,
+             _skip_oof=False,
              **kwargs):
         use_child_oof = self.params.get('use_child_oof', False)
         if use_child_oof:
@@ -220,7 +221,9 @@ class BaggedEnsembleModel(AbstractModel):
         if self._oof_pred_proba is None and self.is_fit():
             self._load_oof()
 
-        if (not self._get_tags_child().get('can_refit_full', False) or k_fold == 1) and not self.params.get('save_bag_folds', True):
+        can_refit_full = self._get_tags_child().get('can_refit_full', False)
+
+        if (not can_refit_full or k_fold == 1) and not self.params.get('save_bag_folds', True):
             # TODO: This is a hack to avoid a very challenging situation:
             #  in high_quality preset we don't save fold models, but for models that don't support refit_full,
             #  they must copy the first fold model instead of fitting again.
@@ -234,11 +237,15 @@ class BaggedEnsembleModel(AbstractModel):
 
         save_bag_folds = self.params.get('save_bag_folds', True)
         if k_fold == 1:
-            self._fit_single(X=X, y=y, model_base=model_base, use_child_oof=use_child_oof, **kwargs)
+            self._fit_single(X=X, y=y, model_base=model_base, use_child_oof=use_child_oof, skip_oof=_skip_oof, **kwargs)
             return self
         else:
             refit_folds = self.params.get('refit_folds', False)
             if refit_folds:
+                if n_repeat_start != 0 or k_fold_start != 0:
+                    raise AssertionError(f'n_repeat_start and k_fold_start must be 0 with refit_folds=True, values: ({n_repeat_start}, {k_fold_start})')
+                if k_fold_end != k_fold:
+                    raise AssertionError(f'k_fold_end and k_fold must be equal with refit_folds=True, values: ({k_fold_end}, {k_fold})')
                 save_bag_folds = False
                 if kwargs.get('time_limit', None) is not None:
                     fold_start = n_repeat_start * k_fold + k_fold_start
@@ -249,19 +256,19 @@ class BaggedEnsembleModel(AbstractModel):
             self._fit_folds(X=X, y=y, model_base=model_base, X_pseudo=X_pseudo, y_pseudo=y_pseudo,
                             k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end,
                             n_repeats=n_repeats, n_repeat_start=n_repeat_start, save_folds=save_bag_folds, groups=groups, **kwargs)
-            # FIXME: Don't save folds except for refit
             # FIXME: Cleanup self
-            # FIXME: Don't add `_FULL` to name
             # FIXME: Support `can_refit_full=False` models
             if refit_folds:
-                refit_template = self.convert_to_refit_full_template()
+                refit_template = self.convert_to_refit_full_template(name_suffix=None)
                 refit_template.params['use_child_oof'] = False
                 kwargs['time_limit'] = None
-                refit_template.fit(X=X, y=y, k_fold=1, **kwargs)
+                # _skip_oof=True to avoid inferring on training data needlessly.
+                refit_template.fit(X=X, y=y, k_fold=1, _skip_oof=True, **kwargs)
                 refit_template._oof_pred_proba = self._oof_pred_proba
                 refit_template._oof_pred_model_repeats = self._oof_pred_model_repeats
                 refit_template._child_oof = True
                 refit_template.fit_time += self.fit_time + self.predict_time
+                refit_template.predict_time = self.predict_time
                 return refit_template
             else:
                 return self
@@ -345,7 +352,7 @@ class BaggedEnsembleModel(AbstractModel):
             sample_weight = sample_weight[valid_indices]
         return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba, sample_weight=sample_weight)
 
-    def _fit_single(self, X, y, model_base, use_child_oof, time_limit=None, **kwargs):
+    def _fit_single(self, X, y, model_base, use_child_oof, time_limit=None, skip_oof=False, **kwargs):
         if self.is_fit():
             raise AssertionError('Model is already fit.')
         if self._n_repeats != 0:
@@ -356,46 +363,48 @@ class BaggedEnsembleModel(AbstractModel):
         model_base.fit(X=X, y=y, time_limit=time_limit, **kwargs)
         model_base.fit_time = time.time() - time_start_fit
         model_base.predict_time = None
-        X_len = len(X)
+        if not skip_oof:
+            X_len = len(X)
+            # Check if pred_proba is going to take too long
+            if time_limit is not None and X_len >= 10000:
 
-        # Check if pred_proba is going to take too long
-        if time_limit is not None and X_len >= 10000:
+                max_allowed_time = time_limit * 1.3  # allow some buffer
+                time_left = max(
+                    max_allowed_time - model_base.fit_time,
+                    time_limit * 0.1,  # At least 10% of time_limit
+                    10,  # At least 10 seconds
+                )
+                # Sample at most 500 rows to estimate prediction time of all rows
+                # TODO: Consider moving this into end of abstract model fit for all models.
+                #  Currently this only fixes problem when in bagged mode, if not bagging, then inference could still be problematic
+                n_sample = min(500, round(X_len * 0.1))
+                frac = n_sample / X_len
+                X_sample = X.sample(n=n_sample)
+                time_start_predict = time.time()
+                model_base.predict_proba(X_sample)
+                time_predict_frac = time.time() - time_start_predict
+                time_predict_estimate = time_predict_frac / frac
+                logger.log(15, f'\t{round(time_predict_estimate, 2)}s\t= Estimated out-of-fold prediction time...')
+                if time_predict_estimate > time_left:
+                    logger.warning(f'\tNot enough time to generate out-of-fold predictions for model. Estimated time required was {round(time_predict_estimate, 2)}s compared to {round(time_left, 2)}s of available time.')
+                    raise TimeLimitExceeded
 
-            max_allowed_time = time_limit * 1.3  # allow some buffer
-            time_left = max(
-                max_allowed_time - model_base.fit_time,
-                time_limit * 0.1,  # At least 10% of time_limit
-                10,  # At least 10 seconds
-            )
-            # Sample at most 500 rows to estimate prediction time of all rows
-            # TODO: Consider moving this into end of abstract model fit for all models.
-            #  Currently this only fixes problem when in bagged mode, if not bagging, then inference could still be problematic
-            n_sample = min(500, round(X_len * 0.1))
-            frac = n_sample / X_len
-            X_sample = X.sample(n=n_sample)
-            time_start_predict = time.time()
-            model_base.predict_proba(X_sample)
-            time_predict_frac = time.time() - time_start_predict
-            time_predict_estimate = time_predict_frac / frac
-            logger.log(15, f'\t{round(time_predict_estimate, 2)}s\t= Estimated out-of-fold prediction time...')
-            if time_predict_estimate > time_left:
-                logger.warning(f'\tNot enough time to generate out-of-fold predictions for model. Estimated time required was {round(time_predict_estimate, 2)}s compared to {round(time_left, 2)}s of available time.')
-                raise TimeLimitExceeded
-
-        if use_child_oof:
-            logger.log(15, '\t`use_child_oof` was specified for this model. It will function similarly to a bagged model, but will only fit one child model.')
-            time_start_predict = time.time()
-            if model_base._get_tags().get('valid_oof', False):
-                self._oof_pred_proba = model_base.get_oof_pred_proba(X=X, y=y)
+            if use_child_oof:
+                logger.log(15, '\t`use_child_oof` was specified for this model. It will function similarly to a bagged model, but will only fit one child model.')
+                time_start_predict = time.time()
+                if model_base._get_tags().get('valid_oof', False):
+                    self._oof_pred_proba = model_base.get_oof_pred_proba(X=X, y=y)
+                else:
+                    logger.warning('\tWARNING: `use_child_oof` was specified but child model does not have a dedicated `get_oof_pred_proba` method. This model may have heavily overfit validation scores.')
+                    self._oof_pred_proba = model_base.predict_proba(X=X)
+                self._child_oof = True
+                model_base.predict_time = time.time() - time_start_predict
+                model_base.val_score = model_base.score_with_y_pred_proba(y=y, y_pred_proba=self._oof_pred_proba)
             else:
-                logger.warning('\tWARNING: `use_child_oof` was specified but child model does not have a dedicated `get_oof_pred_proba` method. This model may have heavily overfit validation scores.')
-                self._oof_pred_proba = model_base.predict_proba(X=X)
-            self._child_oof = True
-            model_base.predict_time = time.time() - time_start_predict
-            model_base.val_score = model_base.score_with_y_pred_proba(y=y, y_pred_proba=self._oof_pred_proba)
-        else:
-            self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
-        self._oof_pred_model_repeats = np.ones(shape=len(X), dtype=np.uint8)
+                logger.log(30, f'\tWARNING: Setting `self._oof_pred_proba` by predicting on train directly! '
+                               f'This is probably a bug and should be investigated...')
+                self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
+            self._oof_pred_model_repeats = np.ones(shape=len(X), dtype=np.uint8)
         model_base.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
         if not self.params.get('save_bag_folds', True):
             model_base.model = None
@@ -469,7 +478,7 @@ class BaggedEnsembleModel(AbstractModel):
                    num_cpus=None,
                    num_gpus=None,
                    **kwargs):
-        fold_fitting_strategy = self._get_fold_fitting_strategy(model_base=model_base, num_gpus=num_gpus)
+        fold_fitting_strategy_cls = self._get_fold_fitting_strategy(model_base=model_base, num_gpus=num_gpus)
         # TODO: Preprocess data here instead of repeatedly
         # FIXME: Raise exception if multiclass/binary and a single val fold contains all instances of a class. (Can happen if custom groups is specified)
         time_start = time.time()
@@ -512,16 +521,16 @@ class BaggedEnsembleModel(AbstractModel):
             save_folds=save_folds, num_cpus=num_cpus, num_gpus=num_gpus
         )
         # noinspection PyCallingNonCallable
-        if issubclass(fold_fitting_strategy, ParallelFoldFittingStrategy):
+        if issubclass(fold_fitting_strategy_cls, ParallelFoldFittingStrategy):
             fold_fitting_strategy_args['num_jobs'] = num_folds
             fold_fitting_strategy_args['num_folds_parallel'] = num_folds_parallel
-        if fold_fitting_strategy == ParallelDistributedFoldFittingStrategy:
+        if fold_fitting_strategy_cls == ParallelDistributedFoldFittingStrategy:
             fold_fitting_strategy_args['model_sync_path'] = DistributedContext.get_model_sync_path()
-        fold_fitting_strategy = fold_fitting_strategy(**fold_fitting_strategy_args)
+        fold_fitting_strategy: FoldFittingStrategy = fold_fitting_strategy_cls(**fold_fitting_strategy_args)
 
         if type(fold_fitting_strategy) == ParallelLocalFoldFittingStrategy and not fold_fitting_strategy.is_mem_sufficient():
             # If memory is not sufficient, fall back to sequential fold strategy
-            fold_fitting_strategy: AbstractFoldFittingStrategy = SequentialLocalFoldFittingStrategy(**fold_fitting_strategy_args)
+            fold_fitting_strategy: FoldFittingStrategy = SequentialLocalFoldFittingStrategy(**fold_fitting_strategy_args)
             logger.log(30, f'\tMemory not enough to fit {model_base.__class__.__name__} folds in parallel. Will do sequential fitting instead. '
                            f'\tConsider decreasing folds trained in parallel by passing num_folds_parallel to ag_args_ensemble when calling predictor.fit')
 
@@ -569,7 +578,7 @@ class BaggedEnsembleModel(AbstractModel):
                                n_repeat_end) -> (list, int, int):
         """
         Generates fold configs given a cv_splitter, k_fold start-end and n_repeat start-end.
-        Fold configs are used by inheritors of AbstractFoldFittingStrategy when fitting fold models.
+        Fold configs are used by inheritors of FoldFittingStrategy when fitting fold models.
 
         Returns a list of fold configs, the number of started repeats, and the number of finished repeats.
         """
@@ -754,15 +763,30 @@ class BaggedEnsembleModel(AbstractModel):
         return self.load_child(self.models[0]).get_compiler_name()
 
     # TODO: Multiply epochs/n_iterations by some value (such as 1.1) to account for having more training data than bagged models
-    def convert_to_refit_full_template(self):
+    def convert_to_refit_full_template(self, name_suffix=REFIT_FULL_SUFFIX) -> AbstractModel:
+        """
+        After calling this function, returned model should be able to be fit without X_val, y_val using the iterations trained by the original model.
+
+        Parameters
+        ----------
+        name_suffix : str, default = '_FULL'
+            If name_suffix is not None, will append name_suffix to self.name when creating the template model's name.
+            Be careful of setting to None or empty string, as this will lead to the template overwriting self on disk when saved.
+
+        Returns
+        -------
+        model_full_template : AbstractModel
+            Unfit model capable of being fit without X_val, y_val. Hyperparameters are based on post-fit self hyperparameters.
+        """
         init_args = self.get_params()
         init_args['hyperparameters']['save_bag_folds'] = True  # refit full models must save folds
         init_args['model_base'] = self.convert_to_refit_full_template_child()
-        init_args['name'] = init_args['name'] + REFIT_FULL_SUFFIX
+        if name_suffix:
+            init_args['name'] = init_args['name'] + name_suffix
         model_full_template = self.__class__(**init_args)
         return model_full_template
 
-    def convert_to_refit_full_template_child(self):
+    def convert_to_refit_full_template_child(self) -> AbstractModel:
         refit_params_trained = self._get_compressed_params_trained()
         refit_params = copy.deepcopy(self._get_model_base().get_params())
         refit_params['hyperparameters'].update(refit_params_trained)
