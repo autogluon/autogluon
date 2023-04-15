@@ -235,11 +235,48 @@ def get_s3_to_local_tuple_list(*,
     return s3_to_local_tuple_list
 
 
-def download_s3_file(*, s3_path: str, local_path: str, mkdir: bool = True, dry_run: bool = False):
+def download_s3_file(*,
+                     local_path: str,
+                     s3_path: Optional[str] = None,
+                     s3_bucket: Optional[str] = None,
+                     s3_prefix: Optional[str] = None,
+                     mkdir: bool = True,
+                     dry_run: bool = False):
     """
     Download a file from s3 to local.
+
+    Must specify either `s3_path` or (`s3_bucket`, `s3_prefix`).
+    Will raise an AssertionError if none or both are specified.
+
+    Parameters
+    ----------
+    local_path: str
+        The location to save the file on local disk.
+        Example: `local_path="folder/name.csv"`
+            Note that you must specify the filename in this path, not just the folder.
+    s3_path: str, default = None
+        The complete s3 path of the file, including both the bucket and prefix. This is also known as the "S3 URI".
+        Example: `s3_path="s3://autogluon/datasets/Inc/train.csv"`
+            This refers to a file located in the s3_bucket "autogluon" with the s3_prefix "datasets/Inc/train.csv"
+            An alternative way to download the file is via `s3_bucket="autogluon"`, `s3_prefix="datasets/Inc/train.csv"`
+    s3_bucket: str, default = None
+        The s3 bucket of the file to download.
+        Only specify if `s3_path` is None.
+    s3_prefix: str, default = None
+        The s3 prefix of the file to download.
+        Only specify if `s3_path` is None.
+    # TODO: mkdir
+    # TODO: dry_run
     """
-    s3_bucket, s3_prefix = s3_path_to_bucket_prefix(s3_path=s3_path)
+    if s3_path is not None:
+        if s3_bucket is not None or s3_prefix is not None:
+            raise AssertionError(f'`s3_bucket` and `s3_prefix must not be specified when `s3_path` is specified. '
+                                 f'(`s3_bucket={s3_bucket}`, `s3_prefix={s3_prefix}`, `s3_path={s3_path}`)')
+        s3_bucket, s3_prefix = s3_path_to_bucket_prefix(s3_path=s3_path)
+    else:
+        assert s3_bucket is not None, f'`s3_bucket` must be specified when `s3_path` is None.'
+        assert s3_prefix is not None, f'`s3_prefix` must be specified when `s3_path` is None.'
+        s3_path = s3_bucket_prefix_to_path(bucket=s3_bucket, prefix=s3_prefix, version='s3')
     if dry_run:
         logger.log(20, f'Dry Run: Would download S3 file "{s3_path}" to "{local_path}"')
     else:
