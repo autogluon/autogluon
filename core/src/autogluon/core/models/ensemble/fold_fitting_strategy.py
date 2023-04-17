@@ -622,7 +622,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         logger.debug(f'Folding resources per job {resources}')
         train_index, val_index = fold
         fold_ctx_ref = self.ray.put(fold_ctx)
-        save_bag_folds = self.bagged_ensemble_model.params.get('save_bag_folds', True)
+        save_bag_folds = self.save_folds
         kwargs_fold = kwargs.copy()
         is_pseudo = X_pseudo_ref is not None and y_pseudo_ref is not None
         if self.sample_weight is not None:
