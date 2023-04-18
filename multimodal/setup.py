@@ -83,6 +83,11 @@ if __name__ == "__main__":
         "configs/environment/*.yaml",
         "configs/distiller/*.yaml",
         "configs/matcher/*.yaml",
+        "configs/pretrain/detection/*.py",
+        "configs/pretrain/detection/faster_rcnn/*.py",
+        "configs/pretrain/detection/voc/*.py",
+        "configs/pretrain/detection/yolox/*.py",
+        "cli/*.py",
     ]
     setup(
         install_requires=install_requires,
