@@ -15,7 +15,7 @@ from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
 from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
-from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
+from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
 
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
@@ -397,3 +397,60 @@ def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict
         # No models failed during prediction
         assert inputs["DeepAR"] is not None
         assert inputs["ETS"] is not None
+
+
+@pytest.fixture(scope="module")
+def trained_and_refit_trainers():
+    def fit_trainer():
+        temp_model_path = tempfile.mkdtemp()
+        trainer = AutoTimeSeriesTrainer(
+            path=temp_model_path + os.path.sep,
+            prediction_length=3,
+        )
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={
+                "Naive": {},
+                "ETS": {"maxiter": 1},
+                "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
+                "AutoGluonTabular": {"tabular_hyperparameters": {"GBM": {}}},
+            },
+        )
+        return trainer
+
+    trainer = fit_trainer()
+    refit_trainer = fit_trainer()
+    refit_trainer.refit_full("all")
+
+    yield trainer, refit_trainer
+
+
+def test_when_refit_full_called_then_all_models_except_local_models_are_retrained(trained_and_refit_trainers):
+    trainer, refit_trainer = trained_and_refit_trainers
+    leaderboard_initial = trainer.leaderboard()
+    leaderboard_refit = refit_trainer.leaderboard()
+
+    expected_refit_full_dict = {name: name + ag.constants.REFIT_FULL_NAME for name in trainer.get_model_names()}
+    assert dict_equal_primitive(refit_trainer.model_full_dict, expected_refit_full_dict)
+    assert len(leaderboard_refit) == len(leaderboard_initial) + len(expected_refit_full_dict)
+
+
+def test_when_refit_full_called_then_all_models_can_predict(trained_and_refit_trainers):
+    _, refit_trainer = trained_and_refit_trainers
+    for model in refit_trainer.get_model_names():
+        preds = refit_trainer.predict(DUMMY_TS_DATAFRAME, model=model)
+        assert isinstance(preds, TimeSeriesDataFrame)
+        assert len(preds) == DUMMY_TS_DATAFRAME.num_items * refit_trainer.prediction_length
+
+
+def test_when_refit_full_called_with_model_name_then_single_model_is_updated(temp_model_path):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
+    trainer.fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters={
+            "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
+            "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
+        },
+    )
+    model_full_dict = trainer.refit_full("DeepAR")
+    assert list(model_full_dict.values()) == ["DeepAR_FULL"]

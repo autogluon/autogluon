@@ -397,3 +397,6 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         for col in data.columns:
             data[col] = data[col] * scale_per_item
         return data
+
+    def _more_tags(self) -> dict:
+        return {"can_refit_full": True}

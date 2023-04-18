@@ -184,7 +184,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     @classmethod
     def load(
         cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
-    ) -> "AbstractTimeSeriesModel":
+    ) -> AbstractTimeSeriesModel:
         model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
         # Most recent model is always generated for the window W0
         most_recent_model_path = model.path + os.sep + "W0" + os.sep
@@ -194,3 +194,9 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             verbose=verbose,
         )
         return model
+
+    def convert_to_refit_full_template(self) -> AbstractTimeSeriesModel:
+        return self.most_recent_model.convert_to_refit_full_template()
+
+    def _more_tags(self) -> dict:
+        return self.most_recent_model._get_tags()

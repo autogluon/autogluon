@@ -223,7 +223,5 @@ class TimeSeriesLearner(AbstractLearner):
         learner_info.pop("random_state", None)
         return learner_info
 
-    def refit_full(self, models="all"):
-        # TODO: Implement refitting
-        # return self.load_trainer().refit_full(models=models)
-        raise NotImplementedError("refitting logic currently not implemented in autogluon.timeseries")
+    def refit_full(self, model: str = "best") -> Dict[str, str]:
+        return self.load_trainer().refit_full(model=model)
