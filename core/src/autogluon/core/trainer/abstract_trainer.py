@@ -238,12 +238,26 @@ class AbstractTrainer:
         path = path_context
         model_paths = self.get_models_attribute_dict(attribute='path')
         og_path = self.path
-        if os.path.sep != self._og_os_path_sep:
-            # Update the original path to use the current OS os.path.sep value
-            og_path = og_path.replace(self._og_os_path_sep, os.path.sep)
-        for model, og_path_model in model_paths.items():
+        try: # Added Try/Except to be backwards compatible with older versions of AutoGluon models
             if os.path.sep != self._og_os_path_sep:
-                og_path_model = og_path_model.replace(self._og_os_path_sep, os.path.sep)
+                # Update the original path to use the current OS os.path.sep value
+                og_path = og_path.replace(self._og_os_path_sep, os.path.sep)
+        except AttributeError: # older version of AutoGluon models does not have _og_os_path_sep attributes
+            if "/models/" in og_path and os.path.sep != "/":
+                og_path = og_path.replace("/", os.path.sep)
+            elif "\\models\\" in og_path and os.path.sep != "\\":
+                og_path = og_path.replace("\\", os.path.sep)
+                
+        for model, og_path_model in model_paths.items():
+            
+            try:  # Added Try/Except to be backwards compatible with older versions of AutoGluon models
+                if os.path.sep != self._og_os_path_sep:
+                    og_path_model = og_path_model.replace(self._og_os_path_sep, os.path.sep)
+            except AttributeError:
+                if "/models/" in og_path_model and os.path.sep != "/":
+                    og_path_model = og_path_model.replace("/", os.path.sep)
+                elif "\\models\\" in og_path_model and os.path.sep != "\\":
+                    og_path_model = og_path_model.replace("\\", os.path.sep)
             prev_path = os.path.abspath(og_path_model) + os.path.sep
             abs_path = os.path.abspath(og_path) + os.path.sep
             model_local_path = prev_path.split(abs_path, 1)[1]
@@ -1355,8 +1369,10 @@ class AbstractTrainer:
         else:
             if path is None:
                 path = self.get_model_attribute(model=model_name, attribute='path')
+                logging.warning(f'model path is: {path}')
             if model_type is None:
                 model_type = self.get_model_attribute(model=model_name, attribute='type')
+                logging.warning(f'model type is: {model_type}')
             return model_type.load(path=path, reset_paths=self.reset_paths)
 
     def unpersist_models(self, model_names='all') -> list:
