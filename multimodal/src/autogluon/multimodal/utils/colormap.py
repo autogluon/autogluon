@@ -1,4 +1,8 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
+# ------------------------------------------------------------------------
+# Modified from GroundingDino (https://github.com/IDEA-Research/GroundingDINO)
+# That modified from DETR (https://github.com/facebookresearch/detr)
+# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# ------------------------------------------------------------------------
 
 """
 An awesome colormap for really neat visualizations.

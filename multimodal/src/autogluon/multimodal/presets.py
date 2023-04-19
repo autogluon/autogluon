@@ -293,6 +293,55 @@ def zero_shot_image_classification(presets: str = DEFAULT):
 
 
 @automm_presets.register()
+def open_vocabulary_object_detection(presets: str = DEFAULT):
+    """
+    Register the presets for open_vocabulary_object_detection.
+
+    Parameters
+    ----------
+    presets
+        The preset name.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
+    hyperparameters = {
+        "model.names": ["ovd"],  # TODO: update with more preset hps
+    }
+    hyperparameter_tune_kwargs = {}
+
+    if presets in [DEFAULT, BEST_QUALITY]:
+        hyperparameters.update(
+            {
+                "model.ovd.checkpoint_name": "swinB",  # TODO: update this name
+                "env.eval_batch_size_ratio": 1,
+            }
+        )
+    elif presets == HIGH_QUALITY:
+        hyperparameters.update(
+            {
+                "model.ovd.checkpoint_name": "swinB",
+                "env.eval_batch_size_ratio": 1,
+            }
+        )
+    elif presets == MEDIUM_QUALITY:
+        hyperparameters.update(
+            {
+                "model.ovd.checkpoint_name": "swinT",
+                "env.eval_batch_size_ratio": 1,
+            }
+        )
+    else:
+        raise ValueError(f"Unknown preset type: {presets}")
+
+    return hyperparameters, hyperparameter_tune_kwargs
+
+
+@automm_presets.register()
 def object_detection(presets: str = DEFAULT):
     """
     Register the presets for object_detection.

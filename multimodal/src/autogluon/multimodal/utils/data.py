@@ -29,6 +29,7 @@ from ..constants import (
     NER_ANNOTATION,
     NER_TEXT,
     NUMERICAL,
+    OVD,
     ROIS,
     TEXT,
     TEXT_NER,
@@ -45,6 +46,7 @@ from ..data import (
     NerLabelEncoder,
     NerProcessor,
     NumericalProcessor,
+    OVDProcessor,
     TextProcessor,
 )
 from ..data.infer_types import is_image_column
@@ -179,6 +181,12 @@ def create_data_processor(
             max_img_num_per_col=model_config.max_img_num_per_col,
             missing_value_strategy=config.data.image.missing_value_strategy,
         )
+    elif data_type == OVD:
+        data_processor = OVDProcessor(
+            model=model,
+            max_img_num_per_col=model_config.max_img_num_per_col,
+            missing_value_strategy=config.data.image.missing_value_strategy,
+        )
     elif data_type == DOCUMENT:
         train_transforms, val_transforms = get_image_transforms(
             model_config=model_config,
@@ -271,6 +279,17 @@ def create_fusion_data_processors(
             data_processors[ROIS].append(
                 create_data_processor(
                     data_type=ROIS,
+                    config=config,
+                    model=per_model,
+                )
+            )
+            if data_types is not None and IMAGE in data_types:
+                data_types.remove(IMAGE)
+        elif per_name == OVD:
+            # create a multimodal processor for NER.
+            data_processors[OVD].append(
+                create_data_processor(
+                    data_type=OVD,
                     config=config,
                     model=per_model,
                 )

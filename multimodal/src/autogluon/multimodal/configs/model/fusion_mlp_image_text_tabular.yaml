@@ -150,6 +150,15 @@ model:
     max_img_num_per_col: 1
     output_bbox_format: "xyxy"
 
+  open_vocabulary_detection:
+    checkpoint_name: "grounding_dino_swinB"
+    config_file: ""
+    data_types:
+      - "image"
+      - "text"
+    max_img_num_per_col: 1
+    output_bbox_format: "xyxy"
+
   mmocr_text_detection:
     checkpoint_name: "TextSnake"
     data_types:

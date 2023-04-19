@@ -68,6 +68,7 @@ from .constants import (
     OBJECT_DETECTION,
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
+    OPEN_VOCABULARY_OBJECT_DETECTION,
     OVERALL_F1,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
@@ -215,6 +216,7 @@ class MultiModalPredictor(ExportMixin):
             In addition, we support advanced problems such as
 
             - 'object_detection': Object detection
+            - 'open_vocabulry_object_detection': Zero-shot object detection (only support inference for now, finetuning TBC)
             - 'ner' or 'named_entity_recognition': Named entity extraction
             - 'text_similarity': Text-text similarity problem
             - 'image_similarity': Image-image similarity problem
@@ -231,6 +233,7 @@ class MultiModalPredictor(ExportMixin):
             problem types:
 
             - 'object_detection'
+            - 'open_vocabulry_object_detection'
             - 'text_similarity'
             - 'image_similarity'
             - 'image_text_similarity'

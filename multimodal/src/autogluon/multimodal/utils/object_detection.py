@@ -26,6 +26,7 @@ from ..constants import (
     MAR_SMALL,
     MEAN_AVERAGE_PRECISION,
     OBJECT_DETECTION,
+    OPEN_VOCABULARY_OBJECT_DETECTION,
 )
 from .download import download, is_url
 from .inference import predict
@@ -1500,8 +1501,10 @@ def evaluate_coco(
     eval_tool
         The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
     """
-    assert predictor._problem_type == OBJECT_DETECTION, (
-        f"predictor.evaluate_coco() is only supported when problem_type is {OBJECT_DETECTION}. "
+    assert (
+        predictor._problem_type == OBJECT_DETECTION or predictor._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION
+    ), (
+        f"predictor.evaluate_coco() is only supported when problem_type is {OBJECT_DETECTION} or {OPEN_VOCABULARY_OBJECT_DETECTION}. "
         f"Received problem_type={predictor._problem_type}."
     )
     if isinstance(anno_file_or_df, str):
