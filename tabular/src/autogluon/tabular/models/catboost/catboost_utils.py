@@ -5,6 +5,9 @@ from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, S
 logger = logging.getLogger(__name__)
 
 
+CATBOOST_QUANTILE_PREFIX = 'MultiQuantile:'
+
+
 # TODO: Add weight support?
 # TODO: Can these be optimized? What computational cost do they have compared to the default catboost versions?
 class CustomMetric:
@@ -66,10 +69,12 @@ def get_catboost_metric_from_ag_metric(metric, problem_type, quantile_levels=Non
         )
         metric_class = metric_map.get(metric.name, 'RMSE')
     elif problem_type == QUANTILE:
-        if quantile_levels is None or not all(0 < q < 1 for q in quantile_levels):
+        if quantile_levels is None:
+            raise AssertionError(f'quantile_levels must be provided for problem_type = {problem_type}')
+        if not all(0 < q < 1 for q in quantile_levels):
             raise AssertionError(f'quantile_levels must fulfill 0 < q < 1')
         quantile_string = ','.join(str(q) for q in quantile_levels)
-        metric_class = f'MultiQuantile:alpha={quantile_string}'
+        metric_class = f'{CATBOOST_QUANTILE_PREFIX}alpha={quantile_string}'
     else:
         raise AssertionError(f'CatBoost does not support {problem_type} problem type.')
 
