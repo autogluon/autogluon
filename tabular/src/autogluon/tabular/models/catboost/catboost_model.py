@@ -6,7 +6,7 @@ import numpy as np
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, SOFTCLASS
+from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, QUANTILE, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -39,7 +39,7 @@ class CatBoostModel(AbstractModel):
         # Set 'allow_writing_files' to True in order to keep log files created by catboost during training (these will be saved in the directory where AutoGluon stores this model)
         self._set_default_param_value('allow_writing_files', False)  # Disables creation of catboost logging files during training by default
         if self.problem_type != SOFTCLASS:  # TODO: remove this after catboost 0.24
-            self._set_default_param_value('eval_metric', get_catboost_metric_from_ag_metric(self.stopping_metric, self.problem_type))
+            self._set_default_param_value('eval_metric', get_catboost_metric_from_ag_metric(self.stopping_metric, self.problem_type, self.quantile_levels))
 
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=self.num_classes)
@@ -88,6 +88,9 @@ class CatBoostModel(AbstractModel):
             from .catboost_softclass_utils import SoftclassCustomMetric, SoftclassObjective
             params['loss_function'] = SoftclassObjective.SoftLogLossObjective()
             params['eval_metric'] = SoftclassCustomMetric.SoftLogLossMetric()
+        elif self.problem_type == QUANTILE:
+            # FIXME: Unless specified, CatBoost defaults to loss_function='MultiQuantile' and raises an exception
+            params['loss_function'] = params['eval_metric']
 
         model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         num_rows_train = len(X)
@@ -193,7 +196,6 @@ class CatBoostModel(AbstractModel):
                     extra_fit_kwargs['early_stopping_rounds'] = early_stopping_rounds
                 elif isinstance(early_stopping_rounds, tuple):
                     extra_fit_kwargs['early_stopping_rounds'] = 50
-
         self.model = model_type(**params)
 
         # TODO: Custom metrics don't seem to work anymore

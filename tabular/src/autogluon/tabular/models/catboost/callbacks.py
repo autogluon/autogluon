@@ -139,7 +139,13 @@ class EarlyStoppingCallback:
 
     def after_iteration(self, info):
         is_best_iter = False
-        cur_score = info.metrics[self.compare_key][self.eval_metric_name][-1]
+        if self.eval_metric_name.startswith('MultiQuantile'):
+            # FIXME: CatBoost adds extra ',' in the metric name if quantile levels are not balanced
+            # e.g., 'MultiQuantile:alpha=0.1,0.25,0.5,0.95' becomes 'MultiQuantile:alpha=0.1,,0.25,0.5,0.95'
+            eval_metric_name = [k for k in info.metrics[self.compare_key] if k.startswith('MultiQuantile')][0]
+        else:
+            eval_metric_name = self.eval_metric_name
+        cur_score = info.metrics[self.compare_key][eval_metric_name][-1]
         if not self.is_max_optimal:
             cur_score *= -1
         if self.best_score is None:

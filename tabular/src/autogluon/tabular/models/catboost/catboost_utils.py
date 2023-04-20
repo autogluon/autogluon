@@ -1,6 +1,6 @@
 import logging
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class CustomMetric:
         raise NotImplementedError
 
 
-def get_catboost_metric_from_ag_metric(metric, problem_type):
+def get_catboost_metric_from_ag_metric(metric, problem_type, quantile_levels=None):
     if problem_type == SOFTCLASS:
         from .catboost_softclass_utils import SoftclassCustomMetric
         if metric.name != 'soft_log_loss':
@@ -65,6 +65,11 @@ def get_catboost_metric_from_ag_metric(metric, problem_type):
             r2='R2',
         )
         metric_class = metric_map.get(metric.name, 'RMSE')
+    elif problem_type == QUANTILE:
+        if quantile_levels is None or not all(0 < q < 1 for q in quantile_levels):
+            raise AssertionError(f'quantile_levels must fulfill 0 < q < 1')
+        quantile_string = ','.join(str(q) for q in quantile_levels)
+        metric_class = f'MultiQuantile:alpha={quantile_string}'
     else:
         raise AssertionError(f'CatBoost does not support {problem_type} problem type.')
 
