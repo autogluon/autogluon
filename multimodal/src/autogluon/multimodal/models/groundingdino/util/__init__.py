@@ -4,5 +4,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 # ------------------------------------------------------------------------
 
-from utils import clean_state_dict, get_phrases_from_posmap
-from slconfig import SLConfig
+from .utils import clean_state_dict, get_phrases_from_posmap
+from .slconfig import SLConfig

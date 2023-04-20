@@ -7,9 +7,10 @@ import PIL
 from PIL import ImageFile
 from torch import nn
 
-from ...constants import COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
-from ..collator import PadCollator, StackCollator
+from ..constants import COLUMN, IMAGE, IMAGE_PATH, IMAGE_VALID_NUM, PROMPT
+from .collator import ListCollator, PadCollator
 from .transform_bbox import *
+from .utils import is_image_input, is_rois_input
 
 logger = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -62,6 +63,10 @@ class OVDProcessor:
         return f"{self.prefix}_{IMAGE}"
 
     @property
+    def prompt_key(self):
+        return f"{self.prefix}_{PROMPT}"
+
+    @property
     def image_valid_num_key(self):
         return f"{self.prefix}_{IMAGE_VALID_NUM}"
 
@@ -89,14 +94,14 @@ class OVDProcessor:
         fn.update(
             {
                 self.image_key: PadCollator(pad_val=0),
-                self.text_key: StackCollator(),
+                self.prompt_key: ListCollator(),
             }
         )
         return fn
 
     def process_one_sample(
         self,
-        image_paths: Dict[str, List[str]],
+        texts_and_images: Dict[str, Union[str, List[str]]],
         is_training: bool,
     ) -> Dict:
         """
@@ -105,9 +110,8 @@ class OVDProcessor:
 
         Parameters
         ----------
-        image_paths
-            One sample may have multiple image columns in a pd.DataFrame and multiple images
-            inside each image column.
+        texts_and_images
+            The input could be image or text (image captions) for open vocabulary detection.
         is_training
             Whether to process images in the training mode.
 
@@ -115,31 +119,51 @@ class OVDProcessor:
         -------
         A dictionary containing one sample's images and their number.
         """
-        mm_data = dict(img_prefix=None, bbox_fields=[], mask_fields=[])
         ret = {}
+        image_data = {}
 
-        for per_col_name, per_col_content in image_paths.items():
-            print(per_col_name)
-            print(per_col_content)
-            exit()
-            if is_rois_input(per_col_content):
-                rois = np.array(per_col_content)
-                # TODO: add gt masks
-                mm_data["ann_info"] = dict(bboxes=rois[:, :4], labels=rois[:, 4], masks=[])
-            else:
+        for per_col_name, per_col_content in texts_and_images.items():
+            if is_image_input(per_col_content, IMAGE_PATH):
                 with PIL.Image.open(per_col_content[0]) as img:
-                    mm_data["img_info"] = dict(filename=per_col_content[0], height=img.height, width=img.width)
+                    image_data[self.image_key] = dict(filename=per_col_content[0], height=img.height, width=img.width)
+            elif is_rois_input(per_col_content):
+                raise NotImplementedError(
+                    "Finetuning/Evaluation with ground truth labels are not implemented for OVD yet"
+                )  # TODO
+            else:
+                ret[self.prompt_key] = per_col_content[0]
         if self.requires_column_info:
             pass  # TODO
 
-        ret.update({self.image_key: self.train_processor(mm_data) if is_training else self.val_processor(mm_data)})
+        ret.update(
+            {self.image_key: self.train_processor(image_data) if is_training else self.val_processor(image_data)}
+        )
 
         return ret
 
+    def train_processor(self, image_data):
+        raise NotImplementedError("Training mode not implemented for OVD yet.")
+
+    def val_processor(self, image_data):
+        import autogluon.multimodal.models.groundingdino.datasets.transforms as T
+
+        image_path = image_data[self.image_key]["filename"]
+
+        image_pil = PIL.Image.open(image_path).convert("RGB")
+
+        transform = T.Compose(
+            [
+                T.RandomResize([800], max_size=1333),
+                T.ToTensor(),
+                T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ]
+        )
+        image, _ = transform(image_pil, None)  # 3, h, w
+        return image
+
     def __call__(
         self,
-        texts: Dict[str, str],
-        images: Dict[str, List[str]],
+        texts_and_images: Dict[str, Union[str, List[str]]],
         feature_modalities: Dict[str, Union[int, float, list]],
         is_training: bool,
     ) -> Dict:
@@ -159,9 +183,9 @@ class OVDProcessor:
         -------
         A dictionary containing one sample's processed images and their number.
         """
-        images = {k: [v] if isinstance(v, str) else v for k, v in images.items()}
+        texts_and_images = {k: [v] if isinstance(v, str) else v for k, v in texts_and_images.items()}
 
-        return self.process_one_sample(images, texts, is_training)
+        return self.process_one_sample(texts_and_images, is_training)
 
     def __getstate__(self):
         odict = self.__dict__.copy()  # get attribute dictionary

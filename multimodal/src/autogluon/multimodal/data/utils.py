@@ -3,10 +3,12 @@ import codecs
 import copy
 import re
 import warnings
+from io import BytesIO
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
+import PIL
 from omegaconf import ListConfig
 from text_unidecode import unidecode
 from timm.data.constants import (
@@ -18,7 +20,16 @@ from timm.data.constants import (
 from tokenizers import pre_tokenizers
 from torchvision import transforms
 
-from ..constants import CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, IDENTIFIER, IMAGE, MMDET_IMAGE, MMLAB_MODELS
+from ..constants import (
+    CLIP_IMAGE_MEAN,
+    CLIP_IMAGE_STD,
+    IDENTIFIER,
+    IMAGE,
+    IMAGE_BYTEARRAY,
+    IMAGE_PATH,
+    MMDET_IMAGE,
+    MMLAB_MODELS,
+)
 from .collator import DictCollator
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 
@@ -419,6 +430,39 @@ def is_rois_input(sample):
     bool, whether a sample is rois for object detection
     """
     return isinstance(sample, list) and len(sample) and isinstance(sample[0], list) and len(sample[0]) == 5
+
+
+def is_image_input(images, image_type):
+    """
+    check if an (/a list of) data is image(s) (IMAGE_PATH/IMAGE_BYTEARRAY)
+
+    Parameters
+    ----------
+    images
+        The sampled data.
+
+    Returns
+    -------
+    bool, whether the data are images"""
+    success = False
+    if not isinstance(images, list):
+        images = [images]
+    for per_image in images:
+        try:
+            if image_type == IMAGE_PATH:
+                with PIL.Image.open(per_image) as img:
+                    pass
+            elif image_type == IMAGE_BYTEARRAY:
+                with PIL.Image.open(BytesIO(per_image)) as img:
+                    pass
+            else:
+                raise ValueError(f"Unsupported image type: {image_type}")
+        except:
+            success = False
+            break
+
+        success = True
+    return success
 
 
 def get_text_token_max_len(provided_max_len, config, tokenizer, checkpoint_name):

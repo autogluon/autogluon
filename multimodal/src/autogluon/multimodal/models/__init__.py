@@ -16,5 +16,6 @@ from .mmocr_text_recognition import MMOCRAutoModelForTextRecognition
 from .ner_text import HFAutoModelForNER
 from .numerical_mlp import NumericalMLP
 from .numerical_transformer import NumericalTransformer
+from .ovd import OVDModel
 from .t_few import TFewModel
 from .timm_image import TimmAutoModelForImagePrediction

@@ -41,3 +41,7 @@ text_dropout = 0.0
 fusion_dropout = 0.0
 fusion_droppath = 0.1
 sub_sentence_present = True
+
+# TODO: move to our HP settings?
+box_threshold = 0.3
+text_threshold = 0.25

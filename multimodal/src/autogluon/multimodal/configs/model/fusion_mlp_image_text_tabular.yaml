@@ -150,8 +150,8 @@ model:
     max_img_num_per_col: 1
     output_bbox_format: "xyxy"
 
-  open_vocabulary_detection:
-    checkpoint_name: "grounding_dino_swinB"
+  ovd:
+    checkpoint_name: "GroundingDINO_SwinB"
     config_file: ""
     data_types:
       - "image"

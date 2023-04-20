@@ -317,21 +317,21 @@ def open_vocabulary_object_detection(presets: str = DEFAULT):
     if presets in [DEFAULT, BEST_QUALITY]:
         hyperparameters.update(
             {
-                "model.ovd.checkpoint_name": "swinB",  # TODO: update this name
+                "model.ovd.checkpoint_name": "GroundingDINO_SwinB",  # TODO: update this name
                 "env.eval_batch_size_ratio": 1,
             }
         )
     elif presets == HIGH_QUALITY:
         hyperparameters.update(
             {
-                "model.ovd.checkpoint_name": "swinB",
+                "model.ovd.checkpoint_name": "GroundingDINO_SwinB",
                 "env.eval_batch_size_ratio": 1,
             }
         )
     elif presets == MEDIUM_QUALITY:
         hyperparameters.update(
             {
-                "model.ovd.checkpoint_name": "swinT",
+                "model.ovd.checkpoint_name": "GroundingDINO_SwinT_OGC",
                 "env.eval_batch_size_ratio": 1,
             }
         )

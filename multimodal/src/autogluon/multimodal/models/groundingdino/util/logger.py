@@ -1,4 +1,8 @@
+# ------------------------------------------------------------------------
+# Modified from GroundingDino (https://github.com/IDEA-Research/GroundingDINO)
+# That modified from DETR (https://github.com/facebookresearch/detr)
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# ------------------------------------------------------------------------
 import functools
 import logging
 import os

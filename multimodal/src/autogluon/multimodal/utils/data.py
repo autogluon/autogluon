@@ -245,6 +245,7 @@ def create_fusion_data_processors(
         ROIS: [],
         TEXT_NER: [],
         DOCUMENT: [],
+        OVD: [],
     }
 
     model_dict = {model.prefix: model}
@@ -286,7 +287,7 @@ def create_fusion_data_processors(
             if data_types is not None and IMAGE in data_types:
                 data_types.remove(IMAGE)
         elif per_name == OVD:
-            # create a multimodal processor for NER.
+            # create a multimodal processor for OVD.
             data_processors[OVD].append(
                 create_data_processor(
                     data_type=OVD,
@@ -306,7 +307,7 @@ def create_fusion_data_processors(
             )
             data_processors[LABEL].append(label_processor)
 
-        if requires_data and data_types:
+        if requires_data and data_types and per_name != OVD:  # currently OVD does not require additional processors
             for data_type in data_types:
                 per_data_processor = create_data_processor(
                     data_type=data_type,

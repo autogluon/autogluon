@@ -23,8 +23,8 @@ from torch import nn
 from torchvision.ops.boxes import nms
 from transformers import AutoTokenizer, BertModel, BertTokenizer, RobertaModel, RobertaTokenizerFast
 
-from groundingdino.util import box_ops, get_tokenlizer
-from groundingdino.util.misc import (
+from autogluon.multimodal.models.groundingdino.util import box_ops, get_tokenlizer
+from autogluon.multimodal.models.groundingdino.util.misc import (
     NestedTensor,
     accuracy,
     get_world_size,
@@ -33,9 +33,9 @@ from groundingdino.util.misc import (
     is_dist_avail_and_initialized,
     nested_tensor_from_tensor_list,
 )
-from groundingdino.util.utils import get_phrases_from_posmap
-from groundingdino.util.visualizer import COCOVisualizer
-from groundingdino.util.vl_utils import create_positive_map_from_span
+from autogluon.multimodal.models.groundingdino.util.utils import get_phrases_from_posmap
+from autogluon.multimodal.models.groundingdino.util.visualizer import COCOVisualizer
+from autogluon.multimodal.models.groundingdino.util.vl_utils import create_positive_map_from_span
 
 from ..registry import MODULE_BUILD_FUNCS
 from .backbone import build_backbone
@@ -169,9 +169,7 @@ class GroundingDINO(nn.Module):
         if dec_pred_bbox_embed_share:
             box_embed_layerlist = [_bbox_embed for i in range(transformer.num_decoder_layers)]
         else:
-            box_embed_layerlist = [
-                copy.deepcopy(_bbox_embed) for i in range(transformer.num_decoder_layers)
-            ]
+            box_embed_layerlist = [copy.deepcopy(_bbox_embed) for i in range(transformer.num_decoder_layers)]
         class_embed_layerlist = [_class_embed for i in range(transformer.num_decoder_layers)]
         self.bbox_embed = nn.ModuleList(box_embed_layerlist)
         self.class_embed = nn.ModuleList(class_embed_layerlist)
@@ -180,9 +178,7 @@ class GroundingDINO(nn.Module):
 
         # two stage
         self.two_stage_type = two_stage_type
-        assert two_stage_type in ["no", "standard"], "unknown param {} of two_stage_type".format(
-            two_stage_type
-        )
+        assert two_stage_type in ["no", "standard"], "unknown param {} of two_stage_type".format(two_stage_type)
         if two_stage_type != "no":
             if two_stage_bbox_embed_share:
                 assert dec_pred_bbox_embed_share
@@ -231,21 +227,15 @@ class GroundingDINO(nn.Module):
         len(captions)
 
         # encoder texts
-        tokenized = self.tokenizer(captions, padding="longest", return_tensors="pt").to(
-            samples.device
-        )
+        tokenized = self.tokenizer(captions, padding="longest", return_tensors="pt").to(samples.device)
         (
             text_self_attention_masks,
             position_ids,
             cate_to_token_mask_list,
-        ) = generate_masks_with_special_tokens_and_transfer_map(
-            tokenized, self.specical_tokens, self.tokenizer
-        )
+        ) = generate_masks_with_special_tokens_and_transfer_map(tokenized, self.specical_tokens, self.tokenizer)
 
         if text_self_attention_masks.shape[1] > self.max_text_len:
-            text_self_attention_masks = text_self_attention_masks[
-                :, : self.max_text_len, : self.max_text_len
-            ]
+            text_self_attention_masks = text_self_attention_masks[:, : self.max_text_len, : self.max_text_len]
             position_ids = position_ids[:, : self.max_text_len]
             tokenized["input_ids"] = tokenized["input_ids"][:, : self.max_text_len]
             tokenized["attention_mask"] = tokenized["attention_mask"][:, : self.max_text_len]
@@ -271,9 +261,7 @@ class GroundingDINO(nn.Module):
             encoded_text = encoded_text[:, : self.max_text_len, :]
             text_token_mask = text_token_mask[:, : self.max_text_len]
             position_ids = position_ids[:, : self.max_text_len]
-            text_self_attention_masks = text_self_attention_masks[
-                :, : self.max_text_len, : self.max_text_len
-            ]
+            text_self_attention_masks = text_self_attention_masks[:, : self.max_text_len, : self.max_text_len]
 
         text_dict = {
             "encoded_text": encoded_text,  # bs, 195, d_model
@@ -327,10 +315,7 @@ class GroundingDINO(nn.Module):
 
         # output
         outputs_class = torch.stack(
-            [
-                layer_cls_embed(layer_hs, text_dict)
-                for layer_cls_embed, layer_hs in zip(self.class_embed, hs)
-            ]
+            [layer_cls_embed(layer_hs, text_dict) for layer_cls_embed, layer_hs in zip(self.class_embed, hs)]
         )
         out = {"pred_logits": outputs_class[-1], "pred_boxes": outputs_coord_list[-1]}
 
@@ -353,10 +338,7 @@ class GroundingDINO(nn.Module):
         # this is a workaround to make torchscript happy, as torchscript
         # doesn't support dictionary with non-homogeneous values, such
         # as a dict having both a Tensor and a list.
-        return [
-            {"pred_logits": a, "pred_boxes": b}
-            for a, b in zip(outputs_class[:-1], outputs_coord[:-1])
-        ]
+        return [{"pred_logits": a, "pred_boxes": b} for a, b in zip(outputs_class[:-1], outputs_coord[:-1])]
 
 
 @MODULE_BUILD_FUNCS.registe_with_name(module_name="groundingdino")

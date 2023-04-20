@@ -31,7 +31,7 @@ from ..constants import (
     TEXT,
     TEXT_NER,
 )
-from .utils import is_rois_input
+from .utils import is_image_input, is_rois_input
 
 logger = logging.getLogger(__name__)
 
@@ -198,26 +198,7 @@ def is_image_column(
 
     failure_count = 0
     for images in data:
-        success = False
-        if not isinstance(images, list):
-            images = [images]
-        for per_image in images:
-            try:
-                if image_type == IMAGE_PATH:
-                    with PIL.Image.open(per_image) as img:
-                        pass
-                elif image_type == IMAGE_BYTEARRAY:
-                    with PIL.Image.open(BytesIO(per_image)) as img:
-                        pass
-                else:
-                    raise ValueError(f"Unsupported image type: {image_type}")
-            except:
-                success = False
-                break
-
-            success = True
-
-        if not success:
+        if not is_image_input(images, image_type):
             failure_count += 1
     failure_ratio = failure_count / sample_num
     # Tolerate high failure rate in case that many image files may be corrupted.

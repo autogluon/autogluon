@@ -1,4 +1,8 @@
+# ------------------------------------------------------------------------
+# Modified from GroundingDino (https://github.com/IDEA-Research/GroundingDINO)
+# That modified from DETR (https://github.com/facebookresearch/detr)
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# ------------------------------------------------------------------------
 """
 Misc functions, including distributed helpers.
 
@@ -352,11 +356,7 @@ class MetricLogger(object):
             end = time.time()
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-        print_func(
-            "{} Total time: {} ({:.4f} s / it)".format(
-                header, total_time_str, total_time / len(iterable)
-            )
-        )
+        print_func("{} Total time: {} ({:.4f} s / it)".format(header, total_time_str, total_time / len(iterable)))
 
 
 def get_sha():
@@ -408,9 +408,7 @@ class NestedTensor(object):
                 self.mask = self.mask.sum(1).to(bool)
             else:
                 raise ValueError(
-                    "tensors dim must be 3 or 4 but {}({})".format(
-                        self.tensors.dim(), self.tensors.shape
-                    )
+                    "tensors dim must be 3 or 4 but {}({})".format(self.tensors.dim(), self.tensors.shape)
                 )
 
     def imgsize(self):
@@ -502,9 +500,7 @@ def nested_tensor_from_tensor_list(tensor_list: List[Tensor]):
 def _onnx_nested_tensor_from_tensor_list(tensor_list: List[Tensor]) -> NestedTensor:
     max_size = []
     for i in range(tensor_list[0].dim()):
-        max_size_i = torch.max(
-            torch.stack([img.shape[i] for img in tensor_list]).to(torch.float32)
-        ).to(torch.int64)
+        max_size_i = torch.max(torch.stack([img.shape[i] for img in tensor_list]).to(torch.float32)).to(torch.int64)
         max_size.append(max_size_i)
     max_size = tuple(max_size)
 
@@ -591,11 +587,7 @@ def init_distributed_mode(args):
         # args.world_size = args.world_size * local_world_size
         # args.gpu = args.local_rank = int(os.environ['LOCAL_RANK'])
         # args.rank = args.rank * local_world_size + args.local_rank
-        print(
-            "world size: {}, rank: {}, local rank: {}".format(
-                args.world_size, args.rank, args.local_rank
-            )
-        )
+        print("world size: {}, rank: {}, local rank: {}".format(args.world_size, args.rank, args.local_rank))
         print(json.dumps(dict(os.environ), indent=2))
     elif "SLURM_PROCID" in os.environ:
         args.rank = int(os.environ["SLURM_PROCID"])
@@ -692,9 +684,7 @@ class color_sys:
             hue = i / 360.0
             lightness = (50 + np.random.rand() * 10) / 100.0
             saturation = (90 + np.random.rand() * 10) / 100.0
-            colors.append(
-                tuple([int(j * 255) for j in colorsys.hls_to_rgb(hue, lightness, saturation)])
-            )
+            colors.append(tuple([int(j * 255) for j in colorsys.hls_to_rgb(hue, lightness, saturation)]))
         self.colors = colors
 
     def __call__(self, idx):

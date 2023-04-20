@@ -36,7 +36,6 @@ class OVDModel(nn.Module):
         self,
         prefix: str,
         checkpoint_name: str,
-        num_classes: Optional[int] = None,
         pretrained: Optional[bool] = True,
     ):
         """
@@ -56,7 +55,6 @@ class OVDModel(nn.Module):
         super().__init__()
         logger.debug(f"initializing {checkpoint_name}")
         self.checkpoint_name = checkpoint_name
-        self.num_classes = num_classes
 
         self.config, self.model = self.get_ovd_config_and_model(
             checkpoint_name=checkpoint_name, pretrained=pretrained
@@ -73,6 +71,10 @@ class OVDModel(nn.Module):
     @property
     def image_key(self):
         return f"{self.prefix}_{IMAGE}"
+
+    @property
+    def prompt_key(self):
+        return f"{self.prefix}_{PROMPT}"
 
     @property
     def image_valid_num_key(self):
@@ -106,49 +108,63 @@ class OVDModel(nn.Module):
         -------
             A dictionary with logits and features.
         """
-        from .grounding_dino.util import get_phrases_from_posmap
+        from .groundingdino.util import get_phrases_from_posmap
 
-        def process_caption(caption):
+        def process_caption(caption):  # TODO: split if it's too long
             caption = caption.lower().strip()
             if not caption.endswith("."):
                 caption = caption + "."
             return caption
 
-        captions = [process_caption(caption) for caption in batch[PROMPT]]
-        images = batch["images"]
+        captions = [process_caption(caption) for caption in batch[self.prompt_key]]
+        images = batch[self.image_key]
 
         with torch.no_grad():
             outputs = self.model(images, captions=captions)
         logits = (
             outputs["pred_logits"].cpu().sigmoid()
         )  # (bs, nq, 256)  # TODO: will .cpu() affect the data collection of lightning?
-        boxes = outputs["pred_boxes"].cpu()[0]  # (bs, nq, 4)
+        boxes = outputs["pred_boxes"].cpu()  # (bs, nq, 4)
 
         # filter output
-        logits_filt = logits.clone()
-        boxes_filt = boxes.clone()
-        filt_mask = logits_filt.max(dim=2)[0] > self.box_threshold
-        logits_filt = logits_filt[filt_mask]  # bs, num_filt, 256
-        boxes_filt = boxes_filt[filt_mask]  # bs, num_filt, 4
+        batch_size = logits.shape[0]  # bs
+        logits_filt = logits.clone()  # bs, num_filt(900), 256
+        boxes_filt = boxes.clone()  # bs, num_filt(900), 4
+        filt_mask = logits_filt.max(dim=2)[0] > self.box_threshold  # bs, num_filt(900)
+        logits_filt = [
+            logits_filt[sample_idx][filt_mask[sample_idx]] for sample_idx in range(batch_size)
+        ]  # [bs * (num_after_mask_this_sample, 256)]
+        boxes_filt = [
+            boxes_filt[sample_idx][filt_mask[sample_idx]] for sample_idx in range(batch_size)
+        ]  # [bs * (num_after_mask_this_sample, 4)]
 
         # get phrase
         tokenizer = self.model.tokenizer
-        tokenized = tokenizer(captions)
+        tokenized = [tokenizer(caption) for caption in captions]
         # build pred
         pred_phrases = []
-        batch_size = boxes_filt.shape[0]
         for sample_idx in range(batch_size):
-            pred_phrases_per_sample = []
-            for logit, box in zip(logits_filt[sample_idx], boxes_filt[sample_idx]):
-                pred_phrase = get_phrases_from_posmap(logit > self.text_threshold, tokenized, tokenizer)
+            pred_phrase_per_sample = []
+            logits_filt_per_sample = logits_filt[sample_idx]
+            boxes_filt_per_sample = boxes_filt[sample_idx]
+            tokenized_per_sample = tokenized[sample_idx]
+            for logit, box in zip(logits_filt_per_sample, boxes_filt_per_sample):
+                pred_phrase = get_phrases_from_posmap(logit > self.text_threshold, tokenized_per_sample, tokenizer)
                 if with_logits:
-                    pred_phrases_per_sample.append(pred_phrase + f"({str(logit.max().item())[:4]})")
+                    pred_phrase_per_sample.append(pred_phrase + f"({str(logit.max().item())[:4]})")
                 else:
-                    pred_phrases_per_sample.append(pred_phrase)
-            pred_phrases.append(pred_phrases_per_sample)
+                    pred_phrase_per_sample.append(pred_phrase)
+            pred_phrases.append(pred_phrase_per_sample)
 
-        ret = {BBOX: boxes_filt}
-        ret = {PROMPT: pred_phrases}
+        ret = {
+            BBOX: boxes_filt,
+            PROMPT: pred_phrases,
+            LOGITS: [logits_filt_per_sample.max(dim=1)[0] for logits_filt_per_sample in logits_filt],
+        }
+
+        print(ret[LOGITS][0].shape)
+        print(ret[LOGITS][1].shape)
+        exit()
 
         return ret
 
@@ -162,18 +178,18 @@ class OVDModel(nn.Module):
         ovd_configs_dir = get_pretrain_configs_dir(subfolder="ovd")
         OVD_CUSTOM_MODELS = {
             "GroundingDINO_SwinB": {
-                "url": "https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn_1x_voc0712_20220320_192712-54bef0f3.pth",
+                "url": "https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha2/groundingdino_swinb_cogcoor.pth",
                 "config_file": os.path.join(ovd_configs_dir, "grounding_dino", "GroundingDINO_SwinB.cfg.py"),
             },
             "GroundingDINO_SwinT_OGC": {
-                "url": "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_nano.pth",
+                "url": "https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha/groundingdino_swint_ogc.pth",
                 "config_file": os.path.join(ovd_configs_dir, "grounding_dino", "GroundingDINO_SwinT_OGC.py"),
             },
         }
 
         if checkpoint_name in ["GroundingDINO_SwinB" or "GroundingDINO_SwinT_OGC"]:
-            from .grounding_dino.models import build_model
-            from .grounding_dino.util import clean_state_dict, SLConfig
+            from .groundingdino.models import build_model
+            from .groundingdino.util import clean_state_dict, SLConfig
 
             model_config_path = OVD_CUSTOM_MODELS[checkpoint_name]["config_file"]
 
