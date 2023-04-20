@@ -10,15 +10,16 @@ def ovd():
     # Evaluation on test dataset
     test_result = predictor.predict(
         {
-            "images": [
+            "image": [
                 "/home/haoyfang/datasets/AGDetBench/cityscapes/images/leftImg8bit/train/zurich/zurich_000006_000019_leftImg8bit.png",
                 "/home/haoyfang/datasets/AGDetBench/cityscapes/images/leftImg8bit/train/zurich/zurich_000005_000019_leftImg8bit.png",
             ],
-            "prompts": [
+            "prompt": [
                 "car. bicycle. traffic light. people. building. tree.",
                 "car. bicycle. people. building. tree.",
             ],
-        }
+        },
+        as_pandas=True,
     )
     print("test_result:")
     print(test_result)

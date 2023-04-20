@@ -151,6 +151,7 @@ from .utils import (
     object_detection_data_to_df,
     predict,
     process_batch,
+    save_ovd_result_df,
     save_pretrained_model_configs,
     save_result_df,
     save_text_tokenizers,
@@ -1986,6 +1987,8 @@ class MultiModalPredictor(ExportMixin):
 
         if self._problem_type == NER:
             ret_type = NER_RET
+        elif self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+            ret_type = OPEN_VOCABULARY_OBJECT_DETECTION
         else:
             ret_type = LOGITS
 
@@ -2159,6 +2162,9 @@ class MultiModalPredictor(ExportMixin):
         if self._problem_type == NER:
             ret_type = NER_RET
 
+        if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+            ret_type = OPEN_VOCABULARY_OBJECT_DETECTION
+
         if candidate_data:
             pred = self._match_queries_and_candidates(
                 query_data=data,
@@ -2226,6 +2232,12 @@ class MultiModalPredictor(ExportMixin):
                     pred=pred,
                     data=data,
                     detection_classes=self._model.model.CLASSES,
+                    result_path=None,
+                )
+            elif self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+                pred = save_ovd_result_df(
+                    pred=pred,
+                    data=data,
                     result_path=None,
                 )
             else:

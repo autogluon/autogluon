@@ -20,7 +20,9 @@ from ..constants import (
     NER_ANNOTATION,
     NER_RET,
     OBJECT_DETECTION,
+    OPEN_VOCABULARY_OBJECT_DETECTION,
     PROBABILITY,
+    PROMPT,
     QUERY,
     RESPONSE,
     SCORE,
@@ -84,6 +86,23 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
             ret[feature_name] = torch.cat([ele[feature_name] for ele in feature_masks])
     elif ret_type == BBOX:
         return [ele[BBOX] for ele in outputs]
+    elif ret_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+        ovd_pred = []
+        for ele in outputs:
+            curr_batch_size = len(ele[BBOX])
+            for i in range(curr_batch_size):
+                curr_pred = []
+                curr_pred_size = len(ele[BBOX][i])
+                for j in range(curr_pred_size):
+                    curr_pred.append(
+                        {
+                            "bbox": ele[BBOX][i][j].detach().cpu().numpy(),
+                            "class": ele[PROMPT][i][j],
+                            "score": ele[LOGITS][i][j].detach().cpu().numpy(),
+                        }
+                    )
+                ovd_pred.append(curr_pred)
+        return ovd_pred
     elif ret_type == TEXT:
         return [ele[TEXT] for ele in outputs]  # single image
     elif ret_type == SCORE:

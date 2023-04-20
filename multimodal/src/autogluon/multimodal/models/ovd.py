@@ -95,7 +95,7 @@ class OVDModel(nn.Module):
     def forward(
         self,
         batch: dict,
-        with_logits: bool = True,
+        with_logits: bool = False,
     ):
         """
         Parameters
@@ -162,11 +162,7 @@ class OVDModel(nn.Module):
             LOGITS: [logits_filt_per_sample.max(dim=1)[0] for logits_filt_per_sample in logits_filt],
         }
 
-        print(ret[LOGITS][0].shape)
-        print(ret[LOGITS][1].shape)
-        exit()
-
-        return ret
+        return {self.prefix: ret}
 
     def get_ovd_config_and_model(
         self,
