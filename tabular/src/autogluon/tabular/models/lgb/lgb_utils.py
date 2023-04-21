@@ -106,7 +106,7 @@ def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, pa
 def train_lgb_model(time_limit=None, **train_params):
     import lightgbm as lgb
 
-    if train_params['params']['objective'] == QUANTILE:
+    if train_params['params']['objective'] == 'quantile':
         quantile_levels = train_params['params'].pop('quantile_levels')
         return QuantileBooster(quantile_levels=quantile_levels).fit(time_limit=time_limit, **train_params)
     else:
