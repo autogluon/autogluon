@@ -4,6 +4,9 @@ import time
 
 from autogluon.common.utils.resource_utils import ResourceManager
 
+from .catboost_utils import CATBOOST_QUANTILE_PREFIX
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -136,10 +139,17 @@ class EarlyStoppingCallback:
 
         self.eval_metric_name = eval_metric_name
         self.is_max_optimal = is_max_optimal
+        self.is_quantile = self.eval_metric_name.startswith(CATBOOST_QUANTILE_PREFIX)
 
     def after_iteration(self, info):
         is_best_iter = False
-        cur_score = info.metrics[self.compare_key][self.eval_metric_name][-1]
+        if self.is_quantile:
+            # FIXME: CatBoost adds extra ',' in the metric name if quantile levels are not balanced
+            # e.g., 'MultiQuantile:alpha=0.1,0.25,0.5,0.95' becomes 'MultiQuantile:alpha=0.1,,0.25,0.5,0.95'
+            eval_metric_name = [k for k in info.metrics[self.compare_key] if k.startswith(CATBOOST_QUANTILE_PREFIX)][0]
+        else:
+            eval_metric_name = self.eval_metric_name
+        cur_score = info.metrics[self.compare_key][eval_metric_name][-1]
         if not self.is_max_optimal:
             cur_score *= -1
         if self.best_score is None:
