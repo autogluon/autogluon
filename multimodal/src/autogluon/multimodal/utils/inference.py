@@ -87,6 +87,8 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
     elif ret_type == BBOX:
         return [ele[BBOX] for ele in outputs]
     elif ret_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+        from .object_detection import bbox_ratio_xywh_to_index_xyxy
+
         ovd_pred = []
         for ele in outputs:
             curr_batch_size = len(ele[BBOX])
@@ -96,7 +98,10 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
                 for j in range(curr_pred_size):
                     curr_pred.append(
                         {
-                            "bbox": ele[BBOX][i][j].detach().cpu().numpy(),
+                            "bbox": bbox_ratio_xywh_to_index_xyxy(
+                                xywh=ele[BBOX][i][j].detach().cpu().numpy(),
+                                image_wh=ele["imageinfo"][i],
+                            )[0],
                             "class": ele[PROMPT][i][j],
                             "score": ele[LOGITS][i][j].detach().cpu().numpy(),
                         }

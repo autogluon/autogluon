@@ -73,6 +73,10 @@ class OVDModel(nn.Module):
         return f"{self.prefix}_{IMAGE}"
 
     @property
+    def image_info_key(self):
+        return f"{self.prefix}_imageinfo"
+
+    @property
     def prompt_key(self):
         return f"{self.prefix}_{PROMPT}"
 
@@ -160,6 +164,7 @@ class OVDModel(nn.Module):
             BBOX: boxes_filt,
             PROMPT: pred_phrases,
             LOGITS: [logits_filt_per_sample.max(dim=1)[0] for logits_filt_per_sample in logits_filt],
+            "imageinfo": batch[self.image_info_key],
         }
 
         return {self.prefix: ret}

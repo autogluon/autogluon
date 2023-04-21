@@ -34,7 +34,6 @@ def save_ovd_result_df(pred: Iterable, data: Union[pd.DataFrame, Dict], result_p
         results.append([image_name, image_pred])
     result_df = pd.DataFrame(results, columns=["image", "bboxes"])
 
-    print(result_df)
     if result_path:
         result_df.to_csv(result_path, index=False)
         logger.info("Saved detection results to {}".format(result_path))

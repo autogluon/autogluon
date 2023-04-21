@@ -63,6 +63,10 @@ class OVDProcessor:
         return f"{self.prefix}_{IMAGE}"
 
     @property
+    def image_info_key(self):
+        return f"{self.prefix}_imageinfo"
+
+    @property
     def prompt_key(self):
         return f"{self.prefix}_{PROMPT}"
 
@@ -87,14 +91,15 @@ class OVDProcessor:
         """
         fn = {}
         if self.requires_column_info:
-            assert image_column_names, "Empty image column names."
-            for col_name in image_column_names:
-                fn[f"{self.image_column_prefix}_{col_name}"] = StackCollator()
+            return NotImplementedError(
+                f"requires_column_info={self.requires_column_info} not implemented for OVD tasks."
+            )
 
         fn.update(
             {
                 self.image_key: PadCollator(pad_val=0),
                 self.prompt_key: ListCollator(),
+                self.image_info_key: ListCollator(),
             }
         )
         return fn
@@ -126,6 +131,7 @@ class OVDProcessor:
             if is_image_input(per_col_content, IMAGE_PATH):
                 with PIL.Image.open(per_col_content[0]) as img:
                     image_data[self.image_key] = dict(filename=per_col_content[0], height=img.height, width=img.width)
+                    ret[self.image_info_key] = [img.width, img.height]
             elif is_rois_input(per_col_content):
                 raise NotImplementedError(
                     "Finetuning/Evaluation with ground truth labels are not implemented for OVD yet"

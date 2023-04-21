@@ -13,11 +13,13 @@ def ovd():
             "image": [
                 "/home/haoyfang/datasets/AGDetBench/cityscapes/images/leftImg8bit/train/zurich/zurich_000006_000019_leftImg8bit.png",
                 "/home/haoyfang/datasets/AGDetBench/cityscapes/images/leftImg8bit/train/zurich/zurich_000005_000019_leftImg8bit.png",
-            ],
+            ]
+            * 10,
             "prompt": [
                 "car. bicycle. traffic light. people. building. tree.",
                 "car. bicycle. people. building. tree.",
-            ],
+            ]
+            * 10,
         },
         as_pandas=True,
     )
