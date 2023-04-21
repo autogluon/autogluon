@@ -25,6 +25,7 @@ import torch
 import torch.distributed as dist
 
 # needed due to empty tensor bug in pytorch and torchvision 0.5
+from autogluon.multimodal.utils import CustomUnpickler
 import torchvision
 from torch import Tensor
 
@@ -216,7 +217,7 @@ def all_gather(data):
     data_list = []
     for size, tensor in zip(size_list, tensor_list):
         buffer = tensor.cpu().numpy().tobytes()[:size]
-        data_list.append(pickle.loads(buffer))
+        data_list.append(CustomUnpickler().loads(buffer))
 
     return data_list
 
