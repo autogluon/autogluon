@@ -21,9 +21,7 @@ class Registry(object):
         self._module_dict = dict()
 
     def __repr__(self):
-        format_str = self.__class__.__name__ + "(name={}, items={})".format(
-            self._name, list(self._module_dict.keys())
-        )
+        format_str = self.__class__.__name__ + "(name={}, items={})".format(self._name, list(self._module_dict.keys()))
         return format_str
 
     def __len__(self):
@@ -49,11 +47,7 @@ class Registry(object):
             module (:obj:`nn.Module`): Module to be registered.
         """
         if not inspect.isfunction(module_build_function):
-            raise TypeError(
-                "module_build_function must be a function, but got {}".format(
-                    type(module_build_function)
-                )
-            )
+            raise TypeError("module_build_function must be a function, but got {}".format(type(module_build_function)))
         if module_name is None:
             module_name = module_build_function.__name__
         if not force and module_name in self._module_dict:

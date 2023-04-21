@@ -169,9 +169,7 @@ class Transformer(nn.Module):
 
         # for two stage
         self.two_stage_type = two_stage_type
-        assert two_stage_type in ["no", "standard"], "unknown param {} of two_stage_type".format(
-            two_stage_type
-        )
+        assert two_stage_type in ["no", "standard"], "unknown param {} of two_stage_type".format(two_stage_type)
         if two_stage_type == "standard":
             # anchor selection at the output of encoder
             self.enc_output = nn.Linear(d_model, d_model)
@@ -241,12 +239,8 @@ class Transformer(nn.Module):
         src_flatten = torch.cat(src_flatten, 1)  # bs, \sum{hxw}, c
         mask_flatten = torch.cat(mask_flatten, 1)  # bs, \sum{hxw}
         lvl_pos_embed_flatten = torch.cat(lvl_pos_embed_flatten, 1)  # bs, \sum{hxw}, c
-        spatial_shapes = torch.as_tensor(
-            spatial_shapes, dtype=torch.long, device=src_flatten.device
-        )
-        level_start_index = torch.cat(
-            (spatial_shapes.new_zeros((1,)), spatial_shapes.prod(1).cumsum(0)[:-1])
-        )
+        spatial_shapes = torch.as_tensor(spatial_shapes, dtype=torch.long, device=src_flatten.device)
+        level_start_index = torch.cat((spatial_shapes.new_zeros((1,)), spatial_shapes.prod(1).cumsum(0)[:-1]))
         valid_ratios = torch.stack([self.get_valid_ratio(m) for m in masks], 1)
 
         # two stage
@@ -282,9 +276,7 @@ class Transformer(nn.Module):
         #         import ipdb; ipdb.set_trace()
 
         if self.two_stage_type == "standard":
-            output_memory, output_proposals = gen_encoder_output_proposals(
-                memory, mask_flatten, spatial_shapes
-            )
+            output_memory, output_proposals = gen_encoder_output_proposals(memory, mask_flatten, spatial_shapes)
             output_memory = self.enc_output_norm(self.enc_output(output_memory))
 
             if text_dict is not None:
@@ -310,13 +302,9 @@ class Transformer(nn.Module):
             ).sigmoid()  # sigmoid
 
             # gather tgt
-            tgt_undetach = torch.gather(
-                output_memory, 1, topk_proposals.unsqueeze(-1).repeat(1, 1, self.d_model)
-            )
+            tgt_undetach = torch.gather(output_memory, 1, topk_proposals.unsqueeze(-1).repeat(1, 1, self.d_model))
             if self.embed_init_tgt:
-                tgt_ = (
-                    self.tgt_embed.weight[:, None, :].repeat(1, bs, 1).transpose(0, 1)
-                )  # nq, bs, d_model
+                tgt_ = self.tgt_embed.weight[:, None, :].repeat(1, bs, 1).transpose(0, 1)  # nq, bs, d_model
             else:
                 tgt_ = tgt_undetach.detach()
 
@@ -327,12 +315,8 @@ class Transformer(nn.Module):
                 refpoint_embed, tgt = refpoint_embed_, tgt_
 
         elif self.two_stage_type == "no":
-            tgt_ = (
-                self.tgt_embed.weight[:, None, :].repeat(1, bs, 1).transpose(0, 1)
-            )  # nq, bs, d_model
-            refpoint_embed_ = (
-                self.refpoint_embed.weight[:, None, :].repeat(1, bs, 1).transpose(0, 1)
-            )  # nq, bs, 4
+            tgt_ = self.tgt_embed.weight[:, None, :].repeat(1, bs, 1).transpose(0, 1)  # nq, bs, d_model
+            refpoint_embed_ = self.refpoint_embed.weight[:, None, :].repeat(1, bs, 1).transpose(0, 1)  # nq, bs, 4
 
             if refpoint_embed is not None:
                 refpoint_embed = torch.cat([refpoint_embed, refpoint_embed_], dim=1)
@@ -436,13 +420,9 @@ class TransformerEncoder(nn.Module):
             self.layers = _get_clones(encoder_layer, num_layers, layer_share=enc_layer_share)
 
             if text_enhance_layer is not None:
-                self.text_layers = _get_clones(
-                    text_enhance_layer, num_layers, layer_share=enc_layer_share
-                )
+                self.text_layers = _get_clones(text_enhance_layer, num_layers, layer_share=enc_layer_share)
             if feature_fusion_layer is not None:
-                self.fusion_layers = _get_clones(
-                    feature_fusion_layer, num_layers, layer_share=enc_layer_share
-                )
+                self.fusion_layers = _get_clones(feature_fusion_layer, num_layers, layer_share=enc_layer_share)
         else:
             self.layers = []
             del encoder_layer
@@ -520,26 +500,18 @@ class TransformerEncoder(nn.Module):
 
         # preparation and reshape
         if self.num_layers > 0:
-            reference_points = self.get_reference_points(
-                spatial_shapes, valid_ratios, device=src.device
-            )
+            reference_points = self.get_reference_points(spatial_shapes, valid_ratios, device=src.device)
 
         if self.text_layers:
             # generate pos_text
             bs, n_text, text_dim = memory_text.shape
             if pos_text is None and position_ids is None:
                 pos_text = (
-                    torch.arange(n_text, device=memory_text.device)
-                    .float()
-                    .unsqueeze(0)
-                    .unsqueeze(-1)
-                    .repeat(bs, 1, 1)
+                    torch.arange(n_text, device=memory_text.device).float().unsqueeze(0).unsqueeze(-1).repeat(bs, 1, 1)
                 )
                 pos_text = get_sine_pos_embed(pos_text, num_pos_feats=256, exchange_xy=False)
             if position_ids is not None:
-                pos_text = get_sine_pos_embed(
-                    position_ids[..., None], num_pos_feats=256, exchange_xy=False
-                )
+                pos_text = get_sine_pos_embed(position_ids[..., None], num_pos_feats=256, exchange_xy=False)
 
         # main process
         for layer_id, layer in enumerate(self.layers):
@@ -666,15 +638,12 @@ class TransformerDecoder(nn.Module):
 
             if reference_points.shape[-1] == 4:
                 reference_points_input = (
-                    reference_points[:, :, None]
-                    * torch.cat([valid_ratios, valid_ratios], -1)[None, :]
+                    reference_points[:, :, None] * torch.cat([valid_ratios, valid_ratios], -1)[None, :]
                 )  # nq, bs, nlevel, 4
             else:
                 assert reference_points.shape[-1] == 2
                 reference_points_input = reference_points[:, :, None] * valid_ratios[None, :]
-            query_sine_embed = gen_sineembed_for_position(
-                reference_points_input[:, :, 0, :]
-            )  # nq, bs, 256*2
+            query_sine_embed = gen_sineembed_for_position(reference_points_input[:, :, 0, :])  # nq, bs, 256*2
 
             # conditional query
             raw_query_pos = self.ref_point_head(query_sine_embed)  # nq, bs, 256
@@ -777,9 +746,7 @@ class DeformableTransformerEncoderLayer(nn.Module):
         src = self.norm2(src)
         return src
 
-    def forward(
-        self, src, pos, reference_points, spatial_shapes, level_start_index, key_padding_mask=None
-    ):
+    def forward(self, src, pos, reference_points, spatial_shapes, level_start_index, key_padding_mask=None):
         # self attention
         # import ipdb; ipdb.set_trace()
         src2 = self.self_attn(

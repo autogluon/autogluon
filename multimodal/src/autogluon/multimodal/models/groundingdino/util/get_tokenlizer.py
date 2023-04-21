@@ -9,9 +9,7 @@ def get_tokenlizer(text_encoder_type):
         elif text_encoder_type.get("text_encoder_type", False):
             text_encoder_type = text_encoder_type.get("text_encoder_type")
         else:
-            raise ValueError(
-                "Unknown type of text_encoder_type: {}".format(type(text_encoder_type))
-            )
+            raise ValueError("Unknown type of text_encoder_type: {}".format(type(text_encoder_type)))
     print("final text_encoder_type: {}".format(text_encoder_type))
 
     tokenizer = AutoTokenizer.from_pretrained(text_encoder_type)

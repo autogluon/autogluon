@@ -551,7 +551,7 @@ def bbox_ratio_xywh_to_index_xyxy(
 
             W, H = np.maximum(image_wh[0] - 1, 0), np.maximum(image_wh[1] - 1, 0)
 
-            xywh = xywh * np.array([[W,H,W,H]])  # ratio to index
+            xywh = xywh * np.array([[W, H, W, H]])  # ratio to index
 
             # mid to upper left corner
             xywh[:, :2] -= xywh[:, 2:] / 2

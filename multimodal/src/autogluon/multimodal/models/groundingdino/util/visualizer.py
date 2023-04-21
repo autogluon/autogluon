@@ -19,9 +19,7 @@ from matplotlib.patches import Polygon
 from pycocotools import mask as maskUtils
 
 
-def renorm(
-    img: torch.FloatTensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-) -> torch.FloatTensor:
+def renorm(img: torch.FloatTensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) -> torch.FloatTensor:
     # img: tensor(3,H,W) or tensor(B,3,H,W)
     # return: same as img
     assert img.dim() == 3 or img.dim() == 4, "img.dim() should be 3 or 4 but %d" % img.dim()
@@ -120,9 +118,7 @@ class COCOVisualizer:
             image_id = tgt["image_id"]
 
         if caption is None:
-            savename = "{}/{}-{}.png".format(
-                savedir, int(image_id), str(datetime.datetime.now()).replace(" ", "-")
-            )
+            savename = "{}/{}-{}.png".format(savedir, int(image_id), str(datetime.datetime.now()).replace(" ", "-"))
         else:
             savename = "{}/{}-{}-{}.png".format(
                 savedir, caption, int(image_id), str(datetime.datetime.now()).replace(" ", "-")
@@ -172,9 +168,7 @@ class COCOVisualizer:
         ax.add_collection(p)
 
         if "strings_positive" in tgt and len(tgt["strings_positive"]) > 0:
-            assert (
-                len(tgt["strings_positive"]) == numbox
-            ), f"{len(tgt['strings_positive'])} = {numbox}, "
+            assert len(tgt["strings_positive"]) == numbox, f"{len(tgt['strings_positive'])} = {numbox}, "
             for idx, strlist in enumerate(tgt["strings_positive"]):
                 cate_id = int(tgt["labels"][idx])
                 _string = str(cate_id) + ":" + " ".join(strlist)
@@ -254,9 +248,7 @@ class COCOVisualizer:
                         # mask
                         t = self.imgs[ann["image_id"]]
                         if type(ann["segmentation"]["counts"]) == list:
-                            rle = maskUtils.frPyObjects(
-                                [ann["segmentation"]], t["height"], t["width"]
-                            )
+                            rle = maskUtils.frPyObjects([ann["segmentation"]], t["height"], t["width"])
                         else:
                             rle = [ann["segmentation"]]
                         m = maskUtils.decode(rle)
