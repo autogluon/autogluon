@@ -12,7 +12,7 @@ from pandas import DataFrame, Series
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.common.utils.try_import import try_import_lightgbm
@@ -20,7 +20,7 @@ from autogluon.common.utils.try_import import try_import_lightgbm
 from . import lgb_utils
 from .hyperparameters.parameters import get_param_baseline, get_lgb_objective, DEFAULT_NUM_BOOST_ROUND
 from .hyperparameters.searchspaces import get_default_searchspace
-from .lgb_utils import construct_dataset
+from .lgb_utils import construct_dataset, train_lgb_model
 
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning
 logger = logging.getLogger(__name__)
@@ -140,6 +140,9 @@ class LGBModel(AbstractModel):
                     params['metric'] = train_loss_name
                 elif train_loss_name not in params['metric']:
                     params['metric'] = f'{params["metric"]},{train_loss_name}'
+            if self.problem_type == QUANTILE and time_limit is not None:
+                # Spread time equally among models trained for each quantile level
+                time_limit = time_limit / len(self.quantile_levels)
             callbacks += [
                 # Note: Don't use self.params_aux['max_memory_usage_ratio'] here as LightGBM handles memory per iteration optimally.  # TODO: Consider using when ratio < 1.
                 early_stopping_custom(early_stopping_rounds, metrics_to_use=[('valid_set', stopping_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
@@ -169,20 +172,21 @@ class LGBModel(AbstractModel):
                 train_params['params']['metric'] = f'{train_params["params"]["metric"]},{stopping_metric}'
         if self.problem_type == SOFTCLASS:
             train_params['fobj'] = lgb_utils.softclass_lgbobj
+        elif self.problem_type == QUANTILE:
+            train_params['params']['quantile_levels'] = self.quantile_levels
         if seed_val is not None:
             train_params['params']['seed'] = seed_val
             random.seed(seed_val)
             np.random.seed(seed_val)
 
         # Train LightGBM model:
-        import lightgbm as lgb
         from lightgbm.basic import LightGBMError
         with warnings.catch_warnings():
             # Filter harmless warnings introduced in lightgbm 3.0, future versions plan to remove: https://github.com/microsoft/LightGBM/issues/3379
             warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
             warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
             try:
-                self.model = lgb.train(**train_params)
+                self.model = train_lgb_model(time_limit=time_limit, **train_params)
             except LightGBMError:
                 if train_params['params'].get('device', 'cpu') != 'gpu':
                     raise
@@ -194,7 +198,7 @@ class LGBModel(AbstractModel):
                                    '\tpip install lightgbm --install-option=--gpu'
                                    )
                     train_params['params']['device'] = 'cpu'
-                    self.model = lgb.train(**train_params)
+                    self.model = train_lgb_model(time_limit=time_limit, **train_params)
             retrain = False
             if train_params['params'].get('boosting_type', '') == 'dart':
                 if dataset_val is not None and dart_retrain and (self.model.best_iteration != num_boost_round):
@@ -209,7 +213,7 @@ class LGBModel(AbstractModel):
                         train_params.pop('valid_sets', None)
                         train_params.pop('valid_names', None)
                         train_params['num_boost_round'] = self.model.best_iteration
-                        self.model = lgb.train(**train_params)
+                        self.model = train_lgb_model(time_limit=time_limit, **train_params)
                     else:
                         logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
 
@@ -324,7 +328,7 @@ class LGBModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
-    
+
     def _is_gpu_lgbm_installed(self):
         # Taken from https://github.com/microsoft/LightGBM/issues/3939
         try_import_lightgbm()
@@ -338,7 +342,7 @@ class LGBModel(AbstractModel):
             return True
         except Exception as e:
             return False
-    
+
     def get_minimum_resources(self, is_gpu_available=False):
         minimum_resources = {
             'num_cpus': 1,

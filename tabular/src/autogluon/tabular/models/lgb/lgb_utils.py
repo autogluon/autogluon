@@ -1,9 +1,13 @@
+import copy
 import os
+import time
 
 import numpy as np
+import pandas as pd
 from pandas import DataFrame, Series
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.common.utils.try_import import try_import_lightgbm
 
 
@@ -17,6 +21,9 @@ _ag_to_lgbm_metric_dict = {
     MULTICLASS: dict(
         accuracy='multi_error',
         log_loss='multi_logloss',
+    ),
+    QUANTILE: dict(
+        pinball_loss='quantile',
     ),
     REGRESSION: dict(
         mean_absolute_error='l1',
@@ -94,3 +101,53 @@ def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, pa
         # dataset_binary = lgb.Dataset(location + '.bin', reference=reference, free_raw_data=False)# .construct()
 
     return dataset
+
+
+def train_lgb_model(time_limit=None, **train_params):
+    import lightgbm as lgb
+
+    if train_params['params']['objective'] == QUANTILE:
+        quantile_levels = train_params['params'].pop('quantile_levels')
+        return QuantileBooster(quantile_levels=quantile_levels).fit(time_limit=time_limit, **train_params)
+    else:
+        return lgb.train(**train_params)
+
+
+class QuantileBooster:
+    """Wrapper that trains a separate LGBM Booster for each quantile level."""
+    def __init__(self, quantile_levels):
+        if quantile_levels is None:
+            raise AssertionError
+        if not all(0 < q < 1 for q in quantile_levels):
+            raise AssertionError(f'quantile_levels must fulfill 0 < q < 1, provided quantile_levels: {quantile_levels}')
+
+        self.quantile_levels = quantile_levels
+        self.model_dict = {}
+
+    def fit(self, time_limit=None, **train_params_base):
+        import lightgbm as lgb
+        start_time = time.time()
+
+        for q in self.quantile_levels:
+            train_params = copy.deepcopy(train_params_base)
+            train_params['params']['alpha'] = q
+            self.model_dict[q] = lgb.train(**train_params)
+
+            if time_limit is not None:
+                time_left = time.time() - start_time
+                if time_left < 0 and len(self.model_dict) != len(self.quantile_levels):
+                    raise TimeLimitExceeded
+        return self
+
+    def predict(self, X, num_threads):
+        predictions = {}
+        for q, model in self.model_dict.items():
+            predictions[q] = model.predict(X, num_threads=num_threads)
+        return DataFrame(predictions)
+
+    @property
+    def best_iteration(self):
+        return int(np.ceil(np.mean([model.best_iteration for model in self.model_dict.values()])))
+
+    def current_iteration(self):
+        return int(np.ceil(np.mean([model.current_iteration() for model in self.model_dict.values()])))
