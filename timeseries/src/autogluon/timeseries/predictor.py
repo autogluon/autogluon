@@ -668,6 +668,7 @@ class TimeSeriesPredictor:
         learner = AbstractLearner.load(path)
         predictor = load_pkl.load(path=learner.path + cls.predictor_file_name)
         predictor._learner = learner
+        predictor.path = learner.path
         return predictor
 
     def save(self) -> None:

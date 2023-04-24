@@ -14,6 +14,7 @@ extensions = [
     'sphinx_design',                 # github.com/executablebooks/sphinx-design
     'sphinx_inline_tabs',            # sphinx-inline-tabs.readthedocs.io
     'sphinx_togglebutton',           # sphinx-togglebutton.readthedocs.io
+    'sphinxext.opengraph',           # sphinxext-opengraph.readthedocs.io/en/latest/
     'sphinx.ext.autodoc',            # www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
     'sphinx.ext.autosummary',        # www.sphinx-doc.org/en/master/usage/extensions/autosummary.html
     'sphinx.ext.napoleon',           # www.sphinx-doc.org/en/master/usage/extensions/napoleon.html
@@ -84,3 +85,5 @@ html_static_path = ['_static']
 html_css_files = ['custom.css']
 html_js_files = ['custom.js']
 
+ogp_site_url = "https://auto.gluon.ai/"
+ogp_description_length = 300

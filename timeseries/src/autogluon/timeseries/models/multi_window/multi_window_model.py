@@ -55,7 +55,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.info_per_val_window = []
 
         self.most_recent_model: AbstractTimeSeriesModel = None
-        self.most_recent_model_path: str = None
         super().__init__(**kwargs)
 
     def _fit(
@@ -117,7 +116,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
         # Only the model trained on most recent data is saved & used for prediction
         self.most_recent_model = trained_models[0]
-        self.most_recent_model_path = trained_models[0].path
         self.predict_time = self.most_recent_model.predict_time
         self.fit_time = time.time() - global_fit_start_time - self.predict_time
         self._oof_predictions = pd.concat([model.get_oof_predictions() for model in trained_models])
@@ -188,8 +186,10 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
     ) -> "AbstractTimeSeriesModel":
         model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
+        # Most recent model is always generated for the window W0
+        most_recent_model_path = model.path + os.sep + "W0" + os.sep
         model.most_recent_model = model.model_base_type.load(
-            model.most_recent_model_path,
+            most_recent_model_path,
             reset_paths=reset_paths,
             verbose=verbose,
         )

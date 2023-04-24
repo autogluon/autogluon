@@ -1,3 +1,7 @@
+import os
+import shutil
+import tempfile
+
 import pytest
 
 from autogluon.timeseries.models import DeepARModel, ETSModel
@@ -43,3 +47,18 @@ def test_when_val_data_passed_to_mw_model_fit_then_exception_is_raised(temp_mode
     mw_model = get_multi_window_deepar(path=temp_model_path)
     with pytest.raises(ValueError, match="val_data should not be passed"):
         mw_model.fit(train_data=DUMMY_TS_DATAFRAME, val_data=DUMMY_TS_DATAFRAME)
+
+
+def test_when_saved_model_moved_then_model_can_be_loaded_with_updated_path():
+    original_path = tempfile.mkdtemp() + os.sep
+    model = get_multi_window_deepar(path=original_path)
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    model.save()
+    new_path = tempfile.mkdtemp() + os.sep
+    shutil.move(os.path.join(original_path, model.name), new_path)
+    loaded_model = model.load(os.path.join(new_path, model.name) + os.sep)
+    assert loaded_model.path.startswith(new_path)
+    assert loaded_model.most_recent_model.path.startswith(new_path)
+
+    shutil.rmtree(original_path)
+    shutil.rmtree(new_path)
