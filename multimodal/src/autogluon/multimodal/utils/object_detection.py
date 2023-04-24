@@ -488,12 +488,12 @@ def bbox_ratio_xywh_to_index_xyxy(
     xywh: Optional[Union[list, tuple, np.ndarray]], image_wh: Optional[Union[list, tuple, np.ndarray]]
 ):
     """
-    Convert bounding boxes from format (xmin, ymin, w, h) to (xmin, ymin, xmax, ymax). Modified from gluon cv.
+    Convert bounding boxes from format (x_center_ratio, y_center_ratio, w_ratio, h_ratio) to (xmin, ymin, xmax, ymax) in pixel index.
 
     Parameters
     ----------
     xywh
-        The bbox in format (x, y, w, h).
+        The bbox in format (x_center_ratio, y_center_ratio, w_ratio, h_ratio).
         If numpy.ndarray is provided, we expect multiple bounding boxes with
         shape `(N, 4)`.
 
