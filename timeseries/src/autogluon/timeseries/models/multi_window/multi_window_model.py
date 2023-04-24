@@ -3,11 +3,13 @@ import inspect
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Dict, Optional, Type, Union
 
 import numpy as np
 import pandas as pd
 
+import autogluon.core as ag
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
@@ -31,6 +33,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     num_val_windows : int, default = 1
         Number of windows to use for backtesting, starting from the end of the training data.
     """
+    _most_recent_model_folder: str = "W0"
 
     def __init__(
         self,
@@ -128,7 +131,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
     def get_child_model(self, window_index: int) -> AbstractTimeSeriesModel:
         model = copy.deepcopy(self.model_base)
-        model.set_contexts(self.path + f"W{window_index}" + os.sep)
+        model.rename(model.name + os.sep + f"W{window_index}")
         return model
 
     def predict(
@@ -186,8 +189,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
     ) -> AbstractTimeSeriesModel:
         model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
-        # Most recent model is always generated for the window W0
-        most_recent_model_path = model.path + os.sep + "W0" + os.sep
+        most_recent_model_path = model.path + os.sep + cls._most_recent_model_folder + os.sep
         model.most_recent_model = model.model_base_type.load(
             most_recent_model_path,
             reset_paths=reset_paths,
@@ -197,6 +199,15 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
     def convert_to_refit_full_template(self) -> AbstractTimeSeriesModel:
         return self.most_recent_model.convert_to_refit_full_template()
+
+    def convert_to_refit_full_via_copy(self) -> AbstractTimeSeriesModel:
+        most_recent_model_full = copy.deepcopy(self.most_recent_model)
+        self.most_recent_model = None
+        model_full = copy.deepcopy(self)
+        model_full.rename(self.name + ag.constants.REFIT_FULL_SUFFIX)
+        most_recent_model_full.rename(model_full.name + os.sep + self._most_recent_model_folder)
+        model_full.most_recent_model = most_recent_model_full
+        return model_full
 
     def _more_tags(self) -> dict:
         return self.most_recent_model._get_tags()
