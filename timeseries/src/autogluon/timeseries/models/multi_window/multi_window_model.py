@@ -33,6 +33,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     num_val_windows : int, default = 1
         Number of windows to use for backtesting, starting from the end of the training data.
     """
+
     _most_recent_model_folder: str = "W0"
 
     def __init__(
