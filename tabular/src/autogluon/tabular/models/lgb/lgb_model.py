@@ -140,16 +140,27 @@ class LGBModel(AbstractModel):
                     params['metric'] = train_loss_name
                 elif train_loss_name not in params['metric']:
                     params['metric'] = f'{params["metric"]},{train_loss_name}'
-            if self.problem_type == QUANTILE and time_limit is not None:
-                # Spread time equally among models trained for each quantile level
-                time_limit = time_limit / len(self.quantile_levels)
+            # early stopping callback will be added later by QuantileBooster if problem_type==QUANTILE
+            early_stopping_callback_kwargs = dict(
+                stopping_rounds=early_stopping_rounds,
+                metrics_to_use=[('valid_set', stopping_metric_name)],
+                max_diff=None,
+                start_time=start_time,
+                time_limit=time_limit,
+                ignore_dart_warning=True,
+                verbose=False,
+                manual_stop_file=False,
+                reporter=reporter,
+                train_loss_name=train_loss_name,
+            )
             callbacks += [
                 # Note: Don't use self.params_aux['max_memory_usage_ratio'] here as LightGBM handles memory per iteration optimally.  # TODO: Consider using when ratio < 1.
-                early_stopping_custom(early_stopping_rounds, metrics_to_use=[('valid_set', stopping_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
-                                      ignore_dart_warning=True, verbose=False, manual_stop_file=False, reporter=reporter, train_loss_name=train_loss_name),
+                early_stopping_custom(**early_stopping_callback_kwargs)
             ]
             valid_names = ['valid_set'] + valid_names
             valid_sets = [dataset_val] + valid_sets
+        else:
+            early_stopping_callback_kwargs = None
         from lightgbm.callback import log_evaluation
         if log_period is not None:
             callbacks.append(log_evaluation(period=log_period))
@@ -186,7 +197,7 @@ class LGBModel(AbstractModel):
             warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
             warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
             try:
-                self.model = train_lgb_model(time_limit=time_limit, **train_params)
+                self.model = train_lgb_model(early_stopping_callback_kwargs=early_stopping_callback_kwargs, **train_params)
             except LightGBMError:
                 if train_params['params'].get('device', 'cpu') != 'gpu':
                     raise
@@ -198,7 +209,7 @@ class LGBModel(AbstractModel):
                                    '\tpip install lightgbm --install-option=--gpu'
                                    )
                     train_params['params']['device'] = 'cpu'
-                    self.model = train_lgb_model(time_limit=time_limit, **train_params)
+                    self.model = train_lgb_model(early_stopping_callback_kwargs=early_stopping_callback_kwargs, **train_params)
             retrain = False
             if train_params['params'].get('boosting_type', '') == 'dart':
                 if dataset_val is not None and dart_retrain and (self.model.best_iteration != num_boost_round):
@@ -213,7 +224,7 @@ class LGBModel(AbstractModel):
                         train_params.pop('valid_sets', None)
                         train_params.pop('valid_names', None)
                         train_params['num_boost_round'] = self.model.best_iteration
-                        self.model = train_lgb_model(time_limit=time_limit, **train_params)
+                        self.model = train_lgb_model(**train_params)
                     else:
                         logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
 
