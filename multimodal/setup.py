@@ -76,6 +76,7 @@ extras_require = {
 # Compile for grounding dino
 def get_extensions():
     import glob
+
     import torch
     from torch.utils.cpp_extension import CUDA_HOME, CppExtension, CUDAExtension
 
