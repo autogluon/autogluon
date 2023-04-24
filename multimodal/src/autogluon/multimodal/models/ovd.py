@@ -190,7 +190,7 @@ class OVDModel(nn.Module):
 
         if checkpoint_name in ["GroundingDINO_SwinB" or "GroundingDINO_SwinT_OGC"]:
             from .groundingdino.models import build_model
-            from .groundingdino.util import clean_state_dict, SLConfig
+            from .groundingdino.util import SLConfig, clean_state_dict
 
             model_config_path = OVD_CUSTOM_MODELS[checkpoint_name]["config_file"]
 

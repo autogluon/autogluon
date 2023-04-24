@@ -23,11 +23,11 @@ from typing import List, Optional
 import numpy as np
 import torch
 import torch.distributed as dist
+import torchvision
+from torch import Tensor
 
 # needed due to empty tensor bug in pytorch and torchvision 0.5
 from autogluon.multimodal.utils import CustomUnpickler
-import torchvision
-from torch import Tensor
 
 __torchvision_need_compat_flag = float(torchvision.__version__.split(".")[1]) < 7
 if __torchvision_need_compat_flag:

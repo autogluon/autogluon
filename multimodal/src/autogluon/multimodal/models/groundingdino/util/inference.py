@@ -1,13 +1,13 @@
-from typing import Tuple, List
+from typing import List, Tuple
 
 import cv2
+import groundingdino.datasets.transforms as T
 import numpy as np
 import supervision as sv
 import torch
 from PIL import Image
 from torchvision.ops import box_convert
 
-import groundingdino.datasets.transforms as T
 from autogluon.multimodal.models.groundingdino.models import build_model
 from autogluon.multimodal.models.groundingdino.util.misc import clean_state_dict
 from autogluon.multimodal.models.groundingdino.util.slconfig import SLConfig
