@@ -74,8 +74,6 @@ extras_require = {
 
 
 if __name__ == "__main__":
-    import torch
-
     ag.create_version_file(version=version, submodule=submodule)
     setup_args = ag.default_setup_args(version=version, submodule=submodule)
     setup_args["package_data"]["autogluon.multimodal"] = [
