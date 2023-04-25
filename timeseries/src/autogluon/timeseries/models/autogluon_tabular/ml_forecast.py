@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 class TabularEstimator(BaseEstimator):
     """Scikit-learn compatible interface for TabularPredictor."""
-    label_column_name = "y"
+
+    _label_column_name = "y"
 
     def __init__(self, predictor_init_kwargs: Optional[dict] = None, predictor_fit_kwargs: Optional[dict] = None):
         self.predictor_init_kwargs = predictor_init_kwargs if predictor_init_kwargs is not None else {}
@@ -30,9 +31,9 @@ class TabularEstimator(BaseEstimator):
         }
 
     def fit(self, X, y):
-        assert isinstance(X, pd.DataFrame)
-        df = pd.concat([X, y.rename(self.label_column_name).to_frame()], axis=1)
-        self.predictor = TabularPredictor(label=self.label_column_name, **self.predictor_init_kwargs)
+        assert isinstance(X, pd.DataFrame) and isinstance(y, pd.Series)
+        df = pd.concat([X, y.rename(self._label_column_name).to_frame()], axis=1)
+        self.predictor = TabularPredictor(label=self._label_column_name, **self.predictor_init_kwargs)
         self.predictor.fit(df, **self.predictor_fit_kwargs)
         return self
 
@@ -49,29 +50,65 @@ class RecurrentTabularModel(AbstractTimeSeriesModel):
     lags : List[int], default = None
         Lags of the target that will be used as features for predictions. If None, will be determined automatically
         based on the frequency of the data.
+    date_features : List[Union[str, Callable]], default = None
+        Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
+        If None, will be determined automatically based on the frequency of the data.
     differences : List[int], default = None
         Differences to take of the target before computing the features. These are restored at the forecasting step.
         If None, will be determined automatically based on the frequency of the data.
 
     """
-    # TODO: Parse model kwargs
-    # TODO: Add static features
-    # TODO: Add time features
-    # TODO: Add covariates
-    # TODO: Add transforms
+
+    # TODO: Compute quantiles on the forecast
+    # TODO: Add transforms - std scaling / detrending
+
+    TIMESERIES_METRIC_TO_TABULAR_METRIC = {
+        "MASE": "mean_absolute_error",
+        "MAPE": "mean_absolute_percentage_error",
+        "sMAPE": "mean_absolute_percentage_error",
+        "mean_wQuantileLoss": "mean_absolute_error",
+        "MSE": "mean_squared_error",
+        "RMSE": "root_mean_squared_error",
+    }
+
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
         from mlforecast import MLForecast
-        from mlforecast.target_transforms import Differences
-        from gluonts.time_feature import get_lags_for_frequency
 
-        self.mlf = MLForecast(
-            models={},
-            lags=get_lags_for_frequency(self.freq),
-            freq=self.freq,
-            target_transforms=[Differences([get_seasonality(self.freq)])]
-        )
+        super().__init__(**kwargs)
+        self.mlf: Optional[MLForecast] = None
+
+    def _get_mlforecast_init_args(self, train_data) -> dict:
+        from gluonts.time_feature import get_lags_for_frequency, time_features_from_frequency_str
+        from mlforecast.target_transforms import Differences
+
+        model_params = self._get_model_params().copy()
+        lags = model_params.get("lags")
+        if lags is None:
+            lags = get_lags_for_frequency(self.freq)
+
+        date_features = model_params.get("date_features")
+        if date_features is None:
+            date_features = time_features_from_frequency_str(self.freq)
+
+        differences = model_params.get("differences")
+        if differences is None:
+            differences = [get_seasonality(self.freq)]
+
+        longest_ts_length = train_data.num_timesteps_per_item().max()
+        if longest_ts_length <= max(differences):
+            logger.warning(
+                f"Chosen differences {self._diffrences} are too high for given data "
+                f"(longest time series length = {longest_ts_length}). Disabling differencing."
+            )
+            target_transforms = None
+        else:
+            target_transforms = [Differences(differences)]
+
+        return {
+            "lags": lags,
+            "date_features": date_features,
+            "target_transforms": target_transforms,
+        }
 
     def _fit(
         self,
@@ -81,14 +118,21 @@ class RecurrentTabularModel(AbstractTimeSeriesModel):
         verbosity: int = 2,
         **kwargs,
     ) -> None:
-        d_train, d_val = train_data.train_test_split(self.prediction_length)
-        tuning_data = self._prepare_data(d_val, last_k_values=self.prediction_length)
+        from mlforecast import MLForecast
 
+        # Do not use external val_data as tuning_data to avoid overfitting
+        train_data, val_data = train_data.train_test_split(self.prediction_length)
+        mlforecast_init_args = self._get_mlforecast_init_args(train_data)
+
+        self.mlf = MLForecast(models={}, freq=self.freq, **mlforecast_init_args)
+
+        # TabularEstimator is passed to MLForecast later to include tuning_data
+        tuning_data = self._prepare_data(val_data, last_k_values=self.prediction_length)
         estimator = TabularEstimator(
             predictor_init_kwargs={
                 "problem_type": "regression",
-                "eval_metric": "mean_absolute_error",
-                "verbosity": 0,
+                "eval_metric": self.TIMESERIES_METRIC_TO_TABULAR_METRIC[self.eval_metric],
+                "verbosity": verbosity - 2,
             },
             predictor_fit_kwargs={
                 "time_limit": time_limit,
@@ -96,21 +140,48 @@ class RecurrentTabularModel(AbstractTimeSeriesModel):
                 "tuning_data": tuning_data,
             },
         )
-
         self.mlf.models = {"mean": estimator}
 
-        X_train, y_train = self._prepare_data(d_train, return_X_y=True)
+        X_train, y_train = self._prepare_data(train_data, return_X_y=True)
         with statsmodels_warning_filter():
             self.mlf.fit_models(X_train, y_train)
 
-    def _to_mlforecast_df(self, data: TimeSeriesDataFrame) -> pd.DataFrame:
-        return pd.DataFrame(data)[[self.target]].reset_index().rename(
-            columns={"item_id": "unique_id", "timestamp": "ds", self.target: "y"}
-        )
+    def _to_mlforecast_df(
+        self,
+        data: TimeSeriesDataFrame,
+        static_features: pd.DataFrame,
+        include_target: bool = True,
+    ) -> pd.DataFrame:
+        """Convert TimeSeriesDataFrame to a format supported by MLForecast.
 
-    def _prepare_data(self, data: TimeSeriesDataFrame, last_k_values: int = None, return_X_y: bool = False) -> pd.DataFrame:
-        df = self._to_mlforecast_df(data)
-        features = self.mlf.preprocess(df, dropna=False)
+        Each row contains unique_id, ds, y, and (optionally) known covariates & static features.
+        """
+        # past_covariates & lags for known_covariates are not supported
+        selected_columns = self.metadata.known_covariates_real.copy()
+        column_name_mapping = {ITEMID: "unique_id", TIMESTAMP: "ds"}
+        if include_target:
+            selected_columns += [self.target]
+            column_name_mapping[self.target] = "y"
+
+        df = pd.DataFrame(data)[selected_columns].reset_index()
+        if static_features is not None:
+            df = pd.merge(df, static_features, how="left", on=ITEMID, suffixes=(None, "_static_feat"))
+        return df.rename(columns=column_name_mapping)
+
+    def _prepare_data(
+        self,
+        data: TimeSeriesDataFrame,
+        last_k_values: int = None,
+        return_X_y: bool = False,
+    ) -> pd.DataFrame:
+        """Prepare data that can be given as input to MLForecast.fit()."""
+        df = self._to_mlforecast_df(data, data.static_features)
+        # FIXME: keep_last_n produces a bug if time series too short -> manually select tail of each series
+        features = self.mlf.preprocess(
+            df,
+            dropna=False,
+            static_features=None,  # we handle static features in `_to_mlforecast_df`, without relying on MLForecast
+        )
         if last_k_values is not None:
             features = features.groupby("unique_id", sort=False).tail(last_k_values)
         features.dropna(subset=self.mlf.ts.target_col, inplace=True)
@@ -119,9 +190,21 @@ class RecurrentTabularModel(AbstractTimeSeriesModel):
         else:
             return features[self.mlf.ts.features_order_ + [self.mlf.ts.target_col]]
 
-    def predict(self, data: TimeSeriesDataFrame, known_covariates: TimeSeriesDataFrame = None, **kwargs) -> TimeSeriesDataFrame:
+    def predict(
+        self, data: TimeSeriesDataFrame, known_covariates: TimeSeriesDataFrame = None, **kwargs
+    ) -> TimeSeriesDataFrame:
+        new_data = self._to_mlforecast_df(data, data.static_features)
+        if known_covariates is not None:
+            dynamic_dfs = [self._to_mlforecast_df(known_covariates, data.static_features, include_target=False)]
+        else:
+            dynamic_dfs = None
+
         with statsmodels_warning_filter():
-            raw_predictions = self.mlf.predict(horizon=self.prediction_length, new_data=self._to_mlforecast_df(data))
+            raw_predictions = self.mlf.predict(
+                horizon=self.prediction_length,
+                new_data=new_data,
+                dynamic_dfs=dynamic_dfs,
+            )
 
         predictions = raw_predictions.rename(columns={"unique_id": ITEMID, "ds": TIMESTAMP})
         for q in self.quantile_levels:

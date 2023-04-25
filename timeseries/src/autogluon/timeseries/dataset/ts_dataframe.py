@@ -157,6 +157,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 value = value.loc[self.item_ids]
             # Avoid modifying static features inplace
             value = value.copy()
+            # TODO: If item_id is a column, set this column as index
             if value.index.name != ITEMID:
                 value.index.rename(ITEMID, inplace=True)
 
