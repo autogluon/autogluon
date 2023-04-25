@@ -223,5 +223,5 @@ class TimeSeriesLearner(AbstractLearner):
         learner_info.pop("random_state", None)
         return learner_info
 
-    def refit_full(self, model: str = "best") -> Dict[str, str]:
+    def refit_full(self, model: str = "all") -> Dict[str, str]:
         return self.load_trainer().refit_full(model=model)
