@@ -219,6 +219,7 @@ class HpoExecutor(ABC):
             }
 
         self.resources = dict(num_gpus=num_gpus, num_cpus=num_cpus)
+        print(self.resources)
     
     @abstractmethod
     def validate_search_space(

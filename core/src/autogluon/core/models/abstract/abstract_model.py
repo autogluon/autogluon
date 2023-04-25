@@ -1354,6 +1354,7 @@ class AbstractModel:
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
         kwargs = self._preprocess_fit_resources(parallel_hpo=hpo_executor.executor_type=='ray', **kwargs)
+        print("FFFFFKFKFKFKF")
         self.validate_fit_resources(**kwargs)
         hpo_executor.register_resources(self, **kwargs)
         return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
