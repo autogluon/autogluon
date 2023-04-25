@@ -291,6 +291,7 @@ class TimeSeriesPredictor:
         hyperparameters: Dict[Union[str, Type], Any] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         num_val_windows: int = 1,
+        refit_full: bool = False,
         enable_ensemble: bool = True,
         random_seed: Optional[int] = None,
         verbosity: Optional[int] = None,
@@ -327,8 +328,8 @@ class TimeSeriesPredictor:
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
             time series are used for computing the validation score.
 
-            If ``tuning_data`` is provided, multi-window backtesting on training data will be disabled and the
-            ``num_val_windows`` argument will be ignored.
+            If ``tuning_data`` is provided, multi-window backtesting on training data will be disabled, the
+            ``num_val_windows`` argument will be ignored, and ``refit_full`` will be set to ``False``.
 
             Leaving this argument empty and letting AutoGluon automatically generate the validation set from
             ``train_data`` is a good default.
@@ -444,7 +445,12 @@ class TimeSeriesPredictor:
                 )
         num_val_windows : int, default = 1
             Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
+            A separate copy of each model is trained for each validation window.
             When ``num_val_windows = k``, training time is increased roughly by a factor of ``k``.
+        refit_full : bool, default = False
+            If True, after training is complete, AutoGluon will attempt to re-train all models using all of training
+            data (including the data initially reserved for validation). This argument has no effect if ``tuning_data``
+            is provided.
         enable_ensemble : bool, default = True
             If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
             ``hyperparameters``.
@@ -519,6 +525,11 @@ class TimeSeriesPredictor:
             num_val_windows=num_val_windows,
             enable_ensemble=enable_ensemble,
         )
+        if refit_full:
+            if tuning_data is None:
+                self.refit_full()
+            else:
+                logger.warning("Skipping `refit_full` because custom `tuning_data` was provided during `fit`.")
 
         self.save()
         return self
@@ -688,6 +699,10 @@ class TimeSeriesPredictor:
 
     def get_model_best(self) -> str:
         """Returns the name of the best model from trainer."""
+        if self._trainer.model_best is not None:
+            models = self._trainer.get_model_names()
+            if self._trainer.model_best in models:
+                return self._trainer.model_best
         return self._trainer.get_model_best()
 
     def leaderboard(
@@ -791,6 +806,64 @@ class TimeSeriesPredictor:
             print("****************** End of fit() summary ******************")
         return results
 
-    # TODO
-    def refit_full(self, models="all"):
-        raise NotImplementedError("Refitting logic not yet implemented in autogluon.timeseries")
+    def refit_full(self, model: str = "all", set_best_to_refit_full: bool = True) -> Dict[str, str]:
+        """Retrain model on all of the data (training + validation).
+
+        This method can only be used if no ``tuning_data`` was passed to :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`.
+
+        .. warning::
+            This is experimental functionality, many time series models do not yet support ``refit_full`` and will
+            simply be copied.
+
+
+        Parameters
+        ----------
+        model : str, default = "all"
+            Name of the model to refit.
+            All ancestor models will also be refit in the case that the selected model is a weighted ensemble.
+            Valid models are listed in this ``predictor`` by calling :meth:`~autogluon.timeseries.TimeSeriesPredictor.get_model_names`.
+
+            * If "all" then all models are refitted.
+            * If "best" then the model with the highest validation score is refit.
+
+        set_best_to_refit_full : bool, default = True
+            If True, sets best model to the refit_full version of the prior best model. This means the model used when
+            ``predictor.predict(data)`` is called will be the refit_full version instead of the original version of the
+            model. Has no effect if ``model`` is not the best model.
+        """
+        logger.warning(
+            "\tWARNING: refit_full functionality for TimeSeriesPredictor is experimental "
+            "and is not yet supported by all models."
+        )
+
+        logger.info(
+            "Refitting models via `refit_full` using all of the data (combined train and validation)...\n"
+            "\tModels trained in this way will have the suffix '_FULL' and have NaN validation score.\n"
+            "\tThis process is not bound by time_limit, but should take less time than the original `fit` call."
+        )
+        model_best = self.get_model_best()
+        refit_full_dict = self._learner.refit_full(model=model)
+
+        if set_best_to_refit_full:
+            if model_best in refit_full_dict:
+                self._trainer.model_best = refit_full_dict[model_best]
+                self._trainer.save()
+                logger.info(
+                    f"Updated best model to '{self._trainer.model_best}' (Previously '{model_best}'). "
+                    f"AutoGluon will default to using '{self._trainer.model_best}' for predict()."
+                )
+            elif model_best in refit_full_dict.values():
+                # Model best is already a refit full model
+                prev_best = self._trainer.model_best
+                self._trainer.model_best = model_best
+                self._trainer.save()
+                logger.info(
+                    f"Updated best model to '{self._trainer.model_best}' (Previously '{prev_best}'). "
+                    f"AutoGluon will default to using '{self._trainer.model_best}' for predict()."
+                )
+            else:
+                logger.warning(
+                    f"Best model ('{model_best}') is not present in refit_full dictionary. "
+                    f"Training may have failed on the refit model. AutoGluon will default to using '{model_best}' for predict()."
+                )
+        return refit_full_dict
