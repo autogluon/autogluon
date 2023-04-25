@@ -112,7 +112,7 @@ class OVDModel(nn.Module):
         -------
             A dictionary with logits and features.
         """
-        from .groundingdino.util import get_phrases_from_posmap
+        from groundingdino.util import get_phrases_from_posmap
 
         def process_caption(caption):  # TODO: split if it's too long
             caption = caption.lower().strip()
@@ -189,8 +189,8 @@ class OVDModel(nn.Module):
         }
 
         if checkpoint_name in ["GroundingDINO_SwinB" or "GroundingDINO_SwinT_OGC"]:
-            from .groundingdino.models import build_model
-            from .groundingdino.util import SLConfig, clean_state_dict
+            from groundingdino.models import build_model
+            from groundingdino.util import SLConfig, clean_state_dict
 
             model_config_path = OVD_CUSTOM_MODELS[checkpoint_name]["config_file"]
 

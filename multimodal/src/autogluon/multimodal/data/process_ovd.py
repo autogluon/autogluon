@@ -151,7 +151,7 @@ class OVDProcessor:
         raise NotImplementedError("Training mode not implemented for OVD yet.")
 
     def val_processor(self, image_data):
-        import autogluon.multimodal.models.groundingdino.datasets.transforms as T
+        import groundingdino.datasets.transforms as T
 
         image_path = image_data[self.image_key]["filename"]
 
