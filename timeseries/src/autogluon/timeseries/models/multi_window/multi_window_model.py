@@ -132,7 +132,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
     def get_child_model(self, window_index: int) -> AbstractTimeSeriesModel:
         model = copy.deepcopy(self.model_base)
-        model.rename(model.name + os.sep + f"W{window_index}")
+        model.rename(self.name + os.sep + f"W{window_index}")
         return model
 
     def predict(
@@ -199,16 +199,16 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         return model
 
     def convert_to_refit_full_template(self) -> AbstractTimeSeriesModel:
-        return self.most_recent_model.convert_to_refit_full_template()
+        # refit_model is an instance of base model type, not MultiWindowBacktestingModel
+        refit_model = self.most_recent_model.convert_to_refit_full_template()
+        refit_model.rename(self.name + ag.constants.REFIT_FULL_SUFFIX)
+        return refit_model
 
     def convert_to_refit_full_via_copy(self) -> AbstractTimeSeriesModel:
-        most_recent_model_full = copy.deepcopy(self.most_recent_model)
-        self.most_recent_model = None
-        model_full = copy.deepcopy(self)
-        model_full.rename(self.name + ag.constants.REFIT_FULL_SUFFIX)
-        most_recent_model_full.rename(model_full.name + os.sep + self._most_recent_model_folder)
-        model_full.most_recent_model = most_recent_model_full
-        return model_full
+        # refit_model is an instance of base model type, not MultiWindowBacktestingModel
+        refit_model = self.most_recent_model.convert_to_refit_full_via_copy()
+        refit_model.rename(self.name + ag.constants.REFIT_FULL_SUFFIX)
+        return refit_model
 
     def _more_tags(self) -> dict:
         return self.most_recent_model._get_tags()

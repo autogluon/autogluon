@@ -809,10 +809,12 @@ class TimeSeriesPredictor:
     def refit_full(self, model: str = "all", set_best_to_refit_full: bool = True) -> Dict[str, str]:
         """Retrain model on all of the data (training + validation).
 
-        This is experimental functionality, many time series models do not yet support ``refit_full`` and will simply
-        be copied.
-
         This method can only be used if no ``tuning_data`` was passed to :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`.
+
+        .. warning::
+            This is experimental functionality, many time series models do not yet support ``refit_full`` and will
+            simply be copied.
+
 
         Parameters
         ----------
@@ -829,6 +831,10 @@ class TimeSeriesPredictor:
             ``predictor.predict(data)`` is called will be the refit_full version instead of the original version of the
             model. Has no effect if ``model`` is not the best model.
         """
+        logger.warning(
+            "\tWARNING: refit_full functionality for TimeSeriesPredictor is experimental "
+            "and is not yet supported by all models."
+        )
 
         logger.info(
             "Refitting models via `refit_full` using all of the data (combined train and validation)...\n"

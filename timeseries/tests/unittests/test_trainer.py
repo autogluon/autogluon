@@ -425,12 +425,12 @@ def trained_and_refit_trainers():
     yield trainer, refit_trainer
 
 
-def test_when_refit_full_called_then_all_models_except_local_models_are_retrained(trained_and_refit_trainers):
+def test_when_refit_full_called_then_all_models_are_retrained(trained_and_refit_trainers):
     trainer, refit_trainer = trained_and_refit_trainers
     leaderboard_initial = trainer.leaderboard()
     leaderboard_refit = refit_trainer.leaderboard()
 
-    expected_refit_full_dict = {name: name + ag.constants.REFIT_FULL_NAME for name in trainer.get_model_names()}
+    expected_refit_full_dict = {name: name + ag.constants.REFIT_FULL_SUFFIX for name in trainer.get_model_names()}
     assert dict_equal_primitive(refit_trainer.model_full_dict, expected_refit_full_dict)
     assert len(leaderboard_refit) == len(leaderboard_initial) + len(expected_refit_full_dict)
 
