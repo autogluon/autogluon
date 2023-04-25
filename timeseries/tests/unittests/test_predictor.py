@@ -16,7 +16,7 @@ from .common import DUMMY_TS_DATAFRAME
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
-    {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
+    {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
 ]
 
 
@@ -605,3 +605,38 @@ def test_when_invalid_argument_passed_to_fit_then_exception_is_raised(temp_model
     predictor = TimeSeriesPredictor(path=temp_model_path)
     with pytest.raises(TypeError, match="unexpected keyword argument 'invalid_argument'"):
         predictor.fit(DUMMY_TS_DATAFRAME, invalid_argument=23)
+
+
+@pytest.mark.parametrize("set_best_to_refit_full", [True, False])
+def test_when_refit_full_called_then_best_model_is_updated(temp_model_path, set_best_to_refit_full):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    predictor.fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters={
+            "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
+            "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
+        },
+    )
+    model_best_before = predictor.get_model_best()
+    model_full_dict = predictor.refit_full(set_best_to_refit_full=set_best_to_refit_full)
+    model_best_after = predictor.get_model_best()
+    if set_best_to_refit_full:
+        assert model_best_after == model_full_dict[model_best_before]
+    else:
+        assert model_best_after == model_best_before
+
+
+@pytest.mark.parametrize("tuning_data, refit_called", [(None, True), (DUMMY_TS_DATAFRAME, False)])
+def test_when_refit_full_is_passed_to_fit_then_refit_full_is_skipped(temp_model_path, tuning_data, refit_called):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    with mock.patch("autogluon.timeseries.predictor.TimeSeriesPredictor.refit_full") as refit_method:
+        predictor.fit(
+            DUMMY_TS_DATAFRAME,
+            tuning_data=tuning_data,
+            hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0],
+            refit_full=True,
+        )
+        if refit_called:
+            refit_method.assert_called()
+        else:
+            refit_method.assert_not_called()
