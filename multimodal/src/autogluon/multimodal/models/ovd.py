@@ -112,7 +112,12 @@ class OVDModel(nn.Module):
         -------
             A dictionary with logits and features.
         """
-        from groundingdino.util.utils import get_phrases_from_posmap
+        try:
+            from groundingdino.util.utils import get_phrases_from_posmap
+        except ImportError as e:
+            logger.warning(
+                "Please install groundingdino by: pip install git+https://github.com/IDEA-Research/GroundingDINO.git"
+            )
 
         def process_caption(caption):  # TODO: split if it's too long
             caption = caption.lower().strip()
@@ -189,9 +194,14 @@ class OVDModel(nn.Module):
         }
 
         if checkpoint_name in ["GroundingDINO_SwinB" or "GroundingDINO_SwinT_OGC"]:
-            from groundingdino.models import build_model
-            from groundingdino.util.slconfig import SLConfig
-            from groundingdino.util.utils import clean_state_dict
+            try:
+                from groundingdino.models import build_model
+                from groundingdino.util.slconfig import SLConfig
+                from groundingdino.util.utils import clean_state_dict
+            except ImportError as e:
+                logger.warning(
+                    "Please install groundingdino by: pip install git+https://github.com/IDEA-Research/GroundingDINO.git"
+                )
 
             model_config_path = OVD_CUSTOM_MODELS[checkpoint_name]["config_file"]
 
