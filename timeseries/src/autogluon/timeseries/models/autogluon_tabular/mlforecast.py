@@ -11,7 +11,6 @@ from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_da
 from autogluon.timeseries.utils.seasonality import get_seasonality
 from autogluon.timeseries.utils.warning_filters import statsmodels_warning_filter
 
-
 logger = logging.getLogger(__name__)
 
 
