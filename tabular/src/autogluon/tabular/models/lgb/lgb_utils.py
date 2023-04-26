@@ -147,7 +147,10 @@ class QuantileBooster:
                 if self.time_limit_global is not None:
                     es_kwargs['start_time'] = time.time()
                     es_kwargs['time_limit'] = self.time_limit_global / len(self.quantile_levels)
-                train_params['callbacks'].append(early_stopping_custom(**es_kwargs))
+                # Don't add a logging callback to avoid printing logs for each base booster
+                train_params["callbacks"] = [early_stopping_custom(**es_kwargs)]
+            else:
+                train_params["callbacks"] = []
 
             self.model_dict[q] = lgb.train(**train_params)
             if self.time_limit_global is not None:
