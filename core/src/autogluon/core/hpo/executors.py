@@ -198,7 +198,7 @@ class HpoExecutor(ABC):
             num_jobs_in_parallel = min(num_jobs_in_parallel_with_mem, num_jobs_in_parallel_with_cpu, num_jobs_in_parallel_with_gpu)
             if k_fold is not None:
                 num_jobs_in_parallel = min(num_jobs_in_parallel, self.hyperparameter_tune_kwargs["num_trials"] * k_fold)
-            # 
+
             system_num_cpu = ResourceManager.get_cpu_count()
             system_num_gpu = ResourceManager.get_gpu_count_all()
             if model_base != initialized_model:
@@ -211,18 +211,20 @@ class HpoExecutor(ABC):
                 if self.executor_type == 'custom':
                     # custom backend runs sequentially
                     num_trials_in_parallel = 1
-                # In distributed setting, a single trial could be scheduled with resources that's more than a single node causing hanging
-                # Force it to be less than the current node. This works under the assumption that all nodes are of the same type
-                cpu_per_trial = min(int(num_cpus // num_trials_in_parallel), system_num_cpu)
-                gpu_per_trial = min(num_gpus // num_trials_in_parallel, system_num_gpu)
+                cpu_per_trial = int(num_cpus // num_trials_in_parallel)
+                gpu_per_trial = num_gpus // num_trials_in_parallel
             else:
                 num_trials = self.hyperparameter_tune_kwargs.get('num_trials', math.inf)
                 if self.executor_type == 'custom':
                     # custom backend runs sequentially
                     num_jobs_in_parallel = 1
-                cpu_per_trial = min(int(num_cpus // min(num_jobs_in_parallel, num_trials)), system_num_cpu)
-                gpu_per_trial = min(num_gpus / min(num_jobs_in_parallel, num_trials), system_num_gpu)
-                
+                cpu_per_trial = int(num_cpus // min(num_jobs_in_parallel, num_trials))
+                gpu_per_trial = num_gpus / min(num_jobs_in_parallel, num_trials)
+            # In distributed setting, a single trial could be scheduled with resources that's more than a single node causing hanging
+            # Force it to be less than the current node. This works under the assumption that all nodes are of the same type
+            cpu_per_trial = min(cpu_per_trial, system_num_cpu)
+            gpu_per_trial = min(gpu_per_trial, system_num_gpu)
+            
             self.hyperparameter_tune_kwargs['resources_per_trial'] = {
                 'num_cpus': cpu_per_trial,
                 'num_gpus': gpu_per_trial
@@ -442,7 +444,7 @@ class RayHpoExecutor(HpoExecutor):
             minimum_gpu_per_trial=minimum_gpu_per_trial,
             model_estimate_memory_usage=model_estimate_memory_usage,
             time_budget_s=self.time_limit,
-            verbose=1,
+            verbose=0,
         )
         os.environ.pop('TUNE_DISABLE_AUTO_CALLBACK_LOGGERS', None)
         self.analysis = analysis
