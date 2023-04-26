@@ -43,5 +43,5 @@ fusion_droppath = 0.1
 sub_sentence_present = True
 
 # TODO: move to our HP settings?
-box_threshold = 0.3
+box_threshold = 0.25
 text_threshold = 0.25
