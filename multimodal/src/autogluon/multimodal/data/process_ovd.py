@@ -7,7 +7,7 @@ import PIL
 from PIL import ImageFile
 from torch import nn
 
-from ..constants import COLUMN, IMAGE, IMAGE_PATH, IMAGE_VALID_NUM, PROMPT
+from ..constants import COLUMN, IMAGE, IMAGE_META, IMAGE_PATH, IMAGE_VALID_NUM, PROMPT
 from .collator import ListCollator, PadCollator
 from .transform_bbox import *
 from .utils import is_image_input, is_rois_input
@@ -63,8 +63,8 @@ class OVDProcessor:
         return f"{self.prefix}_{IMAGE}"
 
     @property
-    def image_info_key(self):
-        return f"{self.prefix}_imageinfo"
+    def image_meta_key(self):
+        return f"{self.prefix}_{IMAGE_META}"
 
     @property
     def prompt_key(self):
@@ -99,7 +99,7 @@ class OVDProcessor:
             {
                 self.image_key: PadCollator(pad_val=0),
                 self.prompt_key: ListCollator(),
-                self.image_info_key: ListCollator(),
+                self.image_meta_key: ListCollator(),
             }
         )
         return fn
@@ -131,7 +131,7 @@ class OVDProcessor:
             if is_image_input(per_col_content, IMAGE_PATH):
                 with PIL.Image.open(per_col_content[0]) as img:
                     image_data[self.image_key] = dict(filename=per_col_content[0], height=img.height, width=img.width)
-                    ret[self.image_info_key] = [img.width, img.height]
+                    ret[self.image_meta_key] = [img.width, img.height]
             elif is_rois_input(per_col_content):
                 raise NotImplementedError(
                     "Finetuning/Evaluation with ground truth labels are not implemented for OVD yet"

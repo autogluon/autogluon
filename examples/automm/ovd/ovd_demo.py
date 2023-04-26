@@ -1,25 +1,19 @@
-from autogluon.multimodal import MultiModalPredictor
+from autogluon.multimodal import MultiModalPredictor, download
 
 
 def ovd():
+    sample_image_path = download("https://live.staticflickr.com/65535/49004630088_d15a9be500_6k.jpg")
 
     # Train
     predictor = MultiModalPredictor(problem_type="open_vocabulary_object_detection")
-    predictor.set_num_gpus(1)
 
     # Evaluation on test dataset
     test_result = predictor.predict(
         {
-            "image": [
-                "/home/haoyfang/datasets/AGDetBench/cityscapes/images/leftImg8bit/train/zurich/zurich_000006_000019_leftImg8bit.png",
-                "/home/haoyfang/datasets/AGDetBench/cityscapes/images/leftImg8bit/train/zurich/zurich_000005_000019_leftImg8bit.png",
-            ]
-            * 10,
+            "image": [sample_image_path],
             "prompt": [
-                "car. bicycle. traffic light. people. building. tree.",
-                "car. bicycle. people. building. tree.",
-            ]
-            * 10,
+                "Pink notice. Green sign. One Way sign. People group. Tower crane in construction. Lamp post. Glass skyscraper."
+            ],
         },
         as_pandas=True,
     )

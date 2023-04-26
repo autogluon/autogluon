@@ -37,6 +37,7 @@ IMAGE_TEXT_SIMILARITY = "image_text_similarity"
 
 # Input keys
 IMAGE = "image"
+IMAGE_META = "image_meta"
 IMAGE_VALID_NUM = "image_valid_num"
 LABEL = "label"
 TEXT_TOKEN_IDS = "text_token_ids"
@@ -289,6 +290,7 @@ BBOX_FORMATS = [XYWH, XYXY]
 
 # open vocabulary detection
 PROMPT = "prompt"
+OVD_RET = "ovd_ret"
 
 # presets
 DEFAULT = "default"

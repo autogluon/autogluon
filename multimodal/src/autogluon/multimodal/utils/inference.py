@@ -14,6 +14,7 @@ from ..constants import (
     COLUMN_FEATURES,
     FEATURES,
     IMAGE,
+    IMAGE_META,
     LOGITS,
     MASKS,
     NER,
@@ -21,6 +22,7 @@ from ..constants import (
     NER_RET,
     OBJECT_DETECTION,
     OPEN_VOCABULARY_OBJECT_DETECTION,
+    OVD_RET,
     PROBABILITY,
     PROMPT,
     QUERY,
@@ -86,7 +88,7 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
             ret[feature_name] = torch.cat([ele[feature_name] for ele in feature_masks])
     elif ret_type == BBOX:
         return [ele[BBOX] for ele in outputs]
-    elif ret_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+    elif ret_type == OVD_RET:
         from .object_detection import bbox_ratio_xywh_to_index_xyxy
 
         ovd_pred = []
@@ -100,7 +102,7 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
                         {
                             "bbox": bbox_ratio_xywh_to_index_xyxy(
                                 xywh=ele[BBOX][i][j].detach().cpu().numpy(),
-                                image_wh=ele["imageinfo"][i],
+                                image_wh=ele[IMAGE_META][i],
                             )[0],
                             "class": ele[PROMPT][i][j],
                             "score": ele[LOGITS][i][j].detach().cpu().numpy(),

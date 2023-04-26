@@ -12,6 +12,7 @@ from ..constants import (
     COLUMN_FEATURES,
     FEATURES,
     IMAGE,
+    IMAGE_META,
     IMAGE_VALID_NUM,
     LABEL,
     LOGIT_SCALE,
@@ -21,7 +22,7 @@ from ..constants import (
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
 )
-from .utils import assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
+from .utils import assign_layer_ids, get_column_features, init_weights
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +46,6 @@ class OVDModel(nn.Module):
         ----------
         prefix
             The model prefix.
-        checkpoint_name
-            Name of the checkpoint.
         num_classes
             The number of classes. 1 for a regression task.
         pretrained
@@ -56,9 +55,7 @@ class OVDModel(nn.Module):
         logger.debug(f"initializing {checkpoint_name}")
         self.checkpoint_name = checkpoint_name
 
-        self.config, self.model = self.get_ovd_config_and_model(
-            checkpoint_name=checkpoint_name, pretrained=pretrained
-        )  # TODO: implement this
+        self.config, self.model = self.get_ovd_config_and_model(checkpoint_name=checkpoint_name, pretrained=pretrained)
 
         self.box_threshold = self.config.box_threshold
         self.text_threshold = self.config.text_threshold
@@ -73,8 +70,8 @@ class OVDModel(nn.Module):
         return f"{self.prefix}_{IMAGE}"
 
     @property
-    def image_info_key(self):
-        return f"{self.prefix}_imageinfo"
+    def image_meta_key(self):
+        return f"{self.prefix}_{IMAGE_META}"
 
     @property
     def prompt_key(self):
@@ -132,7 +129,7 @@ class OVDModel(nn.Module):
             outputs = self.model(images, captions=captions)
         logits = (
             outputs["pred_logits"].cpu().sigmoid()
-        )  # (bs, nq, 256)  # TODO: will .cpu() affect the data collection of lightning?
+        )  # (bs, nq, 256)  # TODO: will .cpu() affect the data collection of lightning once we support multi gpu?
         boxes = outputs["pred_boxes"].cpu()  # (bs, nq, 4)
 
         # filter output
@@ -169,7 +166,7 @@ class OVDModel(nn.Module):
             BBOX: boxes_filt,
             PROMPT: pred_phrases,
             LOGITS: [logits_filt_per_sample.max(dim=1)[0] for logits_filt_per_sample in logits_filt],
-            "imageinfo": batch[self.image_info_key],
+            IMAGE_META: batch[self.image_meta_key],
         }
 
         return {self.prefix: ret}
@@ -199,7 +196,7 @@ class OVDModel(nn.Module):
                 from groundingdino.util.slconfig import SLConfig
                 from groundingdino.util.utils import clean_state_dict
             except ImportError as e:
-                logger.warning(
+                raise ImportError(
                     "Please install groundingdino by: pip install git+https://github.com/IDEA-Research/GroundingDINO.git"
                 )
 
@@ -216,7 +213,7 @@ class OVDModel(nn.Module):
                 )
 
             config = SLConfig.fromfile(model_config_path)
-            config.device = "cpu"  # lighting will handle the device part
+            config.device = "cpu"  # lightning will handle the device part
             model = build_model(config)
             if pretrained:
                 checkpoint = torch.load(model_checkpoint_path, map_location="cpu")
@@ -239,33 +236,6 @@ class OVDModel(nn.Module):
         -------
         A dictionary mapping the layer names (keys) to their ids (values).
         """
-        model_prefixes = ["model.text_model", "model.vision_model", "model"]
-        # later model prefixes can't starts with the early ones
-        for i, model_pre in enumerate(model_prefixes):
-            for model_pre2 in model_prefixes[i + 1 :]:
-                if model_pre2.startswith(model_pre):
-                    raise ValueError(
-                        f"{model_pre} is a substring of {model_pre2}. Need to swap them in {model_prefixes}."
-                    )
+        # TODO
 
-        pre_encoder_patterns = ("embeddings", "pre")
-        post_encoder_patterns = ("head", "final", "post", "logit", "project")
-        names = [n for n, _ in self.named_parameters()]
-
-        name_to_id = {}
-        for per_prefix in model_prefixes:
-            per_model_name_to_id, names = assign_layer_ids(
-                names=names,
-                pre_encoder_patterns=pre_encoder_patterns,
-                post_encoder_patterns=post_encoder_patterns,
-                model_pre=per_prefix,
-            )
-            name_to_id.update(per_model_name_to_id)
-
-        if len(names) > 0:
-            logger.debug(f"outer layers are treated as head: {names}")
-        for n in names:
-            assert n not in name_to_id
-            name_to_id[n] = 0
-
-        return name_to_id
+        return {}

@@ -157,7 +157,7 @@ model:
       - "image"
       - "text"
     max_img_num_per_col: 1
-    output_bbox_format: "xyxy"
+    output_bbox_format: "xyxy" # TODO
 
   mmocr_text_detection:
     checkpoint_name: "TextSnake"
