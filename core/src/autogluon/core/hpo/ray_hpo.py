@@ -257,8 +257,8 @@ def run(
         model_estimate_memory_usage=model_estimate_memory_usage,
         wrap_resources_per_job_into_placement_group=trainable_is_parallel,
     )
-    print(f"resources: {resources_per_trial}")
     resources_per_trial = _validate_resources_per_trial(resources_per_trial)
+    logger.debug(resources_per_trial)
     ray_tune_adapter.resources_per_trial = resources_per_trial
     trainable_args = ray_tune_adapter.trainable_args_update_method(trainable_args)
     
@@ -286,10 +286,7 @@ def run(
         run_config=air.RunConfig(
             name=os.path.basename(save_dir),
             local_dir=os.path.dirname(save_dir),
-            verbose=2,
-            sync_config=tune.SyncConfig(
-                upload_dir="s3://weisy-personal/test_distributed_predictor_hpo/utils/"
-            ),
+            verbose=verbose,
             **run_config_kwargs
         ),
         _tuner_kwargs={

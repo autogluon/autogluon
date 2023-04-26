@@ -361,6 +361,8 @@ def _ray_fit(
     import ray  # ray must be present
     node_id = ray.get_runtime_context().get_node_id()
     is_head_node = node_id == head_node_id
+    logger.debug(f"head node: {is_head_node}")
+    logger.debug(f"executing fold on node {node_id}")
     logger.log(10, 'ray worker training')
     time_start_fold = time.time()
     fold, folds_finished, folds_left, \
@@ -520,6 +522,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             ray_init_args = self._get_ray_init_args()
             self.ray.init(**ray_init_args)
         head_node_id = self.ray.get_runtime_context().get_node_id()
+        logger.debug(f"Dispatching folds on node {head_node_id}")
         job_refs = []
         job_fold_map = {}
         # prepare shared data
@@ -632,8 +635,12 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             else:
                 kwargs_fold['sample_weight'] = self.sample_weight[train_index]
                 kwargs_fold['sample_weight_val'] = self.sample_weight[val_index]
-        return self._ray_fit.options(**resources) \
-            .remote(
+        pg = self.ray.util.get_current_placement_group()
+        return self._ray_fit.options(
+            **resources,
+            scheduling_strategy=self.ray.util.scheduling_strategies.PlacementGroupSchedulingStrategy(
+                placement_group=pg
+            )).remote(
                 model_base=model_base_ref,
                 bagged_ensemble_model_path=self.bagged_ensemble_model.path,
                 X=X_ref,
@@ -814,7 +821,7 @@ class ParallelLocalFoldFittingStrategy(ParallelFoldFittingStrategy):
     
     def _get_ray_init_args(self):
         ray_init_args = dict(
-            log_to_driver=True,
+            log_to_driver=False,
             logging_level=logging.ERROR,
             num_cpus=self.num_cpus
         )

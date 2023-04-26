@@ -142,8 +142,8 @@ class RayResourceManager:
         if not ray.is_initialized():
             ray.init(
                 address="auto",  # Force ray to connect to an existing cluster. There should be one. Otherwise, something went wrong
-                log_to_driver=True,
-                # logging_level=logging.ERROR
+                log_to_driver=False,
+                logging_level=logging.ERROR
             )
     
     @staticmethod
