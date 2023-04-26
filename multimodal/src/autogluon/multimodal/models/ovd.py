@@ -193,7 +193,7 @@ class OVDModel(nn.Module):
             },
         }
 
-        if checkpoint_name in ["GroundingDINO_SwinB" or "GroundingDINO_SwinT_OGC"]:
+        if checkpoint_name in ["GroundingDINO_SwinB", "GroundingDINO_SwinT_OGC"]:
             try:
                 from groundingdino.models import build_model
                 from groundingdino.util.slconfig import SLConfig
