@@ -196,9 +196,8 @@ class HpoExecutor(ABC):
             if minimum_model_num_gpus > 0:
                 num_jobs_in_parallel_with_gpu = num_gpus // minimum_model_num_gpus
             num_jobs_in_parallel = min(num_jobs_in_parallel_with_mem, num_jobs_in_parallel_with_cpu, num_jobs_in_parallel_with_gpu)
-            if k_fold is not None:
+            if k_fold is not None and k_fold > 0:
                 num_jobs_in_parallel = min(num_jobs_in_parallel, self.hyperparameter_tune_kwargs.get("num_trials", math.inf) * k_fold)
-
             system_num_cpu = ResourceManager.get_cpu_count()
             system_num_gpu = ResourceManager.get_gpu_count_all()
             if model_base != initialized_model:
