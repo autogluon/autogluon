@@ -144,6 +144,7 @@ def download_s3_folder(
 ):
     """
     This util function downloads a s3 folder and maintain its structure.
+    Note that empty folders will not be downloaded.
     For example, assuming bucket = bar and prefix = foo, and the bucket structure looks like this
         .
         └── bar/
