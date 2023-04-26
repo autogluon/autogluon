@@ -23,6 +23,21 @@ def is_interactive():
     return hasattr(sys, "ps1")
 
 
+def compute_grad_steps(config: dict, num_gpus: int):
+    if num_gpus == 0:  # CPU only training
+        grad_steps = max(
+            config.env.batch_size // (config.env.per_gpu_batch_size * config.env.num_nodes),
+            1,
+        )
+    else:
+        grad_steps = max(
+            config.env.batch_size // (config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes),
+            1,
+        )
+
+    return grad_steps
+
+
 def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
     """
     Compute the gpu number to initialize the lightning trainer.
@@ -266,14 +281,16 @@ def check_if_packages_installed(problem_type: str):
         try:
             import mmdet
         except ImportError as e:
-            raise ValueError(f"Encountered error while importing mmdet: {e}. Try to install mmdet: pip install mmdet.")
+            raise ValueError(
+                f'Encountered error while importing mmdet: {e}. Try to install mmdet: pip install "mmdet>=2.28, <3.0.0".'
+            )
 
         if OCR in problem_type:
             try:
                 import mmocr
             except ImportError as e:
                 raise ValueError(
-                    f"Encountered error while importing mmocr: {e}. Try to install mmocr: pip install mmocr."
+                    f'Encountered error while importing mmocr: {e}. Try to install mmocr: pip install "mmocr<1.0".'
                 )
 
 

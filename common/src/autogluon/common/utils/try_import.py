@@ -54,7 +54,7 @@ def try_import_mxnet():
 
 
 def try_import_ray() -> ModuleType:
-    RAY_MAX_VERSION = '2.3.0'
+    RAY_MAX_VERSION = '2.4.0'
     ray_max_version_os_map = dict(
         Darwin=RAY_MAX_VERSION,
         Windows=RAY_MAX_VERSION,

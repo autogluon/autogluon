@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import itertools
-import warnings
 from collections.abc import Iterable
 from typing import Any, List, Optional, Tuple, Type
 
@@ -817,3 +816,42 @@ class TimeSeriesDataFrame(pd.DataFrame):
         else:
             known_covariates = None
         return past_data, known_covariates
+
+    def train_test_split(
+        self,
+        prediction_length: int,
+        end_index: Optional[int] = None,
+        suffix: Optional[str] = None,
+    ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
+        """Generate a train/test split from the given dataset.
+        This method can be used to generate splits for multi-window backtesting.
+
+        Parameters
+        ----------
+        prediction_length : int
+            Number of time steps in a single evaluation window.
+        end_index : int, optional
+            If given, all time series will be shortened up to ``end_idx`` before the train/test splitting. In other
+            words, test data will include the slice ``[:end_index]`` of each time series, and train data will include
+            the slice ``[:end_index - prediction_length]``.
+        suffix : str, optional
+            Suffix appended to all entries in the ``item_id`` index level.
+
+        Returns
+        -------
+        train_data : TimeSeriesDataFrame
+            Train portion of the data. Contains the slice ``[:-prediction_length]`` of each time series in ``test_data``.
+        test_data : TimeSeriesDataFrame
+            Test portion of the data. Contains the slice ``[:end_idx]`` of each time series in the original dataset.
+        """
+        test_data = self.slice_by_timestep(None, end_index)
+        train_data = test_data.slice_by_timestep(None, -prediction_length)
+
+        if suffix is not None:
+            for data in [train_data, test_data]:
+                new_item_id = data.index.levels[0].astype(str) + suffix
+                data.index = data.index.set_levels(levels=new_item_id, level=0)
+                if data.static_features is not None:
+                    data.static_features.index = data.static_features.index.astype(str)
+                    data.static_features.index += suffix
+        return train_data, test_data

@@ -164,15 +164,15 @@ class RayResourceManager:
         return ray.cluster_resources().get(key, default_val)
 
     @staticmethod
-    def get_cpu_count():
+    def get_cpu_count() -> int:
         """Get number of cpu cores (virtual) available in the cluster"""
-        return RayResourceManager._get_cluster_resources("CPU")
+        return int(RayResourceManager._get_cluster_resources("CPU"))
 
     @staticmethod
     # TODO: find a better naming, "all" sounds unnecessary
-    def get_gpu_count_all():
+    def get_gpu_count_all() -> int:
         """Get number of gpus available in the cluster"""
-        return RayResourceManager._get_cluster_resources("GPU")
+        return int(RayResourceManager._get_cluster_resources("GPU"))
     
     
 def get_resource_manager():

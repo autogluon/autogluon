@@ -320,7 +320,7 @@ def object_detection(presets: str = DEFAULT):
         "env.per_gpu_batch_size": 8,  # Works on 8G GPU
         "env.num_workers": 2,
         "optimization.learning_rate": 1e-4,
-        "optimization.lr_decay": 0.90,
+        "optimization.lr_decay": 0.9,
         "optimization.lr_mult": 100,
         "optimization.lr_choice": "two_stages",
         "optimization.top_k": 1,
@@ -343,7 +343,6 @@ def object_detection(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "optimization.max_epochs": 30,
-                "optimization.lr_decay": 0.95,
                 "optimization.patience": 3,
                 "optimization.val_check_interval": 1.0,
                 "optimization.check_val_every_n_epoch": 3,
@@ -355,7 +354,6 @@ def object_detection(presets: str = DEFAULT):
                 "model.mmdet_image.checkpoint_name": "yolox_l_8x8_300e_coco",
                 "env.per_gpu_batch_size": 2,  # Works on 8G GPU
                 "optimization.learning_rate": 5e-5,
-                "optimization.lr_decay": 0.95,
                 "optimization.patience": 3,
                 "optimization.max_epochs": 50,
                 "optimization.val_check_interval": 1.0,
@@ -368,7 +366,6 @@ def object_detection(presets: str = DEFAULT):
                 "model.mmdet_image.checkpoint_name": "yolox_x_8x8_300e_coco",
                 "env.per_gpu_batch_size": 1,  # Works on 8G GPU
                 "optimization.learning_rate": 1e-5,
-                "optimization.lr_decay": 0.95,
                 "optimization.patience": 20,
                 "optimization.max_epochs": 50,
             }

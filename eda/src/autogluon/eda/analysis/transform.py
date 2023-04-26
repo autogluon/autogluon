@@ -86,7 +86,7 @@ class ApplyFeatureGenerator(AbstractAnalysis, StateCheckMixin):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         x = args.train_data
-        if args.label is not None:
+        if (args.label is not None) and (args.label in x.columns):
             x = x.drop(columns=args.label)
         self.feature_generator.fit(x)
         self.args["feature_generator"] = True

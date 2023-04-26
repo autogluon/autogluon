@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
-    def construct_model_templates(self, hyperparameters, **kwargs):
+    def construct_model_templates(self, hyperparameters, multi_window: bool = False, **kwargs):
         path = kwargs.pop("path", self.path)
         eval_metric = kwargs.pop("eval_metric", self.eval_metric)
         eval_metric_seasonal_period = kwargs.pop("eval_metric", self.eval_metric_seasonal_period)
@@ -26,6 +26,7 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             invalid_model_names=self._get_banned_model_names(),
             target=self.target,
             metadata=self.metadata,
+            multi_window=multi_window,
         )
 
     def fit(

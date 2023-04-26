@@ -33,6 +33,7 @@ def test_Sampler():
         test_data=df_test,
         children=[
             Namespace(namespace="ns_sampler", children=[Sampler(sample=5, children=[SomeAnalysis()])]),
+            Namespace(namespace="ns_sampler_2", children=[Sampler(sample=15, children=[SomeAnalysis()])]),
             Namespace(namespace="ns_sampler_none", children=[Sampler(sample=None, children=[SomeAnalysis()])]),
             Namespace(namespace="ns_no_sampler", children=[SomeAnalysis()]),
         ],
@@ -41,7 +42,11 @@ def test_Sampler():
     state = analysis.fit()
     assert state.ns_sampler.args.train_data.shape == (5, 4)
     assert state.ns_sampler.args.test_data.shape == (5, 4)
-    assert state.ns_sampler.sample_size == 5
+    assert state.ns_sampler.sample_size == {"test_data": 5, "train_data": 5}
+
+    assert state.ns_sampler_2.args.train_data.shape == (10, 4)
+    assert state.ns_sampler_2.args.test_data.shape == (15, 4)
+    assert state.ns_sampler_2.sample_size == {"test_data": 15}
 
     assert state.ns_sampler_none.args.train_data.shape == (10, 4)
     assert state.ns_sampler_none.args.test_data.shape == (20, 4)
@@ -69,7 +74,7 @@ def test_Sampler__window_larger_than_dataset():
     state = analysis.fit()
     assert state.args.train_data.shape == (10, 4)
     assert state.args.test_data.shape == (20, 4)
-    assert state.sample_size == 10000
+    assert state.sample_size is None
 
 
 def test_Sampler_frac():
@@ -83,7 +88,7 @@ def test_Sampler_frac():
     )
 
     state = analysis.fit()
-    assert state.sample_size == 0.5
+    assert state.sample_size == {"test_data": 0.5, "train_data": 0.5}
     assert state.args.train_data.shape == (5, 4)
     assert state.args.test_data.shape == (10, 4)
 
@@ -292,7 +297,10 @@ def test_LabelInsightsAnalysis__classification__not_present_in_train():
         ],
     )
 
-    assert state == {"label_insights": {"not_present_in_train": {3, 4}}, "problem_type": "binary"}
+    assert state == {
+        "label_insights": {"not_present_in_train": {3, 4}},
+        "problem_type": "binary",
+    }
 
 
 def test_LabelInsightsAnalysis__regression__no_ood():

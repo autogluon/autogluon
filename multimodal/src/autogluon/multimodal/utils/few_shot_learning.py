@@ -15,7 +15,7 @@ from sklearn.svm import SVC
 from autogluon.multimodal.predictor import MultiModalPredictor
 
 from ..constants import AUTOMM, FEATURE_EXTRACTION, Y_PRED, Y_TRUE
-from ..utils import CustomUnpickler, compute_score, setup_save_path, try_to_infer_pos_label
+from ..utils import CustomUnpickler, compute_score, setup_save_path
 
 logger = logging.getLogger(__name__)
 
@@ -141,15 +141,9 @@ class FewShotSVMPredictor:
                 macro_f1 = f1_score(labels, preds, average="macro")
                 results[per_metric] = macro_f1
             else:
-                pos_label = try_to_infer_pos_label(
-                    data_config=self._automm_predictor._config.data,
-                    label_encoder=df_preprocessor.label_generator,
-                    problem_type=self._automm_predictor._problem_type,
-                )
                 score = compute_score(
                     metric_data=metric_data,
                     metric_name=per_metric.lower(),
-                    pos_label=pos_label,
                 )
                 results[per_metric] = score
 

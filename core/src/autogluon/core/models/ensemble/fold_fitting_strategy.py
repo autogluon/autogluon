@@ -15,7 +15,7 @@ from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray
-from autogluon.common.utils.s3_utils import download_s3_folder, s3_path_to_bucket_prefix
+from autogluon.common.utils.s3_utils import download_s3_folder, upload_s3_folder, s3_path_to_bucket_prefix
 
 from ..abstract.abstract_model import AbstractModel
 from ...ray.resources_calculator import ResourceCalculatorFactory
@@ -355,8 +355,12 @@ def _ray_fit(
     save_bag_folds: bool, 
     resources: Dict[str, Any],
     kwargs_fold: Dict[str, Any],
+    head_node_id: str,
     model_sync_path: Optional[str] = None
 ):
+    import ray  # ray must be present
+    node_id = ray.get_runtime_context().get_node_id()
+    is_head_node = node_id == head_node_id
     logger.log(10, 'ray worker training')
     time_start_fold = time.time()
     fold, folds_finished, folds_left, \
@@ -391,8 +395,16 @@ def _ray_fit(
     fold_model.fit_time = time_train_end_fold - time_start_fold
     fold_model, pred_proba = _ray_predict_oof(fold_model, X_val_fold, y_val_fold,
                                               time_train_end_fold, resources['num_cpus'], save_bag_folds)
-    model_save_path = model_sync_path + f"{fold_model.name}/" if model_sync_path is not None else None  # s3 path hence need "/" as the saperator
-    fold_model.save(path=model_save_path)
+    save_path = fold_model.save()
+    if model_sync_path is not None and not is_head_node:
+        model_sync_path = model_sync_path + f"{fold_model.name}/"  # s3 path hence need "/" as the saperator
+        bucket, prefix = s3_path_to_bucket_prefix(model_sync_path)
+        upload_s3_folder(
+            bucket=bucket,
+            prefix=prefix,
+            folder_to_upload=save_path,
+            verbose=False
+        )
     return fold_model.name, pred_proba, time_start_fold, \
         time_train_end_fold, fold_model.predict_time, fold_model.predict_1_time
 
@@ -507,6 +519,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if not self.ray.is_initialized():
             ray_init_args = self._get_ray_init_args()
             self.ray.init(**ray_init_args)
+        head_node_id = self.ray.get_runtime_context().get_node_id()
         job_refs = []
         job_fold_map = {}
         # prepare shared data
@@ -516,7 +529,18 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         # spread the task
         for job in self.jobs:
             fold_ctx = job
-            ref = self._fit(model_base_ref, X, y, X_pseudo, y_pseudo, time_limit_fold, fold_ctx, self.resources, self.model_base_kwargs)
+            ref = self._fit(
+                model_base_ref=model_base_ref,
+                X_ref=X,
+                y_ref=y,
+                X_pseudo_ref=X_pseudo,
+                y_pseudo_ref=y_pseudo,
+                time_limit_fold=time_limit_fold,
+                fold_ctx=fold_ctx,
+                resources=self.resources,
+                head_node_id=head_node_id,
+                kwargs=self.model_base_kwargs
+            )
             job_fold_map[ref] = fold_ctx
             job_refs.append(ref)
 
@@ -537,6 +561,15 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                                              predict_time=predict_time,
                                              predict_1_time=predict_1_time,
                                              fold_ctx=fold_ctx)
+                model_sync_path = None
+                if self.model_sync_path is not None:
+                    model_sync_path: str = self.model_sync_path + fold_model
+                    if not model_sync_path.endswith("/"):
+                        model_sync_path += "/"
+                self.sync_model_artifact(
+                    local_path=os.path.join(self.bagged_ensemble_model.path + fold_model),
+                    model_sync_path=model_sync_path
+                )
             except TimeLimitExceeded:
                 # Terminate all ray tasks because a fold failed
                 self.terminate_all_unfinished_tasks(unfinished)
@@ -560,10 +593,6 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 # Terminate all ray tasks because a fold failed
                 self.terminate_all_unfinished_tasks(unfinished)
                 raise processed_exception
-        self.sync_model_artifact(
-            local_path=self.bagged_ensemble_model.path,
-            model_sync_path=self.model_sync_path
-        )
         self.fit_time = 0
         if self.time_start_fit and self.time_end_fit:
             self.fit_time = self.time_end_fit - self.time_start_fit
@@ -573,14 +602,27 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         for task in unfinished_tasks:
             self.ray.cancel(task, force=True)
 
-    def _fit(self, model_base_ref, X_ref, y_ref, X_pseudo_ref, y_pseudo_ref, time_limit_fold, fold_ctx, resources, kwargs):
+    def _fit(
+        self,
+        *,
+        model_base_ref,
+        X_ref,
+        y_ref,
+        X_pseudo_ref,
+        y_pseudo_ref,
+        time_limit_fold,
+        fold_ctx,
+        resources,
+        head_node_id,
+        kwargs
+    ):
         fold, folds_finished, folds_left, \
             folds_to_fit, is_last_fold, \
             model_name_suffix = self._get_fold_properties(fold_ctx)
         logger.debug(f'Folding resources per job {resources}')
         train_index, val_index = fold
         fold_ctx_ref = self.ray.put(fold_ctx)
-        save_bag_folds = self.bagged_ensemble_model.params.get('save_bag_folds', True)
+        save_bag_folds = self.save_folds
         kwargs_fold = kwargs.copy()
         is_pseudo = X_pseudo_ref is not None and y_pseudo_ref is not None
         if self.sample_weight is not None:
@@ -603,6 +645,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 save_bag_folds=save_bag_folds,
                 resources=resources,
                 kwargs_fold=kwargs_fold,
+                head_node_id=head_node_id,
                 model_sync_path=self.model_sync_path
             )
 
@@ -793,5 +836,6 @@ class ParallelDistributedFoldFittingStrategy(ParallelFoldFittingStrategy):
             bucket=bucket,
             prefix=path,
             local_path=local_path,
-            error_if_exists=False
+            error_if_exists=False,
+            verbose=False
         )

@@ -20,6 +20,7 @@ from . import (
     ThetaModel,
 )
 from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
+from .multi_window.multi_window_model import MultiWindowBacktestingModel
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,6 @@ MODEL_TYPES = dict(
     SimpleFeedForward=SimpleFeedForwardModel,
     DeepAR=DeepARModel,
     TemporalFusionTransformer=TemporalFusionTransformerModel,
-    # Prophet=ProphetModel,
     ETS=ETSModel,
     ARIMA=ARIMAModel,
     Theta=ThetaModel,
@@ -60,17 +60,6 @@ if agts.MXNET_INSTALLED:
         )
     )
 
-if agts.SKTIME_INSTALLED:
-    from .sktime import ARIMASktimeModel, AutoARIMASktimeModel, AutoETSSktimeModel
-
-    MODEL_TYPES.update(
-        dict(
-            ARIMASktime=ARIMASktimeModel,
-            AutoARIMASktime=AutoARIMASktimeModel,
-            AutoETSSktime=AutoETSSktimeModel,
-        )
-    )
-
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
     Naive=100,
@@ -87,12 +76,9 @@ DEFAULT_MODEL_PRIORITY = dict(
     AutoETS=70,
     DynamicOptimizedTheta=60,
     # Models below are not included in any presets
-    AutoETSSktime=60,
-    ARIMASktime=50,
     DeepARMXNet=50,
     SimpleFeedForwardMXNet=30,
     TemporalFusionTransformerMXNet=50,
-    AutoARIMASktime=20,
     MQCNNMXNet=10,
     MQRNNMXNet=10,
 )
@@ -129,9 +115,7 @@ def get_default_hps(key, prediction_length):
             "ETS": {},
             "AutoETS": {},
             "AutoARIMA": {},
-            "Theta": {
-                "deseasonalize": ag.Categorical(True, False),
-            },
+            "Theta": {},
             "AutoGluonTabular": {},
             "DeepAR": {
                 "context_length": context_length,
@@ -149,9 +133,7 @@ def get_default_hps(key, prediction_length):
             "AutoETS": {},
             "AutoARIMA": {},
             "DynamicOptimizedTheta": {},
-            "Theta": {
-                "deseasonalize": ag.Categorical(True, False),
-            },
+            "Theta": {},
             "AutoGluonTabular": {},
             "DeepAR": {
                 "context_length": context_length,
@@ -192,6 +174,7 @@ def get_preset_models(
     hyperparameters: Union[str, Dict],
     hyperparameter_tune: bool,
     invalid_model_names: List[str],
+    multi_window: bool = False,
     **kwargs,
 ):
     """
@@ -262,6 +245,9 @@ def get_preset_models(
         while model.name in all_assigned_names:
             increment += 1
             model = model_type(name=f"{name_stem}_{increment}", **model_type_kwargs)
+
+        if multi_window:
+            model = MultiWindowBacktestingModel(model_base=model, name=model.name, **model_type_kwargs)
 
         all_assigned_names.add(model.name)
         models.append(model)

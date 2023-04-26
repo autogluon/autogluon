@@ -61,3 +61,10 @@ class AbstractTimeSeriesEnsembleModel(AbstractTimeSeriesModel):
 
     def predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
         raise NotImplementedError
+
+    def remap_base_models(self, model_full_dict: Dict[str, str]) -> None:
+        """Update names of the base models based on the mapping in model_full_dict.
+
+        This method should be called after performing refit_full to point to the refitted base models, if necessary.
+        """
+        raise NotImplementedError

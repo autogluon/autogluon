@@ -1,6 +1,7 @@
 import pytest
 
-from autogluon.eda.state import AnalysisState, StateCheckMixin, expand_nested_args_into_nested_maps
+from autogluon.eda.state import AnalysisState, StateCheckMixin
+from autogluon.eda.utils.common import expand_nested_args_into_nested_maps
 
 
 def test_analysis_state():
@@ -47,11 +48,13 @@ def test_statecheckmixin_at_least_one_key_must_be_present():
     assert StateCheckMixin().at_least_one_key_must_be_present(AnalysisState(q=42, w=43), "w") is True
     assert StateCheckMixin().at_least_one_key_must_be_present(AnalysisState(q=42, w=43), "q", "w") is True
     assert StateCheckMixin().at_least_one_key_must_be_present(AnalysisState(q=42, w=43), "q", "missing") is True
+    assert StateCheckMixin().at_least_one_key_must_be_present(AnalysisState(q=None, w=43), "q", "missing") is False
 
 
 def test_statecheckmixin_all_keys_must_be_present():
     assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), "missing") is False
     assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), "q") is True
+    assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=None), "q") is False
     assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), "w") is True
     assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), "q", "w") is True
     assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), "q", "missing") is False

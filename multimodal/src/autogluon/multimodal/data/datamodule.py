@@ -2,9 +2,9 @@ from typing import Dict, List, Optional, Union
 
 import pandas as pd
 from pytorch_lightning import LightningDataModule
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
-from ..constants import PREDICT, TEST, TRAIN, VALIDATE
+from ..constants import DEFAULT_DATASET, PREDICT, TEST, TRAIN, VALIDATE
 from .dataset import BaseDataset
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from .utils import get_collate_fn
@@ -26,6 +26,7 @@ class BaseDataModule(LightningDataModule):
         per_gpu_batch_size: int,
         num_workers: int,
         train_data: Optional[pd.DataFrame] = None,
+        train_dataset: Optional[Dataset] = None,
         validate_data: Optional[pd.DataFrame] = None,
         test_data: Optional[pd.DataFrame] = None,
         predict_data: Optional[pd.DataFrame] = None,
@@ -50,6 +51,8 @@ class BaseDataModule(LightningDataModule):
             Number of workers for Pytorch DataLoader.
         train_data
             Training data.
+        train_dataset
+            Training dataset.
         validate_data
             Validation data.
         test_data
@@ -57,12 +60,12 @@ class BaseDataModule(LightningDataModule):
         predict_data
             Prediction data. No labels required in it.
         id_mappings
-             Id-to-content mappings. The contents can be text, image, etc.
-             This is used when the dataframe contains the query/response indexes instead of their contents.
+            Id-to-content mappings. The contents can be text, image, etc.
+            This is used when the dataframe contains the query/response indexes instead of their contents.
         val_use_training_mode
-             whether we are triggering is_training when creating the dataset for validation.
-             This is used when we want to use val_loss as val metric, and thus we'll use data pipeline
-             for training instead of for inference during validation.
+            whether we are triggering is_training when creating the dataset for validation.
+            This is used when we want to use val_loss as val metric, and thus we'll use data pipeline
+            for training instead of for inference during validation.
         """
         super().__init__()
         self.prepare_data_per_node = True
@@ -77,6 +80,7 @@ class BaseDataModule(LightningDataModule):
         self.per_gpu_batch_size = per_gpu_batch_size
         self.num_workers = num_workers
         self.train_data = train_data
+        self.train_dataset = train_dataset
         self.validate_data = validate_data
         self.test_data = test_data
         self.predict_data = predict_data
@@ -84,11 +88,15 @@ class BaseDataModule(LightningDataModule):
         self.val_use_training_mode = val_use_training_mode
 
     def set_dataset(self, split):
-        data_split = getattr(self, f"{split}_data")
         if self.val_use_training_mode:
             is_training = split in [TRAIN, VALIDATE]
         else:
             is_training = split == TRAIN
+
+        if is_training and self.train_dataset is not None:
+            return
+
+        data_split = getattr(self, f"{split}_data")
         dataset = BaseDataset(
             data=data_split,
             preprocessor=self.df_preprocessor,

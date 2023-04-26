@@ -25,7 +25,7 @@ def fit_model(path, df_train, target, fit_args=None):
 
 def test_AutoGluonModelEvaluator_regression():
     df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "houses", "train_data.csv")).sample(100, random_state=0)
-    df_test = pd.read_csv(os.path.join(RESOURCE_PATH, "houses", "test_data.csv")).sample(50, random_state=0)
+    df_val = pd.read_csv(os.path.join(RESOURCE_PATH, "houses", "test_data.csv")).sample(50, random_state=0)
     target_col = "SalePrice"
 
     with tempfile.TemporaryDirectory() as path:
@@ -34,21 +34,23 @@ def test_AutoGluonModelEvaluator_regression():
         state = auto.analyze(
             model=predictor,
             train_data=df_train,
-            val_data=df_test,
+            val_data=df_val,
             return_state=True,
             anlz_facets=[eda.model.AutoGluonModelEvaluator(normalize="true")],
         )
 
     assert state.model_evaluation.problem_type == REGRESSION
-    assert len(state.model_evaluation.y_true) == len(df_test)
-    assert len(state.model_evaluation.y_pred) == len(df_test)
+    assert len(state.model_evaluation.y_true_val) == len(df_val)
+    assert len(state.model_evaluation.y_pred_val) == len(df_val)
     expected = [c for c in df_train.columns if c not in ["Street", "Utilities", "SalePrice"]]
     assert sorted(state.model_evaluation.importance.index.to_list()) == sorted(expected)
     _assert_importance_is_present(state)
     assert state.model_evaluation.confusion_matrix is None
     assert state.model_evaluation.confusion_matrix_normalized is None
-    assert state.model_evaluation.y_true_val is None
-    assert state.model_evaluation.y_pred_val is None
+    assert state.model_evaluation.y_true_test is None
+    assert state.model_evaluation.y_pred_test is None
+    assert state.model_evaluation.y_true_train is None
+    assert state.model_evaluation.y_pred_train is None
 
 
 def test_AutoGluonModelEvaluator_regression__with_test_data():
@@ -70,8 +72,8 @@ def test_AutoGluonModelEvaluator_regression__with_test_data():
         )
 
     assert state.model_evaluation.problem_type == REGRESSION
-    assert len(state.model_evaluation.y_true) == len(df_test)
-    assert len(state.model_evaluation.y_pred) == len(df_test)
+    assert len(state.model_evaluation.y_true_test) == len(df_test)
+    assert len(state.model_evaluation.y_pred_test) == len(df_test)
     assert len(state.model_evaluation.y_true_val) == len(df_val)
     assert len(state.model_evaluation.y_pred_val) == len(df_val)
     expected = [c for c in df_train.columns if c not in ["Street", "Utilities", "SalePrice"]]
@@ -83,7 +85,7 @@ def test_AutoGluonModelEvaluator_regression__with_test_data():
 
 def test_AutoGluonModelEvaluator_classification():
     df_train = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "train_data.csv")).sample(100, random_state=0)
-    df_test = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "test_data.csv")).sample(50, random_state=0)
+    df_val = pd.read_csv(os.path.join(RESOURCE_PATH, "adult", "test_data.csv")).sample(50, random_state=0)
     target_col = "class"
 
     with tempfile.TemporaryDirectory() as path:
@@ -92,14 +94,14 @@ def test_AutoGluonModelEvaluator_classification():
         state = auto.analyze(
             model=predictor,
             train_data=df_train,
-            val_data=df_test,
+            val_data=df_val,
             return_state=True,
             anlz_facets=[eda.model.AutoGluonModelEvaluator(normalize="true")],
         )
 
     assert state.model_evaluation.problem_type == "binary"
-    assert len(state.model_evaluation.y_true) == len(df_test)
-    assert len(state.model_evaluation.y_pred) == len(df_test)
+    assert len(state.model_evaluation.y_true_val) == len(df_val)
+    assert len(state.model_evaluation.y_pred_val) == len(df_val)
     expected = [c for c in df_train.columns if c not in ["class"]]
     assert sorted(state.model_evaluation.importance.index.to_list()) == sorted(expected)
     _assert_importance_is_present(state)
@@ -138,8 +140,8 @@ def test_AutoGluonModelQuickFit(save_model_to_state):
         )
 
     assert state.model_evaluation.problem_type == "binary"
-    assert len(state.model_evaluation.y_true) == int(len(df_train) * 0.3)
-    assert len(state.model_evaluation.y_pred) == int(len(df_train) * 0.3)
+    assert len(state.model_evaluation.y_true_val) == int(len(df_train) * 0.3)
+    assert len(state.model_evaluation.y_pred_val) == int(len(df_train) * 0.3)
     expected = [c for c in df_train.columns if c not in ["class"]]
     assert sorted(state.model_evaluation.importance.index.to_list()) == sorted(expected)
     _assert_importance_is_present(state)

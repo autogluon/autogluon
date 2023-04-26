@@ -427,5 +427,5 @@ def test_FeatureDistanceAnalysis__happy_path():
                 {"distance": 0.8306, "nodes": ["age", "capital-gain"]},
             ],
             "near_duplicates_threshold": 0.85,
-        }
+        },
     }

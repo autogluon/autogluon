@@ -176,9 +176,8 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
         val_data = args.val_data
         problem_type = predictor.problem_type
         label = predictor.label
-        y_true_train, y_pred_train, _, _ = self._predict(problem_type, predictor, args.train_data)
         y_true_val, y_pred_val, highest_error, undecided = self._predict(problem_type, predictor, val_data)
-        test_data = val_data
+        test_data = args.test_data
         test_data_present = args.test_data is not None and label in args.test_data.columns
 
         y_true_test = None
@@ -187,8 +186,9 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
             test_data = args.test_data
             y_true_test, y_pred_test, highest_error, undecided = self._predict(problem_type, predictor, test_data)
 
-        importance = predictor.feature_importance(test_data.reset_index(drop=True), silent=True)
-        leaderboard = predictor.leaderboard(test_data, silent=True)
+        _data = test_data if test_data_present else val_data
+        importance = predictor.feature_importance(_data.reset_index(drop=True), silent=True)
+        leaderboard = predictor.leaderboard(_data, silent=True)
 
         labels = predictor.class_labels
         s = {
@@ -196,18 +196,21 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
             "importance": importance,
             "leaderboard": leaderboard,
             "labels": labels,
-            "y_true_train": y_true_train,
-            "y_pred_train": y_pred_train,
+            "y_true_val": y_true_val,
+            "y_pred_val": y_pred_val,
         }
 
+        try:
+            y_pred_train = args.model.get_oof_pred_proba()
+            s["y_true_train"] = args.train_data[args.label]
+            s["y_pred_train"] = y_pred_train
+        except AssertionError:
+            # OOF is not available - don't use it
+            pass
+
         if test_data_present:
-            s["y_true_val"] = y_true_val
-            s["y_pred_val"] = y_pred_val
-            s["y_true"] = y_true_test
-            s["y_pred"] = y_pred_test
-        else:
-            s["y_true"] = y_true_val
-            s["y_pred"] = y_pred_val
+            s["y_true_test"] = y_true_test
+            s["y_pred_test"] = y_pred_test
 
         if undecided is not None:
             s["undecided"] = undecided

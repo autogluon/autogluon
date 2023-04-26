@@ -10,13 +10,14 @@ import pytest
 
 import autogluon.eda as eda
 from autogluon.eda import AnalysisState
-from autogluon.eda.analysis import Namespace, ShapAnalysis
+from autogluon.eda.analysis import AnomalyDetectorAnalysis, Namespace, ShapAnalysis
 from autogluon.eda.analysis.base import BaseAnalysis
 from autogluon.eda.auto import (
     analyze,
     analyze_interaction,
     covariate_shift_detection,
     dataset_overview,
+    detect_anomalies,
     explain_rows,
     partial_dependence_plots,
     quick_fit,
@@ -30,6 +31,7 @@ from autogluon.eda.auto.simple import (
     get_empty_dict_if_none,
 )
 from autogluon.eda.visualization import (
+    AnomalyScoresVisualization,
     ConfusionMatrix,
     CorrelationVisualization,
     DatasetStatistics,
@@ -89,7 +91,7 @@ def test_analyze():
         anlz_facets=[Namespace(namespace="ns1", children=[anlz])],
         viz_facets=[viz],
     )
-    assert state.sample_size == 5
+    assert state.sample_size == {"test_data": 5, "train_data": 5, "val_data": 5}
     assert state.some_previous_state == {"arg": 1}
     assert state.ns1.args.train_data.shape == (5, 2)
     assert state.ns1.args.test_data.shape == (5, 2)
@@ -149,7 +151,7 @@ def test_quick_fit(monkeypatch):
         with tempfile.TemporaryDirectory() as path:
             quick_fit(path=path, train_data=df_train, label="class")
 
-    assert call_md_render.call_count == 7
+    assert call_md_render.call_count == 9
     assert call_prc_render.call_count == 2
     call_cm_render.assert_called_once()
     call_reg_render.assert_called_once()
@@ -600,3 +602,132 @@ def test_partial_dependence_plots(monkeypatch):
 
     call_pdp_interaction_render.assert_called_once()
     call_md_render.assert_called()
+
+
+@pytest.mark.parametrize(
+    "add_explainability",
+    [
+        True,
+        False,
+    ],
+)
+def test_detect_anomalies(monkeypatch, add_explainability):
+    df_train = pd.DataFrame({"A": np.arange(4), "B": np.arange(4)})
+    df_test = pd.DataFrame({"A": np.arange(5), "B": np.arange(5)})
+
+    train_data_scores = pd.Series([0.13, 0.01, 0.08, 0.76], name="score")
+    test_data_scores = pd.Series([0.60, 0.20, 0.91, 0.60, 0.23], name="score")
+    assert len(df_train) == len(train_data_scores)
+    assert len(df_test) == len(test_data_scores)
+
+    call_md_render = MagicMock()
+    call_df_render = MagicMock()
+    call_anomaly_viz_render = MagicMock()
+
+    def verify_explain_fn(anomaly_idx):
+        return {"called_vals": list(anomaly_idx)}
+
+    def call_anomaly_anlz_fit_mock(state: AnalysisState, args: AnalysisState, **fit_kwargs):
+        assert state == {"problem_type": "regression"}
+        assert args.train_data.equals(df_train)
+        assert args.test_data.equals(df_test)
+        assert args.label == "B"
+        assert args.feature_generator is True
+
+        state.anomaly_detection = {
+            "scores": {"train_data": train_data_scores, "test_data": test_data_scores},
+            "explain_rows_fns": {
+                "train_data": verify_explain_fn,
+                "test_data": verify_explain_fn,
+            },
+        }
+
+    call_anomaly_anlz_fit = MagicMock(side_effect=call_anomaly_anlz_fit_mock)
+    call_explain_rows = MagicMock()
+
+    with monkeypatch.context() as m:
+        m.setattr(AnomalyDetectorAnalysis, "_fit", call_anomaly_anlz_fit)
+        m.setattr(MarkdownSectionComponent, "render_markdown", call_md_render)
+        m.setattr(PropertyRendererComponent, "display_obj", call_df_render)
+        m.setattr(AnomalyScoresVisualization, "render", call_anomaly_viz_render)
+        m.setattr("autogluon.eda.auto.simple.explain_rows", call_explain_rows)
+        state = detect_anomalies(
+            train_data=df_train,
+            test_data=df_test,
+            label="B",
+            threshold_stds=2,
+            explain_top_n_anomalies=1 if add_explainability else None,
+            show_help_text=False,
+            return_state=True,
+        )
+
+    assert list(state.anomaly_detection.scores.keys()) == ["train_data", "test_data"]
+    assert state.anomaly_detection.scores.train_data.equals(train_data_scores)
+    assert state.anomaly_detection.scores.test_data.equals(test_data_scores)
+    state.anomaly_detection.pop("scores")
+
+    assert list(state.anomaly_detection.anomalies.keys()) == ["train_data", "test_data"]
+    assert state.anomaly_detection.anomalies.train_data.equals(
+        pd.DataFrame({"A": [3], "B": [3], "score": 0.76}, index=[3])
+    )
+    assert state.anomaly_detection.anomalies.test_data.equals(
+        pd.DataFrame({"A": [2], "B": [2], "score": 0.91}, index=[2])
+    )
+    state.anomaly_detection.pop("anomalies")
+
+    assert state == {
+        "problem_type": "regression",
+        "anomaly_detection": {
+            "anomaly_score_threshold": 0.693685807840985,
+            "explain_rows_fns": {
+                "train_data": verify_explain_fn,
+                "test_data": verify_explain_fn,
+            },
+        },
+    }
+
+    # Markdown rendering
+    calls = [c[0][0] for c in call_md_render.call_args_list]
+    expected_calls = [
+        "### Anomaly Detection Report",
+        # train_data
+        "**Top-10 `train_data` anomalies (total: 1)**",
+        # test_data
+        "**Top-10 `test_data` anomalies (total: 1)**",
+    ]
+    if add_explainability:
+        expected_calls.insert(
+            2,
+            "⚠️ Please note that the feature values shown on the charts below are transformed "
+            "into an internal representation; they may be encoded or modified based on internal preprocessing. "
+            "Refer to the original datasets for the actual feature values.",
+        )
+        expected_calls.insert(
+            3,
+            "⚠️ The detector has seen this dataset; the may result in overly optimistic estimates. "
+            "Although the anomaly score in the explanation might not match, the magnitude of the feature scores "
+            "can still be utilized to evaluate the impact of the feature on the anomaly score.",
+        )
+        expected_calls.append(
+            "⚠️ Please note that the feature values shown on the charts below are transformed "
+            "into an internal representation; they may be encoded or modified based on internal preprocessing. "
+            "Refer to the original datasets for the actual feature values."
+        )
+    assert calls == expected_calls
+
+    # Tables rendering
+    calls = [c[0][0].to_dict() for c in call_df_render.call_args_list]
+    assert calls == [
+        {"A": {3: 3}, "B": {3: 3}, "score": {3: 0.76}},
+        {"A": {2: 2}, "B": {2: 2}, "score": {2: 0.91}},
+    ]
+
+    # Explainability data
+    if add_explainability:
+        calls = [c.kwargs for c in call_explain_rows.call_args_list]
+        assert calls == [
+            {"called_vals": [3], "plot": "waterfall"},
+            {"called_vals": [2], "plot": "waterfall"},
+        ]
+    else:
+        call_explain_rows.assert_not_called()

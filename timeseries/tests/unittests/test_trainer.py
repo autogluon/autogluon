@@ -15,7 +15,7 @@ from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
 from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
-from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
+from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
 
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
@@ -38,7 +38,6 @@ def trained_trainers():
         )
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
-            val_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hp,
         )
         trainers[repr(hp)] = trainer
@@ -73,7 +72,6 @@ def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
     )
     leaderboard = trainer.leaderboard()
 
@@ -159,7 +157,6 @@ def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(temp_mod
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
     )
 
     for model_name in trainer.get_model_names():
@@ -178,7 +175,6 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
-            val_data=DUMMY_TS_DATAFRAME,
             hyperparameter_tune_kwargs={
                 "num_trials": 2,
                 "searcher": "random",
@@ -216,7 +212,6 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
     )
     leaderboard = trainer.leaderboard()
 
@@ -269,7 +264,6 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hp,
-            val_data=DUMMY_TS_DATAFRAME,
         )
 
     model_names = trainer.get_model_names()
@@ -298,7 +292,6 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
     )
     model_names = copy.copy(trainer.get_model_names())
     trainer.save()
@@ -329,10 +322,9 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
             "Naive": {},
             "ETS": {},
             "AutoETS": {"n_jobs": 1},
-            "AutoGluonTabular": {"tabular_hyperparameters": {"GBM"}},
+            "AutoGluonTabular": {"tabular_hyperparameters": {"GBM": {}}},
             "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
         },
-        val_data=DUMMY_TS_DATAFRAME,
     )
     model_names = copy.copy(trainer.get_model_names())
     trainer.save()
@@ -340,11 +332,12 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
 
     loaded_trainer = AutoTimeSeriesTrainer.load(path=temp_model_path)
 
+    oof_data = loaded_trainer._get_ensemble_oof_data(DUMMY_TS_DATAFRAME)
     for m in model_names:
         if "WeightedEnsemble" not in m:
             oof_predictions = loaded_trainer._get_model_oof_predictions(m)
             assert isinstance(oof_predictions, TimeSeriesDataFrame)
-            loaded_trainer._score_with_predictions(DUMMY_TS_DATAFRAME, oof_predictions)
+            loaded_trainer._score_with_predictions(oof_data, oof_predictions)
 
 
 @pytest.mark.parametrize("failing_model", ["NaiveModel", "SeasonalNaiveModel"])
@@ -404,3 +397,60 @@ def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict
         # No models failed during prediction
         assert inputs["DeepAR"] is not None
         assert inputs["ETS"] is not None
+
+
+@pytest.fixture(scope="module")
+def trained_and_refit_trainers():
+    def fit_trainer():
+        temp_model_path = tempfile.mkdtemp()
+        trainer = AutoTimeSeriesTrainer(
+            path=temp_model_path + os.path.sep,
+            prediction_length=3,
+        )
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={
+                "Naive": {},
+                "ETS": {"maxiter": 1},
+                "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
+                "AutoGluonTabular": {"tabular_hyperparameters": {"GBM": {}}},
+            },
+        )
+        return trainer
+
+    trainer = fit_trainer()
+    refit_trainer = fit_trainer()
+    refit_trainer.refit_full("all")
+
+    yield trainer, refit_trainer
+
+
+def test_when_refit_full_called_then_all_models_are_retrained(trained_and_refit_trainers):
+    trainer, refit_trainer = trained_and_refit_trainers
+    leaderboard_initial = trainer.leaderboard()
+    leaderboard_refit = refit_trainer.leaderboard()
+
+    expected_refit_full_dict = {name: name + ag.constants.REFIT_FULL_SUFFIX for name in trainer.get_model_names()}
+    assert dict_equal_primitive(refit_trainer.model_full_dict, expected_refit_full_dict)
+    assert len(leaderboard_refit) == len(leaderboard_initial) + len(expected_refit_full_dict)
+
+
+def test_when_refit_full_called_then_all_models_can_predict(trained_and_refit_trainers):
+    _, refit_trainer = trained_and_refit_trainers
+    for model in refit_trainer.get_model_names():
+        preds = refit_trainer.predict(DUMMY_TS_DATAFRAME, model=model)
+        assert isinstance(preds, TimeSeriesDataFrame)
+        assert len(preds) == DUMMY_TS_DATAFRAME.num_items * refit_trainer.prediction_length
+
+
+def test_when_refit_full_called_with_model_name_then_single_model_is_updated(temp_model_path):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
+    trainer.fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters={
+            "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
+            "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
+        },
+    )
+    model_full_dict = trainer.refit_full("DeepAR")
+    assert list(model_full_dict.values()) == ["DeepAR_FULL"]

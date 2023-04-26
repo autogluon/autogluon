@@ -11,13 +11,12 @@ from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.predictor import TimeSeriesPredictor
-from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter
 
 from .common import DUMMY_TS_DATAFRAME
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
-    {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
+    {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
 ]
 
 
@@ -254,20 +253,20 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_loaded
     scope="module",
     params=[
         [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00", "2020-01-04 00:01:00"],
         ],
         [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:01"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00", "2020-01-04 00:00:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00", "2020-01-04 00:00:01"],
         ],
         [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-04 00:00:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00", "2020-01-04 00:00:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00", "2020-01-05 00:00:00"],
         ],
         [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00", "2020-01-04 00:00:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00", "2020-01-04 00:00:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00", "2020-01-04 00:00:00"],
         ],
     ],
 )
@@ -384,17 +383,6 @@ def test_when_predictor_called_and_loaded_back_then_ignore_time_index_persists(t
 
     loaded_predictor = TimeSeriesPredictor.load(temp_model_path)
     assert loaded_predictor.ignore_time_index == ignore_time_index
-
-
-@pytest.mark.parametrize(
-    "splitter_string, expected_splitter_class",
-    [("last_window", LastWindowSplitter), ("multi_window", MultiWindowSplitter)],
-)
-def test_when_passing_magic_string_as_validation_splitter_then_correct_splitter_object_is_created(
-    splitter_string, expected_splitter_class
-):
-    predictor = TimeSeriesPredictor(validation_splitter=splitter_string)
-    assert isinstance(predictor.validation_splitter, expected_splitter_class)
 
 
 def test_given_enable_ensemble_true_when_predictor_called_then_ensemble_is_fitted(temp_model_path):
@@ -617,3 +605,38 @@ def test_when_invalid_argument_passed_to_fit_then_exception_is_raised(temp_model
     predictor = TimeSeriesPredictor(path=temp_model_path)
     with pytest.raises(TypeError, match="unexpected keyword argument 'invalid_argument'"):
         predictor.fit(DUMMY_TS_DATAFRAME, invalid_argument=23)
+
+
+@pytest.mark.parametrize("set_best_to_refit_full", [True, False])
+def test_when_refit_full_called_then_best_model_is_updated(temp_model_path, set_best_to_refit_full):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    predictor.fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters={
+            "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
+            "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
+        },
+    )
+    model_best_before = predictor.get_model_best()
+    model_full_dict = predictor.refit_full(set_best_to_refit_full=set_best_to_refit_full)
+    model_best_after = predictor.get_model_best()
+    if set_best_to_refit_full:
+        assert model_best_after == model_full_dict[model_best_before]
+    else:
+        assert model_best_after == model_best_before
+
+
+@pytest.mark.parametrize("tuning_data, refit_called", [(None, True), (DUMMY_TS_DATAFRAME, False)])
+def test_when_refit_full_is_passed_to_fit_then_refit_full_is_skipped(temp_model_path, tuning_data, refit_called):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    with mock.patch("autogluon.timeseries.predictor.TimeSeriesPredictor.refit_full") as refit_method:
+        predictor.fit(
+            DUMMY_TS_DATAFRAME,
+            tuning_data=tuning_data,
+            hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0],
+            refit_full=True,
+        )
+        if refit_called:
+            refit_method.assert_called()
+        else:
+            refit_method.assert_not_called()
