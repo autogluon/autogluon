@@ -258,7 +258,7 @@ def run(
         wrap_resources_per_job_into_placement_group=trainable_is_parallel,
     )
     resources_per_trial = _validate_resources_per_trial(resources_per_trial)
-    logger.debug(resources_per_trial)
+    logger.debug(f"resources_per_trial to be dispatched by ray tune: {resources_per_trial}")
     ray_tune_adapter.resources_per_trial = resources_per_trial
     trainable_args = ray_tune_adapter.trainable_args_update_method(trainable_args)
     
