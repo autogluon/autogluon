@@ -311,28 +311,27 @@ def open_vocabulary_object_detection(presets: str = DEFAULT):
     """
     hyperparameters = {
         "model.names": ["ovd"],  # TODO: update with more preset hps
+        "env.num_gpus": 1,  # TODO: add multi gpu support and remove this
+        "env.eval_batch_size_ratio": 1,
     }
     hyperparameter_tune_kwargs = {}
 
     if presets in [DEFAULT, BEST_QUALITY]:
         hyperparameters.update(
             {
-                "model.ovd.checkpoint_name": "GroundingDINO_SwinB",  # TODO: update this name
-                "env.eval_batch_size_ratio": 1,
+                "model.ovd.checkpoint_name": "GroundingDINO_SwinB",
             }
         )
     elif presets == HIGH_QUALITY:
         hyperparameters.update(
             {
-                "model.ovd.checkpoint_name": "GroundingDINO_SwinB",
-                "env.eval_batch_size_ratio": 1,
+                "model.ovd.checkpoint_name": "GroundingDINO_SwinT_OGC",
             }
         )
     elif presets == MEDIUM_QUALITY:
         hyperparameters.update(
             {
                 "model.ovd.checkpoint_name": "GroundingDINO_SwinT_OGC",
-                "env.eval_batch_size_ratio": 1,
             }
         )
     else:
