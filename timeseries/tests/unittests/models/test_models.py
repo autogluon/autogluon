@@ -21,7 +21,7 @@ from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_wi
 from .gluonts.test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_autogluon_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
-from .test_ml_forecast import TESTABLE_MODELS as MLFORECAST_TESTABLE_MODELS
+from .test_mlforecast import TESTABLE_MODELS as MLFORECAST_TESTABLE_MODELS
 from .test_multi_window_model import get_multi_window_deepar
 
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
