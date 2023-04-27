@@ -133,7 +133,7 @@ class RecurrentTabularModel(AbstractTimeSeriesModel):
         longest_ts_length = train_data.num_timesteps_per_item().max()
         if longest_ts_length <= max(differences, default=0):
             logger.warning(
-                f"Chosen differences {self._diffrences} are too high for given data "
+                f"Chosen differences {differences} are too high for given data "
                 f"(longest time series length = {longest_ts_length}). Disabling differencing."
             )
             target_transforms = None
