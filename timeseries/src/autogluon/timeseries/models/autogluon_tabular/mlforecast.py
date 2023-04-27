@@ -64,9 +64,13 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
     differences : List[int], default = None
         Differences to take of the target before computing the features. These are restored at the forecasting step.
         If None, will be determined automatically based on the frequency of the data.
+    tabular_hyperparameters : Dict[Dict[str, Any]], optional
+        Hyperparameters dictionary passed to `TabularPredictor.fit`. Contains the names of models that should be fit.
+        Defaults to ``{"GBM": {}}``.
 
     """
 
+    # TODO: Find good tabular presets
     # TODO: Add transforms - std scaling / detrending
     # TODO: Use sample_weight to align metrics with Tabular
     # TODO: Add lag_transforms
@@ -226,6 +230,9 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         self.mlf = MLForecast(models={}, freq=self.freq, **mlforecast_init_args)
 
         tuning_data = self._get_features_dataframe(val_data, last_k_values=self.prediction_length)
+        tabular_hyperparameters = self._get_model_params().get(
+            "tabular_hyperparameters", self.default_tabular_hyperparameters
+        )
         estimator = TabularEstimator(
             predictor_init_kwargs={
                 "path": self.path,
@@ -235,7 +242,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             },
             predictor_fit_kwargs={
                 "time_limit": time_limit,
-                "hyperparameters": {"GBM": {}},
+                "hyperparameters": tabular_hyperparameters,
                 "tuning_data": tuning_data,
             },
         )
@@ -289,3 +296,6 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         for q in self.quantile_levels:
             predictions[str(q)] = predictions["mean"] + self.quantile_adjustments[q]
         return TimeSeriesDataFrame(predictions)
+
+    def _more_tags(self) -> dict:
+        return {"can_refit_full": True}
