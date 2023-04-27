@@ -2,6 +2,7 @@ import logging
 import os
 import shutil
 
+from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.try_import import try_import_ray
 try_import_ray()  # try import ray before importing the remaining contents so we can give proper error messages
 import ray
@@ -236,12 +237,15 @@ def run(
     )
 
     if not ray.is_initialized():
-        ray.init(
-            log_to_driver=False,
-            runtime_env={"env_vars": {"PL_DISABLE_FORK": "1"}},  # https://github.com/ray-project/ray/issues/28197
-            logging_level=logging.ERROR,  # https://github.com/ray-project/ray/issues/29216
-            **total_resources
-        )
+        if DistributedContext.is_distributed_mode():
+            ray.init(address="auto")
+        else:
+            ray.init(
+                log_to_driver=False,
+                runtime_env={"env_vars": {"PL_DISABLE_FORK": "1"}},  # https://github.com/ray-project/ray/issues/28197
+                logging_level=logging.ERROR,  # https://github.com/ray-project/ray/issues/29216
+                **total_resources
+            )
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     resources_per_trial = ray_tune_adapter.get_resources_per_trial(
@@ -254,6 +258,7 @@ def run(
         wrap_resources_per_job_into_placement_group=trainable_is_parallel,
     )
     resources_per_trial = _validate_resources_per_trial(resources_per_trial)
+    logger.debug(f"resources_per_trial to be dispatched by ray tune: {resources_per_trial}")
     ray_tune_adapter.resources_per_trial = resources_per_trial
     trainable_args = ray_tune_adapter.trainable_args_update_method(trainable_args)
     

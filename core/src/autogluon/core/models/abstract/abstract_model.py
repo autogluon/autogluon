@@ -22,6 +22,7 @@ from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
 from autogluon.common.utils.resource_utils import ResourceManager, RayResourceManager
 from autogluon.common.utils.resource_utils import get_resource_manager
+from autogluon.common.utils.distribute_utils import DistributedContext
 
 from .model_trial import model_trial, skip_hpo
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
@@ -1376,15 +1377,13 @@ class AbstractModel:
 
         # Use absolute path here because ray tune will change the working directory
         self.set_contexts(os.path.abspath(self.path) + os.path.sep)
-        directory = self.path  # also create model directory if it doesn't exist
-        # TODO: This will break on S3. Use tabular/utils/savers for datasets, add new function
-        dataset_train_filename = 'dataset_train.pkl'
-        train_path = os.path.join(directory, dataset_train_filename)
-        save_pkl.save(path=train_path, object=(X, y))
 
-        dataset_val_filename = 'dataset_val.pkl'
-        val_path = os.path.join(directory, dataset_val_filename)
-        save_pkl.save(path=val_path, object=(X_val, y_val))
+        directory = self.path
+        os.makedirs(directory, exist_ok=True)
+        data_path = directory
+        if DistributedContext.is_distributed_mode():
+            data_path = DistributedContext.get_util_path()
+        train_path, val_path = hpo_executor.prepare_data(X=X, y=y, X_val=X_val, y_val=y_val, path_prefix=data_path)
 
         model_cls = self.__class__
         init_params = self.get_params()
@@ -1441,6 +1440,8 @@ class AbstractModel:
     
     def _get_hpo_backend(self):
         """Choose which backend(Ray or Custom) to use for hpo"""
+        if DistributedContext.is_distributed_mode():
+            return RAY_BACKEND
         return CUSTOM_BACKEND
 
     def _get_default_hpo_executor(self) -> HpoExecutor:
