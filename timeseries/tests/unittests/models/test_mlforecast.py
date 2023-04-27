@@ -46,5 +46,5 @@ def test_when_covariates_and_features_present_then_feature_df_shape_is_correct(
         + len(static_features_names)
         + len(model._get_date_features(data.freq))
     )
-    expected_num_rows = len(data) - sum(differences) * data.num_items  # sum(differences) rows are dropped for each time series
+    expected_num_rows = len(data) - sum(differences) * data.num_items  # sum(differences) rows  dropped per item
     assert df.shape == (expected_num_rows, expected_num_features)
