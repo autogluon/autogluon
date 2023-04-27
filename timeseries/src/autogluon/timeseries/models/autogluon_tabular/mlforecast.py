@@ -212,6 +212,7 @@ class RecurrentTabularModel(AbstractTimeSeriesModel):
         verbosity: int = 2,
         **kwargs,
     ) -> None:
+        self._check_fit_params()
         from mlforecast import MLForecast
 
         # Do not use external val_data as tuning_data to avoid overfitting

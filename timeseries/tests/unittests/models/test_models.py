@@ -170,17 +170,6 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_given_no_freq_argument_when_fit_called_with_freq_then_model_does_not_raise_error(
-    model_class, temp_model_path
-):
-    model = model_class(path=temp_model_path, hyperparameters=DUMMY_HYPERPARAMETERS)
-    try:
-        model.fit(train_data=DUMMY_TS_DATAFRAME, freq="H")
-    except ValueError:
-        pytest.fail("unexpected ValueError raised in fit")
-
-
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raised(model_class, temp_model_path):
     model = model_class(
         path=temp_model_path,

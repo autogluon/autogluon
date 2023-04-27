@@ -4,13 +4,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from autogluon.timeseries.models.autogluon_tabular.mlforecast import RecurrentTabularModel
+from autogluon.timeseries.models.autogluon_tabular.mlforecast import RecursiveTabularModel
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
 from ..common import get_data_frame_with_variable_lengths
 
 TESTABLE_MODELS = [
-    RecurrentTabularModel,
+    RecursiveTabularModel,
 ]
 
 
@@ -31,7 +31,7 @@ def test_when_covariates_and_features_present_then_feature_df_shape_is_correct(
     feat_gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
     data = feat_gen.fit_transform(data)
     # Initialize model._target_lag_indices and model._time_features from freq
-    model = RecurrentTabularModel(
+    model = RecursiveTabularModel(
         freq=data.freq,
         path=temp_model_path,
         metadata=feat_gen.covariate_metadata,

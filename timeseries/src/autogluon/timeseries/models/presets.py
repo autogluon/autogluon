@@ -14,7 +14,7 @@ from . import (
     DynamicOptimizedThetaModel,
     ETSModel,
     NaiveModel,
-    RecurrentTabularModel,
+    RecursiveTabularModel,
     SeasonalNaiveModel,
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
@@ -39,7 +39,7 @@ MODEL_TYPES = dict(
     AutoETS=AutoETSModel,
     AutoARIMA=AutoARIMAModel,
     DynamicOptimizedTheta=DynamicOptimizedThetaModel,
-    RecurrentTabular=RecurrentTabularModel,
+    RecurrentTabular=RecursiveTabularModel,
 )
 if agts.MXNET_INSTALLED:
     from .gluonts.mx import (

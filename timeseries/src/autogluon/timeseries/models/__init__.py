@@ -1,4 +1,4 @@
-from .autogluon_tabular import AutoGluonTabularModel, RecurrentTabularModel
+from .autogluon_tabular import AutoGluonTabularModel, RecursiveTabularModel
 from .gluonts import DeepARModel, SimpleFeedForwardModel, TemporalFusionTransformerModel
 from .local import (
     ARIMAModel,
@@ -19,7 +19,7 @@ __all__ = [
     "ETSModel",
     "ThetaModel",
     "AutoGluonTabularModel",
-    "RecurrentTabularModel",
+    "RecursiveTabularModel",
     "NaiveModel",
     "SeasonalNaiveModel",
     "AutoETSModel",
