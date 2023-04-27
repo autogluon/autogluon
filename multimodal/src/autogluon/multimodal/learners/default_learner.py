@@ -1,15 +1,5 @@
 from __future__ import annotations
 
-import warnings
-
-from abc import ABC, abstractmethod, abstractclassmethod, abstractstaticmethod, abstractproperty
-from datetime import timedelta
-from typing import Dict, Optional, Union, List
-
-from .abstract_mm_learner import AbstractMMLearner
-from autogluon.multimodal.problem_types import ProblemTypeProperty
-
-
 import copy
 import json
 import logging
@@ -30,6 +20,7 @@ import torch
 import transformers
 import yaml
 from omegaconf import OmegaConf
+from overrides import override
 from packaging import version
 from pytorch_lightning import LightningDataModule
 from torch import nn
@@ -39,7 +30,7 @@ from autogluon.core.utils import default_holdout_frac, generate_train_test_split
 from autogluon.core.utils.loaders import load_pd
 from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
-from . import version as ag_version
+# from . import version as ag_version
 from autogluon.multimodal.constants import (
     AUTOMM,
     AUTOMM_TUTORIAL_MODE,
@@ -112,7 +103,7 @@ from autogluon.multimodal.optimization.utils import (
     get_norm_layer_param_names,
     get_trainable_params_efficient_finetune,
 )
-from autogluon.multimodal.problem_types import PROBLEM_TYPES_REG
+from autogluon.multimodal.problem_types import PROBLEM_TYPES_REG, ProblemTypeProperty
 from autogluon.multimodal.utils import (
     AutoMMModelCheckpoint,
     AutoMMModelCheckpointIO,
@@ -166,13 +157,14 @@ from autogluon.multimodal.utils import (
     setup_save_path,
     split_hyperparameters,
     tensor_to_ndarray,
-    try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
     update_hyperparameters,
     update_tabular_config_by_resources,
     upgrade_config,
 )
+from .abstract_mm_learner import AbstractMMLearner
+
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +179,7 @@ class DefaultLearner(AbstractMMLearner):
         # response: Optional[Union[str, List[str]]] = None,
         # match_label: Optional[Union[int, str]] = None,
         # pipeline: Optional[str] = None,
-        presets: Optional[str] = None,
+        # presets: Optional[str] = None,
         eval_metric: Optional[str] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 2,
@@ -199,7 +191,7 @@ class DefaultLearner(AbstractMMLearner):
 
         self._label_column = label
         self._problem_type = problem_type
-        self._presets = presets.lower() if presets else None
+        # self._presets = presets.lower() if presets else None  # NOTE: This will be handled by predictor.
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = num_classes
@@ -226,22 +218,54 @@ class DefaultLearner(AbstractMMLearner):
         # self._total_train_time = None
         self._best_score = None
 
+    @override
+    def path(self) -> str | None:
+        return self._save_path
+
+    @override
+    def label(self) -> str | None:
+        return self._label_column
+
+    @property
+    @override
+    def problem_type(self) -> str | None:
+        return self._problem_type
+
+    @property
+    @override
+    def problem_property(self) -> ProblemTypeProperty | None:
+        if self._problem_type is None:
+            return None
+        else:
+            return PROBLEM_TYPES_REG.get(self._problem_type)
+
+    @property
+    @override
+    def class_labels(self) -> list | None:
+        return self._classes
+
+    @property
+    @override
+    def positive_class(self) -> int | None:
+        return None
+
+    @override
     def fit(
         self,
         train_df: pd.DataFrame,
         val_df: pd.DataFrame,
         validation_metric_name: str,
         minmax_mode: str,  # this is determined solely on validation_metric_name
-        max_time: timedelta,
         save_path: str,
         ckpt_path: str,  # these two are synced
         resume: bool,  # these two are synced
-        enable_progress_bar: bool,  # can be inferred?
+        max_time: Optional[timedelta] = None,
+        enable_progress_bar: Optional[bool] = False,  # can be inferred?
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         advanced_hyperparameters: Optional[Dict] = None,
-        teacher_predictor: Union[str, MultiModalPredictor] = None,
+        teacher_predictor: Union[str, DefaultLearner] = None,
         hpo_mode: bool = False,
         standalone: bool = True,
         clean_ckpts: bool = True,
@@ -251,9 +275,10 @@ class DefaultLearner(AbstractMMLearner):
         logger.info(get_fit_start_message(save_path, validation_metric_name))
 
         ### SETUP Environments ###
-        # 1. get config.
+        self._fit_called = True
+        # 1-3, 22. get config.
         config, df_preprocessor, grad_steps, strategy, use_ray_lightning = self._setup_environment(
-            train_df, presets, hyperparameters, teacher_predictor, hpo_mode, **hpo_kwargs
+            train_df, config, presets, hyperparameters, teacher_predictor, hpo_mode, **hpo_kwargs
         )
 
         # 4. if NER, update output shape. NOTE: This can be refactored into the NER Learner
@@ -266,15 +291,15 @@ class DefaultLearner(AbstractMMLearner):
         # 7. get data_processors.
         data_processors = self._get_data_processors(config, advanced_hyperparameters, model)
 
-        # 8. infer positive labels
-        pos_label = try_to_infer_pos_label(
-            data_config=config.data,
-            label_encoder=df_preprocessor.label_generator,
-            problem_type=self._problem_type,
-        )
+        # 8. infer positive labels (NOTE: This is deleted in the latest main branch)
+        # pos_label = try_to_infer_pos_label(
+        #     data_config=config.data,
+        #     label_encoder=df_preprocessor.label_generator,
+        #     problem_type=self._problem_type,
+        # )
 
         # 9. setup validation metric
-        validation_metric, custom_metric_func = self._setup_validation_metric(validation_metric_name, pos_label)
+        validation_metric, custom_metric_func = self._setup_validation_metric(validation_metric_name)
 
         # 10. setup mix up if applicable
         mixup_active, mixup_fn = self._setup_mixup(config)
@@ -303,23 +328,24 @@ class DefaultLearner(AbstractMMLearner):
         # TODO: complete this later
         # 14. if times up. return final model
         if max_time == timedelta(seconds=0):
-            # self._top_k_average(
-            #     model=model,
-            #     save_path=save_path,
-            #     minmax_mode=minmax_mode,
-            #     is_distill=False,
-            #     top_k_average_method=config.optimization.top_k_average_method,
-            #     val_df=val_df,
-            #     validation_metric_name=validation_metric_name,
-            #     strict_loading=not trainable_param_names,
-            #     standalone=standalone,
-            #     clean_ckpts=clean_ckpts,
-            # )
+            self._top_k_average(
+                model=model,
+                save_path=save_path,
+                minmax_mode=minmax_mode,
+                is_distill=False,
+                top_k_average_method=config.optimization.top_k_average_method,
+                val_df=val_df,
+                validation_metric_name=validation_metric_name,
+                strict_loading=not trainable_param_names,
+                standalone=standalone,
+                clean_ckpts=clean_ckpts,
+            )
 
             return self
 
         # By Default, no distillation. So ignore for now.
-        # TODO: complete this later. This can be wrapped into another function called learner.distill()
+        # TODO: refactor this into a separate function called self.distill()
+        # which is invoked by self.fit() if teacher_predictor is not None
         # 15. setup distillation.
         # need to assign the above attributes before setting up distillation
         # if teacher_predictor is not None:
@@ -368,7 +394,8 @@ class DefaultLearner(AbstractMMLearner):
         metrics_kwargs = self._get_metrics_kwargs(validation_metric_name, validation_metric, custom_metric_func)
 
         # By default, we use the default task type a.k.a. LitModule
-        ## TODO: complete this later in different learners
+        # TODO: Refactor this into sub-learners
+        # TODO: i.e. define function self._setup_task_lightning_module() -> pl.LightningModule
         # 19. select the correct pl module for a given problem type.
         # NOTE: The task creation and all related variables/functions should be refactored into each Learner class
         # is_distill = teacher_model is not None
@@ -432,7 +459,7 @@ class DefaultLearner(AbstractMMLearner):
         #         **optimization_kwargs,
         #     )
 
-        task = self._create_task(
+        task = self._setup_task_lightning_module(
             config,
             model,
             trainable_param_names,
@@ -534,7 +561,7 @@ class DefaultLearner(AbstractMMLearner):
         # config.env.strategy = strategy if not config.env.strategy == DEEPSPEED_OFFLOADING else DEEPSPEED_OFFLOADING
         # self._config = config
 
-        ## IGNORE THIS FOR NOW
+        ## TODO: Complete the save later. IGNORE THIS FOR NOW
         # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
         # self.save(save_path, standalone=standalone)
 
@@ -594,24 +621,331 @@ class DefaultLearner(AbstractMMLearner):
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
             # We only averaging the checkpoint of the best trial in the end in the master process
-            # if not hpo_mode:
-            # self._top_k_average(
-            #     model=model,
-            #     save_path=save_path,
-            #     minmax_mode=minmax_mode,
-            #     is_distill=False,  # By default, we do not do distill. If distill, we will do it in the distill learner
-            #     top_k_average_method=config.optimization.top_k_average_method,
-            #     val_df=val_df,
-            #     validation_metric_name=validation_metric_name,
-            #     strategy=strategy,
-            #     strict_loading=not trainable_param_names,
-            #     # Not strict loading if using parameter-efficient finetuning
-            #     standalone=standalone,
-            #     clean_ckpts=clean_ckpts,
-            # )
-            self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
+            if not hpo_mode:
+                self._top_k_average(
+                    model=model,
+                    save_path=save_path,
+                    minmax_mode=minmax_mode,
+                    is_distill=False,  # By default, we do not do distill. If distill, we will do it in the distill learner
+                    top_k_average_method=config.optimization.top_k_average_method,
+                    val_df=val_df,
+                    validation_metric_name=validation_metric_name,
+                    strategy=strategy,
+                    strict_loading=not trainable_param_names,
+                    # Not strict loading if using parameter-efficient finetuning
+                    standalone=standalone,
+                    clean_ckpts=clean_ckpts,
+                )
+            self._best_score = trainer.callback_metrics[f"val_{validation_metric_name}"].item()
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
+
+    @override
+    def predict(
+        self,
+        data: Union[pd.DataFrame, dict, list, str],
+        candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
+        as_pandas: Optional[bool] = None,
+        realtime: Optional[bool] = None,
+        save_results: Optional[bool] = None,
+        **kwargs,
+    ):
+        self._verify_inference_ready()
+
+        # TODO: refactor into matching learner. Leave it as is for now in predictor.
+        # if self._matcher:
+        #     return self._matcher.predict(
+        #         data=data,
+        #         id_mappings=id_mappings,
+        #         as_pandas=as_pandas,
+        #         realtime=realtime,
+        #     )
+
+        # TODO: refactor into detection learner.
+        # i.e. define self._transform_data_for_predict(data) -> pd.DataFrame
+        # if self._problem_type == OBJECT_DETECTION:
+        # data = object_detection_data_to_df(data)
+
+        #     if self._label_column not in data:
+        #         self._label_column = None
+
+        # TODO: refactor into sub-learners
+        # i.e. define self._get_prediction_ret_type() -> str
+        # or just init a mapping in this default_learner
+        # I think defining a function makes more sense.
+
+        # if self._problem_type == OBJECT_DETECTION or self._problem_type == OCR_TEXT_DETECTION:
+        #     ret_type = BBOX
+        # elif self._problem_type == OCR_TEXT_RECOGNITION:
+        #     ret_type = [TEXT, SCORE]
+        # else:
+        #     ret_type = LOGITS
+        ret_type = LOGITS
+
+        # if self._problem_type == NER:
+        #     ret_type = NER_RET
+
+        # TODO: This is a matching problem type, except the self._matcher is None
+        if candidate_data:
+            # I believe this only apply to a certain problem types
+            # i.e. obviously this wouldn't make sense for OBJECT_DETECTION, OCR, etc.
+            # From what I understand, this is more likely using models such CLIP, SWIN to extract embeddings
+            # This is problem_type agnostic, but depends on what model is used.
+            pred = self._match_queries_and_candidates(
+                query_data=data,
+                candidate_data=candidate_data,
+                return_prob=False,
+            )
+        else:
+            outputs = predict(
+                predictor=self,
+                data=data,
+                requires_label=False,
+                realtime=realtime,
+            )
+
+            # TODO: refactor into sub-learners
+            # i.e. define function self._extract_from_output(outputs, ret_type) -> logits
+            # if self._problem_type == OCR_TEXT_RECOGNITION:
+            #     logits = []
+            #     for r_type in ret_type:
+            #         logits.append(extract_from_output(outputs=outputs, ret_type=r_type))
+            # else:
+            #     logits = extract_from_output(outputs=outputs, ret_type=ret_type)
+            logits = extract_from_output(outputs=outputs, ret_type=ret_type)
+
+            if self._df_preprocessor:
+                if ret_type == BBOX:
+                    pred = logits
+                else:
+                    pred = self._df_preprocessor.transform_prediction(
+                        y_pred=logits,
+                    )
+            else:
+                if isinstance(logits, (torch.Tensor, np.ndarray)) and logits.ndim == 2:
+                    pred = logits.argmax(axis=1)
+                else:
+                    pred = logits
+
+            # TODO: refactor into sub-learners
+            # i.e. define function self._postprocess_pred(pred, **kwargs) -> pred
+            # if self._problem_type == NER:
+            #     pred = merge_bio_format(data[self._df_preprocessor.ner_feature_names[0]], pred)
+
+            # if self._problem_type == OBJECT_DETECTION:
+            #     if self._model.output_bbox_format == XYWH:
+            #         pred = convert_pred_to_xywh(pred)
+
+        # TODO: refactor into sub-learners
+        # i.e. define self._save_results()
+        if save_results:
+            ## Dumping Result for detection only now
+            assert (
+                self._problem_type == OBJECT_DETECTION
+            ), "Aborting: save results only works for object detection now."
+
+            self._save_path = setup_save_path(
+                old_save_path=self._save_path,
+                warn_if_exist=False,
+            )
+
+            result_path = os.path.join(self._save_path, "result.txt")
+
+            save_result_df(
+                pred=pred,
+                data=data,
+                detection_classes=self._model.model.CLASSES,
+                result_path=result_path,
+            )
+
+        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
+            if self._problem_type == OBJECT_DETECTION:
+                pred = save_result_df(
+                    pred=pred,
+                    data=data,
+                    detection_classes=self._model.model.CLASSES,
+                    result_path=None,
+                )
+            else:
+                pred = self._as_pandas(data=data, to_be_converted=pred)
+
+        return pred
+
+    @override
+    def predict_proba(self, **kwargs):
+        pass
+
+    @override
+    def evaluate(
+        self,
+        data: Union[pd.DataFrame, dict, list, str],
+        query_data: Optional[list] = None,
+        response_data: Optional[list] = None,
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
+        metrics: Optional[Union[str, List[str]]] = None,
+        chunk_size: Optional[int] = 1024,
+        similarity_type: Optional[str] = "cosine",
+        cutoffs: Optional[List[int]] = [1, 5, 10],
+        label: Optional[str] = None,
+        return_pred: Optional[bool] = False,
+        realtime: Optional[bool] = None,
+        eval_tool: Optional[str] = None,
+        **kwargs,
+    ):
+        # 1. sanity check for verifying if it is ready for inference
+        self._verify_inference_ready()
+
+        # 2. route to matcher if necessary. TODO: refactor this into matching learner.
+        # We'll leave it as is for now in the predictor.
+        # if self._matcher:
+        #     return self._matcher.evaluate(
+        #         data=data,
+        #         query_data=query_data,
+        #         response_data=response_data,
+        #         id_mappings=id_mappings,
+        #         chunk_size=chunk_size,
+        #         similarity_type=similarity_type,
+        #         cutoffs=cutoffs,
+        #         label=label,
+        #         metrics=metrics,
+        #         return_pred=return_pred,
+        #         realtime=realtime,
+        #     )
+
+        # 3. for detection problems. TODO: refactor this into Detection Learner
+        # i.e. override self._evaluate method in Detection Learner
+        # if self._problem_type == OBJECT_DETECTION:
+        #     if realtime:
+        #         return NotImplementedError(
+        #             f"Current problem type {self._problem_type} does not support realtime predict."
+        #         )
+        #     if isinstance(data, str):
+        #         return evaluate_coco(
+        #             predictor=self,
+        #             anno_file_or_df=data,
+        #             metrics=metrics,
+        #             return_pred=return_pred,
+        #             eval_tool=eval_tool,
+        #         )
+        #     else:
+        #         data = object_detection_data_to_df(data)
+        #         return evaluate_coco(
+        #             predictor=self,
+        #             anno_file_or_df=data,
+        #             metrics=metrics,
+        #             return_pred=return_pred,
+        #             eval_tool="torchmetrics",
+        #         )
+
+        # 4. get return type. TODO: refactor this into sub-learners
+        # i.e. define self.get_return_type() -> str
+        if self._problem_type == NER:
+            ret_type = NER_RET
+        else:
+            ret_type = LOGITS
+
+        # 5. run predict and get outputs
+        outputs = predict(
+            predictor=self,
+            data=data,
+            requires_label=True,
+            realtime=realtime,
+        )
+        logits = extract_from_output(ret_type=ret_type, outputs=outputs)
+
+        # 6. get y_pred and y_true for computing metrics. TODO: refactor this into sub-learners
+        # i.e. define self.transform_logits_to_metric_input(logits)
+        metric_data = {}
+        if self._problem_type in [BINARY, MULTICLASS]:
+            y_pred_prob = logits_to_prob(logits)
+            metric_data[Y_PRED_PROB] = y_pred_prob
+
+        y_pred = self._df_preprocessor.transform_prediction(
+            y_pred=logits,
+            inverse_categorical=False,
+        )
+        y_pred_inv = self._df_preprocessor.transform_prediction(
+            y_pred=logits,
+            inverse_categorical=True,
+        )
+
+        # TODO: refactore this into NER learner
+        # i.e. define self.get_y_true_for_metric(data)
+        # if self._problem_type == NER:
+        #     y_true = self._df_preprocessor.transform_label_for_metric(df=data, tokenizer=self._model.tokenizer)
+        # else:
+        #     y_true = self._df_preprocessor.transform_label_for_metric(df=data)
+        y_true = self._df_preprocessor.transform_label_for_metric(df=data)
+
+        metric_data.update(
+            {
+                Y_PRED: y_pred,
+                Y_TRUE: y_true,
+            }
+        )
+
+        metrics_is_none = False
+
+        if metrics is None:
+            metrics_is_none = True
+            metrics = [self._eval_metric_name]
+        if isinstance(metrics, str):
+            metrics = [metrics]
+
+        # 7. compute metrics. TODO: Refactor this into sub-learners
+        # i.e. define self.compute_score_and_get_results()
+        results = {}
+        # if self._problem_type == NER:
+        #     score = compute_score(
+        #         metric_data=metric_data,
+        #         metric_name=self._eval_metric_name.lower(),
+        #     )
+        #     score = {k.lower(): v for k, v in score.items()}
+        #     if metrics_is_none:
+        #         results = score
+        #     else:
+        #         for per_metric in metrics:
+        #             if per_metric.lower() in score:
+        #                 results.update({per_metric: score[per_metric.lower()]})
+        #             else:
+        #                 logger.warning(f"Warning: {per_metric} is not a supported evaluation metric!")
+        #         if not results:
+        #             results = score  # If the results dict is empty, return all scores.
+        # else:
+        #     for per_metric in metrics:
+        #         score = compute_score(
+        #             metric_data=metric_data,
+        #             metric_name=per_metric.lower(),
+        #         )
+        #         results[per_metric] = score
+        for per_metric in metrics:
+            score = compute_score(
+                metric_data=metric_data,
+                metric_name=per_metric.lower(),
+            )
+            results[per_metric] = score
+
+        if return_pred:
+            return results, self._as_pandas(data=data, to_be_converted=y_pred_inv)
+        else:
+            return results
+
+    @override
+    def extract_embedding(self, **kwargs):
+        pass
+
+    @override
+    def fit_summary(self, **kwargs):
+        pass
+
+    @override
+    def save(self, **kwargs):
+        pass
+
+    @override
+    def load(self, **kwargs):
+        pass
 
     def _top_k_average(
         self,
@@ -821,7 +1155,7 @@ class DefaultLearner(AbstractMMLearner):
 
         return checkpoint_callback
 
-    def _create_task(
+    def _setup_task_lightning_module(
         self,
         config,
         model,
@@ -935,12 +1269,11 @@ class DefaultLearner(AbstractMMLearner):
 
         return mixup_active, mixup_fn
 
-    def _setup_validation_metric(self, validation_metric_name, pos_label):
+    def _setup_validation_metric(self, validation_metric_name):
         if validation_metric_name is not None:
             validation_metric, custom_metric_func = get_metric(
                 metric_name=validation_metric_name,
                 num_classes=self._output_shape,
-                pos_label=pos_label,
             )
         else:
             validation_metric, custom_metric_func = (None, None)
@@ -1000,6 +1333,7 @@ class DefaultLearner(AbstractMMLearner):
     def _setup_environment(
         self,
         train_df: pd.DataFrame,
+        config: dict,
         presets: Optional[str],
         hyperparameters: Optional[Union[str, List[str], Dict]],
         teacher_predictor: Union[str, MultiModalPredictor],
@@ -1107,3 +1441,284 @@ class DefaultLearner(AbstractMMLearner):
                 strategy = None
                 num_gpus = min(num_gpus, 1)
         return num_gpus, strategy
+
+    @staticmethod
+    def _load_state_dict(
+        model: nn.Module,
+        state_dict: dict = None,
+        path: str = None,
+        prefix: str = "model.",
+        strict: bool = True,
+    ):
+        if state_dict is None:
+            if os.path.isdir(path + "-dir"):  # deepspeed save checkpoints into a directory
+                from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
+
+                convert_zero_checkpoint_to_fp32_state_dict(path + "-dir", path)
+                shutil.rmtree(path + "-dir")
+                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
+            else:
+                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
+        state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
+        load_result = model.load_state_dict(state_dict, strict=strict)
+        assert (
+            len(load_result.unexpected_keys) == 0
+        ), f"Load model failed, unexpected keys {load_result.unexpected_keys.__str__()}"
+        return model
+
+    @staticmethod
+    def _replace_model_name_prefix(
+        state_dict: dict,
+        old_prefix: str,
+        new_prefix: str,
+    ):
+        start_idx = len(old_prefix)
+        state_dict_processed = {
+            new_prefix + k[start_idx:]: v for k, v in state_dict.items() if k.startswith(old_prefix)
+        }
+        return state_dict_processed
+
+    def _as_pandas(
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        to_be_converted: Union[np.ndarray, dict],
+    ):
+        if isinstance(data, pd.DataFrame):
+            index = data.index
+        else:
+            index = None
+        if isinstance(to_be_converted, list) or (
+            isinstance(to_be_converted, np.ndarray) and to_be_converted.ndim == 1
+        ):
+            return pd.Series(to_be_converted, index=index, name=self._label_column)
+        else:
+            return pd.DataFrame(to_be_converted, index=index, columns=self.class_labels)
+
+    def _verify_inference_ready(self):
+        if not self._fit_called:
+            if self._problem_type and not self.problem_property.support_zero_shot:
+                raise RuntimeError(
+                    f"problem_type='{self._problem_type}' does not support running inference directly. "
+                    f"You need to call `predictor.fit()`, or load a predictor first before "
+                    f"running `predictor.predict()`, `predictor.evaluate()` or `predictor.extract_embedding()`."
+                )
+
+    # TODO: consider renaming this to something like prepare predict?
+    def _on_predict_start(
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        requires_label: bool,
+    ):
+        if self._column_types is None:
+            data = data_to_df(data=data)
+            allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
+            column_types = infer_column_types(
+                data=data,
+                allowable_column_types=allowable_dtypes,
+                fallback_column_type=fallback_dtype,
+            )
+            if self._label_column and self._label_column in data.columns:
+                column_types = infer_label_column_type_by_problem_type(
+                    column_types=column_types,
+                    label_columns=self._label_column,
+                    problem_type=self._problem_type,
+                    data=data,
+                )
+
+            if self._problem_type == OBJECT_DETECTION:
+                column_types = infer_rois_column_type(
+                    column_types=column_types,
+                    data=data,
+                )
+        else:  # called .fit() or .load()
+            column_names = list(self._column_types.keys())
+            # remove label column since it's not required in inference.
+            column_names.remove(self._label_column)
+            data = data_to_df(
+                data=data,
+                required_columns=self._df_preprocessor.required_feature_names,
+                all_columns=column_names,
+            )
+            column_types = self._column_types
+            column_types_copy = copy.deepcopy(column_types)
+            for col_name, col_type in column_types.items():
+                if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
+                    if is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_PATH):
+                        image_type = IMAGE_PATH
+                    elif is_image_column(
+                        data=data[col_name],
+                        col_name=col_name,
+                        image_type=IMAGE_BYTEARRAY,
+                    ):
+                        image_type = IMAGE_BYTEARRAY
+                    else:
+                        image_type = col_type
+                    if col_type != image_type:
+                        column_types_copy[col_name] = image_type
+            self._df_preprocessor._column_types = column_types_copy
+
+        if self._df_preprocessor is None:
+            df_preprocessor = init_df_preprocessor(
+                config=self._config,
+                column_types=column_types,
+                label_column=self._label_column,
+                train_df_x=data,  # TODO: drop label like in line 884?
+                train_df_y=data[self._label_column] if self._label_column else None,
+            )
+        else:  # called .fit() or .load()
+            df_preprocessor = self._df_preprocessor
+
+        data_processors = copy.copy(self._data_processors)
+        # For prediction data with no labels provided.
+        if not requires_label:
+            data_processors.pop(LABEL, None)
+
+        return data, df_preprocessor, data_processors
+
+    def _default_predict(
+        self,
+        data: pd.DataFrame,
+        df_preprocessor: MultiModalFeaturePreprocessor,
+        data_processors: Dict,
+        num_gpus: int,
+        precision: Union[int, str],
+        batch_size: int,
+        strategy: str,
+    ) -> List[Dict]:
+        if self._config.env.strategy == DEEPSPEED_OFFLOADING and DEEPSPEED_MODULE not in sys.modules:
+            # Need to initialize DeepSpeed and optimizer as currently required in Pytorch-Lighting integration of deepspeed.
+            # TODO: Using optimiation_kwargs for inference is confusing and bad design. Remove as soon as fixed in pytorch-lighting.
+            from autogluon.multimodal.optimization.deepspeed import CustomDeepSpeedStrategy
+
+            strategy = CustomDeepSpeedStrategy(
+                stage=3,
+                offload_optimizer=True,
+                offload_parameters=False,
+                allgather_bucket_size=self._config.env.deepspeed_allgather_size,
+                reduce_bucket_size=self._config.env.deepspeed_allreduce_size,
+            )
+            norm_param_names = get_norm_layer_param_names(self._model)
+            trainable_param_names = get_trainable_params_efficient_finetune(
+                norm_param_names,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+            )
+
+            optimization_kwargs = dict(
+                optim_type=self._config.optimization.optim_type,
+                lr_choice=self._config.optimization.lr_choice,
+                lr_schedule=self._config.optimization.lr_schedule,
+                lr=self._config.optimization.learning_rate,
+                lr_decay=self._config.optimization.lr_decay,
+                end_lr=self._config.optimization.end_lr,
+                lr_mult=self._config.optimization.lr_mult,
+                weight_decay=self._config.optimization.weight_decay,
+                warmup_steps=self._config.optimization.warmup_steps,
+            )
+        else:
+            optimization_kwargs = {}
+            trainable_param_names = []
+
+        predict_dm = BaseDataModule(
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            per_gpu_batch_size=batch_size,
+            num_workers=self._config.env.num_workers_evaluation,
+            predict_data=data,
+        )
+
+        callbacks = []
+
+        if strategy == "ddp":
+            if self._problem_type != OBJECT_DETECTION:
+                raise NotImplementedError(f"inference using ddp is only implemented for {OBJECT_DETECTION}")
+            else:
+                pred_writer = DDPCacheWriter(pipeline=self._problem_type, write_interval="epoch")
+                callbacks = [pred_writer]
+
+        # TODO: refactor into sub-learners
+        # if self._problem_type == NER:
+        #     task = NerLitModule(
+        #         model=self._model,
+        #         model_postprocess_fn=self._model_postprocess_fn,
+        #         efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+        #         trainable_param_names=trainable_param_names,
+        #         **optimization_kwargs,
+        #     )
+        # elif self._problem_type == OBJECT_DETECTION:
+        #     task = MMDetLitModule(
+        #         model=self._model,
+        #         **optimization_kwargs,
+        #     )
+        # else:
+        #     task = LitModule(
+        #         model=self._model,
+        #         model_postprocess_fn=self._model_postprocess_fn,
+        #         efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+        #         trainable_param_names=trainable_param_names,
+        #         **optimization_kwargs,
+        #     )
+
+        task = LitModule(
+            model=self._model,
+            model_postprocess_fn=self._model_postprocess_fn,
+            efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+            trainable_param_names=trainable_param_names,
+            **optimization_kwargs,
+        )
+
+        blacklist_msgs = []
+        if self._verbosity <= 3:  # turn off logging in prediction
+            blacklist_msgs.append("Automatic Mixed Precision")
+            blacklist_msgs.append("GPU available")
+            blacklist_msgs.append("TPU available")
+            blacklist_msgs.append("IPU available")
+            blacklist_msgs.append("HPU available")
+            blacklist_msgs.append("select gpus")
+            blacklist_msgs.append("LOCAL_RANK")
+        log_filter = LogFilter(blacklist_msgs)
+
+        with apply_log_filter(log_filter):
+            evaluator = pl.Trainer(
+                accelerator="gpu" if num_gpus > 0 else None,
+                devices=get_available_devices(num_gpus=num_gpus, auto_select_gpus=self._config.env.auto_select_gpus),
+                num_nodes=self._config.env.num_nodes,
+                precision=precision,
+                strategy=strategy,
+                benchmark=False,
+                enable_progress_bar=self._enable_progress_bar,
+                deterministic=self._config.env.deterministic,
+                max_epochs=-1,  # Add max_epochs to disable warning
+                logger=False,
+                callbacks=callbacks,
+            )
+
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    ".*does not have many workers which may be a bottleneck. "
+                    "Consider increasing the value of the `num_workers` argument` "
+                    ".* in the `DataLoader` init to improve performance.*",
+                )
+
+                outputs = evaluator.predict(
+                    task,
+                    datamodule=predict_dm,
+                    return_predictions=not callbacks,
+                )
+
+                if strategy == "ddp":
+                    if evaluator.global_rank != 0:
+                        sys.exit(f"Prediction finished, exit the process with global_rank={evaluator.global_rank}...")
+                    else:
+                        outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
+                elif self._problem_type == OBJECT_DETECTION:
+                    # reformat single gpu output for object detection
+                    # outputs shape: num_batch, 1(["bbox"]), batch_size, 80, n, 5
+                    # output LABEL if exists for evaluations
+                    outputs = [
+                        {BBOX: bbox, LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox}
+                        for ele in outputs
+                        for i, bbox in enumerate(ele[BBOX])
+                    ]
+
+        return outputs

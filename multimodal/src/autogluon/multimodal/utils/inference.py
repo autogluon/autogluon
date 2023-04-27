@@ -462,6 +462,7 @@ def predict(
     -------
     A list of output dicts.
     """
+    # NOTE: can this be refactored?
     if is_matching:
         data, df_preprocessor, data_processors, match_label = predictor._on_predict_start(
             data=data,
@@ -479,6 +480,7 @@ def predict(
 
     num_gpus = compute_num_gpus(config_num_gpus=predictor._config.env.num_gpus, strategy=strategy)
 
+    # TODO: Consider refactor this into object detection learner?
     if predictor._problem_type == OBJECT_DETECTION:
         strategy = "ddp"
 

@@ -18,24 +18,33 @@ def test_predictor_with_learner(checkpoint_name):
 
     model_path = f"./tmp/{uuid.uuid4().hex}-automm_shopee"
 
-    predictor = MultiModalPredictor(label="label", problem_type="multiclass", path=model_path)
+    predictor = MultiModalPredictor(
+        label="label",
+        problem_type="multiclass",
+        path=model_path,
+        use_learner=True,
+    )
+    import ipdb
 
+    ipdb.set_trace()
     predictor.fit(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": 1,
-            # "optimization.loss_function": "focal_loss",
-            # "optimization.focal_loss.alpha": [1, 0.25, 0.35, 0.16],  # shopee dataset has 4 classes.
-            # "optimization.focal_loss.gamma": 2.5,
-            # "optimization.focal_loss.reduction": "mean",
-            "optimization.max_epochs": 5,
+            "optimization.max_epochs": 2,
         },
         train_data=train_data,
         # time_limit=30,  # seconds
     )  # you can trust the default config, e.g., we use a `swin_base_patch4_window7_224` model
 
+    result = predictor.evaluate(test_data)
+
     image_path = test_data.iloc[0]["image"]
 
-    # predictions_str = predictor.predict(image_path)
-    # predictions_list1 = predictor.predict([image_path])
-    # predictions_list10 = predictor.predict([image_path] * 10)
+    predictions_str = predictor.predict(image_path)
+    predictions_list1 = predictor.predict([image_path])
+    predictions_list10 = predictor.predict([image_path] * 10)
+
+
+if __name__ == "__main__":
+    test_predictor_with_learner("swin_tiny_patch4_window7_224")

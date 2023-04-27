@@ -4,6 +4,8 @@ import warnings
 from abc import ABC, abstractmethod, abstractclassmethod, abstractstaticmethod, abstractproperty
 from typing import Optional, Union, List
 
+import pandas as pd
+
 from autogluon.multimodal.problem_types import ProblemTypeProperty
 
 logger = logging.getLogger(__name__)
@@ -41,11 +43,21 @@ class AbstractMMLearner(ABC):
         pass
 
     @abstractmethod
-    def fit(self, **kwargs) -> ABC.__class__:
+    def fit(
+        self,
+        train_df: pd.DataFrame,
+        val_df: pd.DataFrame,
+        validation_metric_name: str,
+        minmax_mode: str,  # this is determined solely on validation_metric_name
+        save_path: str,
+        ckpt_path: str,  # these two are synced
+        resume: bool,
+        **kwargs,
+    ):
         pass
 
     @abstractmethod
-    def predict(self, **kwargs):
+    def predict(self, data: Union[pd.DataFrame, dict, list, str], **kwargs):
         pass
 
     @abstractmethod
@@ -53,7 +65,7 @@ class AbstractMMLearner(ABC):
         pass
 
     @abstractmethod
-    def evaluate(self, **kwargs):
+    def evaluate(self, data: Union[pd.DataFrame, dict, list, str], **kwargs):
         pass
 
     @abstractmethod

@@ -13,7 +13,7 @@ import sys
 import time
 import warnings
 from datetime import timedelta
-from typing import Dict, List, Optional, Union
+from typing import Dict, Final, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -199,6 +199,7 @@ class MultiModalPredictor(ExportMixin):
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
         sample_data_path: Optional[str] = None,
+        use_learner: Optional[bool] = False,  # TODO: temporary arg for unit testing, remove later
     ):
         """
         Parameters
@@ -408,7 +409,8 @@ class MultiModalPredictor(ExportMixin):
         self._best_score = None
 
         # initialize learner as None
-        self._learner = None
+        self._use_learner = use_learner  # TODO: temporary arg for unit testing, remove later
+        self._learner: Optional[DefaultLearner] = None
         # Based on the information given, setup a corresponding learner. NOTE: learner is initialized at the end of .fit()
         # if self._problem_type == None:
         #     self._learner = None
@@ -847,25 +849,27 @@ class MultiModalPredictor(ExportMixin):
             return predictor
 
         # 15.2 default ._fit() which invokes pl module
-        # self._fit(**_fit_args)
-        # calling learner.fit
-        # After getting the parameters, setup learner
-        if self._learner is None:
-            self._learner = DefaultLearner(
-                label=self._label_column,
-                problem_type=self._problem_type,
-                preset=self._presets,
-                eval_metric=self._eval_metric_name,
-                path=self._save_path,
-                verbosity=self._verbosity,
-                num_classes=self._output_shape,
-                classes=self._classes,
-                enable_progress_bar=self._enable_progress_bar,
-            )
+        if not self._use_learner:
+            self._fit(**_fit_args)
         else:
-            # self._update_learner_properties()
-            pass
-        self._learner.fit(**_fit_args)
+            # calling learner.fit
+            # After getting the parameters, setup learner
+            if self._learner is None:
+                self._learner = DefaultLearner(
+                    label=self._label_column,
+                    problem_type=self._problem_type,
+                    column_types=self._column_types,
+                    eval_metric=self._eval_metric_name,
+                    path=self._save_path,
+                    verbosity=self._verbosity,
+                    num_classes=self._output_shape,
+                    classes=self._classes,
+                    enable_progress_bar=self._enable_progress_bar,
+                )
+            else:
+                # self._update_learner_properties()
+                pass
+            self._learner.fit(**_fit_args)
 
         # 16. post processing
         training_end = time.time()
@@ -914,7 +918,7 @@ class MultiModalPredictor(ExportMixin):
 
     def _split_train_tuning(
         self, data: pd.DataFrame, holdout_frac: float = None, random_state: int = 0
-    ) -> (pd.DataFrame, pd.DataFrame):
+    ) -> Tuple(pd.DataFrame, pd.DataFrame):
         """
         Splits `data` into `train_data` and `tuning_data`.
         If the problem_type is one of ['binary', 'multiclass']:
@@ -1116,6 +1120,7 @@ class MultiModalPredictor(ExportMixin):
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
         logger.info(get_fit_start_message(save_path, validation_metric_name))
 
+        ### SETUP Environments ###
         # 1. get config.
         config = get_config(
             problem_type=self._problem_type,
@@ -1129,7 +1134,7 @@ class MultiModalPredictor(ExportMixin):
             problem_type=self._problem_type,
             config=config,
         )
-
+        # 2. get df_preprocessor.
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
                 config=config,
@@ -1141,6 +1146,7 @@ class MultiModalPredictor(ExportMixin):
         else:  # continuing training
             df_preprocessor = self._df_preprocessor
 
+        # 3. update config
         # Avoid passing tabular data with many columns to MultiHeadAttention.
         # If models have additive_attention="auto", we enable it automatically for large tables.
         config = update_tabular_config_by_resources(
@@ -1150,10 +1156,12 @@ class MultiModalPredictor(ExportMixin):
         )
         config = select_model(config=config, df_preprocessor=df_preprocessor)
 
+        # 4. if NER, update output shape. NOTE: This can be refactored into the NER Learner
         # Update output_shape with label_generator.
         if self._problem_type == NER:
             self._output_shape = len(df_preprocessor.label_generator.unique_entity_groups)
 
+        # 5. get model
         if self._model is None:
             model = create_fusion_model(
                 config=config,
@@ -1165,6 +1173,7 @@ class MultiModalPredictor(ExportMixin):
         else:  # continuing training
             model = self._model
 
+        # 6. get trainable layer params for efficient finetuning only?
         norm_param_names = get_norm_layer_param_names(model)
 
         trainable_param_names = get_trainable_params_efficient_finetune(
@@ -1172,6 +1181,7 @@ class MultiModalPredictor(ExportMixin):
             efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
         )
 
+        # 7. get data_processors.
         if self._data_processors is None:
             data_processors = create_fusion_data_processors(
                 config=config,
@@ -1183,7 +1193,9 @@ class MultiModalPredictor(ExportMixin):
 
         data_processors_count = {k: len(v) for k, v in data_processors.items()}
         logger.debug(f"data_processors_count: {data_processors_count}")
+        # 8. infer positive labels. NOTE: This is deleted
 
+        # 9. setup validation metric
         if validation_metric_name is not None:
             validation_metric, custom_metric_func = get_metric(
                 metric_name=validation_metric_name,
@@ -1193,6 +1205,7 @@ class MultiModalPredictor(ExportMixin):
         else:
             validation_metric, custom_metric_func = (None, None)
 
+        # 10. setup mix up if applicable
         mixup_active, mixup_fn = get_mixup(
             model_config=OmegaConf.select(config, "model"),
             mixup_config=OmegaConf.select(config, "data.mixup"),
@@ -1213,17 +1226,20 @@ class MultiModalPredictor(ExportMixin):
             config=config.optimization,
         )
 
+        # 12. get post process function
         model_postprocess_fn = get_model_postprocess_fn(
             problem_type=self._problem_type,
             loss_func=loss_func,
         )
 
+        # 13. assign properties
         self._config = config
         self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
         self._model = model
         self._model_postprocess_fn = model_postprocess_fn
 
+        # 14. if times up. return final model
         if max_time == timedelta(seconds=0):
             self._top_k_average(
                 model=model,
@@ -1240,6 +1256,7 @@ class MultiModalPredictor(ExportMixin):
 
             return self
 
+        # 15. setup distillation.
         # need to assign the above attributes before setting up distillation
         if teacher_predictor is not None:
             (
@@ -1276,6 +1293,8 @@ class MultiModalPredictor(ExportMixin):
             data_processors = [data_processors, teacher_data_processors]
 
         val_use_training_mode = (self._problem_type == OBJECT_DETECTION) and (validation_metric_name != MAP)
+
+        # 16. setup pl training data module
         train_dataset = None
         if (
             self._problem_type == OBJECT_DETECTION
@@ -1310,6 +1329,7 @@ class MultiModalPredictor(ExportMixin):
                 val_use_training_mode=val_use_training_mode,
             )
 
+        # 17. setup optim args
         optimization_kwargs = dict(
             optim_type=config.optimization.optim_type,
             lr_choice=config.optimization.lr_choice,
@@ -1321,6 +1341,8 @@ class MultiModalPredictor(ExportMixin):
             weight_decay=config.optimization.weight_decay,
             warmup_steps=config.optimization.warmup_steps,
         )
+
+        # 18. setup metrics args
         metrics_kwargs = dict(
             validation_metric=validation_metric,
             validation_metric_name=validation_metric_name,
@@ -1393,6 +1415,7 @@ class MultiModalPredictor(ExportMixin):
         logger.debug(f"validation_metric_name: {task.validation_metric_name}")
         logger.debug(f"minmax_mode: {minmax_mode}")
 
+        # 20. Setup call backs
         checkpoint_callback = AutoMMModelCheckpoint(
             dirpath=save_path,
             save_top_k=config.optimization.top_k,
@@ -1416,6 +1439,7 @@ class MultiModalPredictor(ExportMixin):
             model_summary,
         ]
 
+        # 21. for hpo with ray
         use_ray_lightning = "_ray_lightning_plugin" in hpo_kwargs
         if hpo_mode:
             if use_ray_lightning:
@@ -1444,6 +1468,7 @@ class MultiModalPredictor(ExportMixin):
             version="",
         )
 
+        # 22. training environment-dependent configs
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
 
         precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
@@ -1530,6 +1555,7 @@ class MultiModalPredictor(ExportMixin):
                 plugins=[custom_checkpoint_plugin],
             )
 
+        # 24. pl.Trainer.fit()
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
@@ -1544,6 +1570,7 @@ class MultiModalPredictor(ExportMixin):
                 ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
             )
 
+        # 25. execute call bakcs at training finish
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
             # We only averaging the checkpoint of the best trial in the end in the master process
@@ -1989,6 +2016,23 @@ class MultiModalPredictor(ExportMixin):
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
+        if self._use_learner:
+            results = self._learner.evaluate(
+                data=data,
+                query_data=query_data,
+                response_data=response_data,
+                id_mappings=id_mappings,
+                metrics=metrics,
+                chunk_size=chunk_size,
+                similarity_type=similarity_type,
+                cutoffs=cutoffs,
+                label=label,
+                return_pred=return_pred,
+                realtime=realtime,
+                eval_tool=eval_tool,
+            )
+            return results
+
         self._verify_inference_ready()
         if self._matcher:
             return self._matcher.evaluate(
@@ -2177,6 +2221,17 @@ class MultiModalPredictor(ExportMixin):
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
+        if self._use_learner:
+            pred = self._learner.predict(
+                data=data,
+                candidate_data=candidate_data,
+                id_mappings=id_mappings,
+                as_pandas=as_pandas,
+                realtime=realtime,
+                save_results=save_results,
+            )
+            return pred
+        
         self._verify_inference_ready()
 
         if self._matcher:
