@@ -17,7 +17,7 @@ TESTABLE_MODELS = [
 @pytest.mark.parametrize("known_covariates_names", [["known_1", "known_2"], []])
 # @pytest.mark.parametrize("past_covariates_names", [["past_1", "past_2", "past_3"], []])
 @pytest.mark.parametrize("static_features_names", [["cat_1"], []])
-@pytest.mark.parametrize("differences", [[2], []])
+@pytest.mark.parametrize("differences", [[2, 3], []])
 @pytest.mark.parametrize("lags", [[1, 2, 5], [4]])
 def test_when_covariates_and_features_present_then_feature_df_shape_is_correct(
     temp_model_path, known_covariates_names, static_features_names, differences, lags
@@ -46,6 +46,5 @@ def test_when_covariates_and_features_present_then_feature_df_shape_is_correct(
         + len(static_features_names)
         + len(model._get_date_features(data.freq))
     )
-    max_diff = max(differences, default=0)
-    expected_num_rows = len(data) - max_diff * data.num_items  # max_diff rows are dropped for each time series
+    expected_num_rows = len(data) - sum(differences) * data.num_items  # sum(differences) rows are dropped for each time series
     assert df.shape == (expected_num_rows, expected_num_features)

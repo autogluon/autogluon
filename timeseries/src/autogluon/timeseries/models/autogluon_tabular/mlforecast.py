@@ -131,10 +131,11 @@ class RecurrentTabularModel(AbstractTimeSeriesModel):
             differences = [get_seasonality(self.freq)]
 
         longest_ts_length = train_data.num_timesteps_per_item().max()
-        if longest_ts_length <= max(differences, default=0):
+        if longest_ts_length <= sum(differences):
             logger.warning(
-                f"Chosen differences {differences} are too high for given data "
-                f"(longest time series length = {longest_ts_length}). Disabling differencing."
+                f"Chosen differences {differences} require that time series have length "
+                f">= sum(differences) (at least {sum(differences)}), "
+                f"but longest time series length = {longest_ts_length}. Disabling differencing."
             )
             target_transforms = None
         else:
