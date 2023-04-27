@@ -4,17 +4,20 @@ import copy
 import logging
 import math
 import os
+import pandas as pd
 import time
 
 from abc import ABC, abstractmethod
-from typing import Optional, List, Dict, Union, Callable
+from typing import Any, Optional, List, Dict, Union, Callable, Tuple
 from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.s3_utils import is_s3_url
 
 from .constants import RAY_BACKEND, CUSTOM_BACKEND
 from .exceptions import EmptySearchSpace
 from .. import Space
 from ..ray.resources_calculator import ResourceCalculator
 from ..scheduler.scheduler_factory import scheduler_factory
+from ..utils.savers import save_pkl
 
 from typing import TYPE_CHECKING
 
@@ -193,6 +196,11 @@ class HpoExecutor(ABC):
             if minimum_model_num_gpus > 0:
                 num_jobs_in_parallel_with_gpu = num_gpus // minimum_model_num_gpus
             num_jobs_in_parallel = min(num_jobs_in_parallel_with_mem, num_jobs_in_parallel_with_cpu, num_jobs_in_parallel_with_gpu)
+            if k_fold is not None and k_fold > 0:
+                max_models = self.hyperparameter_tune_kwargs.get("num_trials", math.inf) * k_fold
+                num_jobs_in_parallel = min(num_jobs_in_parallel, max_models)
+            system_num_cpu = ResourceManager.get_cpu_count()
+            system_num_gpu = ResourceManager.get_gpu_count_all()
             if model_base != initialized_model:
                 # bagged model
                 if num_jobs_in_parallel // k_fold < 1:
@@ -212,14 +220,18 @@ class HpoExecutor(ABC):
                     num_jobs_in_parallel = 1
                 cpu_per_trial = int(num_cpus // min(num_jobs_in_parallel, num_trials))
                 gpu_per_trial = num_gpus / min(num_jobs_in_parallel, num_trials)
-                
+            # In distributed setting, a single trial could be scheduled with resources that's more than a single node causing hanging
+            # Force it to be less than the current node. This works under the assumption that all nodes are of the same type
+            cpu_per_trial = min(cpu_per_trial, system_num_cpu)
+            gpu_per_trial = min(gpu_per_trial, system_num_gpu)
+            
             self.hyperparameter_tune_kwargs['resources_per_trial'] = {
                 'num_cpus': cpu_per_trial,
                 'num_gpus': gpu_per_trial
             }
 
         self.resources = dict(num_gpus=num_gpus, num_cpus=num_cpus)
-    
+
     @abstractmethod
     def validate_search_space(
             self,
@@ -237,6 +249,51 @@ class HpoExecutor(ABC):
             The model name of the hpo experiment is tuning. This is only used for logging purpose
         """
         raise NotImplementedError
+
+    def prepare_data(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        X_val: pd.DataFrame,
+        y_val: pd.Series,
+        path_prefix: str
+    ) -> Tuple[str, str]:
+        """
+        Prepare data as pickle files for hpo trials.
+        If path_prefix is a s3 url, will store to s3. Otherwise, store in local disk
+        
+        Parameters
+        ----------
+        X: pd.DataFrame
+            Training data
+        y: pd.Series
+            Training label
+        X_val: pd.DataFrame
+            Validation data
+        y_val: pd.Series
+            Validation label
+        path_prefix: str
+            path prefix to store the data artifacts
+        
+        Return
+        ------
+        Tuple[str, str]:
+            Path to both the training and validation data
+        """
+        def save_data(data: Any, path_prefix: str, filename: str) -> str:
+            if is_s3_url(path_prefix):
+                path = path_prefix + filename if path_prefix.endswith("/") else path_prefix + f"/{filename}"
+            else:
+                path = os.path.join(path_prefix, filename)
+            save_pkl.save(path=path, object=data, verbose=False)
+            return path
+
+        dataset_train_filename = 'dataset_train.pkl'
+        dataset_val_filename = 'dataset_val.pkl'
+        train_path = save_data(data=(X, y), path_prefix=path_prefix, filename=dataset_train_filename)
+        val_path = save_data(data=(X_val, y_val), path_prefix=path_prefix, filename=dataset_val_filename)
+
+        return train_path, val_path
     
     @abstractmethod
     def execute(self, **kwargs):

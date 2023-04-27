@@ -28,7 +28,11 @@ class ResourceCalculator(ABC):
         from ray import tune
         num_cpus = resources_per_job.get('cpu', 0)
         num_gpus = resources_per_job.get('gpu', 0)
-        return tune.PlacementGroupFactory([{'CPU': 0.0}] + [{'CPU': num_cpus, 'GPU': num_gpus}])
+        # The head bundle doesn't actually require resources.
+        # This memory constraint is a hack (1024 is a random number, unit is bytes) to trick ray to schedule bundles on the same node
+        # Currently we force the trial and its underlying folds being trained on the same node to avoid synchronization
+        # TODO: consider seperate the sub-bundle of folding so they can be scheduled on seperate nodes
+        return tune.PlacementGroupFactory([{"memory": 1024}, {'CPU': num_cpus, 'GPU': num_gpus}], strategy="STRICT_PACK")
 
 
 class CpuResourceCalculator(ResourceCalculator):
