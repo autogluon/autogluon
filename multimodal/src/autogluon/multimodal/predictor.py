@@ -92,6 +92,7 @@ from .data.infer_types import (
     is_image_column,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
+from .learners import DefaultLearner
 from .matcher import MultiModalMatcher
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
@@ -383,7 +384,7 @@ class MultiModalPredictor(ExportMixin):
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = num_classes
-        self._classes = classes
+        self._classes = classes  # NOTE: This is only set in detection task (i.e. MMDetAutoModelForObjectDetection), None otherwise.
         self._ckpt_path = None
         self._pretrained_path = None
         self._config = None
@@ -394,7 +395,7 @@ class MultiModalPredictor(ExportMixin):
         self._model = None
         self._resume = False
         self._verbosity = verbosity
-        self._warn_if_exist = warn_if_exist
+        self._warn_if_exist = warn_if_exist  # NOTE: This seems to be unused. Consider to remove it.
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
         self._init_scratch = init_scratch
         self._sample_data_path = sample_data_path
@@ -405,6 +406,20 @@ class MultiModalPredictor(ExportMixin):
         # Summary statistics used in fit summary. TODO: wrap it in a class.
         self._total_train_time = None
         self._best_score = None
+
+        # initialize learner as None
+        self._learner = None
+        # Based on the information given, setup a corresponding learner. NOTE: learner is initialized at the end of .fit()
+        # if self._problem_type == None:
+        #     self._learner = None
+        # else:
+        #     self._initialized_learner()
+        # elif self._problem_type == "somethingA":
+        #     self._learner = SomeLearnerA(**kwargs)
+        # elif self._problem_type == "somethingB":
+        #     self._learner = SomeLearnerB(**kwargs)
+        # else:
+        #     self._learner = DefaultLearner(**kwargs)
 
         if self.problem_property and self.problem_property.is_matching:
             self._matcher = MultiModalMatcher(
@@ -661,6 +676,8 @@ class MultiModalPredictor(ExportMixin):
             )
 
         training_start = time.time()
+
+        # 2. Route to Matcher if applicable. This can be an example of how a learner would work.
         if self._matcher:
             self._matcher.fit(
                 train_data=train_data,
@@ -765,6 +782,8 @@ class MultiModalPredictor(ExportMixin):
         else:
             validation_metric_name = self._validation_metric_name
             eval_metric_name = self._eval_metric_name
+
+        # 11. get minmax mode. FIXME: Can be merged with step 0 at the top
         minmax_mode = get_minmax_mode(validation_metric_name)
 
         if time_limit is not None:
@@ -805,7 +824,6 @@ class MultiModalPredictor(ExportMixin):
             resume=False if hpo_mode else self._resume,
             enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
             presets=presets,
-            config=config,
             hyperparameters=hyperparameters,
             advanced_hyperparameters=advanced_hyperparameters,
             teacher_predictor=teacher_predictor,
@@ -828,7 +846,28 @@ class MultiModalPredictor(ExportMixin):
             )
             return predictor
 
-        self._fit(**_fit_args)
+        # 15.2 default ._fit() which invokes pl module
+        # self._fit(**_fit_args)
+        # calling learner.fit
+        # After getting the parameters, setup learner
+        if self._learner is None:
+            self._learner = DefaultLearner(
+                label=self._label_column,
+                problem_type=self._problem_type,
+                preset=self._presets,
+                eval_metric=self._eval_metric_name,
+                path=self._save_path,
+                verbosity=self._verbosity,
+                num_classes=self._output_shape,
+                classes=self._classes,
+                enable_progress_bar=self._enable_progress_bar,
+            )
+        else:
+            # self._update_learner_properties()
+            pass
+        self._learner.fit(**_fit_args)
+
+        # 16. post processing
         training_end = time.time()
         self._total_train_time = training_end - training_start
 
@@ -1076,6 +1115,8 @@ class MultiModalPredictor(ExportMixin):
     ):
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
         logger.info(get_fit_start_message(save_path, validation_metric_name))
+
+        # 1. get config.
         config = get_config(
             problem_type=self._problem_type,
             presets=presets,
@@ -1163,6 +1204,8 @@ class MultiModalPredictor(ExportMixin):
                 "The per_gpu_batch_size should be >1 and even for reasonable operation",
                 UserWarning,
             )
+
+        # 11. get loss function, NOTE: This can be refactored into Learner class
         loss_func = get_loss_func(
             problem_type=self._problem_type,
             mixup_active=mixup_active,
@@ -1283,6 +1326,9 @@ class MultiModalPredictor(ExportMixin):
             validation_metric_name=validation_metric_name,
             custom_metric_func=custom_metric_func,
         )
+
+        # 19. select the correct pl module for a given problem type.
+        # NOTE: The task creation and all related variables/functions should be refactored into each Learner class
         is_distill = teacher_model is not None
         if is_distill:
             output_feature_loss_weight = OmegaConf.select(
@@ -1449,6 +1495,7 @@ class MultiModalPredictor(ExportMixin):
 
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
+        # 23. Declare pl.Trainer
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else None,
