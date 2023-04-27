@@ -1,9 +1,14 @@
+import copy
 import os
+import time
+from typing import List, Optional
 
 import numpy as np
+import pandas as pd
 from pandas import DataFrame, Series
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.common.utils.try_import import try_import_lightgbm
 
 
@@ -17,6 +22,9 @@ _ag_to_lgbm_metric_dict = {
     MULTICLASS: dict(
         accuracy='multi_error',
         log_loss='multi_logloss',
+    ),
+    QUANTILE: dict(
+        pinball_loss='quantile',
     ),
     REGRESSION: dict(
         mean_absolute_error='l1',
@@ -94,3 +102,72 @@ def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, pa
         # dataset_binary = lgb.Dataset(location + '.bin', reference=reference, free_raw_data=False)# .construct()
 
     return dataset
+
+
+def train_lgb_model(early_stopping_callback_kwargs=None, **train_params):
+    import lightgbm as lgb
+
+    if train_params['params']['objective'] == 'quantile':
+        quantile_levels = train_params['params'].pop('quantile_levels')
+        booster = QuantileBooster(quantile_levels=quantile_levels, early_stopping_callback_kwargs=early_stopping_callback_kwargs)
+        return booster.fit(**train_params)
+    else:
+        return lgb.train(**train_params)
+
+
+class QuantileBooster:
+    """Wrapper that trains a separate LGBM Booster for each quantile level."""
+    def __init__(self, quantile_levels: List[float], early_stopping_callback_kwargs: Optional[dict] = None):
+        if quantile_levels is None:
+            raise AssertionError
+        if not all(0 < q < 1 for q in quantile_levels):
+            raise AssertionError(f'quantile_levels must fulfill 0 < q < 1, provided quantile_levels: {quantile_levels}')
+
+        self.quantile_levels = quantile_levels
+
+        self.early_stopping_callback_kwargs = None
+        self.time_limit_global = None
+
+        if early_stopping_callback_kwargs is not None:
+            self.early_stopping_callback_kwargs = early_stopping_callback_kwargs
+            self.time_limit_global = early_stopping_callback_kwargs.pop('time_limit')
+        self.model_dict = {}
+
+    def fit(self, **train_params_base):
+        import lightgbm as lgb
+        from .callbacks import early_stopping_custom
+
+        start_time_global = time.time()
+
+        for q in self.quantile_levels:
+            train_params = copy.deepcopy(train_params_base)
+            train_params['params']['alpha'] = q
+            if self.early_stopping_callback_kwargs is not None:
+                es_kwargs = copy.deepcopy(self.early_stopping_callback_kwargs)
+                if self.time_limit_global is not None:
+                    es_kwargs['start_time'] = time.time()
+                    es_kwargs['time_limit'] = self.time_limit_global / len(self.quantile_levels)
+                # Don't add a logging callback to avoid printing logs for each base booster
+                train_params["callbacks"] = [early_stopping_custom(**es_kwargs)]
+            else:
+                train_params["callbacks"] = []
+
+            self.model_dict[q] = lgb.train(**train_params)
+            if self.time_limit_global is not None:
+                time_left = self.time_limit_global - (time.time() - start_time_global)
+                if time_left <= 0 and len(self.model_dict) != len(self.quantile_levels):
+                    raise TimeLimitExceeded
+        return self
+
+    def predict(self, X, num_threads=0):
+        predictions = {}
+        for q in self.quantile_levels:
+            predictions[q] = self.model_dict[q].predict(X, num_threads=num_threads)
+        return DataFrame(predictions)
+
+    @property
+    def best_iteration(self):
+        return int(np.ceil(np.mean([model.best_iteration for model in self.model_dict.values()])))
+
+    def current_iteration(self):
+        return int(np.ceil(np.mean([model.current_iteration() for model in self.model_dict.values()])))
