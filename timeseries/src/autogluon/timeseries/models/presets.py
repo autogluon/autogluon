@@ -226,7 +226,9 @@ def get_preset_models(
             ag_args = model_hps.pop(ag.constants.AG_ARGS, {})
             for key in ag_args:
                 if key not in VALID_AG_ARGS_KEYS:
-                    logger.warning(f"WARNING: Unknown ag_args key: {key}")
+                    raise ValueError(
+                        f"Model {model_type} received unknown ag_args key: {key} (valid keys {VALID_AG_ARGS_KEYS})"
+                    )
             model_name_base = get_model_name(ag_args, model_type)
 
             model_type_kwargs = dict(
