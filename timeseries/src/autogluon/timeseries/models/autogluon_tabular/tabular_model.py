@@ -1,5 +1,4 @@
 import logging
-import re
 import time
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -69,7 +68,6 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         hyperparameters: Dict[str, Any] = None,
         **kwargs,  # noqa
     ):
-        name = name or re.sub(r"Model$", "", self.__class__.__name__)  # TODO: look name up from presets
         super().__init__(
             path=path,
             freq=freq,
