@@ -89,7 +89,6 @@ DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
 VALID_AG_ARGS_KEYS = {
     "name",
-    "name_main",
     "name_prefix",
     "name_suffix",
 }
