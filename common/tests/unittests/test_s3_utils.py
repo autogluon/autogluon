@@ -1,27 +1,56 @@
-from autogluon.common.utils.s3_utils import _get_local_path_to_download_objs_and_local_dir_to_create, _get_local_objs_to_upload_and_s3_prefix
+from autogluon.common.utils.s3_utils import get_s3_to_local_tuple_list, _get_local_path_to_download_objs, _get_local_objs_to_upload_and_s3_prefix
 
 import pytest
 import tempfile
 import os
 
 @pytest.mark.parametrize(
-    "s3_objs,prefix,local_path,expected_objs,expected_dirs",
+    "s3_objs,prefix,local_path,expected_objs",
     [
-        (["foo/"], "foo", ".", [], []),
-        (["foo/", "foo/test.txt"], "foo", ".", ["test.txt"], []),
-        (["foo/test.txt", "foo/test2.txt"], "foo", ".", ["test.txt", "test2.txt"], []),
-        (["foo/temp/", "foo/test.txt"], "foo", ".", ["test.txt"], ["temp"]),
-        (["foo/temp/test.txt", "foo/test2.txt"], "foo", ".", ["temp/test.txt", "test2.txt"], ["temp"]),
-        (["foo/temp/test.txt"], "foo", ".", ["temp/test.txt"], ["temp"]),
-        (["foo/temp/temp2/test.txt"], "foo", ".", ["temp/temp2/test.txt"], ["temp/temp2"]),
-        (["foo/temp/temp2/test.txt", "foo/temp/temp3/test.txt"], "foo", ".", ["temp/temp2/test.txt", "temp/temp3/test.txt"], ["temp/temp2", "temp/temp3"]),
+        ([], "foo", ".", []),
+        (["foo/test.txt"], "foo", ".", ["test.txt"]),
+        (["foo/test.txt", "foo/test2.txt"], "foo", ".", ["test.txt", "test2.txt"]),
+        (["foo/test.txt"], "foo", ".", ["test.txt"]),
+        (["foo/temp/test.txt", "foo/test2.txt"], "foo", ".", ["temp/test.txt", "test2.txt"]),
+        (["foo/temp/test.txt"], "foo", ".", ["temp/test.txt"]),
+        (["foo/temp/temp2/test.txt"], "foo", ".", ["temp/temp2/test.txt"]),
+        (["foo/temp/temp2/test.txt", "foo/temp/temp3/test.txt"], "foo", ".", ["temp/temp2/test.txt", "temp/temp3/test.txt"]),
     ]
 )
-def test_get_local_path_to_download_objs_and_local_dir_to_create(s3_objs, prefix, local_path, expected_objs, expected_dirs):
-    objs, dirs = _get_local_path_to_download_objs_and_local_dir_to_create(s3_objs=s3_objs, prefix=prefix, local_path=local_path)
-    assert sorted(objs) == sorted(expected_objs)
-    assert sorted(dirs) == sorted(expected_dirs)
-    
+def test_get_local_path_to_download_objs(s3_objs, prefix, local_path, expected_objs):
+    objs = _get_local_path_to_download_objs(s3_objs=s3_objs, prefix=prefix, local_path=local_path)
+    assert objs == expected_objs
+
+
+@pytest.mark.parametrize(
+    "s3_bucket,s3_prefix,local_path,s3_prefixes,expected_output",
+    [
+        ("foo", "bar", "local/path", [], []),
+        ("foo", "bar", "local/path", ["bar/test.txt"], [('s3://foo/bar/test.txt', 'local/path/test.txt')]),
+        ("foo", "", "", ["test.txt"], [('s3://foo/test.txt', 'test.txt')]),
+        ("foo", "bar/bar", "local/path", ["bar/bar/test.txt"], [('s3://foo/bar/bar/test.txt', 'local/path/test.txt')]),
+        ("foo", "bar", "local/path", ["bar/temp/test.txt", "bar/test2.txt"], [('s3://foo/bar/temp/test.txt', 'local/path/temp/test.txt'), ('s3://foo/bar/test2.txt', 'local/path/test2.txt')]),
+        ("foo", "bar", "local/path", ["bar/temp/test.txt"], [('s3://foo/bar/temp/test.txt', 'local/path/temp/test.txt')]),
+        ("foo", "", "", ["a"], [('s3://foo/a', 'a')]),
+    ]
+)
+def test_get_s3_to_local_tuple_list(s3_bucket, s3_prefix, local_path, s3_prefixes, expected_output):
+    actual_output = get_s3_to_local_tuple_list(s3_bucket=s3_bucket, s3_prefix=s3_prefix, local_path=local_path, s3_prefixes=s3_prefixes)
+    assert actual_output == expected_output
+
+
+@pytest.mark.parametrize(
+    "s3_bucket,s3_prefix,local_path,s3_prefixes,expected_error",
+    [
+        ("foo", "bar", "local/path", ["foo/test.txt"], ValueError),
+        ("", "bar", "local/path", ["bar/test.txt"], ValueError),
+        ("foo", "bar", "local/path", ["foo/test.txt", "bar/test.txt"], ValueError),
+    ]
+)
+def test_get_s3_to_local_tuple_list_raises(s3_bucket, s3_prefix, local_path, s3_prefixes, expected_error):
+    with pytest.raises(expected_error):
+        get_s3_to_local_tuple_list(s3_bucket=s3_bucket, s3_prefix=s3_prefix, local_path=local_path, s3_prefixes=s3_prefixes)
+
     
 def test_get_local_objs_to_upload_and_s3_prefix():
     """
