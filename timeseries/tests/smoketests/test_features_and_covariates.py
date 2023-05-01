@@ -73,6 +73,7 @@ def test_predictor_smoke_test(
         "ARIMA": DUMMY_MODEL_HPARAMS,
         "Theta": DUMMY_MODEL_HPARAMS,
         "AutoGluonTabular": {},
+        "RecursiveTabular": {},
         "DeepAR": DUMMY_MODEL_HPARAMS,
         "SimpleFeedForward": DUMMY_MODEL_HPARAMS,
         "TemporalFusionTransformer": DUMMY_MODEL_HPARAMS,

@@ -414,6 +414,7 @@ def trained_and_refit_trainers():
                 "ETS": {"maxiter": 1},
                 "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
                 "AutoGluonTabular": {"tabular_hyperparameters": {"GBM": {}}},
+                "RecursiveTabular": {},
             },
         )
         return trainer
