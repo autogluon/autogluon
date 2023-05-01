@@ -156,12 +156,24 @@ class MMDetProcessor(MMLabProcessor):
         for per_col_name, per_col_content in image_paths.items():
             if is_rois_input(per_col_content):
                 rois = np.array(per_col_content)
-                mm_data["ann_info"] = dict(bboxes=rois[:, :4], labels=rois[:, 4])
+                # https://github.com/open-mmlab/mmdetection/blob/ecac3a77becc63f23d9f6980b2a36f86acd00a8a/mmdet/datasets/transforms/loading.py#L155
+                mm_data["instances"] = []
+                for roi in rois:
+                    mm_data["instances"].append(
+                        {
+                            "bbox": roi[:4],
+                            "bbox_label": roi[4],
+                            "ignore_flag": 0,
+                        }
+                    )
             else:
                 with PIL.Image.open(per_col_content[0]) as img:
-                    mm_data["img_info"] = dict(filename=per_col_content[0], height=img.height, width=img.width)
+                    # mm_data["img_info"] = dict(filename=per_col_content[0], height=img.height, width=img.width)
+                    mm_data["img_path"] = per_col_content[0]
         if self.requires_column_info:
             pass  # TODO
+
+        mm_data["img_id"] = 0  # TODO: use a non trivial image id for TTA (test time augmentation)
 
         ret.update({self.image_key: self.train_processor(mm_data) if is_training else self.val_processor(mm_data)})
 

@@ -34,7 +34,7 @@ class MultiImageMixDataset(torch.utils.data.Dataset):
         data: pd.DataFrame,
         preprocessor: List[MultiModalFeaturePreprocessor],
         processors: List[dict],
-        model_config: mmcv.utils.config.Config,
+        model_config: None,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         is_training: bool = False,
     ):

@@ -70,7 +70,8 @@ def tutorial_script_for_finetune_fast_pothole_in_coco_format():
     val_path = os.path.join(data_dir, "Annotations", "usersplit_val_cocoformat.json")
     test_path = os.path.join(data_dir, "Annotations", "usersplit_test_cocoformat.json")
 
-    checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"
+    # checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"  # mmdet2
+    checkpoint_name = "yolov3_mobilenetv2_8xb24-320-300e_coco"  # mmdet3
     num_gpus = 1
 
     predictor = MultiModalPredictor(
@@ -89,7 +90,7 @@ def tutorial_script_for_finetune_fast_pothole_in_coco_format():
         hyperparameters={
             "optimization.learning_rate": 2e-4,  # we use two stage and detection head has 100x lr
             "optimization.max_epochs": 30,
-            "env.per_gpu_batch_size": 32,  # decrease it when model is large
+            "env.per_gpu_batch_size": 2,  # decrease it when model is large
         },
     )
     end = time.time()
@@ -330,4 +331,4 @@ def main():
 
 
 if __name__ == "__main__":
-    tutorial_script_for_finetune_yoloxo365_pothole_in_coco_format()
+    tutorial_script_for_finetune_fast_pothole_in_coco_format()

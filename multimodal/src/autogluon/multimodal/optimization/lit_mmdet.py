@@ -19,7 +19,6 @@ except ImportError as e:
     pass
 
 from ..constants import AUTOMM, IMAGE, LABEL
-from ..utils import unpack_datacontainers
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(__name__)
@@ -63,66 +62,54 @@ class MMDetLitModule(pl.LightningModule):
         self.input_data_key = self.model.prefix + "_" + IMAGE
         self.input_label_key = self.model.prefix + "_" + LABEL
 
-    def _predict_step(self, batch, batch_idx=0, return_loss=False):
-        pred_results = self.model.model(
-            return_loss=False,
-            rescale=True,
-            img=batch[self.input_data_key]["imgs"],
-            img_metas=batch[self.input_data_key]["img_metas"],
+    def _base_step(self, batch, mode):
+        self.model.set_data_preprocessor_device()
+        data = self.model.data_preprocessor(batch[self.input_data_key])
+        ret = self.model.model(
+            inputs=data["inputs"],
+            data_samples=data["data_samples"],
+            mode=mode,
         )
 
-        return pred_results
+        return ret
 
-    def _loss_step(self, img, img_metas, gt_bboxes, gt_labels):
-        loss, log_vars = self.compute_loss(
-            img=img,
-            img_metas=img_metas,
-            gt_bboxes=gt_bboxes,
-            gt_labels=gt_labels,
-        )
+    def _predict_step(self, batch):
+        return self._base_step(batch=batch, mode="predict")
 
-        return loss, log_vars
+    def _loss_step(self, batch):
+        return self._base_step(batch=batch, mode="loss")
 
     def _get_map_input(self, pred_results, sample):
+        # print(pred_results)
+        # print(pred_results[0].gt_instances)
+        # print(pred_results[0].ignored_instances)
+        # print(pred_results[0].keys())
+        # exit()
+
         preds = []
-        for img_idx, img_result in enumerate(pred_results):
-            img_result = img_result
-            boxes = []
-            scores = []
-            labels = []
-            if isinstance(img_result[0], list):
+        target = []
+
+        batch_size = len(pred_results)
+
+        for i in range(batch_size):
+            if hasattr(pred_results[i].pred_instances, "masks"):
                 # has one additional dimension with 2 outputs: img_result=img_result[0], mask_result=img_result[1]
                 raise NotImplementedError(
                     "Do not support training for models with masks like mask r-cnn, "
                     "because most custom datasets do not have a ground truth mask."
                     " However, you can still inference with this model."
                 )
-            for category_idx, category_result in enumerate(img_result):
-                for item_idx, item_result in enumerate(category_result):
-                    boxes.append(item_result[:4])
-                    scores.append(float(item_result[4]))
-                    labels.append(category_idx)
             preds.append(
                 dict(
-                    boxes=torch.tensor(np.array(boxes).astype(float)).float().to(self.device),
-                    scores=torch.tensor(scores).float().to(self.device),
-                    labels=torch.tensor(labels).long().to(self.device),
+                    boxes=pred_results[i].pred_instances.bboxes,  # .float().to(self.device)?
+                    scores=pred_results[i].pred_instances.scores,  # .float().to(self.device)?
+                    labels=pred_results[i].pred_instances.labels,  # .long().to(self.device)?
                 )
             )
-
-        target = []
-
-        batch_size = len(preds)
-        batch = unpack_datacontainers(sample)
-        gt = batch[self.input_label_key]  # batch_size, (n, 5)
-        for i in range(batch_size):
-            img_gt = np.array(gt[i])
-            boxes = img_gt[:, :4]
-            labels = img_gt[:, 4]
             target.append(
                 dict(
-                    boxes=torch.tensor(boxes).float().to(self.device),
-                    labels=torch.tensor(labels).long().to(self.device),
+                    boxes=pred_results[i].gt_instances.bboxes,
+                    labels=pred_results[i].gt_instances.labels,
                 )
             )
 
@@ -208,24 +195,18 @@ class MMDetLitModule(pl.LightningModule):
             self.log(f"step/{loss_name}", losses[key])
 
     def training_step(self, batch, batch_idx):
-        loss, log_vars = self._loss_step(
-            img=batch[self.input_data_key]["img"],
-            img_metas=batch[self.input_data_key]["img_metas"],
-            gt_bboxes=batch[self.input_data_key]["gt_bboxes"],
-            gt_labels=batch[self.input_data_key]["gt_labels"],
-        )
+        print(len(batch))
+        losses = self._loss_step(batch=batch)  # TODO: sum and log losses
+        print(f"losses:\n{losses}", flush=True)
+        exit()
+        return losses
         # log step losses
         self.log_step_results(log_vars)
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         if self.use_loss:
-            val_loss, log_vars = self._loss_step(
-                img=batch[self.input_data_key]["img"],
-                img_metas=batch[self.input_data_key]["img_metas"],
-                gt_bboxes=batch[self.input_data_key]["gt_bboxes"],
-                gt_labels=batch[self.input_data_key]["gt_labels"],
-            )
+            losses = self._loss_step(batch=batch)
             self.validation_metric.update(val_loss)
         else:
             self.evaluate(batch, "val")
@@ -245,7 +226,7 @@ class MMDetLitModule(pl.LightningModule):
         raise NotImplementedError("test with lit_mmdet is not implemented yet.")
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        pred = self._predict_step(batch, batch_idx)
+        pred = self._predict_step(batch)
         if "mmdet_image_label" in batch:
             return {"bbox": pred, "label": batch[self.input_label_key]}
         else:

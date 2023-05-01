@@ -11,15 +11,19 @@ try:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         import mmcv
-    from mmcv.parallel import collate
+    from mmcv.transforms import Compose
+
+    # from mmcv.parallel import collate
 except ImportError as e:
     mmcv = None
 
 try:
     import mmdet
-    from mmdet.datasets import replace_ImageToTensor
-    from mmdet.datasets.pipelines import Compose
+    from mmdet.datasets.transforms import ImageToTensor
+
+    # from mmdet.datasets.pipelines import Compose
 except ImportError as e:
+    print(e)
     mmdet = None
 
 try:
@@ -92,13 +96,8 @@ class MMLabProcessor:
         else:
             assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
         self.cfg = model.model.cfg
-        # TODO: remove hardcode here
-        try:  # yolov3
-            training_pipeline = self.cfg.data.train.dataset.pipeline
-        except:  # faster_rcnn
-            training_pipeline = self.cfg.data.train.pipeline
-        self.val_processor = Compose(replace_ImageToTensor(self.cfg.data.val.pipeline))
-        self.train_processor = Compose(replace_ImageToTensor(training_pipeline))
+        self.val_processor = Compose(self.cfg.test_pipeline)
+        self.train_processor = Compose(self.cfg.train_pipeline)
 
     @property
     def image_key(self):

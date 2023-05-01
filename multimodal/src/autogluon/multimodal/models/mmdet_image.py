@@ -14,15 +14,21 @@ try:
         warnings.simplefilter("ignore")
         import mmcv
     from mmcv.ops import RoIPool
-    from mmcv.parallel import scatter
-    from mmcv.runner import load_checkpoint
+
+    # from mmcv.runner import load_checkpoint  # mmdet 2
+    from mmcv.parallel import scatter  # not in mmdet3
 except ImportError as e:
     mmcv = None
 
 try:
+    import mmengine
+    from mmengine.runner import load_checkpoint  # mmdet 3
+except ImportError as e:
+    mmengine = None
+
+try:
     import mmdet
-    from mmdet.core import get_classes
-    from mmdet.models import build_detector
+    from mmdet.registry import MODELS
 except ImportError as e:
     mmdet = None
 
@@ -83,6 +89,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.config_file = config_file
         self.classes = classes
 
+        self.device = None
+
         if output_bbox_format.lower() in BBOX_FORMATS:
             self.output_bbox_format = output_bbox_format.lower()
         else:
@@ -121,7 +129,12 @@ class MMDetAutoModelForObjectDetection(nn.Module):
     def _load_checkpoint(self, checkpoint_file):
         # build model and load pretrained weights
         assert mmdet is not None, 'Please install MMDetection by: pip install "mmdet>=2.28, <3.0.0".'
-        self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
+        from mmdet.utils import register_all_modules
+
+        register_all_modules()  # https://github.com/open-mmlab/mmdetection/issues/9719
+
+        self.model = MODELS.build(self.config.model)
+        self.data_preprocessor = MODELS.build(self.config.data_preprocessor)
 
         if self.pretrained and checkpoint_file is not None:  # TODO: enable training from scratch
             self.checkpoint = load_checkpoint(self.model, checkpoint_file, map_location="cpu")
@@ -142,6 +155,12 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id <= 0]
+
+    def set_data_preprocessor_device(self):
+        if not self.device:
+            self.device = next(self.model.parameters()).device
+        if self.device != self.data_preprocessor.device:
+            self.data_preprocessor.to(self.device)
 
     def save(self, save_path: str = "./", tokenizers: Optional[dict] = None):
 
@@ -257,9 +276,9 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
     def _load_config(self):
         # read config files
-        assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+        assert mmengine is not None, "Please install mmengine by: pip install mmengine."
         if isinstance(self.config_file, str):
-            self.config = mmcv.Config.fromfile(self.config_file)
+            self.config = mmengine.Config.fromfile(self.config_file)
         else:
             if not isinstance(self.config_file, dict):
                 raise ValueError(
