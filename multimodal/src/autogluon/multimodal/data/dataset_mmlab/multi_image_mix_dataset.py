@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 try:
     import mmcv
-    import mmcv.utils.config.Config as MMCVConfig
+    from mmcv.utils import Config as MMCVConfig
     from mmdet.core import find_inside_bboxes
     from mmdet.utils import log_img_scale  # inline import to avoid mmdet uninstall error for other tasks
 except:
