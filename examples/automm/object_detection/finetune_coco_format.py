@@ -90,7 +90,7 @@ def tutorial_script_for_finetune_fast_pothole_in_coco_format():
         hyperparameters={
             "optimization.learning_rate": 2e-4,  # we use two stage and detection head has 100x lr
             "optimization.max_epochs": 30,
-            "env.per_gpu_batch_size": 16,  # decrease it when model is large
+            "env.per_gpu_batch_size": 32,  # decrease it when model is large
         },
     )
     end = time.time()
