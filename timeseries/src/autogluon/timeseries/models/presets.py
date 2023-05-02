@@ -1,6 +1,7 @@
 import copy
 import logging
-from typing import Any, Dict, List, Optional, Union
+import re
+from typing import Any, Dict, List, Optional, Type, Union
 
 import autogluon.core as ag
 import autogluon.timeseries as agts
@@ -85,11 +86,15 @@ DEFAULT_MODEL_PRIORITY = dict(
     MQRNNMXNet=10,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
-MINIMUM_CONTEXT_LENGTH = 10
+
+VALID_AG_ARGS_KEYS = {
+    "name",
+    "name_prefix",
+    "name_suffix",
+}
 
 
-def get_default_hps(key, prediction_length):
-    context_length = max(prediction_length * 2, MINIMUM_CONTEXT_LENGTH)
+def get_default_hps(key):
     default_model_hps = {
         "local_only": {
             "Naive": {},
@@ -106,9 +111,7 @@ def get_default_hps(key, prediction_length):
             "AutoETS": {},
             "Theta": {},
             "AutoGluonTabular": {},
-            "DeepAR": {
-                "context_length": context_length,
-            },
+            "DeepAR": {},
         },
         "high_quality": {
             "Naive": {},
@@ -119,12 +122,8 @@ def get_default_hps(key, prediction_length):
             "AutoARIMA": {},
             "Theta": {},
             "AutoGluonTabular": {},
-            "DeepAR": {
-                "context_length": context_length,
-            },
-            "SimpleFeedForward": {
-                "context_length": context_length,
-            },
+            "DeepAR": {},
+            "SimpleFeedForward": {},
             "TemporalFusionTransformer": {},
         },
         "best_quality": {
@@ -138,12 +137,10 @@ def get_default_hps(key, prediction_length):
             "Theta": {},
             "AutoGluonTabular": {},
             "DeepAR": {
-                "context_length": context_length,
                 "num_layers": ag.Int(1, 3, default=2),
                 "hidden_size": ag.Int(40, 80, default=40),
             },
             "SimpleFeedForward": {
-                "context_length": context_length,
                 "hidden_dimensions": ag.Categorical([40], [40, 40], [120]),
             },
             "TemporalFusionTransformer": {},
@@ -154,7 +151,7 @@ def get_default_hps(key, prediction_length):
     if agts.MXNET_INSTALLED:
         mxnet_default_updates = {
             "best_quality": {
-                "TransformerMXNet": {"context_length": context_length},
+                "TransformerMXNet": {},
             },
         }
         for k in default_model_hps:
@@ -186,17 +183,11 @@ def get_preset_models(
     models = []
     if hyperparameters is None:
         hp_string = "default_hpo" if hyperparameter_tune else "default"
-        hyperparameters = copy.deepcopy(get_default_hps(hp_string, prediction_length))
+        hyperparameters = copy.deepcopy(get_default_hps(hp_string))
     elif isinstance(hyperparameters, str):
-        hyperparameters = copy.deepcopy(get_default_hps(hyperparameters, prediction_length))
+        hyperparameters = copy.deepcopy(get_default_hps(hyperparameters))
     elif isinstance(hyperparameters, dict):
-        default_hps = copy.deepcopy(get_default_hps("default", prediction_length))
-        updated_hyperparameters = {}
-        # Only train models from `hyperparameters`, overload default HPs if provided
-        for model, hps in hyperparameters.items():
-            updated_hyperparameters[model] = default_hps.get(model, {})
-            updated_hyperparameters[model].update(hps)
-        hyperparameters = copy.deepcopy(updated_hyperparameters)
+        hyperparameters = copy.deepcopy(hyperparameters)
     else:
         raise ValueError(
             f"hyperparameters must be a dict, a string or None (received {type(hyperparameters)}). "
@@ -214,7 +205,6 @@ def get_preset_models(
     model_priority_list = sorted(hyperparameters.keys(), key=lambda x: DEFAULT_MODEL_PRIORITY.get(x, 0), reverse=True)
 
     for model in model_priority_list:
-        model_hps = hyperparameters[model]
         if isinstance(model, str):
             if model not in MODEL_TYPES:
                 raise ValueError(f"Model {model} is not supported yet.")
@@ -228,33 +218,56 @@ def get_preset_models(
             logger.log(20, f"Custom Model Type Detected: {model}")
             model_type = model
 
-        model_type_kwargs = dict(
-            path=path,
-            freq=freq,
-            prediction_length=prediction_length,
-            eval_metric=eval_metric,
-            eval_metric_seasonal_period=eval_metric_seasonal_period,
-            hyperparameters=model_hps,
-            **kwargs,
-        )
+        model_hps_list = hyperparameters[model]
+        if not isinstance(model_hps_list, list):
+            model_hps_list = [model_hps_list]
 
-        # add models while preventing name collisions
-        model = model_type(**model_type_kwargs)
-        name_stem = model.name
+        for model_hps in model_hps_list:
+            ag_args = model_hps.pop(ag.constants.AG_ARGS, {})
+            for key in ag_args:
+                if key not in VALID_AG_ARGS_KEYS:
+                    raise ValueError(
+                        f"Model {model_type} received unknown ag_args key: {key} (valid keys {VALID_AG_ARGS_KEYS})"
+                    )
+            model_name_base = get_model_name(ag_args, model_type)
 
-        model_type_kwargs.pop("name", None)
-        increment = 1
-        while model.name in all_assigned_names:
-            increment += 1
-            model = model_type(name=f"{name_stem}_{increment}", **model_type_kwargs)
+            model_type_kwargs = dict(
+                name=model_name_base,
+                path=path,
+                freq=freq,
+                prediction_length=prediction_length,
+                eval_metric=eval_metric,
+                eval_metric_seasonal_period=eval_metric_seasonal_period,
+                hyperparameters=model_hps,
+                **kwargs,
+            )
 
-        if multi_window:
-            model = MultiWindowBacktestingModel(model_base=model, name=model.name, **model_type_kwargs)
+            # add models while preventing name collisions
+            model = model_type(**model_type_kwargs)
 
-        all_assigned_names.add(model.name)
-        models.append(model)
+            model_type_kwargs.pop("name", None)
+            increment = 1
+            while model.name in all_assigned_names:
+                increment += 1
+                model = model_type(name=f"{model_name_base}_{increment}", **model_type_kwargs)
+
+            if multi_window:
+                model = MultiWindowBacktestingModel(model_base=model, name=model.name, **model_type_kwargs)
+
+            all_assigned_names.add(model.name)
+            models.append(model)
 
     return models
+
+
+def get_model_name(ag_args: Dict[str, Any], model_type: Type[AbstractTimeSeriesModel]) -> str:
+    name = ag_args.get("name")
+    if name is None:
+        name_stem = re.sub(r"Model$", "", model_type.__name__)
+        name_prefix = ag_args.get("name_prefix", "")
+        name_suffix = ag_args.get("name_suffix", "")
+        name = name_prefix + name_stem + name_suffix
+    return name
 
 
 def contains_searchspace(model_hyperparameters: Dict[str, Any]) -> bool:
@@ -265,18 +278,29 @@ def contains_searchspace(model_hyperparameters: Dict[str, Any]) -> bool:
 
 
 def verify_contains_at_least_one_searchspace(hyperparameters: Dict[str, Dict[str, Any]]):
-    if not any(contains_searchspace(model_hps) for model_hps in hyperparameters.values()):
-        raise ValueError(
-            f"Hyperparameter tuning specified, but no model contains a hyperparameter search space. "
-            f"Please disable hyperparameter tuning with `hyperparameter_tune_kwargs=None` or provide a search space "
-            f"for at least one model."
-        )
+    for model, model_hps_list in hyperparameters.items():
+        if not isinstance(model_hps_list, list):
+            model_hps_list = [model_hps_list]
+
+        for model_hps in model_hps_list:
+            if contains_searchspace(model_hps):
+                return
+
+    raise ValueError(
+        f"Hyperparameter tuning specified, but no model contains a hyperparameter search space. "
+        f"Please disable hyperparameter tuning with `hyperparameter_tune_kwargs=None` or provide a search space "
+        f"for at least one model."
+    )
 
 
 def verify_contains_no_searchspaces(hyperparameters: Dict[str, Dict[str, Any]]):
-    for model, model_hps in hyperparameters.items():
-        if contains_searchspace(model_hps):
-            raise ValueError(
-                f"Hyperparameter tuning not specified, so hyperparameters must have fixed values. "
-                f"However, for model {model} hyperparameters {model_hps} contain a search space."
-            )
+    for model, model_hps_list in hyperparameters.items():
+        if not isinstance(model_hps_list, list):
+            model_hps_list = [model_hps_list]
+
+        for model_hps in model_hps_list:
+            if contains_searchspace(model_hps):
+                raise ValueError(
+                    f"Hyperparameter tuning not specified, so hyperparameters must have fixed values. "
+                    f"However, for model {model} hyperparameters {model_hps} contain a search space."
+                )

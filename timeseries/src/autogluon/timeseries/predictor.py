@@ -378,21 +378,25 @@ class TimeSeriesPredictor:
             `autogluon/timeseries/trainer/models/presets.py``.
 
             If dict is provided, the keys are strings or Types that indicate which models to train. Each value is
-            itself a dict containing hyperparameters for each of the trained models. Any omitted hyperparameters not
-            specified here will be set to default. For example::
+            itself a dict containing hyperparameters for each of the trained models, or a list of such dicts. Any
+            omitted hyperparameters not specified here will be set to default. For example::
 
                 predictor.fit(
                     ...
                     hyperparameters={
                         "DeepAR": {},
-                        "ETS": {"seasonal_period": 7},
+                        "ETS": [
+                            {"seasonal": "add"},
+                            {"seasonal": None},
+                        ],
                     }
                 )
 
-            The above example will only train two models:
+            The above example will train three models:
 
-            * ``DeepAR`` (with default hyperparameters)
-            * ``ETS`` (with the given `seasonal_period`; all other parameters set to their defaults)
+            * ``DeepAR`` with default hyperparameters
+            * ``ETS`` with additive seasonality (all other parameters set to their defaults)
+            * ``ETS`` with seasonality disabled (all other parameters set to their defaults)
 
             Full list of available models and their hyperparameters is provided in :ref:`forecasting_zoo`.
 

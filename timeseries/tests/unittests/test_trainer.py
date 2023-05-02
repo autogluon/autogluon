@@ -191,6 +191,25 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
     assert all(1 <= config["epochs"] <= 4 for config in config_history)
 
 
+@pytest.mark.parametrize(
+    "hyperparameters, expected_model_names",
+    [
+        ({"Naive": [{}, {}, {"ag_args": {"name_suffix": "_extra"}}]}, ["Naive", "Naive_2", "Naive_extra"]),
+        ({"Naive": [{"ag_args": {"name": "CustomNaive"}}], "SeasonalNaive": {}}, ["CustomNaive", "SeasonalNaive"]),
+    ],
+)
+def test_given_hyperparameters_with_lists_when_trainer_called_then_multiple_models_are_trained(
+    temp_model_path, hyperparameters, expected_model_names
+):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
+    trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
+    leaderboard = trainer.leaderboard()
+    print(leaderboard["model"].values)
+    print(expected_model_names)
+    assert len(leaderboard) == len(expected_model_names)
+    assert all(name in leaderboard["model"].values for name in expected_model_names)
+
+
 @pytest.mark.parametrize("eval_metric", ["MAPE", None])
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
