@@ -16,21 +16,23 @@ function setup_build_contrib_env {
 }
 
 function setup_torch_gpu {
-    # Security-patched torch.
-    python3 -m pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
+    PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu118 reinstall_torch
 }
 
 function setup_torch_cpu {
-    # Security-patched torch
-    python3 -m pip install torch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cpu
+    PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu reinstall_torch
 }
 
 function setup_torch_gpu_non_linux {
-    pip3 install torch==1.13.1+cu116 torchvision==0.14.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
+    setup_torch_gpu
 }
 
 function setup_torch_cpu_non_linux {
-    pip3 install torch==1.13.1 torchvision==0.14.1
+    setup_torch_cpu
+}
+
+function reinstall_torch {
+    pip3 install --force-reinstall torchvision~=0.15.1
 }
 
 function setup_hf_model_mirror {

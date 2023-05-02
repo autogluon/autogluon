@@ -34,7 +34,7 @@ extras_require = {
         'lightgbm>=3.3,<3.4',
     ],
     'catboost': [
-        'catboost>=1.1,<1.2',
+        'catboost>=1.1,<1.3',
     ],
     # FIXME: Debug why xgboost 1.6 has 4x+ slower inference on multiclass datasets compared to 1.4
     #  It is possibly only present on MacOS, haven't tested linux.

@@ -13,7 +13,7 @@ AUTOGLUON_ROOT_PATH = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..')
 )
 
-PYTHON_REQUIRES = '>=3.8, <3.11'
+PYTHON_REQUIRES = '>=3.8, <3.12'
 
 
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
