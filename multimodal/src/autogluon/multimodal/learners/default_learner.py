@@ -11,7 +11,7 @@ import sys
 import time
 import warnings
 from datetime import timedelta
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -19,11 +19,15 @@ import pytorch_lightning as pl
 import torch
 import transformers
 import yaml
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 from overrides import override
 from packaging import version
 from pytorch_lightning import LightningDataModule
+from pytorch_lightning.callbacks import Callback
+from pytorch_lightning.strategies import Strategy
+from timm.data.mixup import Mixup
 from torch import nn
+from torchmetrics import Metric
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
@@ -92,6 +96,7 @@ from autogluon.multimodal.data.infer_types import (
 from autogluon.multimodal.data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from autogluon.multimodal.matcher import MultiModalMatcher
 from autogluon.multimodal.models.utils import get_model_postprocess_fn
+from autogluon.multimodal.optimization.deepspeed import CustomDeepSpeedStrategy
 from autogluon.multimodal.optimization.lit_distiller import DistillerLitModule
 from autogluon.multimodal.optimization.lit_mmdet import MMDetLitModule
 from autogluon.multimodal.optimization.lit_module import LitModule
@@ -185,7 +190,7 @@ class DefaultLearner(AbstractMMLearner):
         verbosity: Optional[int] = 2,
         num_classes: Optional[int] = None,
         classes: Optional[list] = None,
-        enable_progress_bar: Optional[bool] = None,
+        enable_progress_bar: Optional[bool] = True,
     ):
         super().__init__()
 
@@ -208,7 +213,7 @@ class DefaultLearner(AbstractMMLearner):
         # self._resume = False  # This is for predictor to handle.
         self._verbosity = verbosity
         # self._warn_if_exist = warn_if_exist  # unused
-        self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
+        self._enable_progress_bar = enable_progress_bar
         # self._init_scratch = init_scratch  # NOTE: is this for predictor to handle?
         # self._sample_data_path = sample_data_path  # this is for detection problem only
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
@@ -219,21 +224,21 @@ class DefaultLearner(AbstractMMLearner):
         self._best_score = None
 
     @override
-    def path(self) -> str | None:
+    def path(self) -> Union[str, None]:
         return self._save_path
 
     @override
-    def label(self) -> str | None:
+    def label(self) -> Union[str, None]:
         return self._label_column
 
     @property
     @override
-    def problem_type(self) -> str | None:
+    def problem_type(self) -> Union[str, None]:
         return self._problem_type
 
     @property
     @override
-    def problem_property(self) -> ProblemTypeProperty | None:
+    def problem_property(self) -> Union[ProblemTypeProperty, None]:
         if self._problem_type is None:
             return None
         else:
@@ -241,12 +246,12 @@ class DefaultLearner(AbstractMMLearner):
 
     @property
     @override
-    def class_labels(self) -> list | None:
+    def class_labels(self) -> Union[list, None]:
         return self._classes
 
     @property
     @override
-    def positive_class(self) -> int | None:
+    def positive_class(self) -> Union[int, None]:
         return None
 
     @override
@@ -277,32 +282,38 @@ class DefaultLearner(AbstractMMLearner):
         ### SETUP Environments ###
         self._fit_called = True
         # 1-3, 22. get config.
+        # TODO: Create another PR to isolate df_preprocessor from self._setup_environment().
+        # Create another method self._create_df_preprocessor(), self._get_data_processors(), and _create_model()
         config, df_preprocessor, grad_steps, strategy, use_ray_lightning = self._setup_environment(
-            train_df, config, presets, hyperparameters, teacher_predictor, hpo_mode, **hpo_kwargs
+            train_df=train_df,
+            config=config,
+            presets=presets,
+            hyperparameters=hyperparameters,
+            teacher_predictor=teacher_predictor,
+            hpo_mode=hpo_mode,
+            **hpo_kwargs,
         )
 
-        # 4. if NER, update output shape. NOTE: This can be refactored into the NER Learner
-        # Update output_shape with label_generator.
-        model = self._create_model(config, df_preprocessor)
+        # 4-5. if NER, update output shape. Otherwise create model. TODO: This can be refactored into the NER Learner
+        model = self._create_model(config=config, df_preprocessor=df_preprocessor)
 
         # 6. get trainable layer params for efficient finetuning only?
-        trainable_param_names = self._get_trainable_params(config, model)
+        trainable_param_names = self._get_trainable_params(config=config, model=model)
 
         # 7. get data_processors.
-        data_processors = self._get_data_processors(config, advanced_hyperparameters, model)
+        data_processors = self._get_data_processors(
+            config=config, advanced_hyperparameters=advanced_hyperparameters, model=model
+        )
 
         # 8. infer positive labels (NOTE: This is deleted in the latest main branch)
-        # pos_label = try_to_infer_pos_label(
-        #     data_config=config.data,
-        #     label_encoder=df_preprocessor.label_generator,
-        #     problem_type=self._problem_type,
-        # )
 
         # 9. setup validation metric
-        validation_metric, custom_metric_func = self._setup_validation_metric(validation_metric_name)
+        validation_metric, custom_metric_func = self._setup_validation_metric(
+            validation_metric_name=validation_metric_name
+        )
 
         # 10. setup mix up if applicable
-        mixup_active, mixup_fn = self._setup_mixup(config)
+        mixup_active, mixup_fn = self._setup_mixup(config=config)
 
         # 11. get loss function, NOTE: This can be refactored into Learner class
         loss_func = get_loss_func(
@@ -318,7 +329,7 @@ class DefaultLearner(AbstractMMLearner):
             loss_func=loss_func,
         )
 
-        # 13. assign properties
+        # 13. assign properties, and use self properties afterward whenever possible
         self._config = config
         self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
@@ -382,16 +393,27 @@ class DefaultLearner(AbstractMMLearner):
         # if teacher_data_processors is not None:
         #     data_processors = [data_processors, teacher_data_processors]
 
+        # TODO: Refactor this into detection learner
         val_use_training_mode = (self._problem_type == OBJECT_DETECTION) and (validation_metric_name != MAP)
 
         # 16. setup pl training data module
         train_dm = self._get_train_data_module(
-            train_df, val_df, config, df_preprocessor, data_processors, val_use_training_mode
+            train_df=train_df,
+            val_df=val_df,
+            config=config,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            val_use_training_mode=val_use_training_mode,
         )
+
         # 17. setup optim args
-        optimization_kwargs = self._get_optim_kwargs(config)
+        optimization_kwargs = self._get_optim_kwargs(config=config)
         # 18. setup metrics args
-        metrics_kwargs = self._get_metrics_kwargs(validation_metric_name, validation_metric, custom_metric_func)
+        metrics_kwargs = self._get_metrics_kwargs(
+            validation_metric_name=validation_metric_name,
+            validation_metric=validation_metric,
+            custom_metric_func=custom_metric_func,
+        )
 
         # By default, we use the default task type a.k.a. LitModule
         # TODO: Refactor this into sub-learners
@@ -460,19 +482,23 @@ class DefaultLearner(AbstractMMLearner):
         #     )
 
         task = self._setup_task_lightning_module(
-            config,
-            model,
-            trainable_param_names,
-            mixup_fn,
-            loss_func,
-            model_postprocess_fn,
-            optimization_kwargs,
-            metrics_kwargs,
+            config=config,
+            model=model,
+            trainable_param_names=trainable_param_names,
+            mixup_fn=mixup_fn,
+            loss_func=loss_func,
+            model_postprocess_fn=model_postprocess_fn,
+            optimization_kwargs=optimization_kwargs,
+            metrics_kwargs=metrics_kwargs,
         )
 
         # 20. Setup call backs
-        checkpoint_callback = self._create_checkpoint_callback(minmax_mode, save_path, config, task)
-        early_stopping_callback = self._create_early_stop_callback(validation_metric_name, minmax_mode, config, task)
+        checkpoint_callback = self._create_checkpoint_callback(
+            minmax_mode=minmax_mode, save_path=save_path, config=config, task=task
+        )
+        early_stopping_callback = self._create_early_stop_callback(
+            validation_metric_name=validation_metric_name, minmax_mode=minmax_mode, config=config, task=task
+        )
         lr_callback = self._create_lr_callback()
         model_summary = pl.callbacks.ModelSummary(max_depth=1)
         callbacks = [
@@ -949,19 +975,40 @@ class DefaultLearner(AbstractMMLearner):
 
     def _top_k_average(
         self,
-        model,
-        save_path,
-        minmax_mode,
-        is_distill,
-        top_k_average_method,
-        val_df,
-        validation_metric_name,
-        strategy=None,
-        last_ckpt_path=None,
-        strict_loading=True,
-        standalone=True,
-        clean_ckpts=True,
+        model: nn.Module,
+        save_path: str,
+        minmax_mode: str,
+        is_distill: bool,
+        top_k_average_method: Optional[str],
+        val_df: pd.DataFrame,
+        validation_metric_name: str,
+        strategy: Optional[Union[Strategy, str]] = None,
+        last_ckpt_path: Optional[str] = None,
+        strict_loading: bool = True,
+        standalone: bool = True,
+        clean_ckpts: bool = True,
     ):
+        """Top K average the models at the end of the training
+
+        Parameters
+        ----------
+        model (nn.Module): model trained
+        save_path (str): model save path
+        minmax_mode (str): _description_
+        is_distill (bool): if this is a distillation model
+        top_k_average_method (Optional[str]): a string representing top k average method
+        val_df (pd.DataFrame): validation data frame for model selection
+        validation_metric_name (str): validation metric name
+        strategy (Optional[Union[Strategy, str]], optional): Parallelism strategies. Defaults to None.
+        last_ckpt_path (Optional[str], optional): _description_. Defaults to None.
+        strict_loading (bool, optional): _description_. Defaults to True.
+        standalone (bool, optional): _description_. Defaults to True.
+        clean_ckpts (bool, optional): _description_. Defaults to True.
+
+        Raises
+        ------
+        ValueError: raise error when top_k_average_method is not supported
+        """
         # FIXME: we need to change validation_metric to evaluation_metric for model choosing
         # since we called self.evaluate. Below is a temporal fix for NER.
         if self._problem_type is not None and self._problem_type == NER:
@@ -1096,30 +1143,40 @@ class DefaultLearner(AbstractMMLearner):
             if os.path.isfile(last_ckpt_path):
                 os.remove(last_ckpt_path)
 
-    def _create_lr_callback(self):
+    def _create_lr_callback(self) -> Callback:
         """Creates the learning rate callback
         By default, we use the pl LearningRateMonitor callback
         This can be overriden by child learners to use other learning rate callbacks
 
-        Returns:
-            _type_: _description_
+        Returns
+        --------
+        pl.callbacks.LearningRateMonitor: pytorch lightning learning rate callback
         """
         lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
         return lr_callback
 
-    def _create_early_stop_callback(self, validation_metric_name, minmax_mode, config, task):
+    def _create_early_stop_callback(
+        self, validation_metric_name: str, minmax_mode: str, config: DictConfig, task: pl.LightningModule
+    ) -> Callback:
         """Creates the callback for early stopping during training
         By default, we use the pl EarlyStopping callback
         This can be overriden by child learners to use other early stopping callbacks
 
-        Args:
-            validation_metric_name (_type_): _description_
-            minmax_mode (_type_): _description_
-            config (_type_): _description_
-            task (_type_): _description_
+        Parameters
+        -----------
+        validation_metric_name (str): name of the validation metric
+        minmax_mode (str):
+            The min/max mode used in selecting model checkpoints.
+            - min
+                Its means that smaller metric is better.
+            - max
+                It means that larger metric is better.
+        config (DictConfig): OmegaConfig holding the configuration for training
+        task (pl.LightningModule): pytorch lightning module for training
 
-        Returns:
-            _type_: _description_
+        Returns
+        --------
+        pl.callbacks.EarlyStopping: pytorch lightning early stopping callback
         """
         early_stopping_callback = pl.callbacks.EarlyStopping(
             monitor=task.validation_metric_name,
@@ -1130,19 +1187,28 @@ class DefaultLearner(AbstractMMLearner):
 
         return early_stopping_callback
 
-    def _create_checkpoint_callback(self, minmax_mode, save_path, config, task):
+    def _create_checkpoint_callback(
+        self, minmax_mode: str, save_path: str, config: DictConfig, task: pl.LightningModule
+    ) -> Callback:
         """Creates the pl checkpoint callback during training
         By default, we use the AutoMMModelCheckpoint, which is a customized checkpoint callback
         This can be overriden by child learners to use other checkpoint callbacks
 
-        Args:
-            minmax_mode (_type_): _description_
-            save_path (_type_): _description_
-            config (_type_): _description_
-            task (_type_): _description_
+        Parameters
+        -----------
+        minmax_mode (str):
+            The min/max mode used in selecting model checkpoints.
+            - min
+                Its means that smaller metric is better.
+            - max
+                It means that larger metric is better.
+        save_path (str): model save path
+        config (DictConfig): OmegaConfig holding the configuration for training
+        task (pl.LightningModule): pytorch lightning module for training
 
-        Returns:
-            _type_: _description_
+        Returns
+        --------
+        pl.callbacks.ModelCheckpoint: The pytorch lightning checkpoint callback
         """
         checkpoint_callback = AutoMMModelCheckpoint(
             dirpath=save_path,
@@ -1157,14 +1223,14 @@ class DefaultLearner(AbstractMMLearner):
 
     def _setup_task_lightning_module(
         self,
-        config,
-        model,
-        trainable_param_names,
-        mixup_fn,
-        loss_func,
-        model_postprocess_fn,
-        optimization_kwargs,
-        metrics_kwargs,
+        config: DictConfig,
+        model: nn.Module,
+        trainable_param_names: List[str],
+        mixup_fn: Optional[Mixup],
+        loss_func: Optional[nn.Module],
+        model_postprocess_fn: Optional[Callable],
+        optimization_kwargs: dict,
+        metrics_kwargs: dict,
     ) -> pl.LightningModule:
         """
         Select the correct pl task module for a given problem type.
@@ -1172,18 +1238,20 @@ class DefaultLearner(AbstractMMLearner):
         This can be overridden by a child learner if needed.
 
 
-        Args:
-            config (_type_): _description_
-            model (_type_): _description_
-            trainable_param_names (_type_): _description_
-            mixup_fn (_type_): _description_
-            loss_func (_type_): _description_
-            model_postprocess_fn (_type_): _description_
-            optimization_kwargs (_type_): _description_
-            metrics_kwargs (_type_): _description_
+        Parameters
+        -----------
+        config (DictConfig): OmegaConfig dict with all the configs for training
+        model (nn.Module): pytorch nn.Module to train
+        trainable_param_names (List[str]): the list of trainable parameter names
+        mixup_fn (Optional[Mixup]): model mixup function that applies different params to each element or whole batch
+        loss_func (Optional[nn.Module]): pytorch nn.Module loss function
+        model_postprocess_fn (Optional[Callable]): postprocess function to apply to the model output (i.e. sigmoid after nn.BCEWithLogitsLoss)
+        optimization_kwargs (dict): parameters for optimization
+        metrics_kwargs (dict): parameters for metrics
 
-        Returns:
-            _type_: _description_
+        Returns
+        --------
+        pl.LightningModule: pytorch lightning module for training task
         """
         task = LitModule(
             model=model,
@@ -1200,7 +1268,21 @@ class DefaultLearner(AbstractMMLearner):
 
         return task
 
-    def _get_metrics_kwargs(self, validation_metric_name, validation_metric, custom_metric_func) -> dict:
+    def _get_metrics_kwargs(
+        self, validation_metric_name: str, validation_metric: Optional[Metric], custom_metric_func: Optional[Callable]
+    ) -> dict:
+        """get the metrics kwargs for the training task
+
+        Parameters
+        ----------
+        validation_metric_name (str): name of the validation metric
+        validation_metric (Optional[Metric]): validation metric object of type torchmetrics.Metric
+        custom_metric_func (Optional[Callable]): customized metric function
+
+        Returns
+        -------
+        dict: dictionary containing the metrics parameters
+        """
         metrics_kwargs = dict(
             validation_metric=validation_metric,
             validation_metric_name=validation_metric_name,
@@ -1209,7 +1291,17 @@ class DefaultLearner(AbstractMMLearner):
 
         return metrics_kwargs
 
-    def _get_optim_kwargs(self, config) -> dict:
+    def _get_optim_kwargs(self, config: DictConfig) -> dict:
+        """get the optimization kwargs for the training task
+
+        Parameters
+        ----------
+        config (DictConfig): OmegaConf holding the config for training
+
+        Returns
+        -------
+        dict: dictionary containing the optimization parameters
+        """
         optimization_kwargs = dict(
             optim_type=config.optimization.optim_type,
             lr_choice=config.optimization.lr_choice,
@@ -1225,22 +1317,30 @@ class DefaultLearner(AbstractMMLearner):
         return optimization_kwargs
 
     def _get_train_data_module(
-        self, train_df, val_df, config, df_preprocessor, data_processors, val_use_training_mode
+        self,
+        train_df: pd.DataFrame,
+        val_df: pd.DataFrame,
+        config: DictConfig,
+        df_preprocessor: MultiModalFeaturePreprocessor,
+        data_processors: List,
+        val_use_training_mode: bool,
     ) -> LightningDataModule:
         """get the data module for training
         By default, we use the default data module a.k.a. BaseDataModule
         This is to be overridden by a child learner if needed.
 
-        Args:
-            train_df (_type_): _description_
-            val_df (_type_): _description_
-            config (_type_): _description_
-            df_preprocessor (_type_): _description_
-            data_processors (_type_): _description_
-            val_use_training_mode (_type_): _description_
+        Parameters
+        ----------
+        train_df (pd.DataFrame): training data as in pandas data frame
+        val_df (pd.DataFrame): validation data as in pandas data frame
+        config (DictConfig): OmegaConfig instance holding training configurations
+        df_preprocessor (MultiModalFeaturePreprocessor): data frame preprocessor to read and preprocess pandas data frames
+        data_processors (List): data processors to read trainig data
+        val_use_training_mode (bool): whether to use training mode for validation data
 
-        Returns:
-            _type_: _description_
+        Returns
+        -------
+        LightningDataModule: pytorch lightning data module used for loading data during training
         """
         train_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
@@ -1254,7 +1354,17 @@ class DefaultLearner(AbstractMMLearner):
 
         return train_dm
 
-    def _setup_mixup(self, config):
+    def _setup_mixup(self, config: DictConfig) -> Tuple[bool, Optional[Mixup]]:
+        """Setup mixup for training
+
+        Parameters
+        ----------
+        config (DictConfig): OmegaConfig instance holding model configurations
+
+        Returns
+        -------
+        Tuple[bool, Optional[Mixup]]: tuple of mixup_active and mixup_fn (Mixup if mixup is active, None otherwise)
+        """
         mixup_active, mixup_fn = get_mixup(
             model_config=OmegaConf.select(config, "model"),
             mixup_config=OmegaConf.select(config, "data.mixup"),
@@ -1269,7 +1379,19 @@ class DefaultLearner(AbstractMMLearner):
 
         return mixup_active, mixup_fn
 
-    def _setup_validation_metric(self, validation_metric_name):
+    def _setup_validation_metric(
+        self, validation_metric_name: Optional[str] = None
+    ) -> Tuple[Optional[Metric], Optional[Callable]]:
+        """Get validation metric from validation metric name
+
+        Parameters
+        ----------
+        validation_metric_name (Optional[str]): name for the validation metric
+
+        Returns
+        -------
+        Tuple[Metric, Union[Callable, None]]: Tuple of validation metric and custom metric function.
+        """
         if validation_metric_name is not None:
             validation_metric, custom_metric_func = get_metric(
                 metric_name=validation_metric_name,
@@ -1279,7 +1401,21 @@ class DefaultLearner(AbstractMMLearner):
             validation_metric, custom_metric_func = (None, None)
         return validation_metric, custom_metric_func
 
-    def _get_data_processors(self, config, advanced_hyperparameters, model):
+    def _get_data_processors(
+        self, config: DictConfig, advanced_hyperparameters: Optional[Dict], model: nn.Module
+    ) -> List[object]:
+        """Create data processors for training. Reuse the existing data processors if exists
+
+        Parameters
+        ----------
+        config (DictConfig): OmegaConfig instance holding model configurations
+        advanced_hyperparameters (dict): advanced hyperparameters for data processors, such as image transforms, whose values are complex objects
+        model (nn.Module): torch model (a.k.a. nn.Module)
+
+        Returns
+        TODO: !!! Hot issue - data processors do not inherit from a common base class!!!!!!
+        List[object]: list of required data processors.
+        """
         if self._data_processors is None:
             data_processors = create_fusion_data_processors(
                 config=config,
@@ -1290,7 +1426,18 @@ class DefaultLearner(AbstractMMLearner):
             data_processors = self._data_processors
         return data_processors
 
-    def _get_trainable_params(self, config, model):
+    def _get_trainable_params(self, config: DictConfig, model: nn.Module) -> List[str]:
+        """Get trainable parameters for efficient finetuning
+
+        Parameters
+        -----------
+        config (DictConfig): OmegaConfig instance holding model configurations
+        model (nn.Module): the torch model (a.k.a. nn.Module)
+
+        Returns
+        --------
+        List[str]: list of trainable parameter names
+        """
         norm_param_names = get_norm_layer_param_names(model)
 
         trainable_param_names = get_trainable_params_efficient_finetune(
@@ -1300,17 +1447,19 @@ class DefaultLearner(AbstractMMLearner):
 
         return trainable_param_names
 
-    def _create_model(self, config, df_preprocessor) -> nn.Module:
-        """Creates the model for training
+    def _create_model(self, config: DictConfig, df_preprocessor: MultiModalFeaturePreprocessor) -> nn.Module:
+        """Creates the model for training based on the config and info in df_preprocessor
         By default we use the create_fusion_model function to create the model
-        This can be overriden by a child learner if needed.
+        This can be overriden by a child learner to create custom models
 
-        Args:
-            config (_type_): _description_
-            df_preprocessor (_type_): _description_
+        Parameters
+        -----------
+        config (DictConfig): OmegaConfig instance holding model configurations
+        df_preprocessor (MultiModalFeaturePreprocessor): data frame preprocessor
 
-        Returns:
-            nn.Module: _description_
+        Returns
+        --------
+        nn.Module: the torch model (a.k.a. nn.Module) to be trained
         """
         ##  this is to be moved into NER learners
         if self._problem_type == NER:
@@ -1339,23 +1488,26 @@ class DefaultLearner(AbstractMMLearner):
         teacher_predictor: Union[str, MultiModalPredictor],
         hpo_mode: bool,
         **hpo_kwargs,
-    ):
+    ) -> Tuple[DictConfig, MultiModalFeaturePreprocessor, int, Optional[Union[Strategy, str]], bool]:
         """Set up training environment parameters: config, df_preprocessor, grad_step, strategy, etc.
         TODO: Can df_preprocessor be moved outside this function?
 
-        Args:
-            train_df (pd.DataFrame): training data frame
-            presets (Optional[str]): preset to use
-            hyperparameters (Optional[Union[str, List[str], Dict]]): user provided hyperparameter overrides
-            teacher_predictor (Union[str, MultiModalPredictor]): teacher model for knowledge distillation
-            hpo_mode (_type_): if running hpo
-            hpo_kwargs (_type_): hpo params
+        Parameters
+        -----------
+        train_df (pd.DataFrame): training data frame
+        presets (Optional[str]): preset to use
+        hyperparameters (Optional[Union[str, List[str], Dict]]): user provided hyperparameter overrides
+        teacher_predictor (Union[str, MultiModalPredictor]): teacher model for knowledge distillation
+        hpo_mode (_type_): if running hpo
+        hpo_kwargs (_type_): hpo params
 
-        Returns:
-            config: dict
-            df_preprocessor: MultiModalFeaturePreprocessor
-            grad_step: int
-            strategy: str
+        Returns
+        --------
+        config: dict
+        df_preprocessor: MultiModalFeaturePreprocessor
+        grad_step: int
+        strategy: Optional[Union[Strategy, str]]
+        use_ray_lightning: bool
         """
         config = get_config(
             problem_type=self._problem_type,
@@ -1413,14 +1565,29 @@ class DefaultLearner(AbstractMMLearner):
         self._config = config
         return config, df_preprocessor, grad_steps, strategy, use_ray_lightning
 
-    def _compute_strategy(self, config, hpo_mode, hpo_kwargs, num_gpus, use_ray_lightning):
+    def _compute_strategy(
+        self, config: dict, hpo_mode: bool, hpo_kwargs: dict, num_gpus: int, use_ray_lightning: bool
+    ) -> Tuple[int, Optional[Union[Strategy, str]]]:
+        """Compute what data parallel strategy to use for training
+
+        Parameters
+        -----------
+        config (dict): configuration OmegaConfig instance
+        hpo_mode (bool): whether to use hpo
+        hpo_kwargs (dict): key word arguments for hpo
+        num_gpus (int): number of gpus to use
+        use_ray_lightning (bool): whether to use ray lightning for hpo
+
+        Returns
+        --------
+        Tuple[int, Optional[Union[Strategy, str]]]: Tuple containing number of gpus and strategy (num_gpus, strategy)
+        """
         if not hpo_mode:
             if num_gpus <= 1:
                 if config.env.strategy == DEEPSPEED_OFFLOADING:  # Offloading currently only tested for single GPU
                     assert version.parse(pl.__version__) >= version.parse(
                         DEEPSPEED_MIN_PL_VERSION
                     ), f"For DeepSpeed Offloading to work reliably you need at least pytorch-lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your pytorch-lightning version."
-                    from autogluon.multimodal.optimization.deepspeed import CustomDeepSpeedStrategy
 
                     strategy = CustomDeepSpeedStrategy(
                         stage=3,

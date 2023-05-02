@@ -918,7 +918,7 @@ class MultiModalPredictor(ExportMixin):
 
     def _split_train_tuning(
         self, data: pd.DataFrame, holdout_frac: float = None, random_state: int = 0
-    ) -> Tuple(pd.DataFrame, pd.DataFrame):
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Splits `data` into `train_data` and `tuning_data`.
         If the problem_type is one of ['binary', 'multiclass']:
@@ -2231,7 +2231,7 @@ class MultiModalPredictor(ExportMixin):
                 save_results=save_results,
             )
             return pred
-        
+
         self._verify_inference_ready()
 
         if self._matcher:
