@@ -1,8 +1,7 @@
 import logging
 import warnings
-
-from abc import ABC, abstractmethod, abstractclassmethod, abstractstaticmethod, abstractproperty
-from typing import Optional, Union, List
+from abc import ABC, abstractclassmethod, abstractmethod, abstractproperty, abstractstaticmethod
+from typing import List, Optional, Union
 
 import pandas as pd
 

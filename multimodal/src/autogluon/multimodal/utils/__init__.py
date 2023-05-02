@@ -33,9 +33,9 @@ from .data import (
 from .download import download, is_url
 from .environment import (
     check_if_packages_installed,
+    compute_grad_steps,
     compute_inference_batch_size,
     compute_num_gpus,
-    compute_grad_steps,
     get_available_devices,
     get_precision_context,
     infer_precision,

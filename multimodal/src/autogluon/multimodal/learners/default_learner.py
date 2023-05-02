@@ -32,7 +32,6 @@ from torchmetrics import Metric
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
 from autogluon.core.utils.loaders import load_pd
-from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 # from . import version as ag_version
 from autogluon.multimodal.constants import (
@@ -168,8 +167,8 @@ from autogluon.multimodal.utils import (
     update_tabular_config_by_resources,
     upgrade_config,
 )
+from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 from .abstract_mm_learner import AbstractMMLearner
-
 
 logger = logging.getLogger(__name__)
 
