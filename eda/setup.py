@@ -33,6 +33,7 @@ install_requires = [
     'yellowbrick>=1.5,<1.6',
     'pyod>=1.0,<1.1',
     'suod>=0.0.8,<0.1',
+    'ipython>7.16,<8.13',  # IPython 8.13+ supports Python 3.9 and above; Python 3.7 is supported with IPython >7.16
     f'autogluon.core=={version}',
     f'autogluon.common=={version}',
     f'autogluon.features=={version}',

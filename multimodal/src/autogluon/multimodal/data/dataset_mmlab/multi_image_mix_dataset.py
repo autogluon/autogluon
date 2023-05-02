@@ -15,10 +15,11 @@ logger = logging.getLogger(__name__)
 
 try:
     import mmcv
+    from mmcv.utils import Config as MMCVConfig
     from mmdet.core import find_inside_bboxes
     from mmdet.utils import log_img_scale  # inline import to avoid mmdet uninstall error for other tasks
 except:
-    pass
+    MMCVConfig = None
 
 
 class MultiImageMixDataset(torch.utils.data.Dataset):
@@ -34,7 +35,7 @@ class MultiImageMixDataset(torch.utils.data.Dataset):
         data: pd.DataFrame,
         preprocessor: List[MultiModalFeaturePreprocessor],
         processors: List[dict],
-        model_config: None,
+        model_config: MMCVConfig,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         is_training: bool = False,
     ):

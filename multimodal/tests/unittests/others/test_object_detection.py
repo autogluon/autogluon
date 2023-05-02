@@ -32,7 +32,7 @@ def download_sample_dataset():
     "checkpoint_name",
     [
         "yolox_s_8x8_300e_coco",
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
@@ -67,7 +67,7 @@ def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_inference_list_str_dict(checkpoint_name):
@@ -94,7 +94,7 @@ def test_mmdet_object_detection_inference_list_str_dict(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
@@ -136,7 +136,7 @@ def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_inference_df(checkpoint_name):
@@ -161,7 +161,7 @@ def test_mmdet_object_detection_inference_df(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_inference_coco(checkpoint_name):
@@ -183,7 +183,7 @@ def test_mmdet_object_detection_inference_coco(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_save_and_load(checkpoint_name):
@@ -236,7 +236,7 @@ def test_mmdet_object_detection_evaluate_coco(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_then_inference_dict(checkpoint_name):
@@ -270,7 +270,7 @@ def test_mmdet_object_detection_fit_then_inference_dict(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_then_inference_df(checkpoint_name):
@@ -306,7 +306,7 @@ def test_mmdet_object_detection_fit_then_inference_df(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_then_inference_coco(checkpoint_name):
@@ -340,7 +340,7 @@ def test_mmdet_object_detection_fit_then_inference_coco(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
