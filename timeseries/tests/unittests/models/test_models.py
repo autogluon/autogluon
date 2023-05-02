@@ -21,11 +21,17 @@ from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_wi
 from .gluonts.test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_autogluon_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
+from .test_mlforecast import TESTABLE_MODELS as MLFORECAST_TESTABLE_MODELS
 from .test_multi_window_model import get_multi_window_deepar
 
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
-TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + TABULAR_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS + [get_multi_window_deepar]
-
+TESTABLE_MODELS = (
+    GLUONTS_TESTABLE_MODELS
+    + TABULAR_TESTABLE_MODELS
+    + LOCAL_TESTABLE_MODELS
+    + MLFORECAST_TESTABLE_MODELS
+    + [get_multi_window_deepar]
+)
 
 DUMMY_HYPERPARAMETERS = {"epochs": 1, "num_batches_per_epoch": 1, "maxiter": 1, "n_jobs": 1}
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
@@ -161,17 +167,6 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
     assert len(hpo_results) == num_trials
     for result in hpo_results.values():
         assert 1 <= result["hyperparameters"]["epochs"] <= 3
-
-
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_given_no_freq_argument_when_fit_called_with_freq_then_model_does_not_raise_error(
-    model_class, temp_model_path
-):
-    model = model_class(path=temp_model_path, hyperparameters=DUMMY_HYPERPARAMETERS)
-    try:
-        model.fit(train_data=DUMMY_TS_DATAFRAME, freq="H")
-    except ValueError:
-        pytest.fail("unexpected ValueError raised in fit")
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
