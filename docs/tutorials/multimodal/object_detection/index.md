@@ -16,7 +16,6 @@
 
   How to use a foundation model in object detection to detect novel classes defined by an unbounded (open) vocabulary.
 :::
-
 ::::
 
 ## Data Preparation
