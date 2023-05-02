@@ -122,11 +122,11 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
 
     def _setup_transformer(self, model_params: dict) -> None:
         transformations = []
-        # Avoid copying data multiple times
-        if model_params.get("detrend", True):
-            transformations.append(Detrender(target=self.target, copy=False))
-        if model_params.get("scale", True):
-            transformations.append(StdScaler(target=self.target, copy=False))
+        # # Avoid copying data multiple times
+        # if model_params.get("detrend", True):
+        #     transformations.append(Detrender(target=self.target, copy=False))
+        # if model_params.get("scale", True):
+        #     transformations.append(StdScaler(target=self.target, copy=False))
         self.transformer = PipelineTransformer(transformations, target=self.target, copy=True)
 
     @staticmethod
@@ -137,8 +137,9 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         return time_features_from_frequency_str(freq)
 
     def _get_mlforecast_init_args(self, train_data: TimeSeriesDataFrame, model_params: dict) -> dict:
-        from gluonts.time_feature import get_lags_for_frequency, time_features_from_frequency_str
+        from gluonts.time_feature import get_lags_for_frequency
         from mlforecast.target_transforms import Differences
+        from .utils import StandardScaler
 
         lags = model_params.get("lags")
         if lags is None:
@@ -159,9 +160,12 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
                 f">= sum(differences) (at least {sum(differences)}), "
                 f"but longest time series length = {longest_ts_length}. Disabling differencing."
             )
-            target_transforms = None
+            target_transforms = []
         else:
             target_transforms = [Differences(differences)]
+
+        if model_params.get("scale", True):
+            target_transforms.append(StandardScaler())
 
         return {
             "lags": lags,
@@ -269,12 +273,12 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         with statsmodels_warning_filter():
             self.mlf.fit_models(X_train, y_train)
 
-        # Use residuals to compute quantiles
-        val_data_future = val_data.slice_by_timestep(-self.prediction_length, None)
-        val_forecast = self._predict_without_quantiles(train_data, val_data_future.drop(self.target, axis=1))
-        residuals = val_forecast["mean"] - val_data_future[self.target]
-        for q in self.quantile_levels:
-            self.quantile_adjustments[q] = np.quantile(residuals, q)
+        # # Use residuals to compute quantiles
+        # val_data_future = val_data.slice_by_timestep(-self.prediction_length, None)
+        # val_forecast = self._predict_without_quantiles(train_data, val_data_future.drop(self.target, axis=1))
+        # residuals = val_forecast["mean"] - val_data_future[self.target]
+        # for q in self.quantile_levels:
+        #     self.quantile_adjustments[q] = np.quantile(residuals, q)
 
     def _predict_without_quantiles(
         self,
@@ -312,7 +316,8 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         data = self.transformer.fit_transform(data)
         predictions = self._predict_without_quantiles(data, known_covariates)
         for q in self.quantile_levels:
-            predictions[str(q)] = predictions["mean"] + self.quantile_adjustments[q]
+            predictions[str(q)] = predictions["mean"]
+            # predictions[str(q)] = predictions["mean"] + self.quantile_adjustments[q]
         return self.transformer.inverse_transform_predictions(TimeSeriesDataFrame(predictions))
 
     def _more_tags(self) -> dict:

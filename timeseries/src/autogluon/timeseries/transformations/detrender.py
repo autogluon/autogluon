@@ -54,7 +54,7 @@ class Detrender(AbstractTransformer):
 
     def _inverse_transform_predictions(self, predictions: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         future_trends = []
-        for item_id, length in predictions.num_timesteps_per_item().items:
+        for item_id, length in predictions.num_timesteps_per_item().items():
             future_trends.append(self.detrender_per_series[item_id].get_future_trend(length))
         future_trends = np.concatenate(future_trends)
         for col in predictions.columns:

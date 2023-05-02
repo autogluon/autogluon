@@ -1,6 +1,6 @@
 from typing import List
-from autogluon.timeseries import TimeSeriesDataFrame
 
+from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 
 from .abstract_transformer import AbstractTransformer

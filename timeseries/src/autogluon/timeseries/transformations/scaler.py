@@ -1,4 +1,5 @@
 from typing import Optional
+
 import pandas as pd
 
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
