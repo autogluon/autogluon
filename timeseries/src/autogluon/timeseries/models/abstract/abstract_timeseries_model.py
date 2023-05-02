@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import time
 from typing import Any, Dict, List, Optional, Union
 
@@ -86,6 +87,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         hyperparameters: Dict[str, Union[int, float, str, ag.Space]] = None,
         **kwargs,
     ):
+        name = name or re.sub(r"Model$", "", self.__class__.__name__)
         super().__init__(
             path=path,
             name=name,

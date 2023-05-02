@@ -1,6 +1,5 @@
 import hashlib
 import logging
-import re
 from multiprocessing import cpu_count
 from typing import Any, Dict, List, Optional, Union
 
@@ -45,7 +44,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         hyperparameters: Dict[str, Any] = None,
         **kwargs,  # noqa
     ):
-        name = name or re.sub(r"Model$", "", self.__class__.__name__)
         super().__init__(
             path=path,
             freq=freq,
