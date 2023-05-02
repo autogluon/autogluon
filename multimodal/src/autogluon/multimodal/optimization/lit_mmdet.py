@@ -179,35 +179,37 @@ class MMDetLitModule(pl.LightningModule):
         loss, log_vars = self.model._parse_losses(losses)
         return loss, log_vars
 
-    def log_step_results(self, losses):
-        map_loss_names = {
-            "loss": "total_loss",
-            "acc": "classification-accuracy",
-            "loss_rpn_cls": "loss/rpn_cls",
-            "loss_rpn_bbox": "loss/rpn_bbox",
-            "loss_bbox": "loss/bbox_reg",
-            "loss_cls": "loss/classification",
-        }
-        for key in losses:
-            # map metric names same name with epoch-wise metrics defined in:
-            # `configs/vision/object-detection/mmdet/mmdet-base.yaml`
-            loss_name = map_loss_names.get(key, key)
-            self.log(f"step/{loss_name}", losses[key])
+    def sum_and_log_step_results(self, losses, logging=True):
+        # losses is a dict of several type of losses, e.g. ['loss_cls', 'loss_conf', 'loss_xy', 'loss_wh']
+        # each type of losses may have multiple channels due to multiple resolution settings
+        total_loss = 0.0
+        for loss_key, loss_values in losses.items():
+            curr_loss = 0.0
+            if isinstance(loss_values, list) or isinstance(loss_values, tuple):  # is a collection of shape 0 tensors
+                for loss_chanel_idx, loss_val in enumerate(loss_values):
+                    if logging:
+                        self.log(f"step/{loss_key}_{loss_chanel_idx}", loss_val)
+                    curr_loss += loss_val
+            else:  # is a shape 0 tensor
+                curr_loss += loss_values
+
+            if logging:
+                self.log(f"step/{loss_key}", curr_loss)
+            total_loss += curr_loss
+
+        return total_loss
 
     def training_step(self, batch, batch_idx):
-        print(len(batch))
-        losses = self._loss_step(batch=batch)  # TODO: sum and log losses
-        print(f"losses:\n{losses}", flush=True)
-        exit()
-        return losses
-        # log step losses
-        self.log_step_results(log_vars)
-        return loss
+        losses = self._loss_step(batch=batch)
+        # sum and log step losses
+        total_loss = self.sum_and_log_step_results(losses)
+        return total_loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         if self.use_loss:
             losses = self._loss_step(batch=batch)
-            self.validation_metric.update(val_loss)
+            total_loss = self.sum_and_log_step_results(losses, logging=False)
+            self.validation_metric.update(total_loss)
         else:
             self.evaluate(batch, "val")
 

@@ -775,17 +775,18 @@ class COCODataset:
 
         for i, row in data.reset_index(drop=True).iterrows():
             image_id = self.get_image_id_from_path(row["image"])
-            for j, res in enumerate(ret[i]):
-                category_id = self.category_ids[j]
-                for bbox in res:
-                    coco_format_result.append(
-                        {
-                            "image_id": image_id,
-                            "category_id": category_id,
-                            "bbox": bbox_xyxy_to_xywh(bbox[:4].astype(float).tolist()),
-                            "score": float(bbox[4]),
-                        }
-                    )
+
+            pred_result = ret[i].pred_instances
+            N_pred = len(pred_result["bboxes"])
+            for bbox_idx in range(N_pred):
+                coco_format_result.append(
+                    {
+                        "image_id": image_id,
+                        "category_id": self.category_ids[int(pred_result["labels"][bbox_idx].item())],
+                        "bbox": bbox_xyxy_to_xywh(pred_result["bboxes"][bbox_idx].tolist()),
+                        "score": pred_result["scores"][bbox_idx].item(),
+                    }
+                )
 
         with open(save_path, "w") as f:
             print(f"saving file at {save_path}")
@@ -814,31 +815,19 @@ def cocoeval_torchmetrics(outputs: List):
 
     preds = []
     target = []
-    for img_idx, img_output in enumerate(outputs):  # TODO: refactor here
-        img_result = img_output["bbox"]
-        boxes = []
-        scores = []
-        labels = []
-        for category_idx, category_result in enumerate(img_result):
-            for item_idx, item_result in enumerate(category_result):
-                boxes.append(item_result[:4])
-                scores.append(float(item_result[4]))
-                labels.append(category_idx)
+    for per_img_outputs in outputs:  # TODO: refactor here
         preds.append(
             dict(
-                boxes=torch.tensor(np.array(boxes).astype(float)).float().to("cpu"),
-                scores=torch.tensor(scores).float().to("cpu"),
-                labels=torch.tensor(labels).long().to("cpu"),
+                boxes=per_img_outputs.pred_instances["bboxes"].to("cpu"),
+                scores=per_img_outputs.pred_instances["scores"].to("cpu"),
+                labels=per_img_outputs.pred_instances["labels"].to("cpu"),
             )
         )
 
-        img_gt = np.array(img_output["label"])
-        boxes = img_gt[:, :4]
-        labels = img_gt[:, 4]
         target.append(
             dict(
-                boxes=torch.tensor(boxes).float().to("cpu"),
-                labels=torch.tensor(labels).long().to("cpu"),
+                boxes=per_img_outputs.gt_instances["bboxes"].to("cpu"),
+                labels=per_img_outputs.gt_instances["labels"].to("cpu"),
             )
         )
 

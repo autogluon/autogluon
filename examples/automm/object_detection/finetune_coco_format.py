@@ -90,14 +90,17 @@ def tutorial_script_for_finetune_fast_pothole_in_coco_format():
         hyperparameters={
             "optimization.learning_rate": 2e-4,  # we use two stage and detection head has 100x lr
             "optimization.max_epochs": 30,
-            "env.per_gpu_batch_size": 2,  # decrease it when model is large
+            "env.per_gpu_batch_size": 16,  # decrease it when model is large
         },
     )
     end = time.time()
 
     print("This finetuning takes %.2f seconds." % (end - start))
 
-    predictor.evaluate(test_path)
+    predictor.evaluate(
+        test_path,
+        # eval_tool="torchmetrics",
+    )
 
 
 def tutorial_script_for_finetune_yolox_pothole_in_coco_format():
