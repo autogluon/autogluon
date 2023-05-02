@@ -7,6 +7,7 @@ from functools import partial
 from typing import Any, Dict, List, Optional
 
 import joblib
+import numpy as np
 import pandas as pd
 from pyod.models.base import BaseDetector
 from pyod.models.copod import COPOD
@@ -161,6 +162,7 @@ class AnomalyDetector:
 
             with _suod_silent_print(self.silent):
                 detector = SUOD(**self._suod_kwargs)
+                np.int = int  # type: ignore[attr-defined] # workaround to address shap's use of old numpy APIs
                 self._detectors.append(detector.fit(x_train))
                 self._train_index_to_detector = {**self._train_index_to_detector, **{idx: i for idx in x_train.index}}
                 val_scores = detector.decision_function(x_val)  # outlier scores
