@@ -2,6 +2,7 @@ import logging
 import warnings
 from typing import List, Optional
 
+import numpy as np
 import pandas as pd
 import shap
 
@@ -122,6 +123,7 @@ class ShapAnalysis(AbstractAnalysis):
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore")
                 # Suppress sklearn pipeline warnings
+                np.int = int  # type: ignore[attr-defined] # workaround to address shap's use of old numpy APIs
                 ke_shap_values = explainer.shap_values(_row[args.train_data.columns], silent=True)
             shap_data.append(
                 AnalysisState(
