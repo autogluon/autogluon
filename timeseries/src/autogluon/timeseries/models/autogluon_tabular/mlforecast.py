@@ -153,6 +153,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         if differences is None:
             differences = [get_seasonality(self.freq)]
 
+        target_transforms = []
         longest_ts_length = train_data.num_timesteps_per_item().max()
         if longest_ts_length <= sum(differences):
             logger.warning(
@@ -160,9 +161,8 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
                 f">= sum(differences) (at least {sum(differences)}), "
                 f"but longest time series length = {longest_ts_length}. Disabling differencing."
             )
-            target_transforms = []
         else:
-            target_transforms = [Differences(differences)]
+            target_transforms.append(Differences(differences))
 
         if model_params.get("scale", True):
             target_transforms.append(StandardScaler())
@@ -273,13 +273,6 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         with statsmodels_warning_filter():
             self.mlf.fit_models(X_train, y_train)
 
-        # # Use residuals to compute quantiles
-        # val_data_future = val_data.slice_by_timestep(-self.prediction_length, None)
-        # val_forecast = self._predict_without_quantiles(train_data, val_data_future.drop(self.target, axis=1))
-        # residuals = val_forecast["mean"] - val_data_future[self.target]
-        # for q in self.quantile_levels:
-        #     self.quantile_adjustments[q] = np.quantile(residuals, q)
-
     def _predict_without_quantiles(
         self,
         data: TimeSeriesDataFrame,
@@ -304,8 +297,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
                 dynamic_dfs=dynamic_dfs,
             )
         predictions = raw_predictions.rename(columns={"unique_id": ITEMID, "ds": TIMESTAMP})
-        forecast_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
-        return predictions.set_index([ITEMID, TIMESTAMP]).reindex(forecast_index)
+        return predictions.set_index([ITEMID, TIMESTAMP]).reindex(data.item_ids, level=ITEMID)
 
     def predict(
         self,
@@ -317,7 +309,6 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         predictions = self._predict_without_quantiles(data, known_covariates)
         for q in self.quantile_levels:
             predictions[str(q)] = predictions["mean"]
-            # predictions[str(q)] = predictions["mean"] + self.quantile_adjustments[q]
         return self.transformer.inverse_transform_predictions(TimeSeriesDataFrame(predictions))
 
     def _more_tags(self) -> dict:
