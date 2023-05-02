@@ -864,7 +864,7 @@ class MultiModalMatcher:
 
         if not hpo_mode:
             if num_gpus <= 1:
-                strategy = None
+                strategy = "auto"
             else:
                 strategy = config.env.strategy
         else:
@@ -872,7 +872,7 @@ class MultiModalMatcher:
             if use_ray_lightning:
                 strategy = hpo_kwargs.get("_ray_lightning_plugin")
             else:
-                strategy = None
+                strategy = "auto"
                 num_gpus = min(num_gpus, 1)
 
         config.env.num_gpus = num_gpus
@@ -886,12 +886,12 @@ class MultiModalMatcher:
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
-                accelerator="gpu" if num_gpus > 0 else None,
+                accelerator="gpu" if num_gpus > 0 else "auto",
                 devices=get_available_devices(
                     num_gpus=num_gpus,
                     auto_select_gpus=config.env.auto_select_gpus,
                     use_ray_lightning=use_ray_lightning,
-                ),
+                ) or "auto",
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
