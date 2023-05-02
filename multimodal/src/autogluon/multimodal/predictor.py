@@ -1456,7 +1456,7 @@ class MultiModalPredictor(ExportMixin):
                     num_gpus=num_gpus,
                     auto_select_gpus=config.env.auto_select_gpus,
                     use_ray_lightning=use_ray_lightning,
-                ) or "auto",
+                ),
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
