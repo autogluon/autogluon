@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Optional, Type, Union
 import autogluon.common as ag
 import autogluon.timeseries as agts
 
+from autogluon.core import constants
+
 from . import (
     ARIMAModel,
     AutoARIMAModel,
@@ -223,7 +225,7 @@ def get_preset_models(
             model_hps_list = [model_hps_list]
 
         for model_hps in model_hps_list:
-            ag_args = model_hps.pop(ag.constants.AG_ARGS, {})
+            ag_args = model_hps.pop(constants.AG_ARGS, {})
             for key in ag_args:
                 if key not in VALID_AG_ARGS_KEYS:
                     raise ValueError(
