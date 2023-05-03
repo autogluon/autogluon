@@ -4,7 +4,7 @@ import re
 import time
 from typing import Any, Dict, List, Optional, Union
 
-import autogluon.core as ag
+import autogluon.common as ag
 from autogluon.common.loaders import load_pkl
 from autogluon.common.savers import save_pkl
 from autogluon.core.hpo.exceptions import EmptySearchSpace

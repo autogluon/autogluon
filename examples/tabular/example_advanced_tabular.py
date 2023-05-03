@@ -3,7 +3,7 @@
     To maximize predictive accuracy, we recommend you do NOT specify `hyperparameters` or `hyperparameter_tune_kwargs`, and instead specify `TabularPredictor(..., eval_metric=YOUR_METRIC).fit(..., presets='best_quality')`
 """
 
-import autogluon.core as ag
+import autogluon.common as ag
 from autogluon.tabular import TabularDataset, TabularPredictor
 
 

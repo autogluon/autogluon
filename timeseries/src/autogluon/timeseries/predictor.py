@@ -404,7 +404,7 @@ class TimeSeriesPredictor:
             hyperparameter optimization is performed. A search space should only be provided when
             ``hyperparameter_tune_kwargs`` is given (i.e., hyperparameter-tuning is utilized). For example::
 
-                import autogluon.core as ag
+                import autogluon.common as ag
 
                 predictor.fit(
                     ...

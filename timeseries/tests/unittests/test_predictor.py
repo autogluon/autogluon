@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import autogluon.core as ag
+import autogluon.common as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel

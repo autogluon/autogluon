@@ -1,9 +1,6 @@
-from time import sleep
-
 import pytest
 
-import autogluon.core as ag
-from autogluon.core import Real
+import autogluon.common as ag
 from autogluon.core.scheduler.seq_scheduler import LocalSequentialScheduler
 
 cls = LocalSequentialScheduler
@@ -49,7 +46,7 @@ def test_has_enough_time_for_trial__enough_time__avg_time_not_allows_trials_by_f
 
 
 def test_LocalSequentialScheduler_no_criteria():
-    search_space = {'lr': Real(1e-2, 1e-1, log=True)}
+    search_space = {'lr': ag.space.Real(1e-2, 1e-1, log=True)}
 
     def _train_fn_():
         pass

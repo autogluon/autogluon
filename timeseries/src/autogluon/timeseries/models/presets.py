@@ -3,7 +3,7 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Type, Union
 
-import autogluon.core as ag
+import autogluon.common as ag
 import autogluon.timeseries as agts
 
 from . import (
