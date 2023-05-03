@@ -53,7 +53,7 @@ function install_multimodal {
     mim install mmcv-full --timeout 60
     python3 -m pip install --upgrade "mmdet>=2.28, <3.0.0"
     python3 -m pip install --upgrade "mmocr<1.0"
-    python3 -m pip install --upgrade git+https://github.com/IDEA-Research/GroundingDINO.git
+    python3 -m pip install --upgrade git+https://github.com/FANGAreNotGnu/GroundingDINO.git
 }
 
 function install_all {
