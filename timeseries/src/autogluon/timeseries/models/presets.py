@@ -137,11 +137,11 @@ def get_default_hps(key):
             "Theta": {},
             "AutoGluonTabular": {},
             "DeepAR": {
-                "num_layers": ag.Int(1, 3, default=2),
-                "hidden_size": ag.Int(40, 80, default=40),
+                "num_layers": ag.space.Int(1, 3, default=2),
+                "hidden_size": ag.space.Int(40, 80, default=40),
             },
             "SimpleFeedForward": {
-                "hidden_dimensions": ag.Categorical([40], [40, 40], [120]),
+                "hidden_dimensions": ag.space.Categorical([40], [40, 40], [120]),
             },
             "TemporalFusionTransformer": {},
         },
