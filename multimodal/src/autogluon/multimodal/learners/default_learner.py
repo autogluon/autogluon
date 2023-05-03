@@ -24,6 +24,8 @@ from overrides import override
 from packaging import version
 from pytorch_lightning import LightningDataModule
 from pytorch_lightning.callbacks import Callback
+from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.plugins import CheckpointIO
 from pytorch_lightning.strategies import Strategy
 from timm.data.mixup import Mixup
 from torch import nn
@@ -193,22 +195,22 @@ class DefaultLearner(AbstractMMLearner):
     ):
         super().__init__()
 
-        self._label_column = label
-        self._problem_type = problem_type
+        self._label_column: Optional[str] = label
+        self._problem_type: Optional[str] = problem_type
         # self._presets = presets.lower() if presets else None  # NOTE: This will be handled by predictor.
-        self._eval_metric_name = eval_metric
-        self._validation_metric_name = None
-        self._output_shape = num_classes
+        self._eval_metric_name: Optional[str] = eval_metric
+        self._validation_metric_name: Optional[str] = None
+        self._output_shape: int = num_classes
         self._classes = classes  # TODO: To be refactored into detection learner only
 
-        self._ckpt_path = None
-        self._pretrained_path = None
-        self._config = None
-        self._df_preprocessor = None  # initialize it as None.
+        self._ckpt_path: Optional[str] = None
+        self._pretrained_path: Optional[str] = None
+        self._config: Optional[DictConfig] = None
+        self._df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None  # initialize it as None.
         self._column_types = column_types  # predictor will setup column_types, and set values here.
-        self._data_processors = None  # initialize it as None.
-        self._model_postprocess_fn = None
-        self._model = None
+        self._data_processors: Optional[List] = None  # initialize it as None.
+        self._model_postprocess_fn: Optional[Callable] = None
+        self._model: Optional[nn.Module] = None
         # self._resume = False  # This is for predictor to handle.
         self._verbosity = verbosity
         # self._warn_if_exist = warn_if_exist  # unused
@@ -292,17 +294,19 @@ class DefaultLearner(AbstractMMLearner):
             hpo_mode=hpo_mode,
             **hpo_kwargs,
         )
+        self._config = config
+        self._df_preprocessor = df_preprocessor
 
         # 4-5. if NER, update output shape. Otherwise create model. TODO: This can be refactored into the NER Learner
-        model = self._create_model(config=config, df_preprocessor=df_preprocessor)
+        self._model = self._create_model()
+        # self._model = model
 
         # 6. get trainable layer params for efficient finetuning only?
-        trainable_param_names = self._get_trainable_params(config=config, model=model)
+        trainable_param_names = self._get_trainable_params()
 
         # 7. get data_processors.
-        data_processors = self._get_data_processors(
-            config=config, advanced_hyperparameters=advanced_hyperparameters, model=model
-        )
+        self._data_processors = self._get_data_processors(advanced_hyperparameters=advanced_hyperparameters)
+        # self._data_processors = data_processors
 
         # 8. infer positive labels (NOTE: This is deleted in the latest main branch)
 
@@ -312,38 +316,39 @@ class DefaultLearner(AbstractMMLearner):
         )
 
         # 10. setup mix up if applicable
-        mixup_active, mixup_fn = self._setup_mixup(config=config)
+        mixup_active, mixup_fn = self._setup_mixup()
 
         # 11. get loss function, NOTE: This can be refactored into Learner class
         loss_func = get_loss_func(
             problem_type=self._problem_type,
             mixup_active=mixup_active,
-            loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
-            config=config.optimization,
+            loss_func_name=OmegaConf.select(self._config, "optimization.loss_function"),
+            config=self._config.optimization,
         )
 
         # 12. get post process function
-        model_postprocess_fn = get_model_postprocess_fn(
+        self._model_postprocess_fn = get_model_postprocess_fn(
             problem_type=self._problem_type,
             loss_func=loss_func,
         )
+        # self._model_postprocess_fn = model_postprocess_fn
 
         # 13. assign properties, and use self properties afterward whenever possible
-        self._config = config
-        self._df_preprocessor = df_preprocessor
-        self._data_processors = data_processors
-        self._model = model
-        self._model_postprocess_fn = model_postprocess_fn
+        # self._config = config
+        # self._df_preprocessor = df_preprocessor
+        # self._data_processors = data_processors
+        # self._model = model
+        # self._model_postprocess_fn = model_postprocess_fn
 
         # TODO: complete this later
         # 14. if times up. return final model
         if max_time == timedelta(seconds=0):
             self._top_k_average(
-                model=model,
+                model=self._model,
                 save_path=save_path,
                 minmax_mode=minmax_mode,
                 is_distill=False,
-                top_k_average_method=config.optimization.top_k_average_method,
+                top_k_average_method=self._config.optimization.top_k_average_method,
                 val_df=val_df,
                 validation_metric_name=validation_metric_name,
                 strict_loading=not trainable_param_names,
@@ -399,14 +404,11 @@ class DefaultLearner(AbstractMMLearner):
         train_dm = self._get_train_data_module(
             train_df=train_df,
             val_df=val_df,
-            config=config,
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
             val_use_training_mode=val_use_training_mode,
         )
 
         # 17. setup optim args
-        optimization_kwargs = self._get_optim_kwargs(config=config)
+        optimization_kwargs = self._get_optim_kwargs()
         # 18. setup metrics args
         metrics_kwargs = self._get_metrics_kwargs(
             validation_metric_name=validation_metric_name,
@@ -481,22 +483,17 @@ class DefaultLearner(AbstractMMLearner):
         #     )
 
         task = self._setup_task_lightning_module(
-            config=config,
-            model=model,
             trainable_param_names=trainable_param_names,
             mixup_fn=mixup_fn,
             loss_func=loss_func,
-            model_postprocess_fn=model_postprocess_fn,
             optimization_kwargs=optimization_kwargs,
             metrics_kwargs=metrics_kwargs,
         )
 
         # 20. Setup call backs
-        checkpoint_callback = self._create_checkpoint_callback(
-            minmax_mode=minmax_mode, save_path=save_path, config=config, task=task
-        )
+        checkpoint_callback = self._create_checkpoint_callback(minmax_mode=minmax_mode, save_path=save_path, task=task)
         early_stopping_callback = self._create_early_stop_callback(
-            validation_metric_name=validation_metric_name, minmax_mode=minmax_mode, config=config, task=task
+            validation_metric_name=validation_metric_name, minmax_mode=minmax_mode, task=task
         )
         lr_callback = self._create_lr_callback()
         model_summary = pl.callbacks.ModelSummary(max_depth=1)
@@ -528,7 +525,7 @@ class DefaultLearner(AbstractMMLearner):
 
         custom_checkpoint_plugin = AutoMMModelCheckpointIO(
             trainable_param_names=trainable_param_names,
-            model_name_to_id=model.name_to_id,
+            model_name_to_id=self._model.name_to_id,
         )
 
         tb_logger = pl.loggers.TensorBoardLogger(
@@ -594,37 +591,15 @@ class DefaultLearner(AbstractMMLearner):
         log_filter = LogFilter(blacklist_msgs)
         # 23. Declare pl.Trainer
         with apply_log_filter(log_filter):
-            trainer = pl.Trainer(
-                accelerator="gpu" if config.env.num_gpus > 0 else None,
-                devices=get_available_devices(
-                    num_gpus=config.env.num_gpus,
-                    auto_select_gpus=config.env.auto_select_gpus,
-                    use_ray_lightning=use_ray_lightning,
-                ),
-                num_nodes=config.env.num_nodes,
-                precision=config.env.precision,
-                strategy=strategy,
-                benchmark=False,
-                deterministic=config.env.deterministic,
-                max_epochs=config.optimization.max_epochs,
-                max_steps=config.optimization.max_steps,
-                max_time=max_time,
-                callbacks=callbacks,
-                logger=tb_logger,
-                gradient_clip_val=OmegaConf.select(config, "optimization.gradient_clip_val", default=1),
-                gradient_clip_algorithm=OmegaConf.select(
-                    config, "optimization.gradient_clip_algorithm", default="norm"
-                ),
-                accumulate_grad_batches=grad_steps,
-                log_every_n_steps=OmegaConf.select(config, "optimization.log_every_n_steps", default=10),
+            trainer = self._get_trainer(
                 enable_progress_bar=enable_progress_bar,
-                fast_dev_run=config.env.fast_dev_run,
-                track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
-                val_check_interval=config.optimization.val_check_interval,
-                check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
-                if hasattr(config.optimization, "check_val_every_n_epoch")
-                else 1,
-                plugins=[custom_checkpoint_plugin],
+                grad_steps=grad_steps,
+                strategy=strategy,
+                use_ray_lightning=use_ray_lightning,
+                callbacks=callbacks,
+                custom_checkpoint_plugin=custom_checkpoint_plugin,
+                tb_logger=tb_logger,
+                max_time=max_time,
             )
 
         # 24. pl.Trainer.fit()
@@ -648,7 +623,7 @@ class DefaultLearner(AbstractMMLearner):
             # We only averaging the checkpoint of the best trial in the end in the master process
             if not hpo_mode:
                 self._top_k_average(
-                    model=model,
+                    model=self._model,
                     save_path=save_path,
                     minmax_mode=minmax_mode,
                     is_distill=False,  # By default, we do not do distill. If distill, we will do it in the distill learner
@@ -664,6 +639,72 @@ class DefaultLearner(AbstractMMLearner):
             self._best_score = trainer.callback_metrics[f"val_{validation_metric_name}"].item()
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
+
+    def _get_trainer(
+        self,
+        enable_progress_bar: bool,
+        grad_steps: int,
+        strategy: Optional[Union[Strategy, str]],
+        use_ray_lightning: bool,
+        callbacks: Optional[List[Callback]],
+        custom_checkpoint_plugin: CheckpointIO,
+        tb_logger: TensorBoardLogger,
+        max_time: Optional[timedelta] = None,
+    ) -> pl.Trainer:
+        """Create the pytorch_lightning trainer for training
+
+        Parameters
+        ----------
+        enable_progress_bar (bool): enable progress bar to display in console
+        grad_steps (int): number of gradient steps to take
+        strategy (Optional[Union[Strategy, str]]): data parallel strategy
+        use_ray_lightning (bool): whether to use ray lightning plugin
+        callbacks (Optional[List[Callback]]): pytorch lightning callbacks during training loop
+        custom_checkpoint_plugin (CheckpointIO): custome pytorch lightning checkpoint plugin that customize the checkpoint saving
+        tb_logger (TensorBoardLogger): tensorboard logger
+        max_time (Optional[timedelta], optional): maximum trainig. Defaults to None.
+
+        Returns
+        -------
+        pl.Trainer: the pytorch lightning trainer object for training
+        """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _get_trainer()"
+        accelerator = "gpu" if self._config.env.num_gpus > 0 else None
+        available_devices = get_available_devices(
+            num_gpus=self._config.env.num_gpus,
+            auto_select_gpus=self._config.env.auto_select_gpus,
+            use_ray_lightning=use_ray_lightning,
+        )
+        trainer = pl.Trainer(
+            accelerator=accelerator,
+            devices=available_devices,
+            num_nodes=self._config.env.num_nodes,
+            precision=self._config.env.precision,
+            strategy=strategy,
+            benchmark=False,
+            deterministic=self._config.env.deterministic,
+            max_epochs=self._config.optimization.max_epochs,
+            max_steps=self._config.optimization.max_steps,
+            max_time=max_time,
+            callbacks=callbacks,
+            logger=tb_logger,
+            gradient_clip_val=OmegaConf.select(self._config, "optimization.gradient_clip_val", default=1),
+            gradient_clip_algorithm=OmegaConf.select(
+                self._config, "optimization.gradient_clip_algorithm", default="norm"
+            ),
+            accumulate_grad_batches=grad_steps,
+            log_every_n_steps=OmegaConf.select(self._config, "optimization.log_every_n_steps", default=10),
+            enable_progress_bar=enable_progress_bar,
+            fast_dev_run=self._config.env.fast_dev_run,
+            track_grad_norm=OmegaConf.select(self._config, "optimization.track_grad_norm", default=-1),
+            val_check_interval=self._config.optimization.val_check_interval,
+            check_val_every_n_epoch=OmegaConf.select(self._config, "optimization.check_val_every_n_epoch", default=1),
+            plugins=[custom_checkpoint_plugin],
+        )
+
+        return trainer
 
     @override
     def predict(
@@ -1155,7 +1196,7 @@ class DefaultLearner(AbstractMMLearner):
         return lr_callback
 
     def _create_early_stop_callback(
-        self, validation_metric_name: str, minmax_mode: str, config: DictConfig, task: pl.LightningModule
+        self, validation_metric_name: str, minmax_mode: str, task: pl.LightningModule
     ) -> Callback:
         """Creates the callback for early stopping during training
         By default, we use the pl EarlyStopping callback
@@ -1177,18 +1218,19 @@ class DefaultLearner(AbstractMMLearner):
         --------
         pl.callbacks.EarlyStopping: pytorch lightning early stopping callback
         """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _create_early_stop_callback()"
         early_stopping_callback = pl.callbacks.EarlyStopping(
             monitor=task.validation_metric_name,
-            patience=config.optimization.patience,
+            patience=self._config.optimization.patience,
             mode=minmax_mode,
             stopping_threshold=get_stopping_threshold(validation_metric_name),
         )
 
         return early_stopping_callback
 
-    def _create_checkpoint_callback(
-        self, minmax_mode: str, save_path: str, config: DictConfig, task: pl.LightningModule
-    ) -> Callback:
+    def _create_checkpoint_callback(self, minmax_mode: str, save_path: str, task: pl.LightningModule) -> Callback:
         """Creates the pl checkpoint callback during training
         By default, we use the AutoMMModelCheckpoint, which is a customized checkpoint callback
         This can be overriden by child learners to use other checkpoint callbacks
@@ -1202,16 +1244,19 @@ class DefaultLearner(AbstractMMLearner):
             - max
                 It means that larger metric is better.
         save_path (str): model save path
-        config (DictConfig): OmegaConfig holding the configuration for training
+        self._config (DictConfig): OmegaConfig holding the configuration for training
         task (pl.LightningModule): pytorch lightning module for training
 
         Returns
         --------
         pl.callbacks.ModelCheckpoint: The pytorch lightning checkpoint callback
         """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _create_checkpoint_callback()"
         checkpoint_callback = AutoMMModelCheckpoint(
             dirpath=save_path,
-            save_top_k=config.optimization.top_k,
+            save_top_k=self._config.optimization.top_k,
             verbose=True,
             monitor=task.validation_metric_name,
             mode=minmax_mode,
@@ -1222,12 +1267,9 @@ class DefaultLearner(AbstractMMLearner):
 
     def _setup_task_lightning_module(
         self,
-        config: DictConfig,
-        model: nn.Module,
         trainable_param_names: List[str],
         mixup_fn: Optional[Mixup],
         loss_func: Optional[nn.Module],
-        model_postprocess_fn: Optional[Callable],
         optimization_kwargs: dict,
         metrics_kwargs: dict,
     ) -> pl.LightningModule:
@@ -1239,12 +1281,12 @@ class DefaultLearner(AbstractMMLearner):
 
         Parameters
         -----------
-        config (DictConfig): OmegaConfig dict with all the configs for training
-        model (nn.Module): pytorch nn.Module to train
+        self._config (DictConfig): OmegaConfig dict with all the configs for training
+        self._model (nn.Module): pytorch nn.Module to train
         trainable_param_names (List[str]): the list of trainable parameter names
         mixup_fn (Optional[Mixup]): model mixup function that applies different params to each element or whole batch
         loss_func (Optional[nn.Module]): pytorch nn.Module loss function
-        model_postprocess_fn (Optional[Callable]): postprocess function to apply to the model output (i.e. sigmoid after nn.BCEWithLogitsLoss)
+        self._model_postprocess_fn (Optional[Callable]): postprocess function to apply to the model output (i.e. sigmoid after nn.BCEWithLogitsLoss)
         optimization_kwargs (dict): parameters for optimization
         metrics_kwargs (dict): parameters for metrics
 
@@ -1252,15 +1294,24 @@ class DefaultLearner(AbstractMMLearner):
         --------
         pl.LightningModule: pytorch lightning module for training task
         """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _setup_task_lightning_module()"
+        assert (
+            self._model is not None
+        ), "self._model is None. You must setup self._model before calling _setup_task_lightning_module()"
+        assert (
+            self._model_postprocess_fn is not None
+        ), "self._model_postprocess_fn is None. You must setup self._model_postprocess_fn before calling _setup_task_lightning_module()"
         task = LitModule(
-            model=model,
+            model=self._model,
             loss_func=loss_func,
-            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+            efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
             mixup_fn=mixup_fn,
-            mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-            model_postprocess_fn=model_postprocess_fn,
+            mixup_off_epoch=OmegaConf.select(self._config, "data.mixup.turn_off_epoch"),
+            model_postprocess_fn=self._model_postprocess_fn,
             trainable_param_names=trainable_param_names,
-            skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
+            skip_final_val=OmegaConf.select(self._config, "optimization.skip_final_val", default=False),
             **metrics_kwargs,
             **optimization_kwargs,
         )
@@ -1290,27 +1341,30 @@ class DefaultLearner(AbstractMMLearner):
 
         return metrics_kwargs
 
-    def _get_optim_kwargs(self, config: DictConfig) -> dict:
+    def _get_optim_kwargs(self) -> dict:
         """get the optimization kwargs for the training task
 
         Parameters
         ----------
-        config (DictConfig): OmegaConf holding the config for training
+        self._config (DictConfig): OmegaConf holding the config for training
 
         Returns
         -------
         dict: dictionary containing the optimization parameters
         """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _get_optim_kwargs()"
         optimization_kwargs = dict(
-            optim_type=config.optimization.optim_type,
-            lr_choice=config.optimization.lr_choice,
-            lr_schedule=config.optimization.lr_schedule,
-            lr=config.optimization.learning_rate,
-            lr_decay=config.optimization.lr_decay,
-            end_lr=config.optimization.end_lr,
-            lr_mult=config.optimization.lr_mult,
-            weight_decay=config.optimization.weight_decay,
-            warmup_steps=config.optimization.warmup_steps,
+            optim_type=self._config.optimization.optim_type,
+            lr_choice=self._config.optimization.lr_choice,
+            lr_schedule=self._config.optimization.lr_schedule,
+            lr=self._config.optimization.learning_rate,
+            lr_decay=self._config.optimization.lr_decay,
+            end_lr=self._config.optimization.end_lr,
+            lr_mult=self._config.optimization.lr_mult,
+            weight_decay=self._config.optimization.weight_decay,
+            warmup_steps=self._config.optimization.warmup_steps,
         )
 
         return optimization_kwargs
@@ -1319,9 +1373,6 @@ class DefaultLearner(AbstractMMLearner):
         self,
         train_df: pd.DataFrame,
         val_df: pd.DataFrame,
-        config: DictConfig,
-        df_preprocessor: MultiModalFeaturePreprocessor,
-        data_processors: List,
         val_use_training_mode: bool,
     ) -> LightningDataModule:
         """get the data module for training
@@ -1332,20 +1383,29 @@ class DefaultLearner(AbstractMMLearner):
         ----------
         train_df (pd.DataFrame): training data as in pandas data frame
         val_df (pd.DataFrame): validation data as in pandas data frame
-        config (DictConfig): OmegaConfig instance holding training configurations
-        df_preprocessor (MultiModalFeaturePreprocessor): data frame preprocessor to read and preprocess pandas data frames
-        data_processors (List): data processors to read trainig data
+        self._config (DictConfig): OmegaConfig instance holding training configurations
+        self._df_preprocessor (MultiModalFeaturePreprocessor): data frame preprocessor to read and preprocess pandas data frames
+        sefl._data_processors (List): data processors to read trainig data
         val_use_training_mode (bool): whether to use training mode for validation data
 
         Returns
         -------
         LightningDataModule: pytorch lightning data module used for loading data during training
         """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _get_train_data_module()"
+        assert (
+            self._df_preprocessor is not None
+        ), "self._df_preprocessor is None. You must setup self._df_preprocessor before calling _get_train_data_module()"
+        assert (
+            self._data_processors is not None
+        ), "self._data_processors is None. You must setup self._data_processors before calling _get_train_data_module()"
         train_dm = BaseDataModule(
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-            per_gpu_batch_size=config.env.per_gpu_batch_size,
-            num_workers=config.env.num_workers,
+            df_preprocessor=self._df_preprocessor,
+            data_processors=self._data_processors,
+            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+            num_workers=self._config.env.num_workers,
             train_data=train_df,
             validate_data=val_df,
             val_use_training_mode=val_use_training_mode,
@@ -1353,23 +1413,26 @@ class DefaultLearner(AbstractMMLearner):
 
         return train_dm
 
-    def _setup_mixup(self, config: DictConfig) -> Tuple[bool, Optional[Mixup]]:
+    def _setup_mixup(self) -> Tuple[bool, Optional[Mixup]]:
         """Setup mixup for training
 
         Parameters
         ----------
-        config (DictConfig): OmegaConfig instance holding model configurations
+        self._config (DictConfig): OmegaConfig instance holding model configurations
 
         Returns
         -------
         Tuple[bool, Optional[Mixup]]: tuple of mixup_active and mixup_fn (Mixup if mixup is active, None otherwise)
         """
+        assert (
+            self._config is not None
+        ), "self._config must be set before calling _setup_mixup(). Are you calling _setup_mixup() directly? Use .fit() instead."
         mixup_active, mixup_fn = get_mixup(
-            model_config=OmegaConf.select(config, "model"),
-            mixup_config=OmegaConf.select(config, "data.mixup"),
+            model_config=OmegaConf.select(self._config, "model"),
+            mixup_config=OmegaConf.select(self._config, "data.mixup"),
             num_classes=self._output_shape,
         )
-        if mixup_active and (config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1):
+        if mixup_active and (self._config.env.per_gpu_batch_size == 1 or self._config.env.per_gpu_batch_size % 2 == 1):
             warnings.warn(
                 "The mixup is done on the batch."
                 "The per_gpu_batch_size should be >1 and even for reasonable operation",
@@ -1400,9 +1463,7 @@ class DefaultLearner(AbstractMMLearner):
             validation_metric, custom_metric_func = (None, None)
         return validation_metric, custom_metric_func
 
-    def _get_data_processors(
-        self, config: DictConfig, advanced_hyperparameters: Optional[Dict], model: nn.Module
-    ) -> List[object]:
+    def _get_data_processors(self, advanced_hyperparameters: Optional[Dict]) -> List[object]:
         """Create data processors for training. Reuse the existing data processors if exists
 
         Parameters
@@ -1412,67 +1473,84 @@ class DefaultLearner(AbstractMMLearner):
         model (nn.Module): torch model (a.k.a. nn.Module)
 
         Returns
-        TODO: !!! Hot issue - data processors do not inherit from a common base class!!!!!!
+        TODO: !!! Hot - data processors do not inherit from a common base class!!!!!!
         List[object]: list of required data processors.
         """
+        assert (
+            self._config is not None
+        ), "self._config must be set before calling _get_data_processors. Are you calling _get_data_processors directly? Use .fit() instead"
+        assert (
+            self._model is not None
+        ), "self._model must be set before calling _get_data_processors. Are you calling _get_data_processors directly? Use .fit() instead"
         if self._data_processors is None:
             data_processors = create_fusion_data_processors(
-                config=config,
-                model=model,
+                config=self._config,
+                model=self._model,
                 advanced_hyperparameters=advanced_hyperparameters,
             )
         else:  # continuing training
             data_processors = self._data_processors
         return data_processors
 
-    def _get_trainable_params(self, config: DictConfig, model: nn.Module) -> List[str]:
+    def _get_trainable_params(self) -> List[str]:
         """Get trainable parameters for efficient finetuning
 
         Parameters
         -----------
-        config (DictConfig): OmegaConfig instance holding model configurations
-        model (nn.Module): the torch model (a.k.a. nn.Module)
+        self._config (DictConfig): OmegaConfig instance holding model configurations
+        self._model (nn.Module): the torch model (a.k.a. nn.Module)
 
         Returns
         --------
         List[str]: list of trainable parameter names
         """
-        norm_param_names = get_norm_layer_param_names(model)
+        assert (
+            self._config is not None
+        ), "self._config must be set before calling _get_trainable_params. Are you calling _get_trainable_params directly? Use .fit() instead"
+
+        assert (
+            self._model is not None
+        ), "self._model must be set before calling _get_trainable_params. Are you calling _get_trainable_params directly? Use .fit() instead"
+        norm_param_names = get_norm_layer_param_names(self._model)
 
         trainable_param_names = get_trainable_params_efficient_finetune(
             norm_param_names,
-            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+            efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
         )
 
         return trainable_param_names
 
-    def _create_model(self, config: DictConfig, df_preprocessor: MultiModalFeaturePreprocessor) -> nn.Module:
+    def _create_model(self) -> nn.Module:
         """Creates the model for training based on the config and info in df_preprocessor
         By default we use the create_fusion_model function to create the model
         This can be overriden by a child learner to create custom models
 
         Parameters
         -----------
-        config (DictConfig): OmegaConfig instance holding model configurations
-        df_preprocessor (MultiModalFeaturePreprocessor): data frame preprocessor
+        self._config (DictConfig): OmegaConfig instance holding model configurations
+        self._df_preprocessor (MultiModalFeaturePreprocessor): data frame preprocessor
 
         Returns
         --------
         nn.Module: the torch model (a.k.a. nn.Module) to be trained
         """
+
+        assert (
+            self._config is not None and self._df_preprocessor is not None
+        ), "Config and df_preprocessor must be set before calling _create_model(). Are you calling _create_model() directly? Use .fit() instead."
         ##  this is to be moved into NER learners
         if self._problem_type == NER:
-            self._output_shape = len(df_preprocessor.label_generator.unique_entity_groups)
+            self._output_shape = len(self._df_preprocessor.label_generator.unique_entity_groups)
 
         # 5. setup model.
         # create a new model if calling ._fit() for the first time. otherwise re-use the existing self._model
         if self._model is None:
             model = create_fusion_model(
-                config=config,
+                config=self._config,
                 num_classes=self._output_shape,
                 classes=self._classes,
-                num_numerical_columns=len(df_preprocessor.numerical_feature_names),
-                num_categories=df_preprocessor.categorical_num_categories,
+                num_numerical_columns=len(self._df_preprocessor.numerical_feature_names),
+                num_categories=self._df_preprocessor.categorical_num_categories,
             )
         else:  # continuing training
             model = self._model
