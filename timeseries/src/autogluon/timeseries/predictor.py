@@ -102,8 +102,6 @@ class TimeSeriesPredictor:
         If ``path`` and ``eval_metric`` are re-specified within ``learner_kwargs``, these are ignored.
     label : str, optional
         Alias for :attr:`target`.
-    quantiles : List[float], optional
-        Alias for :attr:`quantile_levels`.
     """
 
     predictor_file_name = "predictor.pkl"
@@ -149,16 +147,19 @@ class TimeSeriesPredictor:
         self.prediction_length = prediction_length
         self.eval_metric = eval_metric
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
-        if quantile_levels is not None and quantiles is not None:
-            raise ValueError(
-                "Both `quantile_levels` and `quantiles` are specified. Please specify at most one of these arguments."
-            )
-        self.quantile_levels = quantile_levels or quantiles or [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        if quantile_levels is None:
+            quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        self.quantile_levels = quantile_levels
 
         if validation_splitter is not None:
             warnings.warn(
-                "validation_splitter argument has been deprecated as of v0.8.0. "
-                "Please user the `num_val_windows` argument of `TimeSeriesPredictor.fit` instead."
+                "`validation_splitter` argument has been deprecated as of v0.8.0. "
+                "Please use the `num_val_windows` argument of `TimeSeriesPredictor.fit` instead."
+            )
+        if quantiles is not None:
+            warnings.warn(
+                "`quantiles` argument has been deprecated as of v0.8.0. "
+                "Please use the `quantile_levels` argument instead."
             )
 
         if learner_kwargs is None:
