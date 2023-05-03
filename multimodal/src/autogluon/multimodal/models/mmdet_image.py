@@ -128,7 +128,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
     def _load_checkpoint(self, checkpoint_file):
         # build model and load pretrained weights
-        assert mmdet is not None, 'Please install MMDetection by: pip install "mmdet>=2.28, <3.0.0".'
+        assert mmdet is not None, 'Please install MMDetection by: pip install "mmdet>=3.0.0".'
         from mmdet.utils import register_all_modules
 
         register_all_modules()  # https://github.com/open-mmlab/mmdetection/issues/9719

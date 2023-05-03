@@ -258,15 +258,13 @@ def check_if_packages_installed(problem_type: str):
                 warnings.simplefilter("ignore")
                 import mmcv
         except ImportError as e:
-            raise ValueError(
-                f"Encountered error while importing mmcv: {e}. Try to install mmcv: mim install mmcv-full."
-            )
+            raise ValueError(f"Encountered error while importing mmcv: {e}. Try to install mmcv: mim install mmcv.")
 
         try:
             import mmdet
         except ImportError as e:
             raise ValueError(
-                f'Encountered error while importing mmdet: {e}. Try to install mmdet: pip install "mmdet>=2.28, <3.0.0".'
+                f'Encountered error while importing mmdet: {e}. Try to install mmdet: pip install "mmdet>=3.0.0".'
             )
 
         if OCR in problem_type:

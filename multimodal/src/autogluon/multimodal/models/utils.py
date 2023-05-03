@@ -642,7 +642,7 @@ def get_mmocr_config_and_model(checkpoint_name: str):
     checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
 
     # read config files
-    assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+    assert mmcv is not None, "Please install mmcv by: mim install mmcv."
     config_file = checkpoint_name + ".py"
     if isinstance(config_file, str):
         config = mmcv.Config.fromfile(config_file)

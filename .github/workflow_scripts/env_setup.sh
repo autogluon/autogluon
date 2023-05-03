@@ -50,8 +50,8 @@ function install_multimodal {
     # launch different process for each test to make sure memory is released
     python3 -m pip install --upgrade pytest-xdist
     install_local_packages "multimodal/$1"
-    mim install mmcv-full --timeout 60
-    python3 -m pip install --upgrade "mmdet>=2.28, <3.0.0"
+    mim install mmcv --timeout 60
+    python3 -m pip install --upgrade "mmdet>=3.0.0"
     python3 -m pip install --upgrade "mmocr<1.0"
 }
 
