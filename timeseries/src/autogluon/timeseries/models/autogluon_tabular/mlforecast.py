@@ -11,8 +11,6 @@ import autogluon.core as ag
 from autogluon.tabular import TabularPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.transformations import AbstractTransformer, Detrender, PipelineTransformer, StdScaler
-from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.seasonality import get_seasonality
 from autogluon.timeseries.utils.warning_filters import statsmodels_warning_filter
 
@@ -45,7 +43,7 @@ class TabularEstimator(BaseEstimator):
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         assert isinstance(X, pd.DataFrame)
-        return self.predictor.predict(X)
+        return self.predictor.predict(X).values
 
 
 class RecursiveTabularModel(AbstractTimeSeriesModel):
@@ -71,13 +69,14 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
     scale : bool, default = True
         If True, time series values will be divided by the standard deviation.
     tabular_hyperparameters : Dict[Dict[str, Any]], optional
-        Hyperparameters dictionary passed to `TabularPredictor.fit`. Contains the names of models that should be fit.
+        Hyperparameters dictionary passed to ``TabularPredictor.fit``. Contains the names of models that should be fit.
         Defaults to ``{"GBM": {}}``.
+    tabular_fit_kwargs : Dict[str, Any], optional
+        Additional keyword arguments passed to ``TabularPredictor.fit``. Defaults to an empty dict.
 
     """
 
     # TODO: Find good tabular presets
-    # TODO: Add transforms - std scaling / detrending
     # TODO: Use sample_weight to align metrics with Tabular
     # TODO: Add lag_transforms
 
@@ -117,17 +116,8 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         from mlforecast import MLForecast
 
         self.mlf: Optional[MLForecast] = None
-        self.transformer: Optional[PipelineTransformer] = None
+        self.required_ts_length: int = 1
         self.quantile_adjustments: Dict[str, float] = {}
-
-    def _setup_transformer(self, model_params: dict) -> None:
-        transformations = []
-        # # Avoid copying data multiple times
-        # if model_params.get("detrend", True):
-        #     transformations.append(Detrender(target=self.target, copy=False))
-        # if model_params.get("scale", True):
-        #     transformations.append(StdScaler(target=self.target, copy=False))
-        self.transformer = PipelineTransformer(transformations, target=self.target, copy=True)
 
     @staticmethod
     def _get_date_features(freq: str) -> List[Callable]:
@@ -153,16 +143,21 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         if differences is None:
             differences = [get_seasonality(self.freq)]
 
-        target_transforms = []
-        longest_ts_length = train_data.num_timesteps_per_item().max()
-        if longest_ts_length <= sum(differences):
+        ts_lengths = train_data.num_timesteps_per_item()
+        required_ts_length = sum(differences) + 1
+        all_train_ts_are_long_enough = ts_lengths.min() >= required_ts_length
+        some_ts_available_for_validation = ts_lengths.max() >= required_ts_length + self.prediction_length
+        if not (all_train_ts_are_long_enough and some_ts_available_for_validation):
             logger.warning(
-                f"Chosen differences {differences} require that time series have length "
-                f">= sum(differences) (at least {sum(differences)}), "
-                f"but longest time series length = {longest_ts_length}. Disabling differencing."
+                f"Time series in the dataset are too short for chosen differences {differences}. "
+                f"Setting differences to [1]."
             )
-        else:
+            differences = [1]
+
+        target_transforms = []
+        if len(differences) > 0:
             target_transforms.append(Differences(differences))
+        self.required_ts_length = sum(differences) + 1
 
         if model_params.get("scale", True):
             target_transforms.append(StandardScaler())
@@ -215,6 +210,9 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             If False, the method will return a single dataframe containing both features and target. If True, the
             method will return the feature matrix and the regression target as a tuple (X, y).
         """
+        item_ids_to_exclude = data.item_ids[data.num_timesteps_per_item() < self.required_ts_length]
+        if len(item_ids_to_exclude) > 0:
+            data = data.drop(item_ids_to_exclude, level=0)
         df = self._to_mlforecast_df(data, data.static_features)
         # FIXME: keep_last_n produces a bug if time series too short -> manually select tail of each series
         features = self.mlf.preprocess(
@@ -241,19 +239,14 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         self._check_fit_params()
         from mlforecast import MLForecast
 
-        # Do not use external val_data as tuning_data to avoid overfitting
-        train_data, val_data = train_data.train_test_split(self.prediction_length)
-        model_params = self._get_model_params().copy()
-        self._setup_transformer(model_params)
-        train_data = self.transformer.fit_transform(train_data)
-        val_data = self.transformer.fit_transform(val_data)
-
         # TabularEstimator is passed to MLForecast later to include tuning_data
+        model_params = self._get_model_params().copy()
         mlforecast_init_args = self._get_mlforecast_init_args(train_data, model_params)
         self.mlf = MLForecast(models={}, freq=self.freq, **mlforecast_init_args)
 
-        tuning_data = self._get_features_dataframe(val_data, last_k_values=self.prediction_length)
-        tabular_hyperparameters = model_params.get("tabular_hyperparameters", self.default_tabular_hyperparameters)
+        # Do not use external val_data as tuning_data to avoid overfitting
+        train_subset, val_subset = train_data.train_test_split(self.prediction_length)
+
         estimator = TabularEstimator(
             predictor_init_kwargs={
                 "path": self.path,
@@ -263,13 +256,14 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             },
             predictor_fit_kwargs={
                 "time_limit": time_limit,
-                "hyperparameters": tabular_hyperparameters,
-                "tuning_data": tuning_data,
+                "hyperparameters": model_params.get("tabular_hyperparameters", self.default_tabular_hyperparameters),
+                "tuning_data": self._get_features_dataframe(val_subset, last_k_values=self.prediction_length),
+                **model_params.get("tabular_fit_kwargs", {}),
             },
         )
         self.mlf.models = {"mean": estimator}
 
-        X_train, y_train = self._get_features_dataframe(train_data, return_X_y=True)
+        X_train, y_train = self._get_features_dataframe(train_subset, return_X_y=True)
         with statsmodels_warning_filter():
             self.mlf.fit_models(X_train, y_train)
 
@@ -305,11 +299,13 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         known_covariates: TimeSeriesDataFrame = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        data = self.transformer.fit_transform(data)
+        if (data.num_timesteps_per_item() < self.required_ts_length).any():
+            # Raise a RuntimeError to avoid a numba segfault that kills the Python process
+            raise RuntimeError(f"{self.name} requires that all time series have length >= {self.required_ts_length}")
         predictions = self._predict_without_quantiles(data, known_covariates)
         for q in self.quantile_levels:
             predictions[str(q)] = predictions["mean"]
-        return self.transformer.inverse_transform_predictions(TimeSeriesDataFrame(predictions))
+        return TimeSeriesDataFrame(predictions)
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}

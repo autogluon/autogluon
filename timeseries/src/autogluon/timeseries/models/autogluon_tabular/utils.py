@@ -4,7 +4,7 @@ from mlforecast.target_transforms import BaseTargetTransform
 
 
 class StandardScaler(BaseTargetTransform):
-    """Standardizes the series by subtracting their mean and dividing by their standard deviation."""
+    """Standardizes the series by dividing by their standard deviation."""
 
     def fit_transform(self, df: pd.DataFrame) -> pd.DataFrame:
         self.std_ = df.groupby(self.id_col)[self.target_col].std().rename("std").clip(lower=1e-2).to_frame()
