@@ -487,7 +487,7 @@ def predict(
 
     if num_gpus <= 1:
         # Force set strategy to be None if it's cpu-only or we have only one GPU.
-        strategy = None
+        strategy = "auto"
 
     precision = infer_precision(num_gpus=num_gpus, precision=predictor._config.env.precision, cpu_only_warning=False)
 
