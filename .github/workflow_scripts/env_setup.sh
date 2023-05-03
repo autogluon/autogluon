@@ -52,7 +52,7 @@ function install_multimodal {
     install_local_packages "multimodal/$1"
     mim install mmcv --timeout 60
     python3 -m pip install --upgrade "mmdet>=3.0.0"
-    python3 -m pip install --upgrade "mmocr<1.0"
+    # python3 -m pip install --upgrade "mmocr<1.0"  # not compatible with mmcv 2.0
 }
 
 function install_all {
