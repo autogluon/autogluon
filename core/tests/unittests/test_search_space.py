@@ -1,13 +1,14 @@
-from autogluon.core.space import Real, Int, Categorical
+import autogluon.common as ag
+ 
 from autogluon.core.scheduler import LocalSequentialScheduler
 
 
 def test_search_space():
     search_space = dict(
-        a=Real(1e-3, 1e-2, log=True),
-        b=Real(1e-3, 1e-2),
-        c=Int(1, 10),
-        d=Categorical('a', 'b', 'c', 'd'),
+        a=ag.space.Real(1e-3, 1e-2, log=True),
+        b=ag.space.Real(1e-3, 1e-2),
+        c=ag.space.Int(1, 10),
+        d=ag.space.Categorical('a', 'b', 'c', 'd'),
     )
 
     def train_fn(args, reporter):
@@ -27,7 +28,7 @@ def test_search_space():
 
 
 def test_search_space_dot_key():
-    search_space = {'model.name': Categorical('mxnet', 'pytorch')}
+    search_space = {'model.name': ag.space.Categorical('mxnet', 'pytorch')}
 
     def train_fn(args, reporter):
         assert args['model.name'] == 'mxnet' or args['model.name'] == 'pytorch'

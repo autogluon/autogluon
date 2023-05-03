@@ -1,14 +1,15 @@
-from autogluon.core.space import Categorical, Int, Real
+import autogluon.common as ag
+
 from autogluon.core.searcher import LocalRandomSearcher
 
 
 def test_local_random_searcher():
     search_space = dict(
-        a=Real(0, 1, default=0.2),
-        b=Real(0.05, 1, default=0.4, log=True),
-        c=Int(5, 15),
-        d=Int(7, 23, default=16),
-        e=Categorical('a', 7, ['hello', 2]),
+        a=ag.space.Real(0, 1, default=0.2),
+        b=ag.space.Real(0.05, 1, default=0.4, log=True),
+        c=ag.space.Int(5, 15),
+        d=ag.space.Int(7, 23, default=16),
+        e=ag.space.Categorical('a', 7, ['hello', 2]),
     )
 
     searcher = LocalRandomSearcher(search_space=search_space)

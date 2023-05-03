@@ -13,7 +13,7 @@ class DeprecatedSpacesWrapper:
     def __getattr__(self, attr: str) -> Any:
         import autogluon.common as ag
 
-        if attr in ["Space", "Categorical", "Real", "Int", "Bool"]:
+        if attr in ["Space", "Categorical", "Real", "Int", "Bool", "SimpleSpace", "DiscreteSpace"]:
             warnings.warn(
                 "Search spaces have been moved to `autogluon.common.space` as of v0.8 and won't be supported"
                 "in the next release. Please use `autogluon.common.space` instead."

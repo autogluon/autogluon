@@ -1,7 +1,7 @@
+import autogluon.common as ag
+
 from abc import ABC, abstractmethod
 from ray import tune
-
-from .. import Categorical, Real, Int, Bool
 
 
 class RaySpaceConverter(ABC):
@@ -23,11 +23,11 @@ class RayCategoricalSpaceConverter(RaySpaceConverter):
     
     @property
     def space_type(self):
-        return Categorical.__name__
+        return ag.space.Categorical.__name__
     
     @staticmethod
     def convert(space):
-        assert isinstance(space, Categorical)
+        assert isinstance(space, ag.space.Categorical)
         return tune.choice(space.data)
     
 
@@ -35,11 +35,11 @@ class RayRealSpaceConverter(RaySpaceConverter):
     
     @property
     def space_type(self):
-        return Real.__name__
+        return ag.space.Real.__name__
     
     @staticmethod
     def convert(space):
-        assert isinstance(space, Real)
+        assert isinstance(space, ag.space.Real)
         if space.log:
             ray_space = tune.loguniform(space.lower, space.upper)
         else:
@@ -51,11 +51,11 @@ class RayIntSpaceConverter(RaySpaceConverter):
     
     @property
     def space_type(self):
-        return Int.__name__
+        return ag.space.Int.__name__
     
     @staticmethod
     def convert(space):
-        assert isinstance(space, Int)
+        assert isinstance(space, ag.space.Int)
         return tune.randint(space.lower, space.upper+1)
     
 
@@ -63,7 +63,7 @@ class RayBoolSpaceConverter(RayIntSpaceConverter):
     
     @property
     def space_type(self):
-        return Bool.__name__
+        return ag.space.Bool.__name__
 
 
 class RaySpaceConverterFactory:
