@@ -166,8 +166,6 @@ else:
         Args:
             class_metrics:
                 Option to enable per-class metrics for mAP and mAR_100. Has a performance impact. default: False
-            compute_on_step:
-                Forward only calls ``update()`` and return ``None`` if this is set to ``False``.
             dist_sync_on_step:
                 Synchronize metric state across processes at each ``forward()``
                 before returning the value at the step
@@ -190,7 +188,6 @@ else:
         def __init__(
             self,
             class_metrics: bool = False,
-            compute_on_step: bool = True,
             dist_sync_on_step: bool = False,
             process_group: Optional[Any] = None,
             dist_sync_fn: Callable = None,
@@ -198,7 +195,6 @@ else:
             iou_type: str = None,
         ) -> None:  # type: ignore
             super().__init__(
-                compute_on_step=compute_on_step,
                 dist_sync_on_step=dist_sync_on_step,
                 process_group=process_group,
                 dist_sync_fn=dist_sync_fn,
