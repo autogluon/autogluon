@@ -1,5 +1,6 @@
 """ Default hyperparameter search spaces used in XGBoost Boosting model """
-from autogluon.core import Real, Int
+import autogluon.common as ag
+
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
 DEFAULT_NUM_BOOST_ROUND = 10000  # default for HPO
@@ -21,10 +22,10 @@ def get_base_searchspace():
         'n_estimators': DEFAULT_NUM_BOOST_ROUND,
         'booster': 'gbtree',
         'n_jobs': -1,
-        'learning_rate': Real(lower=5e-3, upper=0.2, default=0.1, log=True),
-        'max_depth': Int(lower=3, upper=10, default=6),
-        'min_child_weight': Int(lower=1, upper=5, default=1),
-        'colsample_bytree': Real(lower=0.5, upper=1.0, default=1.0),
+        'learning_rate': ag.space.Real(lower=5e-3, upper=0.2, default=0.1, log=True),
+        'max_depth': ag.space.Int(lower=3, upper=10, default=6),
+        'min_child_weight': ag.space.Int(lower=1, upper=5, default=1),
+        'colsample_bytree': ag.space.Real(lower=0.5, upper=1.0, default=1.0),
         # Below lines are commented out as they made search worse. Refine ranges before considering reintroducing these hyperparameters.
         # 'gamma': Real(lower=0, upper=5, default=0),
         # 'subsample': Real(lower=0.5, upper=1.0, default=1.0),
