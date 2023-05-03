@@ -50,13 +50,10 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         """Get GluonTS specific constructor arguments for estimator objects, an alias to
         `self._get_model_params` for better readability."""
-        init_kwargs = self._get_model_params()
-
-        # GluonTS does not handle context_length=1 well, and sets the context to only prediction_length
-        # we set it to a minimum of 10 here.
-        init_kwargs["context_length"] = max(10, init_kwargs.get("context_length", self.prediction_length))
+        init_kwargs = super()._get_estimator_init_args()
+        # Map MXNet kwarg names to PyTorch Lightning kwarg names
         init_kwargs.setdefault("lr", init_kwargs.get("learning_rate", 1e-3))
-
+        init_kwargs.setdefault("max_epochs", init_kwargs.get("epochs"))
         return init_kwargs
 
     def _get_estimator(self) -> GluonTSPyTorchLightningEstimator:
@@ -70,7 +67,7 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
         init_args = self._get_estimator_init_args()
 
         trainer_kwargs = {}
-        epochs = init_args.get("max_epochs", init_args.get("epochs"))
+        epochs = init_args.get("max_epochs")
         callbacks = init_args.get("callbacks", [])
 
         # TODO: Provide trainer_kwargs outside the function (e.g., to specify # of GPUs)?
@@ -298,7 +295,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSPyTorchModel):
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
-        init_kwargs.setdefault("context_length", max(64, self.prediction_length))
+        init_kwargs["context_length"] = max(64, init_kwargs["context_length"])
         if self.num_feat_dynamic_real > 0:
             init_kwargs["dynamic_dims"] = [self.num_feat_dynamic_real]
         if self.num_past_feat_dynamic_real > 0:
