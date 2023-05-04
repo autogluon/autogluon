@@ -807,8 +807,7 @@ def cocoeval_torchmetrics(outputs: List):
     """
 
     import torch
-
-    from . import MeanAveragePrecision
+    from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
     map_metric = MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False)
 
