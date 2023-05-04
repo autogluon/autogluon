@@ -239,13 +239,13 @@ class LitModule(pl.LightningModule):
 
     def on_validation_start(self) -> None:
         if self.skip_final_val and self.trainer.should_stop:
-            self.trainer.val_dataloaders = []  # skip the final validation by setting val_dataloaders empty
             self.log(
                 self.validation_metric_name,
                 self.validation_metric,
                 on_step=False,
                 on_epoch=True,
             )
+            return None
         return super().on_validation_start()
 
     def validation_step(self, batch, batch_idx):
