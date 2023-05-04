@@ -73,6 +73,8 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         Defaults to ``{"GBM": {}}``.
     tabular_fit_kwargs : Dict[str, Any], optional
         Additional keyword arguments passed to ``TabularPredictor.fit``. Defaults to an empty dict.
+    max_num_samples : int, default = 5_000_000
+        If given, training and validation datasets will contain at most this many rows.
 
     """
 
@@ -87,10 +89,6 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         "mean_wQuantileLoss": "mean_absolute_error",
         "MSE": "mean_squared_error",
         "RMSE": "root_mean_squared_error",
-    }
-
-    default_tabular_hyperparameters = {
-        "GBM": {},
     }
 
     def __init__(
@@ -199,6 +197,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         self,
         data: TimeSeriesDataFrame,
         last_k_values: Optional[int] = None,
+        max_num_samples: Optional[int] = None,
     ) -> Tuple[pd.DataFrame, pd.Series]:
         """Construct feature matrix containing lags, covariates, and target time series values.
 
@@ -210,6 +209,8 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             Time series data that needs to be converted.
         last_k_values : int, optional
             If given, only last `last_k_values` rows will be kept for each time series.
+        max_num_samples : int, optional
+            If given, the output will contain at most this many rows.
         """
         item_ids_to_exclude = data.item_ids[data.num_timesteps_per_item() < self.required_ts_length]
         if len(item_ids_to_exclude) > 0:
@@ -224,6 +225,9 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         if last_k_values is not None:
             features = features.groupby("unique_id", sort=False).tail(last_k_values)
         features.dropna(subset=self.mlf.ts.target_col, inplace=True)
+        if max_num_samples is not None and len(features) > max_num_samples:
+            rows_per_item = int(self.num_max_rows / data.num_items) + 1
+            features = features.groupby("unique_id", sort=False).tail(rows_per_item)
         return features[self.mlf.ts.features_order_], features[self.mlf.ts.target_col]
 
     def _fit(
@@ -243,9 +247,12 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         self.mlf = MLForecast(models={}, freq=self.freq, **mlforecast_init_args)
 
         # Do not use external val_data as tuning_data to avoid overfitting
+        max_num_samples = model_params.get("max_num_samples", 5_000_000)
         train_subset, val_subset = train_data.train_test_split(self.prediction_length)
-        X_train, y_train = self._get_features_dataframe(train_subset)
-        X_val, y_val = self._get_features_dataframe(val_subset, last_k_values=self.prediction_length)
+        X_train, y_train = self._get_features_dataframe(train_subset, max_num_samples=max_num_samples)
+        X_val, y_val = self._get_features_dataframe(
+            val_subset, last_k_values=self.prediction_length, max_num_samples=max_num_samples
+        )
 
         estimator = TabularEstimator(
             predictor_init_kwargs={
@@ -256,7 +263,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             },
             predictor_fit_kwargs={
                 "time_limit": time_limit,
-                "hyperparameters": model_params.get("tabular_hyperparameters", self.default_tabular_hyperparameters),
+                "hyperparameters": model_params.get("tabular_hyperparameters", {"GBM": {}}),
                 "tuning_data": pd.concat([X_val, y_val], axis=1),
                 **model_params.get("tabular_fit_kwargs", {}),
             },
@@ -266,7 +273,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         with statsmodels_warning_filter():
             self.mlf.fit_models(X_train, y_train)
 
-        self.residuals_std = (self.mlf.models_["mean"].predict(X_val) - y_val).std()
+        self.residuals_std = (self.mlf.models_["mean"].predict(X_train) - y_train).std()
 
     def _predict_without_quantiles(
         self,
@@ -297,7 +304,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
     def _get_scale_per_item(self, item_ids: pd.Index) -> pd.Series:
         """Extract the 'std' values from the scaler object, if available."""
         if self.scaler is not None:
-            return self.scaler.std_["std"].copy().reindex(item_ids)
+            return self.scaler.stats_["_std"].copy().reindex(item_ids)
         else:
             return pd.Series(1.0, index=item_ids)
 
