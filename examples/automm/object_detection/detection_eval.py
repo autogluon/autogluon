@@ -10,9 +10,6 @@ An example to evaluate an MMDetection model on VOC:
     python detection_eval.py \
         --test_path ./VOCdevkit/VOC2007/Annotations/test_cocoformat.json \
         --checkpoint_name faster_rcnn_r50_fpn_1x_voc0712
-
-Note that for now it's required to install nightly build torchmetrics.
-This will be solved in next pr. (MeanAveragePrecision will be moved to AG temporarily.)
 """
 
 import argparse
