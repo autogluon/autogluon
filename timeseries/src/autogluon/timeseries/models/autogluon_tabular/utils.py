@@ -1,5 +1,4 @@
 import pandas as pd
-
 from mlforecast.target_transforms import BaseTargetTransform
 
 

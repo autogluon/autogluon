@@ -114,6 +114,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             **kwargs,
         )
         from mlforecast import MLForecast
+
         from .utils import StandardScaler
 
         self.mlf: Optional[MLForecast] = None
@@ -131,6 +132,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
     def _get_mlforecast_init_args(self, train_data: TimeSeriesDataFrame, model_params: dict) -> dict:
         from gluonts.time_feature import get_lags_for_frequency
         from mlforecast.target_transforms import Differences
+
         from .utils import StandardScaler
 
         lags = model_params.get("lags")
