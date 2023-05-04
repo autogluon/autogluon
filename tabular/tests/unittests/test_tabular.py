@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import autogluon.core as ag
+from autogluon.common.space import Real
 from autogluon.core.utils import download, unzip
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.tabular import TabularDataset, TabularPredictor
