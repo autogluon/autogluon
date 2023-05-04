@@ -1,8 +1,6 @@
 
 __all__ = ['Space', 'Categorical', 'Real', 'Int', 'Bool']
 
-import warnings
-
 
 class Space(object):
     """Basic search space describing set of possible candidate values for hyperparameter.
@@ -161,11 +159,11 @@ class Int(DiscreteSpace):
 
 class Bool(Int):
     """Search space for hyperparameter that is either True or False. 
-       `ag.Bool()` serves as shorthand for: `ag.space.Categorical(True, False)`
+       `Bool()` serves as shorthand for: `Categorical(True, False)`
 
     Examples
     --------
-    pretrained = ag.space.Bool()
+    pretrained = Bool()
     """
     def __init__(self):
         super(Bool, self).__init__(0, 1)

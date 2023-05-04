@@ -1,12 +1,12 @@
-import autogluon.common as ag
+from autogluon.common.space import Space, Categorical, Real, Int, Bool
 
 from autogluon.core.searcher import LocalGridSearcher
 
 
 def test_local_grid_searcher_categorical():
     search_space = dict(
-        a=ag.space.Categorical('a', 7, ['hello', 2]),
-        b=ag.space.Categorical(12, 15),
+        a=Categorical('a', 7, ['hello', 2]),
+        b=Categorical(12, 15),
     )
 
     searcher = LocalGridSearcher(search_space=search_space)
@@ -61,10 +61,10 @@ def test_local_grid_searcher_categorical():
 
 def test_local_grid_searcher_numeric():
     search_spaces = [
-        [dict(a=ag.space.Bool()), [{'a': 0}, {'a': 1}]],
-        [dict(a=ag.space.Int(12, 15)), [{'a': 12}, {'a': 13}, {'a': 14}, {'a': 15}]],
-        [dict(a=ag.space.Real(12, 16)), [{'a': 12.0}, {'a': 13.333333333333334}, {'a': 14.666666666666666}, {'a': 16.0}]],
-        [dict(a=ag.space.Real(12, 16, log=True)), [{'a': 12.0}, {'a': 13.207708995578509}, {'a': 14.536964742657117}, {'a': 16.0}]],
+        [dict(a=Bool()), [{'a': 0}, {'a': 1}]],
+        [dict(a=Int(12, 15)), [{'a': 12}, {'a': 13}, {'a': 14}, {'a': 15}]],
+        [dict(a=Real(12, 16)), [{'a': 12.0}, {'a': 13.333333333333334}, {'a': 14.666666666666666}, {'a': 16.0}]],
+        [dict(a=Real(12, 16, log=True)), [{'a': 12.0}, {'a': 13.207708995578509}, {'a': 14.536964742657117}, {'a': 16.0}]],
     ]
     for search_space, expected_values in search_spaces:
         searcher = LocalGridSearcher(search_space=search_space)
@@ -81,9 +81,9 @@ def test_local_grid_searcher_numeric():
 
 def test_local_grid_searcher_numeric_grid_settings():
     search_spaces = [
-        [dict(a=ag.space.Int(12, 15)), [{'a': 12}, {'a': 15}]],
-        [dict(b=ag.space.Int(12, 15)), [{'b': 12}, {'b': 13}, {'b': 15}]],
-        [dict(c=ag.space.Int(12, 15)), [{'c': 12}, {'c': 13}, {'c': 14}, {'c': 15}]],
+        [dict(a=Int(12, 15)), [{'a': 12}, {'a': 15}]],
+        [dict(b=Int(12, 15)), [{'b': 12}, {'b': 13}, {'b': 15}]],
+        [dict(c=Int(12, 15)), [{'c': 12}, {'c': 13}, {'c': 14}, {'c': 15}]],
     ]
 
     grid_num_sample_settings = {

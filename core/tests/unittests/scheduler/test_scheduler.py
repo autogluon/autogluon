@@ -2,15 +2,15 @@ import numpy as np
 import pickle
 import time
 
-import autogluon.common as ag
+from autogluon.common.space import Space, Categorical, Real, Int, Bool
 
 from autogluon.core.scheduler import LocalSequentialScheduler
 
 
 def test_local_sequential_scheduler():
     search_space = dict(
-        lr=ag.space.Real(1e-3, 1e-2, log=True),
-        wd=ag.space.Real(1e-3, 1e-2),
+        lr=Real(1e-3, 1e-2, log=True),
+        wd=Real(1e-3, 1e-2),
         epochs=10,
     )
 
@@ -31,7 +31,7 @@ def test_local_sequential_scheduler():
 
 def test_timeout_scheduler():
     search_space = dict(
-        lr=ag.space.Real(1E-5, 1E-3),
+        lr=Real(1E-5, 1E-3),
     )
 
     def train_fn(args, reporter):

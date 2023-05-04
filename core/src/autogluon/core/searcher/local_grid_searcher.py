@@ -4,7 +4,7 @@ from typing import Dict
 import numpy as np
 from sklearn.model_selection import ParameterGrid
 
-import autogluon.common as ag
+from autogluon.common.space import Space, Categorical, Real, Int, Bool
 
 from .local_searcher import LocalSearcher
 
@@ -40,15 +40,15 @@ class LocalGridSearcher(LocalSearcher):
     def _get_params_space(self) -> dict:
         param_space = dict()
         for key, val in self.search_space.items():
-            if isinstance(val, ag.space.Space):
+            if isinstance(val, Space):
                 samples_num = self._get_samples_number(key)
-                if isinstance(val, ag.space.Int):
+                if isinstance(val, Int):
                     samples = min(val.upper - val.lower + 1, samples_num)
                     param_space[key] = np.linspace(val.lower, val.upper, samples, dtype=int)
-                elif isinstance(val, ag.space.Real):
+                elif isinstance(val, Real):
                     space = np.geomspace if val.log else np.linspace
                     param_space[key] = space(val.lower, val.upper, num=samples_num)
-                elif isinstance(val, ag.space.Categorical):
+                elif isinstance(val, Categorical):
                     sk = val.convert_to_sklearn()
                     param_space[key] = sk
                 else:

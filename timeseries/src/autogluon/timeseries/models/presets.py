@@ -3,7 +3,7 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Type, Union
 
-import autogluon.common as ag
+from autogluon.common.space import Space, Categorical, Real, Int, Bool
 import autogluon.timeseries as agts
 from autogluon.core import constants
 
@@ -138,11 +138,11 @@ def get_default_hps(key):
             "Theta": {},
             "AutoGluonTabular": {},
             "DeepAR": {
-                "num_layers": ag.space.Int(1, 3, default=2),
-                "hidden_size": ag.space.Int(40, 80, default=40),
+                "num_layers": Int(1, 3, default=2),
+                "hidden_size": Int(40, 80, default=40),
             },
             "SimpleFeedForward": {
-                "hidden_dimensions": ag.space.Categorical([40], [40, 40], [120]),
+                "hidden_dimensions": Categorical([40], [40, 40], [120]),
             },
             "TemporalFusionTransformer": {},
         },
@@ -273,7 +273,7 @@ def get_model_name(ag_args: Dict[str, Any], model_type: Type[AbstractTimeSeriesM
 
 def contains_searchspace(model_hyperparameters: Dict[str, Any]) -> bool:
     for hp_value in model_hyperparameters.values():
-        if isinstance(hp_value, ag.space.Space):
+        if isinstance(hp_value, Space):
             return True
     return False
 

@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from sklearn.model_selection import ParameterSampler
 
-import autogluon.common as ag
+from autogluon.common.space import Space, Categorical, Real, Int, Bool, DiscreteSpace
 
 from .local_searcher import LocalSearcher
 from .exceptions import ExhaustedSearchSpaceError
@@ -29,7 +29,7 @@ class LocalRandomSearcher(LocalSearcher):
     def _get_params_space(self) -> dict:
         param_space = dict()
         for key, val in self.search_space.items():
-            if isinstance(val, ag.space.Space):
+            if isinstance(val, Space):
                 sk = val.convert_to_sklearn()
                 param_space[key] = sk
         return param_space
@@ -37,8 +37,8 @@ class LocalRandomSearcher(LocalSearcher):
     def _get_num_configs(self) -> int:
         num_unique = 1
         for key, val in self.search_space.items():
-            if isinstance(val, ag.space.Space):
-                if isinstance(val, ag.space.DiscreteSpace):
+            if isinstance(val, Space):
+                if isinstance(val, DiscreteSpace):
                     num_unique *= len(val)
                 else:
                     num_unique = None

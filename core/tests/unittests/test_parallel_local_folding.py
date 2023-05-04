@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pandas as pd
 
-import autogluon.common as ag
+from autogluon.common.space import Space, Categorical, Real, Int, Bool
 
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy
@@ -78,9 +78,9 @@ def test_resource_allocation_and_time_limit():
     num_iterations = 100
 
     search_space = dict(
-        num_jobs=ag.space.Int(1, 100),
-        num_folds_parallel=ag.space.Int(1, 200),
-        time_limit=ag.space.Int(60, 60 * 60 * 24),
+        num_jobs=Int(1, 100),
+        num_folds_parallel=Int(1, 200),
+        time_limit=Int(60, 60 * 60 * 24),
     )
 
     searcher = LocalRandomSearcher(search_space=search_space)

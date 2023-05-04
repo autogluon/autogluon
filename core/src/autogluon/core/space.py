@@ -14,13 +14,13 @@ class DeprecatedSpaceWrapper:
         self.comomn_space = common_space
     
     def __call__(self, *args, **kwargs) -> Any:
-        import autogluon.common as ag
+        from autogluon.common import space
 
         warnings.warn(
             "Accessing search spaces through `autogluon.core` is deprecated as of v0.8 and won't be supported "
             f"in the next release. Please use `from autogluon.common import {self.comomn_space}` instead."
         )
-        return getattr(ag.space, self.comomn_space)(*args, **kwargs)
+        return getattr(space, self.comomn_space)(*args, **kwargs)
 
 
 for s in spaces:

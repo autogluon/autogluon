@@ -647,8 +647,8 @@ def test_tabularHPObagstack():
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
         subsample_size = 100
-        nn_options = {'num_epochs': 2, 'learning_rate': ag.Real(0.001, 0.01)}
-        gbm_options = {'num_boost_round': 20, 'learning_rate': ag.Real(0.01, 0.1)}
+        nn_options = {'num_epochs': 2, 'learning_rate': Real(0.001, 0.01)}
+        gbm_options = {'num_boost_round': 20, 'learning_rate': Real(0.01, 0.1)}
         hyperparameters = {'GBM': gbm_options, 'NN_TORCH': nn_options}
         time_limit = 50
 

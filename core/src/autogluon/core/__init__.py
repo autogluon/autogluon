@@ -13,14 +13,14 @@ import warnings
 # TODO: Remove deprecation warning for v1.0
 class DeprecatedSpacesWrapper:
     def __getattr__(self, attr: str) -> Any:
-        import autogluon.common as ag
+        from autogluon.common import space
 
         if attr in spaces:
             warnings.warn(
                 "Accessing search spaces as `autogluon.core.space` is deprecated as of v0.8 and won't be supported "
                 "in the next release. Please use `autogluon.common.space` instead."
             )
-            return getattr(ag.space, attr)
+            return getattr(space, attr)
         else:
             raise AttributeError
 
