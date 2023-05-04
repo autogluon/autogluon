@@ -64,6 +64,7 @@ def test_get_local_objs_to_upload_and_s3_prefix():
             └── test2.txt
     """
     with tempfile.TemporaryDirectory() as temp_dir:
+        old_location = os.getcwd()
         os.chdir(temp_dir)
         test1 = "test.txt"
         open(test1, "a").close()
@@ -77,6 +78,7 @@ def test_get_local_objs_to_upload_and_s3_prefix():
         assert (os.path.join(temp_dir, test1), test1) in result
         assert (os.path.join(temp_dir, test2), test2) in result
         assert len(result) == 2
+        os.chdir(old_location)  # Windows will fail if chdir to tempdir https://bugs.python.org/issue42796
         
 
 def test_get_local_objs_to_upload_and_s3_prefix_empty():
