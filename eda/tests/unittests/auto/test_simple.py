@@ -578,7 +578,12 @@ def test_partial_dependence_plots(monkeypatch):
 
         with tempfile.TemporaryDirectory() as path:
             state = partial_dependence_plots(
-                train_data, label="class", features=["education", "native-country"], return_state=True, path=path
+                train_data,
+                label="class",
+                features=["education", "native-country"],
+                return_state=True,
+                path=path,
+                hyperparameters={"RF": {}},
             )
 
             assert state == {
