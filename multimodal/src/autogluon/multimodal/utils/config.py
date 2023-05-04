@@ -50,7 +50,7 @@ def filter_search_space(hyperparameters: Dict, keys_to_filter: Union[str, List[s
     ), f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
     from ray.tune.search.sample import Domain
 
-    from autogluon.common.space import Space, Categorical, Real, Int, Bool
+    from autogluon.common.space import Space
 
     hyperparameters = copy.deepcopy(hyperparameters)
     for hyperparameter, value in hyperparameters.copy().items():
