@@ -150,7 +150,8 @@ def test_AnomalyDetectorAnalysis__explain_rows_fn(dataset):
 
     result = a.explain_rows_fn(args, detector=detector, dataset=dataset, dataset_row_ids=[1, 3])
 
-    assert_frame_equal(result["rows"], pd.DataFrame({dataset: [1, 3]}, index=[1, 3]))
+    # np.int64 is required for running tests on Windows
+    assert_frame_equal(result["rows"].astype(np.int64), pd.DataFrame({dataset: [1, 3]}, index=[1, 3]).astype(np.int64))
     result.pop("rows")
 
     assert result["train_data"] is train_data
