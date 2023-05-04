@@ -114,10 +114,12 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             **kwargs,
         )
         from mlforecast import MLForecast
+        from .utils import StandardScaler
 
         self.mlf: Optional[MLForecast] = None
+        self.scaler: Optional[StandardScaler] = None
         self.required_ts_length: int = 1
-        self.quantile_adjustments: Dict[str, float] = {}
+        self.residuals_std: float = 0.0
 
     @staticmethod
     def _get_date_features(freq: str) -> List[Callable]:
@@ -149,7 +151,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         some_ts_available_for_validation = ts_lengths.max() >= required_ts_length + self.prediction_length
         if not (all_train_ts_are_long_enough and some_ts_available_for_validation):
             logger.warning(
-                f"Time series in the dataset are too short for chosen differences {differences}. "
+                f"\tTime series in the dataset are too short for chosen differences {differences}. "
                 f"Setting differences to [1]."
             )
             differences = [1]
@@ -160,7 +162,8 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         self.required_ts_length = sum(differences) + 1
 
         if model_params.get("scale", True):
-            target_transforms.append(StandardScaler())
+            self.scaler = StandardScaler()
+            target_transforms.append(self.scaler)
 
         return {
             "lags": lags,
@@ -194,8 +197,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         self,
         data: TimeSeriesDataFrame,
         last_k_values: Optional[int] = None,
-        return_X_y: bool = False,
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Tuple[pd.DataFrame, pd.Series]:
         """Construct feature matrix containing lags, covariates, and target time series values.
 
         Rows where the regression target equals NaN are dropped, but rows where the features are missing are kept.
@@ -206,9 +208,6 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             Time series data that needs to be converted.
         last_k_values : int, optional
             If given, only last `last_k_values` rows will be kept for each time series.
-        return_X_y : bool
-            If False, the method will return a single dataframe containing both features and target. If True, the
-            method will return the feature matrix and the regression target as a tuple (X, y).
         """
         item_ids_to_exclude = data.item_ids[data.num_timesteps_per_item() < self.required_ts_length]
         if len(item_ids_to_exclude) > 0:
@@ -223,10 +222,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         if last_k_values is not None:
             features = features.groupby("unique_id", sort=False).tail(last_k_values)
         features.dropna(subset=self.mlf.ts.target_col, inplace=True)
-        if return_X_y:
-            return features[self.mlf.ts.features_order_], features[self.mlf.ts.target_col]
-        else:
-            return features[self.mlf.ts.features_order_ + [self.mlf.ts.target_col]]
+        return features[self.mlf.ts.features_order_], features[self.mlf.ts.target_col]
 
     def _fit(
         self,
@@ -246,6 +242,8 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
 
         # Do not use external val_data as tuning_data to avoid overfitting
         train_subset, val_subset = train_data.train_test_split(self.prediction_length)
+        X_train, y_train = self._get_features_dataframe(train_subset)
+        X_val, y_val = self._get_features_dataframe(val_subset, last_k_values=self.prediction_length)
 
         estimator = TabularEstimator(
             predictor_init_kwargs={
@@ -257,15 +255,16 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             predictor_fit_kwargs={
                 "time_limit": time_limit,
                 "hyperparameters": model_params.get("tabular_hyperparameters", self.default_tabular_hyperparameters),
-                "tuning_data": self._get_features_dataframe(val_subset, last_k_values=self.prediction_length),
+                "tuning_data": pd.concat([X_val, y_val], axis=1),
                 **model_params.get("tabular_fit_kwargs", {}),
             },
         )
         self.mlf.models = {"mean": estimator}
 
-        X_train, y_train = self._get_features_dataframe(train_subset, return_X_y=True)
         with statsmodels_warning_filter():
             self.mlf.fit_models(X_train, y_train)
+
+        self.residuals_std = (self.mlf.models_["mean"].predict(X_val) - y_val).std()
 
     def _predict_without_quantiles(
         self,
@@ -293,6 +292,41 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         predictions = raw_predictions.rename(columns={"unique_id": ITEMID, "ds": TIMESTAMP})
         return predictions.set_index([ITEMID, TIMESTAMP]).reindex(data.item_ids, level=ITEMID)
 
+    def _get_scale_per_item(self, item_ids: pd.Index) -> pd.Series:
+        """Extract the 'std' values from the scaler object, if available."""
+        if self.scaler is not None:
+            return self.scaler.std_["std"].copy().reindex(item_ids)
+        else:
+            return pd.Series(1.0, index=item_ids)
+
+    def _add_gaussian_quantiles(self, predictions: pd.DataFrame, scale_per_item: pd.Series) -> pd.DataFrame:
+        """Add quantile predictions on top of the point forecast.
+
+        We assume that the residuals N steps into the future follow Gaussian distribution with zero mean and scale
+
+            std(observed_time_series) * sqrt(1 + N) * residuals_std
+
+        where residuals_std is the standard deviation of the residuals estimated on the internal validation set.
+
+        Parameters
+        ----------
+        predictions : pd.DataFrame
+            Point forecast of the future values.
+        scale_per_item : pd.Series
+            Scale of each time series.
+        """
+        from scipy.stats import norm
+
+        num_items = int(len(predictions) / self.prediction_length)
+        sqrt_h = np.sqrt(np.arange(1, self.prediction_length + 1))
+        # Series where normal_scale_per_timestep.loc[item_id].loc[N] = sqrt(1 + N) for N in range(prediction_length)
+        normal_scale_per_timestep = pd.Series(np.tile(sqrt_h, num_items), index=predictions.index)
+
+        std_per_timestep = self.residuals_std * scale_per_item * normal_scale_per_timestep
+        for q in self.quantile_levels:
+            predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep
+        return predictions
+
     def predict(
         self,
         data: TimeSeriesDataFrame,
@@ -303,9 +337,8 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             # Raise a RuntimeError to avoid a numba segfault that kills the Python process
             raise RuntimeError(f"{self.name} requires that all time series have length >= {self.required_ts_length}")
         predictions = self._predict_without_quantiles(data, known_covariates)
-        for q in self.quantile_levels:
-            predictions[str(q)] = predictions["mean"]
-        return TimeSeriesDataFrame(predictions)
+        scale_per_item = self._get_scale_per_item(data.item_ids)
+        return TimeSeriesDataFrame(self._add_gaussian_quantiles(predictions, scale_per_item))
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}
