@@ -612,8 +612,9 @@ def test_partial_dependence_plots(monkeypatch):
     ],
 )
 def test_detect_anomalies(monkeypatch, add_explainability):
-    df_train = pd.DataFrame({"A": np.arange(4), "B": np.arange(4)})
-    df_test = pd.DataFrame({"A": np.arange(5), "B": np.arange(5)})
+    # np.int64 is required for running tests on Windows
+    df_train = pd.DataFrame({"A": np.arange(4), "B": np.arange(4)}).astype(np.int64)
+    df_test = pd.DataFrame({"A": np.arange(5), "B": np.arange(5)}).astype(np.int64)
 
     train_data_scores = pd.Series([0.13, 0.01, 0.08, 0.76], name="score")
     test_data_scores = pd.Series([0.60, 0.20, 0.91, 0.60, 0.23], name="score")
@@ -667,11 +668,12 @@ def test_detect_anomalies(monkeypatch, add_explainability):
     state.anomaly_detection.pop("scores")
 
     assert list(state.anomaly_detection.anomalies.keys()) == ["train_data", "test_data"]
+    # np.int64 is required for running tests on Windows
     assert state.anomaly_detection.anomalies.train_data.equals(
-        pd.DataFrame({"A": [3], "B": [3], "score": 0.76}, index=[3])
+        pd.DataFrame({"A": [3], "B": [3], "score": 0.76}, index=[3]).astype({"A": np.int64, "B": np.int64})
     )
     assert state.anomaly_detection.anomalies.test_data.equals(
-        pd.DataFrame({"A": [2], "B": [2], "score": 0.91}, index=[2])
+        pd.DataFrame({"A": [2], "B": [2], "score": 0.91}, index=[2]).astype({"A": np.int64, "B": np.int64})
     )
     state.anomaly_detection.pop("anomalies")
 
