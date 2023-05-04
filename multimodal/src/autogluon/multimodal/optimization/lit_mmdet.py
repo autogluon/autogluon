@@ -230,7 +230,7 @@ class MMDetLitModule(pl.LightningModule):
         else:
             self.evaluate(batch, "val")
 
-    def validation_epoch_end(self, validation_step_outputs):
+    def on_validation_epoch_end(self):
         val_result = self.validation_metric.compute()
         if self.use_loss:
             self.log_dict({"val_direct_loss": val_result}, sync_dist=True)
