@@ -4,6 +4,7 @@ import pytest
 import tempfile
 import os
 
+
 @pytest.mark.parametrize(
     "s3_objs,prefix,local_path,expected_objs",
     [
@@ -11,10 +12,10 @@ import os
         (["foo/test.txt"], "foo", ".", ["test.txt"]),
         (["foo/test.txt", "foo/test2.txt"], "foo", ".", ["test.txt", "test2.txt"]),
         (["foo/test.txt"], "foo", ".", ["test.txt"]),
-        (["foo/temp/test.txt", "foo/test2.txt"], "foo", ".", ["temp/test.txt", "test2.txt"]),
-        (["foo/temp/test.txt"], "foo", ".", ["temp/test.txt"]),
-        (["foo/temp/temp2/test.txt"], "foo", ".", ["temp/temp2/test.txt"]),
-        (["foo/temp/temp2/test.txt", "foo/temp/temp3/test.txt"], "foo", ".", ["temp/temp2/test.txt", "temp/temp3/test.txt"]),
+        (["foo/temp/test.txt", "foo/test2.txt"], "foo", ".", [os.path.join("temp", "test.txt"), "test2.txt"]),
+        (["foo/temp/test.txt"], "foo", ".", [os.path.join("temp", "test.txt")]),
+        (["foo/temp/temp2/test.txt"], "foo", ".", [os.path.join("temp", "temp2", "test.txt")]),
+        (["foo/temp/temp2/test.txt", "foo/temp/temp3/test.txt"], "foo", ".", [os.path.join("temp", "temp2", "test.txt"), os.path.join("temp", "temp3", "test.txt")]),
     ]
 )
 def test_get_local_path_to_download_objs(s3_objs, prefix, local_path, expected_objs):
