@@ -7,12 +7,6 @@ import warnings
 class Space(object):
     """Basic search space describing set of possible candidate values for hyperparameter.
     """
-    def __init__(self) -> None:
-        # TODO: Remove the deprecated warning in v1.0
-        warnings.warn(
-            "Search spaces have been moved to `autogluon.common.space` as of v0.8 and won't be supported"
-            "in the next release. Please use `autogluon.common.space` instead."
-        )
 
     @property
     def default(self):
@@ -22,7 +16,6 @@ class Space(object):
 
 class SimpleSpace(Space):
     def __init__(self, default):
-        super().__init__()
         self._default = default
 
     """Non-nested search space (i.e. corresponds to a single simple hyperparameter)."""
