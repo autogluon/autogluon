@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from autogluon.common.space import Space, Categorical, Real, Int, Bool
+from autogluon.common.space import Bool, Categorical, Int, Real, Space
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
