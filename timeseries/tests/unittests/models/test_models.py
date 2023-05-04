@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 from flaky import flaky
 
-import autogluon.core as ag
+from autogluon.common.space import Int
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel, ETSModel

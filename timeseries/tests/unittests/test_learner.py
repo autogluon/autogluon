@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import autogluon.core as ag
+from autogluon.common.space import Int
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.models import DeepARModel, ETSModel
