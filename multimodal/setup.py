@@ -39,9 +39,7 @@ install_requires = [
     "scikit-image>=0.19.1,<0.21.0",
     "pytorch-lightning>=1.9.0,<2.1",
     "text-unidecode>=1.3,<1.4",
-    # temporary for testing ref https://github.com/autogluon/autogluon/issues/2687#issuecomment-1531122312
-    # "torchmetrics>=0.11.0,<0.12.0",
-    "torchmetrics @ https://github.com/Lightning-AI/torchmetrics/archive/95599c9a7bd5e6c8f0a8039562dbbc832b434031.zip",
+    "torchmetrics~=1.0.0rc0",
     "transformers>=4.23.0,<4.27.0",
     "nptyping>=1.4.4,<2.5.0",
     "omegaconf>=2.1.1,<2.3.0",
