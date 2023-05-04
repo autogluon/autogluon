@@ -90,7 +90,7 @@ def ref_symmetric_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10
         )
         target = torch.eye(num_elements, dtype=bool).reshape(-1)
         for k in top_ks:
-            hr_k = RetrievalHitRate(k=k)
+            hr_k = RetrievalHitRate(top_k=k)
             hit_rate += hr_k(preds, target, indexes=indexes)
     return hit_rate / (2 * len(top_ks))
 
