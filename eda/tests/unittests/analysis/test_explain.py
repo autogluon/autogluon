@@ -28,6 +28,7 @@ def test_ShapAnalysis(label, expected_task_type, monkeypatch):
             label=label,
             return_state=True,
             render_analysis=False,
+            hyperparameters={"RF": {}},
         )
         assert state.model.problem_type == expected_task_type
 
