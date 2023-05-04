@@ -30,7 +30,7 @@ install_requires = [
     "statsmodels>=0.13.0,<0.14",
     "gluonts>=0.12.4,<0.13",
     "torch>=1.9,<2.1",
-    "pytorch-lightning>=1.9.0,<2.1",
+    "pytorch-lightning>=2.0.0,<2.1",
     "networkx",  # version range defined in `core/_setup_utils.py`
     "statsforecast>=1.4.0,<1.5",
     "mlforecast>=0.7.0,<0.8.0",
