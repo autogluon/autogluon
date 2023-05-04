@@ -27,11 +27,11 @@ def test_get_local_path_to_download_objs(s3_objs, prefix, local_path, expected_o
     "s3_bucket,s3_prefix,local_path,s3_prefixes,expected_output",
     [
         ("foo", "bar", "local/path", [], []),
-        ("foo", "bar", "local/path", ["bar/test.txt"], [('s3://foo/bar/test.txt', 'local/path/test.txt')]),
+        ("foo", "bar", "local/path", ["bar/test.txt"], [('s3://foo/bar/test.txt', os.path.join("local", "path", "test.txt"))]),
         ("foo", "", "", ["test.txt"], [('s3://foo/test.txt', 'test.txt')]),
-        ("foo", "bar/bar", "local/path", ["bar/bar/test.txt"], [('s3://foo/bar/bar/test.txt', 'local/path/test.txt')]),
-        ("foo", "bar", "local/path", ["bar/temp/test.txt", "bar/test2.txt"], [('s3://foo/bar/temp/test.txt', 'local/path/temp/test.txt'), ('s3://foo/bar/test2.txt', 'local/path/test2.txt')]),
-        ("foo", "bar", "local/path", ["bar/temp/test.txt"], [('s3://foo/bar/temp/test.txt', 'local/path/temp/test.txt')]),
+        ("foo", "bar/bar", "local/path", ["bar/bar/test.txt"], [('s3://foo/bar/bar/test.txt', os.path.join("local", "path", "test.txt"))]),
+        ("foo", "bar", "local/path", ["bar/temp/test.txt", "bar/test2.txt"], [('s3://foo/bar/temp/test.txt', os.path.join("local", "path", "temp", "test.txt")), ('s3://foo/bar/test2.txt', os.path.join("local", "path", "test2.txt"))]),
+        ("foo", "bar", "local/path", ["bar/temp/test.txt"], [('s3://foo/bar/temp/test.txt', os.path.join("local", "path", "temp", "test.txt"))]),
         ("foo", "", "", ["a"], [('s3://foo/a', 'a')]),
     ]
 )
