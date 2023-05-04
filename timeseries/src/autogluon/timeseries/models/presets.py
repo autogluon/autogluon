@@ -3,8 +3,8 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Type, Union
 
-from autogluon.common.space import Space, Categorical, Real, Int, Bool
 import autogluon.timeseries as agts
+from autogluon.common.space import Categorical, Int, Space
 from autogluon.core import constants
 
 from . import (
