@@ -236,6 +236,7 @@ class MMDetLitModule(pl.LightningModule):
             self.log_dict({"val_direct_loss": val_result}, sync_dist=True)
         else:
             # TODO: add mAP/mAR_per_class
+            val_result.pop("classes", None)  # introduced in torchmetrics v1.0.0
             mAPs = {"val_" + k: v for k, v in val_result.items()}
             mAPs["val_mAP"] = mAPs["val_map"]
             self.log_dict(mAPs, sync_dist=True)
