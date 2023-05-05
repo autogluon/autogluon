@@ -1,24 +1,21 @@
 import inspect
-import logging
+import warnings
 
-from typing import Optional, Union
+from typing import Optional
 from packaging import version
 
-from .log_utils import DuplicateFilter
 from ..version import __version__
 
 
-ag_logger = logging.getLogger("autogluon")
-logger = logging.getLogger(__name__)
-
-
-def deprecation_warning(
+def _deprecation_warning(
     old: str,
     new: Optional[str] = None,
     custom_warning_msg: Optional[str] = None,
-    error: Optional[Union[bool, Exception]] = None,
+    error: Optional[bool] = None,
+    version_to_remove: Optional[str] = None
 ):
     msg = f"`{old}` has been deprecated. "
+    msg += f"Will be removed in version {version_to_remove} " if version_to_remove is not None else ""
     msg += (
         f"Please use `{new}` instead"
         if new is not None
@@ -27,44 +24,40 @@ def deprecation_warning(
         else ""
     )
 
-    if error is not None:
-        if issubclass(error, Exception):
-            raise error(msg)
-        else:
-            raise ValueError(msg)
+    if error:
+        raise ValueError(msg)
     else:
-        if not any(isinstance(f, DuplicateFilter) for f in ag_logger.filters):
-            dup_filter = DuplicateFilter([msg])
-            ag_logger.addFilter(dup_filter)
-        else:
-            dup_filter: DuplicateFilter = next(
-                f for f in ag_logger.filters if isinstance(f, DuplicateFilter)
-            )
-            dup_filter.attach_filter_targets(msg)
-        logger.warning(
-            f"Deprecation Warning: {msg}. This will raise an error in the future!"
-        )
+        warnings.warn(f"Deprecation Warning: {msg}. This will raise an error in the future!", category=DeprecationWarning, stacklevel=2)
 
 
 def Deprecated(
+    min_version_to_warn: str,
+    min_version_to_error: str,
     old: Optional[str] = None,
     new: Optional[str] = None,
     custom_warning_msg: Optional[str] = None,
-    error: Optional[Union[bool, Exception]] = None,
-    min_version_to_error: Optional[str] = None
+    version_to_remove: Optional[str] = None
 ):
+    """
+    
+    """
     def _decorator(obj):
-        if version.parse(__version__) >= version.parse(min_version_to_error) and error is None:
+        error = False
+        if version.parse(__version__) < version.parse(min_version_to_warn):
+            return obj
+        if version.parse(__version__) >= version.parse(min_version_to_error):
+            print("wtf")
             error = True
         if inspect.isclass(obj):
             obj_init = obj.__init__
 
             def patched_init_with_warning_msg(*args, **kwargs):
-                deprecation_warning(
+                _deprecation_warning(
                     old=old or obj.__name__,
                     new=new,
                     custom_warning_msg=custom_warning_msg,
                     error=error,
+                    version_to_remove=version_to_remove
                 )
                 return obj_init(*args, **kwargs)
 
@@ -72,11 +65,12 @@ def Deprecated(
             return obj
 
         def patched_func_with_warning_msg(*args, **kwargs):
-            deprecation_warning(
+            _deprecation_warning(
                 old=old or obj.__name__,
                 new=new,
                 custom_warning_msg=custom_warning_msg,
                 error=error,
+                version_to_remove=version_to_remove
             )
             return obj(*args, **kwargs)
 
