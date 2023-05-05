@@ -4,9 +4,9 @@ import re
 import time
 from typing import Any, Dict, List, Optional, Union
 
+from autogluon.common import space
 from autogluon.common.loaders import load_pkl
 from autogluon.common.savers import save_pkl
-from autogluon.common import space
 from autogluon.core.hpo.exceptions import EmptySearchSpace
 from autogluon.core.hpo.executors import HpoExecutor
 from autogluon.core.models import AbstractModel
