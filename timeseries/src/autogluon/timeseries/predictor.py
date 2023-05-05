@@ -602,12 +602,12 @@ class TimeSeriesPredictor:
         B       2020-03-04          0    5.0
                 2020-03-05          0    7.0
         >>> predictor.predict(data, known_covariates=future_known_covariates)
-                            target
+                              mean
         item_id timestamp
-        A       2020-01-08      30
-                2020-01-09      27
-        B       2020-03-04      17
-                2020-03-05       8
+        A       2020-01-08    30.2
+                2020-01-09    27.0
+        B       2020-03-04    17.1
+                2020-03-05     8.3
         """
         if random_seed is not None:
             set_random_seed(random_seed)
