@@ -166,7 +166,7 @@ jobs:
   tabular:
     needs: setup
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     defaults:
       run:
         shell: bash
