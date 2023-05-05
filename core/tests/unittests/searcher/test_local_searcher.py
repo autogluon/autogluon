@@ -1,13 +1,14 @@
 
 import unittest
 
+from autogluon.common import space
+
 from autogluon.core.searcher.local_searcher import LocalSearcher
-from autogluon.core.space import Categorical
 
 
 class TestLocalSearcher(unittest.TestCase):
     def test_local_searcher(self):
-        search_space = {'param1': Categorical('hello', 'world'), 7: 42}
+        search_space = {'param1': space.Categorical('hello', 'world'), 7: 42}
         searcher = LocalSearcher(search_space=search_space)
 
         config1 = {'param1': 'hello', 7: 42}
@@ -55,7 +56,7 @@ class TestLocalSearcher(unittest.TestCase):
         assert searcher.get_results() == [({'param1': 'hello', 7: 42}, 0.1), ({'param1': 'world', 7: 42}, 0)]
 
     def test_local_searcher_pickle(self):
-        search_space = {1: Categorical(1, 2), 2: Categorical(1, 2)}
+        search_space = {1: space.Categorical(1, 2), 2: space.Categorical(1, 2)}
         searcher = LocalSearcher(search_space=search_space)
 
         # Identical configs should have same pkl key, different configs should have different pkl keys

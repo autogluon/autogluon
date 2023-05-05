@@ -1,8 +1,10 @@
 import logging
 import pickle
+
+from autogluon.common import space
+
 from collections import OrderedDict
 
-from ..space import Categorical, Space
 
 __all__ = ['LocalSearcher']
 
@@ -148,7 +150,7 @@ class LocalSearcher(object):
         """
         params_static = dict()
         for key, val in self.search_space.items():
-            if not isinstance(val, Space):
+            if not isinstance(val, space.Space):
                 params_static[key] = val
         return params_static
 
@@ -158,7 +160,7 @@ class LocalSearcher(object):
         """
         params_default = dict()
         for key, val in self.search_space.items():
-            if isinstance(val, Space):
+            if isinstance(val, space.Space):
                 params_default[key] = val.default
         params_default.update(params_static)
         return params_default
@@ -171,7 +173,7 @@ class LocalSearcher(object):
         """
         params_cat_dict = dict()
         for key, val in self.search_space.items():
-            if isinstance(val, Categorical):
+            if isinstance(val, space.Categorical):
                 cat_map = dict()
                 for i, cat in enumerate(val.data):
                     cat_pkl = pickle.dumps(cat)

@@ -405,14 +405,14 @@ class TimeSeriesPredictor:
             hyperparameter optimization is performed. A search space should only be provided when
             ``hyperparameter_tune_kwargs`` is given (i.e., hyperparameter-tuning is utilized). For example::
 
-                import autogluon.core as ag
+                from autogluon.common import space
 
                 predictor.fit(
                     ...
                     hyperparameters={
                         "DeepAR": {
-                            "hidden_size": ag.space.Int(20, 100),
-                            "dropout_rate": ag.space.Categorical(0.1, 0.3),
+                            "hidden_size": space.Int(20, 100),
+                            "dropout_rate": space.Categorical(0.1, 0.3),
                         },
                     },
                     hyperparameter_tune_kwargs="auto",
