@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from autogluon.common.space import Int
+from autogluon.common import space
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.models import DeepARModel, ETSModel
@@ -97,7 +97,7 @@ def test_given_hyperparameters_when_learner_called_then_model_can_predict(
 
 @pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
 def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_performed(temp_model_path, model_name):
-    hyperparameters = {model_name: {"epochs": Int(1, 3)}}
+    hyperparameters = {model_name: {"epochs": space.Int(1, 3)}}
     num_trials = 2
     # mock the default hps factory to prevent preset hyperparameter configurations from
     # creeping into the test case

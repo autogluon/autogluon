@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 from flaky import flaky
 
-from autogluon.common.space import Int
+from autogluon.common import space
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel, ETSModel
@@ -144,7 +144,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         freq="H",
         quantile_levels=[0.1, 0.9],
         hyperparameters={
-            "epochs": Int(1, 3),
+            "epochs": space.Int(1, 3),
             "num_batches_per_epoch": 1,
             "maxiter": 1,
         },
@@ -176,7 +176,7 @@ def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raise
         freq="H",
         quantile_levels=[0.1, 0.9],
         hyperparameters={
-            "epochs": Int(3, 4),
+            "epochs": space.Int(3, 4),
         },
     )
     with pytest.raises(ValueError, match=".*hyperparameter_tune.*"):

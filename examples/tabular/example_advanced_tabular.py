@@ -3,7 +3,7 @@
     To maximize predictive accuracy, we recommend you do NOT specify `hyperparameters` or `hyperparameter_tune_kwargs`, and instead specify `TabularPredictor(..., eval_metric=YOUR_METRIC).fit(..., presets='best_quality')`
 """
 
-from autogluon.common.space import Space, Categorical, Real, Int, Bool
+from autogluon.common import space
 from autogluon.tabular import TabularDataset, TabularPredictor
 
 
@@ -15,9 +15,9 @@ label = 'class'  # specifies which column do we want to predict
 save_path = 'ag_hpo_models/'  # where to save trained models
 
 hyperparameters = {
-    'NN_TORCH': {'num_epochs': 10, 'activation': 'relu', 'dropout_prob': Real(0.0, 0.5)},
-    'GBM': {'num_boost_round': 1000, 'learning_rate': Real(0.01, 0.1, log=True)},
-    'XGB': {'n_estimators': 1000, 'learning_rate': Real(0.01, 0.1, log=True)}
+    'NN_TORCH': {'num_epochs': 10, 'activation': 'relu', 'dropout_prob': space.Real(0.0, 0.5)},
+    'GBM': {'num_boost_round': 1000, 'learning_rate': space.Real(0.01, 0.1, log=True)},
+    'XGB': {'n_estimators': 1000, 'learning_rate': space.Real(0.01, 0.1, log=True)}
 }
 
 predictor = TabularPredictor(label=label, path=save_path).fit(

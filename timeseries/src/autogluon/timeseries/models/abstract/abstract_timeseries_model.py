@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from autogluon.common.loaders import load_pkl
 from autogluon.common.savers import save_pkl
-from autogluon.common.space import Space
+from autogluon.common import space
 from autogluon.core.hpo.exceptions import EmptySearchSpace
 from autogluon.core.hpo.executors import HpoExecutor
 from autogluon.core.models import AbstractModel
@@ -84,7 +84,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         metadata: Optional[CovariateMetadata] = None,
         eval_metric: Optional[str] = None,
         eval_metric_seasonal_period: Optional[int] = None,
-        hyperparameters: Dict[str, Union[int, float, str, Space]] = None,
+        hyperparameters: Dict[str, Union[int, float, str, space.Space]] = None,
         **kwargs,
     ):
         name = name or re.sub(r"Model$", "", self.__class__.__name__)
@@ -253,7 +253,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
     def _check_fit_params(self):
         # gracefully handle hyperparameter specifications if they are provided to fit instead
-        if any(isinstance(v, Space) for v in self.params.values()):
+        if any(isinstance(v, space.Space) for v in self.params.values()):
             raise ValueError(
                 "Hyperparameter spaces provided to `fit`. Please provide concrete values "
                 "as hyperparameters when initializing or use `hyperparameter_tune` instead."

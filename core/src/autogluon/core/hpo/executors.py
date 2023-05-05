@@ -7,7 +7,7 @@ import os
 import pandas as pd
 import time
 
-from autogluon.common.space import Space, Categorical, Real, Int, Bool
+from autogluon.common import space
 
 from abc import ABC, abstractmethod
 from typing import Any, Optional, List, Dict, Union, Callable, Tuple
@@ -375,14 +375,14 @@ class RayHpoExecutor(HpoExecutor):
         
     def validate_search_space(self, search_space, model_name):
         from ray.tune.search.sample import Domain
-        if not any(isinstance(search_space[hyperparam], (Space, Domain)) for hyperparam in search_space):
+        if not any(isinstance(search_space[hyperparam], (space.Space, Domain)) for hyperparam in search_space):
             logger.warning(f"\tNo hyperparameter search space specified for {model_name}. Skipping HPO. "
                            f"Will train one model based on the provided hyperparameters.")
             raise EmptySearchSpace
         self.search_space = search_space
         logger.log(15, f"\tHyperparameter search space for {model_name}: ")
         for hyperparam in search_space:
-                if isinstance(search_space[hyperparam], (Space, Domain)):
+                if isinstance(search_space[hyperparam], (space.Space, Domain)):
                     logger.log(15, f"{hyperparam}:   {search_space[hyperparam]}")
                     
     def execute(
@@ -529,14 +529,14 @@ class CustomHpoExecutor(HpoExecutor):
         logger.debug(f'custom backend resource: {self.resources}, per trial resource: {self.hyperparameter_tune_kwargs}')
         
     def validate_search_space(self, search_space, model_name):
-        if not any(isinstance(search_space[hyperparam], Space) for hyperparam in search_space):
+        if not any(isinstance(search_space[hyperparam], space.Space) for hyperparam in search_space):
             logger.warning(f"\tNo hyperparameter search space specified for {model_name}. Skipping HPO. "
                            f"Will train one model based on the provided hyperparameters.")
             raise EmptySearchSpace
         self.search_space = search_space
         logger.log(15, f"\tHyperparameter search space for {model_name}: ")
         for hyperparam in search_space:
-                if isinstance(search_space[hyperparam], Space):
+                if isinstance(search_space[hyperparam], space.Space):
                     logger.log(15, f"{hyperparam}:   {search_space[hyperparam]}")
                     
     def execute(self, model_trial, train_fn_kwargs, **kwargs):
