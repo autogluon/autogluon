@@ -9,7 +9,6 @@ from torch import nn
 
 from ..constants import COLUMN, IMAGE, IMAGE_META, IMAGE_PATH, IMAGE_VALID_NUM, PROMPT
 from .collator import ListCollator, PadCollator
-from .transform_bbox import *
 from .utils import is_image_input, is_rois_input
 
 logger = logging.getLogger(__name__)

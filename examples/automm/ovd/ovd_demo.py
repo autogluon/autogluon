@@ -17,8 +17,7 @@ def ovd():
         },
         as_pandas=True,
     )
-    print("test_result:")
-    print(test_result)
+    print(f"test_result:\n {test_result}")
 
 
 if __name__ == "__main__":

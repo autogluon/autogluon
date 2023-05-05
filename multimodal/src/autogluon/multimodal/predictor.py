@@ -2235,7 +2235,9 @@ class MultiModalPredictor(ExportMixin):
                     detection_classes=self._model.model.CLASSES,
                     result_path=None,
                 )
-            elif self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+            elif (
+                self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION
+            ):  # TODO: refactor and merge with OBJECT DETECTION
                 pred = save_ovd_result_df(
                     pred=pred,
                     data=data,

@@ -109,12 +109,7 @@ class OVDModel(nn.Module):
         -------
             A dictionary with logits and features.
         """
-        try:
-            from groundingdino.util.utils import get_phrases_from_posmap
-        except ImportError as e:
-            logger.warning(
-                "Please install groundingdino by: pip install git+https://github.com/IDEA-Research/GroundingDINO.git"
-            )
+        from groundingdino.util.utils import get_phrases_from_posmap
 
         def process_caption(caption):  # TODO: split if it's too long
             caption = caption.lower().strip()

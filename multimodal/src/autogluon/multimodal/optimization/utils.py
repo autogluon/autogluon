@@ -121,7 +121,7 @@ def get_loss_func(
             loss_func = nn.MSELoss()
     elif problem_type == NER:
         loss_func = nn.CrossEntropyLoss(ignore_index=0)
-    elif problem_type == OBJECT_DETECTION or problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+    elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
         return None
     elif problem_type is None:
         return None
