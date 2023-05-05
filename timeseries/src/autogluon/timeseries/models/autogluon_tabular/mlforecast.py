@@ -73,7 +73,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         Defaults to ``{"GBM": {}}``.
     tabular_fit_kwargs : Dict[str, Any], optional
         Additional keyword arguments passed to ``TabularPredictor.fit``. Defaults to an empty dict.
-    max_num_samples : int, default = 5_000_000
+    max_num_samples : int, default = 1_000_000
         If given, training and validation datasets will contain at most this many rows.
 
     """
@@ -191,7 +191,8 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         df = pd.DataFrame(data)[selected_columns].reset_index()
         if static_features is not None:
             df = pd.merge(df, static_features, how="left", on=ITEMID, suffixes=(None, "_static_feat"))
-        return df.rename(columns=column_name_mapping)
+        # FIXME: If unique_id column is not sorted, MLForecast will assign incorrect IDs to forecasts
+        return df.rename(columns=column_name_mapping).sort_values(by="unique_id", kind="stable")
 
     def _get_features_dataframe(
         self,
@@ -226,7 +227,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             features = features.groupby("unique_id", sort=False).tail(last_k_values)
         features.dropna(subset=self.mlf.ts.target_col, inplace=True)
         if max_num_samples is not None and len(features) > max_num_samples:
-            rows_per_item = int(self.num_max_rows / data.num_items) + 1
+            rows_per_item = int(max_num_samples / data.num_items) + 1
             features = features.groupby("unique_id", sort=False).tail(rows_per_item)
         return features[self.mlf.ts.features_order_], features[self.mlf.ts.target_col]
 
@@ -247,7 +248,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         self.mlf = MLForecast(models={}, freq=self.freq, **mlforecast_init_args)
 
         # Do not use external val_data as tuning_data to avoid overfitting
-        max_num_samples = model_params.get("max_num_samples", 5_000_000)
+        max_num_samples = model_params.get("max_num_samples", 1_000_000)
         train_subset, val_subset = train_data.train_test_split(self.prediction_length)
         X_train, y_train = self._get_features_dataframe(train_subset, max_num_samples=max_num_samples)
         X_val, y_val = self._get_features_dataframe(
