@@ -4,6 +4,7 @@ import pytest
 import tempfile
 import os
 
+
 @pytest.mark.parametrize(
     "s3_objs,prefix,local_path,expected_objs",
     [
@@ -11,10 +12,10 @@ import os
         (["foo/test.txt"], "foo", ".", ["test.txt"]),
         (["foo/test.txt", "foo/test2.txt"], "foo", ".", ["test.txt", "test2.txt"]),
         (["foo/test.txt"], "foo", ".", ["test.txt"]),
-        (["foo/temp/test.txt", "foo/test2.txt"], "foo", ".", ["temp/test.txt", "test2.txt"]),
-        (["foo/temp/test.txt"], "foo", ".", ["temp/test.txt"]),
-        (["foo/temp/temp2/test.txt"], "foo", ".", ["temp/temp2/test.txt"]),
-        (["foo/temp/temp2/test.txt", "foo/temp/temp3/test.txt"], "foo", ".", ["temp/temp2/test.txt", "temp/temp3/test.txt"]),
+        (["foo/temp/test.txt", "foo/test2.txt"], "foo", ".", [os.path.join("temp", "test.txt"), "test2.txt"]),
+        (["foo/temp/test.txt"], "foo", ".", [os.path.join("temp", "test.txt")]),
+        (["foo/temp/temp2/test.txt"], "foo", ".", [os.path.join("temp", "temp2", "test.txt")]),
+        (["foo/temp/temp2/test.txt", "foo/temp/temp3/test.txt"], "foo", ".", [os.path.join("temp", "temp2", "test.txt"), os.path.join("temp", "temp3", "test.txt")]),
     ]
 )
 def test_get_local_path_to_download_objs(s3_objs, prefix, local_path, expected_objs):
@@ -26,11 +27,11 @@ def test_get_local_path_to_download_objs(s3_objs, prefix, local_path, expected_o
     "s3_bucket,s3_prefix,local_path,s3_prefixes,expected_output",
     [
         ("foo", "bar", "local/path", [], []),
-        ("foo", "bar", "local/path", ["bar/test.txt"], [('s3://foo/bar/test.txt', 'local/path/test.txt')]),
+        ("foo", "bar", "local/path", ["bar/test.txt"], [('s3://foo/bar/test.txt', os.path.join("local", "path", "test.txt"))]),
         ("foo", "", "", ["test.txt"], [('s3://foo/test.txt', 'test.txt')]),
-        ("foo", "bar/bar", "local/path", ["bar/bar/test.txt"], [('s3://foo/bar/bar/test.txt', 'local/path/test.txt')]),
-        ("foo", "bar", "local/path", ["bar/temp/test.txt", "bar/test2.txt"], [('s3://foo/bar/temp/test.txt', 'local/path/temp/test.txt'), ('s3://foo/bar/test2.txt', 'local/path/test2.txt')]),
-        ("foo", "bar", "local/path", ["bar/temp/test.txt"], [('s3://foo/bar/temp/test.txt', 'local/path/temp/test.txt')]),
+        ("foo", "bar/bar", "local/path", ["bar/bar/test.txt"], [('s3://foo/bar/bar/test.txt', os.path.join("local", "path", "test.txt"))]),
+        ("foo", "bar", "local/path", ["bar/temp/test.txt", "bar/test2.txt"], [('s3://foo/bar/temp/test.txt', os.path.join("local", "path", "temp", "test.txt")), ('s3://foo/bar/test2.txt', os.path.join("local", "path", "test2.txt"))]),
+        ("foo", "bar", "local/path", ["bar/temp/test.txt"], [('s3://foo/bar/temp/test.txt', os.path.join("local", "path", "temp", "test.txt"))]),
         ("foo", "", "", ["a"], [('s3://foo/a', 'a')]),
     ]
 )
@@ -63,6 +64,7 @@ def test_get_local_objs_to_upload_and_s3_prefix():
             └── test2.txt
     """
     with tempfile.TemporaryDirectory() as temp_dir:
+        old_location = os.getcwd()
         os.chdir(temp_dir)
         test1 = "test.txt"
         open(test1, "a").close()
@@ -76,6 +78,7 @@ def test_get_local_objs_to_upload_and_s3_prefix():
         assert (os.path.join(temp_dir, test1), test1) in result
         assert (os.path.join(temp_dir, test2), test2) in result
         assert len(result) == 2
+        os.chdir(old_location)  # Windows will fail if chdir to tempdir https://bugs.python.org/issue42796
         
 
 def test_get_local_objs_to_upload_and_s3_prefix_empty():
