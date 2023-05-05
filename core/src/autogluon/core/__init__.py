@@ -18,7 +18,8 @@ class DeprecatedSpacesWrapper:
         if attr in spaces:
             warnings.warn(
                 "Accessing search spaces as `autogluon.core.space` is deprecated as of v0.8 and won't be supported "
-                "in the next release. Please use `autogluon.common.space` instead."
+                "in the next release. Please use `autogluon.common.space` instead.",
+                category=DeprecationWarning,
             )
             return getattr(space, attr)
         else:
