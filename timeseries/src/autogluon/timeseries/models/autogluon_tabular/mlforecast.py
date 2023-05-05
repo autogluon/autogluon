@@ -63,10 +63,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
     differences : List[int], default = None
         Differences to take of the target before computing the features. These are restored at the forecasting step.
         If None, will be set to ``[seasonal_period]``, where seasonal_period is determined based on the data frequency.
-    detrend : bool, default = True
-        If True, a linear trend will be removed from each time series before training the model. This is necessary
-        since tree-based models cannot extrapolate outside of the time series values seen during training.
-    scale : bool, default = True
+    standardize : bool, default = True
         If True, time series values will be divided by the standard deviation.
     tabular_hyperparameters : Dict[Dict[str, Any]], optional
         Hyperparameters dictionary passed to ``TabularPredictor.fit``. Contains the names of models that should be fit.
@@ -161,7 +158,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             target_transforms.append(Differences(differences))
         self.required_ts_length = sum(differences) + 1
 
-        if model_params.get("scale", True):
+        if model_params.get("standardize", True):
             self.scaler = StandardScaler()
             target_transforms.append(self.scaler)
 
