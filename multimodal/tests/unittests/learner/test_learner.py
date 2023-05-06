@@ -1,7 +1,7 @@
 import uuid
 
-import pytest
 import numpy as np
+import pytest
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils.misc import shopee_dataset
