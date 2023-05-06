@@ -102,8 +102,6 @@ class TimeSeriesPredictor:
         If ``path`` and ``eval_metric`` are re-specified within ``learner_kwargs``, these are ignored.
     label : str, optional
         Alias for :attr:`target`.
-    quantiles : List[float], optional
-        Alias for :attr:`quantile_levels`.
     """
 
     predictor_file_name = "predictor.pkl"
@@ -149,16 +147,19 @@ class TimeSeriesPredictor:
         self.prediction_length = prediction_length
         self.eval_metric = eval_metric
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
-        if quantile_levels is not None and quantiles is not None:
-            raise ValueError(
-                "Both `quantile_levels` and `quantiles` are specified. Please specify at most one of these arguments."
-            )
-        self.quantile_levels = quantile_levels or quantiles or [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        if quantile_levels is None:
+            quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        self.quantile_levels = quantile_levels
 
         if validation_splitter is not None:
             warnings.warn(
-                "validation_splitter argument has been deprecated as of v0.8.0. "
-                "Please user the `num_val_windows` argument of `TimeSeriesPredictor.fit` instead."
+                "`validation_splitter` argument has been deprecated as of v0.8.0. "
+                "Please use the `num_val_windows` argument of `TimeSeriesPredictor.fit` instead."
+            )
+        if quantiles is not None:
+            warnings.warn(
+                "`quantiles` argument has been deprecated as of v0.8.0. "
+                "Please use the `quantile_levels` argument instead."
             )
 
         if learner_kwargs is None:
@@ -378,21 +379,25 @@ class TimeSeriesPredictor:
             `autogluon/timeseries/trainer/models/presets.py``.
 
             If dict is provided, the keys are strings or Types that indicate which models to train. Each value is
-            itself a dict containing hyperparameters for each of the trained models. Any omitted hyperparameters not
-            specified here will be set to default. For example::
+            itself a dict containing hyperparameters for each of the trained models, or a list of such dicts. Any
+            omitted hyperparameters not specified here will be set to default. For example::
 
                 predictor.fit(
                     ...
                     hyperparameters={
                         "DeepAR": {},
-                        "ETS": {"seasonal_period": 7},
+                        "ETS": [
+                            {"seasonal": "add"},
+                            {"seasonal": None},
+                        ],
                     }
                 )
 
-            The above example will only train two models:
+            The above example will train three models:
 
-            * ``DeepAR`` (with default hyperparameters)
-            * ``ETS`` (with the given `seasonal_period`; all other parameters set to their defaults)
+            * ``DeepAR`` with default hyperparameters
+            * ``ETS`` with additive seasonality (all other parameters set to their defaults)
+            * ``ETS`` with seasonality disabled (all other parameters set to their defaults)
 
             Full list of available models and their hyperparameters is provided in :ref:`forecasting_zoo`.
 
@@ -400,14 +405,14 @@ class TimeSeriesPredictor:
             hyperparameter optimization is performed. A search space should only be provided when
             ``hyperparameter_tune_kwargs`` is given (i.e., hyperparameter-tuning is utilized). For example::
 
-                import autogluon.core as ag
+                from autogluon.common import space
 
                 predictor.fit(
                     ...
                     hyperparameters={
                         "DeepAR": {
-                            "hidden_size": ag.space.Int(20, 100),
-                            "dropout_rate": ag.space.Categorical(0.1, 0.3),
+                            "hidden_size": space.Int(20, 100),
+                            "dropout_rate": space.Categorical(0.1, 0.3),
                         },
                     },
                     hyperparameter_tune_kwargs="auto",

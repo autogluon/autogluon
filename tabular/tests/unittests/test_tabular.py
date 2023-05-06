@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import autogluon.core as ag
+from autogluon.common import space
 from autogluon.core.utils import download, unzip
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.tabular import TabularDataset, TabularPredictor
@@ -647,8 +647,8 @@ def test_tabularHPObagstack():
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
         subsample_size = 100
-        nn_options = {'num_epochs': 2, 'learning_rate': ag.Real(0.001, 0.01)}
-        gbm_options = {'num_boost_round': 20, 'learning_rate': ag.Real(0.01, 0.1)}
+        nn_options = {'num_epochs': 2, 'learning_rate': space.Real(0.001, 0.01)}
+        gbm_options = {'num_boost_round': 20, 'learning_rate': space.Real(0.01, 0.1)}
         hyperparameters = {'GBM': gbm_options, 'NN_TORCH': nn_options}
         time_limit = 50
 

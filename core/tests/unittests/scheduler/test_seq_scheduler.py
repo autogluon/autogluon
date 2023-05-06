@@ -1,9 +1,6 @@
-from time import sleep
-
 import pytest
 
-import autogluon.core as ag
-from autogluon.core import Real
+from autogluon.common import space
 from autogluon.core.scheduler.seq_scheduler import LocalSequentialScheduler
 
 cls = LocalSequentialScheduler
@@ -49,7 +46,7 @@ def test_has_enough_time_for_trial__enough_time__avg_time_not_allows_trials_by_f
 
 
 def test_LocalSequentialScheduler_no_criteria():
-    search_space = {'lr': Real(1e-2, 1e-1, log=True)}
+    search_space = {'lr': space.Real(1e-2, 1e-1, log=True)}
 
     def _train_fn_():
         pass
@@ -60,11 +57,11 @@ def test_LocalSequentialScheduler_no_criteria():
 
 def test_search_space():
     search_space = dict(
-        a=ag.space.Real(1e-3, 1e-2, log=True),
-        b=ag.space.Real(1e-3, 1e-2),
-        c=ag.space.Int(1, 10),
-        d=ag.space.Categorical('a', 'b', 'c', 'd'),
-        e=ag.space.Bool(),
+        a=space.Real(1e-3, 1e-2, log=True),
+        b=space.Real(1e-3, 1e-2),
+        c=space.Int(1, 10),
+        d=space.Categorical('a', 'b', 'c', 'd'),
+        e=space.Bool(),
     )
 
     def train_fn(args, reporter):
@@ -94,7 +91,7 @@ def test_scheduler_can_handle_failing_jobs():
     trails_outcomes = []
     best_result = [-1]
 
-    search_space = dict(a=ag.space.Real(0, 1))
+    search_space = dict(a=space.Real(0, 1))
 
     def train_fn(args, reporter):
         test_should_fail = args['a'] > 0.7

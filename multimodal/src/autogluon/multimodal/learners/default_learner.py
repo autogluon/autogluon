@@ -24,6 +24,8 @@ from overrides import override
 from packaging import version
 from pytorch_lightning import LightningDataModule
 from pytorch_lightning.callbacks import Callback
+from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.plugins import CheckpointIO
 from pytorch_lightning.strategies import Strategy
 from timm.data.mixup import Mixup
 from torch import nn
@@ -95,7 +97,6 @@ from autogluon.multimodal.data.infer_types import (
 from autogluon.multimodal.data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from autogluon.multimodal.matcher import MultiModalMatcher
 from autogluon.multimodal.models.utils import get_model_postprocess_fn
-from autogluon.multimodal.optimization.deepspeed import CustomDeepSpeedStrategy
 from autogluon.multimodal.optimization.lit_distiller import DistillerLitModule
 from autogluon.multimodal.optimization.lit_mmdet import MMDetLitModule
 from autogluon.multimodal.optimization.lit_module import LitModule
@@ -176,15 +177,15 @@ logger = logging.getLogger(__name__)
 class DefaultLearner(AbstractMMLearner):
     def __init__(
         self,
+        problem_type: str,
         label: Optional[str] = None,
-        problem_type: Optional[str] = None,
-        column_types: Optional[dict] = None,
+        # column_types: Optional[dict] = None,  # this is now inferred in learner
         # query: Optional[Union[str, List[str]]] = None,
         # response: Optional[Union[str, List[str]]] = None,
         # match_label: Optional[Union[int, str]] = None,
         # pipeline: Optional[str] = None,
-        # presets: Optional[str] = None,
-        eval_metric: Optional[str] = None,
+        presets: Optional[str] = None,
+        eval_metric: Optional[str] = None,  # this is now inferred in learner
         path: Optional[str] = None,
         verbosity: Optional[int] = 2,
         num_classes: Optional[int] = None,
@@ -193,30 +194,32 @@ class DefaultLearner(AbstractMMLearner):
     ):
         super().__init__()
 
-        self._label_column = label
-        self._problem_type = problem_type
+        self._label_column: Optional[str] = label
+        self._problem_type: Optional[str] = problem_type
         # self._presets = presets.lower() if presets else None  # NOTE: This will be handled by predictor.
-        self._eval_metric_name = eval_metric
-        self._validation_metric_name = None
-        self._output_shape = num_classes
-        self._classes = classes  # TODO: To be refactored into detection learner only
-
-        self._ckpt_path = None
-        self._pretrained_path = None
-        self._config = None
-        self._df_preprocessor = None  # initialize it as None.
-        self._column_types = column_types  # predictor will setup column_types, and set values here.
-        self._data_processors = None  # initialize it as None.
-        self._model_postprocess_fn = None
-        self._model = None
-        # self._resume = False  # This is for predictor to handle.
+        self._eval_metric_name: Optional[str] = eval_metric
+        self._save_path = path
         self._verbosity = verbosity
+        self._output_shape: Optional[int] = num_classes
+        self._classes = classes  # TODO: To be refactored into detection learner only
+        self._presets = presets
+
+        self._ckpt_path: Optional[str] = None
+        self._config: Optional[DictConfig] = None
+        self._column_types: Optional[dict] = None  # this is now inferred in learner
+        self._data_processors: Optional[List] = None  # initialize it as None.
+        self._df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None  # initialize it as None.
+        self._model_postprocess_fn: Optional[Callable] = None
+        self._model: Optional[nn.Module] = None
+        self._pretrained_path: Optional[str] = None
+        self._resume = False  # now learner handles this as well
+        self._validation_metric_name: Optional[str] = None
+
         # self._warn_if_exist = warn_if_exist  # unused
         self._enable_progress_bar = enable_progress_bar
         # self._init_scratch = init_scratch  # NOTE: is this for predictor to handle?
         # self._sample_data_path = sample_data_path  # this is for detection problem only
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
-        self._save_path = path
 
         # Summary statistics used in fit summary. TODO: wrap it in a class.
         # self._total_train_time = None
@@ -226,6 +229,7 @@ class DefaultLearner(AbstractMMLearner):
     def path(self) -> Union[str, None]:
         return self._save_path
 
+    @property
     @override
     def label(self) -> Union[str, None]:
         return self._label_column
@@ -253,8 +257,492 @@ class DefaultLearner(AbstractMMLearner):
     def positive_class(self) -> Union[int, None]:
         return None
 
+    def _prepare_fit_args(
+        self,
+        train_data: Union[pd.DataFrame, str],
+        presets: Optional[str] = None,
+        config: Optional[dict] = None,
+        tuning_data: Optional[Union[pd.DataFrame, str]] = None,
+        max_num_tuning_data: Optional[int] = None,  # TODO: Remove since this is for detection
+        # TODO: Remove since this is for matching
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
+        time_limit: Optional[int] = None,
+        save_path: Optional[str] = None,
+        hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+        column_types: Optional[dict] = None,
+        holdout_frac: Optional[float] = None,
+        teacher_predictor: Union[str, MultiModalPredictor] = None,
+        seed: Optional[int] = 0,
+        standalone: Optional[bool] = True,
+        hyperparameter_tune_kwargs: Optional[dict] = None,
+        clean_ckpts: Optional[bool] = True,
+    ):
+        """Prepare arguments for fit().
+        Parameters
+        ----------
+        train_data
+            A dataframe containing training data.
+        presets
+            Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
+        config
+            A dictionary with four keys "model", "data", "optimization", and "environment".
+            Each key's value can be a string, yaml file path, or OmegaConf's DictConfig.
+            Strings should be the file names (DO NOT include the postfix ".yaml") in
+            automm/configs/model, automm/configs/data, automm/configs/optimization, and automm/configs/environment.
+            For example, you can configure a late-fusion model for the image, text, and tabular data as follows:
+            config = {
+                        "model": "fusion_mlp_image_text_tabular",
+                        "data": "default",
+                        "optimization": "adamw",
+                        "environment": "default",
+                    }
+            or
+            config = {
+                        "model": "/path/to/model/config.yaml",
+                        "data": "/path/to/data/config.yaml",
+                        "optimization": "/path/to/optimization/config.yaml",
+                        "environment": "/path/to/environment/config.yaml",
+                    }
+            or
+            config = {
+                        "model": OmegaConf.load("/path/to/model/config.yaml"),
+                        "data": OmegaConf.load("/path/to/data/config.yaml"),
+                        "optimization": OmegaConf.load("/path/to/optimization/config.yaml"),
+                        "environment": OmegaConf.load("/path/to/environment/config.yaml"),
+                    }
+        tuning_data
+            A dataframe containing validation data, which should have the same columns as the train_data.
+            If `tuning_data = None`, `fit()` will automatically
+            hold out some random validation examples from `train_data`.
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when the dataframe contains the query/response identifiers instead of their contents.
+        time_limit
+            How long `fit()` should run for (wall clock time in seconds).
+            If not specified, `fit()` will run until the model has completed training.
+        save_path
+            Path to directory where models and intermediate outputs should be saved.
+        hyperparameters
+            This is to override some default configurations.
+            For example, changing the text and image backbones can be done by formatting:
+
+            a string
+            hyperparameters = "model.hf_text.checkpoint_name=google/electra-small-discriminator model.timm_image.checkpoint_name=swin_small_patch4_window7_224"
+
+            or a list of strings
+            hyperparameters = ["model.hf_text.checkpoint_name=google/electra-small-discriminator", "model.timm_image.checkpoint_name=swin_small_patch4_window7_224"]
+
+            or a dictionary
+            hyperparameters = {
+                            "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
+                            "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+                        }
+        column_types
+            A dictionary that maps column names to their data types.
+            For example: `column_types = {"item_name": "text", "image": "image_path",
+            "product_description": "text", "height": "numerical"}`
+            may be used for a table with columns: "item_name", "brand", "product_description", and "height".
+            If None, column_types will be automatically inferred from the data.
+            The current supported types are:
+                - "image_path": each row in this column is one image path.
+                - "text": each row in this column contains text (sentence, paragraph, etc.).
+                - "numerical": each row in this column contains a number.
+                - "categorical": each row in this column belongs to one of K categories.
+        holdout_frac
+            Fraction of train_data to holdout as tuning_data for optimizing hyper-parameters or
+            early stopping (ignored unless `tuning_data = None`).
+            Default value (if None) is selected based on the number of rows in the training data
+            and whether hyper-parameter-tuning is utilized.
+        teacher_predictor
+            The pre-trained teacher predictor or its saved path. If provided, `fit()` can distill its
+            knowledge to a student predictor, i.e., the current predictor.
+        seed
+            The random seed to use for this training run.
+            Defaults to 0
+        standalone
+            Whether to save the enire model for offline deployment or only trained parameters of parameter-efficient fine-tuning strategy.
+        hyperparameter_tune_kwargs
+                Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
+                If None, then hyperparameter tuning will not be performed.
+                    num_trials: int
+                        How many HPO trials to run. Either `num_trials` or `time_limit` to `fit` needs to be specified.
+                    scheduler: Union[str, ray.tune.schedulers.TrialScheduler]
+                        If str is passed, AutoGluon will create the scheduler for you with some default parameters.
+                        If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
+                    scheduler_init_args: Optional[dict] = None
+                        If provided str to `scheduler`, you can optionally provide custom init_args to the scheduler
+                    searcher: Union[str, ray.tune.search.SearchAlgorithm, ray.tune.search.Searcher]
+                        If str is passed, AutoGluon will create the searcher for you with some default parameters.
+                        If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
+                        You don't need to worry about `metric` and `mode` of the searcher object. AutoGluon will figure it out by itself.
+                    scheduler_init_args: Optional[dict] = None
+                        If provided str to `searcher`, you can optionally provide custom init_args to the searcher
+                        You don't need to worry about `metric` and `mode`. AutoGluon will figure it out by itself.
+        clean_ckpts
+            Whether to clean the checkpoints of each validation step after training.
+
+        Returns
+        -------
+        An "MultiModalPredictor" object (itself).
+        """
+        # 1. some sanity checks
+        fit_called = self._fit_called  # used in current function
+        self._fit_called = True
+        pl.seed_everything(seed, workers=True)
+
+        if self._problem_type and not self.problem_property.support_fit:
+            raise RuntimeError(
+                f"The problem_type='{self._problem_type}' does not support `predictor.fit()`. "
+                f"You may try to use `predictor.predict()` or `predictor.evaluate()`."
+            )
+
+        if time_limit is not None:
+            time_limit = timedelta(seconds=time_limit)
+        training_start = time.time()
+
+        # 2. Route to Matcher if applicable. This can be an example of how a learner would work.
+        # TODO: Predictor responsible for creating a new learner for matching.
+        # if self._matcher:
+        #     self._matcher.fit(
+        #         train_data=train_data,
+        #         tuning_data=tuning_data,
+        #         id_mappings=id_mappings,
+        #         time_limit=time_limit,
+        #         presets=presets,
+        #         hyperparameters=hyperparameters,
+        #         column_types=column_types,
+        #         holdout_frac=holdout_frac,
+        #         save_path=save_path,
+        #         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        #         seed=seed,
+        #     )
+        #     return self
+
+        # 3. Setup and split data
+        # TODO: Move to detection learner's _setup_train_tuning_data() method
+        # if self._problem_type == OBJECT_DETECTION:
+        #     train_data, tuning_data = setup_detection_train_tuning_data(
+        #         self, max_num_tuning_data, seed, train_data, tuning_data
+        #     )
+        # 6. setup save path
+        self._setup_save_path(save_path, fit_called)
+
+        train_data, tuning_data = self._setup_train_tuning_data(
+            train_data=train_data, tuning_data=tuning_data, holdout_frac=holdout_frac, seed=seed
+        )
+
+        # 4. setup presets. Silently ignore user input if self._presets already exists
+        if self._presets is not None:
+            # FIXME: Silently ignoring user input, there should be a warning
+            presets = self._presets
+        else:
+            self._presets = presets
+
+        # 5. setup config. Silently ignore user input if self._config already exists
+        if self._config is not None:  # continuous training
+            # FIXME: Silently ignoring user input, there should be a warning
+            config = self._config
+        else:
+            self._config = config
+
+        # 7. setup problem types.
+        # TODO: Remove. The problem type is inferred from predictor, and should've been assigned in __init__
+        # self._problem_type = self._infer_problem_type(train_data=train_data, column_types=column_types)
+
+        # 8. infer column types
+        self._column_types = self._infer_column_types(
+            train_data=train_data, tuning_data=tuning_data, column_types=column_types
+        )
+        # 10. ignore user input if self._column_type already exists.
+        # TODO: Merged with _infer_column_types()
+
+        # 9. infer output shape
+        # FIXME: separate infer problem_type with output_shape, should be logically distinct
+        self._output_shape = self._infer_output_shape(train_data=train_data)
+        # 11. check for output shape consistency. Raise error if inconsistent for obj. det.
+        # TODO: Merged with _infer_output_shape()
+        # TODO: Delete this check for object detection
+        # if self._problem_type != OBJECT_DETECTION:
+        #     if self._output_shape is not None and output_shape is not None:
+        #         assert self._output_shape == output_shape, (
+        #             f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
+        #         )
+        #     else:
+        #         self._output_shape = output_shape
+
+        # Determine data scarcity mode, i.e. a few-shot scenario
+        self._check_if_fewshot(train_data, presets)
+
+        logger.debug(f"self._column_types: {self._column_types}")
+        logger.debug(f"image columns: {[k for k, v in self._column_types.items() if v == 'image_path']}")
+
+        # 12. setup validation metric names
+        self._validation_metric_name, self._eval_metric_name = self._infer_metric_names()
+
+        # 13. get minmax mode. FIXME: Can be merged with step 0 at the top
+        # TODO: remove precompute to save an argument. Move to .fit() and compute when needed.
+        minmax_mode = get_minmax_mode(self._validation_metric_name)
+
+        # set attributes for saving and prediction
+        # self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
+        # self._validation_metric_name = validation_metric_name
+
+        # 14. setup hyperparameters and hpo hyperparameters
+        hyperparameters, advanced_hyperparameters, hyperparameter_tune_kwargs = self._setup_hyperparameters(
+            hyperparameters=hyperparameters,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            teacher_predictor=teacher_predictor,
+        )
+
+        hpo_mode = self._is_hpo_mode(hyperparameter_tune_kwargs)
+        # 15. filter out the hyperparameters that have no effect for HPO.
+        if hpo_mode:
+            hyperparameters = filter_hyperparameters(
+                hyperparameters=hyperparameters,
+                column_types=self._column_types,
+                config=config,
+                fit_called=fit_called,
+            )
+
+        _fit_args = dict(
+            train_df=train_data,
+            val_df=tuning_data,
+            validation_metric_name=self._validation_metric_name,  # TODO: Remove this args since _validation_metric_name is already set in self.
+            minmax_mode=minmax_mode,
+            max_time=time_limit,
+            save_path=self._save_path,  # TODO: Remove this args since _save_path is already set in self.
+            ckpt_path=None if hpo_mode else self._ckpt_path,
+            resume=False if hpo_mode else self._resume,
+            enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
+            presets=presets,
+            hyperparameters=hyperparameters,
+            advanced_hyperparameters=advanced_hyperparameters,
+            teacher_predictor=teacher_predictor,
+            standalone=standalone,
+            hpo_mode=hpo_mode,  # skip average checkpoint if in hpo mode
+            clean_ckpts=clean_ckpts,
+        )
+
+        return _fit_args
+
+    def _is_hpo_mode(self, hyperparameter_tune_kwargs):
+        hpo_mode = True if hyperparameter_tune_kwargs else False
+        return hpo_mode
+
+    def _setup_hyperparameters(self, hyperparameters, hyperparameter_tune_kwargs, teacher_predictor):
+        hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
+            problem_type=self._problem_type,
+            presets=self._presets,
+            provided_hyperparameters=hyperparameters,
+            provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            teacher_predictor=teacher_predictor,
+        )
+        # split out the hyperparameters whose values are complex objects
+        hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
+        return (
+            hyperparameters,
+            advanced_hyperparameters,
+            hyperparameter_tune_kwargs,
+        )
+
+    def _setup_config(self):
+        if self._config is not None:  # continuous training
+            # FIXME: Silently ignoring user input, there should be a warning
+            config = self._config
+        return config
+
+    def _setup_presets(self):
+        if self._presets is not None:
+            # FIXME: Silently ignoring user input, there should be a warning
+            presets = self._presets
+        else:
+            self._presets = presets
+        return presets
+
+    def _setup_save_path(self, save_path, fit_called):
+        self._save_path = setup_save_path(
+            resume=self._resume,
+            old_save_path=self._save_path,
+            proposed_save_path=save_path,
+            raise_if_exist=True,
+            warn_if_exist=False,
+            fit_called=fit_called,
+        )
+
+    def _infer_metric_names(self):
+        if self._validation_metric_name is None or self._eval_metric_name is None:
+            validation_metric_name, eval_metric_name = infer_metrics(
+                problem_type=self._problem_type,
+                eval_metric_name=self._eval_metric_name,
+                validation_metric_name=self._validation_metric_name,
+            )
+        else:
+            validation_metric_name = self._validation_metric_name
+            eval_metric_name = self._eval_metric_name
+        return validation_metric_name, eval_metric_name
+
+    def _check_if_fewshot(self, train_data, presets):
+        scarcity_mode = infer_scarcity_mode_by_data_size(
+            df_train=train_data, scarcity_threshold=50
+        )  # Add as separate hyperparameter somewhere?
+        if scarcity_mode == FEW_SHOT and (not presets or FEW_SHOT not in presets):  # TODO: check for data  type
+            logger.info(
+                f"Detected data scarcity. Consider running using the preset '{FEW_SHOT_TEXT_CLASSIFICATION}' for better performance."
+            )
+
+    def _infer_output_shape(self, train_data):
+        _, output_shape = infer_problem_type_output_shape(
+            label_column=self._label_column,
+            column_types=self._column_types,
+            data=train_data,
+            provided_problem_type=self._problem_type,
+        )
+
+        # TODO: Delete this check for object detection
+        # if self._problem_type != OBJECT_DETECTION:
+        if self._output_shape is not None and output_shape is not None:
+            assert self._output_shape == output_shape, (
+                f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
+            )
+        # else:
+        #     self._output_shape = output_shape
+
+        return output_shape
+
+    def _infer_column_types(
+        self, train_data: pd.DataFrame, tuning_data: pd.DataFrame = None, column_types: dict = None
+    ) -> dict:
+        column_types = infer_column_types(
+            data=train_data,
+            label_columns=self._label_column,
+            provided_column_types=column_types,
+            valid_data=tuning_data,
+            problem_type=self._problem_type,
+        )
+        column_types = infer_label_column_type_by_problem_type(
+            column_types=column_types,
+            label_columns=self._label_column,
+            problem_type=self._problem_type,
+            data=train_data,
+            valid_data=tuning_data,
+        )
+        if self._column_types is not None and self._column_types != column_types:
+            warnings.warn(
+                f"Inferred column types {column_types} are inconsistent with "
+                f"the previous {self._column_types}. "
+                f"New columns will not be used in the current training."
+            )
+            # use previous column types to avoid inconsistency with previous numerical mlp and categorical mlp
+            column_types = self._column_types
+
+        return column_types
+
+    def _setup_train_tuning_data(
+        self,
+        train_data: Union[pd.DataFrame, str],
+        tuning_data: Optional[Union[pd.DataFrame, str]],
+        holdout_frac: Optional[float],
+        seed: Optional[int],
+    ):
+        if isinstance(train_data, str):
+            train_data = load_pd.load(train_data)
+        if isinstance(tuning_data, str):
+            tuning_data = load_pd.load(tuning_data)
+        if tuning_data is None:
+            train_data, tuning_data = self._split_train_tuning(
+                data=train_data, holdout_frac=holdout_frac, random_state=seed
+            )
+
+        return train_data, tuning_data
+
+    def _split_train_tuning(
+        self, data: pd.DataFrame, holdout_frac: float = None, random_state: int = 0
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Splits `data` into `train_data` and `tuning_data`.
+        If the problem_type is one of ['binary', 'multiclass']:
+            The split will be done with stratification on the label column.
+            Will guarantee at least 1 sample of every class in `data` will be present in `train_data`.
+                If only 1 sample of a class exists, it will always be put in `train_data` and not `tuning_data`.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The data to be split
+        holdout_frac : float, default = None
+            The ratio of data to use as validation.
+            If 0.2, 20% of the data will be used for validation, and 80% for training.
+            If None, the ratio is automatically determined,
+            ranging from 0.2 for small row count to 0.01 for large row count.
+        random_state : int, default = 0
+            The random state to use when splitting the data, to make the splitting process deterministic.
+            If None, a random value is used.
+
+        Returns
+        -------
+        Tuple of (train_data, tuning_data) of the split `data`
+        """
+        if holdout_frac is None:
+            holdout_frac = default_holdout_frac(num_train_rows=len(data), hyperparameter_tune=False)
+
+        # TODO: Hack since the recognized problem types are only binary, multiclass, and regression
+        #  Problem types used for purpose of stratification, so regression = no stratification
+        if self._problem_type in [BINARY, MULTICLASS]:
+            problem_type_for_split = self._problem_type
+        else:
+            problem_type_for_split = REGRESSION
+
+        train_data, tuning_data = generate_train_test_split_combined(
+            data=data,
+            label=self.label,
+            test_size=holdout_frac,
+            problem_type=problem_type_for_split,
+            random_state=random_state,
+        )
+        return train_data, tuning_data
+
     @override
     def fit(
+        self,
+        train_data: Union[pd.DataFrame, str],
+        presets: Optional[str] = None,
+        config: Optional[dict] = None,
+        tuning_data: Optional[Union[pd.DataFrame, str]] = None,
+        max_num_tuning_data: Optional[int] = None,  # TODO: Remove since this is for detection
+        # TODO: Remove since this is for matching
+        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
+        time_limit: Optional[int] = None,
+        save_path: Optional[str] = None,
+        hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+        column_types: Optional[dict] = None,
+        holdout_frac: Optional[float] = None,
+        teacher_predictor: Union[str, DefaultLearner] = None,
+        seed: Optional[int] = 0,
+        standalone: Optional[bool] = True,
+        hyperparameter_tune_kwargs: Optional[dict] = None,
+        clean_ckpts: Optional[bool] = True,
+    ):
+        _fit_args = self._prepare_fit_args(
+            train_data=train_data,
+            presets=presets,
+            config=config,
+            tuning_data=tuning_data,
+            max_num_tuning_data=max_num_tuning_data,
+            id_mappings=id_mappings,
+            time_limit=time_limit,
+            save_path=save_path,
+            hyperparameters=hyperparameters,
+            column_types=column_types,
+            holdout_frac=holdout_frac,
+            teacher_predictor=teacher_predictor,
+            seed=seed,
+            standalone=standalone,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            clean_ckpts=clean_ckpts,
+        )
+        self._run_fit(**_fit_args)
+
+    def _run_fit(
         self,
         train_df: pd.DataFrame,
         val_df: pd.DataFrame,
@@ -279,7 +767,7 @@ class DefaultLearner(AbstractMMLearner):
         logger.info(get_fit_start_message(save_path, validation_metric_name))
 
         ### SETUP Environments ###
-        self._fit_called = True
+        # self._fit_called = True
         # 1-3, 22. get config.
         # TODO: Create another PR to isolate df_preprocessor from self._setup_environment().
         # Create another method self._create_df_preprocessor(), self._get_data_processors(), and _create_model()
@@ -292,17 +780,19 @@ class DefaultLearner(AbstractMMLearner):
             hpo_mode=hpo_mode,
             **hpo_kwargs,
         )
+        self._config = config
+        self._df_preprocessor = df_preprocessor
 
         # 4-5. if NER, update output shape. Otherwise create model. TODO: This can be refactored into the NER Learner
-        model = self._create_model(config=config, df_preprocessor=df_preprocessor)
+        self._model = self._create_model()
+        # self._model = model
 
         # 6. get trainable layer params for efficient finetuning only?
-        trainable_param_names = self._get_trainable_params(config=config, model=model)
+        trainable_param_names = self._get_trainable_params()
 
         # 7. get data_processors.
-        data_processors = self._get_data_processors(
-            config=config, advanced_hyperparameters=advanced_hyperparameters, model=model
-        )
+        self._data_processors = self._get_data_processors(advanced_hyperparameters=advanced_hyperparameters)
+        # self._data_processors = data_processors
 
         # 8. infer positive labels (NOTE: This is deleted in the latest main branch)
 
@@ -312,38 +802,39 @@ class DefaultLearner(AbstractMMLearner):
         )
 
         # 10. setup mix up if applicable
-        mixup_active, mixup_fn = self._setup_mixup(config=config)
+        mixup_active, mixup_fn = self._setup_mixup()
 
         # 11. get loss function, NOTE: This can be refactored into Learner class
         loss_func = get_loss_func(
             problem_type=self._problem_type,
             mixup_active=mixup_active,
-            loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
-            config=config.optimization,
+            loss_func_name=OmegaConf.select(self._config, "optimization.loss_function"),
+            config=self._config.optimization,
         )
 
         # 12. get post process function
-        model_postprocess_fn = get_model_postprocess_fn(
+        self._model_postprocess_fn = get_model_postprocess_fn(
             problem_type=self._problem_type,
             loss_func=loss_func,
         )
+        # self._model_postprocess_fn = model_postprocess_fn
 
         # 13. assign properties, and use self properties afterward whenever possible
-        self._config = config
-        self._df_preprocessor = df_preprocessor
-        self._data_processors = data_processors
-        self._model = model
-        self._model_postprocess_fn = model_postprocess_fn
+        # self._config = config
+        # self._df_preprocessor = df_preprocessor
+        # self._data_processors = data_processors
+        # self._model = model
+        # self._model_postprocess_fn = model_postprocess_fn
 
         # TODO: complete this later
         # 14. if times up. return final model
         if max_time == timedelta(seconds=0):
             self._top_k_average(
-                model=model,
+                model=self._model,
                 save_path=save_path,
                 minmax_mode=minmax_mode,
                 is_distill=False,
-                top_k_average_method=config.optimization.top_k_average_method,
+                top_k_average_method=self._config.optimization.top_k_average_method,
                 val_df=val_df,
                 validation_metric_name=validation_metric_name,
                 strict_loading=not trainable_param_names,
@@ -399,14 +890,11 @@ class DefaultLearner(AbstractMMLearner):
         train_dm = self._get_train_data_module(
             train_df=train_df,
             val_df=val_df,
-            config=config,
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
             val_use_training_mode=val_use_training_mode,
         )
 
         # 17. setup optim args
-        optimization_kwargs = self._get_optim_kwargs(config=config)
+        optimization_kwargs = self._get_optim_kwargs()
         # 18. setup metrics args
         metrics_kwargs = self._get_metrics_kwargs(
             validation_metric_name=validation_metric_name,
@@ -481,22 +969,17 @@ class DefaultLearner(AbstractMMLearner):
         #     )
 
         task = self._setup_task_lightning_module(
-            config=config,
-            model=model,
             trainable_param_names=trainable_param_names,
             mixup_fn=mixup_fn,
             loss_func=loss_func,
-            model_postprocess_fn=model_postprocess_fn,
             optimization_kwargs=optimization_kwargs,
             metrics_kwargs=metrics_kwargs,
         )
 
         # 20. Setup call backs
-        checkpoint_callback = self._create_checkpoint_callback(
-            minmax_mode=minmax_mode, save_path=save_path, config=config, task=task
-        )
+        checkpoint_callback = self._create_checkpoint_callback(minmax_mode=minmax_mode, save_path=save_path, task=task)
         early_stopping_callback = self._create_early_stop_callback(
-            validation_metric_name=validation_metric_name, minmax_mode=minmax_mode, config=config, task=task
+            validation_metric_name=validation_metric_name, minmax_mode=minmax_mode, task=task
         )
         lr_callback = self._create_lr_callback()
         model_summary = pl.callbacks.ModelSummary(max_depth=1)
@@ -528,7 +1011,7 @@ class DefaultLearner(AbstractMMLearner):
 
         custom_checkpoint_plugin = AutoMMModelCheckpointIO(
             trainable_param_names=trainable_param_names,
-            model_name_to_id=model.name_to_id,
+            model_name_to_id=self._model.name_to_id,
         )
 
         tb_logger = pl.loggers.TensorBoardLogger(
@@ -594,37 +1077,15 @@ class DefaultLearner(AbstractMMLearner):
         log_filter = LogFilter(blacklist_msgs)
         # 23. Declare pl.Trainer
         with apply_log_filter(log_filter):
-            trainer = pl.Trainer(
-                accelerator="gpu" if config.env.num_gpus > 0 else None,
-                devices=get_available_devices(
-                    num_gpus=config.env.num_gpus,
-                    auto_select_gpus=config.env.auto_select_gpus,
-                    use_ray_lightning=use_ray_lightning,
-                ),
-                num_nodes=config.env.num_nodes,
-                precision=config.env.precision,
-                strategy=strategy,
-                benchmark=False,
-                deterministic=config.env.deterministic,
-                max_epochs=config.optimization.max_epochs,
-                max_steps=config.optimization.max_steps,
-                max_time=max_time,
-                callbacks=callbacks,
-                logger=tb_logger,
-                gradient_clip_val=OmegaConf.select(config, "optimization.gradient_clip_val", default=1),
-                gradient_clip_algorithm=OmegaConf.select(
-                    config, "optimization.gradient_clip_algorithm", default="norm"
-                ),
-                accumulate_grad_batches=grad_steps,
-                log_every_n_steps=OmegaConf.select(config, "optimization.log_every_n_steps", default=10),
+            trainer = self._get_trainer(
                 enable_progress_bar=enable_progress_bar,
-                fast_dev_run=config.env.fast_dev_run,
-                track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
-                val_check_interval=config.optimization.val_check_interval,
-                check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
-                if hasattr(config.optimization, "check_val_every_n_epoch")
-                else 1,
-                plugins=[custom_checkpoint_plugin],
+                grad_steps=grad_steps,
+                strategy=strategy,
+                use_ray_lightning=use_ray_lightning,
+                callbacks=callbacks,
+                custom_checkpoint_plugin=custom_checkpoint_plugin,
+                tb_logger=tb_logger,
+                max_time=max_time,
             )
 
         # 24. pl.Trainer.fit()
@@ -648,7 +1109,7 @@ class DefaultLearner(AbstractMMLearner):
             # We only averaging the checkpoint of the best trial in the end in the master process
             if not hpo_mode:
                 self._top_k_average(
-                    model=model,
+                    model=self._model,
                     save_path=save_path,
                     minmax_mode=minmax_mode,
                     is_distill=False,  # By default, we do not do distill. If distill, we will do it in the distill learner
@@ -664,6 +1125,72 @@ class DefaultLearner(AbstractMMLearner):
             self._best_score = trainer.callback_metrics[f"val_{validation_metric_name}"].item()
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
+
+    def _get_trainer(
+        self,
+        enable_progress_bar: bool,
+        grad_steps: int,
+        strategy: Optional[Union[Strategy, str]],
+        use_ray_lightning: bool,
+        callbacks: Optional[List[Callback]],
+        custom_checkpoint_plugin: CheckpointIO,
+        tb_logger: TensorBoardLogger,
+        max_time: Optional[timedelta] = None,
+    ) -> pl.Trainer:
+        """Create the pytorch_lightning trainer for training
+
+        Parameters
+        ----------
+        enable_progress_bar (bool): enable progress bar to display in console
+        grad_steps (int): number of gradient steps to take
+        strategy (Optional[Union[Strategy, str]]): data parallel strategy
+        use_ray_lightning (bool): whether to use ray lightning plugin
+        callbacks (Optional[List[Callback]]): pytorch lightning callbacks during training loop
+        custom_checkpoint_plugin (CheckpointIO): custome pytorch lightning checkpoint plugin that customize the checkpoint saving
+        tb_logger (TensorBoardLogger): tensorboard logger
+        max_time (Optional[timedelta], optional): maximum trainig. Defaults to None.
+
+        Returns
+        -------
+        pl.Trainer: the pytorch lightning trainer object for training
+        """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _get_trainer()"
+        accelerator = "gpu" if self._config.env.num_gpus > 0 else None
+        available_devices = get_available_devices(
+            num_gpus=self._config.env.num_gpus,
+            auto_select_gpus=self._config.env.auto_select_gpus,
+            use_ray_lightning=use_ray_lightning,
+        )
+        trainer = pl.Trainer(
+            accelerator=accelerator,
+            devices=available_devices,
+            num_nodes=self._config.env.num_nodes,
+            precision=self._config.env.precision,
+            strategy=strategy,
+            benchmark=False,
+            deterministic=self._config.env.deterministic,
+            max_epochs=self._config.optimization.max_epochs,
+            max_steps=self._config.optimization.max_steps,
+            max_time=max_time,
+            callbacks=callbacks,
+            logger=tb_logger,
+            gradient_clip_val=OmegaConf.select(self._config, "optimization.gradient_clip_val", default=1),
+            gradient_clip_algorithm=OmegaConf.select(
+                self._config, "optimization.gradient_clip_algorithm", default="norm"
+            ),
+            accumulate_grad_batches=grad_steps,
+            log_every_n_steps=OmegaConf.select(self._config, "optimization.log_every_n_steps", default=10),
+            enable_progress_bar=enable_progress_bar,
+            fast_dev_run=self._config.env.fast_dev_run,
+            track_grad_norm=OmegaConf.select(self._config, "optimization.track_grad_norm", default=-1),
+            val_check_interval=self._config.optimization.val_check_interval,
+            check_val_every_n_epoch=OmegaConf.select(self._config, "optimization.check_val_every_n_epoch", default=1),
+            plugins=[custom_checkpoint_plugin],
+        )
+
+        return trainer
 
     @override
     def predict(
@@ -993,7 +1520,7 @@ class DefaultLearner(AbstractMMLearner):
         ----------
         model (nn.Module): model trained
         save_path (str): model save path
-        minmax_mode (str): _description_
+        minmax_mode (str): in selecting models, whether a min metric or max metric is preferred
         is_distill (bool): if this is a distillation model
         top_k_average_method (Optional[str]): a string representing top k average method
         val_df (pd.DataFrame): validation data frame for model selection
@@ -1155,7 +1682,7 @@ class DefaultLearner(AbstractMMLearner):
         return lr_callback
 
     def _create_early_stop_callback(
-        self, validation_metric_name: str, minmax_mode: str, config: DictConfig, task: pl.LightningModule
+        self, validation_metric_name: str, minmax_mode: str, task: pl.LightningModule
     ) -> Callback:
         """Creates the callback for early stopping during training
         By default, we use the pl EarlyStopping callback
@@ -1177,18 +1704,19 @@ class DefaultLearner(AbstractMMLearner):
         --------
         pl.callbacks.EarlyStopping: pytorch lightning early stopping callback
         """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _create_early_stop_callback()"
         early_stopping_callback = pl.callbacks.EarlyStopping(
             monitor=task.validation_metric_name,
-            patience=config.optimization.patience,
+            patience=self._config.optimization.patience,
             mode=minmax_mode,
             stopping_threshold=get_stopping_threshold(validation_metric_name),
         )
 
         return early_stopping_callback
 
-    def _create_checkpoint_callback(
-        self, minmax_mode: str, save_path: str, config: DictConfig, task: pl.LightningModule
-    ) -> Callback:
+    def _create_checkpoint_callback(self, minmax_mode: str, save_path: str, task: pl.LightningModule) -> Callback:
         """Creates the pl checkpoint callback during training
         By default, we use the AutoMMModelCheckpoint, which is a customized checkpoint callback
         This can be overriden by child learners to use other checkpoint callbacks
@@ -1202,16 +1730,19 @@ class DefaultLearner(AbstractMMLearner):
             - max
                 It means that larger metric is better.
         save_path (str): model save path
-        config (DictConfig): OmegaConfig holding the configuration for training
+        self._config (DictConfig): OmegaConfig holding the configuration for training
         task (pl.LightningModule): pytorch lightning module for training
 
         Returns
         --------
         pl.callbacks.ModelCheckpoint: The pytorch lightning checkpoint callback
         """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _create_checkpoint_callback()"
         checkpoint_callback = AutoMMModelCheckpoint(
             dirpath=save_path,
-            save_top_k=config.optimization.top_k,
+            save_top_k=self._config.optimization.top_k,
             verbose=True,
             monitor=task.validation_metric_name,
             mode=minmax_mode,
@@ -1222,12 +1753,9 @@ class DefaultLearner(AbstractMMLearner):
 
     def _setup_task_lightning_module(
         self,
-        config: DictConfig,
-        model: nn.Module,
         trainable_param_names: List[str],
         mixup_fn: Optional[Mixup],
         loss_func: Optional[nn.Module],
-        model_postprocess_fn: Optional[Callable],
         optimization_kwargs: dict,
         metrics_kwargs: dict,
     ) -> pl.LightningModule:
@@ -1239,12 +1767,12 @@ class DefaultLearner(AbstractMMLearner):
 
         Parameters
         -----------
-        config (DictConfig): OmegaConfig dict with all the configs for training
-        model (nn.Module): pytorch nn.Module to train
+        self._config (DictConfig): OmegaConfig dict with all the configs for training
+        self._model (nn.Module): pytorch nn.Module to train
         trainable_param_names (List[str]): the list of trainable parameter names
         mixup_fn (Optional[Mixup]): model mixup function that applies different params to each element or whole batch
         loss_func (Optional[nn.Module]): pytorch nn.Module loss function
-        model_postprocess_fn (Optional[Callable]): postprocess function to apply to the model output (i.e. sigmoid after nn.BCEWithLogitsLoss)
+        self._model_postprocess_fn (Optional[Callable]): postprocess function to apply to the model output (i.e. sigmoid after nn.BCEWithLogitsLoss)
         optimization_kwargs (dict): parameters for optimization
         metrics_kwargs (dict): parameters for metrics
 
@@ -1252,15 +1780,21 @@ class DefaultLearner(AbstractMMLearner):
         --------
         pl.LightningModule: pytorch lightning module for training task
         """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _setup_task_lightning_module()"
+        assert (
+            self._model is not None
+        ), "self._model is None. You must setup self._model before calling _setup_task_lightning_module()"
         task = LitModule(
-            model=model,
+            model=self._model,
             loss_func=loss_func,
-            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+            efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
             mixup_fn=mixup_fn,
-            mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-            model_postprocess_fn=model_postprocess_fn,
+            mixup_off_epoch=OmegaConf.select(self._config, "data.mixup.turn_off_epoch"),
+            model_postprocess_fn=self._model_postprocess_fn,
             trainable_param_names=trainable_param_names,
-            skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
+            skip_final_val=OmegaConf.select(self._config, "optimization.skip_final_val", default=False),
             **metrics_kwargs,
             **optimization_kwargs,
         )
@@ -1290,27 +1824,30 @@ class DefaultLearner(AbstractMMLearner):
 
         return metrics_kwargs
 
-    def _get_optim_kwargs(self, config: DictConfig) -> dict:
+    def _get_optim_kwargs(self) -> dict:
         """get the optimization kwargs for the training task
 
         Parameters
         ----------
-        config (DictConfig): OmegaConf holding the config for training
+        self._config (DictConfig): OmegaConf holding the config for training
 
         Returns
         -------
         dict: dictionary containing the optimization parameters
         """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _get_optim_kwargs()"
         optimization_kwargs = dict(
-            optim_type=config.optimization.optim_type,
-            lr_choice=config.optimization.lr_choice,
-            lr_schedule=config.optimization.lr_schedule,
-            lr=config.optimization.learning_rate,
-            lr_decay=config.optimization.lr_decay,
-            end_lr=config.optimization.end_lr,
-            lr_mult=config.optimization.lr_mult,
-            weight_decay=config.optimization.weight_decay,
-            warmup_steps=config.optimization.warmup_steps,
+            optim_type=self._config.optimization.optim_type,
+            lr_choice=self._config.optimization.lr_choice,
+            lr_schedule=self._config.optimization.lr_schedule,
+            lr=self._config.optimization.learning_rate,
+            lr_decay=self._config.optimization.lr_decay,
+            end_lr=self._config.optimization.end_lr,
+            lr_mult=self._config.optimization.lr_mult,
+            weight_decay=self._config.optimization.weight_decay,
+            warmup_steps=self._config.optimization.warmup_steps,
         )
 
         return optimization_kwargs
@@ -1319,9 +1856,6 @@ class DefaultLearner(AbstractMMLearner):
         self,
         train_df: pd.DataFrame,
         val_df: pd.DataFrame,
-        config: DictConfig,
-        df_preprocessor: MultiModalFeaturePreprocessor,
-        data_processors: List,
         val_use_training_mode: bool,
     ) -> LightningDataModule:
         """get the data module for training
@@ -1332,20 +1866,29 @@ class DefaultLearner(AbstractMMLearner):
         ----------
         train_df (pd.DataFrame): training data as in pandas data frame
         val_df (pd.DataFrame): validation data as in pandas data frame
-        config (DictConfig): OmegaConfig instance holding training configurations
-        df_preprocessor (MultiModalFeaturePreprocessor): data frame preprocessor to read and preprocess pandas data frames
-        data_processors (List): data processors to read trainig data
+        self._config (DictConfig): OmegaConfig instance holding training configurations
+        self._df_preprocessor (MultiModalFeaturePreprocessor): data frame preprocessor to read and preprocess pandas data frames
+        sefl._data_processors (List): data processors to read trainig data
         val_use_training_mode (bool): whether to use training mode for validation data
 
         Returns
         -------
         LightningDataModule: pytorch lightning data module used for loading data during training
         """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _get_train_data_module()"
+        assert (
+            self._df_preprocessor is not None
+        ), "self._df_preprocessor is None. You must setup self._df_preprocessor before calling _get_train_data_module()"
+        assert (
+            self._data_processors is not None
+        ), "self._data_processors is None. You must setup self._data_processors before calling _get_train_data_module()"
         train_dm = BaseDataModule(
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-            per_gpu_batch_size=config.env.per_gpu_batch_size,
-            num_workers=config.env.num_workers,
+            df_preprocessor=self._df_preprocessor,
+            data_processors=self._data_processors,
+            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+            num_workers=self._config.env.num_workers,
             train_data=train_df,
             validate_data=val_df,
             val_use_training_mode=val_use_training_mode,
@@ -1353,23 +1896,26 @@ class DefaultLearner(AbstractMMLearner):
 
         return train_dm
 
-    def _setup_mixup(self, config: DictConfig) -> Tuple[bool, Optional[Mixup]]:
+    def _setup_mixup(self) -> Tuple[bool, Optional[Mixup]]:
         """Setup mixup for training
 
         Parameters
         ----------
-        config (DictConfig): OmegaConfig instance holding model configurations
+        self._config (DictConfig): OmegaConfig instance holding model configurations
 
         Returns
         -------
         Tuple[bool, Optional[Mixup]]: tuple of mixup_active and mixup_fn (Mixup if mixup is active, None otherwise)
         """
+        assert (
+            self._config is not None
+        ), "self._config must be set before calling _setup_mixup(). Are you calling _setup_mixup() directly? Use .fit() instead."
         mixup_active, mixup_fn = get_mixup(
-            model_config=OmegaConf.select(config, "model"),
-            mixup_config=OmegaConf.select(config, "data.mixup"),
+            model_config=OmegaConf.select(self._config, "model"),
+            mixup_config=OmegaConf.select(self._config, "data.mixup"),
             num_classes=self._output_shape,
         )
-        if mixup_active and (config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1):
+        if mixup_active and (self._config.env.per_gpu_batch_size == 1 or self._config.env.per_gpu_batch_size % 2 == 1):
             warnings.warn(
                 "The mixup is done on the batch."
                 "The per_gpu_batch_size should be >1 and even for reasonable operation",
@@ -1400,9 +1946,7 @@ class DefaultLearner(AbstractMMLearner):
             validation_metric, custom_metric_func = (None, None)
         return validation_metric, custom_metric_func
 
-    def _get_data_processors(
-        self, config: DictConfig, advanced_hyperparameters: Optional[Dict], model: nn.Module
-    ) -> List[object]:
+    def _get_data_processors(self, advanced_hyperparameters: Optional[Dict]) -> List[object]:
         """Create data processors for training. Reuse the existing data processors if exists
 
         Parameters
@@ -1412,67 +1956,84 @@ class DefaultLearner(AbstractMMLearner):
         model (nn.Module): torch model (a.k.a. nn.Module)
 
         Returns
-        TODO: !!! Hot issue - data processors do not inherit from a common base class!!!!!!
+        TODO: !!! Hot - data processors do not inherit from a common base class!!!!!!
         List[object]: list of required data processors.
         """
+        assert (
+            self._config is not None
+        ), "self._config must be set before calling _get_data_processors. Are you calling _get_data_processors directly? Use .fit() instead"
+        assert (
+            self._model is not None
+        ), "self._model must be set before calling _get_data_processors. Are you calling _get_data_processors directly? Use .fit() instead"
         if self._data_processors is None:
             data_processors = create_fusion_data_processors(
-                config=config,
-                model=model,
+                config=self._config,
+                model=self._model,
                 advanced_hyperparameters=advanced_hyperparameters,
             )
         else:  # continuing training
             data_processors = self._data_processors
         return data_processors
 
-    def _get_trainable_params(self, config: DictConfig, model: nn.Module) -> List[str]:
+    def _get_trainable_params(self) -> List[str]:
         """Get trainable parameters for efficient finetuning
 
         Parameters
         -----------
-        config (DictConfig): OmegaConfig instance holding model configurations
-        model (nn.Module): the torch model (a.k.a. nn.Module)
+        self._config (DictConfig): OmegaConfig instance holding model configurations
+        self._model (nn.Module): the torch model (a.k.a. nn.Module)
 
         Returns
         --------
         List[str]: list of trainable parameter names
         """
-        norm_param_names = get_norm_layer_param_names(model)
+        assert (
+            self._config is not None
+        ), "self._config must be set before calling _get_trainable_params. Are you calling _get_trainable_params directly? Use .fit() instead"
+
+        assert (
+            self._model is not None
+        ), "self._model must be set before calling _get_trainable_params. Are you calling _get_trainable_params directly? Use .fit() instead"
+        norm_param_names = get_norm_layer_param_names(self._model)
 
         trainable_param_names = get_trainable_params_efficient_finetune(
             norm_param_names,
-            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+            efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
         )
 
         return trainable_param_names
 
-    def _create_model(self, config: DictConfig, df_preprocessor: MultiModalFeaturePreprocessor) -> nn.Module:
+    def _create_model(self) -> nn.Module:
         """Creates the model for training based on the config and info in df_preprocessor
         By default we use the create_fusion_model function to create the model
         This can be overriden by a child learner to create custom models
 
         Parameters
         -----------
-        config (DictConfig): OmegaConfig instance holding model configurations
-        df_preprocessor (MultiModalFeaturePreprocessor): data frame preprocessor
+        self._config (DictConfig): OmegaConfig instance holding model configurations
+        self._df_preprocessor (MultiModalFeaturePreprocessor): data frame preprocessor
 
         Returns
         --------
         nn.Module: the torch model (a.k.a. nn.Module) to be trained
         """
+
+        assert (
+            self._config is not None and self._df_preprocessor is not None
+        ), "Config and df_preprocessor must be set before calling _create_model(). Are you calling _create_model() directly? Use .fit() instead."
         ##  this is to be moved into NER learners
         if self._problem_type == NER:
-            self._output_shape = len(df_preprocessor.label_generator.unique_entity_groups)
+            self._output_shape = len(self._df_preprocessor.label_generator.unique_entity_groups)
 
         # 5. setup model.
         # create a new model if calling ._fit() for the first time. otherwise re-use the existing self._model
         if self._model is None:
             model = create_fusion_model(
-                config=config,
+                config=self._config,
                 num_classes=self._output_shape,
                 classes=self._classes,
-                num_numerical_columns=len(df_preprocessor.numerical_feature_names),
-                num_categories=df_preprocessor.categorical_num_categories,
+                num_numerical_columns=len(self._df_preprocessor.numerical_feature_names),
+                num_categories=self._df_preprocessor.categorical_num_categories,
             )
         else:  # continuing training
             model = self._model
@@ -1587,6 +2148,7 @@ class DefaultLearner(AbstractMMLearner):
                     assert version.parse(pl.__version__) >= version.parse(
                         DEEPSPEED_MIN_PL_VERSION
                     ), f"For DeepSpeed Offloading to work reliably you need at least pytorch-lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your pytorch-lightning version."
+                    from autogluon.multimodal.optimization.deepspeed import CustomDeepSpeedStrategy
 
                     strategy = CustomDeepSpeedStrategy(
                         stage=3,

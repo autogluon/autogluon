@@ -415,13 +415,7 @@ class MultiModalPredictor(ExportMixin):
         # if self._problem_type == None:
         #     self._learner = None
         # else:
-        #     self._initialized_learner()
-        # elif self._problem_type == "somethingA":
-        #     self._learner = SomeLearnerA(**kwargs)
-        # elif self._problem_type == "somethingB":
-        #     self._learner = SomeLearnerB(**kwargs)
-        # else:
-        #     self._learner = DefaultLearner(**kwargs)
+        #     self._learner = self._initialized_learner()
 
         if self.problem_property and self.problem_property.is_matching:
             self._matcher = MultiModalMatcher(
@@ -668,6 +662,47 @@ class MultiModalPredictor(ExportMixin):
         -------
         An "MultiModalPredictor" object (itself).
         """
+        if self._use_learner:
+            self._problem_type = self._infer_problem_type(train_data=train_data, column_types=column_types)
+            if self._use_learner:
+                if self._problem_type == OBJECT_DETECTION:
+                    # TODO: raise NotImplementedError("Object Detection Learner is not supported yet.")
+                    pass
+                elif self._problem_type == NER:
+                    # TODO: raise NotImplementedError("NER Learner is not supported yet.")
+                    pass
+                else:
+                    self._learner = DefaultLearner(
+                        problem_type=self._problem_type,
+                        label=self._label_column,
+                        presets=self._presets,
+                        eval_metric=self._eval_metric_name,
+                        verbosity=self._verbosity,
+                        num_classes=self._output_shape,
+                        classes=self._classes,
+                        path=self._save_path,
+                    )
+
+                self._learner.fit(
+                    train_data=train_data,
+                    presets=presets,
+                    config=config,
+                    tuning_data=tuning_data,
+                    max_num_tuning_data=max_num_tuning_data,
+                    id_mappings=id_mappings,
+                    time_limit=time_limit,
+                    save_path=save_path,
+                    hyperparameters=hyperparameters,
+                    column_types=column_types,
+                    holdout_frac=holdout_frac,
+                    teacher_predictor=teacher_predictor,
+                    seed=seed,
+                    standalone=standalone,
+                    hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                    clean_ckpts=clean_ckpts,
+                )
+                return self
+
         fit_called = self._fit_called  # used in current function
         self._fit_called = True
 
@@ -680,6 +715,7 @@ class MultiModalPredictor(ExportMixin):
         training_start = time.time()
 
         # 2. Route to Matcher if applicable. This can be an example of how a learner would work.
+        # TODO: Predictor responsible for creating a new learner for matching.
         if self._matcher:
             self._matcher.fit(
                 train_data=train_data,
@@ -696,6 +732,8 @@ class MultiModalPredictor(ExportMixin):
             )
             return self
 
+        # 3. Setup and split data
+        # TODO: Move to detection learner
         if self._problem_type == OBJECT_DETECTION:
             train_data, tuning_data = setup_detection_train_tuning_data(
                 self, max_num_tuning_data, seed, train_data, tuning_data
@@ -705,19 +743,24 @@ class MultiModalPredictor(ExportMixin):
             train_data = load_pd.load(train_data)
         if isinstance(tuning_data, str):
             tuning_data = load_pd.load(tuning_data)
+        if tuning_data is None:
+            train_data, tuning_data = self._split_train_tuning(
+                data=train_data, holdout_frac=holdout_frac, random_state=seed
+            )
 
         pl.seed_everything(seed, workers=True)
 
+        # 4. setup presets. ignore user input if self._presets already exists
         if self._presets is not None:
             # FIXME: Silently ignoring user input, there should be a warning
             presets = self._presets
         else:
             self._presets = presets
-
+        # 5. setup config.
         if self._config is not None:  # continuous training
             # FIXME: Silently ignoring user input, there should be a warning
             config = self._config
-
+        # 6. setup save path
         self._save_path = setup_save_path(
             resume=self._resume,
             old_save_path=self._save_path,
@@ -726,18 +769,14 @@ class MultiModalPredictor(ExportMixin):
             warn_if_exist=False,
             fit_called=fit_called,
         )
-
+        # 7. setup problem types
         self._problem_type = self._infer_problem_type(train_data=train_data, column_types=column_types)
-
-        if tuning_data is None:
-            train_data, tuning_data = self._split_train_tuning(
-                data=train_data, holdout_frac=holdout_frac, random_state=seed
-            )
-
+        # 8. infor column types
         column_types = self._infer_column_types(
             train_data=train_data, tuning_data=tuning_data, column_types=column_types
         )
 
+        # 9. infer output shape
         # FIXME: separate infer problem_type with output_shape, should be logically distinct
         _, output_shape = infer_problem_type_output_shape(
             label_column=self._label_column,
@@ -758,6 +797,7 @@ class MultiModalPredictor(ExportMixin):
         logger.debug(f"column_types: {column_types}")
         logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
 
+        # 10. ignore user input if self._column_type already exists
         if self._column_types is not None and self._column_types != column_types:
             warnings.warn(
                 f"Inferred column types {column_types} are inconsistent with "
@@ -767,6 +807,7 @@ class MultiModalPredictor(ExportMixin):
             # use previous column types to avoid inconsistency with previous numerical mlp and categorical mlp
             column_types = self._column_types
 
+        # 11. check for output shape consistency. Raise error if inconsistent for obj. det.
         if self._problem_type != OBJECT_DETECTION:
             if self._output_shape is not None and output_shape is not None:
                 assert self._output_shape == output_shape, (
@@ -775,6 +816,7 @@ class MultiModalPredictor(ExportMixin):
             else:
                 self._output_shape = output_shape
 
+        # 12. setup validation metric names
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
                 problem_type=self._problem_type,
@@ -785,7 +827,7 @@ class MultiModalPredictor(ExportMixin):
             validation_metric_name = self._validation_metric_name
             eval_metric_name = self._eval_metric_name
 
-        # 11. get minmax mode. FIXME: Can be merged with step 0 at the top
+        # 13. get minmax mode. FIXME: Can be merged with step 0 at the top
         minmax_mode = get_minmax_mode(validation_metric_name)
 
         if time_limit is not None:
@@ -796,6 +838,7 @@ class MultiModalPredictor(ExportMixin):
         self._validation_metric_name = validation_metric_name
         self._column_types = column_types
 
+        # 14. setup hyperparameters and hpo hyperparameters
         hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
             problem_type=self._problem_type,
             presets=presets,
@@ -807,6 +850,7 @@ class MultiModalPredictor(ExportMixin):
         hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
 
         hpo_mode = True if hyperparameter_tune_kwargs else False
+        # 15. filter out the hyperparameters that have no effect for HPO.
         if hpo_mode:
             hyperparameters = filter_hyperparameters(
                 hyperparameters=hyperparameters,
@@ -849,27 +893,7 @@ class MultiModalPredictor(ExportMixin):
             return predictor
 
         # 15.2 default ._fit() which invokes pl module
-        if not self._use_learner:
-            self._fit(**_fit_args)
-        else:
-            # calling learner.fit
-            # After getting the parameters, setup learner
-            if self._learner is None:
-                self._learner = DefaultLearner(
-                    label=self._label_column,
-                    problem_type=self._problem_type,
-                    column_types=self._column_types,
-                    eval_metric=self._eval_metric_name,
-                    path=self._save_path,
-                    verbosity=self._verbosity,
-                    num_classes=self._output_shape,
-                    classes=self._classes,
-                    enable_progress_bar=self._enable_progress_bar,
-                )
-            else:
-                # self._update_learner_properties()
-                pass
-            self._learner.fit(**_fit_args)
+        self._fit(**_fit_args)
 
         # 16. post processing
         training_end = time.time()

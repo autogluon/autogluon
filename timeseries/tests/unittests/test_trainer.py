@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 import autogluon.core as ag
+from autogluon.common import space
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
@@ -166,7 +167,7 @@ def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(temp_mod
 
 @pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
 def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_performed(temp_model_path, model_name):
-    hyperparameters = {model_name: {"epochs": ag.Int(1, 4)}}
+    hyperparameters = {model_name: {"epochs": space.Int(1, 4)}}
     # mock the default hps factory to prevent preset hyperparameter configurations from
     # creeping into the test case
     with mock.patch("autogluon.timeseries.models.presets.get_default_hps") as default_hps_mock:
@@ -189,6 +190,25 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
     config_history = [result["hyperparameters"] for result in hpo_results_first_model.values()]
     assert len(config_history) == 2
     assert all(1 <= config["epochs"] <= 4 for config in config_history)
+
+
+@pytest.mark.parametrize(
+    "hyperparameters, expected_model_names",
+    [
+        ({"Naive": [{}, {}, {"ag_args": {"name_suffix": "_extra"}}]}, ["Naive", "Naive_2", "Naive_extra"]),
+        ({"Naive": [{"ag_args": {"name": "CustomNaive"}}], "SeasonalNaive": {}}, ["CustomNaive", "SeasonalNaive"]),
+    ],
+)
+def test_given_hyperparameters_with_lists_when_trainer_called_then_multiple_models_are_trained(
+    temp_model_path, hyperparameters, expected_model_names
+):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
+    trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
+    leaderboard = trainer.leaderboard()
+    print(leaderboard["model"].values)
+    print(expected_model_names)
+    assert len(leaderboard) == len(expected_model_names)
+    assert all(name in leaderboard["model"].values for name in expected_model_names)
 
 
 @pytest.mark.parametrize("eval_metric", ["MAPE", None])

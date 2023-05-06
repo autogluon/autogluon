@@ -1,5 +1,4 @@
 import logging
-import re
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Type
 
@@ -149,7 +148,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         hyperparameters: Dict[str, Any] = None,
         **kwargs,  # noqa
     ):
-        name = name or re.sub(r"Model$", "", self.__class__.__name__)  # TODO: look name up from presets
         super().__init__(
             path=path,
             freq=freq,
@@ -230,6 +228,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         """Gets params that are passed to the inner model."""
         args = super()._get_model_params().copy()
         args.setdefault("batch_size", 64)
+        args.setdefault("context_length", max(10, 2 * self.prediction_length))
         args.update(
             dict(
                 freq=self.freq,
