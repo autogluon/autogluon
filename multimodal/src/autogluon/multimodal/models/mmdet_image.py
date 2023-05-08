@@ -308,7 +308,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
     def forward(
         self,
-        batch: dict,
+        batch,
+        mode,
     ):
         """
         Parameters
@@ -316,37 +317,30 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         batch
             A dictionary containing the input mini-batch data.
             We need to use the keys with the model prefix to index required data.
+        mode
+            "loss" or "predict". TODO: support "tensor"
+            https://github.com/open-mmlab/mmdetection/blob/main/mmdet/models/detectors/base.py#L58C1
 
         Returns
         -------
             A dictionary with bounding boxes.
         """
-        # TODO: refactor this to work like forward() in MMDet, and support realtime predict
-        logger.warning("MMDetAutoModelForObjectDetection.forward() is deprecated since it does not support multi gpu.")
 
-        data = batch[self.image_key]
+        self.set_data_preprocessor_device()
+        data = self.data_preprocessor(batch)
+        rets = self.model(
+            inputs=data["inputs"],
+            data_samples=data["data_samples"],
+            mode=mode,
+        )
 
-        data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
-        data["img"] = [img.data[0] for img in data["img"]]
-
-        device = next(self.model.parameters()).device  # model device
-        if next(self.model.parameters()).is_cuda:
-            # scatter to specified GPU
-            data = scatter(data, [device])[0]
+        if mode == "loss":
+            return rets
+        elif mode == "predict":
+            # for detailed data structure, see https://github.com/open-mmlab/mmdetection/blob/main/mmdet/structures/det_data_sample.py
+            return [{BBOX: ret.pred_instances, LABEL: ret.gt_instances} for ret in rets]
         else:
-            for m in self.model.modules():
-                assert not isinstance(m, RoIPool), "CPU inference with RoIPool is not supported currently."
-
-        results = self.model(return_loss=False, rescale=True, **data)
-
-        ret = {BBOX: results}
-        return {self.prefix: ret}
-
-    def forward_test(self, imgs, img_metas, rescale=True):
-        return self.model.forward_test(imgs=imgs, img_metas=img_metas, rescale=rescale)
-
-    def forward_train(self, img, img_metas, gt_bboxes, gt_labels):
-        return self.model.forward_train(img=img, img_metas=img_metas, gt_bboxes=gt_bboxes, gt_labels=gt_labels)
+            raise ValueError(f"{mode} mode is not supported.")
 
     def _parse_losses(self, losses):
         return self.model._parse_losses(losses)

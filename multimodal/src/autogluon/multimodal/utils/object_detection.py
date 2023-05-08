@@ -12,6 +12,8 @@ import PIL
 
 from ..constants import (
     AUTOMM,
+    BBOX,
+    LABEL,
     MAP,
     MAP_50,
     MAP_75,
@@ -776,7 +778,7 @@ class COCODataset:
         for i, row in data.reset_index(drop=True).iterrows():
             image_id = self.get_image_id_from_path(row["image"])
 
-            pred_result = ret[i].pred_instances
+            pred_result = ret[i]
             N_pred = len(pred_result["bboxes"])
             for bbox_idx in range(N_pred):
                 coco_format_result.append(
@@ -818,16 +820,16 @@ def cocoeval_torchmetrics(outputs: List):
     for per_img_outputs in outputs:  # TODO: refactor here
         preds.append(
             dict(
-                boxes=per_img_outputs.pred_instances["bboxes"].to("cpu"),
-                scores=per_img_outputs.pred_instances["scores"].to("cpu"),
-                labels=per_img_outputs.pred_instances["labels"].to("cpu"),
+                boxes=per_img_outputs[BBOX]["bboxes"].to("cpu"),
+                scores=per_img_outputs[BBOX]["scores"].to("cpu"),
+                labels=per_img_outputs[BBOX]["labels"].to("cpu"),
             )
         )
 
         target.append(
             dict(
-                boxes=per_img_outputs.gt_instances["bboxes"].to("cpu"),
-                labels=per_img_outputs.gt_instances["labels"].to("cpu"),
+                boxes=per_img_outputs[LABEL]["bboxes"].to("cpu"),
+                labels=per_img_outputs[LABEL]["labels"].to("cpu"),
             )
         )
 
@@ -1439,11 +1441,11 @@ def save_result_df(
 
     for image_pred, image_name in zip(pred, image_names):
         box_info = []
-        for class_idx, bboxes in enumerate(image_pred):
-            pred_class = idx2classname[class_idx]
-
-            for bbox in bboxes:
-                box_info.append({"class": pred_class, "bbox": list(bbox[:4]), "score": bbox[4]})
+        N_preds = len(image_pred["bboxes"])
+        for i in range(N_preds):
+            box_info.append(
+                {"class": image_pred["labels"][i], "bbox": image_pred["bboxes"][i], "score": image_pred["scores"][i]}
+            )
         results.append([image_name, box_info])
     result_df = pd.DataFrame(results, columns=["image", "bboxes"])
     if result_path:

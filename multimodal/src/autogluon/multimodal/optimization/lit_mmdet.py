@@ -18,7 +18,7 @@ except ImportError as e:
 
     pass
 
-from ..constants import AUTOMM, IMAGE, LABEL
+from ..constants import AUTOMM, BBOX, IMAGE, LABEL
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(__name__)
@@ -63,13 +63,7 @@ class MMDetLitModule(pl.LightningModule):
         self.input_label_key = self.model.prefix + "_" + LABEL
 
     def _base_step(self, batch, mode):
-        self.model.set_data_preprocessor_device()
-        data = self.model.data_preprocessor(batch[self.input_data_key])
-        ret = self.model.model(
-            inputs=data["inputs"],
-            data_samples=data["data_samples"],
-            mode=mode,
-        )
+        ret = self.model(batch=batch[self.input_data_key], mode=mode)
 
         return ret
 
@@ -80,11 +74,6 @@ class MMDetLitModule(pl.LightningModule):
         return self._base_step(batch=batch, mode="loss")
 
     def _get_map_input(self, pred_results, sample):
-        # print(pred_results)
-        # print(pred_results[0].gt_instances)
-        # print(pred_results[0].ignored_instances)
-        # print(pred_results[0].keys())
-        # exit()
 
         preds = []
         target = []
@@ -92,7 +81,7 @@ class MMDetLitModule(pl.LightningModule):
         batch_size = len(pred_results)
 
         for i in range(batch_size):
-            if hasattr(pred_results[i].pred_instances, "masks"):
+            if hasattr(pred_results[i][BBOX], "masks"):
                 # has one additional dimension with 2 outputs: img_result=img_result[0], mask_result=img_result[1]
                 raise NotImplementedError(
                     "Do not support training for models with masks like mask r-cnn, "
@@ -101,15 +90,15 @@ class MMDetLitModule(pl.LightningModule):
                 )
             preds.append(
                 dict(
-                    boxes=pred_results[i].pred_instances.bboxes,  # .float().to(self.device)?
-                    scores=pred_results[i].pred_instances.scores,  # .float().to(self.device)?
-                    labels=pred_results[i].pred_instances.labels,  # .long().to(self.device)?
+                    boxes=pred_results[i][BBOX].bboxes,  # .float().to(self.device)?
+                    scores=pred_results[i][BBOX].scores,  # .float().to(self.device)?
+                    labels=pred_results[i][BBOX].labels,  # .long().to(self.device)?
                 )
             )
             target.append(
                 dict(
-                    boxes=pred_results[i].gt_instances.bboxes,
-                    labels=pred_results[i].gt_instances.labels,
+                    boxes=pred_results[i][LABEL].bboxes,
+                    labels=pred_results[i][LABEL].labels,
                 )
             )
 
@@ -128,56 +117,6 @@ class MMDetLitModule(pl.LightningModule):
         self.validation_metric.update(preds, target)
 
         return pred_results
-
-    def compute_loss(self, img, img_metas, gt_bboxes, gt_labels, *args, **kwargs):
-        """
-        Equivalent to `val_step` and `train_step` of `self.model`.
-        https://github.com/open-mmlab/mmdetection/blob/56e42e72cdf516bebb676e586f408b98f854d84c/mmdet/models/detectors/base.py#L221
-        https://github.com/open-mmlab/mmdetection/blob/56e42e72cdf516bebb676e586f408b98f854d84c/mmdet/models/detectors/base.py#L256
-        Parameters
-        ----------
-        img
-            Image Tensor
-            torch.Tensor, Size: [batch_size, C, W, H]
-        img_metas
-            List of image metadata dict
-            [
-                {
-                    'filename': 'data/VOCdevkit/VOC2007/JPEGImages/000001.jpg',
-                    'ori_filename': 'JPEGImages/000001.jpg',
-                    'ori_shape': (500, 353, 3),
-                    ...
-                },
-                ...(batch size times)
-            ]
-        gt_bboxes
-            List of ground-truth bounding boxes position tensors
-            [
-                torch.Tensor, Size: [# objects in image, 4],
-                ...(batch size times)
-            ]
-        gt_labels
-            List of ground-truth bounding boxes label tensors
-            [
-                torch.Tensor, Size: [# objects in image],
-                ...(batch size times)
-            ]
-        """
-        losses = self.model.forward_train(
-            img=img,
-            img_metas=img_metas,
-            gt_bboxes=gt_bboxes,
-            gt_labels=gt_labels,
-            *args,
-            **kwargs,
-        )
-        return self.parse_losses(losses)
-
-    def parse_losses(self, losses):
-        # `_parse_losses`: https://github.com/open-mmlab/mmdetection/blob/
-        # 56e42e72cdf516bebb676e586f408b98f854d84c/mmdet/models/detectors/base.py#L176
-        loss, log_vars = self.model._parse_losses(losses)
-        return loss, log_vars
 
     def sum_and_log_step_results(self, losses, logging=True):
         # losses is a dict of several type of losses, e.g. ['loss_cls', 'loss_conf', 'loss_xy', 'loss_wh']
@@ -229,10 +168,14 @@ class MMDetLitModule(pl.LightningModule):
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         pred = self._predict_step(batch)
+
+        return pred
+        """
         if "mmdet_image_label" in batch:
             return {"bbox": pred, "label": batch[self.input_label_key]}
         else:
             return {"bbox": pred}
+        """
 
     def configure_optimizers(self):
         """

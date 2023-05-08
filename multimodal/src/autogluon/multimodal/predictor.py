@@ -1796,15 +1796,8 @@ class MultiModalPredictor(ExportMixin):
                     else:
                         outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
                 elif self._problem_type == OBJECT_DETECTION:
-                    # reformat single gpu output for object detection
-                    # outputs shape: num_batch, 1(["bbox"]), batch_size, 80, n, 5
-                    # output LABEL if exists for evaluations
-                    outputs = [
-                        {BBOX: bbox, LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox}
-                        for ele in outputs
-                        for i, bbox in enumerate(ele[BBOX])
-                    ]
-
+                    # Unpack outputs for object detection while using single gpu
+                    outputs = [output for batch_outputs in outputs for output in batch_outputs]
         return outputs
 
     def _on_predict_start(
@@ -2218,7 +2211,9 @@ class MultiModalPredictor(ExportMixin):
             )
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
-            if self._problem_type == OBJECT_DETECTION:
+            if (
+                self._problem_type == OBJECT_DETECTION
+            ):  # TODO: add prediction output in COCO format if as_pandas is False
                 pred = save_result_df(
                     pred=pred,
                     data=data,

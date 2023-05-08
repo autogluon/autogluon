@@ -83,7 +83,7 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         for feature_name in feature_masks[0].keys():
             ret[feature_name] = torch.cat([ele[feature_name] for ele in feature_masks])
     elif ret_type == BBOX:
-        return [ele[BBOX] for ele in outputs]
+        return [ele[BBOX] for ele in outputs]  # only return pred results
     elif ret_type == TEXT:
         return [ele[TEXT] for ele in outputs]  # single image
     elif ret_type == SCORE:
