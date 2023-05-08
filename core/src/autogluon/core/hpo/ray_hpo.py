@@ -2,6 +2,8 @@ import logging
 import os
 import shutil
 
+from autogluon.common import space as ag_space
+
 from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.try_import import try_import_ray
 try_import_ray()  # try import ray before importing the remaining contents so we can give proper error messages
@@ -23,7 +25,6 @@ from .exceptions import EmptySearchSpace
 from .ray_tune_scheduler_factory import SchedulerFactory
 from .ray_tune_searcher_factory import SearcherFactory
 from .space_converter import RaySpaceConverterFactory
-from .. import Space
 from ..ray.resources_calculator import ResourceCalculatorFactory, ResourceCalculator
 
 from ray import tune
@@ -220,7 +221,7 @@ def run(
     num_samples = hyperparameter_tune_kwargs.get('num_trials', None)
     if num_samples is None:
         num_samples = 1 if time_budget_s is None else 1000  # if both num_samples and time_budget_s are None, we only run 1 trial
-    if not any(isinstance(search_space[hyperparam], (Space, Domain)) for hyperparam in search_space):
+    if not any(isinstance(search_space[hyperparam], (ag_space.Space, Domain)) for hyperparam in search_space):
         raise EmptySearchSpace
     search_space, default_hyperparameters = _convert_search_space(search_space)
 
@@ -357,7 +358,7 @@ def _convert_search_space(search_space: dict):
     tune_search_space = search_space.copy()
     default_hyperparameters = dict()
     for hyperparameters, space in search_space.items():
-        if isinstance(space, Space):
+        if isinstance(space, ag_space.Space):
             tune_search_space[hyperparameters] = RaySpaceConverterFactory.get_space_converter(space.__class__.__name__).convert(space)
             default_hyperparameters[hyperparameters] = space.default
     default_hyperparameters = default_hyperparameters

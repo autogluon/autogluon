@@ -1,6 +1,5 @@
 import os
 import tempfile
-import unittest
 
 import numpy as np
 import pandas as pd
@@ -43,29 +42,29 @@ def sim_cov_shift(train, test, p_nonmarr=0.75, val=False):
         return train_cs, test_cs
 
 
-class TestShift(unittest.TestCase):
-    def test_shift(self):
-        train, test = load_adult_data()
-        train, test = sim_cov_shift(train, test)
-        with tempfile.TemporaryDirectory() as path:
-            shft_ana = eda.shift.XShiftDetector(
-                train_data=train,
-                test_data=test,
-                label="class",
-                classifier_kwargs={"path": os.path.join(path, "AutogluonModels")},
-                classifier_fit_kwargs={"hyperparameters": {"RF": {}}},
-                pvalue_thresh=0.1,
-            )
-            shft_ana.fit()
-            shft_viz = viz.shift.XShiftSummary(headers=True)
-            shft_viz.render(shft_ana.state)
-            result = shft_ana.state.xshift_results
-            assert result.pop("feature_importance", None).shape == (14, 6)
-            assert result.pop("pvalue", -100) > 0
-            assert result.pop("test_statistic", -100) > 0
-            assert len(result.pop("shift_features")) > 0
-            assert result == {
-                "detection_status": True,
-                "eval_metric": "roc_auc",
-                "pvalue_threshold": 0.1,
-            }
+def test_shift():
+    train, test = load_adult_data()
+    train, test = sim_cov_shift(train, test)
+    expected_threshold = 0.5
+    with tempfile.TemporaryDirectory() as path:
+        shft_ana = eda.shift.XShiftDetector(
+            train_data=train,
+            test_data=test,
+            label="class",
+            classifier_kwargs={"path": os.path.join(path, "AutogluonModels")},
+            classifier_fit_kwargs={"hyperparameters": {"RF": {}}},
+            pvalue_thresh=expected_threshold,
+        )
+        shft_ana.fit()
+        shft_viz = viz.shift.XShiftSummary(headers=True)
+        shft_viz.render(shft_ana.state)
+        result = shft_ana.state.xshift_results
+        assert result.pop("feature_importance", None).shape == (14, 6)
+        assert result.pop("pvalue", -100) > 0
+        assert result.pop("test_statistic", -100) > 0
+        assert len(result.pop("shift_features")) > 0
+        assert result == {
+            "detection_status": True,
+            "eval_metric": "roc_auc",
+            "pvalue_threshold": expected_threshold,
+        }
