@@ -549,7 +549,6 @@ class TimeSeriesPredictor:
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[str] = None,
         random_seed: Optional[int] = 123,
-        **kwargs,
     ) -> TimeSeriesDataFrame:
         """Return quantile and mean forecasts for the given dataset, starting from the end of each time series.
 
@@ -603,25 +602,17 @@ class TimeSeriesPredictor:
         B       2020-03-04          0    5.0
                 2020-03-05          0    7.0
         >>> predictor.predict(data, known_covariates=future_known_covariates)
-                            target
+                              mean
         item_id timestamp
-        A       2020-01-08      30
-                2020-01-09      27
-        B       2020-03-04      17
-                2020-03-05       8
+        A       2020-01-08    30.2
+                2020-01-09    27.0
+        B       2020-03-04    17.1
+                2020-03-05     8.3
         """
-        if "quantile_levels" in kwargs:
-            warnings.warn(
-                "Passing `quantile_levels` as a keyword argument to `TimeSeriesPredictor.predict` is deprecated as of "
-                "v0.7. This argument is ignored. Please specify the desired quantile levels when creating the "
-                "predictor as `TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
-                category=DeprecationWarning,
-            )
-            kwargs.pop("quantile_levels")
         if random_seed is not None:
             set_random_seed(random_seed)
         data = self._check_and_prepare_data_frame(data)
-        return self._learner.predict(data, known_covariates=known_covariates, model=model, **kwargs)
+        return self._learner.predict(data, known_covariates=known_covariates, model=model)
 
     def evaluate(self, data: Union[TimeSeriesDataFrame, pd.DataFrame], **kwargs):
         """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``
