@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 from packaging import version
 
-from .version_utils import VersionManager
+from ..version import __version__
 
 
 def _deprecation_warning(
@@ -38,6 +38,7 @@ def Deprecated(
     new: Optional[str] = None,
     custom_warning_msg: Optional[str] = None,
     version_to_remove: Optional[str] = None,
+    _mock_version: Optional[str] = None
 ):
     """
     Decorator to add deprecation warnings or raise an error to the decorated object.
@@ -93,10 +94,12 @@ def Deprecated(
 
     def _decorator(obj):
         error = False
-        print(VersionManager.get_ag_version())
-        if version.parse(VersionManager.get_ag_version()) < version.parse(min_version_to_warn):
+        ag_version = __version__
+        if _mock_version is not None:
+            ag_version = _mock_version
+        if version.parse(ag_version) < version.parse(min_version_to_warn):
             return obj
-        if version.parse(VersionManager.get_ag_version()) >= version.parse(min_version_to_error):
+        if version.parse(ag_version) >= version.parse(min_version_to_error):
             error = True
         if inspect.isclass(obj):
             obj_init = obj.__init__
@@ -163,6 +166,7 @@ def Deprecated_args(
     min_version_to_error: str,
     custom_warning_msg: Optional[str] = None,
     version_to_remove: Optional[str] = None,
+    _mock_version: Optional[str] = None,
     **kwargs_mapping,
 ):
     """
@@ -209,9 +213,12 @@ def Deprecated_args(
 
     def _decorator(obj):
         error = False
-        if version.parse(VersionManager.get_ag_version()) < version.parse(min_version_to_warn):
+        ag_version = __version__
+        if _mock_version is not None:
+            ag_version = _mock_version
+        if version.parse(ag_version) < version.parse(min_version_to_warn):
             return obj
-        if version.parse(VersionManager.get_ag_version()) >= version.parse(min_version_to_error):
+        if version.parse(ag_version) >= version.parse(min_version_to_error):
             error = True
 
         @functools.wraps(obj)

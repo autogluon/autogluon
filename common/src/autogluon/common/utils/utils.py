@@ -7,7 +7,7 @@ import platform
 import sys
 from typing import Dict, Any
 
-from .version_utils import VersionManager
+from ..version import __version__
 try:
     from ..version import __lite__
 except ImportError:
@@ -82,7 +82,7 @@ def get_package_versions() -> Dict[str, str]:
 def get_autogluon_metadata() -> Dict[str, Any]:
     metadata = dict(
         system=platform.system(),
-        version=f"{VersionManager.get_ag_version()}",
+        version=f"{__version__}",
         lite=__lite__,
         py_version=get_python_version(include_micro=False),
         py_version_micro=get_python_version(include_micro=True),
