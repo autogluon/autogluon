@@ -20,9 +20,9 @@ from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.version_utils import VersionManager
 from autogluon.core.utils.loaders import load_pd
 
-from . import version as ag_version
 from .constants import (
     AUTOMM,
     AUTOMM_TUTORIAL_MODE,
@@ -1811,7 +1811,7 @@ class MultiModalMatcher:
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
                     "fit_called": self._fit_called,
-                    "version": ag_version.__version__,
+                    "version": VersionManager.get_ag_version("multimodal"),
                 },
                 fp,
                 ensure_ascii=True,

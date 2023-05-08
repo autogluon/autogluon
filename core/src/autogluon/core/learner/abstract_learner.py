@@ -36,9 +36,9 @@ class AbstractLearner:
         self.random_state = random_state
 
         try:
-            from ..version import __version__  # noqa
+            from autogluon.common.utils.version_utils import VersionManager  # noqa
 
-            self.version = __version__
+            self.version = VersionManager.get_ag_version("core")
         except ImportError:
             self.version = None
         self._python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"

@@ -26,11 +26,11 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
+from autogluon.common.utils.version_utils import VersoinManager
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
 from autogluon.core.utils.loaders import load_pd
 from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
-from . import version as ag_version
 from .constants import (
     AUTOMM,
     AUTOMM_TUTORIAL_MODE,
@@ -2514,7 +2514,7 @@ class MultiModalPredictor(ExportMixin):
                     "fit_called": self._fit_called,
                     "best_score": self._best_score,
                     "total_train_time": self._total_train_time,
-                    "version": ag_version.__version__,
+                    "version": VersoinManager.get_ag_version("multimodal"),
                 },
                 fp,
                 ensure_ascii=True,

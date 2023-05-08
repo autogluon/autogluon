@@ -3,7 +3,7 @@ import platform
 
 from types import ModuleType
 
-from ..version import __version__
+from .version_utils import VersionManager
 
 __all__ = [
     'try_import_mxboard',
@@ -145,7 +145,7 @@ def try_import_catboost():
         import catboost
     except ImportError as e:
         raise ImportError("`import catboost` failed. "
-                          f"A quick tip is to install via `pip install autogluon.tabular[catboost]=={__version__}`.")
+                          f"A quick tip is to install via `pip install autogluon.tabular[catboost]=={VersionManager.get_ag_version("tabular")}`.")
     except ValueError as e:
         raise ImportError("Import catboost failed. Numpy version may be outdated, "
                           "Please ensure numpy version >=1.17.0. If it is not, please try 'pip uninstall numpy -y; pip install numpy>=1.17.0' "
@@ -157,7 +157,7 @@ def try_import_lightgbm():
         import lightgbm
     except ImportError as e:
         raise ImportError("`import lightgbm` failed. "
-                          f"A quick tip is to install via `pip install autogluon.tabular[lightgbm]=={__version__}`.")
+                          f"A quick tip is to install via `pip install autogluon.tabular[lightgbm]=={VersionManager.get_ag_version("tabular")}`.")
     except OSError as e:
         raise ImportError("`import lightgbm` failed. If you are using Mac OSX, "
                           "Please try 'brew install libomp'. Detailed info: {}".format(str(e)))
@@ -173,7 +173,7 @@ def try_import_xgboost():
             f'Currently, we only support "xgboost>={min_version}". Installed version: "xgboost=={xgboost.__version__}".'
     except ImportError:
         raise ImportError("`import xgboost` failed. "
-                          f"A quick tip is to install via `pip install autogluon.tabular[xgboost]=={__version__}`.")
+                          f"A quick tip is to install via `pip install autogluon.tabular[xgboost]=={VersionManager.get_ag_version("tabular")}`.")
 
 
 def try_import_faiss():
@@ -197,7 +197,7 @@ def try_import_fastai():
         import autogluon.tabular.models.fastainn.imports_helper
 
     except ModuleNotFoundError as e:
-        raise ImportError(f"Import fastai failed. A quick tip is to install via `pip install autogluon.tabular[fastai]=={__version__}`. ")
+        raise ImportError(f"Import fastai failed. A quick tip is to install via `pip install autogluon.tabular[fastai]=={VersionManager.get_ag_version("tabular")}`. ")
 
 
 def try_import_torch():

@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 from packaging import version
 
-from ..version import __version__
+from .version_utils import VersionManager
 
 
 def _deprecation_warning(
@@ -93,9 +93,10 @@ def Deprecated(
 
     def _decorator(obj):
         error = False
-        if version.parse(__version__) < version.parse(min_version_to_warn):
+        print(VersionManager.get_ag_version())
+        if version.parse(VersionManager.get_ag_version()) < version.parse(min_version_to_warn):
             return obj
-        if version.parse(__version__) >= version.parse(min_version_to_error):
+        if version.parse(VersionManager.get_ag_version()) >= version.parse(min_version_to_error):
             error = True
         if inspect.isclass(obj):
             obj_init = obj.__init__
@@ -130,7 +131,7 @@ def Deprecated(
     return _decorator
 
 
-def rename_kwargs(
+def _rename_kwargs(
     func_name: str,
     kwargs: Dict[str, Any],
     kwargs_mapping: Dict[str, str],
@@ -192,7 +193,7 @@ def Deprecated_args(
         AG version when the object will be removed. Will be added to the warning message if specified
     kwargs_mapping
         Mapping between deprecated_arg and new_arg, i.e. kwargs_mapping={"deprecated_arg": "new_args"}
-        If the argument is being deprecated and won't be replaced by other new arg, set it to None, i.e. i.e. kwargs_mapping={"deprecated_arg": None}
+        If the argument is being deprecated and won't be replaced by other new arg, set it to None, i.e. kwargs_mapping={"deprecated_arg": None}
 
     Examples
     --------
@@ -208,14 +209,14 @@ def Deprecated_args(
 
     def _decorator(obj):
         error = False
-        if version.parse(__version__) < version.parse(min_version_to_warn):
+        if version.parse(VersionManager.get_ag_version()) < version.parse(min_version_to_warn):
             return obj
-        if version.parse(__version__) >= version.parse(min_version_to_error):
+        if version.parse(VersionManager.get_ag_version()) >= version.parse(min_version_to_error):
             error = True
 
         @functools.wraps(obj)
         def patched_obj_with_warning_msg(*args, **kwargs):
-            rename_kwargs(
+            _rename_kwargs(
                 func_name=obj.__name__,
                 kwargs=kwargs,
                 kwargs_mapping=kwargs_mapping,

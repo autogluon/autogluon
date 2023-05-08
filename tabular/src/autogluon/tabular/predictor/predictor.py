@@ -3068,8 +3068,8 @@ class TabularPredictor:
         return load_json.load(path=metadata_file_path, verbose=not silent)
 
     def _save_version_file(self, silent=False):
-        from ..version import __version__
-        version_file_contents = f'{__version__}'
+        from autogluon.common.utils.version_utils import VersionManager
+        version_file_contents = VersionManager.get_ag_version("tabular")
         version_file_path = self.path + self._predictor_version_file_name
         save_str.save(path=version_file_path, data=version_file_contents, verbose=not silent)
 
@@ -3156,8 +3156,8 @@ class TabularPredictor:
             raise ValueError("path cannot be None in load()")
 
         try:
-            from ..version import __version__
-            version_load = __version__
+            from autogluon.common.utils.version_utils import VersionManager
+            version_load = VersionManager.get_ag_version("tabular")
         except:
             version_load = None
 

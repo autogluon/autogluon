@@ -1,5 +1,8 @@
 import pytest
 
+from autogluon.common.utils.version_utils import VersionManager
+from contextlib import contextmanager
+
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -21,3 +24,16 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "slow" in item.keywords:
             item.add_marker(skip_slow)
+
+
+@contextmanager
+def mock_ag_version(mocked_version: str):
+    original_get_ag_version = VersionManager.get_ag_version
+    VersionManager.get_ag_version = lambda *args, **kwargs: mocked_version
+    yield
+    VersionManager.get_ag_version = original_get_ag_version
+
+
+@pytest.fixture
+def mock_ag_version_mgr():
+    return mock_ag_version
