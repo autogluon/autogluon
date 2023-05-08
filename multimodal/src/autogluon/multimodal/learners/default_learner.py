@@ -170,12 +170,12 @@ from autogluon.multimodal.utils import (
 )
 from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
-from .abstract_mm_learner import AbstractMMLearner
+from .abstract_learner import AbstractMultiModalLearner
 
 logger = logging.getLogger(__name__)
 
 
-class DefaultLearner(AbstractMMLearner):
+class DefaultLearner(AbstractMultiModalLearner):
     def __init__(
         self,
         problem_type: str,

@@ -12,7 +12,7 @@ from autogluon.multimodal.problem_types import ProblemTypeProperty
 logger = logging.getLogger(__name__)
 
 
-class AbstractMMLearner(ABC):
+class AbstractMultiModalLearner(ABC):
     def __init__(
         self,
         **kwargs,
@@ -58,7 +58,7 @@ class AbstractMMLearner(ABC):
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         column_types: Optional[dict] = None,
         holdout_frac: Optional[float] = None,
-        teacher_predictor: Union[str, AbstractMMLearner] = None,
+        teacher_predictor: Union[str, AbstractMultiModalLearner] = None,
         seed: Optional[int] = 0,
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[dict] = None,
