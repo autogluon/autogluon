@@ -27,6 +27,7 @@ install_requires = [
     "Pillow",  # version range defined in `core/_setup_utils.py`
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "boto3",  # version range defined in `core/_setup_utils.py`
+    "overrides",
     "requests>=2.21,<3",
     "jsonschema>=4.14,<4.18",
     "seqeval>=1.2.2,<1.3.0",
