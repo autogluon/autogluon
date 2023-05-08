@@ -3,8 +3,9 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Type, Union
 
-import autogluon.core as ag
 import autogluon.timeseries as agts
+from autogluon.common import space
+from autogluon.core import constants
 
 from . import (
     ARIMAModel,
@@ -137,11 +138,11 @@ def get_default_hps(key):
             "Theta": {},
             "AutoGluonTabular": {},
             "DeepAR": {
-                "num_layers": ag.Int(1, 3, default=2),
-                "hidden_size": ag.Int(40, 80, default=40),
+                "num_layers": space.Int(1, 3, default=2),
+                "hidden_size": space.Int(40, 80, default=40),
             },
             "SimpleFeedForward": {
-                "hidden_dimensions": ag.Categorical([40], [40, 40], [120]),
+                "hidden_dimensions": space.Categorical([40], [40, 40], [120]),
             },
             "TemporalFusionTransformer": {},
         },
@@ -223,7 +224,7 @@ def get_preset_models(
             model_hps_list = [model_hps_list]
 
         for model_hps in model_hps_list:
-            ag_args = model_hps.pop(ag.constants.AG_ARGS, {})
+            ag_args = model_hps.pop(constants.AG_ARGS, {})
             for key in ag_args:
                 if key not in VALID_AG_ARGS_KEYS:
                     raise ValueError(
@@ -272,7 +273,7 @@ def get_model_name(ag_args: Dict[str, Any], model_type: Type[AbstractTimeSeriesM
 
 def contains_searchspace(model_hyperparameters: Dict[str, Any]) -> bool:
     for hp_value in model_hyperparameters.values():
-        if isinstance(hp_value, ag.space.Space):
+        if isinstance(hp_value, space.Space):
             return True
     return False
 
