@@ -86,23 +86,23 @@ from ..constants import (
     Y_TRUE,
     ZERO_SHOT_IMAGE_CLASSIFICATION,
 )
-from autogluon.multimodal.data.datamodule import BaseDataModule
-from autogluon.multimodal.data.infer_types import (
+from ..data.datamodule import BaseDataModule
+from ..data.infer_types import (
     infer_column_types,
     infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
     infer_rois_column_type,
     is_image_column,
 )
-from autogluon.multimodal.data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from autogluon.multimodal.matcher import MultiModalMatcher
-from autogluon.multimodal.models.utils import get_model_postprocess_fn
-from autogluon.multimodal.optimization.lit_distiller import DistillerLitModule
-from autogluon.multimodal.optimization.lit_mmdet import MMDetLitModule
-from autogluon.multimodal.optimization.lit_module import LitModule
-from autogluon.multimodal.optimization.lit_ner import NerLitModule
-from autogluon.multimodal.optimization.losses import RKDLoss
-from autogluon.multimodal.optimization.utils import (
+from ..data.preprocess_dataframe import MultiModalFeaturePreprocessor
+from ..matcher import MultiModalMatcher
+from ..models.utils import get_model_postprocess_fn
+from ..optimization.lit_distiller import DistillerLitModule
+from ..optimization.lit_mmdet import MMDetLitModule
+from ..optimization.lit_module import LitModule
+from ..optimization.lit_ner import NerLitModule
+from ..optimization.losses import RKDLoss
+from ..optimization.utils import (
     get_loss_func,
     get_metric,
     get_norm_layer_param_names,
@@ -168,7 +168,7 @@ from autogluon.multimodal.utils import (
     update_tabular_config_by_resources,
     upgrade_config,
 )
-from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
+from ..utils.log import get_fit_complete_message, get_fit_start_message
 
 from .abstract_learner import AbstractMultiModalLearner
 
