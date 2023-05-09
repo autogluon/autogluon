@@ -35,8 +35,8 @@ from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2log
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
 from autogluon.core.utils.loaders import load_pd
 
-# from . import version as ag_version
-from autogluon.multimodal.constants import (
+from .. import version as ag_version
+from ..constants import (
     AUTOMM,
     AUTOMM_TUTORIAL_MODE,
     BBOX,
@@ -399,7 +399,6 @@ class DefaultLearner(AbstractMultiModalLearner):
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
-        training_start = time.time()
 
         # 2. Route to Matcher if applicable. This can be an example of how a learner would work.
         # TODO: Predictor responsible for creating a new learner for matching.
@@ -723,6 +722,8 @@ class DefaultLearner(AbstractMultiModalLearner):
         hyperparameter_tune_kwargs: Optional[dict] = None,
         clean_ckpts: Optional[bool] = True,
     ):
+        training_start = time.time()
+        # 1. prepare fit arguments and parameters
         _fit_args = self._prepare_fit_args(
             train_data=train_data,
             presets=presets,
@@ -741,7 +742,17 @@ class DefaultLearner(AbstractMultiModalLearner):
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             clean_ckpts=clean_ckpts,
         )
+        # 2. run fit to train model
         self._run_fit(**_fit_args)
+
+        # 3. fit post processing
+        training_end = time.time()
+        self._total_train_time = training_end - training_start
+
+        # TODO(?) We should have a separate "_post_training_event()" for logging messages.
+        logger.info(get_fit_complete_message(self._save_path))
+
+        return self
 
     def _run_fit(
         self,
@@ -1493,12 +1504,455 @@ class DefaultLearner(AbstractMultiModalLearner):
         pass
 
     @override
-    def save(self, **kwargs):
-        pass
+    def save(self, path: str, standalone: bool, **kwargs):
+        """
+        Save this learner to file in directory specified by `path`.
 
+        Parameters
+        ----------
+        path
+            The directory to save this predictor.
+        standalone
+            Whether to save the downloaded model for offline deployment.
+            When standalone = True, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name),
+            and reset the associate model.model_name.checkpoint_name start with `local://` in config.yaml.
+            When standalone = False, the saved artifact may require an online environment to process in load().
+        """
+        # TODO: refactor this into matching sub-learners
+        # if self._matcher:
+        #     self._matcher.save(path=path, standalone=standalone)
+        #     return
+
+        # 1. save self._config
+        self._save_config(path=path, standalone=standalone)
+        # config = copy.deepcopy(self._config)
+        # if standalone and (
+        #     not OmegaConf.select(config, "optimization.efficient_finetune")
+        #     or OmegaConf.select(config, "optimization.efficient_finetune") == "None"
+        # ):
+        #     config = save_pretrained_model_configs(model=self._model, config=config, path=path)
+
+        # os.makedirs(path, exist_ok=True)
+        # OmegaConf.save(config=config, f=os.path.join(path, "config.yaml"))
+
+        # 2. save self._df_preprocessor as pickle
+        self._save_df_preprocessor(path=path)
+
+        # 3. save self._data_processors
+        # Save text tokenizers before saving data processors
+        self._save_data_processors(path=path)
+        # data_processors = copy.deepcopy(self._data_processors)
+
+        # for modality in [TEXT, TEXT_NER, NER, DOCUMENT]:
+        #     if modality in data_processors:
+        #         data_processors[modality] = save_text_tokenizers(
+        #             text_processors=data_processors[modality],
+        #             path=path,
+        #         )
+
+        # # Clear the documents cache dictionary before saving.
+        # for modality in [DOCUMENT]:
+        #     if modality in data_processors:
+        #         for p in data_processors[modality]:
+        #             p.documents.clear()
+
+        # with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
+        #     pickle.dump(data_processors, fp)
+
+        self._save_learner_properties(path=path)
+
+        # In case that users save to a path, which is not the original save_path.
+        if os.path.abspath(path) != os.path.abspath(self._save_path):
+            self._copy_to_user_path(path=path)
+
+    def _save_df_preprocessor(self, path):
+        """
+        Save the learner self._df_preprocessor to a file inside a directory specified by `path`.
+
+        Parameters
+        ----------
+        path
+            The directory to save this predictor.
+        """
+        with open(os.path.join(path, "df_preprocessor.pkl"), "wb") as fp:
+            pickle.dump(self._df_preprocessor, fp)
+
+    def _save_learner_properties(self, path):
+        """
+        Save the learner self properties to a file inside a directory specified by `path`.
+
+        Parameters
+        ----------
+        path
+            The directory to save this predictor.
+        """
+        with open(os.path.join(path, f"learner_assets.json"), "w") as fp:
+            json.dump(
+                {
+                    "class_name": self.__class__.__name__,
+                    "column_types": self._column_types,
+                    "label_column": self._label_column,
+                    "problem_type": self._problem_type,
+                    "presets": self._presets,
+                    "eval_metric_name": self._eval_metric_name,
+                    "validation_metric_name": self._validation_metric_name,
+                    "output_shape": self._output_shape,
+                    "classes": self._classes,
+                    "save_path": self._save_path,
+                    "pretrained_path": self._pretrained_path,
+                    "fit_called": self._fit_called,
+                    "best_score": self._best_score,
+                    "total_train_time": self._total_train_time,
+                    "version": ag_version.__version__,
+                },
+                fp,
+                ensure_ascii=True,
+            )
+
+    def _save_data_processors(self, path):
+        """
+        Save the self._data_processors to a file inside a directory specified by `path`.
+
+        Parameters
+        ----------
+        path
+            The directory to save this predictor.
+        """
+        data_processors = copy.deepcopy(self._data_processors)
+
+        for modality in [TEXT, TEXT_NER, NER, DOCUMENT]:
+            if modality in data_processors:
+                data_processors[modality] = save_text_tokenizers(
+                    text_processors=data_processors[modality],
+                    path=path,
+                )
+
+        # Clear the documents cache dictionary before saving.
+        for modality in [DOCUMENT]:
+            if modality in data_processors:
+                for p in data_processors[modality]:
+                    p.documents.clear()
+
+        with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
+            pickle.dump(data_processors, fp)
+
+    def _save_config(self, path, standalone):
+        """
+        Save the self._config to a file inside directory specified by `path`.
+
+        Parameters
+        ----------
+        path
+            The directory to save this predictor.
+        standalone
+            Whether to save the downloaded model for offline deployment.
+            When standalone = True, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name),
+            and reset the associate model.model_name.checkpoint_name start with `local://` in config.yaml.
+            When standalone = False, the saved artifact may require an online environment to process in load().
+        """
+        config = copy.deepcopy(self._config)
+        if standalone and (
+            not OmegaConf.select(config, "optimization.efficient_finetune")
+            or OmegaConf.select(config, "optimization.efficient_finetune") == "None"
+        ):
+            config = save_pretrained_model_configs(model=self._model, config=config, path=path)
+
+        os.makedirs(path, exist_ok=True)
+        OmegaConf.save(config=config, f=os.path.join(path, "config.yaml"))
+
+    def _copy_to_user_path(self, path):
+        """
+        Copy this learner artifacts to a user specified `path`.
+
+        Parameters
+        ----------
+        path
+            The directory to save this predictor.
+        """
+        model_path = os.path.join(self._save_path, "model.ckpt")
+        if os.path.isfile(model_path):
+            shutil.copy(model_path, path)
+        else:
+            # FIXME(?) Fix the saving logic
+            RuntimeError(
+                f"Cannot find the model checkpoint in '{model_path}'. Have you removed the folder that "
+                f"is created in .fit()? Currently, .save() won't function appropriately if that folder is "
+                f"removed."
+            )
+
+    @classmethod
     @override
-    def load(self, **kwargs):
-        pass
+    def load(cls, path: str, resume: Optional[bool] = False, verbosity: Optional[int] = 3, **kwargs):
+        """
+        Load a learner object from a directory specified by `path`. The to-be-loaded learner
+        can be completely or partially trained by .fit(). If a previous training has completed,
+        it will load the checkpoint `model.ckpt`. Otherwise if a previous training accidentally
+        collapses in the middle, it can load the `last.ckpt` checkpoint by setting `resume=True`.
+
+        Parameters
+        ----------
+        path
+            The directory to load the learner object.
+        resume
+            Whether to resume training from `last.ckpt`. This is useful when a training was accidentally
+            broken during the middle and we want to resume the training from the last saved checkpoint.
+        verbosity
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+
+        Returns
+        -------
+        The loaded learner object.
+        """
+        path = os.path.abspath(os.path.expanduser(path))
+        assert os.path.isdir(path), f"'{path}' must be an existing directory."
+        learner = cls(label="dummy_label")
+        # 1. load learner properties.
+        # TODO: This is only used in determining if this learner is a matcher. Refactor in matching learner
+        with open(os.path.join(path, "learner_assets.json"), "r") as fp:
+            assets = json.load(fp)
+
+        # 2. load matcher. TODO: Refactor in matching learner
+        # if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
+        #     learner._matcher = MultiModalMatcher.load(
+        #         path=path,
+        #         resume=resume,
+        #         verbosity=verbosity,
+        #     )
+        #     return learner
+
+        learner = cls._load_metadata(learner=learner, path=path, resume=resume, verbosity=verbosity)
+
+        efficient_finetune = OmegaConf.select(learner._config, "optimization.efficient_finetune")
+
+        model = create_fusion_model(
+            config=learner._config,
+            num_classes=learner._output_shape,
+            classes=learner._classes,
+            num_numerical_columns=len(learner._df_preprocessor.numerical_feature_names),
+            num_categories=learner._df_preprocessor.categorical_num_categories,
+            pretrained=False
+            if not efficient_finetune or efficient_finetune == "None"
+            else True,  # set "pretrain=False" to prevent downloading online models
+        )
+
+        if learner._data_processors is None:
+            learner._data_processors = create_fusion_data_processors(
+                config=learner._config,
+                model=model,
+            )
+
+        resume_ckpt_path = os.path.join(path, LAST_CHECKPOINT)
+        final_ckpt_path = os.path.join(path, MODEL_CHECKPOINT)
+        if resume:  # resume training which crashed before
+            if not os.path.isfile(resume_ckpt_path):
+                if os.path.isfile(final_ckpt_path):
+                    raise ValueError(
+                        f"Resuming checkpoint '{resume_ckpt_path}' doesn't exist, but "
+                        f"final checkpoint '{final_ckpt_path}' exists, which means training "
+                        f"is already completed."
+                    )
+                else:
+                    raise ValueError(
+                        f"Resuming checkpoint '{resume_ckpt_path}' and "
+                        f"final checkpoint '{final_ckpt_path}' both don't exist. "
+                        f"Consider starting training from scratch."
+                    )
+            load_path = resume_ckpt_path
+            logger.info(f"Resume training from checkpoint: '{resume_ckpt_path}'")
+            ckpt_path = resume_ckpt_path
+        else:  # load a model checkpoint for prediction, evaluation, or continuing training on new data
+            if not os.path.isfile(final_ckpt_path):
+                if os.path.isfile(resume_ckpt_path):
+                    raise ValueError(
+                        f"Final checkpoint '{final_ckpt_path}' doesn't exist, but "
+                        f"resuming checkpoint '{resume_ckpt_path}' exists, which means training "
+                        f"is not done yet. Consider resume training from '{resume_ckpt_path}'."
+                    )
+                else:
+                    raise ValueError(
+                        f"Resuming checkpoint '{resume_ckpt_path}' and "
+                        f"final checkpoint '{final_ckpt_path}' both don't exist. "
+                        f"Consider starting training from scratch."
+                    )
+            load_path = final_ckpt_path
+            logger.info(f"Load pretrained checkpoint: {os.path.join(path, MODEL_CHECKPOINT)}")
+            ckpt_path = None  # must set None since we do not resume training
+
+        model = cls._load_state_dict(
+            model=model,
+            path=load_path,
+            strict=not efficient_finetune or efficient_finetune == "None",
+        )
+
+        learner._ckpt_path = ckpt_path
+        learner._model = model
+
+        loss_func = get_loss_func(
+            problem_type=learner._problem_type,
+            mixup_active=False,
+            loss_func_name=OmegaConf.select(learner._config, "optimization.loss_function"),
+            config=learner._config.optimization,
+        )
+
+        model_postprocess_fn = get_model_postprocess_fn(
+            problem_type=learner._problem_type,
+            loss_func=loss_func,
+        )
+        learner._model_postprocess_fn = model_postprocess_fn
+
+        return learner
+
+    @staticmethod
+    def _load_metadata(
+        learner: DefaultLearner,
+        path: str,
+        resume: Optional[bool] = False,
+        verbosity: Optional[int] = 3,
+    ):
+        path = os.path.abspath(os.path.expanduser(path))
+        assert os.path.isdir(path), f"'{path}' must be an existing directory."
+        # 1. load learner properties
+        with open(os.path.join(path, "learner_assets.json"), "r") as fp:
+            assets = json.load(fp)
+        # 2. load config
+        config = DefaultLearner._load_config(path=path, assets=assets)
+        # 3. load df_preprocessor
+        df_preprocessor = DefaultLearner._load_df_preprocessor(path)
+        # 4. load data_processors
+        data_processors = DefaultLearner._load_data_processors(path, df_preprocessor)
+
+        # backward compatibility. Use ROISProcessor for old mmdet/mmocr models.
+        # TODO: Refactor to object detection learner
+        if assets["problem_type"] == OBJECT_DETECTION or (
+            "pipeline" in assets and assets["pipeline"] == OBJECT_DETECTION
+        ):
+            data_processors = None
+
+        # 5. assign assets to learner properties
+        learner._label_column = assets["label_column"]
+        learner._problem_type = assets["problem_type"]
+        if "pipeline" in assets:  # backward compatibility
+            learner._problem_type = assets["pipeline"]
+        if "presets" in assets:
+            learner._presets = assets["presets"]
+        if "best_score" in assets:  # backward compatibility
+            learner._best_score = assets["best_score"]
+        if "total_train_time" in assets:  # backward compatibility
+            learner._total_train_time = assets["total_train_time"]
+        learner._eval_metric_name = assets["eval_metric_name"]
+
+        if "fit_called" in assets:
+            learner._fit_called = assets["fit_called"]
+        else:
+            learner._fit_called = True  # backward compatible
+
+        learner._output_shape = assets["output_shape"]
+        if "classes" in assets:
+            learner._classes = assets["classes"]
+        learner._column_types = assets["column_types"]
+        learner._validation_metric_name = assets["validation_metric_name"]
+
+        learner._config = config
+        learner._df_preprocessor = df_preprocessor
+        learner._data_processors = data_processors
+        learner._verbosity = verbosity
+        learner._resume = resume
+        learner._save_path = path  # in case the original exp dir is copied to somewhere else
+        learner._pretrain_path = path  # TODO: Remove as this is only defined but not used
+
+        return learner
+
+    @staticmethod
+    def _load_data_processors(path, df_preprocessor) -> Optional[List]:
+        """
+        Load the df_preprocessor from the given path.
+
+        Parameters
+        ----------
+        path (str): The directory where this predictor is saved.
+        df_preprocessor (MultiModalFeaturePreprocessor): The loaded df_preprocessor for this learner.
+
+        Returns
+        -------
+        Optional[List]: list containing data processors
+        """
+        try:
+            with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
+                data_processors = CustomUnpickler(fp).load()
+            # Load text tokenizers after loading data processors.
+            for modality in [
+                TEXT,
+                TEXT_NER,
+                NER,
+            ]:  # NER is included for backward compatibility
+                if modality in data_processors:
+                    data_processors[modality] = load_text_tokenizers(
+                        text_processors=data_processors[modality],
+                        path=path,
+                    )
+
+            # backward compatibility. Add feature column names in each data processor.
+            data_processors = assign_feature_column_names(
+                data_processors=data_processors,
+                df_preprocessor=df_preprocessor,
+            )
+
+            # Only keep the modalities with non-empty processors.
+            data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
+        except:  # backward compatibility. reconstruct the data processor in case something went wrong.
+            data_processors = None
+        return data_processors
+
+    @staticmethod
+    def _load_df_preprocessor(path: str) -> MultiModalFeaturePreprocessor:
+        """
+        Load the df_preprocessor from the given path.
+
+        Parameters
+        ----------
+        path (str): The directory where this predictor is saved.
+
+        Returns
+        -------
+        MultiModalFeaturePreprocessor: the loaded df_preprocessor for this learner.
+        """
+        with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
+            df_preprocessor = CustomUnpickler(fp).load()
+            # TODO: is the following for object detection only? If yes, consider refactor to object detection learner
+            if (
+                not hasattr(df_preprocessor, "_rois_feature_names")
+                and hasattr(df_preprocessor, "_image_feature_names")
+                and ROIS in df_preprocessor._image_feature_names
+            ):  # backward compatibility for mmlab models
+                df_preprocessor._image_feature_names = [
+                    name for name in df_preprocessor._image_feature_names if name != ROIS
+                ]
+                df_preprocessor._rois_feature_names = [ROIS]
+        return df_preprocessor
+
+    @staticmethod
+    def _load_config(path: str, assets: dict) -> DictConfig:
+        """
+        Load the saved config from given `path`. Update the config model paths and upgrade config according to version
+
+        Parameters
+        ----------
+        path (str): The directory where this predictor is saved.
+        assets (dict): Dictionary of assets loaded from learner_assets.json containing the learner properties
+
+        Returns
+        -------
+        DictConfig: the config of the predictor
+        """
+        config = OmegaConf.load(os.path.join(path, "config.yaml"))
+
+        config = get_local_pretrained_config_paths(
+            config=config, path=path
+        )  # check the config to load offline pretrained model configs
+
+        config = upgrade_config(config, assets["version"])
+        return config
 
     def _top_k_average(
         self,

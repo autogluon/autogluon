@@ -88,11 +88,11 @@ class AbstractMultiModalLearner(ABC):
         pass
 
     @abstractmethod
-    def save(self, **kwargs):
+    def save(self, path: str, standalone: bool, **kwargs):
         pass
 
     @abstractclassmethod
-    def load(cls, **kwargs):
+    def load(cls, path: str, resume: Optional[bool] = False, verbosity: Optional[int] = 3, **kwargs):
         pass
 
 

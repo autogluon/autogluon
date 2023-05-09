@@ -410,7 +410,7 @@ class MultiModalPredictor(ExportMixin):
 
         # initialize learner as None
         self._use_learner = use_learner  # TODO: temporary arg for unit testing, remove later
-        self._learner: Optional[DefaultLearner] = None
+        self._learner: Optional[Union[MultiModalMatcher, DefaultLearner]] = None
         # Based on the information given, setup a corresponding learner. NOTE: learner is initialized at the end of .fit()
         # if self._problem_type == None:
         #     self._learner = None
@@ -2586,10 +2586,17 @@ class MultiModalPredictor(ExportMixin):
             and reset the associate model.model_name.checkpoint_name start with `local://` in config.yaml.
             When standalone = False, the saved artifact may require an online environment to process in load().
         """
+
+        if self._use_learner:
+            if self._learner is not None:
+                self._learner.save(path=path, standalone=standalone)
+            return
+
         if self._matcher:
             self._matcher.save(path=path, standalone=standalone)
             return
 
+        # TODO: Remove and learner will handle the following
         config = copy.deepcopy(self._config)
         if standalone and (
             not OmegaConf.select(config, "optimization.efficient_finetune")
@@ -2735,7 +2742,7 @@ class MultiModalPredictor(ExportMixin):
         predictor._verbosity = verbosity
         predictor._resume = resume
         predictor._save_path = path  # in case the original exp dir is copied to somewhere else
-        predictor._pretrain_path = path
+        predictor._pretrain_path = path  # TODO: Remove as this is only defined but not used.
         if "fit_called" in assets:
             predictor._fit_called = assets["fit_called"]
         else:
@@ -2757,6 +2764,7 @@ class MultiModalPredictor(ExportMixin):
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
+        use_learner: Optional[bool] = False,  # TODO: Remove this argument. Temporary for test purpose.
     ):
         """
         Load a predictor object from a directory specified by `path`. The to-be-loaded predictor
@@ -2779,6 +2787,15 @@ class MultiModalPredictor(ExportMixin):
         -------
         The loaded predictor object.
         """
+        if use_learner:
+            learner = DefaultLearner.load(path=path, resume=resume, verbosity=verbosity)
+            predictor = cls(
+                label=learner._label_column,
+                use_learner=True,
+            )  # TODO: temporary solution. self._label_column will be handled by learner only.
+            predictor._learner = learner
+            return predictor
+
         path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         predictor = cls(label="dummy_label")
