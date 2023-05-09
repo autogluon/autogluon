@@ -870,6 +870,7 @@ class MultiModalPredictor(ExportMixin):
             resume=False if hpo_mode else self._resume,
             enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
             presets=presets,
+            config=config,
             hyperparameters=hyperparameters,
             advanced_hyperparameters=advanced_hyperparameters,
             teacher_predictor=teacher_predictor,
