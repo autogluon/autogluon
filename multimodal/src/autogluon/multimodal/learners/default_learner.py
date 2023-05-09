@@ -108,8 +108,8 @@ from ..optimization.utils import (
     get_norm_layer_param_names,
     get_trainable_params_efficient_finetune,
 )
-from autogluon.multimodal.problem_types import PROBLEM_TYPES_REG, ProblemTypeProperty
-from autogluon.multimodal.utils import (
+from ..problem_types import PROBLEM_TYPES_REG, ProblemTypeProperty
+from ..utils import (
     AutoMMModelCheckpoint,
     AutoMMModelCheckpointIO,
     CustomUnpickler,
