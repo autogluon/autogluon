@@ -169,7 +169,6 @@ from ..utils import (
     upgrade_config,
 )
 from ..utils.log import get_fit_complete_message, get_fit_start_message
-
 from .abstract_learner import AbstractMultiModalLearner
 
 logger = logging.getLogger(__name__)
