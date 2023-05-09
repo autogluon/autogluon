@@ -47,7 +47,7 @@ def predictor_hpo(searcher, scheduler, presets=None):
     predictor = predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=30,
+        time_limit=90,
         save_path=save_path,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
@@ -59,7 +59,7 @@ def predictor_hpo(searcher, scheduler, presets=None):
     predictor = predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=30,
+        time_limit=90,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
 
