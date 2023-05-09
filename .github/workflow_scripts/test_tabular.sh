@@ -20,6 +20,10 @@ fi
 install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/[all,tests]"
 install_multimodal "[tests]"
 
+pip3 install "thinc==8.1.9"
+pip3 install "pyarrow==11.0.0"
+pip3 install "regex==2023.3.23"
+
 cd tabular/
 if [ -n "$ADDITIONAL_TEST_ARGS" ]
 then
