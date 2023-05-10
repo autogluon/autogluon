@@ -113,7 +113,7 @@ def tutorial_script_for_finetune_yolox_pothole_in_coco_format():
     val_path = os.path.join(data_dir, "Annotations", "usersplit_val_cocoformat.json")
     test_path = os.path.join(data_dir, "Annotations", "usersplit_test_cocoformat.json")
 
-    checkpoint_name = "yolox_l_8x8_300e_coco"
+    checkpoint_name = "yolox_s"
     num_gpus = 1
 
     predictor = MultiModalPredictor(
@@ -334,4 +334,4 @@ def main():
 
 
 if __name__ == "__main__":
-    tutorial_script_for_finetune_fast_pothole_in_coco_format()
+    tutorial_script_for_finetune_yolox_pothole_in_coco_format()

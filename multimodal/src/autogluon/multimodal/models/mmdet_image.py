@@ -134,7 +134,12 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         register_all_modules()  # https://github.com/open-mmlab/mmdetection/issues/9719
 
         self.model = MODELS.build(self.config.model)
-        self.data_preprocessor = MODELS.build(self.config.data_preprocessor)
+        # yolox use self.config.model.data_preprocessor, yolov3 use self.config.data_preprocessor
+        self.data_preprocessor = MODELS.build(
+            self.config.data_preprocessor
+            if "data_preprocessor" in self.config
+            else self.config.model.data_preprocessor
+        )
 
         if self.pretrained and checkpoint_file is not None:  # TODO: enable training from scratch
             self.checkpoint = load_checkpoint(self.model, checkpoint_file, map_location="cpu")
@@ -203,35 +208,35 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 "url": "https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn_1x_voc0712_20220320_192712-54bef0f3.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "voc", "faster_rcnn_r50_fpn_1x_voc0712.py"),
             },
-            "yolox_nano_8x8_300e_coco": {
+            "yolox_nano": {
                 "url": "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_nano.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_nano_8x8_300e_coco.py"),
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_nano_8xb8-300e_coco.py"),
                 "source": "MegVii",
             },
-            "yolox_tiny_8x8_300e_coco": {
+            "yolox_tiny": {
                 "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_tiny_8x8_300e_coco/yolox_tiny_8x8_300e_coco_20211124_171234-b4047906.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_tiny_8x8_300e_coco.py"),
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_tiny_8xb8-300e_coco.py"),
             },
-            "yolox_s_8x8_300e_coco": {
+            "yolox_s": {
                 "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_s_8x8_300e_coco/yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_s_8x8_300e_coco.py"),
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_s_8xb8-300e_coco.py"),
             },
-            "yolox_m_8x8_300e_coco": {
+            "yolox_m": {
                 "url": "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_m.pth",  # Megvii weight, need more verifications
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_m_8x8_300e_coco.py"),
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_m_8xb8-300e_coco.py"),
                 "source": "MegVii",
             },
-            "yolox_l_8x8_300e_coco": {
+            "yolox_l": {
                 "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_l_8x8_300e_coco/yolox_l_8x8_300e_coco_20211126_140236-d3bd2b23.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py"),
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8xb8-300e_coco.py"),
             },
             "yolox_l_objects365": {  # TODO: update with better pretrained weights
                 "url": "https://automl-mm-bench.s3.amazonaws.com/object_detection/checkpoints/yolox/yolox_l_objects365_temp.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py"),
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8xb8-300e_coco.py"),
             },
-            "yolox_x_8x8_300e_coco": {
+            "yolox_x": {
                 "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_x_8x8_300e_coco/yolox_x_8x8_300e_coco_20211126_140254-1ef88d67.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_x_8x8_300e_coco.py"),
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_x_8xb8-300e_coco.py"),
             },
         }
 

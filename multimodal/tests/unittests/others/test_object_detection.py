@@ -31,7 +31,7 @@ def download_sample_dataset():
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolox_s_8x8_300e_coco",
+        "yolox_s",
         "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
