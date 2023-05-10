@@ -140,7 +140,6 @@ def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
     ],
 )
 def test_mmdet_object_detection_inference_df(checkpoint_name):
-
     data_dir = download_sample_dataset()
 
     test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
@@ -274,7 +273,6 @@ def test_mmdet_object_detection_fit_then_inference_dict(checkpoint_name):
     ],
 )
 def test_mmdet_object_detection_fit_then_inference_df(checkpoint_name):
-
     data_dir = download_sample_dataset()
 
     train_path = os.path.join(data_dir, "Annotations", "trainval_cocoformat.json")

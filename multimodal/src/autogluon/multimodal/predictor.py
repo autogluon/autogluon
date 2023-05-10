@@ -92,7 +92,7 @@ from .data.infer_types import (
     is_image_column,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from .learners import DefaultLearner
+from .learners import DefaultLearner, ObjectDetectionLearner
 from .matcher import MultiModalMatcher
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
@@ -199,7 +199,7 @@ class MultiModalPredictor(ExportMixin):
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
         sample_data_path: Optional[str] = None,
-        use_learner: Optional[bool] = False,  # TODO: temporary arg for unit testing, remove later
+        use_learner: Optional[bool] = True,  # TODO: temporary arg for unit testing, remove later
     ):
         """
         Parameters
@@ -439,6 +439,44 @@ class MultiModalPredictor(ExportMixin):
             if self._sample_data_path is not None:
                 self._classes = get_detection_classes(self._sample_data_path)
                 self._output_shape = len(self._classes)
+            self._learner = ObjectDetectionLearner(
+                problem_type=problem_type,
+                label="label",
+                presets=presets,
+                eval_metric=eval_metric,
+                hyperparameters=hyperparameters,
+                verbosity=verbosity,
+                num_classes=self._output_shape,
+                classes=self._classes,
+                path=path,
+                enable_progress_bar=enable_progress_bar,
+                init_scratch=init_scratch,
+                sample_data_path=sample_data_path,
+            )
+            self._use_learner = True
+        elif self._problem_type == NER:
+            # TODO: raise NotImplementedError("NER Learner is not supported yet.")
+            self._use_learner = False
+        else:
+            self._learner = DefaultLearner(
+                problem_type=problem_type,
+                label=label,
+                presets=presets,
+                eval_metric=eval_metric,
+                verbosity=verbosity,
+                num_classes=num_classes,
+                classes=classes,
+                path=path,
+                enable_progress_bar=enable_progress_bar,
+                init_scratch=init_scratch,
+            )
+            self._use_learner = True
+
+        # if self._problem_type == OBJECT_DETECTION:
+        #     self._label_column = "label"
+        #     if self._sample_data_path is not None:
+        #         self._classes = get_detection_classes(self._sample_data_path)
+        #         self._output_shape = len(self._classes)
 
         if self._problem_type is not None:
             if self.problem_property.support_zero_shot:
@@ -662,55 +700,38 @@ class MultiModalPredictor(ExportMixin):
         -------
         An "MultiModalPredictor" object (itself).
         """
-        if self._use_learner:
-            self._problem_type = self._infer_problem_type(train_data=train_data, column_types=column_types)
-            if self._use_learner:
-                if self._problem_type == OBJECT_DETECTION:
-                    # TODO: raise NotImplementedError("Object Detection Learner is not supported yet.")
-                    pass
-                elif self._problem_type == NER:
-                    # TODO: raise NotImplementedError("NER Learner is not supported yet.")
-                    pass
-                else:
-                    self._learner = DefaultLearner(
-                        problem_type=self._problem_type,
-                        label=self._label_column,
-                        presets=self._presets,
-                        eval_metric=self._eval_metric_name,
-                        verbosity=self._verbosity,
-                        num_classes=self._output_shape,
-                        classes=self._classes,
-                        path=self._save_path,
-                    )
-
-                self._learner.fit(
-                    train_data=train_data,
-                    presets=presets,
-                    config=config,
-                    tuning_data=tuning_data,
-                    max_num_tuning_data=max_num_tuning_data,
-                    id_mappings=id_mappings,
-                    time_limit=time_limit,
-                    save_path=save_path,
-                    hyperparameters=hyperparameters,
-                    column_types=column_types,
-                    holdout_frac=holdout_frac,
-                    teacher_predictor=teacher_predictor,
-                    seed=seed,
-                    standalone=standalone,
-                    hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                    clean_ckpts=clean_ckpts,
-                )
-                return self
-
-        fit_called = self._fit_called  # used in current function
-        self._fit_called = True
-
         if self._problem_type and not self.problem_property.support_fit:
             raise RuntimeError(
                 f"The problem_type='{self._problem_type}' does not support `predictor.fit()`. "
                 f"You may try to use `predictor.predict()` or `predictor.evaluate()`."
             )
+
+        if self._use_learner:
+            # self._problem_type = self._infer_problem_type(train_data=train_data, column_types=column_types)
+            # if self._problem_type != OBJECT_DETECTION and self._problem_type != NER:
+            #     self._learner._problem_type = self._problem_type
+            self._learner.fit(
+                train_data=train_data,
+                presets=presets,
+                config=config,
+                tuning_data=tuning_data,
+                max_num_tuning_data=max_num_tuning_data,
+                id_mappings=id_mappings,
+                time_limit=time_limit,
+                save_path=save_path,
+                hyperparameters=hyperparameters,
+                column_types=column_types,
+                holdout_frac=holdout_frac,
+                teacher_predictor=teacher_predictor,
+                seed=seed,
+                standalone=standalone,
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                clean_ckpts=clean_ckpts,
+            )
+            return self
+
+        fit_called = self._fit_called  # used in current function
+        self._fit_called = True
 
         training_start = time.time()
 
@@ -2765,7 +2786,7 @@ class MultiModalPredictor(ExportMixin):
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
-        use_learner: Optional[bool] = False,  # TODO: Remove this argument. Temporary for test purpose.
+        use_learner: Optional[bool] = True,  # TODO: Remove this argument. Temporary for test purpose.
     ):
         """
         Load a predictor object from a directory specified by `path`. The to-be-loaded predictor

@@ -186,11 +186,14 @@ class DefaultLearner(AbstractMultiModalLearner):
         # pipeline: Optional[str] = None,
         presets: Optional[str] = None,
         eval_metric: Optional[str] = None,  # this is now inferred in learner
+        hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 2,
         num_classes: Optional[int] = None,
         classes: Optional[list] = None,
         enable_progress_bar: Optional[bool] = True,
+        init_scratch: Optional[bool] = False,
+        **kwargs,
     ):
         super().__init__()
 
@@ -217,13 +220,24 @@ class DefaultLearner(AbstractMultiModalLearner):
 
         # self._warn_if_exist = warn_if_exist  # unused
         self._enable_progress_bar = enable_progress_bar
-        # self._init_scratch = init_scratch  # NOTE: is this for predictor to handle?
-        # self._sample_data_path = sample_data_path  # this is for detection problem only
+        self._init_scratch = init_scratch
+        # self._sample_data_path = sample_data_path  # TODO: Remove since this is for detection problem only
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
 
         # Summary statistics used in fit summary. TODO: wrap it in a class.
         # self._total_train_time = None
         self._best_score = None
+        if self.problem_property is not None and self.problem_property.support_zero_shot:
+            # Load pretrained model via the provided hyperparameters and presets
+            # TODO: do not create pretrained model for HPO presets.
+            self._config, self._model, self._data_processors = init_pretrained(
+                problem_type=self._problem_type,
+                presets=self._presets,
+                hyperparameters=hyperparameters,
+                num_classes=self._output_shape,
+                classes=self._classes,
+                init_scratch=self._init_scratch,
+            )
 
     @override
     def path(self) -> Union[str, None]:
@@ -427,7 +441,11 @@ class DefaultLearner(AbstractMultiModalLearner):
         self._setup_save_path(save_path, fit_called)
 
         train_data, tuning_data = self._setup_train_tuning_data(
-            train_data=train_data, tuning_data=tuning_data, holdout_frac=holdout_frac, seed=seed
+            train_data=train_data,
+            tuning_data=tuning_data,
+            holdout_frac=holdout_frac,
+            seed=seed,
+            max_num_tuning_data=max_num_tuning_data,
         )
 
         # 4. setup presets. Silently ignore user input if self._presets already exists
@@ -642,6 +660,7 @@ class DefaultLearner(AbstractMultiModalLearner):
         tuning_data: Optional[Union[pd.DataFrame, str]],
         holdout_frac: Optional[float],
         seed: Optional[int],
+        **kwargs,
     ):
         if isinstance(train_data, str):
             train_data = load_pd.load(train_data)
@@ -795,7 +814,7 @@ class DefaultLearner(AbstractMultiModalLearner):
         self._df_preprocessor = df_preprocessor
 
         # 4-5. if NER, update output shape. Otherwise create model. TODO: This can be refactored into the NER Learner
-        self._model = self._create_model()
+        self._model = self._get_model()
         # self._model = model
 
         # 6. get trainable layer params for efficient finetuning only?
@@ -979,7 +998,7 @@ class DefaultLearner(AbstractMultiModalLearner):
         #         **optimization_kwargs,
         #     )
 
-        task = self._setup_task_lightning_module(
+        task = self._setup_train_task_lightning_module(
             trainable_param_names=trainable_param_names,
             mixup_fn=mixup_fn,
             loss_func=loss_func,
@@ -1227,24 +1246,14 @@ class DefaultLearner(AbstractMultiModalLearner):
 
         # TODO: refactor into detection learner.
         # i.e. define self._transform_data_for_predict(data) -> pd.DataFrame
-        # if self._problem_type == OBJECT_DETECTION:
-        # data = object_detection_data_to_df(data)
-
-        #     if self._label_column not in data:
-        #         self._label_column = None
+        data = self._transform_data_for_predict(data=data)
 
         # TODO: refactor into sub-learners
         # i.e. define self._get_prediction_ret_type() -> str
         # or just init a mapping in this default_learner
         # I think defining a function makes more sense.
 
-        # if self._problem_type == OBJECT_DETECTION or self._problem_type == OCR_TEXT_DETECTION:
-        #     ret_type = BBOX
-        # elif self._problem_type == OCR_TEXT_RECOGNITION:
-        #     ret_type = [TEXT, SCORE]
-        # else:
-        #     ret_type = LOGITS
-        ret_type = LOGITS
+        ret_type = self._get_prediction_ret_type()
 
         # if self._problem_type == NER:
         #     ret_type = NER_RET
@@ -1270,13 +1279,7 @@ class DefaultLearner(AbstractMultiModalLearner):
 
             # TODO: refactor into sub-learners
             # i.e. define function self._extract_from_output(outputs, ret_type) -> logits
-            # if self._problem_type == OCR_TEXT_RECOGNITION:
-            #     logits = []
-            #     for r_type in ret_type:
-            #         logits.append(extract_from_output(outputs=outputs, ret_type=r_type))
-            # else:
-            #     logits = extract_from_output(outputs=outputs, ret_type=ret_type)
-            logits = extract_from_output(outputs=outputs, ret_type=ret_type)
+            logits = self._extract_from_output(ret_type=ret_type, outputs=outputs)
 
             if self._df_preprocessor:
                 if ret_type == BBOX:
@@ -1293,47 +1296,75 @@ class DefaultLearner(AbstractMultiModalLearner):
 
             # TODO: refactor into sub-learners
             # i.e. define function self._postprocess_pred(pred, **kwargs) -> pred
-            # if self._problem_type == NER:
-            #     pred = merge_bio_format(data[self._df_preprocessor.ner_feature_names[0]], pred)
-
-            # if self._problem_type == OBJECT_DETECTION:
-            #     if self._model.output_bbox_format == XYWH:
-            #         pred = convert_pred_to_xywh(pred)
+            pred = self._postprocess_pred(data=data, pred=pred)
 
         # TODO: refactor into sub-learners
         # i.e. define self._save_results()
         if save_results:
             ## Dumping Result for detection only now
-            assert (
-                self._problem_type == OBJECT_DETECTION
-            ), "Aborting: save results only works for object detection now."
-
-            self._save_path = setup_save_path(
-                old_save_path=self._save_path,
-                warn_if_exist=False,
-            )
-
-            result_path = os.path.join(self._save_path, "result.txt")
-
-            save_result_df(
-                pred=pred,
-                data=data,
-                detection_classes=self._model.model.CLASSES,
-                result_path=result_path,
-            )
+            self._save_prediction(data=data, pred=pred)
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
-            if self._problem_type == OBJECT_DETECTION:
-                pred = save_result_df(
-                    pred=pred,
-                    data=data,
-                    detection_classes=self._model.model.CLASSES,
-                    result_path=None,
-                )
-            else:
-                pred = self._as_pandas(data=data, to_be_converted=pred)
+            # if self._problem_type == OBJECT_DETECTION:
+            #     pred = save_result_df(
+            #         pred=pred,
+            #         data=data,
+            #         detection_classes=self._model.model.CLASSES,
+            #         result_path=None,
+            #     )
+            # else:
+            #     pred = self._as_pandas(data=data, to_be_converted=pred)
+            pred = self._as_pandas(data=data, to_be_converted=pred)
 
         return pred
+
+    def _save_prediction(self, **kwargs):
+        warnings.warn("Saving results is currently only supported in Object Detection. Skipping...")
+
+    def _transform_data_for_predict(self, data):
+        """preprocessing - transform data format for prediction. To be overridden by subclasses.
+
+        Args:
+            data (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        return data
+
+    def _postprocess_pred(self, data, pred):
+        if self._problem_type == NER:
+            pred = merge_bio_format(data[self._df_preprocessor.ner_feature_names[0]], pred)
+
+        if self._problem_type == OBJECT_DETECTION:
+            if self._model.output_bbox_format == XYWH:
+                pred = convert_pred_to_xywh(pred)
+        return pred
+
+    def _extract_from_output(
+        self, ret_type, outputs
+    ) -> Union[
+        torch.Tensor, np.ndarray, List[torch.Tensor], List[np.ndarray], Dict[str, torch.Tensor], Dict[str, np.ndarray]
+    ]:
+        if self._problem_type == OCR_TEXT_RECOGNITION:
+            logits = []
+            for r_type in ret_type:
+                logits.append(extract_from_output(outputs=outputs, ret_type=r_type))
+        else:
+            logits = extract_from_output(outputs=outputs, ret_type=ret_type)
+        return logits
+
+    def _get_prediction_ret_type(self) -> str:
+        if self._problem_type == OBJECT_DETECTION or self._problem_type == OCR_TEXT_DETECTION:
+            ret_type = BBOX
+        elif self._problem_type == OCR_TEXT_RECOGNITION:
+            ret_type = [TEXT, SCORE]
+        elif self._problem_type == NER:
+            ret_type = NER_RET
+        else:
+            ret_type = LOGITS
+
+        return ret_type
 
     @override
     def predict_proba(self, **kwargs):
@@ -2205,13 +2236,15 @@ class DefaultLearner(AbstractMultiModalLearner):
 
         return checkpoint_callback
 
-    def _setup_task_lightning_module(
+    def _setup_train_task_lightning_module(
         self,
         trainable_param_names: List[str],
         mixup_fn: Optional[Mixup],
         loss_func: Optional[nn.Module],
         optimization_kwargs: dict,
         metrics_kwargs: dict,
+        *args,
+        **kwargs,
     ) -> pl.LightningModule:
         """
         Select the correct pl task module for a given problem type.
@@ -2457,7 +2490,7 @@ class DefaultLearner(AbstractMultiModalLearner):
 
         return trainable_param_names
 
-    def _create_model(self) -> nn.Module:
+    def _get_model(self) -> nn.Module:
         """Creates the model for training based on the config and info in df_preprocessor
         By default we use the create_fusion_model function to create the model
         This can be overriden by a child learner to create custom models
@@ -2664,6 +2697,7 @@ class DefaultLearner(AbstractMultiModalLearner):
         self,
         data: Union[pd.DataFrame, dict, list],
         to_be_converted: Union[np.ndarray, dict],
+        **kwargs,
     ):
         if isinstance(data, pd.DataFrame):
             index = data.index
@@ -2840,12 +2874,9 @@ class DefaultLearner(AbstractMultiModalLearner):
         #         **optimization_kwargs,
         #     )
 
-        task = LitModule(
-            model=self._model,
-            model_postprocess_fn=self._model_postprocess_fn,
-            efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+        task = self._setup_prediction_task_lightning_module(
             trainable_param_names=trainable_param_names,
-            **optimization_kwargs,
+            optimization_kwargs=optimization_kwargs,
         )
 
         blacklist_msgs = []
@@ -2904,3 +2935,34 @@ class DefaultLearner(AbstractMultiModalLearner):
                     ]
 
         return outputs
+
+    def _setup_prediction_task_lightning_module(
+        self, trainable_param_names: List[str], optimization_kwargs: dict, **kwargs
+    ) -> pl.LightningModule:
+        """
+        Select the correct pl task module for a given problem type for prediction.
+        By default, we use the default task type a.k.a. LitModule
+        This can be overridden by a child learner if needed.
+
+
+        Parameters
+        -----------
+        self._config (DictConfig): OmegaConfig dict with all the configs
+        self._model (nn.Module): pytorch nn.Module to run prediction with
+        trainable_param_names (List[str]): the list of trainable parameter names
+        self._model_postprocess_fn (Optional[Callable]): postprocess function to apply to the model output (i.e. sigmoid after nn.BCEWithLogitsLoss)
+        optimization_kwargs (dict): parameters for optimization
+
+        Returns
+        --------
+        pl.LightningModule: pytorch lightning module for prediction task
+        """
+        task = LitModule(
+            model=self._model,
+            model_postprocess_fn=self._model_postprocess_fn,
+            efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+            trainable_param_names=trainable_param_names,
+            **optimization_kwargs,
+        )
+
+        return task
