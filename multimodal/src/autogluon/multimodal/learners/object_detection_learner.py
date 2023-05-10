@@ -105,7 +105,7 @@ class ObjectDetectionLearner(DefaultLearner):
         )
         return task
 
-    def _setup_train_task_lightning_module(
+    def _setup_prediction_task_lightning_module(
         self,
         optimization_kwargs: dict,
         **kwargs,
