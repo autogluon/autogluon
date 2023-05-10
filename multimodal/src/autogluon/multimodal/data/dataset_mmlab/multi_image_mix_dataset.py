@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 try:
     import mmcv
-    from mmcv.utils import Config as MMCVConfig
     from mmcv.transforms import BaseTransform
     from mmcv.transforms.utils import avoid_cache_randomness, cache_randomness
+    from mmcv.utils import Config as MMCVConfig
 except:
     MMCVConfig = None
 
