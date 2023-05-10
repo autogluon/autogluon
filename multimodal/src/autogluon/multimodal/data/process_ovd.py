@@ -7,9 +7,9 @@ import PIL
 from PIL import ImageFile
 from torch import nn
 
-from ..constants import COLUMN, IMAGE, IMAGE_META, IMAGE_PATH, IMAGE_VALID_NUM, PROMPT
+from ..constants import COLUMN, IMAGE, IMAGE_META, IMAGE_VALID_NUM, PROMPT, TEXT
 from .collator import ListCollator, PadCollator
-from .utils import is_image_input, is_rois_input
+from .utils import is_rois_input
 
 logger = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -106,6 +106,7 @@ class OVDProcessor:
     def process_one_sample(
         self,
         texts_and_images: Dict[str, Union[str, List[str]]],
+        feature_modalities: Dict[str, List[str]],
         is_training: bool,
     ) -> Dict:
         """
@@ -116,6 +117,8 @@ class OVDProcessor:
         ----------
         texts_and_images
             The input could be image or text (image captions) for open vocabulary detection.
+        feature_modalities
+            What modality each column belongs to.
         is_training
             Whether to process images in the training mode.
 
@@ -127,16 +130,16 @@ class OVDProcessor:
         image_data = {}
 
         for per_col_name, per_col_content in texts_and_images.items():
-            if is_image_input(per_col_content, IMAGE_PATH):
-                with PIL.Image.open(per_col_content[0]) as img:
-                    image_data[self.image_key] = dict(filename=per_col_content[0], height=img.height, width=img.width)
-                    ret[self.image_meta_key] = [img.width, img.height]
+            if feature_modalities.get(per_col_name) == TEXT:
+                ret[self.prompt_key] = per_col_content[0]
             elif is_rois_input(per_col_content):
                 raise NotImplementedError(
                     "Finetuning/Evaluation with ground truth labels are not implemented for OVD yet"
                 )  # TODO
             else:
-                ret[self.prompt_key] = per_col_content[0]
+                with PIL.Image.open(per_col_content[0]) as img:
+                    image_data[self.image_key] = dict(filename=per_col_content[0], height=img.height, width=img.width)
+                    ret[self.image_meta_key] = [img.width, img.height]
         if self.requires_column_info:
             pass  # TODO
 
@@ -190,7 +193,7 @@ class OVDProcessor:
         """
         texts_and_images = {k: [v] if isinstance(v, str) else v for k, v in texts_and_images.items()}
 
-        return self.process_one_sample(texts_and_images, is_training)
+        return self.process_one_sample(texts_and_images, feature_modalities, is_training)
 
     def __getstate__(self):
         odict = self.__dict__.copy()  # get attribute dictionary

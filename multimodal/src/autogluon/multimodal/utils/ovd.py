@@ -37,5 +37,4 @@ def save_ovd_result_df(pred: Iterable, data: Union[pd.DataFrame, Dict], result_p
     if result_path:
         result_df.to_csv(result_path, index=False)
         logger.info("Saved detection results to {}".format(result_path))
-        print("Saved detection results to {}".format(result_path))
     return result_df
