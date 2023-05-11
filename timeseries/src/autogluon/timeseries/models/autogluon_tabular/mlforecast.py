@@ -3,7 +3,6 @@ import os
 import re
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 import numpy as np
 import pandas as pd
