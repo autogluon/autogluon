@@ -49,7 +49,6 @@ def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
         problem_type="object_detection",
         sample_data_path=train_path,
     )
-
     # Fit
     predictor.fit(
         train_path,
@@ -369,3 +368,7 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
     test_df = from_coco_or_voc(test_path)
     preds = predictor.predict(data=test_df)
     results = predictor.evaluate(data=test_df)
+
+
+if __name__ == "__main__":
+    test_mmdet_object_detection_fit_then_evaluate_coco("yolov3_mobilenetv2_320_300e_coco")
