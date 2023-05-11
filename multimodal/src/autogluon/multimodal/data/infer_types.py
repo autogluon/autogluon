@@ -623,7 +623,7 @@ def infer_label_column_type_by_problem_type(
             column_types[col_name] = NUMERICAL
         elif problem_type == NER:
             column_types[col_name] = NER_ANNOTATION
-        elif problem_type == OBJECT_DETECTION or problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+        elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
             column_types[col_name] = ROIS
 
         if column_types[col_name] not in allowable_label_types:

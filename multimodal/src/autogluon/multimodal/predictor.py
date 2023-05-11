@@ -2153,7 +2153,7 @@ class MultiModalPredictor(ExportMixin):
             if self._label_column not in data:
                 self._label_column = None
 
-        if self._problem_type == OBJECT_DETECTION or self._problem_type == OCR_TEXT_DETECTION:
+        if self._problem_type in [OBJECT_DETECTION, OCR_TEXT_DETECTION]:
             ret_type = BBOX
         elif self._problem_type == OCR_TEXT_RECOGNITION:
             ret_type = [TEXT, SCORE]
