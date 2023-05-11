@@ -4,13 +4,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from autogluon.timeseries.models.autogluon_tabular import AutoGluonTabularModel
+from autogluon.timeseries.models.autogluon_tabular import DirectTabularModel
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
 from ..common import DATAFRAME_WITH_STATIC, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, get_data_frame_with_variable_lengths
 
 TESTABLE_MODELS = [
-    AutoGluonTabularModel,
+    DirectTabularModel,
 ]
 
 
@@ -25,7 +25,7 @@ TESTABLE_MODELS = [
 def test_when_feature_df_is_constructed_then_shape_is_correct(
     data, max_rows_per_item, expected_length, temp_model_path
 ):
-    model = AutoGluonTabularModel(path=temp_model_path)
+    model = DirectTabularModel(path=temp_model_path)
     # Initialize model._lag_indices and model._time_features from freq
     model.fit(train_data=data, time_limit=2)
     df = model._get_features_dataframe(data, max_rows_per_item=max_rows_per_item)
@@ -37,7 +37,7 @@ def test_when_feature_df_is_constructed_then_shape_is_correct(
 def test_when_predict_is_called_then_get_features_dataframe_receives_correct_input_with_dummy(
     temp_model_path, prediction_length
 ):
-    model = AutoGluonTabularModel(path=temp_model_path, prediction_length=prediction_length)
+    model = DirectTabularModel(path=temp_model_path, prediction_length=prediction_length)
     model.fit(train_data=DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, time_limit=2)
     with mock.patch.object(model, "_get_features_dataframe") as patch_method:
         try:
@@ -68,7 +68,7 @@ def test_when_covariates_and_features_present_then_feature_df_shape_is_correct(
     feat_gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
     data = feat_gen.fit_transform(data)
     # Initialize model._target_lag_indices and model._time_features from freq
-    model = AutoGluonTabularModel(path=temp_model_path, metadata=feat_gen.covariate_metadata)
+    model = DirectTabularModel(path=temp_model_path, metadata=feat_gen.covariate_metadata)
     model.fit(train_data=data, time_limit=2)
     df = model._get_features_dataframe(data)
     expected_num_features = (
@@ -85,6 +85,6 @@ def test_when_covariates_and_features_present_then_feature_df_shape_is_correct(
 
 def test_when_static_features_present_then_prediction_works(temp_model_path):
     data = DATAFRAME_WITH_STATIC.copy()
-    model = AutoGluonTabularModel(path=temp_model_path)
+    model = DirectTabularModel(path=temp_model_path)
     model.fit(train_data=data, time_limit=2)
     model.predict(data)
