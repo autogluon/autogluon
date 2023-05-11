@@ -15,7 +15,6 @@ def ovd():
                 "Pink notice. Green sign. One Way sign. People group. Tower crane in construction. Lamp post. Glass skyscraper."
             ],
         },
-        as_pandas=True,
     )
     print(f"test_result:\n {test_result}")
 
