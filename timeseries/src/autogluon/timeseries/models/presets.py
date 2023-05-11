@@ -36,12 +36,12 @@ MODEL_TYPES = dict(
     ARIMA=ARIMAModel,
     Theta=ThetaModel,
     AutoGluonTabular=AutoGluonTabularModel,
+    RecursiveTabular=RecursiveTabularModel,
     Naive=NaiveModel,
     SeasonalNaive=SeasonalNaiveModel,
     AutoETS=AutoETSModel,
     AutoARIMA=AutoARIMAModel,
     DynamicOptimizedTheta=DynamicOptimizedThetaModel,
-    RecursiveTabular=RecursiveTabularModel,
 )
 if agts.MXNET_INSTALLED:
     from .gluonts.mx import (
