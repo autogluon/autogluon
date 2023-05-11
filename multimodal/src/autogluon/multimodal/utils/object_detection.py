@@ -1445,7 +1445,8 @@ def save_result_df(
         for i in range(N_preds):
             box_info.append(
                 {
-                    "class": image_pred["labels"][i].item(),
+                    "class": idx2classname[image_pred["labels"][i].item()],
+                    "class_id": image_pred["labels"][i].item(),
                     "bbox": image_pred["bboxes"][i].tolist(),
                     "score": image_pred["scores"][i].item(),
                 }
