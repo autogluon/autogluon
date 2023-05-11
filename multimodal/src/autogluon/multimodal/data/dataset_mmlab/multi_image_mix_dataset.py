@@ -9,7 +9,7 @@ import pandas as pd
 import torch
 from numpy import random
 
-from ...constants import AUTOMM, GET_ITEM_ERROR_RETRY, MULTI_IMAGE_MIX_DATASET, ROIS
+from ...constants import GET_ITEM_ERROR_RETRY, MULTI_IMAGE_MIX_DATASET, ROIS
 from ..preprocess_dataframe import MultiModalFeaturePreprocessor
 from ..utils import apply_data_processor, apply_df_preprocessor, get_per_sample_features
 
@@ -17,16 +17,13 @@ logger = logging.getLogger(__name__)
 
 try:
     import mmcv
-    from mmcv.transforms import BaseTransform
-    from mmcv.transforms.utils import avoid_cache_randomness, cache_randomness
     from mmcv.utils import Config as MMCVConfig
 except:
     MMCVConfig = None
 
-
 try:
     from mmcv.transforms import BaseTransform
-    from mmcv.transforms.utils import avoid_cache_randomness, cache_randomness
+    from mmcv.transforms.utils import cache_randomness
 except:
     pass
 
@@ -36,7 +33,7 @@ except:
     pass
 
 try:
-    from mmdet.structures.bbox import autocast_box_type, find_inside_bboxes
+    from mmdet.structures.bbox import autocast_box_type
     from mmdet.utils import log_img_scale  # inline import to avoid mmdet uninstall error for other tasks
 except:
     pass

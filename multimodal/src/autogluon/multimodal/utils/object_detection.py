@@ -1444,14 +1444,17 @@ def save_result_df(
         N_preds = len(image_pred["bboxes"])
         for i in range(N_preds):
             box_info.append(
-                {"class": image_pred["labels"][i], "bbox": image_pred["bboxes"][i], "score": image_pred["scores"][i]}
+                {
+                    "class": image_pred["labels"][i].item(),
+                    "bbox": image_pred["bboxes"][i].tolist(),
+                    "score": image_pred["scores"][i].item(),
+                }
             )
         results.append([image_name, box_info])
     result_df = pd.DataFrame(results, columns=["image", "bboxes"])
     if result_path:
         result_df.to_csv(result_path, index=False)
         logger.info("Saved detection results to {}".format(result_path))
-        print("Saved detection results to {}".format(result_path))
     return result_df
 
 
@@ -1565,9 +1568,6 @@ def setup_detection_train_tuning_data(predictor, max_num_tuning_data, seed, trai
 def convert_pred_to_xywh(pred: Optional[List]):
     if not pred:
         return pred
-    num_images = len(pred)
-    num_categories = len(pred[0])
-    for i in range(num_images):
-        for j in range(num_categories):
-            pred[i][j][:, :4] = bbox_xyxy_to_xywh(pred[i][j][:, :4])
+    for i, pred_per_image in enumerate(pred):
+        pred[i]["bboxes"] = bbox_xyxy_to_xywh(pred_per_image["bboxes"].detach().numpy())
     return pred
