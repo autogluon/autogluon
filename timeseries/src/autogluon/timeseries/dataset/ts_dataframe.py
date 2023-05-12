@@ -293,13 +293,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
         ----------
         iterable_dataset: Iterable
             An iterator over dictionaries, each with a ``target`` field specifying the value of the
-            (univariate) time series, and a ``start`` field that features a pandas Timestamp with features.
+            (univariate) time series, and a ``start`` field with the starting time as a pandas Period .
             Example::
 
                 iterable_dataset = [
-                    {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq='D')},
-                    {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq='D')},
-                    {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq='D')}
+                    {"target": [0, 1, 2], "start": pd.Period("01-01-2019", freq='D')},
+                    {"target": [3, 4, 5], "start": pd.Period("01-01-2019", freq='D')},
+                    {"target": [6, 7, 8], "start": pd.Period("01-01-2019", freq='D')}
                 ]
         num_cpus : int, default = -1
             Number of CPU cores used to process the iterable dataset in parallel. Set to -1 to use all cores.
