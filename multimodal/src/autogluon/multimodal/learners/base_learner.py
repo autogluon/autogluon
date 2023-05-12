@@ -99,7 +99,6 @@ from ..data.infer_types import (
     is_image_column,
 )
 from ..data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from ..learners import DefaultLearner, ObjectDetectionLearner
 from ..matcher import MultiModalMatcher
 from ..models.utils import get_model_postprocess_fn
 from ..optimization.lit_distiller import DistillerLitModule
@@ -418,7 +417,7 @@ class BaseLearner(ExportMixin):
 
         # initialize learner as None
         # self._use_learner = use_learner  # TODO: temporary arg for unit testing, remove later
-        self._learner: Optional[Union[MultiModalMatcher, DefaultLearner]] = None
+        self._learner: Optional[Union[MultiModalMatcher, BaseLearner]] = None
         # Based on the information given, setup a corresponding learner. NOTE: learner is initialized at the end of .fit()
         # if self._problem_type == None:
         #     self._learner = None
