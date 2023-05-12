@@ -1,7 +1,7 @@
 import os
 from typing import Dict, List, Optional, Union
-import numpy as np
 
+import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 from timm.data.mixup import Mixup
@@ -10,17 +10,16 @@ from torch import nn
 from ..constants import BBOX, XYWH
 from ..data.infer_types import infer_problem_type_output_shape
 from ..optimization.lit_mmdet import MMDetLitModule
-from ..utils.save import setup_save_path
 from ..utils.object_detection import (
     convert_pred_to_xywh,
     evaluate_coco,
     get_detection_classes,
     object_detection_data_to_df,
-    setup_detection_train_tuning_data,
     save_result_df,
+    setup_detection_train_tuning_data,
 )
 from ..utils.pipeline import init_pretrained
-
+from ..utils.save import setup_save_path
 from .default_learner import DefaultLearner
 
 
