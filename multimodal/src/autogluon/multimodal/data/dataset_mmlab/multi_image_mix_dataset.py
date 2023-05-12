@@ -165,7 +165,7 @@ class MultiImageMixDataset(torch.utils.data.Dataset):
         """
         results = copy.deepcopy(self._load_item(idx))
 
-        for (transform, transform_type) in zip(self.mix_transforms, self.mix_transforms_types):
+        for transform, transform_type in zip(self.mix_transforms, self.mix_transforms_types):
             assert hasattr(transform, "get_indexes")
 
             if self._skip_type_keys is not None and transform_type in self._skip_type_keys:
@@ -279,7 +279,6 @@ class Mosaic:
         pad_val=114,
         prob=1.0,
     ):
-
         assert isinstance(img_scale, tuple)
         assert 0 <= prob <= 1.0, "The probability should be in range [0,1]. " f"got {prob}."
 

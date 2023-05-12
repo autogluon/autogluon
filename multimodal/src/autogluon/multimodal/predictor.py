@@ -516,6 +516,8 @@ class MultiModalPredictor(ExportMixin):
 
     @property
     def path(self):
+        if self._use_learner:
+            return self._learner._save_path
         if self._matcher:
             return self._matcher.path
         else:
@@ -523,6 +525,8 @@ class MultiModalPredictor(ExportMixin):
 
     @property
     def label(self):
+        if self._use_learner:
+            return self._learner._label_column
         if self._matcher:
             return self._matcher.label
         else:
@@ -554,6 +558,8 @@ class MultiModalPredictor(ExportMixin):
 
     @property
     def problem_type(self):
+        if self._use_learner:
+            return self._learner.problem_type
         return self._problem_type
 
     @property
@@ -565,6 +571,8 @@ class MultiModalPredictor(ExportMixin):
 
     @property
     def column_types(self):
+        if self._use_learner:
+            return self._learner.column_types
         if self._matcher:
             return self._matcher.column_types
         else:
@@ -586,6 +594,9 @@ class MultiModalPredictor(ExportMixin):
             4 --> everything
 
         """
+        if self._use_learner:
+            self._learner.set_verbosity(verbosity)
+            return
         self._verbosity = verbosity
         set_logger_verbosity(verbosity)
         transformers.logging.set_verbosity(verbosity2loglevel(verbosity))
@@ -724,6 +735,12 @@ class MultiModalPredictor(ExportMixin):
             # self._problem_type = self._infer_problem_type(train_data=train_data, column_types=column_types)
             # if self._problem_type != OBJECT_DETECTION and self._problem_type != NER:
             #     self._learner._problem_type = self._problem_type
+            if teacher_predictor is not None:
+                teacher_predictor = (
+                    teacher_predictor._learner
+                    if isinstance(teacher_predictor, MultiModalPredictor)
+                    else teacher_predictor
+                )
             self._learner.fit(
                 train_data=train_data,
                 presets=presets,
@@ -2018,7 +2035,10 @@ class MultiModalPredictor(ExportMixin):
 
     def set_num_gpus(self, num_gpus):
         assert isinstance(num_gpus, int)
-        self._config.env.num_gpus = num_gpus
+        if self._use_learner:
+            self._learner.set_num_gpus(num_gpus)
+        else:
+            self._config.env.num_gpus = num_gpus
 
     def get_num_gpus(self):
         try:
@@ -2436,6 +2456,17 @@ class MultiModalPredictor(ExportMixin):
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
+        if self._use_learner:
+            pred = self._learner.predict_proba(
+                data=data,
+                candidate_data=candidate_data,
+                id_mappings=id_mappings,
+                as_pandas=as_pandas,
+                as_multiclass=as_multiclass,
+                realtime=realtime,
+            )
+            return pred
+
         self._verify_inference_ready()
         if self._matcher:
             return self._matcher.predict_proba(
@@ -2524,6 +2555,16 @@ class MultiModalPredictor(ExportMixin):
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
+        if self._use_learner:
+            return self._learner.extract_embedding(
+                data=data,
+                id_mappings=id_mappings,
+                return_masks=return_masks,
+                as_tensor=as_tensor,
+                as_pandas=as_pandas,
+                realtime=realtime,
+                signature=signature,
+            )
         self._verify_inference_ready()
         if self._matcher:
             return self._matcher.extract_embedding(
@@ -2999,6 +3040,9 @@ class MultiModalPredictor(ExportMixin):
         Dict containing various detailed information.
         We do not recommend directly printing this dict as it may be very large.
         """
+        if self._use_learner:
+            return self._learner.fit_summary(verbosity=verbosity, show_plot=show_plot)
+
         if self._total_train_time is None:
             logging.info("There is no `best_score` or `total_train_time`. Have you called `predictor.fit()`?")
         else:

@@ -13,7 +13,7 @@ import sys
 import time
 import warnings
 from datetime import timedelta
-from typing import Dict, Final, List, Optional, Tuple, Union
+from typing import Callable, Dict, Final, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -21,9 +21,16 @@ import pytorch_lightning as pl
 import torch
 import transformers
 import yaml
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 from packaging import version
+from pytorch_lightning import LightningDataModule, LightningModule
+from pytorch_lightning.callbacks import Callback
+from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.plugins import CheckpointIO
+from pytorch_lightning.strategies import Strategy
+from timm.data.mixup import Mixup
 from torch import nn
+from torchmetrics import Metric
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
@@ -118,6 +125,7 @@ from ..utils import (
     assign_feature_column_names,
     average_checkpoints,
     check_if_packages_installed,
+    compute_grad_steps,
     compute_num_gpus,
     compute_score,
     convert_pred_to_xywh,
@@ -532,6 +540,682 @@ class BaseLearner(ExportMixin):
         set_logger_verbosity(verbosity)
         transformers.logging.set_verbosity(verbosity2loglevel(verbosity))
 
+    def _setup_save_path(self, save_path, fit_called):
+        return setup_save_path(
+            resume=self._resume,
+            old_save_path=self._save_path,
+            proposed_save_path=save_path,
+            raise_if_exist=True,
+            warn_if_exist=False,
+            fit_called=fit_called,
+        )
+
+    def _setup_train_tuning_data(
+        self,
+        train_data: Union[pd.DataFrame, str],
+        tuning_data: Optional[Union[pd.DataFrame, str]],
+        holdout_frac: Optional[float],
+        seed: Optional[int],
+        max_num_tuning_data: Optional[int],
+        **kwargs,
+    ):
+        if self._problem_type == OBJECT_DETECTION:
+            train_data, tuning_data = setup_detection_train_tuning_data(
+                self, max_num_tuning_data, seed, train_data, tuning_data
+            )
+        if isinstance(train_data, str):
+            train_data = load_pd.load(train_data)
+        if isinstance(tuning_data, str):
+            tuning_data = load_pd.load(tuning_data)
+        if tuning_data is None:
+            train_data, tuning_data = self._split_train_tuning(
+                data=train_data, holdout_frac=holdout_frac, random_state=seed
+            )
+
+        return train_data, tuning_data
+
+    def _infer_output_shape(self, train_data):
+        _, output_shape = infer_problem_type_output_shape(
+            label_column=self._label_column,
+            column_types=self._column_types,
+            data=train_data,
+            provided_problem_type=self._problem_type,
+        )
+
+        # TODO: Delete this check for object detection
+        # if self._problem_type != OBJECT_DETECTION:
+        if self._output_shape is not None and output_shape is not None:
+            assert self._output_shape == output_shape, (
+                f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
+            )
+        # else:
+        #     self._output_shape = output_shape
+
+        return output_shape
+
+    def _check_if_fewshot(self, train_data):
+        scarcity_mode = infer_scarcity_mode_by_data_size(
+            df_train=train_data, scarcity_threshold=50
+        )  # Add as separate hyperparameter somewhere?
+        if scarcity_mode == FEW_SHOT and (
+            not self._presets or FEW_SHOT not in self._presets
+        ):  # TODO: check for data  type
+            logger.info(
+                f"Detected data scarcity. Consider running using the preset '{FEW_SHOT_TEXT_CLASSIFICATION}' for better performance."
+            )
+
+    def _infer_metric_names(self):
+        if self._validation_metric_name is None or self._eval_metric_name is None:
+            validation_metric_name, eval_metric_name = infer_metrics(
+                problem_type=self._problem_type,
+                eval_metric_name=self._eval_metric_name,
+                validation_metric_name=self._validation_metric_name,
+            )
+        else:
+            validation_metric_name = self._validation_metric_name
+            eval_metric_name = self._eval_metric_name
+        return validation_metric_name, eval_metric_name
+
+    def _setup_hyperparameters(self, hyperparameters, hyperparameter_tune_kwargs, teacher_predictor):
+        hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
+            problem_type=self._problem_type,
+            presets=self._presets,
+            provided_hyperparameters=hyperparameters,
+            provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            teacher_predictor=teacher_predictor,
+        )
+        # split out the hyperparameters whose values are complex objects
+        hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
+        return (
+            hyperparameters,
+            advanced_hyperparameters,
+            hyperparameter_tune_kwargs,
+        )
+
+    def _update_hyperparameters(self, hyperparameters, hyperparameter_tune_kwargs, teacher_predictor):
+        hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
+            problem_type=self._problem_type,
+            presets=self._presets,
+            provided_hyperparameters=hyperparameters,
+            provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            teacher_predictor=teacher_predictor,
+        )
+        return hyperparameters, hyperparameter_tune_kwargs
+
+    def _split_hyperparameters(self, hyperparameters):
+        # split out the hyperparameters whose values are complex objects
+        hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
+        return hyperparameters, advanced_hyperparameters
+
+    def _create_lr_callback(self) -> Callback:
+        """Creates the learning rate callback
+        By default, we use the pl LearningRateMonitor callback
+        This can be overriden by child learners to use other learning rate callbacks
+
+        Returns
+        --------
+        pl.callbacks.LearningRateMonitor: pytorch lightning learning rate callback
+        """
+        lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
+        return lr_callback
+
+    def _create_early_stop_callback(
+        self, validation_metric_name: str, minmax_mode: str, task: pl.LightningModule
+    ) -> Callback:
+        """Creates the callback for early stopping during training
+        By default, we use the pl EarlyStopping callback
+        This can be overriden by child learners to use other early stopping callbacks
+
+        Parameters
+        -----------
+        validation_metric_name (str): name of the validation metric
+        minmax_mode (str):
+            The min/max mode used in selecting model checkpoints.
+            - min
+                Its means that smaller metric is better.
+            - max
+                It means that larger metric is better.
+        config (DictConfig): OmegaConfig holding the configuration for training
+        task (pl.LightningModule): pytorch lightning module for training
+
+        Returns
+        --------
+        pl.callbacks.EarlyStopping: pytorch lightning early stopping callback
+        """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _create_early_stop_callback()"
+        early_stopping_callback = pl.callbacks.EarlyStopping(
+            monitor=task.validation_metric_name,
+            patience=self._config.optimization.patience,
+            mode=minmax_mode,
+            stopping_threshold=get_stopping_threshold(validation_metric_name),
+        )
+
+        return early_stopping_callback
+
+    def _create_checkpoint_callback(self, minmax_mode: str, save_path: str, task: pl.LightningModule) -> Callback:
+        """Creates the pl checkpoint callback during training
+        By default, we use the AutoMMModelCheckpoint, which is a customized checkpoint callback
+        This can be overriden by child learners to use other checkpoint callbacks
+
+        Parameters
+        -----------
+        minmax_mode (str):
+            The min/max mode used in selecting model checkpoints.
+            - min
+                Its means that smaller metric is better.
+            - max
+                It means that larger metric is better.
+        save_path (str): model save path
+        self._config (DictConfig): OmegaConfig holding the configuration for training
+        task (pl.LightningModule): pytorch lightning module for training
+
+        Returns
+        --------
+        pl.callbacks.ModelCheckpoint: The pytorch lightning checkpoint callback
+        """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _create_checkpoint_callback()"
+        checkpoint_callback = AutoMMModelCheckpoint(
+            dirpath=save_path,
+            save_top_k=self._config.optimization.top_k,
+            verbose=True,
+            monitor=task.validation_metric_name,
+            mode=minmax_mode,
+            save_last=True,
+        )
+
+        return checkpoint_callback
+
+    def _setup_train_task_lightning_module(
+        self,
+        trainable_param_names: List[str],
+        mixup_fn: Optional[Mixup],
+        loss_func: Optional[nn.Module],
+        optimization_kwargs: dict,
+        metrics_kwargs: dict,
+        *args,
+        **kwargs,
+    ) -> pl.LightningModule:
+        """
+        Select the correct pl task module for a given problem type.
+        By default, we use the default task type a.k.a. LitModule
+        This can be overridden by a child learner if needed.
+
+
+        Parameters
+        -----------
+        self._config (DictConfig): OmegaConfig dict with all the configs for training
+        self._model (nn.Module): pytorch nn.Module to train
+        trainable_param_names (List[str]): the list of trainable parameter names
+        mixup_fn (Optional[Mixup]): model mixup function that applies different params to each element or whole batch
+        loss_func (Optional[nn.Module]): pytorch nn.Module loss function
+        self._model_postprocess_fn (Optional[Callable]): postprocess function to apply to the model output (i.e. sigmoid after nn.BCEWithLogitsLoss)
+        optimization_kwargs (dict): parameters for optimization
+        metrics_kwargs (dict): parameters for metrics
+
+        Returns
+        --------
+        pl.LightningModule: pytorch lightning module for training task
+        """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _setup_task_lightning_module()"
+        assert (
+            self._model is not None
+        ), "self._model is None. You must setup self._model before calling _setup_task_lightning_module()"
+        task = LitModule(
+            model=self._model,
+            loss_func=loss_func,
+            efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+            mixup_fn=mixup_fn,
+            mixup_off_epoch=OmegaConf.select(self._config, "data.mixup.turn_off_epoch"),
+            model_postprocess_fn=self._model_postprocess_fn,
+            trainable_param_names=trainable_param_names,
+            skip_final_val=OmegaConf.select(self._config, "optimization.skip_final_val", default=False),
+            **metrics_kwargs,
+            **optimization_kwargs,
+        )
+
+        return task
+
+    def _get_metrics_kwargs(
+        self, validation_metric_name: str, validation_metric: Optional[Metric], custom_metric_func: Optional[Callable]
+    ) -> dict:
+        """get the metrics kwargs for the training task
+
+        Parameters
+        ----------
+        validation_metric_name (str): name of the validation metric
+        validation_metric (Optional[Metric]): validation metric object of type torchmetrics.Metric
+        custom_metric_func (Optional[Callable]): customized metric function
+
+        Returns
+        -------
+        dict: dictionary containing the metrics parameters
+        """
+        metrics_kwargs = dict(
+            validation_metric=validation_metric,
+            validation_metric_name=validation_metric_name,
+            custom_metric_func=custom_metric_func,
+        )
+
+        return metrics_kwargs
+
+    def _get_optim_kwargs(self) -> dict:
+        """get the optimization kwargs for the training task
+
+        Parameters
+        ----------
+        self._config (DictConfig): OmegaConf holding the config for training
+
+        Returns
+        -------
+        dict: dictionary containing the optimization parameters
+        """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _get_optim_kwargs()"
+        optimization_kwargs = dict(
+            optim_type=self._config.optimization.optim_type,
+            lr_choice=self._config.optimization.lr_choice,
+            lr_schedule=self._config.optimization.lr_schedule,
+            lr=self._config.optimization.learning_rate,
+            lr_decay=self._config.optimization.lr_decay,
+            end_lr=self._config.optimization.end_lr,
+            lr_mult=self._config.optimization.lr_mult,
+            weight_decay=self._config.optimization.weight_decay,
+            warmup_steps=self._config.optimization.warmup_steps,
+        )
+
+        return optimization_kwargs
+
+    def _get_train_data_module(
+        self,
+        train_df: pd.DataFrame,
+        val_df: pd.DataFrame,
+        val_use_training_mode: bool,
+    ) -> LightningDataModule:
+        """get the data module for training
+        By default, we use the default data module a.k.a. BaseDataModule
+        This is to be overridden by a child learner if needed.
+
+        Parameters
+        ----------
+        train_df (pd.DataFrame): training data as in pandas data frame
+        val_df (pd.DataFrame): validation data as in pandas data frame
+        self._config (DictConfig): OmegaConfig instance holding training configurations
+        self._df_preprocessor (MultiModalFeaturePreprocessor): data frame preprocessor to read and preprocess pandas data frames
+        sefl._data_processors (List): data processors to read trainig data
+        val_use_training_mode (bool): whether to use training mode for validation data
+
+        Returns
+        -------
+        LightningDataModule: pytorch lightning data module used for loading data during training
+        """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _get_train_data_module()"
+        assert (
+            self._df_preprocessor is not None
+        ), "self._df_preprocessor is None. You must setup self._df_preprocessor before calling _get_train_data_module()"
+        assert (
+            self._data_processors is not None
+        ), "self._data_processors is None. You must setup self._data_processors before calling _get_train_data_module()"
+        train_dm = BaseDataModule(
+            df_preprocessor=self._df_preprocessor,
+            data_processors=self._data_processors,
+            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+            num_workers=self._config.env.num_workers,
+            train_data=train_df,
+            validate_data=val_df,
+            val_use_training_mode=val_use_training_mode,
+        )
+
+        return train_dm
+
+    def _get_mixup(self) -> Tuple[bool, Optional[Mixup]]:
+        """Setup mixup for training
+
+        Parameters
+        ----------
+        self._config (DictConfig): OmegaConfig instance holding model configurations
+
+        Returns
+        -------
+        Tuple[bool, Optional[Mixup]]: tuple of mixup_active and mixup_fn (Mixup if mixup is active, None otherwise)
+        """
+        assert (
+            self._config is not None
+        ), "self._config must be set before calling _get_mixup(). Are you calling _get_mixup() directly? Use .fit() instead."
+        mixup_active, mixup_fn = get_mixup(
+            model_config=OmegaConf.select(self._config, "model"),
+            mixup_config=OmegaConf.select(self._config, "data.mixup"),
+            num_classes=self._output_shape,
+        )
+        if mixup_active and (self._config.env.per_gpu_batch_size == 1 or self._config.env.per_gpu_batch_size % 2 == 1):
+            warnings.warn(
+                "The mixup is done on the batch."
+                "The per_gpu_batch_size should be >1 and even for reasonable operation",
+                UserWarning,
+            )
+
+        return mixup_active, mixup_fn
+
+    def _setup_validation_metric(
+        self, validation_metric_name: Optional[str] = None
+    ) -> Tuple[Optional[Metric], Optional[Callable]]:
+        """Get validation metric from validation metric name
+
+        Parameters
+        ----------
+        validation_metric_name (Optional[str]): name for the validation metric
+
+        Returns
+        -------
+        Tuple[Metric, Union[Callable, None]]: Tuple of validation metric and custom metric function.
+        """
+        if validation_metric_name is not None:
+            validation_metric, custom_metric_func = get_metric(
+                metric_name=validation_metric_name,
+                num_classes=self._output_shape,
+            )
+        else:
+            validation_metric, custom_metric_func = (None, None)
+        return validation_metric, custom_metric_func
+
+    def _get_data_processors(self, advanced_hyperparameters: Optional[Dict]) -> List[object]:
+        """Create data processors for training. Reuse the existing data processors if exists
+
+        Parameters
+        ----------
+        self._config (DictConfig): OmegaConfig instance holding model configurations
+        advanced_hyperparameters (dict): advanced hyperparameters for data processors, such as image transforms, whose values are complex objects
+        self._model (nn.Module): torch model (a.k.a. nn.Module)
+
+        Returns
+        TODO: !!! Hot - data processors do not inherit from a common base class!!!!!!
+        List[object]: list of required data processors.
+        """
+        assert (
+            self._config is not None
+        ), "self._config must be set before calling _get_data_processors. Are you calling _get_data_processors directly? Use .fit() instead"
+        assert (
+            self._model is not None
+        ), "self._model must be set before calling _get_data_processors. Are you calling _get_data_processors directly? Use .fit() instead"
+        if self._data_processors is None:
+            data_processors = create_fusion_data_processors(
+                config=self._config,
+                model=self._model,
+                advanced_hyperparameters=advanced_hyperparameters,
+            )
+        else:  # continuing training
+            data_processors = self._data_processors
+        return data_processors
+
+    def _get_trainable_params(self) -> List[str]:
+        """Get trainable parameters for efficient finetuning
+
+        Parameters
+        -----------
+        self._config (DictConfig): OmegaConfig instance holding model configurations
+        self._model (nn.Module): the torch model (a.k.a. nn.Module)
+
+        Returns
+        --------
+        List[str]: list of trainable parameter names
+        """
+        assert (
+            self._config is not None
+        ), "self._config must be set before calling _get_trainable_params. Are you calling _get_trainable_params directly? Use .fit() instead"
+
+        assert (
+            self._model is not None
+        ), "self._model must be set before calling _get_trainable_params. Are you calling _get_trainable_params directly? Use .fit() instead"
+        norm_param_names = get_norm_layer_param_names(self._model)
+
+        trainable_param_names = get_trainable_params_efficient_finetune(
+            norm_param_names,
+            efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+        )
+
+        return trainable_param_names
+
+    # def _get_model(self) -> nn.Module:
+    #     """Creates the model for training based on the config and info in df_preprocessor
+    #     By default we use the create_fusion_model function to create the model
+    #     This can be overriden by a child learner to create custom models
+
+    #     Parameters
+    #     -----------
+    #     self._config (DictConfig): OmegaConfig instance holding model configurations
+    #     self._df_preprocessor (MultiModalFeaturePreprocessor): data frame preprocessor
+
+    #     Returns
+    #     --------
+    #     nn.Module: the torch model (a.k.a. nn.Module) to be trained
+    #     """
+
+    #     assert (
+    #         self._config is not None and self._df_preprocessor is not None
+    #     ), "Config and df_preprocessor must be set before calling _create_model(). Are you calling _create_model() directly? Use .fit() instead."
+    #     ##  this is to be moved into NER learners
+    #     if self._problem_type == NER:
+    #         self._output_shape = len(self._df_preprocessor.label_generator.unique_entity_groups)
+
+    #     # 5. setup model.
+    #     # create a new model if calling ._fit() for the first time. otherwise re-use the existing self._model
+    #     if self._model is None:
+    #         model = create_fusion_model(
+    #             config=self._config,
+    #             num_classes=self._output_shape,
+    #             classes=self._classes,
+    #             num_numerical_columns=len(self._df_preprocessor.numerical_feature_names),
+    #             num_categories=self._df_preprocessor.categorical_num_categories,
+    #         )
+    #     else:  # continuing training
+    #         model = self._model
+    #     return model
+
+    def _setup_environment(
+        self,
+        train_df: pd.DataFrame,
+        config: dict,
+        presets: Optional[str],
+        hyperparameters: Optional[Union[str, List[str], Dict]],
+        teacher_predictor: Union[str, BaseLearner],
+        hpo_mode: bool,
+        **hpo_kwargs,
+    ) -> Tuple[DictConfig, MultiModalFeaturePreprocessor, int, Optional[Union[Strategy, str]], bool]:
+        """Set up training environment parameters: config, df_preprocessor, grad_step, strategy, etc.
+        TODO: Can df_preprocessor be moved outside this function?
+
+        Parameters
+        -----------
+        train_df (pd.DataFrame): training data frame
+        presets (Optional[str]): preset to use
+        hyperparameters (Optional[Union[str, List[str], Dict]]): user provided hyperparameter overrides
+        teacher_predictor (Union[str, BaseLearner]): teacher model for knowledge distillation
+        hpo_mode (_type_): if running hpo
+        hpo_kwargs (_type_): hpo params
+
+        Returns
+        --------
+        config: dict
+        df_preprocessor: MultiModalFeaturePreprocessor
+        grad_step: int
+        strategy: Optional[Union[Strategy, str]]
+        use_ray_lightning: bool
+        """
+        config = get_config(
+            problem_type=self._problem_type,
+            presets=presets,
+            config=config,
+            overrides=hyperparameters,
+            extra=["distiller"] if teacher_predictor is not None else None,
+        )
+
+        config = update_config_by_rules(
+            problem_type=self._problem_type,
+            config=config,
+        )
+
+        # 2. set up df_preprocessor if not given yet
+        if self._df_preprocessor is None:
+            df_preprocessor = init_df_preprocessor(
+                config=config,
+                column_types=self._column_types,
+                label_column=self._label_column,
+                train_df_x=train_df.drop(columns=self._label_column),
+                train_df_y=train_df[self._label_column],
+            )
+        else:  # continuing training
+            df_preprocessor = self._df_preprocessor
+
+        # 3. update config given df_preprocessor
+        # Avoid passing tabular data with many columns to MultiHeadAttention.
+        # If models have additive_attention="auto", we enable it automatically for large tables.
+
+        # NOTE: This part only changes config.model and config.env
+        config = update_tabular_config_by_resources(
+            config,
+            num_numerical_columns=len(df_preprocessor.numerical_feature_names),
+            num_categorical_columns=len(df_preprocessor.categorical_num_categories),
+        )
+
+        # This part only changes config.model
+        config = select_model(config=config, df_preprocessor=df_preprocessor)
+
+        # 22. training environment-dependent configs
+        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
+
+        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
+
+        grad_steps = compute_grad_steps(config=config, num_gpus=num_gpus)
+
+        use_ray_lightning = "_ray_lightning_plugin" in hpo_kwargs
+        num_gpus, strategy = self._compute_strategy(config, hpo_mode, hpo_kwargs, num_gpus, use_ray_lightning)
+
+        config.env.num_gpus = num_gpus
+        config.env.precision = precision
+        config.env.strategy = strategy if not config.env.strategy == DEEPSPEED_OFFLOADING else DEEPSPEED_OFFLOADING
+
+        self._config = config
+        return config, df_preprocessor, grad_steps, strategy, use_ray_lightning
+
+    def _compute_strategy(
+        self, config: dict, hpo_mode: bool, hpo_kwargs: dict, num_gpus: int, use_ray_lightning: bool
+    ) -> Tuple[int, Optional[Union[Strategy, str]]]:
+        """Compute what data parallel strategy to use for training
+
+        Parameters
+        -----------
+        config (dict): configuration OmegaConfig instance
+        hpo_mode (bool): whether to use hpo
+        hpo_kwargs (dict): key word arguments for hpo
+        num_gpus (int): number of gpus to use
+        use_ray_lightning (bool): whether to use ray lightning for hpo
+
+        Returns
+        --------
+        Tuple[int, Optional[Union[Strategy, str]]]: Tuple containing number of gpus and strategy (num_gpus, strategy)
+        """
+        if not hpo_mode:
+            if num_gpus <= 1:
+                if config.env.strategy == DEEPSPEED_OFFLOADING:  # Offloading currently only tested for single GPU
+                    assert version.parse(pl.__version__) >= version.parse(
+                        DEEPSPEED_MIN_PL_VERSION
+                    ), f"For DeepSpeed Offloading to work reliably you need at least pytorch-lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your pytorch-lightning version."
+                    from autogluon.multimodal.optimization.deepspeed import CustomDeepSpeedStrategy
+
+                    strategy = CustomDeepSpeedStrategy(
+                        stage=3,
+                        offload_optimizer=True,
+                        offload_parameters=False,
+                        allgather_bucket_size=config.env.deepspeed_allgather_size,
+                        reduce_bucket_size=config.env.deepspeed_allreduce_size,
+                    )
+                else:
+                    strategy = None
+            else:
+                strategy = config.env.strategy
+        else:
+            # we don't support running each trial in parallel without ray lightning
+            if use_ray_lightning:
+                strategy = hpo_kwargs.get("_ray_lightning_plugin")
+            else:
+                strategy = None
+                num_gpus = min(num_gpus, 1)
+        return num_gpus, strategy
+
+    def _get_trainer(
+        self,
+        enable_progress_bar: bool,
+        grad_steps: int,
+        strategy: Optional[Union[Strategy, str]],
+        use_ray_lightning: bool,
+        callbacks: Optional[List[Callback]],
+        custom_checkpoint_plugin: CheckpointIO,
+        tb_logger: TensorBoardLogger,
+        max_time: Optional[timedelta] = None,
+    ) -> pl.Trainer:
+        """Create the pytorch_lightning trainer for training
+
+        Parameters
+        ----------
+        enable_progress_bar (bool): enable progress bar to display in console
+        grad_steps (int): number of gradient steps to take
+        strategy (Optional[Union[Strategy, str]]): data parallel strategy
+        use_ray_lightning (bool): whether to use ray lightning plugin
+        callbacks (Optional[List[Callback]]): pytorch lightning callbacks during training loop
+        custom_checkpoint_plugin (CheckpointIO): custome pytorch lightning checkpoint plugin that customize the checkpoint saving
+        tb_logger (TensorBoardLogger): tensorboard logger
+        max_time (Optional[timedelta], optional): maximum trainig. Defaults to None.
+
+        Returns
+        -------
+        pl.Trainer: the pytorch lightning trainer object for training
+        """
+        assert (
+            self._config is not None
+        ), "self._config is None. You must setup self._config before calling _get_trainer()"
+        accelerator = "gpu" if self._config.env.num_gpus > 0 else None
+        available_devices = get_available_devices(
+            num_gpus=self._config.env.num_gpus,
+            auto_select_gpus=self._config.env.auto_select_gpus,
+            use_ray_lightning=use_ray_lightning,
+        )
+        trainer = pl.Trainer(
+            accelerator=accelerator,
+            devices=available_devices,
+            num_nodes=self._config.env.num_nodes,
+            precision=self._config.env.precision,
+            strategy=strategy,
+            benchmark=False,
+            deterministic=self._config.env.deterministic,
+            max_epochs=self._config.optimization.max_epochs,
+            max_steps=self._config.optimization.max_steps,
+            max_time=max_time,
+            callbacks=callbacks,
+            logger=tb_logger,
+            gradient_clip_val=OmegaConf.select(self._config, "optimization.gradient_clip_val", default=1),
+            gradient_clip_algorithm=OmegaConf.select(
+                self._config, "optimization.gradient_clip_algorithm", default="norm"
+            ),
+            accumulate_grad_batches=grad_steps,
+            log_every_n_steps=OmegaConf.select(self._config, "optimization.log_every_n_steps", default=10),
+            enable_progress_bar=enable_progress_bar,
+            fast_dev_run=self._config.env.fast_dev_run,
+            track_grad_norm=OmegaConf.select(self._config, "optimization.track_grad_norm", default=-1),
+            val_check_interval=self._config.optimization.val_check_interval,
+            check_val_every_n_epoch=OmegaConf.select(self._config, "optimization.check_val_every_n_epoch", default=1),
+            plugins=[custom_checkpoint_plugin],
+        )
+
+        return trainer
+
     def fit(
         self,
         train_data: Union[pd.DataFrame, str],
@@ -693,120 +1377,149 @@ class BaseLearner(ExportMixin):
 
         # 3. Setup and split data
         # TODO: Move to detection learner
-        if self._problem_type == OBJECT_DETECTION:
-            train_data, tuning_data = setup_detection_train_tuning_data(
-                self, max_num_tuning_data, seed, train_data, tuning_data
-            )
+        # if self._problem_type == OBJECT_DETECTION:
+        #     train_data, tuning_data = setup_detection_train_tuning_data(
+        #         self, max_num_tuning_data, seed, train_data, tuning_data
+        #     )
 
-        if isinstance(train_data, str):
-            train_data = load_pd.load(train_data)
-        if isinstance(tuning_data, str):
-            tuning_data = load_pd.load(tuning_data)
-        if tuning_data is None:
-            train_data, tuning_data = self._split_train_tuning(
-                data=train_data, holdout_frac=holdout_frac, random_state=seed
-            )
+        # if isinstance(train_data, str):
+        #     train_data = load_pd.load(train_data)
+        # if isinstance(tuning_data, str):
+        #     tuning_data = load_pd.load(tuning_data)
+        # if tuning_data is None:
+        #     train_data, tuning_data = self._split_train_tuning(
+        #         data=train_data, holdout_frac=holdout_frac, random_state=seed
+        #     )
+        train_data, tuning_data = self._setup_train_tuning_data(
+            train_data=train_data,
+            tuning_data=tuning_data,
+            holdout_frac=holdout_frac,
+            seed=seed,
+            max_num_tuning_data=max_num_tuning_data,
+        )
 
         pl.seed_everything(seed, workers=True)
 
         # 4. setup presets. ignore user input if self._presets already exists
-        if self._presets is not None:
-            # FIXME: Silently ignoring user input, there should be a warning
-            presets = self._presets
-        else:
+        # if self._presets is not None:
+        #     # FIXME: Silently ignoring user input, there should be a warning
+        #     presets = self._presets
+        # else:
+        #     self._presets = presets
+
+        # FIXME: Silently ignoring user input, there should be a warning
+        if self._presets is None:
             self._presets = presets
+
         # 5. setup config.
-        if self._config is not None:  # continuous training
-            # FIXME: Silently ignoring user input, there should be a warning
-            config = self._config
+        # if self._config is not None:  # continuous training
+        #     # FIXME: Silently ignoring user input, there should be a warning
+        #     config = self._config
+        # FIXME: Silently ignoring user input, there should be a warning
+        if self._config is None:
+            self._config = config
+
         # 6. setup save path
-        self._save_path = setup_save_path(
-            resume=self._resume,
-            old_save_path=self._save_path,
-            proposed_save_path=save_path,
-            raise_if_exist=True,
-            warn_if_exist=False,
+        # self._save_path = setup_save_path(
+        #     resume=self._resume,
+        #     old_save_path=self._save_path,
+        #     proposed_save_path=save_path,
+        #     raise_if_exist=True,
+        #     warn_if_exist=False,
+        #     fit_called=fit_called,
+        # )
+        self._save_path = self._setup_save_path(
+            save_path=save_path,
             fit_called=fit_called,
         )
         # 7. setup problem types
         self._problem_type = self._infer_problem_type(train_data=train_data, column_types=column_types)
         # 8. infor column types
-        column_types = self._infer_column_types(
+        self._column_types = self._infer_column_types(
             train_data=train_data, tuning_data=tuning_data, column_types=column_types
         )
 
         # 9. infer output shape
         # FIXME: separate infer problem_type with output_shape, should be logically distinct
-        _, output_shape = infer_problem_type_output_shape(
-            label_column=self._label_column,
-            column_types=column_types,
-            data=train_data,
-            provided_problem_type=self._problem_type,
-        )
+        self._output_shape = self._infer_output_shape(train_data=train_data)
+        # _, output_shape = infer_problem_type_output_shape(
+        #     label_column=self._label_column,
+        #     column_types=column_types,
+        #     data=train_data,
+        #     provided_problem_type=self._problem_type,
+        # )
 
         # Determine data scarcity mode, i.e. a few-shot scenario
-        scarcity_mode = infer_scarcity_mode_by_data_size(
-            df_train=train_data, scarcity_threshold=50
-        )  # Add as separate hyperparameter somewhere?
-        if scarcity_mode == FEW_SHOT and (not presets or FEW_SHOT not in presets):  # TODO: check for data  type
-            logger.info(
-                f"Detected data scarcity. Consider running using the preset '{FEW_SHOT_TEXT_CLASSIFICATION}' for better performance."
-            )
+        self._check_if_fewshot(train_data)
+        # scarcity_mode = infer_scarcity_mode_by_data_size(
+        #     df_train=train_data, scarcity_threshold=50
+        # )  # Add as separate hyperparameter somewhere?
+        # if scarcity_mode == FEW_SHOT and (not presets or FEW_SHOT not in presets):  # TODO: check for data  type
+        #     logger.info(
+        #         f"Detected data scarcity. Consider running using the preset '{FEW_SHOT_TEXT_CLASSIFICATION}' for better performance."
+        #     )
 
-        logger.debug(f"column_types: {column_types}")
-        logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
+        logger.debug(f"column_types: {self._column_types}")
+        logger.debug(f"image columns: {[k for k, v in self._column_types.items() if v == 'image_path']}")
 
         # 10. ignore user input if self._column_type already exists
-        if self._column_types is not None and self._column_types != column_types:
-            warnings.warn(
-                f"Inferred column types {column_types} are inconsistent with "
-                f"the previous {self._column_types}. "
-                f"New columns will not be used in the current training."
-            )
-            # use previous column types to avoid inconsistency with previous numerical mlp and categorical mlp
-            column_types = self._column_types
+        # if self._column_types is not None and self._column_types != column_types:
+        #     warnings.warn(
+        #         f"Inferred column types {column_types} are inconsistent with "
+        #         f"the previous {self._column_types}. "
+        #         f"New columns will not be used in the current training."
+        #     )
+        #     # use previous column types to avoid inconsistency with previous numerical mlp and categorical mlp
+        #     column_types = self._column_types
 
         # 11. check for output shape consistency. Raise error if inconsistent for obj. det.
-        if self._problem_type != OBJECT_DETECTION:
-            if self._output_shape is not None and output_shape is not None:
-                assert self._output_shape == output_shape, (
-                    f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
-                )
-            else:
-                self._output_shape = output_shape
+        # if self._problem_type != OBJECT_DETECTION:
+        #     if self._output_shape is not None and output_shape is not None:
+        #         assert self._output_shape == output_shape, (
+        #             f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
+        #         )
+        #     else:
+        #         self._output_shape = output_shape
 
         # 12. setup validation metric names
-        if self._validation_metric_name is None or self._eval_metric_name is None:
-            validation_metric_name, eval_metric_name = infer_metrics(
-                problem_type=self._problem_type,
-                eval_metric_name=self._eval_metric_name,
-                validation_metric_name=self._validation_metric_name,
-            )
-        else:
-            validation_metric_name = self._validation_metric_name
-            eval_metric_name = self._eval_metric_name
+        self._validation_metric_name, self._eval_metric_name = self._infer_metric_names()
+        # if self._validation_metric_name is None or self._eval_metric_name is None:
+        #     validation_metric_name, eval_metric_name = infer_metrics(
+        #         problem_type=self._problem_type,
+        #         eval_metric_name=self._eval_metric_name,
+        #         validation_metric_name=self._validation_metric_name,
+        #     )
+        # else:
+        #     validation_metric_name = self._validation_metric_name
+        #     eval_metric_name = self._eval_metric_name
 
         # 13. get minmax mode. FIXME: Can be merged with step 0 at the top
-        minmax_mode = get_minmax_mode(validation_metric_name)
+        minmax_mode = get_minmax_mode(self._validation_metric_name)
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
 
         # set attributes for saving and prediction
-        self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
-        self._validation_metric_name = validation_metric_name
-        self._column_types = column_types
+        # self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
+        # self._validation_metric_name = validation_metric_name
+        # self._column_types = column_types
 
         # 14. setup hyperparameters and hpo hyperparameters
-        hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
-            problem_type=self._problem_type,
-            presets=presets,
-            provided_hyperparameters=hyperparameters,
-            provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        # hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
+        #     problem_type=self._problem_type,
+        #     presets=self._presets,
+        #     provided_hyperparameters=hyperparameters,
+        #     provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        #     teacher_predictor=teacher_predictor,
+        # )
+        hyperparameters, hyperparameter_tune_kwargs = self._update_hyperparameters(
+            hyperparameters=hyperparameters,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             teacher_predictor=teacher_predictor,
         )
         # split out the hyperparameters whose values are complex objects
-        hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
+        # hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
+        hyperparameters, advanced_hyperparameters = self._split_hyperparameters(hyperparameters)
 
         hpo_mode = True if hyperparameter_tune_kwargs else False
         # 15. filter out the hyperparameters that have no effect for HPO.
@@ -814,22 +1527,22 @@ class BaseLearner(ExportMixin):
             hyperparameters = filter_hyperparameters(
                 hyperparameters=hyperparameters,
                 column_types=column_types,
-                config=config,
+                config=self._config,
                 fit_called=fit_called,
             )
 
         _fit_args = dict(
             train_df=train_data,
             val_df=tuning_data,
-            validation_metric_name=validation_metric_name,
+            validation_metric_name=self._validation_metric_name,
             minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=self._save_path,
             ckpt_path=None if hpo_mode else self._ckpt_path,
             resume=False if hpo_mode else self._resume,
             enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
-            presets=presets,
-            config=config,
+            presets=self._presets,
+            config=self._config,
             hyperparameters=hyperparameters,
             advanced_hyperparameters=advanced_hyperparameters,
             teacher_predictor=teacher_predictor,
@@ -837,8 +1550,26 @@ class BaseLearner(ExportMixin):
             hpo_mode=hpo_mode,  # skip average checkpoint if in hpo mode
             clean_ckpts=clean_ckpts,
         )
+        # _fit_args = self._prepare_fit_args(
+        #     train_data=train_data,
+        #     presets=presets,
+        #     config=config,
+        #     tuning_data=tuning_data,
+        #     max_num_tuning_data=max_num_tuning_data,
+        #     id_mappings=id_mappings,
+        #     time_limit=time_limit,
+        #     save_path=save_path,
+        #     hyperparameters=hyperparameters,
+        #     column_types=column_types,
+        #     holdout_frac=holdout_frac,
+        #     teacher_predictor=teacher_predictor,
+        #     seed=seed,
+        #     standalone=standalone,
+        #     hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        #     clean_ckpts=clean_ckpts,
+        # )
 
-        if hpo_mode:
+        if _fit_args["hpo_mode"]:
             # TODO: allow custom gpu
             assert self._resume is False, "You can not resume training with HPO"
             resources = dict(num_gpus=torch.cuda.device_count())
@@ -854,6 +1585,7 @@ class BaseLearner(ExportMixin):
 
         # 15.2 default ._fit() which invokes pl module
         self._fit(**_fit_args)
+        # self._run_fit(**_fit_args)
 
         # 16. post processing
         training_end = time.time()
@@ -882,6 +1614,14 @@ class BaseLearner(ExportMixin):
             data=train_data,
             valid_data=tuning_data,
         )
+        if self._column_types is not None and self._column_types != column_types:
+            warnings.warn(
+                f"Inferred column types {column_types} are inconsistent with "
+                f"the previous {self._column_types}. "
+                f"New columns will not be used in the current training."
+            )
+            # use previous column types to avoid inconsistency with previous numerical mlp and categorical mlp
+            column_types = self._column_types
         return column_types
 
     # FIXME: Align logic with Tabular,
@@ -1105,7 +1845,594 @@ class BaseLearner(ExportMixin):
         logger.info(get_fit_start_message(save_path, validation_metric_name))
 
         ### SETUP Environments ###
-        # 1. get config.
+        # 1. get config and df_preprocessor. NOTE: confige and df_preprocessor depend on each other and so are created together.
+        self._config, self._df_preprocessor = self._get_config(
+            train_df=train_df,
+            config=config,
+            presets=presets,
+            hyperparameters=hyperparameters,
+            teacher_predictor=teacher_predictor,
+        )
+
+        # 2. get the model (nn.Module). NOTE: This operation also updates fields in self._config, so we update self._config by assigning the new value.
+        self._config, self._model = self._get_model()
+
+        # 6. get trainable layer params for efficient finetuning only?
+        norm_param_names = get_norm_layer_param_names(self._model)
+
+        trainable_param_names = get_trainable_params_efficient_finetune(
+            norm_param_names,
+            efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+        )
+
+        # 7. get data_processors.
+        # if self._data_processors is None:
+        #     data_processors = create_fusion_data_processors(
+        #         config=self._config,
+        #         model=self._model,
+        #         advanced_hyperparameters=advanced_hyperparameters,
+        #     )
+        # else:  # continuing training
+        #     data_processors = self._data_processors
+        self._data_processors = self._get_data_processors(advanced_hyperparameters=advanced_hyperparameters)
+
+        data_processors_count = {k: len(v) for k, v in self._data_processors.items()}
+        logger.debug(f"data_processors_count: {data_processors_count}")
+        # 8. infer positive labels. NOTE: This is deleted
+
+        # 9. setup validation metric
+        metrics_kwargs = self._get_torchmetrics(validation_metric_name)
+
+        # 10. setup mix up if applicable
+        mixup_active, mixup_fn = self._get_mixup()
+
+        # 11. get loss function, NOTE: This can be refactored into Learner class
+        loss_func = self._get_loss_func(mixup_active)
+
+        # 12. get post process function
+        self._model_postprocess_fn = self._get_model_postprocess_fn(loss_func)
+
+        # 13. assign properties
+        # self._config = self._config
+        # self._df_preprocessor = self._df_preprocessor
+        # self._data_processors = self._data_processors
+        # self._model = self._model
+        # self._model_postprocess_fn = self._model_postprocess_fn
+
+        # 14. if times up. return final model
+        if max_time == timedelta(seconds=0):
+            self._top_k_average(
+                model=self._model,
+                save_path=save_path,
+                minmax_mode=minmax_mode,
+                is_distill=False,
+                top_k_average_method=self._config.optimization.top_k_average_method,
+                val_df=val_df,
+                validation_metric_name=validation_metric_name,
+                strict_loading=not trainable_param_names,
+                standalone=standalone,
+                clean_ckpts=clean_ckpts,
+            )
+
+            return self
+
+        # 15. setup distillation.
+        # need to assign the above attributes before setting up distillation
+        if teacher_predictor is not None:
+            is_distill = True
+            (
+                teacher_model,
+                critics,
+                baseline_funcs,
+                soft_label_loss_func,
+                softmax_regression_loss_func,
+                output_feature_adaptor,
+                output_feature_loss_func,
+                rkd_loss_func,
+                teacher_df_preprocessor,
+                teacher_data_processors,
+            ) = self._setup_distillation(
+                teacher_predictor=teacher_predictor,
+            )
+            if teacher_df_preprocessor is not None:
+                data_module_df_preprocessor = [self._df_preprocessor, teacher_df_preprocessor]
+            if teacher_data_processors is not None:
+                data_module_data_processors = [self._data_processors, teacher_data_processors]
+
+        else:
+            is_distill = False
+            (
+                teacher_model,
+                critics,
+                baseline_funcs,
+                soft_label_loss_func,
+                softmax_regression_loss_func,
+                output_feature_adaptor,
+                output_feature_loss_func,
+                rkd_loss_func,
+                teacher_df_preprocessor,
+                teacher_data_processors,
+            ) = (None, None, None, None, None, None, None, None, None, None)
+            data_module_df_preprocessor = self._df_preprocessor
+            data_module_data_processors = self._data_processors
+
+        # TODO: This can be a property of the learner class
+        val_use_training_mode = (self._problem_type == OBJECT_DETECTION) and (validation_metric_name != MAP)
+
+        # 16. setup pl training data module
+        # train_dataset = None
+        train_dm = self._get_data_module(
+            train_df=train_df,
+            val_df=val_df,
+            val_use_training_mode=val_use_training_mode,
+            df_preprocessor=data_module_df_preprocessor,
+            data_processors=data_module_data_processors,
+        )
+
+        # 17. setup optim args
+        optimization_kwargs = dict(
+            optim_type=self._config.optimization.optim_type,
+            lr_choice=self._config.optimization.lr_choice,
+            lr_schedule=self._config.optimization.lr_schedule,
+            lr=self._config.optimization.learning_rate,
+            lr_decay=self._config.optimization.lr_decay,
+            end_lr=self._config.optimization.end_lr,
+            lr_mult=self._config.optimization.lr_mult,
+            weight_decay=self._config.optimization.weight_decay,
+            warmup_steps=self._config.optimization.warmup_steps,
+        )
+
+        # 18. setup metrics args. NOTE: Moved to top
+        # metrics_kwargs = dict(
+        #     validation_metric=validation_metric,
+        #     validation_metric_name=validation_metric_name,
+        #     custom_metric_func=custom_metric_func,
+        # )
+
+        # 19. select the correct pl module for a given problem type.
+        # NOTE: The task creation and all related variables/functions should be refactored into each Learner class
+        # is_distill = teacher_model is not None
+        if is_distill:
+            task = self._get_distillation_lightning_module(
+                metrics_kwargs,
+                loss_func,
+                teacher_model,
+                critics,
+                baseline_funcs,
+                soft_label_loss_func,
+                softmax_regression_loss_func,
+                output_feature_adaptor,
+                output_feature_loss_func,
+                rkd_loss_func,
+                optimization_kwargs,
+            )
+        else:
+            task = self._get_lightning_module(
+                trainable_param_names, metrics_kwargs, mixup_fn, loss_func, optimization_kwargs
+            )
+
+        logger.debug(f"validation_metric_name: {task.validation_metric_name}")
+        logger.debug(f"minmax_mode: {minmax_mode}")
+
+        # 20. Setup call backs
+        use_ray_lightning = "_ray_lightning_plugin" in hpo_kwargs
+        callbacks = self._get_lightning_callbacks(
+            validation_metric_name, minmax_mode, save_path, hpo_mode, task, use_ray_lightning
+        )
+
+        custom_checkpoint_plugin = AutoMMModelCheckpointIO(
+            trainable_param_names=trainable_param_names,
+            model_name_to_id=self._model.name_to_id,
+        )
+
+        tb_logger = pl.loggers.TensorBoardLogger(
+            save_dir=save_path,
+            name="",
+            version="",
+        )
+
+        # 22. training environment-dependent configs
+        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=self._config.env.strategy)
+
+        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision)
+
+        grad_steps = self._get_grad_steps(num_gpus)
+
+        num_gpus, strategy = self._compute_strategy(self._config, hpo_mode, hpo_kwargs, num_gpus, use_ray_lightning)
+        # if not hpo_mode:
+        #     if num_gpus <= 1:
+        #         if (
+        #             self._config.env.strategy == DEEPSPEED_OFFLOADING
+        #         ):  # Offloading currently only tested for single GPU
+        #             assert version.parse(pl.__version__) >= version.parse(
+        #                 DEEPSPEED_MIN_PL_VERSION
+        #             ), f"For DeepSpeed Offloading to work reliably you need at least pytorch-lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your pytorch-lightning version."
+        #             from ..optimization.deepspeed import CustomDeepSpeedStrategy
+
+        #             strategy = CustomDeepSpeedStrategy(
+        #                 stage=3,
+        #                 offload_optimizer=True,
+        #                 offload_parameters=False,
+        #                 allgather_bucket_size=self._config.env.deepspeed_allgather_size,
+        #                 reduce_bucket_size=self._config.env.deepspeed_allreduce_size,
+        #             )
+        #         else:
+        #             strategy = None
+        #     else:
+        #         strategy = self._config.env.strategy
+        # else:
+        #     # we don't support running each trial in parallel without ray lightning
+        #     if use_ray_lightning:
+        #         strategy = hpo_kwargs.get("_ray_lightning_plugin")
+        #     else:
+        #         strategy = None
+        #         num_gpus = min(num_gpus, 1)
+
+        self._config.env.num_gpus = num_gpus
+        self._config.env.precision = precision
+        self._config.env.strategy = (
+            strategy if not self._config.env.strategy == DEEPSPEED_OFFLOADING else DEEPSPEED_OFFLOADING
+        )
+        self._config = self._config
+        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
+        self.save(save_path, standalone=standalone)
+
+        blacklist_msgs = ["already configured with model summary"]
+        log_filter = LogFilter(blacklist_msgs)
+        # 23. Declare pl.Trainer
+        with apply_log_filter(log_filter):
+            trainer = pl.Trainer(
+                accelerator="gpu" if self._config.env.num_gpus > 0 else None,
+                devices=get_available_devices(
+                    num_gpus=self._config.env.num_gpus,
+                    auto_select_gpus=self._config.env.auto_select_gpus,
+                    use_ray_lightning=use_ray_lightning,
+                ),
+                num_nodes=self._config.env.num_nodes,
+                precision=self._config.env.precision,
+                strategy=self._config.env.strategy,
+                benchmark=False,
+                deterministic=self._config.env.deterministic,
+                max_epochs=self._config.optimization.max_epochs,
+                max_steps=self._config.optimization.max_steps,
+                max_time=max_time,
+                callbacks=callbacks,
+                logger=tb_logger,
+                gradient_clip_val=OmegaConf.select(self._config, "optimization.gradient_clip_val", default=1),
+                gradient_clip_algorithm=OmegaConf.select(
+                    self._config, "optimization.gradient_clip_algorithm", default="norm"
+                ),
+                accumulate_grad_batches=grad_steps,
+                log_every_n_steps=OmegaConf.select(self._config, "optimization.log_every_n_steps", default=10),
+                enable_progress_bar=enable_progress_bar,
+                fast_dev_run=self._config.env.fast_dev_run,
+                track_grad_norm=OmegaConf.select(self._config, "optimization.track_grad_norm", default=-1),
+                val_check_interval=self._config.optimization.val_check_interval,
+                check_val_every_n_epoch=OmegaConf.select(
+                    self._config.optimization, "check_val_every_n_epoch", default=1
+                ),
+                plugins=[custom_checkpoint_plugin],
+            )
+
+        # 24. pl.Trainer.fit()
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                ".*does not have many workers which may be a bottleneck. "
+                "Consider increasing the value of the `num_workers` argument` "
+                ".* in the `DataLoader` init to improve performance.*",
+            )
+            warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
+            trainer.fit(
+                task,
+                datamodule=train_dm,
+                ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
+            )
+
+        # 25. execute call bakcs at training finish
+        if trainer.global_rank == 0:
+            # We do not perform averaging checkpoint in the case of hpo for each trial
+            # We only averaging the checkpoint of the best trial in the end in the master process
+            if not hpo_mode:
+                self._top_k_average(
+                    model=self._model,
+                    save_path=save_path,
+                    minmax_mode=minmax_mode,
+                    is_distill=is_distill,
+                    top_k_average_method=self._config.optimization.top_k_average_method,
+                    val_df=val_df,
+                    validation_metric_name=validation_metric_name,
+                    strategy=strategy,
+                    strict_loading=not trainable_param_names,
+                    # Not strict loading if using parameter-efficient finetuning
+                    standalone=standalone,
+                    clean_ckpts=clean_ckpts,
+                )
+            self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
+        else:
+            sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
+
+    def _get_grad_steps(self, num_gpus):
+        if num_gpus == 0:  # CPU only training
+            grad_steps = max(
+                self._config.env.batch_size // (self._config.env.per_gpu_batch_size * self._config.env.num_nodes),
+                1,
+            )
+        else:
+            grad_steps = max(
+                self._config.env.batch_size
+                // (self._config.env.per_gpu_batch_size * num_gpus * self._config.env.num_nodes),
+                1,
+            )
+
+        return grad_steps
+
+    def _get_lightning_callbacks(
+        self, validation_metric_name, minmax_mode, save_path, hpo_mode, task, use_ray_lightning
+    ):
+        checkpoint_callback = AutoMMModelCheckpoint(
+            dirpath=save_path,
+            save_top_k=self._config.optimization.top_k,
+            verbose=True,
+            monitor=task.validation_metric_name,
+            mode=minmax_mode,
+            save_last=True,
+        )
+        early_stopping_callback = pl.callbacks.EarlyStopping(
+            monitor=task.validation_metric_name,
+            patience=self._config.optimization.patience,
+            mode=minmax_mode,
+            stopping_threshold=get_stopping_threshold(validation_metric_name),
+        )
+        lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
+        model_summary = pl.callbacks.ModelSummary(max_depth=1)
+        callbacks = [
+            checkpoint_callback,
+            early_stopping_callback,
+            lr_callback,
+            model_summary,
+        ]
+
+        # 21. for hpo with ray
+        # use_ray_lightning = "_ray_lightning_plugin" in hpo_kwargs
+        if hpo_mode:
+            if use_ray_lightning:
+                from ray_lightning.tune import TuneReportCheckpointCallback
+            else:
+                from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
+            tune_report_callback = TuneReportCheckpointCallback(
+                {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
+                filename=RAY_TUNE_CHECKPOINT,
+            )
+            callbacks = [
+                tune_report_callback,
+                early_stopping_callback,
+                lr_callback,
+                model_summary,
+            ]
+
+        return callbacks
+
+    def _get_lightning_module(self, trainable_param_names, metrics_kwargs, mixup_fn, loss_func, optimization_kwargs):
+        if self._problem_type == NER:
+            task = NerLitModule(
+                model=self._model,
+                loss_func=loss_func,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+                mixup_fn=mixup_fn,
+                mixup_off_epoch=OmegaConf.select(self._config, "data.mixup.turn_off_epoch"),
+                model_postprocess_fn=self._model_postprocess_fn,
+                trainable_param_names=trainable_param_names,
+                **metrics_kwargs,
+                **optimization_kwargs,
+            )
+        elif self._problem_type == OBJECT_DETECTION:
+            task = MMDetLitModule(
+                model=self._model,
+                **metrics_kwargs,
+                **optimization_kwargs,
+            )
+        else:
+            task = LitModule(
+                model=self._model,
+                loss_func=loss_func,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+                mixup_fn=mixup_fn,
+                mixup_off_epoch=OmegaConf.select(self._config, "data.mixup.turn_off_epoch"),
+                model_postprocess_fn=self._model_postprocess_fn,
+                trainable_param_names=trainable_param_names,
+                skip_final_val=OmegaConf.select(self._config, "optimization.skip_final_val", default=False),
+                **metrics_kwargs,
+                **optimization_kwargs,
+            )
+
+        return task
+
+    def _get_distillation_lightning_module(
+        self,
+        metrics_kwargs,
+        loss_func,
+        teacher_model,
+        critics,
+        baseline_funcs,
+        soft_label_loss_func,
+        softmax_regression_loss_func,
+        output_feature_adaptor,
+        output_feature_loss_func,
+        rkd_loss_func,
+        optimization_kwargs,
+    ) -> LightningModule:
+        output_feature_loss_weight = OmegaConf.select(
+            self._config, "distiller.output_feature_loss_weight", default=0.0
+        )
+        softmax_regression_weight = OmegaConf.select(self._config, "distiller.softmax_regression_weight", default=0.0)
+        use_raw_features = OmegaConf.select(self._config, "distiller.use_raw_features", default=False)
+        task = DistillerLitModule(
+            student_model=self._model,
+            teacher_model=teacher_model,
+            matches=self._config.distiller.matches,
+            critics=critics,
+            baseline_funcs=baseline_funcs,
+            hard_label_weight=self._config.distiller.hard_label_weight,
+            soft_label_weight=self._config.distiller.soft_label_weight,
+            softmax_regression_weight=softmax_regression_weight,
+            temperature=self._config.distiller.temperature,
+            output_feature_loss_weight=output_feature_loss_weight,
+            hard_label_loss_func=loss_func,
+            soft_label_loss_func=soft_label_loss_func,
+            softmax_regression_loss_func=softmax_regression_loss_func,
+            output_feature_adaptor=output_feature_adaptor,
+            output_feature_loss_func=output_feature_loss_func,
+            rkd_loss_func=rkd_loss_func,
+            **metrics_kwargs,
+            **optimization_kwargs,
+        )
+        return task
+
+    def _get_data_module(
+        self, train_df, val_df, df_preprocessor, data_processors, val_use_training_mode
+    ) -> LightningDataModule:
+        if (
+            self._problem_type == OBJECT_DETECTION
+            and self._model.config is not None
+            and MULTI_IMAGE_MIX_DATASET in self._model.config
+        ):
+            train_dataset = MultiImageMixDataset(
+                data=train_df,
+                preprocessor=[df_preprocessor],
+                processors=[data_processors],
+                model_config=self._model.config,
+                id_mappings=None,
+                is_training=True,
+            )
+            train_dm = BaseDataModule(
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+                num_workers=self._config.env.num_workers,
+                train_dataset=train_dataset,
+                validate_data=val_df,
+                val_use_training_mode=val_use_training_mode,
+            )
+        else:
+            train_dm = BaseDataModule(
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+                num_workers=self._config.env.num_workers,
+                train_data=train_df,
+                validate_data=val_df,
+                val_use_training_mode=val_use_training_mode,
+            )
+
+        return train_dm
+
+    def _get_model_postprocess_fn(self, loss_func):
+        model_postprocess_fn = get_model_postprocess_fn(
+            problem_type=self._problem_type,
+            loss_func=loss_func,
+        )
+
+        return model_postprocess_fn
+
+    def _get_loss_func(self, mixup_active):
+        loss_func = get_loss_func(
+            problem_type=self._problem_type,
+            mixup_active=mixup_active,
+            loss_func_name=OmegaConf.select(self._config, "optimization.loss_function"),
+            config=self._config.optimization,
+        )
+
+        return loss_func
+
+    def _get_torchmetrics(self, validation_metric_name):
+        """Get validation metric from validation metric name
+
+        Parameters
+        ----------
+        validation_metric_name (Optional[str]): name for the validation metric
+        TODO: change to use self._validation_metric_name
+
+        Returns
+        -------
+        dict
+            dictionary of validation metric (Optional[Metric]),
+                          validation metric name (str),
+                          custom metric function (Optional[Callable])
+        """
+        if validation_metric_name is not None:
+            validation_metric, custom_metric_func = get_metric(
+                metric_name=validation_metric_name,
+                num_classes=self._output_shape,
+                problem_type=self._problem_type,
+            )
+        else:
+            validation_metric, custom_metric_func = (None, None)
+        metrics_kwargs = dict(
+            validation_metric=validation_metric,
+            validation_metric_name=validation_metric_name,
+            custom_metric_func=custom_metric_func,
+        )
+
+        return metrics_kwargs
+
+    def _get_model(self) -> Tuple[DictConfig, nn.Module]:
+        """
+        Setup and update config (DictConfig) for the model, and get the model (nn.Module)
+
+        Returns:
+            Tuple[DictConfig, nn.Module]: the updated config (DictConfig) and the model (nn.Module)
+        """
+        config = select_model(config=self._config, df_preprocessor=self._df_preprocessor)
+
+        # 4. if NER, update output shape. NOTE: This can be refactored into the NER Learner
+        # Update output_shape with label_generator.
+        if self._problem_type == NER:
+            self._output_shape = len(self._df_preprocessor.label_generator.unique_entity_groups)
+
+        # 5. get model
+        if self._model is None:
+            model = create_fusion_model(
+                config=config,
+                num_classes=self._output_shape,
+                classes=self._classes,
+                num_numerical_columns=len(self._df_preprocessor.numerical_feature_names),
+                num_categories=self._df_preprocessor.categorical_num_categories,
+            )
+        else:  # continuing training
+            model = self._model
+
+        return config, model
+
+    def _get_config(
+        self,
+        train_df: pd.DataFrame,
+        config: Optional[Union[Dict, DictConfig]],
+        presets: Optional[str],
+        hyperparameters: Optional[Union[str, List[str], Dict]],
+        teacher_predictor: Optional[BaseLearner],
+    ) -> Tuple[DictConfig, MultiModalFeaturePreprocessor]:
+        """
+        Setup and update the config (DictConfig) for the learner, and get df_preprocessor.
+        Since the getting the config and df_preprocessor are coupled, we do it in one function.
+
+        Parameters
+        ----------
+        train_df (pd.DataFrame)
+            The training data frame
+        config (Optional[Union[Dict, DictConfig]])
+            A dictionary including four keys: "model", "data", "optimization", and "environment".
+        hyperparameters (Optional[Union[str, List[str], Dict]])
+            This is to override some default configurations.
+        teacher_predictor (BaseLearner)
+            Teacher predictor for distillation
+        presets
+            Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
+
+        Returns
+        -------
+            Tuple[DictConfig, MultiModalFeaturePreprocessor]: updated config (DictConfig) and df_preprocessor (MultiModalFeaturePreprocessor)
+        """
         config = get_config(
             problem_type=self._problem_type,
             presets=presets,
@@ -1138,444 +2465,8 @@ class BaseLearner(ExportMixin):
             num_numerical_columns=len(df_preprocessor.numerical_feature_names),
             num_categorical_columns=len(df_preprocessor.categorical_num_categories),
         )
-        config = select_model(config=config, df_preprocessor=df_preprocessor)
 
-        # 4. if NER, update output shape. NOTE: This can be refactored into the NER Learner
-        # Update output_shape with label_generator.
-        if self._problem_type == NER:
-            self._output_shape = len(df_preprocessor.label_generator.unique_entity_groups)
-
-        # 5. get model
-        if self._model is None:
-            model = create_fusion_model(
-                config=config,
-                num_classes=self._output_shape,
-                classes=self._classes,
-                num_numerical_columns=len(df_preprocessor.numerical_feature_names),
-                num_categories=df_preprocessor.categorical_num_categories,
-            )
-        else:  # continuing training
-            model = self._model
-
-        # 6. get trainable layer params for efficient finetuning only?
-        norm_param_names = get_norm_layer_param_names(model)
-
-        trainable_param_names = get_trainable_params_efficient_finetune(
-            norm_param_names,
-            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
-        )
-
-        # 7. get data_processors.
-        if self._data_processors is None:
-            data_processors = create_fusion_data_processors(
-                config=config,
-                model=model,
-                advanced_hyperparameters=advanced_hyperparameters,
-            )
-        else:  # continuing training
-            data_processors = self._data_processors
-
-        data_processors_count = {k: len(v) for k, v in data_processors.items()}
-        logger.debug(f"data_processors_count: {data_processors_count}")
-        # 8. infer positive labels. NOTE: This is deleted
-
-        # 9. setup validation metric
-        if validation_metric_name is not None:
-            validation_metric, custom_metric_func = get_metric(
-                metric_name=validation_metric_name,
-                num_classes=self._output_shape,
-                problem_type=self._problem_type,
-            )
-        else:
-            validation_metric, custom_metric_func = (None, None)
-
-        # 10. setup mix up if applicable
-        mixup_active, mixup_fn = get_mixup(
-            model_config=OmegaConf.select(config, "model"),
-            mixup_config=OmegaConf.select(config, "data.mixup"),
-            num_classes=self._output_shape,
-        )
-        if mixup_active and (config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1):
-            warnings.warn(
-                "The mixup is done on the batch."
-                "The per_gpu_batch_size should be >1 and even for reasonable operation",
-                UserWarning,
-            )
-
-        # 11. get loss function, NOTE: This can be refactored into Learner class
-        loss_func = get_loss_func(
-            problem_type=self._problem_type,
-            mixup_active=mixup_active,
-            loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
-            config=config.optimization,
-        )
-
-        # 12. get post process function
-        model_postprocess_fn = get_model_postprocess_fn(
-            problem_type=self._problem_type,
-            loss_func=loss_func,
-        )
-
-        # 13. assign properties
-        self._config = config
-        self._df_preprocessor = df_preprocessor
-        self._data_processors = data_processors
-        self._model = model
-        self._model_postprocess_fn = model_postprocess_fn
-
-        # 14. if times up. return final model
-        if max_time == timedelta(seconds=0):
-            self._top_k_average(
-                model=model,
-                save_path=save_path,
-                minmax_mode=minmax_mode,
-                is_distill=False,
-                top_k_average_method=config.optimization.top_k_average_method,
-                val_df=val_df,
-                validation_metric_name=validation_metric_name,
-                strict_loading=not trainable_param_names,
-                standalone=standalone,
-                clean_ckpts=clean_ckpts,
-            )
-
-            return self
-
-        # 15. setup distillation.
-        # need to assign the above attributes before setting up distillation
-        if teacher_predictor is not None:
-            (
-                teacher_model,
-                critics,
-                baseline_funcs,
-                soft_label_loss_func,
-                softmax_regression_loss_func,
-                output_feature_adaptor,
-                output_feature_loss_func,
-                rkd_loss_func,
-                teacher_df_preprocessor,
-                teacher_data_processors,
-            ) = self._setup_distillation(
-                teacher_predictor=teacher_predictor,
-            )
-        else:
-            (
-                teacher_model,
-                critics,
-                baseline_funcs,
-                soft_label_loss_func,
-                softmax_regression_loss_func,
-                output_feature_adaptor,
-                output_feature_loss_func,
-                rkd_loss_func,
-                teacher_df_preprocessor,
-                teacher_data_processors,
-            ) = (None, None, None, None, None, None, None, None, None, None)
-
-        if teacher_df_preprocessor is not None:
-            df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
-        if teacher_data_processors is not None:
-            data_processors = [data_processors, teacher_data_processors]
-
-        val_use_training_mode = (self._problem_type == OBJECT_DETECTION) and (validation_metric_name != MAP)
-
-        # 16. setup pl training data module
-        train_dataset = None
-        if (
-            self._problem_type == OBJECT_DETECTION
-            and self._model.config is not None
-            and MULTI_IMAGE_MIX_DATASET in self._model.config
-        ):
-            train_dataset = MultiImageMixDataset(
-                data=train_df,
-                preprocessor=[df_preprocessor],
-                processors=[data_processors],
-                model_config=self._model.config,
-                id_mappings=None,
-                is_training=True,
-            )
-            train_dm = BaseDataModule(
-                df_preprocessor=df_preprocessor,
-                data_processors=data_processors,
-                per_gpu_batch_size=config.env.per_gpu_batch_size,
-                num_workers=config.env.num_workers,
-                train_dataset=train_dataset,
-                validate_data=val_df,
-                val_use_training_mode=val_use_training_mode,
-            )
-        else:
-            train_dm = BaseDataModule(
-                df_preprocessor=df_preprocessor,
-                data_processors=data_processors,
-                per_gpu_batch_size=config.env.per_gpu_batch_size,
-                num_workers=config.env.num_workers,
-                train_data=train_df,
-                validate_data=val_df,
-                val_use_training_mode=val_use_training_mode,
-            )
-
-        # 17. setup optim args
-        optimization_kwargs = dict(
-            optim_type=config.optimization.optim_type,
-            lr_choice=config.optimization.lr_choice,
-            lr_schedule=config.optimization.lr_schedule,
-            lr=config.optimization.learning_rate,
-            lr_decay=config.optimization.lr_decay,
-            end_lr=config.optimization.end_lr,
-            lr_mult=config.optimization.lr_mult,
-            weight_decay=config.optimization.weight_decay,
-            warmup_steps=config.optimization.warmup_steps,
-        )
-
-        # 18. setup metrics args
-        metrics_kwargs = dict(
-            validation_metric=validation_metric,
-            validation_metric_name=validation_metric_name,
-            custom_metric_func=custom_metric_func,
-        )
-
-        # 19. select the correct pl module for a given problem type.
-        # NOTE: The task creation and all related variables/functions should be refactored into each Learner class
-        is_distill = teacher_model is not None
-        if is_distill:
-            output_feature_loss_weight = OmegaConf.select(
-                self._config, "distiller.output_feature_loss_weight", default=0.0
-            )
-            softmax_regression_weight = OmegaConf.select(
-                self._config, "distiller.softmax_regression_weight", default=0.0
-            )
-            use_raw_features = OmegaConf.select(self._config, "distiller.use_raw_features", default=False)
-            task = DistillerLitModule(
-                student_model=model,
-                teacher_model=teacher_model,
-                matches=config.distiller.matches,
-                critics=critics,
-                baseline_funcs=baseline_funcs,
-                hard_label_weight=config.distiller.hard_label_weight,
-                soft_label_weight=config.distiller.soft_label_weight,
-                softmax_regression_weight=softmax_regression_weight,
-                temperature=config.distiller.temperature,
-                output_feature_loss_weight=output_feature_loss_weight,
-                hard_label_loss_func=loss_func,
-                soft_label_loss_func=soft_label_loss_func,
-                softmax_regression_loss_func=softmax_regression_loss_func,
-                output_feature_adaptor=output_feature_adaptor,
-                output_feature_loss_func=output_feature_loss_func,
-                rkd_loss_func=rkd_loss_func,
-                **metrics_kwargs,
-                **optimization_kwargs,
-            )
-        elif self._problem_type == NER:
-            task = NerLitModule(
-                model=model,
-                loss_func=loss_func,
-                efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
-                mixup_fn=mixup_fn,
-                mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-                model_postprocess_fn=model_postprocess_fn,
-                trainable_param_names=trainable_param_names,
-                **metrics_kwargs,
-                **optimization_kwargs,
-            )
-        elif self._problem_type == OBJECT_DETECTION:
-            task = MMDetLitModule(
-                model=model,
-                **metrics_kwargs,
-                **optimization_kwargs,
-            )
-        else:
-            task = LitModule(
-                model=model,
-                loss_func=loss_func,
-                efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
-                mixup_fn=mixup_fn,
-                mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-                model_postprocess_fn=model_postprocess_fn,
-                trainable_param_names=trainable_param_names,
-                skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
-                **metrics_kwargs,
-                **optimization_kwargs,
-            )
-
-        logger.debug(f"validation_metric_name: {task.validation_metric_name}")
-        logger.debug(f"minmax_mode: {minmax_mode}")
-
-        # 20. Setup call backs
-        checkpoint_callback = AutoMMModelCheckpoint(
-            dirpath=save_path,
-            save_top_k=config.optimization.top_k,
-            verbose=True,
-            monitor=task.validation_metric_name,
-            mode=minmax_mode,
-            save_last=True,
-        )
-        early_stopping_callback = pl.callbacks.EarlyStopping(
-            monitor=task.validation_metric_name,
-            patience=config.optimization.patience,
-            mode=minmax_mode,
-            stopping_threshold=get_stopping_threshold(validation_metric_name),
-        )
-        lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
-        model_summary = pl.callbacks.ModelSummary(max_depth=1)
-        callbacks = [
-            checkpoint_callback,
-            early_stopping_callback,
-            lr_callback,
-            model_summary,
-        ]
-
-        # 21. for hpo with ray
-        use_ray_lightning = "_ray_lightning_plugin" in hpo_kwargs
-        if hpo_mode:
-            if use_ray_lightning:
-                from ray_lightning.tune import TuneReportCheckpointCallback
-            else:
-                from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
-            tune_report_callback = TuneReportCheckpointCallback(
-                {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
-                filename=RAY_TUNE_CHECKPOINT,
-            )
-            callbacks = [
-                tune_report_callback,
-                early_stopping_callback,
-                lr_callback,
-                model_summary,
-            ]
-
-        custom_checkpoint_plugin = AutoMMModelCheckpointIO(
-            trainable_param_names=trainable_param_names,
-            model_name_to_id=model.name_to_id,
-        )
-
-        tb_logger = pl.loggers.TensorBoardLogger(
-            save_dir=save_path,
-            name="",
-            version="",
-        )
-
-        # 22. training environment-dependent configs
-        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
-
-        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
-
-        if num_gpus == 0:  # CPU only training
-            grad_steps = max(
-                config.env.batch_size // (config.env.per_gpu_batch_size * config.env.num_nodes),
-                1,
-            )
-        else:
-            grad_steps = max(
-                config.env.batch_size // (config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes),
-                1,
-            )
-
-        if not hpo_mode:
-            if num_gpus <= 1:
-                if config.env.strategy == DEEPSPEED_OFFLOADING:  # Offloading currently only tested for single GPU
-                    assert version.parse(pl.__version__) >= version.parse(
-                        DEEPSPEED_MIN_PL_VERSION
-                    ), f"For DeepSpeed Offloading to work reliably you need at least pytorch-lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your pytorch-lightning version."
-                    from .optimization.deepspeed import CustomDeepSpeedStrategy
-
-                    strategy = CustomDeepSpeedStrategy(
-                        stage=3,
-                        offload_optimizer=True,
-                        offload_parameters=False,
-                        allgather_bucket_size=config.env.deepspeed_allgather_size,
-                        reduce_bucket_size=config.env.deepspeed_allreduce_size,
-                    )
-                else:
-                    strategy = None
-            else:
-                strategy = config.env.strategy
-        else:
-            # we don't support running each trial in parallel without ray lightning
-            if use_ray_lightning:
-                strategy = hpo_kwargs.get("_ray_lightning_plugin")
-            else:
-                strategy = None
-                num_gpus = min(num_gpus, 1)
-
-        config.env.num_gpus = num_gpus
-        config.env.precision = precision
-        config.env.strategy = strategy if not config.env.strategy == DEEPSPEED_OFFLOADING else DEEPSPEED_OFFLOADING
-        self._config = config
-        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
-        self.save(save_path, standalone=standalone)
-
-        blacklist_msgs = ["already configured with model summary"]
-        log_filter = LogFilter(blacklist_msgs)
-        # 23. Declare pl.Trainer
-        with apply_log_filter(log_filter):
-            trainer = pl.Trainer(
-                accelerator="gpu" if num_gpus > 0 else None,
-                devices=get_available_devices(
-                    num_gpus=num_gpus,
-                    auto_select_gpus=config.env.auto_select_gpus,
-                    use_ray_lightning=use_ray_lightning,
-                ),
-                num_nodes=config.env.num_nodes,
-                precision=precision,
-                strategy=strategy,
-                benchmark=False,
-                deterministic=config.env.deterministic,
-                max_epochs=config.optimization.max_epochs,
-                max_steps=config.optimization.max_steps,
-                max_time=max_time,
-                callbacks=callbacks,
-                logger=tb_logger,
-                gradient_clip_val=OmegaConf.select(config, "optimization.gradient_clip_val", default=1),
-                gradient_clip_algorithm=OmegaConf.select(
-                    config, "optimization.gradient_clip_algorithm", default="norm"
-                ),
-                accumulate_grad_batches=grad_steps,
-                log_every_n_steps=OmegaConf.select(config, "optimization.log_every_n_steps", default=10),
-                enable_progress_bar=enable_progress_bar,
-                fast_dev_run=config.env.fast_dev_run,
-                track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
-                val_check_interval=config.optimization.val_check_interval,
-                check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
-                if hasattr(config.optimization, "check_val_every_n_epoch")
-                else 1,
-                plugins=[custom_checkpoint_plugin],
-            )
-
-        # 24. pl.Trainer.fit()
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                ".*does not have many workers which may be a bottleneck. "
-                "Consider increasing the value of the `num_workers` argument` "
-                ".* in the `DataLoader` init to improve performance.*",
-            )
-            warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
-            trainer.fit(
-                task,
-                datamodule=train_dm,
-                ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
-            )
-
-        # 25. execute call bakcs at training finish
-        if trainer.global_rank == 0:
-            # We do not perform averaging checkpoint in the case of hpo for each trial
-            # We only averaging the checkpoint of the best trial in the end in the master process
-            if not hpo_mode:
-                self._top_k_average(
-                    model=model,
-                    save_path=save_path,
-                    minmax_mode=minmax_mode,
-                    is_distill=is_distill,
-                    top_k_average_method=config.optimization.top_k_average_method,
-                    val_df=val_df,
-                    validation_metric_name=validation_metric_name,
-                    strategy=strategy,
-                    strict_loading=not trainable_param_names,
-                    # Not strict loading if using parameter-efficient finetuning
-                    standalone=standalone,
-                    clean_ckpts=clean_ckpts,
-                )
-            self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
-        else:
-            sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
+        return config, df_preprocessor
 
     def _top_k_average(
         self,
@@ -1739,7 +2630,7 @@ class BaseLearner(ExportMixin):
         if self._config.env.strategy == DEEPSPEED_OFFLOADING and DEEPSPEED_MODULE not in sys.modules:
             # Need to initialize DeepSpeed and optimizer as currently required in Pytorch-Lighting integration of deepspeed.
             # TODO: Using optimiation_kwargs for inference is confusing and bad design. Remove as soon as fixed in pytorch-lighting.
-            from .optimization.deepspeed import CustomDeepSpeedStrategy
+            from ..optimization.deepspeed import CustomDeepSpeedStrategy
 
             strategy = CustomDeepSpeedStrategy(
                 stage=3,
