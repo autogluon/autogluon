@@ -432,39 +432,6 @@ def is_rois_input(sample):
     return isinstance(sample, list) and len(sample) and isinstance(sample[0], list) and len(sample[0]) == 5
 
 
-def is_image_input(images, image_type):
-    """
-    check if an (/a list of) data is image(s) (IMAGE_PATH/IMAGE_BYTEARRAY)
-
-    Parameters
-    ----------
-    images
-        The sampled data.
-
-    Returns
-    -------
-    bool, whether the data are images"""
-    success = False
-    if not isinstance(images, list):
-        images = [images]
-    for per_image in images:
-        try:
-            if image_type == IMAGE_PATH:
-                with PIL.Image.open(per_image) as img:
-                    pass
-            elif image_type == IMAGE_BYTEARRAY:
-                with PIL.Image.open(BytesIO(per_image)) as img:
-                    pass
-            else:
-                raise ValueError(f"Unsupported image type: {image_type}")
-        except:
-            success = False
-            break
-
-        success = True
-    return success
-
-
 def get_text_token_max_len(provided_max_len, config, tokenizer, checkpoint_name):
     """
     Compute the allowable max length of token sequences.
