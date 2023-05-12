@@ -48,25 +48,7 @@
 :::
 ::::
 
-## Finetuning
-
-::::{grid} 2
-  :gutter: 3
-
-:::{grid-item-card} Fast Finetune on COCO Format Dataset
-  :link: finetune/detection_fast_finetune_coco.html
-
-  How to fast finetune a pretrained model on a dataset in COCO format.
-:::
-
-:::{grid-item-card} High Performance Finetune on COCO Format Dataset
-  :link: finetune/detection_high_performance_finetune_coco.html
-
-  How to finetune a pretrained model on a dataset in COCO format with high performance.
-:::
-::::
-
-## Evaulation
+## Evaluation
 
 ::::{grid} 2
   :gutter: 3
@@ -105,5 +87,4 @@ hidden: true
 quick_start/index
 evaluation/index
 data_preparation/index
-finetune/index
 ```
