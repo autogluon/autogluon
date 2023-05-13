@@ -199,7 +199,7 @@ class MultiModalPredictor(ExportMixin):
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
         sample_data_path: Optional[str] = None,
-        use_learner: Optional[bool] = False,  # TODO: temporary arg for unit testing, remove later
+        use_learner: Optional[bool] = True,  # TODO: temporary arg for unit testing, remove later
     ):
         """
         Parameters
@@ -2903,7 +2903,8 @@ class MultiModalPredictor(ExportMixin):
         """
         if use_learner:
             # learner = DefaultLearner.load(path=path, resume=resume, verbosity=verbosity)
-            learner = BaseLearner.load(path=path, resume=resume, verbosity=verbosity)
+            # TODO: Need to load problem type to determine which learner to load.
+            learner = ObjectDetectionLearner.load(path=path, resume=resume, verbosity=verbosity)
             predictor = cls(
                 label=learner._label_column,
                 use_learner=True,

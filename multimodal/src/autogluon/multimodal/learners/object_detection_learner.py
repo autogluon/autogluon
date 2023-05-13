@@ -9,7 +9,7 @@ from torch import nn
 
 from autogluon.core.utils.loaders import load_pd
 
-from ..constants import BBOX, XYWH, OBJECT_DETECTION, MULTI_IMAGE_MIX_DATASET
+from ..constants import BBOX, MULTI_IMAGE_MIX_DATASET, OBJECT_DETECTION, XYWH
 from ..data.datamodule import BaseDataModule
 from ..data.dataset_mmlab import MultiImageMixDataset
 from ..data.infer_types import infer_problem_type_output_shape
@@ -132,10 +132,59 @@ class ObjectDetectionLearner(BaseLearner):
 
         return train_dm
 
-    def _get_lightning_module(self, metrics_kwargs, optimization_kwargs, **kwargs):
-        task = MMDetLitModule(
-            model=self._model,
-            **metrics_kwargs,
-            **optimization_kwargs,
-        )
+    def _get_lightning_module(
+        self,
+        optimization_kwargs: Optional[dict] = None,
+        metrics_kwargs: Optional[dict] = None,
+        test_time: bool = False,
+        **kwargs,
+    ):
+        if test_time:
+            task = MMDetLitModule(
+                model=self._model,
+                **optimization_kwargs,
+            )
+        else:
+            task = MMDetLitModule(
+                model=self._model,
+                **metrics_kwargs,
+                **optimization_kwargs,
+            )
         return task
+
+    def evaluate(
+        self,
+        data: Union[pd.DataFrame, dict, list, str],
+        # query_data: Optional[list] = None,
+        # response_data: Optional[list] = None,
+        # id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
+        metrics: Optional[Union[str, List[str]]] = None,
+        # chunk_size: Optional[int] = 1024,
+        # similarity_type: Optional[str] = "cosine",
+        # cutoffs: Optional[List[int]] = [1, 5, 10],
+        # label: Optional[str] = None,
+        return_pred: Optional[bool] = False,
+        realtime: Optional[bool] = None,
+        eval_tool: Optional[str] = None,
+        **kwargs,
+    ):
+        self._verify_inference_ready()
+        if realtime:
+            return NotImplementedError(f"Current problem type {self._problem_type} does not support realtime predict.")
+        if isinstance(data, str):
+            return evaluate_coco(
+                predictor=self,
+                anno_file_or_df=data,
+                metrics=metrics,
+                return_pred=return_pred,
+                eval_tool=eval_tool,
+            )
+        else:
+            data = object_detection_data_to_df(data)
+            return evaluate_coco(
+                predictor=self,
+                anno_file_or_df=data,
+                metrics=metrics,
+                return_pred=return_pred,
+                eval_tool="torchmetrics",
+            )

@@ -1804,7 +1804,14 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
         return callbacks
 
     def _get_lightning_module(
-        self, trainable_param_names, metrics_kwargs, mixup_fn, loss_func, optimization_kwargs, **kwargs
+        self,
+        trainable_param_names: List[str],
+        mixup_fn: Optional[Mixup] = None,
+        loss_func: Optional[nn.Module] = None,
+        optimization_kwargs: Optional[dict] = None,
+        metrics_kwargs: Optional[dict] = None,
+        test_time: bool = False,
+        **kwargs,
     ):
         # if self._problem_type == NER:
         #     task = NerLitModule(
@@ -1837,18 +1844,27 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
         #         **metrics_kwargs,
         #         **optimization_kwargs,
         #     )
-        task = LitModule(
-            model=self._model,
-            loss_func=loss_func,
-            efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-            mixup_fn=mixup_fn,
-            mixup_off_epoch=OmegaConf.select(self._config, "data.mixup.turn_off_epoch"),
-            model_postprocess_fn=self._model_postprocess_fn,
-            trainable_param_names=trainable_param_names,
-            skip_final_val=OmegaConf.select(self._config, "optimization.skip_final_val", default=False),
-            **metrics_kwargs,
-            **optimization_kwargs,
-        )
+        if test_time:
+            task = LitModule(
+                model=self._model,
+                model_postprocess_fn=self._model_postprocess_fn,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+                trainable_param_names=trainable_param_names,
+                **optimization_kwargs,
+            )
+        else:
+            task = LitModule(
+                model=self._model,
+                loss_func=loss_func,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+                mixup_fn=mixup_fn,
+                mixup_off_epoch=OmegaConf.select(self._config, "data.mixup.turn_off_epoch"),
+                model_postprocess_fn=self._model_postprocess_fn,
+                trainable_param_names=trainable_param_names,
+                skip_final_val=OmegaConf.select(self._config, "optimization.skip_final_val", default=False),
+                **metrics_kwargs,
+                **optimization_kwargs,
+            )
 
         return task
 
@@ -1999,8 +2015,8 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
 
         # 4. if NER, update output shape. TODO: This can be refactored into the NER Learner
         # Update output_shape with label_generator.
-        if self._problem_type == NER:
-            self._output_shape = len(self._df_preprocessor.label_generator.unique_entity_groups)
+        # if self._problem_type == NER:
+        #     self._output_shape = len(self._df_preprocessor.label_generator.unique_entity_groups)
 
         # 5. get model
         if self._model is None:
@@ -2288,27 +2304,32 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
                 pred_writer = DDPCacheWriter(pipeline=self._problem_type, write_interval="epoch")
                 callbacks = [pred_writer]
 
-        if self._problem_type == NER:
-            task = NerLitModule(
-                model=self._model,
-                model_postprocess_fn=self._model_postprocess_fn,
-                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                trainable_param_names=trainable_param_names,
-                **optimization_kwargs,
-            )
-        elif self._problem_type == OBJECT_DETECTION:
-            task = MMDetLitModule(
-                model=self._model,
-                **optimization_kwargs,
-            )
-        else:
-            task = LitModule(
-                model=self._model,
-                model_postprocess_fn=self._model_postprocess_fn,
-                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                trainable_param_names=trainable_param_names,
-                **optimization_kwargs,
-            )
+        # if self._problem_type == NER:
+        #     task = NerLitModule(
+        #         model=self._model,
+        #         model_postprocess_fn=self._model_postprocess_fn,
+        #         efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+        #         trainable_param_names=trainable_param_names,
+        #         **optimization_kwargs,
+        #     )
+        # elif self._problem_type == OBJECT_DETECTION:
+        #     task = MMDetLitModule(
+        #         model=self._model,
+        #         **optimization_kwargs,
+        #     )
+        # else:
+        #     task = LitModule(
+        #         model=self._model,
+        #         model_postprocess_fn=self._model_postprocess_fn,
+        #         efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+        #         trainable_param_names=trainable_param_names,
+        #         **optimization_kwargs,
+        #     )
+        task = self._get_lightning_module(
+            trainable_param_names=trainable_param_names,
+            optimization_kwargs=optimization_kwargs,
+            test_time=True,
+        )
 
         blacklist_msgs = []
         if self._verbosity <= 3:  # turn off logging in prediction
@@ -2322,18 +2343,8 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
         log_filter = LogFilter(blacklist_msgs)
 
         with apply_log_filter(log_filter):
-            evaluator = pl.Trainer(
-                accelerator="gpu" if num_gpus > 0 else None,
-                devices=get_available_devices(num_gpus=num_gpus, auto_select_gpus=self._config.env.auto_select_gpus),
-                num_nodes=self._config.env.num_nodes,
-                precision=precision,
-                strategy=strategy,
-                benchmark=False,
-                enable_progress_bar=self._enable_progress_bar,
-                deterministic=self._config.env.deterministic,
-                max_epochs=-1,  # Add max_epochs to disable warning
-                logger=False,
-                callbacks=callbacks,
+            evaluator = self._get_lightning_evaluator(
+                num_gpus=num_gpus, precision=precision, strategy=strategy, callbacks=callbacks
             )
 
             with warnings.catch_warnings():
@@ -2366,6 +2377,23 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
                     ]
 
         return outputs
+
+    def _get_lightning_evaluator(self, num_gpus, precision, strategy, callbacks):
+        evaluator = pl.Trainer(
+            accelerator="gpu" if num_gpus > 0 else None,
+            devices=get_available_devices(num_gpus=num_gpus, auto_select_gpus=self._config.env.auto_select_gpus),
+            num_nodes=self._config.env.num_nodes,
+            precision=precision,
+            strategy=strategy,
+            benchmark=False,
+            enable_progress_bar=self._enable_progress_bar,
+            deterministic=self._config.env.deterministic,
+            max_epochs=-1,  # Add max_epochs to disable warning
+            logger=False,
+            callbacks=callbacks,
+        )
+
+        return evaluator
 
     def _on_predict_start(
         self,
@@ -2503,22 +2531,6 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        # if self._use_learner:
-        #     results = self._learner.evaluate(
-        #         data=data,
-        #         query_data=query_data,
-        #         response_data=response_data,
-        #         id_mappings=id_mappings,
-        #         metrics=metrics,
-        #         chunk_size=chunk_size,
-        #         similarity_type=similarity_type,
-        #         cutoffs=cutoffs,
-        #         label=label,
-        #         return_pred=return_pred,
-        #         realtime=realtime,
-        #         eval_tool=eval_tool,
-        #     )
-        #     return results
 
         self._verify_inference_ready()
         if self._matcher:
@@ -2535,33 +2547,30 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
                 return_pred=return_pred,
                 realtime=realtime,
             )
-        if self._problem_type == OBJECT_DETECTION:
-            if realtime:
-                return NotImplementedError(
-                    f"Current problem type {self._problem_type} does not support realtime predict."
-                )
-            if isinstance(data, str):
-                return evaluate_coco(
-                    predictor=self,
-                    anno_file_or_df=data,
-                    metrics=metrics,
-                    return_pred=return_pred,
-                    eval_tool=eval_tool,
-                )
-            else:
-                data = object_detection_data_to_df(data)
-                return evaluate_coco(
-                    predictor=self,
-                    anno_file_or_df=data,
-                    metrics=metrics,
-                    return_pred=return_pred,
-                    eval_tool="torchmetrics",
-                )
+        # if self._problem_type == OBJECT_DETECTION:
+        #     if realtime:
+        #         return NotImplementedError(
+        #             f"Current problem type {self._problem_type} does not support realtime predict."
+        #         )
+        #     if isinstance(data, str):
+        #         return evaluate_coco(
+        #             predictor=self,
+        #             anno_file_or_df=data,
+        #             metrics=metrics,
+        #             return_pred=return_pred,
+        #             eval_tool=eval_tool,
+        #         )
+        #     else:
+        #         data = object_detection_data_to_df(data)
+        #         return evaluate_coco(
+        #             predictor=self,
+        #             anno_file_or_df=data,
+        #             metrics=metrics,
+        #             return_pred=return_pred,
+        #             eval_tool="torchmetrics",
+        #         )
 
-        if self._problem_type == NER:
-            ret_type = NER_RET
-        else:
-            ret_type = LOGITS
+        ret_type = self._get_pred_ret_type()
 
         outputs = predict(
             predictor=self,
@@ -2570,12 +2579,6 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
             realtime=realtime,
         )
         logits = extract_from_output(ret_type=ret_type, outputs=outputs)
-
-        metric_data = {}
-        if self._problem_type in [BINARY, MULTICLASS]:
-            y_pred_prob = logits_to_prob(logits)
-            metric_data[Y_PRED_PROB] = y_pred_prob
-
         y_pred = self._df_preprocessor.transform_prediction(
             y_pred=logits,
             inverse_categorical=False,
@@ -2585,17 +2588,7 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
             inverse_categorical=True,
         )
 
-        if self._problem_type == NER:
-            y_true = self._df_preprocessor.transform_label_for_metric(df=data, tokenizer=self._model.tokenizer)
-        else:
-            y_true = self._df_preprocessor.transform_label_for_metric(df=data)
-
-        metric_data.update(
-            {
-                Y_PRED: y_pred,
-                Y_TRUE: y_true,
-            }
-        )
+        metric_data = self._get_eval_metric_data(data=data, logits=logits, y_pred=y_pred)
 
         metrics_is_none = False
 
@@ -2605,6 +2598,14 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
         if isinstance(metrics, str):
             metrics = [metrics]
 
+        results = self._get_eval_results(metrics=metrics, metric_data=metric_data, metrics_is_none=metrics_is_none)
+
+        if return_pred:
+            return results, self._as_pandas(data=data, to_be_converted=y_pred_inv)
+        else:
+            return results
+
+    def _get_eval_results(self, metrics, metric_data, metrics_is_none):
         results = {}
         if self._problem_type == NER:
             score = compute_score(
@@ -2629,11 +2630,34 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
                     metric_name=per_metric.lower(),
                 )
                 results[per_metric] = score
+        return results
 
-        if return_pred:
-            return results, self._as_pandas(data=data, to_be_converted=y_pred_inv)
+    def _get_eval_metric_data(self, data, logits, y_pred):
+        metric_data = {}
+        if self._problem_type in [BINARY, MULTICLASS]:
+            y_pred_prob = logits_to_prob(logits)
+            metric_data[Y_PRED_PROB] = y_pred_prob
+
+        if self._problem_type == NER:
+            y_true = self._df_preprocessor.transform_label_for_metric(df=data, tokenizer=self._model.tokenizer)
         else:
-            return results
+            y_true = self._df_preprocessor.transform_label_for_metric(df=data)
+
+        metric_data.update(
+            {
+                Y_PRED: y_pred,
+                Y_TRUE: y_true,
+            }
+        )
+
+        return metric_data
+
+    def _get_pred_ret_type(self):
+        if self._problem_type == NER:
+            ret_type = NER_RET
+        else:
+            ret_type = LOGITS
+        return ret_type
 
     def _match_queries_and_candidates(
         self,

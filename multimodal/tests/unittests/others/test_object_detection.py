@@ -227,7 +227,6 @@ def test_mmdet_object_detection_evaluate_coco(checkpoint_name):
     load_zip.unzip(zip_file, unzip_dir=download_dir)
     predictor = MultiModalPredictor.load("./AP50_433/quick_start_tutorial_temp_save")
     predictor.set_num_gpus(1)
-
     pred = predictor.evaluate(test_path)
 
 
