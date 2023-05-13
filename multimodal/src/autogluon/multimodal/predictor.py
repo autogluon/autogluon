@@ -199,7 +199,7 @@ class MultiModalPredictor(ExportMixin):
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
         sample_data_path: Optional[str] = None,
-        use_learner: Optional[bool] = True,  # TODO: temporary arg for unit testing, remove later
+        use_learner: Optional[bool] = False,  # TODO: temporary arg for unit testing, remove later
     ):
         """
         Parameters
@@ -307,25 +307,49 @@ class MultiModalPredictor(ExportMixin):
         """
         self._use_learner = use_learner
         if use_learner:
-            self._learner = BaseLearner(
-                label=label,
-                problem_type=problem_type,
-                query=query,
-                response=response,
-                match_label=match_label,
-                pipeline=pipeline,
-                presets=presets,
-                eval_metric=eval_metric,
-                hyperparameters=hyperparameters,
-                path=path,
-                verbosity=verbosity,
-                num_classes=num_classes,
-                classes=classes,
-                warn_if_exist=warn_if_exist,
-                enable_progress_bar=enable_progress_bar,
-                init_scratch=init_scratch,
-                sample_data_path=sample_data_path,
-            )
+            if problem_type == OBJECT_DETECTION:
+                self._learner = ObjectDetectionLearner(
+                    label=label,
+                    problem_type=problem_type,
+                    query=query,
+                    response=response,
+                    match_label=match_label,
+                    pipeline=pipeline,
+                    presets=presets,
+                    eval_metric=eval_metric,
+                    hyperparameters=hyperparameters,
+                    path=path,
+                    verbosity=verbosity,
+                    num_classes=num_classes,
+                    classes=classes,
+                    warn_if_exist=warn_if_exist,
+                    enable_progress_bar=enable_progress_bar,
+                    init_scratch=init_scratch,
+                    sample_data_path=sample_data_path,
+                )
+            elif problem_type == NER:
+                # self._learner = NERLearner()
+                pass
+            else:
+                self._learner = BaseLearner(
+                    label=label,
+                    problem_type=problem_type,
+                    query=query,
+                    response=response,
+                    match_label=match_label,
+                    pipeline=pipeline,
+                    presets=presets,
+                    eval_metric=eval_metric,
+                    hyperparameters=hyperparameters,
+                    path=path,
+                    verbosity=verbosity,
+                    num_classes=num_classes,
+                    classes=classes,
+                    warn_if_exist=warn_if_exist,
+                    enable_progress_bar=enable_progress_bar,
+                    init_scratch=init_scratch,
+                    sample_data_path=sample_data_path,
+                )
         else:
             # Handle the deprecated pipeline flag
             if pipeline is not None:
@@ -577,6 +601,12 @@ class MultiModalPredictor(ExportMixin):
             return self._matcher.column_types
         else:
             return self._column_types
+
+    # @property
+    # def _config(self):
+    #     if self._use_learner:
+    #         return self._learner._config
+    #     return self._config
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
@@ -2494,6 +2524,7 @@ class MultiModalPredictor(ExportMixin):
                 requires_label=False,
                 realtime=realtime,
             )
+            print(f"{'realtime' if realtime else 'normal'}: {outputs}")
 
             if self._problem_type == NER:
                 ner_outputs = extract_from_output(outputs=outputs, ret_type=NER_RET)
