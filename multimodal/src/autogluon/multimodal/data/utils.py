@@ -3,10 +3,12 @@ import codecs
 import copy
 import re
 import warnings
+from io import BytesIO
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
+import PIL
 from omegaconf import ListConfig
 from text_unidecode import unidecode
 from timm.data.constants import (
@@ -18,7 +20,16 @@ from timm.data.constants import (
 from tokenizers import pre_tokenizers
 from torchvision import transforms
 
-from ..constants import CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, IDENTIFIER, IMAGE, MMDET_IMAGE, MMLAB_MODELS
+from ..constants import (
+    CLIP_IMAGE_MEAN,
+    CLIP_IMAGE_STD,
+    IDENTIFIER,
+    IMAGE,
+    IMAGE_BYTEARRAY,
+    IMAGE_PATH,
+    MMDET_IMAGE,
+    MMLAB_MODELS,
+)
 from .collator import DictCollator
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 
