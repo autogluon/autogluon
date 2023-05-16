@@ -2993,21 +2993,6 @@ class MultiModalPredictor(ExportMixin):
 
         return predictor
 
-    @staticmethod
-    def _load_problem_type(path) -> str:
-        """
-        Load the problem type from the assets.json file.
-
-        Args:
-            path (str): path where predictor artifacts are
-
-        Returns:
-            str: problem type
-        """
-        with open(os.path.join(path, "assets.json"), "r") as fp:
-            assets = json.load(fp)
-        return assets["problem_type"]
-
     @classmethod
     def load(
         cls,
@@ -3037,28 +3022,37 @@ class MultiModalPredictor(ExportMixin):
         -------
         The loaded predictor object.
         """
+        path = os.path.abspath(os.path.expanduser(path))
+        assert os.path.isdir(path), f"'{path}' must be an existing directory."
+        with open(os.path.join(path, "assets.json"), "r") as fp:
+            assets = json.load(fp)
+
         if use_learner:
-            # learner = DefaultLearner.load(path=path, resume=resume, verbosity=verbosity)
-            # TODO: Need to load problem type to determine which learner to load.
-            problem_type = MultiModalPredictor._load_problem_type(path=path)
-            if problem_type == OBJECT_DETECTION:
-                learner = ObjectDetectionLearner.load(path=path, resume=resume, verbosity=verbosity)
-            elif problem_type == NER:
-                learner = NERLearner.load(path=path, resume=resume, verbosity=verbosity)
+            if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
+                learner = MultiModalMatcher.load(
+                    path=path,
+                    resume=resume,
+                    verbosity=verbosity,
+                )
             else:
-                learner = BaseLearner.load(path=path, resume=resume, verbosity=verbosity)
+                # learner = DefaultLearner.load(path=path, resume=resume, verbosity=verbosity)
+                # TODO: Need to load problem type to determine which learner to load.
+                problem_type = assets["problem_type"]
+                if problem_type == OBJECT_DETECTION:
+                    learner = ObjectDetectionLearner.load(path=path, resume=resume, verbosity=verbosity)
+                elif problem_type == NER:
+                    learner = NERLearner.load(path=path, resume=resume, verbosity=verbosity)
+                else:
+                    learner = BaseLearner.load(path=path, resume=resume, verbosity=verbosity)
+
             predictor = cls(
                 use_learner=True,
             )  # TODO: temporary solution. self._label_column will be handled by learner only.
             predictor._learner = learner
             return predictor
 
-        path = os.path.abspath(os.path.expanduser(path))
-        assert os.path.isdir(path), f"'{path}' must be an existing directory."
         predictor = cls(label="dummy_label")
 
-        with open(os.path.join(path, "assets.json"), "r") as fp:
-            assets = json.load(fp)
         if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
             predictor._matcher = MultiModalMatcher.load(
                 path=path,
