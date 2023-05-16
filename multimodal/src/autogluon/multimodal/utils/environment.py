@@ -9,6 +9,8 @@ import torch
 from pytorch_lightning.accelerators import find_usable_cuda_devices
 from torch import nn
 
+from autogluon.common.utils.resource_utils import ResourceManager
+
 from ..constants import AUTOMM, OBJECT_DETECTION, OCR
 from .mmcv import DataContainer
 
@@ -21,6 +23,35 @@ def is_interactive():
     Check also https://stackoverflow.com/a/64523765
     """
     return hasattr(sys, "ps1")
+
+
+def compute_num_cpus(config_num_cpus: int):
+    """
+    Compute the cpu number to be used by torch lightning
+
+    Parameters
+    ----------
+    config_num_cpus
+        The cpu number provided by config.
+
+    Returns
+    -------
+    A valid cpu number for the current environment and config.
+    """
+    assert isinstance(config_num_cpus, int), "Please provide an integer value for number of cpus"
+    detected_num_cpus = ResourceManager.get_cpu_count()
+    num_cpus = config_num_cpus
+    if config_num_cpus < 0:
+        num_cpus = detected_num_cpus
+    else:
+        num_cpus = min(config_num_cpus, detected_num_cpus)
+        if config_num_cpus > detected_num_cpus:
+            warnings.warn(
+                f"Using the detected CPU number {detected_num_cpus}, "
+                f"smaller than the CPU number {config_num_cpus} in the config.",
+                UserWarning,
+            )
+    return num_cpus
 
 
 def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
@@ -41,7 +72,7 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
     config_num_gpus = (
         math.floor(config_num_gpus) if isinstance(config_num_gpus, (int, float)) else len(config_num_gpus)
     )
-    detected_num_gpus = torch.cuda.device_count()
+    detected_num_gpus = ResourceManager.get_gpu_count_torch()
 
     if config_num_gpus < 0:  # In case config_num_gpus is -1, meaning using all gpus.
         num_gpus = detected_num_gpus

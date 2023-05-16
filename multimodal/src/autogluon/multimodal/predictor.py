@@ -25,6 +25,8 @@ from omegaconf import OmegaConf
 from packaging import version
 from torch import nn
 
+from autogluon.common.utils.context import set_torch_num_threads
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
 from autogluon.core.utils.loaders import load_pd
@@ -119,6 +121,7 @@ from .utils import (
     assign_feature_column_names,
     average_checkpoints,
     check_if_packages_installed,
+    compute_num_cpus,
     compute_num_gpus,
     compute_score,
     convert_pred_to_xywh,
@@ -822,7 +825,7 @@ class MultiModalPredictor(ExportMixin):
         if hpo_mode:
             # TODO: allow custom gpu
             assert self._resume is False, "You can not resume training with HPO"
-            resources = dict(num_gpus=torch.cuda.device_count())
+            resources = dict(num_cpus=ResourceManager.get_cpu_count(), num_gpus=ResourceManager.get_gpu_count_torch())
             if _fit_args["max_time"] is not None:
                 _fit_args["max_time"] *= 0.95  # give some buffer time to ray lightning trainer
             _fit_args["predictor"] = self
@@ -1403,6 +1406,7 @@ class MultiModalPredictor(ExportMixin):
             version="",
         )
 
+        num_cpus = compute_num_cpus(config_num_cpus=config.env.num_cpus)
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
 
         precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
@@ -1445,6 +1449,7 @@ class MultiModalPredictor(ExportMixin):
                 strategy = None
                 num_gpus = min(num_gpus, 1)
 
+        config.env.num_cpus = num_cpus
         config.env.num_gpus = num_gpus
         config.env.precision = precision
         config.env.strategy = strategy if not config.env.strategy == DEEPSPEED_OFFLOADING else DEEPSPEED_OFFLOADING
@@ -1496,6 +1501,7 @@ class MultiModalPredictor(ExportMixin):
                 ".* in the `DataLoader` init to improve performance.*",
             )
             warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
+            # with set_torch_num_threads(num_cpus=num_cpus):
             trainer.fit(
                 task,
                 datamodule=train_dm,

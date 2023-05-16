@@ -475,6 +475,9 @@ class AutommRayTuneAdapter(RayTuneAdapter):
     def trainable_args_update_method(self, trainable_args: dict) -> dict:
         trainable_args['hyperparameters']['env.num_gpus'] = self.gpu_per_job
         trainable_args['hyperparameters']['env.num_workers'] = self.cpu_per_job
+        # if self.gpu_per_job == 0:
+        #     trainable_args['hyperparameters']['env.num_workers'] = 0
+        #     trainable_args['hyperparameters']['env.num_cpus'] = self.cpu_per_job
         
         return trainable_args
     
