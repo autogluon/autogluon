@@ -1,6 +1,5 @@
 from typing import List, Optional, Union
 
-
 import pandas as pd
 import pytorch_lightning as pl
 from omegaconf import OmegaConf
