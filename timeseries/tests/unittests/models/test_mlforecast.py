@@ -38,13 +38,10 @@ def test_when_covariates_and_features_present_then_feature_df_shape_is_correct(
         hyperparameters={"differences": differences, "lags": lags},
     )
     model.fit(train_data=data, time_limit=2)
-    df = model._get_features_dataframe(data)
+    X, y = model._get_features_dataframe(data)
     expected_num_features = (
-        1  # target
-        + len(lags)
-        + len(known_covariates_names)
-        + len(static_features_names)
-        + len(model._get_date_features(data.freq))
+        len(lags) + len(known_covariates_names) + len(static_features_names) + len(model._get_date_features(data.freq))
     )
     expected_num_rows = len(data) - sum(differences) * data.num_items  # sum(differences) rows  dropped per item
-    assert df.shape == (expected_num_rows, expected_num_features)
+    assert X.shape == (expected_num_rows, expected_num_features)
+    assert y.shape == (expected_num_rows,)
