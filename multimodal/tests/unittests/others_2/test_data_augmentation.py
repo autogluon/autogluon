@@ -113,7 +113,7 @@ def test_textagumentor_deepcopy():
     )
 
     # Copy data processors via pickle + load
-    predictor._data_processors = pickle.loads(pickle.dumps(predictor._data_processors))
+    predictor._learner._data_processors = pickle.loads(pickle.dumps(predictor._data_processors))
 
     # Test copied data processors
     predictor.fit(
