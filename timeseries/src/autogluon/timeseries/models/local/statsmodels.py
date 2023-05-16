@@ -5,7 +5,6 @@ from typing import Any, Callable, Dict, List
 import pandas as pd
 from statsmodels.tools.sm_exceptions import ConvergenceWarning, ModelWarning, ValueWarning
 
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_single_time_series
 from autogluon.timeseries.utils.warning_filters import statsmodels_warning_filter
 
@@ -16,6 +15,8 @@ logger = logging.getLogger(__name__)
 warnings.simplefilter("ignore", ModelWarning)
 warnings.simplefilter("ignore", ConvergenceWarning)
 warnings.simplefilter("ignore", ValueWarning)
+
+from .abstract_local_model import AbstractLocalModel
 
 
 def get_quantiles_from_statsmodels(coverage_fn: Callable, quantile_levels: List[float]) -> List[pd.Series]:
@@ -50,7 +51,7 @@ def get_quantiles_from_statsmodels(coverage_fn: Callable, quantile_levels: List[
     return results
 
 
-class ETSModel(AbstractLocalModel):
+class ETSStatsmodelsModel(AbstractLocalModel):
     """Exponential smoothing with trend and seasonality.
 
     Based on `statsmodels.tsa.exponential_smoothing.ets.ETSModel <https://www.statsmodels.org/stable/generated/statsmodels.tsa.exponential_smoothing.ets.ETSModel.html>`_.
@@ -97,9 +98,7 @@ class ETSModel(AbstractLocalModel):
         "maxiter",
     ]
 
-    def _update_local_model_args(
-        self, local_model_args: Dict[str, Any], data: TimeSeriesDataFrame, **kwargs
-    ) -> Dict[str, Any]:
+    def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
         local_model_args.setdefault("trend", "add")
         local_model_args.setdefault("maxiter", 1000)
 
@@ -117,17 +116,13 @@ class ETSModel(AbstractLocalModel):
 
         return local_model_args
 
-    @staticmethod
     def _predict_with_local_model(
+        self,
         time_series: pd.Series,
-        freq: str,
-        prediction_length: int,
-        quantile_levels: List[float],
         local_model_args: dict,
-        **kwargs,
     ) -> pd.DataFrame:
         forecast_timestamps = get_forecast_horizon_index_single_time_series(
-            past_timestamps=time_series.index, freq=freq, prediction_length=prediction_length
+            past_timestamps=time_series.index, freq=self.freq, prediction_length=self.prediction_length
         )
         from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 
@@ -140,7 +135,7 @@ class ETSModel(AbstractLocalModel):
         with statsmodels_warning_filter():
             model = ETSModel(
                 endog=time_series,
-                freq=freq,
+                freq=self.freq,
                 **local_model_args,
             )
             fit_result = model.fit(disp=False, maxiter=maxiter)
@@ -152,7 +147,7 @@ class ETSModel(AbstractLocalModel):
         return pd.concat(results, axis=1)
 
 
-class ARIMAModel(AbstractLocalModel):
+class ARIMAStatsmodelsModel(AbstractLocalModel):
     """Autoregressive Integrated Moving Average (ARIMA) model.
 
     Based on `statsmodels.tsa.statespace.sarimax.SARIMAX <https://www.statsmodels.org/stable/generated/statsmodels.tsa.statespace.sarimax.SARIMAX.html>`_.
@@ -202,9 +197,7 @@ class ARIMAModel(AbstractLocalModel):
     ]
     MAX_TS_LENGTH = 3000
 
-    def _update_local_model_args(
-        self, local_model_args: Dict[str, Any], data: TimeSeriesDataFrame, **kwargs
-    ) -> Dict[str, Any]:
+    def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
         local_model_args.setdefault("trend", "c")
         local_model_args.setdefault("order", (1, 1, 1))
         local_model_args.setdefault("maxiter", 50)
@@ -227,17 +220,13 @@ class ARIMAModel(AbstractLocalModel):
 
         return local_model_args
 
-    @staticmethod
     def _predict_with_local_model(
+        self,
         time_series: pd.Series,
-        freq: str,
-        prediction_length: int,
-        quantile_levels: List[float],
         local_model_args: dict,
-        **kwargs,
     ) -> pd.DataFrame:
         forecast_timestamps = get_forecast_horizon_index_single_time_series(
-            past_timestamps=time_series.index, freq=freq, prediction_length=prediction_length
+            past_timestamps=time_series.index, freq=self.freq, prediction_length=self.prediction_length
         )
         from statsmodels.tsa.statespace.sarimax import SARIMAX as StatsmodelSARIMAX
 
@@ -246,7 +235,7 @@ class ARIMAModel(AbstractLocalModel):
         with statsmodels_warning_filter():
             model = StatsmodelSARIMAX(
                 endog=time_series,
-                freq=freq,
+                freq=self.freq,
                 **local_model_args,
             )
             fit_result = model.fit(disp=False, maxiter=maxiter)
@@ -254,11 +243,11 @@ class ARIMAModel(AbstractLocalModel):
 
         results = [predictions.predicted_mean.rename("mean")]
         coverage_fn = lambda alpha: predictions.conf_int(alpha=alpha)
-        results += get_quantiles_from_statsmodels(coverage_fn=coverage_fn, quantile_levels=quantile_levels)
+        results += get_quantiles_from_statsmodels(coverage_fn=coverage_fn, quantile_levels=self.quantile_levels)
         return pd.concat(results, axis=1)
 
 
-class ThetaModel(AbstractLocalModel):
+class ThetaStatsmodelsModel(AbstractLocalModel):
     """The Theta forecasting model of Assimakopoulos and Nikolopoulos (2000).
 
     Based on `statsmodels.tsa.forecasting.theta.ThetaModel <https://www.statsmodels.org/stable/generated/statsmodels.tsa.forecasting.theta.ThetaModel.html>`_.
@@ -309,9 +298,7 @@ class ThetaModel(AbstractLocalModel):
         "difference",
     ]
 
-    def _update_local_model_args(
-        self, local_model_args: Dict[str, Any], data: TimeSeriesDataFrame, **kwargs
-    ) -> Dict[str, Any]:
+    def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
         local_model_args.setdefault("deseasonalize", True)
 
         seasonal_period = local_model_args.pop("seasonal_period")
@@ -319,14 +306,10 @@ class ThetaModel(AbstractLocalModel):
 
         return local_model_args
 
-    @staticmethod
     def _predict_with_local_model(
+        self,
         time_series: pd.Series,
-        freq: str,
-        prediction_length: int,
-        quantile_levels: List[float],
         local_model_args: dict,
-        **kwargs,
     ) -> pd.DataFrame:
         from statsmodels.tsa.forecasting.theta import ThetaModel as StatsmodelsTheta
 
@@ -334,7 +317,7 @@ class ThetaModel(AbstractLocalModel):
         if local_model_args["deseasonalize"] and len(time_series) < 2 * local_model_args["period"]:
             local_model_args["deseasonalize"] = False
 
-        time_series.index.freq = freq
+        time_series.index.freq = self.freq
 
         with statsmodels_warning_filter():
             model = StatsmodelsTheta(
@@ -343,7 +326,7 @@ class ThetaModel(AbstractLocalModel):
             )
             fit_result = model.fit(disp=False)
 
-        results = [fit_result.forecast(prediction_length).rename("mean")]
-        coverage_fn = lambda alpha: fit_result.prediction_intervals(steps=prediction_length, alpha=alpha)
-        results += get_quantiles_from_statsmodels(coverage_fn=coverage_fn, quantile_levels=quantile_levels)
+        results = [fit_result.forecast(self.prediction_length).rename("mean")]
+        coverage_fn = lambda alpha: fit_result.prediction_intervals(steps=self.prediction_length, alpha=alpha)
+        results += get_quantiles_from_statsmodels(coverage_fn=coverage_fn, quantile_levels=self.quantile_levels)
         return pd.concat(results, axis=1)
