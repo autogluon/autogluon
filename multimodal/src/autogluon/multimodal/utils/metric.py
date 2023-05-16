@@ -24,6 +24,7 @@ from ..constants import (
     NER,
     NER_TOKEN_F1,
     OBJECT_DETECTION,
+    OPEN_VOCABULARY_OBJECT_DETECTION,
     OVERALL_ACCURACY,
     OVERALL_F1,
     PRECISION,
@@ -110,7 +111,7 @@ def infer_metrics(
             eval_metric_name = SPEARMANR
         else:
             eval_metric_name = RMSE
-    elif problem_type == OBJECT_DETECTION:
+    elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
         if (not validation_metric_name) or validation_metric_name.lower() == MAP:
             return MAP, MAP
         elif validation_metric_name.lower() == DIRECT_LOSS:
