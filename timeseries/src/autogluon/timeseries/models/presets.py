@@ -8,19 +8,20 @@ from autogluon.common import space
 from autogluon.core import constants
 
 from . import (
-    ARIMAModel,
     AutoARIMAModel,
     AutoETSModel,
     AutoGluonTabularModel,
     DeepARModel,
     DynamicOptimizedThetaModel,
-    ETSModel,
     NaiveModel,
     RecursiveTabularModel,
     SeasonalNaiveModel,
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
     ThetaModel,
+    ETSStatsmodelsModel,
+    ARIMAStatsmodelsModel,
+    ThetaStatsmodelsModel,
 )
 from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
@@ -32,8 +33,9 @@ MODEL_TYPES = dict(
     SimpleFeedForward=SimpleFeedForwardModel,
     DeepAR=DeepARModel,
     TemporalFusionTransformer=TemporalFusionTransformerModel,
-    ETS=ETSModel,
-    ARIMA=ARIMAModel,
+    ETS_SM=ETSStatsmodelsModel,
+    ARIMA_SM=ARIMAStatsmodelsModel,
+    Theta_SM=ThetaStatsmodelsModel,
     Theta=ThetaModel,
     AutoGluonTabular=AutoGluonTabularModel,
     RecursiveTabular=RecursiveTabularModel,
