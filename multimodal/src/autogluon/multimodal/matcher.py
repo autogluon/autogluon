@@ -128,6 +128,7 @@ class MultiModalMatcher:
         verbosity: Optional[int] = 3,
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Parameters
@@ -300,6 +301,7 @@ class MultiModalMatcher:
         holdout_frac: Optional[float] = None,
         hyperparameter_tune_kwargs: Optional[dict] = None,
         seed: Optional[int] = 123,
+        **kwargs,
     ):
         """
         Fit MultiModalMatcher. Train the model to learn embeddings to simultaneously maximize and minimize
@@ -1206,7 +1208,6 @@ class MultiModalMatcher:
         match_label: int,
         signature: Optional[str] = None,
     ) -> List[Dict]:
-
         predict_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
@@ -1421,6 +1422,7 @@ class MultiModalMatcher:
         cutoffs: Optional[List[int]] = [1, 5, 10],
         label: Optional[str] = None,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Evaluate model on a test dataset.
@@ -1513,6 +1515,7 @@ class MultiModalMatcher:
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Predict values for the label column of new data.
@@ -1568,6 +1571,7 @@ class MultiModalMatcher:
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -1624,6 +1628,7 @@ class MultiModalMatcher:
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Extract features for each sample, i.e., one row in the provided dataframe `data`.

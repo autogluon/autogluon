@@ -31,7 +31,7 @@ class ObjectDetectionLearner(BaseLearner):
     def __init__(
         self,
         label: Optional[str] = None,
-        problem_type: Optional[str] = None,
+        problem_type: Optional[str] = OBJECT_DETECTION,
         query: Optional[Union[str, List[str]]] = None,
         response: Optional[Union[str, List[str]]] = None,
         match_label: Optional[Union[int, str]] = None,
@@ -51,24 +51,28 @@ class ObjectDetectionLearner(BaseLearner):
         assert (
             problem_type == OBJECT_DETECTION
         ), f"Expected problem_type={OBJECT_DETECTION}, but problem_type={problem_type}"
+        label_column = "label"
+        if sample_data_path is not None:
+            classes = get_detection_classes(sample_data_path)
+            num_classes = len(classes)
         super().__init__(
-            label,
-            problem_type,
-            query,
-            response,
-            match_label,
-            pipeline,
-            presets,
-            eval_metric,
-            hyperparameters,
-            path,
-            verbosity,
-            num_classes,
-            classes,
-            warn_if_exist,
-            enable_progress_bar,
-            init_scratch,
-            sample_data_path,
+            label=label_column,
+            problem_type=problem_type,
+            query=query,
+            response=response,
+            match_label=match_label,
+            pipeline=pipeline,
+            presets=presets,
+            eval_metric=eval_metric,
+            hyperparameters=hyperparameters,
+            path=path,
+            verbosity=verbosity,
+            num_classes=num_classes,
+            classes=classes,
+            warn_if_exist=warn_if_exist,
+            enable_progress_bar=enable_progress_bar,
+            init_scratch=init_scratch,
+            sample_data_path=sample_data_path,
         )
         self._validation_metric_name = self._config["optimization"][
             "val_metric"

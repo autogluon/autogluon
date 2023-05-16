@@ -172,12 +172,12 @@ from ..utils import (
     update_tabular_config_by_resources,
     upgrade_config,
 )
-from .abstract_learner import AbstractMultiModalLearner
+from .abstract_learner import AbstractLearner
 
 logger = logging.getLogger(__name__)
 
 
-class BaseLearner(ExportMixin, AbstractMultiModalLearner):
+class BaseLearner(ExportMixin, AbstractLearner):
     """
     BaseLearner is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that
     are suitable for multimodal datasets. You will only need to preprocess the data in the multimodal dataframe format
@@ -433,11 +433,11 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
             )
             return
 
-        if self._problem_type == OBJECT_DETECTION:
-            self._label_column = "label"
-            if self._sample_data_path is not None:
-                self._classes = get_detection_classes(self._sample_data_path)
-                self._output_shape = len(self._classes)
+        # if self._problem_type == OBJECT_DETECTION:
+        #     self._label_column = "label"
+        #     if self._sample_data_path is not None:
+        #         self._classes = get_detection_classes(self._sample_data_path)
+        #         self._output_shape = len(self._classes)
 
         if self._problem_type is not None:
             if self.problem_property.support_zero_shot:
@@ -1032,7 +1032,7 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
         if hpo_mode:
             hyperparameters = filter_hyperparameters(
                 hyperparameters=hyperparameters,
-                column_types=column_types,
+                column_types=self._column_types,
                 config=self._config,
                 fit_called=fit_called,
             )
@@ -1577,20 +1577,39 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
 
         # 24. pl.Trainer.fit()
         with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                ".*does not have many workers which may be a bottleneck. "
-                "Consider increasing the value of the `num_workers` argument` "
-                ".* in the `DataLoader` init to improve performance.*",
-            )
-            warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
-            trainer.fit(
-                task,
-                datamodule=train_dm,
-                ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
+            self._run_lightning_trainer(
+                ckpt_path=ckpt_path, resume=resume, train_dm=train_dm, task=task, trainer=trainer
             )
 
         # 25. execute call bakcs at training finish
+        self._fit_postprocess(
+            val_df=val_df,
+            validation_metric_name=validation_metric_name,
+            minmax_mode=minmax_mode,
+            save_path=save_path,
+            hpo_mode=hpo_mode,
+            standalone=standalone,
+            clean_ckpts=clean_ckpts,
+            trainable_param_names=trainable_param_names,
+            is_distill=is_distill,
+            strategy=strategy,
+            trainer=trainer,
+        )
+
+    def _fit_postprocess(
+        self,
+        val_df,
+        validation_metric_name,
+        minmax_mode,
+        save_path,
+        hpo_mode,
+        standalone,
+        clean_ckpts,
+        trainable_param_names,
+        is_distill,
+        strategy,
+        trainer,
+    ):
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
             # We only averaging the checkpoint of the best trial in the end in the master process
@@ -1612,6 +1631,20 @@ class BaseLearner(ExportMixin, AbstractMultiModalLearner):
             self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
+
+    def _run_lightning_trainer(self, ckpt_path, resume, train_dm, task, trainer):
+        warnings.filterwarnings(
+            "ignore",
+            ".*does not have many workers which may be a bottleneck. "
+            "Consider increasing the value of the `num_workers` argument` "
+            ".* in the `DataLoader` init to improve performance.*",
+        )
+        warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
+        trainer.fit(
+            task,
+            datamodule=train_dm,
+            ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
+        )
 
     def _get_strategy(
         self, hpo_mode: bool, hpo_kwargs: dict, num_gpus: int, use_ray_lightning: bool

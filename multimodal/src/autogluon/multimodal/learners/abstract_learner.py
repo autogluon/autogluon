@@ -12,34 +12,40 @@ from autogluon.multimodal.problem_types import ProblemTypeProperty
 logger = logging.getLogger(__name__)
 
 
-class AbstractMultiModalLearner(ABC):
+class AbstractLearner(ABC):
     def __init__(
         self,
         **kwargs,
     ):
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def path(self) -> Optional[str]:
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def label(self) -> Optional[str]:
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def problem_type(self) -> Optional[str]:
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def problem_property(self) -> Optional[ProblemTypeProperty]:
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def class_labels(self) -> Optional[List[str]]:
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def positive_class(self) -> Optional[str]:
         pass
 
@@ -58,7 +64,7 @@ class AbstractMultiModalLearner(ABC):
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         column_types: Optional[dict] = None,
         holdout_frac: Optional[float] = None,
-        teacher_predictor: Union[str, AbstractMultiModalLearner] = None,
+        teacher_predictor: Union[str, AbstractLearner] = None,
         seed: Optional[int] = 0,
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[dict] = None,

@@ -92,7 +92,7 @@ from .data.infer_types import (
     is_image_column,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from .learners import BaseLearner, DefaultLearner, ObjectDetectionLearner
+from .learners import BaseLearner, NERLearner, ObjectDetectionLearner
 from .matcher import MultiModalMatcher
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
@@ -307,49 +307,25 @@ class MultiModalPredictor(ExportMixin):
         """
         self._use_learner = use_learner
         if use_learner:
-            if problem_type == OBJECT_DETECTION:
-                self._learner = ObjectDetectionLearner(
-                    label=label,
-                    problem_type=problem_type,
-                    query=query,
-                    response=response,
-                    match_label=match_label,
-                    pipeline=pipeline,
-                    presets=presets,
-                    eval_metric=eval_metric,
-                    hyperparameters=hyperparameters,
-                    path=path,
-                    verbosity=verbosity,
-                    num_classes=num_classes,
-                    classes=classes,
-                    warn_if_exist=warn_if_exist,
-                    enable_progress_bar=enable_progress_bar,
-                    init_scratch=init_scratch,
-                    sample_data_path=sample_data_path,
-                )
-            elif problem_type == NER:
-                # self._learner = NERLearner()
-                pass
-            else:
-                self._learner = BaseLearner(
-                    label=label,
-                    problem_type=problem_type,
-                    query=query,
-                    response=response,
-                    match_label=match_label,
-                    pipeline=pipeline,
-                    presets=presets,
-                    eval_metric=eval_metric,
-                    hyperparameters=hyperparameters,
-                    path=path,
-                    verbosity=verbosity,
-                    num_classes=num_classes,
-                    classes=classes,
-                    warn_if_exist=warn_if_exist,
-                    enable_progress_bar=enable_progress_bar,
-                    init_scratch=init_scratch,
-                    sample_data_path=sample_data_path,
-                )
+            self._learner = self._get_learner(
+                label=label,
+                problem_type=problem_type,
+                query=query,
+                response=response,
+                match_label=match_label,
+                pipeline=pipeline,
+                presets=presets,
+                eval_metric=eval_metric,
+                hyperparameters=hyperparameters,
+                path=path,
+                verbosity=verbosity,
+                num_classes=num_classes,
+                classes=classes,
+                warn_if_exist=warn_if_exist,
+                enable_progress_bar=enable_progress_bar,
+                init_scratch=init_scratch,
+                sample_data_path=sample_data_path,
+            )
         else:
             # Handle the deprecated pipeline flag
             if pipeline is not None:
@@ -534,9 +510,108 @@ class MultiModalPredictor(ExportMixin):
                         classes=self._classes,
                         init_scratch=self._init_scratch,
                     )
-                    self._validation_metric_name = self._config["optimization"][
-                        "val_metric"
-                    ]  # TODO: only object detection is using this
+                    self._validation_metric_name = self._config["optimization"]["val_metric"]
+
+    def _get_learner(
+        self,
+        label: Optional[str] = None,
+        problem_type: Optional[str] = None,
+        query: Optional[Union[str, List[str]]] = None,
+        response: Optional[Union[str, List[str]]] = None,
+        match_label: Optional[Union[int, str]] = None,
+        pipeline: Optional[str] = None,
+        presets: Optional[str] = None,
+        eval_metric: Optional[str] = None,
+        hyperparameters: Optional[dict] = None,
+        path: Optional[str] = None,
+        verbosity: Optional[int] = 2,
+        num_classes: Optional[int] = None,  # TODO: can we infer this from data?
+        classes: Optional[list] = None,
+        warn_if_exist: Optional[bool] = True,
+        enable_progress_bar: Optional[bool] = None,
+        init_scratch: Optional[bool] = False,
+        sample_data_path: Optional[str] = None,
+    ):
+        problem_property = None
+        if problem_type is not None:
+            problem_property = PROBLEM_TYPES_REG.get(problem_type)
+        if problem_property and problem_property.is_matching:
+            learner = MultiModalMatcher(
+                query=query,
+                response=response,
+                label=label,
+                match_label=match_label,
+                problem_type=problem_type,
+                presets=presets,
+                hyperparameters=hyperparameters,
+                eval_metric=eval_metric,
+                path=path,
+                verbosity=verbosity,
+                warn_if_exist=warn_if_exist,
+                enable_progress_bar=enable_progress_bar,
+            )
+        else:
+            if problem_type == OBJECT_DETECTION:
+                learner = ObjectDetectionLearner(
+                    label=label,
+                    problem_type=problem_type,
+                    query=query,
+                    response=response,
+                    match_label=match_label,
+                    pipeline=pipeline,
+                    presets=presets,
+                    eval_metric=eval_metric,
+                    hyperparameters=hyperparameters,
+                    path=path,
+                    verbosity=verbosity,
+                    num_classes=num_classes,
+                    classes=classes,
+                    warn_if_exist=warn_if_exist,
+                    enable_progress_bar=enable_progress_bar,
+                    init_scratch=init_scratch,
+                    sample_data_path=sample_data_path,
+                )
+            elif problem_type == NER:
+                learner = NERLearner(
+                    label=label,
+                    problem_type=problem_type,
+                    query=query,
+                    response=response,
+                    match_label=match_label,
+                    pipeline=pipeline,
+                    presets=presets,
+                    eval_metric=eval_metric,
+                    hyperparameters=hyperparameters,
+                    path=path,
+                    verbosity=verbosity,
+                    num_classes=num_classes,
+                    classes=classes,
+                    warn_if_exist=warn_if_exist,
+                    enable_progress_bar=enable_progress_bar,
+                    init_scratch=init_scratch,
+                    sample_data_path=sample_data_path,
+                )
+            else:
+                learner = BaseLearner(
+                    label=label,
+                    problem_type=problem_type,
+                    query=query,
+                    response=response,
+                    match_label=match_label,
+                    pipeline=pipeline,
+                    presets=presets,
+                    eval_metric=eval_metric,
+                    hyperparameters=hyperparameters,
+                    path=path,
+                    verbosity=verbosity,
+                    num_classes=num_classes,
+                    classes=classes,
+                    warn_if_exist=warn_if_exist,
+                    enable_progress_bar=enable_progress_bar,
+                    init_scratch=init_scratch,
+                    sample_data_path=sample_data_path,
+                )  # TODO: only object detection is using this
+        return learner
 
     @property
     def path(self):
@@ -558,6 +633,8 @@ class MultiModalPredictor(ExportMixin):
 
     @property
     def query(self):
+        if self._use_learner:
+            return self._learner.query
         if self._matcher:
             return self._matcher.query
         else:
@@ -566,6 +643,8 @@ class MultiModalPredictor(ExportMixin):
 
     @property
     def response(self):
+        if self._use_learner:
+            return self._learner.query
         if self._matcher:
             return self._matcher.response
         else:
@@ -602,11 +681,35 @@ class MultiModalPredictor(ExportMixin):
         else:
             return self._column_types
 
-    # @property
-    # def _config(self):
-    #     if self._use_learner:
-    #         return self._learner._config
-    #     return self._config
+    @property
+    def _config(self):
+        if self._use_learner:
+            return self._learner._config
+        return self._config
+
+    @property
+    def _model(self):
+        if self._use_learner:
+            return self._learner._model
+        return self._model
+
+    @property
+    def _column_types(self):
+        if self._use_learner:
+            return self._learner._column_types
+        return self._column_types
+
+    @property
+    def _data_processors(self):
+        if self._use_learner:
+            return self._learner._data_processors
+        return self._data_processors
+
+    @property
+    def _save_path(self):
+        if self._use_learner:
+            return self._learner._save_path
+        return self._save_path
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
@@ -2872,6 +2975,21 @@ class MultiModalPredictor(ExportMixin):
 
         return predictor
 
+    @staticmethod
+    def _load_problem_type(path) -> str:
+        """
+        Load the problem type from the assets.json file.
+
+        Args:
+            path (str): path where predictor artifacts are
+
+        Returns:
+            str: problem type
+        """
+        with open(os.path.join(path, "assets.json"), "r") as fp:
+            assets = json.load(fp)
+        return assets["problem_type"]
+
     @classmethod
     def load(
         cls,
@@ -2904,9 +3022,14 @@ class MultiModalPredictor(ExportMixin):
         if use_learner:
             # learner = DefaultLearner.load(path=path, resume=resume, verbosity=verbosity)
             # TODO: Need to load problem type to determine which learner to load.
-            learner = ObjectDetectionLearner.load(path=path, resume=resume, verbosity=verbosity)
+            problem_type = MultiModalPredictor._load_problem_type(path=path)
+            if problem_type == OBJECT_DETECTION:
+                learner = ObjectDetectionLearner.load(path=path, resume=resume, verbosity=verbosity)
+            elif problem_type == NER:
+                learner = NERLearner.load(path=path, resume=resume, verbosity=verbosity)
+            else:
+                learner = BaseLearner.load(path=path, resume=resume, verbosity=verbosity)
             predictor = cls(
-                label=learner._label_column,
                 use_learner=True,
             )  # TODO: temporary solution. self._label_column will be handled by learner only.
             predictor._learner = learner

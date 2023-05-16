@@ -139,12 +139,12 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
 
     # create onnx module for evaluation
     onnx_module = OnnxModule(onnx_path, providers=["CUDAExecutionProvider"])
-    onnx_module.input_keys = loaded_predictor._model.input_keys
-    onnx_module.prefix = loaded_predictor._model.prefix
-    onnx_module.get_output_dict = loaded_predictor._model.get_output_dict
+    onnx_module.input_keys = loaded_predictor._learner._model.input_keys
+    onnx_module.prefix = loaded_predictor._learner._model.prefix
+    onnx_module.get_output_dict = loaded_predictor._learner._model.get_output_dict
 
     # simply replace _model in the loaded predictor to predict with onnxruntime
-    loaded_predictor._model = onnx_module
+    loaded_predictor._learner._model = onnx_module
     onnx_proba = loaded_predictor.predict_proba({"image": [image_path_test]})
 
     # assert allclose
@@ -163,12 +163,12 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
 
     # create onnx module for evaluation
     onnx_module = OnnxModule(onnx_path, providers=["CUDAExecutionProvider"])
-    onnx_module.input_keys = loaded_predictor._model.input_keys
-    onnx_module.prefix = loaded_predictor._model.prefix
-    onnx_module.get_output_dict = loaded_predictor._model.get_output_dict
+    onnx_module.input_keys = loaded_predictor._learner._model.input_keys
+    onnx_module.prefix = loaded_predictor._learner._model.prefix
+    onnx_module.get_output_dict = loaded_predictor._learner._model.get_output_dict
 
     # simply replace _model in the loaded predictor to predict with onnxruntime
-    loaded_predictor._model = onnx_module
+    loaded_predictor._learner._model = onnx_module
     onnx_proba = loaded_predictor.predict_proba({"image": [image_path_test]})
 
     # assert allclose

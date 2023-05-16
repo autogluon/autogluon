@@ -34,7 +34,7 @@ class ExportMixin:
         """
 
         if not save_path:
-            save_path = self._save_path if self._save_path else "./"
+            save_path = self._learner._save_path if self._learner._save_path else "./"
 
         supported_models = {
             TIMM_IMAGE: TimmAutoModelForImagePrediction,
@@ -44,17 +44,17 @@ class ExportMixin:
 
         models = defaultdict(list)
         # TODO: simplify the code
-        if isinstance(self._model, AbstractMultimodalFusionModel) and isinstance(
-            self._model.model, torch.nn.modules.container.ModuleList
+        if isinstance(self._learner._model, AbstractMultimodalFusionModel) and isinstance(
+            self._learner._model.model, torch.nn.modules.container.ModuleList
         ):
-            for per_model in self._model.model:
+            for per_model in self._learner._model.model:
                 for model_key, model_type in supported_models.items():
                     if isinstance(per_model, model_type):
                         models[model_key].append(per_model)
         else:
             for model_key, model_type in supported_models.items():
-                if isinstance(self._model, model_type):
-                    models[model_key].append(self._model)
+                if isinstance(self._learner._model, model_type):
+                    models[model_key].append(self._learner._model)
 
         if not models:
             raise NotImplementedError(
@@ -62,7 +62,7 @@ class ExportMixin:
             )
 
         # get tokenizers for hf_text
-        text_processors = self._data_processors.get(TEXT, {})
+        text_processors = self._learner._data_processors.get(TEXT, {})
         tokenizers = {}
         for per_processor in text_processors:
             tokenizers[per_processor.prefix] = per_processor.tokenizer
@@ -121,8 +121,8 @@ class ExportMixin:
         from ..models.timm_image import TimmAutoModelForImagePrediction
 
         supported_models = (TimmAutoModelForImagePrediction, HFAutoModelForTextPrediction, MultimodalFusionMLP)
-        if not isinstance(self._model, supported_models):
-            raise NotImplementedError(f"export_onnx doesn't support model type {type(self._model)}")
+        if not isinstance(self._learner._model, supported_models):
+            raise NotImplementedError(f"export_onnx doesn't support model type {type(self._learner._model)}")
         warnings.warn("Currently, the functionality of exporting to ONNX is experimental.")
 
         # Data preprocessing, loading, and filtering
@@ -132,7 +132,7 @@ class ExportMixin:
             batch_size=batch_size,
             truncate_long_and_double=truncate_long_and_double,
         )
-        input_keys = self._model.input_keys
+        input_keys = self._learner._model.input_keys
         input_vec = [batch[k] for k in input_keys]
 
         # Write to BytesIO if path argument is not provided
@@ -148,7 +148,7 @@ class ExportMixin:
         dynamic_axes = onnx_get_dynamic_axes(input_keys)
 
         torch.onnx.export(
-            self._model.eval(),
+            self._learner._model.eval(),
             args=tuple(input_vec),
             f=onnx_path,
             opset_version=opset_version,
@@ -191,7 +191,7 @@ class ExportMixin:
             The onnx-based module that can be used to replace predictor._model for model inference.
         """
         data_dict = {}
-        for col_name, col_type in self._column_types.items():
+        for col_name, col_type in self._learner._column_types.items():
             if col_type in [NUMERICAL, CATEGORICAL, NULL]:
                 data_dict[col_name] = [0, 1]
             elif col_type == TEXT:
@@ -206,16 +206,16 @@ class ExportMixin:
         onnx_path = self.export_onnx(data=data, truncate_long_and_double=True)
 
         onnx_module = OnnxModule(onnx_path, providers)
-        onnx_module.input_keys = self._model.input_keys
-        onnx_module.prefix = self._model.prefix
-        onnx_module.get_output_dict = self._model.get_output_dict
+        onnx_module.input_keys = self._learner._model.input_keys
+        onnx_module.prefix = self._learner._model.prefix
+        onnx_module.get_output_dict = self._learner._model.get_output_dict
 
         # To use the TensorRT module for prediction, simply replace the _model in the predictor
-        self._model = onnx_module
+        self._learner._model = onnx_module
 
         # Evaluate and cache TensorRT engine files
         logger.info("Compiling ... (this may take a few minutes)")
-        _ = self.predict(data)
+        _ = self._learner.predict(data)
         logger.info("Finished compilation!")
 
         return onnx_module
@@ -251,7 +251,7 @@ class ExportMixin:
         Tensor or numpy array.
         The output processed batch could be used for export/evaluate deployed model.
         """
-        data, df_preprocessor, data_processors = self._on_predict_start(
+        data, df_preprocessor, data_processors = self._learner._on_predict_start(
             data=data,
             requires_label=requires_label,
         )
@@ -262,7 +262,7 @@ class ExportMixin:
             data_processors=data_processors,
         )
 
-        input_keys = self._model.input_keys
+        input_keys = self._learner._model.input_keys
 
         # Perform tracing on cpu
         device_type = "cpu"
@@ -270,7 +270,7 @@ class ExportMixin:
         strategy = "dp"  # default used in inference.
         device = torch.device(device_type)
         dtype = infer_precision(
-            num_gpus=num_gpus, precision=self._config.env.precision, cpu_only_warning=False, as_torch=True
+            num_gpus=num_gpus, precision=self._learner._config.env.precision, cpu_only_warning=False, as_torch=True
         )
 
         # Move model data to the specified device
@@ -281,7 +281,7 @@ class ExportMixin:
                 batch[key] = inp.to(device, dtype=dtype)
             else:
                 batch[key] = inp.to(device)
-        self._model.to(device)
+        self._learner._model.to(device)
 
         # Truncate input data types for TensorRT (only support: bool, int32, half, float)
         if truncate_long_and_double:
