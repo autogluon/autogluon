@@ -56,8 +56,7 @@ class AbstractLearner(ABC):
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         tuning_data: Optional[Union[pd.DataFrame, str]] = None,
-        max_num_tuning_data: Optional[int] = None,  # TODO: Remove since this is for detection
-        # TODO: Remove since this is for matching
+        max_num_tuning_data: Optional[int] = None,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         time_limit: Optional[int] = None,
         save_path: Optional[str] = None,

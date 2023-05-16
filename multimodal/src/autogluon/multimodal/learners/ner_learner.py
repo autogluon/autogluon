@@ -1,8 +1,9 @@
 from typing import List, Optional, Union
-from omegaconf import OmegaConf
+
 
 import pandas as pd
 import pytorch_lightning as pl
+from omegaconf import OmegaConf
 from timm.data.mixup import Mixup
 from torch import nn
 
@@ -11,8 +12,8 @@ from autogluon.core.utils.loaders import load_pd
 from ..constants import NER
 from ..data.infer_types import infer_problem_type_output_shape
 from ..optimization.lit_ner import NerLitModule
-from ..utils.object_detection import setup_detection_train_tuning_data
 from ..utils.model import create_fusion_model, select_model
+from ..utils.object_detection import setup_detection_train_tuning_data
 from .base_learner import BaseLearner
 
 
