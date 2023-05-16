@@ -12,7 +12,7 @@ from autogluon.core.models._utils import get_early_stopping_rounds
 
 from . import xgboost_utils
 from .hyperparameters.parameters import get_param_baseline
-from .hyperparameters.searchspaces import get_default_searchspace
+from .hyperparameters.searchspaces import get_default_searchspace, DEFAULT_NUM_BOOST_ROUND
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +180,8 @@ class XGBoostModel(AbstractModel):
     def _estimate_memory_usage(self, X, **kwargs):
         num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
-        approx_mem_size_req = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        n_estimators = self.params.get('n_estimators', DEFAULT_NUM_BOOST_ROUND)
+        approx_mem_size_req = -0.19 * data_mem_usage + 6.2 * num_classes + 0.015 * n_estimators + 1.34 * len(self.features)  # Linear regression from collected memory profiling data points
         return approx_mem_size_req
 
     def _validate_fit_memory_usage(self, mem_error_threshold: float = 1.0, mem_warning_threshold: float = 0.75, mem_size_threshold: int = 1e9, **kwargs):

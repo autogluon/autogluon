@@ -14,7 +14,7 @@ from autogluon.common.utils.try_import import try_import_catboost
 
 from .callbacks import EarlyStoppingCallback, MemoryCheckCallback, TimeCheckCallback
 from .catboost_utils import get_catboost_metric_from_ag_metric
-from .hyperparameters.parameters import get_param_baseline
+from .hyperparameters.parameters import get_param_baseline, DEFAULT_ITERATIONS
 from .hyperparameters.searchspaces import get_default_searchspace
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,8 @@ class CatBoostModel(AbstractModel):
     def _estimate_memory_usage(self, X, **kwargs):
         num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
-        approx_mem_size_req = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        iterations = self.params.get('iterations', DEFAULT_ITERATIONS)
+        approx_mem_size_req = 76.55 * data_mem_usage + 25.24 * num_classes - 0.16 * iterations - 9.38 * len(self.features)  # Linear regression from collected memory profiling data points
         return approx_mem_size_req
 
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
