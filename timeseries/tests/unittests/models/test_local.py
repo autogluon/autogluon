@@ -12,6 +12,7 @@ from autogluon.timeseries.models.local import (
     NaiveModel,
     SeasonalNaiveModel,
     ThetaModel,
+    ThetaStatsmodelsModel,
 )
 
 from ..common import (
@@ -30,6 +31,7 @@ TESTABLE_MODELS = [
     ThetaModel,
     NaiveModel,
     SeasonalNaiveModel,
+    ThetaStatsmodelsModel,
 ]
 
 
