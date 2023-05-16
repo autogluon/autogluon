@@ -206,7 +206,7 @@ def test_matcher(
         )
     else:
         score = matcher.evaluate(dataset.test_df)
-    # verify_matcher_save_load(matcher, dataset.test_df, cls=MultiModalPredictor)
+    verify_matcher_save_load(matcher, dataset.test_df, cls=MultiModalPredictor)
     verify_matcher_realtime_inference(matcher, dataset.test_df)
 
     # Test for continuous fit
