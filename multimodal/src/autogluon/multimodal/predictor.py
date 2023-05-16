@@ -26,8 +26,8 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.context import set_torch_num_threads
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
 from autogluon.core.utils.loaders import load_pd
 from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
@@ -1501,12 +1501,12 @@ class MultiModalPredictor(ExportMixin):
                 ".* in the `DataLoader` init to improve performance.*",
             )
             warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
-            # with set_torch_num_threads(num_cpus=num_cpus):
-            trainer.fit(
-                task,
-                datamodule=train_dm,
-                ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
-            )
+            with set_torch_num_threads(num_cpus=num_cpus):
+                trainer.fit(
+                    task,
+                    datamodule=train_dm,
+                    ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
+                )
 
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
