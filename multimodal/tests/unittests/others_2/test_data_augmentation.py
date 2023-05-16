@@ -103,7 +103,7 @@ def test_textagumentor_deepcopy():
         )
 
     # Deepcopy data processors
-    predictor._data_processors = copy.deepcopy(predictor._data_processors)
+    predictor._learner._data_processors = copy.deepcopy(predictor._data_processors)
 
     # Test copied data processors
     predictor.fit(
@@ -229,9 +229,9 @@ def test_customizing_matcher_image_aug(train_transforms, val_transforms):
         time_limit=10,  # seconds
     )
 
-    assert str(train_transforms) == str(matcher._matcher._query_processors["image"][0].train_transforms)
-    assert str(train_transforms) == str(matcher._matcher._response_processors["image"][0].train_transforms)
-    assert str(val_transforms) == str(matcher._matcher._query_processors["image"][0].val_transforms)
-    assert str(val_transforms) == str(matcher._matcher._response_processors["image"][0].val_transforms)
-    assert len(matcher._matcher._query_processors["image"][0].train_processor.transforms) == len(train_transforms) + 2
-    assert len(matcher._matcher._query_processors["image"][0].val_processor.transforms) == len(val_transforms) + 2
+    assert str(train_transforms) == str(matcher._learner._query_processors["image"][0].train_transforms)
+    assert str(train_transforms) == str(matcher._learner._response_processors["image"][0].train_transforms)
+    assert str(val_transforms) == str(matcher._learner._query_processors["image"][0].val_transforms)
+    assert str(val_transforms) == str(matcher._learner._response_processors["image"][0].val_transforms)
+    assert len(matcher._learner._query_processors["image"][0].train_processor.transforms) == len(train_transforms) + 2
+    assert len(matcher._learner._query_processors["image"][0].val_processor.transforms) == len(val_transforms) + 2
