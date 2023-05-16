@@ -51,7 +51,7 @@ def get_quantiles_from_statsmodels(coverage_fn: Callable, quantile_levels: List[
     return results
 
 
-class ETSStatsmodelsModel(AbstractLocalModel):
+class ETSModel(AbstractLocalModel):
     """Exponential smoothing with trend and seasonality.
 
     Based on `statsmodels.tsa.exponential_smoothing.ets.ETSModel <https://www.statsmodels.org/stable/generated/statsmodels.tsa.exponential_smoothing.ets.ETSModel.html>`_.
@@ -147,7 +147,7 @@ class ETSStatsmodelsModel(AbstractLocalModel):
         return pd.concat(results, axis=1)
 
 
-class ARIMAStatsmodelsModel(AbstractLocalModel):
+class ARIMAModel(AbstractLocalModel):
     """Autoregressive Integrated Moving Average (ARIMA) model.
 
     Based on `statsmodels.tsa.statespace.sarimax.SARIMAX <https://www.statsmodels.org/stable/generated/statsmodels.tsa.statespace.sarimax.SARIMAX.html>`_.

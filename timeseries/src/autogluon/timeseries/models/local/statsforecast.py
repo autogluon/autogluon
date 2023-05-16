@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 class AbstractStatsForecastModel(AbstractLocalModel):
     """Wrapper for StatsForecast models."""
 
+    init_time_in_seconds = 15  # numba compilation for the first run
+
     def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
         seasonal_period = local_model_args.pop("seasonal_period")
         local_model_args["season_length"] = seasonal_period

@@ -1,8 +1,7 @@
 import logging
 import time
-from multiprocessing import cpu_count, TimeoutError
+from multiprocessing import TimeoutError, cpu_count
 from typing import Any, Dict, List, Optional, Union
-from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 import numpy as np
 import pandas as pd
@@ -10,6 +9,7 @@ from joblib import Parallel, delayed
 from scipy.stats import norm
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
@@ -32,11 +32,15 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
     default_n_jobs : Union[int, float]
         Default number of CPU cores used to train models. If float, this fraction of CPU cores will be used.
+    init_time_in_seconds : int
+        Time that it takes to initialize the model in seconds (e.g., because of JIT compilation by Numba).
+        If time_limit is below this number, model won't be trained.
     """
 
     allowed_local_model_args: List[str] = []
     max_ts_length: Optional[int] = None
     default_n_jobs: Union[int, float] = 0.5
+    init_time_in_seconds: int = 0
 
     def __init__(
         self,
@@ -73,6 +77,9 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
     def _fit(self, train_data: TimeSeriesDataFrame, time_limit: int = None, **kwargs):
         self._check_fit_params()
+        if time_limit is not None and time_limit < self.init_time_in_seconds:
+            raise TimeLimitExceeded
+
         # Initialize parameters passed to each local model
         raw_local_model_args = self._get_model_params().copy()
         raw_local_model_args.pop("n_jobs", None)
@@ -142,12 +149,10 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         try:
             result = self._predict_with_local_model(
                 time_series=time_series,
-                freq=self.freq,
-                prediction_length=self.prediction_length,
-                quantile_levels=self.quantile_levels,
                 local_model_args=self._local_model_args.copy(),
             )
         except Exception as e:
+            logger.debug(f"{self.name} failed with exception {e}, falling back to SeasonalNaive")
             result = seasonal_naive_forecast(
                 target=time_series.values.ravel(),
                 prediction_length=self.prediction_length,

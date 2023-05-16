@@ -8,19 +8,19 @@ from autogluon.common import space
 from autogluon.core import constants
 
 from . import (
+    ARIMAModel,
     AutoARIMAModel,
     AutoETSModel,
     AutoGluonTabularModel,
     DeepARModel,
     DynamicOptimizedThetaModel,
+    ETSModel,
     NaiveModel,
     RecursiveTabularModel,
     SeasonalNaiveModel,
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
     ThetaModel,
-    ETSStatsmodelsModel,
-    ARIMAStatsmodelsModel,
     ThetaStatsmodelsModel,
 )
 from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
@@ -33,10 +33,6 @@ MODEL_TYPES = dict(
     SimpleFeedForward=SimpleFeedForwardModel,
     DeepAR=DeepARModel,
     TemporalFusionTransformer=TemporalFusionTransformerModel,
-    ETS_SM=ETSStatsmodelsModel,
-    ARIMA_SM=ARIMAStatsmodelsModel,
-    Theta_SM=ThetaStatsmodelsModel,
-    Theta=ThetaModel,
     AutoGluonTabular=AutoGluonTabularModel,
     RecursiveTabular=RecursiveTabularModel,
     Naive=NaiveModel,
@@ -44,6 +40,10 @@ MODEL_TYPES = dict(
     AutoETS=AutoETSModel,
     AutoARIMA=AutoARIMAModel,
     DynamicOptimizedTheta=DynamicOptimizedThetaModel,
+    Theta=ThetaModel,
+    ARIMA=ARIMAModel,
+    ETS=ETSModel,
+    ThetaStatsmodels=ThetaStatsmodelsModel,
 )
 if agts.MXNET_INSTALLED:
     from .gluonts.mx import (
