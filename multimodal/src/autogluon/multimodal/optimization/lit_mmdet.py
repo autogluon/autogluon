@@ -20,7 +20,14 @@ except ImportError as e:
 
 from ..constants import AUTOMM, IMAGE, LABEL
 from ..utils import unpack_datacontainers
-from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
+from .utils import (
+    apply_freeze_backbone_lr,
+    apply_layerwise_lr_decay,
+    apply_single_lr,
+    apply_two_stages_lr,
+    get_lr_scheduler,
+    get_optimizer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -278,6 +285,12 @@ class MMDetLitModule(pl.LightningModule):
         elif self.hparams.lr_choice == "layerwise_decay":
             logger.debug("applying layerwise learning rate decay...")
             grouped_parameters = apply_layerwise_lr_decay(
+                lr_decay=self.hparams.lr_decay,
+                **kwargs,
+            )
+        elif self.hparams.lr_choice == "freeze_backbone":
+            logger.debug("applying freeze backbone learning rate...")
+            grouped_parameters = apply_freeze_backbone_lr(
                 lr_decay=self.hparams.lr_decay,
                 **kwargs,
             )

@@ -628,6 +628,68 @@ def get_trainable_params_efficient_finetune(
     return trainable_param_names
 
 
+def apply_freeze_backbone_lr(
+    model: nn.Module,
+    lr: float,
+    weight_decay: float,
+    return_params: Optional[bool] = True,
+):
+    """
+    Set up the pretrained backbone to be frozen.
+    Other layers use the normal learning rate (lr).
+    Layer normalization parameters and other layers' bias parameters don't use weight decay.
+
+    Parameters
+    ----------
+    model
+        A Pytorch model.
+    lr
+        The learning rate.
+    lr_mult
+        The multiplier (0, 1) to scale down the learning rate.
+    weight_decay
+        Weight decay.
+    return_params
+        return_params
+        Whether to return parameters or their names. If you want to double-check
+        whether the learning rate setup is as expected, you can set "return_params=False",
+        and print the layer names along with their learning rates through
+        "print("Param groups = %s" % json.dumps(optimizer_grouped_parameters, indent=2))".
+
+    Returns
+    -------
+    The grouped parameters or their names.
+    """
+    decay_param_names = get_weight_decay_param_names(model)
+
+    assert hasattr(
+        model, "backbone_layer_names"
+    ), f"backbone_layer_names does not exist for current model. Thus freeze_backbone learning rate setting is not available."
+
+    optimizer_grouped_parameters = [
+        {
+            "params": [
+                p if return_params else n
+                for n, p in model.named_parameters()
+                if n in decay_param_names and not any(bb in n for bb in model.backbone_layer_names)
+            ],
+            "weight_decay": weight_decay,
+            "lr": lr,
+        },
+        {
+            "params": [
+                p if return_params else n
+                for n, p in model.named_parameters()
+                if n not in decay_param_names and not any(bb in n for bb in model.backbone_layer_names)
+            ],
+            "weight_decay": 0.0,
+            "lr": lr,
+        },
+    ]
+
+    return optimizer_grouped_parameters
+
+
 def apply_layerwise_lr_decay(
     model: nn.Module,
     lr: float,

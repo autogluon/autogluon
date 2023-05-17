@@ -156,6 +156,7 @@ def tutorial_script_for_finetune_yoloxo365_pothole_in_coco_format():
             "model.mmdet_image.checkpoint_name": "yolox_l_objects365",
             "env.num_gpus": num_gpus,
             "optimization.val_metric": "map",
+            "optimization.lr_choice": "freeze_backbone",
         },
         problem_type="object_detection",
         sample_data_path=train_path,
