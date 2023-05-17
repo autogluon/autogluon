@@ -25,7 +25,6 @@ from omegaconf import OmegaConf
 from packaging import version
 from torch import nn
 
-from autogluon.common.utils.context import set_torch_num_threads
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
