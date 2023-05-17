@@ -401,7 +401,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             for pattern in backbone_layers_patterns:
                 if pattern in n:
                     backbone_layer_names.append(n)
-
         return backbone_layer_names
 
     def get_yolox_layer_ids(self):

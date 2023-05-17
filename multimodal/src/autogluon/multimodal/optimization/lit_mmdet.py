@@ -291,7 +291,6 @@ class MMDetLitModule(pl.LightningModule):
         elif self.hparams.lr_choice == "freeze_backbone":
             logger.debug("applying freeze backbone learning rate...")
             grouped_parameters = apply_freeze_backbone_lr(
-                lr_decay=self.hparams.lr_decay,
                 **kwargs,
             )
         else:

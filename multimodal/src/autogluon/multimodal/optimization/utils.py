@@ -636,7 +636,7 @@ def apply_freeze_backbone_lr(
 ):
     """
     Set up the pretrained backbone to be frozen.
-    Other layers use the normal learning rate (lr).
+    Head layers use the normal learning rate (lr).
     Layer normalization parameters and other layers' bias parameters don't use weight decay.
 
     Parameters
@@ -662,16 +662,17 @@ def apply_freeze_backbone_lr(
     """
     decay_param_names = get_weight_decay_param_names(model)
 
-    assert hasattr(
-        model, "backbone_layer_names"
-    ), f"backbone_layer_names does not exist for current model. Thus freeze_backbone learning rate setting is not available."
+    if hasattr(model, "backbone_layer_names"):
+        is_nonfrozen_layer = lambda n: not any(bb in n for bb in model.backbone_layer_names)
+    else:  # freeze all non-head layers if backbone layers are not specified
+        is_nonfrozen_layer = lambda n: any(bb in n for bb in model.head_layer_names)
 
     optimizer_grouped_parameters = [
         {
             "params": [
                 p if return_params else n
                 for n, p in model.named_parameters()
-                if n in decay_param_names and not any(bb in n for bb in model.backbone_layer_names)
+                if n in decay_param_names and is_nonfrozen_layer(n)
             ],
             "weight_decay": weight_decay,
             "lr": lr,
@@ -680,12 +681,16 @@ def apply_freeze_backbone_lr(
             "params": [
                 p if return_params else n
                 for n, p in model.named_parameters()
-                if n not in decay_param_names and not any(bb in n for bb in model.backbone_layer_names)
+                if n not in decay_param_names and is_nonfrozen_layer(n)
             ],
             "weight_decay": 0.0,
             "lr": lr,
         },
     ]
+
+    for n, p in model.named_parameters():
+        if not is_nonfrozen_layer(n):
+            p.requires_grad = False
 
     return optimizer_grouped_parameters
 
