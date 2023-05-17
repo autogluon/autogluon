@@ -1406,7 +1406,7 @@ class MultiModalPredictor(ExportMixin):
             version="",
         )
 
-        num_cpus = compute_num_cpus(config_num_cpus=config.env.num_cpus)
+        num_cpus = compute_num_cpus(config_num_cpus=config.env.get("num_cpus", ResourceManager.get_cpu_count()))
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
 
         precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
