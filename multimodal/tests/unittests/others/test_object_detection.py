@@ -404,5 +404,3 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
         },
         time_limit=30,
     )
-
-    test_df = from_coco_or_voc(test_path)
