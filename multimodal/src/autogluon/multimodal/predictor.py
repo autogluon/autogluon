@@ -674,35 +674,35 @@ class MultiModalPredictor(ExportMixin):
         else:
             return self._column_types
 
-    # @property
-    # def _config(self):
-    #     if self._use_learner:
-    #         return self._learner._config
-    #     return self._config
+    @property
+    def _config(self):
+        if self._use_learner:
+            return self._learner._config
+        return self._config
 
-    # @property
-    # def _model(self):
-    #     if self._use_learner:
-    #         return self._learner._model
-    #     return self._model
+    @property
+    def _model(self):
+        if self._use_learner:
+            return self._learner._model
+        return self._model
 
-    # @property
-    # def _column_types(self):
-    #     if self._use_learner:
-    #         return self._learner._column_types
-    #     return self._column_types
+    @property
+    def _column_types(self):
+        if self._use_learner:
+            return self._learner._column_types
+        return self._column_types
 
-    # @property
-    # def _data_processors(self):
-    #     if self._use_learner:
-    #         return self._learner._data_processors
-    #     return self._data_processors
+    @property
+    def _data_processors(self):
+        if self._use_learner:
+            return self._learner._data_processors
+        return self._data_processors
 
-    # @property
-    # def _save_path(self):
-    #     if self._use_learner:
-    #         return self._learner._save_path
-    #     return self._save_path
+    @property
+    def _save_path(self):
+        if self._use_learner:
+            return self._learner._save_path
+        return self._save_path
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
