@@ -692,8 +692,6 @@ class MultiModalPredictor(ExportMixin):
         if isinstance(tuning_data, str):
             tuning_data = load_pd.load(tuning_data)
 
-        pl.seed_everything(seed, workers=True)
-
         if self._presets is not None:
             # FIXME: Silently ignoring user input, there should be a warning
             presets = self._presets
@@ -809,6 +807,7 @@ class MultiModalPredictor(ExportMixin):
             ckpt_path=None if hpo_mode else self._ckpt_path,
             resume=False if hpo_mode else self._resume,
             enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
+            seed=seed,
             presets=presets,
             config=config,
             hyperparameters=hyperparameters,
@@ -1069,6 +1068,7 @@ class MultiModalPredictor(ExportMixin):
         ckpt_path: str,
         resume: bool,
         enable_progress_bar: bool,
+        seed: int,
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
@@ -1079,6 +1079,7 @@ class MultiModalPredictor(ExportMixin):
         clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
+        pl.seed_everything(seed, workers=True)
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
         logger.info(get_fit_start_message(save_path, validation_metric_name))
         config = get_config(
