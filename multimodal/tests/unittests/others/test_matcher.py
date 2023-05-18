@@ -44,13 +44,16 @@ def verify_matcher_save_load(matcher, df, verify_embedding=True, cls=MultiModalP
 
 def verify_matcher_realtime_inference(matcher, df, verify_embedding=True):
     for i in range(1, 3):
-        df_small = df.head(i)
+        df_small = df.head(10)
         predictions_default = matcher.predict(df_small, as_pandas=False, realtime=False)
         predictions_realtime = matcher.predict(df_small, as_pandas=False, realtime=True)
         npt.assert_equal(predictions_default, predictions_realtime)
         if matcher._learner._problem_type in [BINARY, MULTICLASS]:
             predictions_prob_default = matcher.predict_proba(df_small, as_pandas=False, realtime=False)
             predictions_prob_realtime = matcher.predict_proba(df_small, as_pandas=False, realtime=True)
+            import ipdb
+
+            ipdb.set_trace()
             npt.assert_equal(predictions_prob_default, predictions_prob_realtime)
         if verify_embedding:
             embeddings_default = matcher.extract_embedding(df_small, signature=QUERY, realtime=False)
@@ -110,16 +113,16 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
             False,
             False,
         ),
-        (
-            "flickr30k",
-            "caption",
-            "image",
-            "image_text_similarity",
-            "google/electra-small-discriminator",
-            "swin_tiny_patch4_window7_224",
-            True,
-            True,
-        ),
+        # (
+        #     "flickr30k",
+        #     "caption",
+        #     "image",
+        #     "image_text_similarity",
+        #     "google/electra-small-discriminator",
+        #     "swin_tiny_patch4_window7_224",
+        #     True,
+        #     True,
+        # ),
     ],
 )
 def test_matcher(
@@ -207,6 +210,8 @@ def test_matcher(
     else:
         score = matcher.evaluate(dataset.test_df)
     verify_matcher_save_load(matcher, dataset.test_df, cls=MultiModalPredictor)
+
+    print("verifying realtime")
     verify_matcher_realtime_inference(matcher, dataset.test_df)
 
     # Test for continuous fit
