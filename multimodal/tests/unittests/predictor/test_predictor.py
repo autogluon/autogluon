@@ -88,9 +88,9 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
 
 
 def verify_no_redundant_model_configs(predictor):
-    model_names = list(predictor._config.model.keys())
+    model_names = list(predictor._learner._config.model.keys())
     model_names.remove("names")
-    assert sorted(predictor._config.model.names) == sorted(model_names)
+    assert sorted(predictor._learner._config.model.names) == sorted(model_names)
 
 
 @pytest.mark.parametrize(
@@ -405,9 +405,9 @@ def test_customizing_model_names(
         save_path=save_path,
     )
 
-    assert sorted(predictor._config.model.names) == sorted(hyperparameters_gt["model.names"])
+    assert sorted(predictor._learner._config.model.names) == sorted(hyperparameters_gt["model.names"])
     for per_name in hyperparameters_gt["model.names"]:
-        assert hasattr(predictor._config.model, per_name)
+        assert hasattr(predictor._learner._config.model, per_name)
 
     score = predictor.evaluate(dataset.test_df)
     verify_predictor_save_load(predictor, dataset.test_df)
@@ -418,9 +418,9 @@ def test_customizing_model_names(
         hyperparameters=hyperparameters,
         time_limit=20,
     )
-    assert sorted(predictor._config.model.names) == sorted(hyperparameters_gt["model.names"])
+    assert sorted(predictor._learner._config.model.names) == sorted(hyperparameters_gt["model.names"])
     for per_name in hyperparameters_gt["model.names"]:
-        assert hasattr(predictor._config.model, per_name)
+        assert hasattr(predictor._learner._config.model, per_name)
     verify_predictor_save_load(predictor, dataset.test_df)
 
     # Saving to folder, loading the saved model and call fit again (continuous fit)
@@ -432,9 +432,9 @@ def test_customizing_model_names(
             hyperparameters=hyperparameters,
             time_limit=10,
         )
-        assert sorted(predictor._config.model.names) == sorted(hyperparameters_gt["model.names"])
+        assert sorted(predictor._learner._config.model.names) == sorted(hyperparameters_gt["model.names"])
         for per_name in hyperparameters_gt["model.names"]:
-            assert hasattr(predictor._config.model, per_name)
+            assert hasattr(predictor._learner._config.model, per_name)
 
 
 def test_model_configs():
@@ -629,25 +629,30 @@ def test_modifying_duplicate_model_names():
     teacher_predictor = modify_duplicate_model_names(
         predictor=teacher_predictor,
         postfix="teacher",
-        blacklist=student_predictor._config.model.names,
+        blacklist=student_predictor._learner._config.model.names,
     )
 
     # verify teacher and student have no duplicate model names
-    assert all([n not in teacher_predictor._config.model.names for n in student_predictor._config.model.names]), (
-        f"teacher model names {teacher_predictor._config.model.names} and"
-        f" student model names {student_predictor._config.model.names} have duplicates."
+    assert all(
+        [
+            n not in teacher_predictor._learner._config.model.names
+            for n in student_predictor._learner._config.model.names
+        ]
+    ), (
+        f"teacher model names {teacher_predictor._learner._config.model.names} and"
+        f" student model names {student_predictor._learner._config.model.names} have duplicates."
     )
 
     # verify each model name prefix is valid
-    assert teacher_predictor._model.prefix in teacher_predictor._config.model.names
-    if isinstance(teacher_predictor._model.model, nn.ModuleList):
-        for per_model in teacher_predictor._model.model:
-            assert per_model.prefix in teacher_predictor._config.model.names
+    assert teacher_predictor._learner._model.prefix in teacher_predictor._learner._config.model.names
+    if isinstance(teacher_predictor._learner._model.model, nn.ModuleList):
+        for per_model in teacher_predictor._learner._model.model:
+            assert per_model.prefix in teacher_predictor._learner._config.model.names
 
     # verify each data processor's prefix is valid
-    for per_modality_processors in teacher_predictor._data_processors.values():
+    for per_modality_processors in teacher_predictor._learner._data_processors.values():
         for per_processor in per_modality_processors:
-            assert per_processor.prefix in teacher_predictor._config.model.names
+            assert per_processor.prefix in teacher_predictor._learner._config.model.names
 
 
 def test_image_bytearray():

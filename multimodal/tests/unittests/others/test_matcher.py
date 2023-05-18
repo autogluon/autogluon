@@ -29,7 +29,6 @@ def verify_matcher_save_load(matcher, df, verify_embedding=True, cls=MultiModalP
         predictions2_df = loaded_matcher.predict(df, as_pandas=True)
         npt.assert_equal(predictions, predictions2)
         npt.assert_equal(predictions2, predictions2_df.to_numpy())
-        # if matcher._learner.problem_type in [BINARY, MULTICLASS]:
         if matcher.problem_type in [BINARY, MULTICLASS]:
             predictions_prob = matcher.predict_proba(df, as_pandas=False)
             predictions2_prob = loaded_matcher.predict_proba(df, as_pandas=False)
@@ -49,13 +48,10 @@ def verify_matcher_realtime_inference(matcher, df, verify_embedding=True):
         predictions_default = matcher.predict(df_small, as_pandas=False, realtime=False)
         predictions_realtime = matcher.predict(df_small, as_pandas=False, realtime=True)
         npt.assert_equal(predictions_default, predictions_realtime)
-        # if matcher._learner._problem_type in [BINARY, MULTICLASS]:
         if matcher._problem_type in [BINARY, MULTICLASS]:
             predictions_prob_default = matcher.predict_proba(df_small, as_pandas=False, realtime=False)
             predictions_prob_realtime = matcher.predict_proba(df_small, as_pandas=False, realtime=True)
-            # import ipdb
 
-            # ipdb.set_trace()
             npt.assert_equal(predictions_prob_default, predictions_prob_realtime)
         if verify_embedding:
             embeddings_default = matcher.extract_embedding(df_small, signature=QUERY, realtime=False)
@@ -183,7 +179,6 @@ def test_matcher(
 
     if is_ranking:
         evaluate_matcher_ranking(
-            # matcher=matcher._learner,
             matcher=matcher,
             test_df=dataset.test_df,
             query_column=query,
@@ -192,7 +187,6 @@ def test_matcher(
             symmetric=symmetric,
         )
         text_to_image_hits = semantic_search(
-            # matcher=matcher._learner,
             matcher=matcher,
             query_data={
                 query: dataset.test_df[query].tolist()
@@ -203,7 +197,6 @@ def test_matcher(
             top_k=5,
         )
         image_to_text_hits = semantic_search(
-            # matcher=matcher._learner,
             matcher=matcher,
             query_data={
                 response: dataset.test_df[response].tolist()
@@ -264,7 +257,6 @@ def test_text_semantic_search():
         hyperparameters={"model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2"},
     )
     hits = semantic_search(
-        # matcher=matcher._learner,
         matcher=matcher,
         query_data=queries,
         response_data=corpus,
@@ -274,7 +266,6 @@ def test_text_semantic_search():
     query_embeddings = matcher.extract_embedding(queries)
     response_embeddings = matcher.extract_embedding(corpus)
     hits_2 = semantic_search(
-        # matcher=matcher._learner,
         matcher=matcher,
         query_embeddings=query_embeddings,
         response_embeddings=response_embeddings,
@@ -323,7 +314,6 @@ def test_image_text_semantic_search():
         hyperparameters={"model.hf_text.checkpoint_name": "openai/clip-vit-base-patch32"},
     )
     text_to_image_hits = semantic_search(
-        # matcher=matcher._learner,
         matcher=matcher,
         query_data=text_list,
         response_data=image_list,
@@ -334,7 +324,6 @@ def test_image_text_semantic_search():
     query_embeddings = matcher.extract_embedding(text_list, as_tensor=True)
     response_embeddings = matcher.extract_embedding(image_list, as_tensor=True)
     text_to_image_hits_2 = semantic_search(
-        # matcher=matcher._learner,
         matcher=matcher,
         query_embeddings=query_embeddings,
         response_embeddings=response_embeddings,
@@ -347,7 +336,6 @@ def test_image_text_semantic_search():
             npt.assert_almost_equal(per_hit["score"], per_hit_2["score"])
 
     image_to_text_hits = semantic_search(
-        # matcher=matcher._learner,
         matcher=matcher,
         query_data=image_list,
         response_data=text_list,
@@ -358,7 +346,6 @@ def test_image_text_semantic_search():
     query_embeddings = matcher.extract_embedding(image_list, as_tensor=True)
     response_embeddings = matcher.extract_embedding(text_list, as_tensor=True)
     image_to_text_hits_2 = semantic_search(
-        # matcher=matcher._learner,
         matcher=matcher,
         query_embeddings=query_embeddings,
         response_embeddings=response_embeddings,

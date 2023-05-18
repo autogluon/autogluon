@@ -233,8 +233,8 @@ def test_onnx_optimize_for_inference(dataset_name, model_names, text_backbone, i
 
         # Check module type of optimized predictor
         assert isinstance(
-            predictor_opt._model, OnnxModule
-        ), f"invalid onnx module type, expected to be OnnxModule, but the model type is {type(predictor._model)}"
+            predictor_opt._learner._model, OnnxModule
+        ), f"invalid onnx module type, expected to be OnnxModule, but the model type is {type(predictor._learner._model)}"
 
         # We should support dynamic shape
         for batch_size in [2, 4, 8]:

@@ -318,6 +318,7 @@ class MultiModalPredictor(ExportMixin):
             use_learner = False
 
         self._learner = None
+        self._matcher = None
         if use_learner:
             self._learner = self._get_learner(
                 label=label,
@@ -504,25 +505,25 @@ class MultiModalPredictor(ExportMixin):
             #     )
             #     self._use_learner = True
 
-            if self._problem_type == OBJECT_DETECTION:
-                self._label_column = "label"
-                if self._sample_data_path is not None:
-                    self._classes = get_detection_classes(self._sample_data_path)
-                    self._output_shape = len(self._classes)
+            # if self._problem_type == OBJECT_DETECTION:
+            #     self._label_column = "label"
+            #     if self._sample_data_path is not None:
+            #         self._classes = get_detection_classes(self._sample_data_path)
+            #         self._output_shape = len(self._classes)
 
-            if self._problem_type is not None:
-                if self.problem_property.support_zero_shot:
-                    # Load pretrained model via the provided hyperparameters and presets
-                    # TODO: do not create pretrained model for HPO presets.
-                    self._config, self._model, self._data_processors = init_pretrained(
-                        problem_type=self._problem_type,
-                        presets=self._presets,
-                        hyperparameters=hyperparameters,
-                        num_classes=self._output_shape,
-                        classes=self._classes,
-                        init_scratch=self._init_scratch,
-                    )
-                    self._validation_metric_name = self._config["optimization"]["val_metric"]
+            # if self._problem_type is not None:
+            #     if self.problem_property.support_zero_shot:
+            #         # Load pretrained model via the provided hyperparameters and presets
+            #         # TODO: do not create pretrained model for HPO presets.
+            #         self._config, self._model, self._data_processors = init_pretrained(
+            #             problem_type=self._problem_type,
+            #             presets=self._presets,
+            #             hyperparameters=hyperparameters,
+            #             num_classes=self._output_shape,
+            #             classes=self._classes,
+            #             init_scratch=self._init_scratch,
+            #         )
+            #         self._validation_metric_name = self._config["optimization"]["val_metric"]
 
     def _get_learner(
         self,
@@ -609,7 +610,7 @@ class MultiModalPredictor(ExportMixin):
     @property
     def path(self):
         if self._learner:
-            return self._learner._save_path
+            return self._learner.path
         if self._matcher:
             return self._matcher.path
         else:
@@ -618,7 +619,7 @@ class MultiModalPredictor(ExportMixin):
     @property
     def label(self):
         if self._learner:
-            return self._learner._label_column
+            return self._learner.label
         if self._matcher:
             return self._matcher.label
         else:
@@ -656,6 +657,8 @@ class MultiModalPredictor(ExportMixin):
     def problem_type(self):
         if self._learner:
             return self._learner.problem_type
+        if self._matcher:
+            return self._matcher.problem_type
         return self._problem_type
 
     @property
@@ -674,35 +677,35 @@ class MultiModalPredictor(ExportMixin):
         else:
             return self._column_types
 
-    @property
-    def _config(self):
-        if self._learner:
-            return self._learner._config
-        return self._config
+    # @property
+    # def _config(self):
+    #     if self._learner:
+    #         return self._learner._config
+    #     return self._config
 
-    @property
-    def _model(self):
-        if self._learner:
-            return self._learner._model
-        return self._model
+    # @property
+    # def _model(self):
+    #     if self._learner:
+    #         return self._learner._model
+    #     return self._model
 
-    @property
-    def _column_types(self):
-        if self._learner:
-            return self._learner._column_types
-        return self._column_types
+    # @property
+    # def _column_types(self):
+    #     if self._learner:
+    #         return self._learner._column_types
+    #     return self._column_types
 
-    @property
-    def _data_processors(self):
-        if self._learner:
-            return self._learner._data_processors
-        return self._data_processors
+    # @property
+    # def _data_processors(self):
+    #     if self._learner:
+    #         return self._learner._data_processors
+    #     return self._data_processors
 
-    @property
-    def _save_path(self):
-        if self._learner:
-            return self._learner._save_path
-        return self._save_path
+    # @property
+    # def _save_path(self):
+    #     if self._learner:
+    #         return self._learner._save_path
+    #     return self._save_path
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):

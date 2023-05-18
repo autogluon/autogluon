@@ -135,7 +135,7 @@ def test_mmdet_object_detection_save_and_load():
     pred = predictor.predict(test_path)
 
     model_save_dir = predictor.dump_model()
-    detection_model_save_subdir = os.path.join(model_save_dir, predictor._model.prefix)
+    detection_model_save_subdir = os.path.join(model_save_dir, predictor._learner._model.prefix)
 
     new_predictor = MultiModalPredictor(
         hyperparameters={

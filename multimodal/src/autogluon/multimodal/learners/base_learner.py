@@ -416,22 +416,22 @@ class BaseLearner(ExportMixin, AbstractLearner):
         self._total_train_time = None
         self._best_score = None
 
-        if self.problem_property and self.problem_property.is_matching:
-            self._matcher = MultiModalMatcher(
-                query=query,
-                response=response,
-                label=label,
-                match_label=match_label,
-                problem_type=problem_type,
-                presets=presets,
-                hyperparameters=hyperparameters,
-                eval_metric=eval_metric,
-                path=path,
-                verbosity=verbosity,
-                warn_if_exist=warn_if_exist,
-                enable_progress_bar=enable_progress_bar,
-            )
-            return
+        # if self.problem_property and self.problem_property.is_matching:
+        #     self._matcher = MultiModalMatcher(
+        #         query=query,
+        #         response=response,
+        #         label=label,
+        #         match_label=match_label,
+        #         problem_type=problem_type,
+        #         presets=presets,
+        #         hyperparameters=hyperparameters,
+        #         eval_metric=eval_metric,
+        #         path=path,
+        #         verbosity=verbosity,
+        #         warn_if_exist=warn_if_exist,
+        #         enable_progress_bar=enable_progress_bar,
+        #     )
+        #     return
 
         # if self._problem_type == OBJECT_DETECTION:
         #     self._label_column = "label"
@@ -859,21 +859,21 @@ class BaseLearner(ExportMixin, AbstractLearner):
 
         # 2. Route to Matcher if applicable. This can be an example of how a learner would work.
         # TODO: Predictor responsible for creating a new learner for matching.
-        if self._matcher:
-            self._matcher.fit(
-                train_data=train_data,
-                tuning_data=tuning_data,
-                id_mappings=id_mappings,
-                time_limit=time_limit,
-                presets=presets,
-                hyperparameters=hyperparameters,
-                column_types=column_types,
-                holdout_frac=holdout_frac,
-                save_path=save_path,
-                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                seed=seed,
-            )
-            return self
+        # if self._matcher:
+        #     self._matcher.fit(
+        #         train_data=train_data,
+        #         tuning_data=tuning_data,
+        #         id_mappings=id_mappings,
+        #         time_limit=time_limit,
+        #         presets=presets,
+        #         hyperparameters=hyperparameters,
+        #         column_types=column_types,
+        #         holdout_frac=holdout_frac,
+        #         save_path=save_path,
+        #         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        #         seed=seed,
+        #     )
+        #     return self
 
         if self._problem_type and not self.problem_property.support_fit:
             raise RuntimeError(
@@ -2566,20 +2566,20 @@ class BaseLearner(ExportMixin, AbstractLearner):
         """
 
         self._verify_inference_ready()
-        if self._matcher:
-            return self._matcher.evaluate(
-                data=data,
-                query_data=query_data,
-                response_data=response_data,
-                id_mappings=id_mappings,
-                chunk_size=chunk_size,
-                similarity_type=similarity_type,
-                cutoffs=cutoffs,
-                label=label,
-                metrics=metrics,
-                return_pred=return_pred,
-                realtime=realtime,
-            )
+        # if self._matcher:
+        #     return self._matcher.evaluate(
+        #         data=data,
+        #         query_data=query_data,
+        #         response_data=response_data,
+        #         id_mappings=id_mappings,
+        #         chunk_size=chunk_size,
+        #         similarity_type=similarity_type,
+        #         cutoffs=cutoffs,
+        #         label=label,
+        #         metrics=metrics,
+        #         return_pred=return_pred,
+        #         realtime=realtime,
+        #     )
         # if self._problem_type == OBJECT_DETECTION:
         #     if realtime:
         #         return NotImplementedError(
@@ -2778,13 +2778,13 @@ class BaseLearner(ExportMixin, AbstractLearner):
 
         self._verify_inference_ready()
 
-        if self._matcher:
-            return self._matcher.predict(
-                data=data,
-                id_mappings=id_mappings,
-                as_pandas=as_pandas,
-                realtime=realtime,
-            )
+        # if self._matcher:
+        #     return self._matcher.predict(
+        #         data=data,
+        #         id_mappings=id_mappings,
+        #         as_pandas=as_pandas,
+        #         realtime=realtime,
+        #     )
         if self._problem_type == OBJECT_DETECTION:
             data = object_detection_data_to_df(data)
 
@@ -2915,14 +2915,14 @@ class BaseLearner(ExportMixin, AbstractLearner):
         Otherwise, the output will have shape (#samples,)
         """
         self._verify_inference_ready()
-        if self._matcher:
-            return self._matcher.predict_proba(
-                data=data,
-                id_mappings=id_mappings,
-                as_pandas=as_pandas,
-                as_multiclass=as_multiclass,
-                realtime=realtime,
-            )
+        # if self._matcher:
+        #     return self._matcher.predict_proba(
+        #         data=data,
+        #         id_mappings=id_mappings,
+        #         as_pandas=as_pandas,
+        #         as_multiclass=as_multiclass,
+        #         realtime=realtime,
+        #     )
 
         assert self._problem_type not in [
             REGRESSION,
@@ -3003,15 +3003,15 @@ class BaseLearner(ExportMixin, AbstractLearner):
         by the neural network's architecture.
         """
         self._verify_inference_ready()
-        if self._matcher:
-            return self._matcher.extract_embedding(
-                data=data,
-                signature=signature,
-                id_mappings=id_mappings,
-                as_tensor=as_tensor,
-                as_pandas=as_pandas,
-                realtime=realtime,
-            )
+        # if self._matcher:
+        #     return self._matcher.extract_embedding(
+        #         data=data,
+        #         signature=signature,
+        #         id_mappings=id_mappings,
+        #         as_tensor=as_tensor,
+        #         as_pandas=as_pandas,
+        #         realtime=realtime,
+        #     )
 
         turn_on_off_feature_column_info(
             data_processors=self._data_processors,
@@ -3112,9 +3112,9 @@ class BaseLearner(ExportMixin, AbstractLearner):
         #         self._learner.save(path=path, standalone=standalone)
         #     return
 
-        if self._matcher:
-            self._matcher.save(path=path, standalone=standalone)
-            return
+        # if self._matcher:
+        #     self._matcher.save(path=path, standalone=standalone)
+        #     return
 
         # TODO: Remove and learner will handle the following
         config = copy.deepcopy(self._config)

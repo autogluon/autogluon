@@ -103,7 +103,7 @@ def test_textagumentor_deepcopy():
         )
 
     # Deepcopy data processors
-    predictor._learner._data_processors = copy.deepcopy(predictor._data_processors)
+    predictor._learner._data_processors = copy.deepcopy(predictor._learner._data_processors)
 
     # Test copied data processors
     predictor.fit(
@@ -113,7 +113,7 @@ def test_textagumentor_deepcopy():
     )
 
     # Copy data processors via pickle + load
-    predictor._learner._data_processors = pickle.loads(pickle.dumps(predictor._data_processors))
+    predictor._learner._data_processors = pickle.loads(pickle.dumps(predictor._learner._data_processors))
 
     # Test copied data processors
     predictor.fit(
@@ -187,10 +187,10 @@ def test_customizing_predictor_image_aug(train_transforms, val_transforms):
         time_limit=10,  # seconds
     )
 
-    assert str(train_transforms) == str(predictor._data_processors["image"][0].train_transforms)
-    assert str(val_transforms) == str(predictor._data_processors["image"][0].val_transforms)
-    assert len(predictor._data_processors["image"][0].train_processor.transforms) == len(train_transforms) + 2
-    assert len(predictor._data_processors["image"][0].val_processor.transforms) == len(val_transforms) + 2
+    assert str(train_transforms) == str(predictor._learner._data_processors["image"][0].train_transforms)
+    assert str(val_transforms) == str(predictor._learner._data_processors["image"][0].val_transforms)
+    assert len(predictor._learner._data_processors["image"][0].train_processor.transforms) == len(train_transforms) + 2
+    assert len(predictor._learner._data_processors["image"][0].val_processor.transforms) == len(val_transforms) + 2
 
 
 @pytest.mark.parametrize(

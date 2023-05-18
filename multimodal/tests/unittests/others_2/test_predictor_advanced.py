@@ -75,7 +75,7 @@ def test_predictor_gradient_checkpointing(
         time_limit=30,
     )
     predictions = predictor.predict(test_data, as_pandas=False)
-    tunable_ratio = trainable_parameters(predictor._model) / total_parameters(predictor._model)
+    tunable_ratio = trainable_parameters(predictor._learner._model) / total_parameters(predictor._learner._model)
     npt.assert_allclose(tunable_ratio, expected_ratio, 2e-05, 2e-05)
     save_path = save_path + "_new"
     if os.path.isdir(save_path):

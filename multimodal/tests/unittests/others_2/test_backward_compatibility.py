@@ -63,12 +63,12 @@ def test_v0_6_2_checkpoint_timm_image():
         folder=save_path,
     )
     predictor = MultiModalPredictor.load(checkpoint_path)
-    print(predictor._config)
-    assert predictor._config.model.timm_image.image_size is None
+    print(predictor._learner._config)
+    assert predictor._learner._config.model.timm_image.image_size is None
 
     predictor.fit(
         train_df,
         hyperparameters={"model.timm_image.image_size": 288},
         time_limit=10,
     )
-    assert predictor._config.model.timm_image.image_size == 288
+    assert predictor._learner._config.model.timm_image.image_size == 288
