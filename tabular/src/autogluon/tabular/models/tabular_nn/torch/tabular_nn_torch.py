@@ -6,7 +6,6 @@ import time
 import warnings
 import numpy as np
 import pandas as pd
-import torch
 
 from typing import Dict, Union
 
@@ -564,6 +563,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         return num_cpus, num_gpus
 
     def save(self, path: str = None, verbose=True) -> str:
+        import torch
         # Save on CPU to ensure the model can be loaded on a box without GPU
         self.model = self.model.to(torch.device("cpu"))
         path = super().save(path, verbose)
@@ -573,6 +573,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
+        import torch
+
         model: TabularNeuralNetTorchModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
 
         original_device_type = model.device.type
