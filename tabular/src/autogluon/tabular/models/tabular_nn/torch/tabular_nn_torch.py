@@ -575,24 +575,54 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
+        """
+        Loads the model from disk to memory.
+        The loaded model will be on the same device it was trained on (cuda/mps);
+        if the device is it's not available (trained on GPU, deployed on CPU),
+        then `cpu` will be used.
+
+        Parameters
+        ----------
+        path : str
+            Path to the saved model, minus the file name.
+            This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
+            The model file is typically located in path + cls.model_file_name.
+        reset_paths : bool, default True
+            Whether to reset the self.path value of the loaded model to be equal to path.
+            It is highly recommended to keep this value as True unless accessing the original self.path value is important.
+            If False, the actual valid path and self.path may differ, leading to strange behaviour and potential exceptions if the model needs to load any other files at a later time.
+        verbose : bool, default True
+            Whether to log the location of the loaded file.
+
+        Returns
+        -------
+        model : cls
+            Loaded model object.
+        """
         import torch
 
         model: TabularNeuralNetTorchModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
 
+        # Put the model on the same device it was train on (GPU/MPS) if it is available; otherwise use CPU
         if model.model is not None:
             original_device_type = model.device.type
             if 'cuda' in original_device_type:
+                # cuda: nvidia GPU
                 device = torch.device(original_device_type if torch.cuda.is_available() else 'cpu')
             elif 'mps' in original_device_type:
+                # mps: Apple Silicon
                 device = torch.device(original_device_type if torch.backends.mps.is_available() else 'cpu')
             else:
                 device = torch.device(original_device_type)
-            if original_device_type != device.type:
+
+            if verbose and (original_device_type != device.type):
                 logger.log(15, f'Model is trained on {original_device_type}, but the device is not available - loading on {device.type}')
+
             model.device = device
             model.model = model.model.to(model.device)
             model.model.device = model.device
 
+        # Compiled models handling
         if hasattr(model, '_compiler') and model._compiler and model._compiler.name != 'native':
             model.model.eval()
             model.processor = model._compiler.load(path=model.path)
