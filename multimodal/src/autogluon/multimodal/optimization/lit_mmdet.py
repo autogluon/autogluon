@@ -38,6 +38,7 @@ class MMDetLitModule(pl.LightningModule):
         model,
         optim_type: Optional[str] = None,
         lr_choice: Optional[str] = None,
+        freeze_backbone: Optional[str] = None,
         lr_schedule: Optional[str] = None,
         lr: Optional[float] = None,
         lr_decay: Optional[float] = None,
@@ -269,7 +270,6 @@ class MMDetLitModule(pl.LightningModule):
         [sched]
             Learning rate scheduler.
         """
-        # TODO: add freeze layer and different lr for head and backbone.
         kwargs = dict(
             model=self.model,
             lr=self.hparams.lr,
@@ -288,14 +288,16 @@ class MMDetLitModule(pl.LightningModule):
                 lr_decay=self.hparams.lr_decay,
                 **kwargs,
             )
-        elif self.hparams.lr_choice == "freeze_backbone":
-            logger.debug("applying freeze backbone learning rate...")
-            grouped_parameters = apply_freeze_backbone_lr(
-                **kwargs,
-            )
         else:
             logger.debug("applying single learning rate...")
             grouped_parameters = apply_single_lr(
+                **kwargs,
+            )
+
+        if "freeze_backbone" in self.hparams and self.hparams.freeze_backbone:
+            logger.debug("applying freeze backbone learning rate...")
+            grouped_parameters = apply_freeze_backbone_lr(
+                optimizer_grouped_parameters=grouped_parameters,
                 **kwargs,
             )
 

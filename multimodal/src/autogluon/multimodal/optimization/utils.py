@@ -632,6 +632,7 @@ def apply_freeze_backbone_lr(
     model: nn.Module,
     lr: float,
     weight_decay: float,
+    optimizer_grouped_parameters: List,
     return_params: Optional[bool] = True,
 ):
     """
@@ -660,37 +661,21 @@ def apply_freeze_backbone_lr(
     -------
     The grouped parameters or their names.
     """
-    decay_param_names = get_weight_decay_param_names(model)
-
     if hasattr(model, "backbone_layer_names"):
         is_nonfrozen_layer = lambda n: not any(bb in n for bb in model.backbone_layer_names)
     else:  # freeze all non-head layers if backbone layers are not specified
         is_nonfrozen_layer = lambda n: any(bb in n for bb in model.head_layer_names)
 
-    optimizer_grouped_parameters = [
-        {
-            "params": [
-                p if return_params else n
-                for n, p in model.named_parameters()
-                if n in decay_param_names and is_nonfrozen_layer(n)
-            ],
-            "weight_decay": weight_decay,
-            "lr": lr,
-        },
-        {
-            "params": [
-                p if return_params else n
-                for n, p in model.named_parameters()
-                if n not in decay_param_names and is_nonfrozen_layer(n)
-            ],
-            "weight_decay": 0.0,
-            "lr": lr,
-        },
-    ]
-
     for n, p in model.named_parameters():
         if not is_nonfrozen_layer(n):
             p.requires_grad = False
+
+    for group_idx, group_param in enumerate(optimizer_grouped_parameters):
+        updated_params = []
+        for p in group_param["params"]:
+            if p.requires_grad:
+                updated_params.append(p)
+        optimizer_grouped_parameters[group_idx]["params"] = updated_params
 
     return optimizer_grouped_parameters
 

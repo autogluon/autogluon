@@ -155,8 +155,7 @@ def tutorial_script_for_finetune_yoloxo365_pothole_in_coco_format():
         hyperparameters={
             "model.mmdet_image.checkpoint_name": "yolox_l_objects365",
             "env.num_gpus": num_gpus,
-            "optimization.val_metric": "map",
-            "optimization.lr_choice": "freeze_backbone",
+            "optimization.freeze_backbone": True,
         },
         problem_type="object_detection",
         sample_data_path=train_path,
@@ -169,7 +168,7 @@ def tutorial_script_for_finetune_yoloxo365_pothole_in_coco_format():
         hyperparameters={
             "optimization.learning_rate": 1e-4,  # we use two stage and detection head has 100x lr
             "optimization.max_epochs": 50,
-            "env.per_gpu_batch_size": 8,  # decrease it when model is large
+            "env.per_gpu_batch_size": 12,  # decrease it when model is large
         },
     )
     end = time.time()

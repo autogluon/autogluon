@@ -390,7 +390,7 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": 1,
-            "optimization.lr_choice": "freeze_backbone",
+            "optimization.freeze_backbone": True,
         },
         problem_type="object_detection",
         sample_data_path=train_df,
