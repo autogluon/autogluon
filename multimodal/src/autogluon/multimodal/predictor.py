@@ -385,6 +385,10 @@ class MultiModalPredictor(ExportMixin):
         if verbosity is not None:
             set_logger_verbosity(verbosity)
 
+        self._fit_called = False
+        self._problem_type = problem_type
+        self._verbosity = verbosity
+
         problem_property = None
         if problem_type is not None:
             problem_property = PROBLEM_TYPES_REG.get(problem_type)
@@ -2066,6 +2070,8 @@ class MultiModalPredictor(ExportMixin):
         assert isinstance(num_gpus, int)
         if self._learner:
             self._learner.set_num_gpus(num_gpus)
+        elif self._matcher:
+            self._matcher.set_num_gpus(num_gpus)
         else:
             self._config.env.num_gpus = num_gpus
 

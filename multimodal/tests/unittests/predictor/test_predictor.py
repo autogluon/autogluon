@@ -634,25 +634,22 @@ def test_modifying_duplicate_model_names():
 
     # verify teacher and student have no duplicate model names
     assert all(
-        [
-            n not in teacher_predictor._learner._config.model.names
-            for n in student_predictor._learner._config.model.names
-        ]
+        [n not in teacher_predictor._config.model.names for n in student_predictor._learner._config.model.names]
     ), (
-        f"teacher model names {teacher_predictor._learner._config.model.names} and"
+        f"teacher model names {teacher_predictor._config.model.names} and"
         f" student model names {student_predictor._learner._config.model.names} have duplicates."
     )
 
     # verify each model name prefix is valid
-    assert teacher_predictor._learner._model.prefix in teacher_predictor._learner._config.model.names
-    if isinstance(teacher_predictor._learner._model.model, nn.ModuleList):
-        for per_model in teacher_predictor._learner._model.model:
-            assert per_model.prefix in teacher_predictor._learner._config.model.names
+    assert teacher_predictor._model.prefix in teacher_predictor._config.model.names
+    if isinstance(teacher_predictor._model.model, nn.ModuleList):
+        for per_model in teacher_predictor._model.model:
+            assert per_model.prefix in teacher_predictor._config.model.names
 
     # verify each data processor's prefix is valid
-    for per_modality_processors in teacher_predictor._learner._data_processors.values():
+    for per_modality_processors in teacher_predictor._data_processors.values():
         for per_processor in per_modality_processors:
-            assert per_processor.prefix in teacher_predictor._learner._config.model.names
+            assert per_processor.prefix in teacher_predictor._config.model.names
 
 
 def test_image_bytearray():
