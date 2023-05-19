@@ -108,7 +108,7 @@ def test_predictor_skip_final_val():
         time_limit=2,
     )
     predictor_new = MultiModalPredictor.load(path=save_path)
-    assert isinstance(predictor_new._model, TimmAutoModelForImagePrediction)
+    assert isinstance(predictor_new._learner._model, TimmAutoModelForImagePrediction)
 
 
 def test_hyperparameters_in_terminal_format():

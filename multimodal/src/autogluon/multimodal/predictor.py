@@ -310,16 +310,101 @@ class MultiModalPredictor(ExportMixin):
             This is used for automatically inference num_classes, classes, or label.
 
         """
-        # self._use_learner = use_learner
+        self._learner = None
+        self._matcher = None
+        # Handle the deprecated pipeline flag
+        if pipeline is not None:
+            pipeline = pipeline.lower()
+            warnings.warn(
+                f"pipeline argument has been deprecated and moved to problem_type. "
+                f"Use problem_type='{pipeline}' instead.",
+                DeprecationWarning,
+            )
+            if problem_type is not None:
+                assert pipeline == problem_type, (
+                    f"Mismatched pipeline and problem_type. "
+                    f"Received pipeline={pipeline}, problem_type={problem_type}. "
+                    f"Consider to revise the arguments."
+                )
+            problem_type = pipeline
+
+        # Sanity check of problem_type
+        if problem_type is not None:
+            problem_type = problem_type.lower()
+            if problem_type == DEPRECATED_ZERO_SHOT:
+                warnings.warn(
+                    f'problem_type="{DEPRECATED_ZERO_SHOT}" is deprecated. For inference with CLIP model, '
+                    f'use pipeline="{ZERO_SHOT_IMAGE_CLASSIFICATION}" instead.',
+                    DeprecationWarning,
+                )
+                problem_type = ZERO_SHOT_IMAGE_CLASSIFICATION
+            assert problem_type in PROBLEM_TYPES_REG, (
+                f"problem_type='{problem_type}' is not supported yet. You may pick a problem type from"
+                f" {PROBLEM_TYPES_REG.list_keys()}."
+            )
+            problem_prop = PROBLEM_TYPES_REG.get(problem_type)
+            if problem_prop.experimental:
+                warnings.warn(
+                    f"problem_type='{problem_type}' is currently experimental.",
+                    UserWarning,
+                )
+            problem_type = problem_prop.name
+
+        check_if_packages_installed(problem_type=problem_type)
+
+        if eval_metric is not None and not isinstance(eval_metric, str):
+            eval_metric = eval_metric.name
+
+        if eval_metric is not None and eval_metric.lower() in [
+            "rmse",
+            "r2",
+            "pearsonr",
+            "spearmanr",
+        ]:
+            if problem_type is None:
+                logger.debug(
+                    f"Infer problem type to be a regression problem "
+                    f"since the evaluation metric is set as {eval_metric}."
+                )
+                problem_type = REGRESSION
+            else:
+                problem_prop = PROBLEM_TYPES_REG.get(problem_type)
+                if NUMERICAL not in problem_prop.supported_label_type:
+                    raise ValueError(
+                        f"The provided evaluation metric will require the problem "
+                        f"to support label type = {NUMERICAL}. However, "
+                        f"the provided problem type = {problem_type} only "
+                        f"supports label type = {problem_prop.supported_label_type}."
+                    )
+
+        if os.environ.get(AUTOMM_TUTORIAL_MODE):
+            enable_progress_bar = False
+            # Also disable progress bar of transformers package
+            transformers.logging.disable_progress_bar()
+
+        if verbosity is not None:
+            set_logger_verbosity(verbosity)
+
         problem_property = None
         if problem_type is not None:
             problem_property = PROBLEM_TYPES_REG.get(problem_type)
         if problem_property is not None and problem_property.is_matching:
-            use_learner = False
-
-        self._learner = None
-        self._matcher = None
-        if use_learner:
+            self._matcher = MultiModalMatcher(
+                query=query,
+                response=response,
+                label=label,
+                match_label=match_label,
+                problem_type=problem_type,
+                presets=presets,
+                hyperparameters=hyperparameters,
+                eval_metric=eval_metric,
+                path=path,
+                verbosity=verbosity,
+                warn_if_exist=warn_if_exist,
+                enable_progress_bar=enable_progress_bar,
+            )
+            return
+        else:
             self._learner = self._get_learner(
                 label=label,
                 problem_type=problem_type,
@@ -339,191 +424,6 @@ class MultiModalPredictor(ExportMixin):
                 init_scratch=init_scratch,
                 sample_data_path=sample_data_path,
             )
-        else:
-            # Handle the deprecated pipeline flag
-            if pipeline is not None:
-                pipeline = pipeline.lower()
-                warnings.warn(
-                    f"pipeline argument has been deprecated and moved to problem_type. "
-                    f"Use problem_type='{pipeline}' instead.",
-                    DeprecationWarning,
-                )
-                if problem_type is not None:
-                    assert pipeline == problem_type, (
-                        f"Mismatched pipeline and problem_type. "
-                        f"Received pipeline={pipeline}, problem_type={problem_type}. "
-                        f"Consider to revise the arguments."
-                    )
-                problem_type = pipeline
-
-            # Sanity check of problem_type
-            if problem_type is not None:
-                problem_type = problem_type.lower()
-                if problem_type == DEPRECATED_ZERO_SHOT:
-                    warnings.warn(
-                        f'problem_type="{DEPRECATED_ZERO_SHOT}" is deprecated. For inference with CLIP model, '
-                        f'use pipeline="{ZERO_SHOT_IMAGE_CLASSIFICATION}" instead.',
-                        DeprecationWarning,
-                    )
-                    problem_type = ZERO_SHOT_IMAGE_CLASSIFICATION
-                assert problem_type in PROBLEM_TYPES_REG, (
-                    f"problem_type='{problem_type}' is not supported yet. You may pick a problem type from"
-                    f" {PROBLEM_TYPES_REG.list_keys()}."
-                )
-                problem_prop = PROBLEM_TYPES_REG.get(problem_type)
-                if problem_prop.experimental:
-                    warnings.warn(
-                        f"problem_type='{problem_type}' is currently experimental.",
-                        UserWarning,
-                    )
-                problem_type = problem_prop.name
-
-            check_if_packages_installed(problem_type=problem_type)
-
-            if eval_metric is not None and not isinstance(eval_metric, str):
-                eval_metric = eval_metric.name
-
-            if eval_metric is not None and eval_metric.lower() in [
-                "rmse",
-                "r2",
-                "pearsonr",
-                "spearmanr",
-            ]:
-                if problem_type is None:
-                    logger.debug(
-                        f"Infer problem type to be a regression problem "
-                        f"since the evaluation metric is set as {eval_metric}."
-                    )
-                    problem_type = REGRESSION
-                else:
-                    problem_prop = PROBLEM_TYPES_REG.get(problem_type)
-                    if NUMERICAL not in problem_prop.supported_label_type:
-                        raise ValueError(
-                            f"The provided evaluation metric will require the problem "
-                            f"to support label type = {NUMERICAL}. However, "
-                            f"the provided problem type = {problem_type} only "
-                            f"supports label type = {problem_prop.supported_label_type}."
-                        )
-
-            if os.environ.get(AUTOMM_TUTORIAL_MODE):
-                enable_progress_bar = False
-                # Also disable progress bar of transformers package
-                transformers.logging.disable_progress_bar()
-
-            if verbosity is not None:
-                set_logger_verbosity(verbosity)
-
-            self._label_column = label
-            self._problem_type = problem_type
-            self._presets = presets.lower() if presets else None
-            self._eval_metric_name = eval_metric
-            self._validation_metric_name = None
-            self._output_shape = num_classes
-            self._classes = classes  # NOTE: This is only set in detection task (i.e. MMDetAutoModelForObjectDetection), None otherwise.
-            self._ckpt_path = None
-            self._pretrained_path = None
-            self._config = None
-            self._df_preprocessor = None
-            self._column_types = None
-            self._data_processors = None
-            self._model_postprocess_fn = None
-            self._model = None
-            self._resume = False
-            self._verbosity = verbosity
-            self._warn_if_exist = warn_if_exist  # NOTE: This seems to be unused. Consider to remove it.
-            self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
-            self._init_scratch = init_scratch
-            self._sample_data_path = sample_data_path
-            self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
-            self._matcher = None
-            self._save_path = path
-
-            # Summary statistics used in fit summary. TODO: wrap it in a class.
-            self._total_train_time = None
-            self._best_score = None
-
-            # initialize learner as None
-            # self._learner: Optional[Union[MultiModalMatcher, DefaultLearner]] = None
-            # Based on the information given, setup a corresponding learner. NOTE: learner is initialized at the end of .fit()
-            # if self._problem_type == None:
-            #     self._learner = None
-            # else:
-            #     self._learner = self._initialized_learner()
-
-            if self.problem_property and self.problem_property.is_matching:
-                self._matcher = MultiModalMatcher(
-                    query=query,
-                    response=response,
-                    label=label,
-                    match_label=match_label,
-                    problem_type=problem_type,
-                    presets=presets,
-                    hyperparameters=hyperparameters,
-                    eval_metric=eval_metric,
-                    path=path,
-                    verbosity=verbosity,
-                    warn_if_exist=warn_if_exist,
-                    enable_progress_bar=enable_progress_bar,
-                )
-                return
-
-            # if self._problem_type == OBJECT_DETECTION:
-            #     self._label_column = "label"
-            #     if self._sample_data_path is not None:
-            #         self._classes = get_detection_classes(self._sample_data_path)
-            #         self._output_shape = len(self._classes)
-            #     self._learner = ObjectDetectionLearner(
-            #         problem_type=problem_type,
-            #         label="label",
-            #         presets=presets,
-            #         eval_metric=eval_metric,
-            #         hyperparameters=hyperparameters,
-            #         verbosity=verbosity,
-            #         num_classes=self._output_shape,
-            #         classes=self._classes,
-            #         path=path,
-            #         enable_progress_bar=enable_progress_bar,
-            #         init_scratch=init_scratch,
-            #         sample_data_path=sample_data_path,
-            #     )
-            #     self._use_learner = True
-            # elif self._problem_type == NER:
-            #     # TODO: raise NotImplementedError("NER Learner is not supported yet.")
-            #     self._use_learner = False
-            # else:
-            #     self._learner = DefaultLearner(
-            #         problem_type=problem_type,
-            #         label=label,
-            #         presets=presets,
-            #         eval_metric=eval_metric,
-            #         verbosity=verbosity,
-            #         num_classes=num_classes,
-            #         classes=classes,
-            #         path=path,
-            #         enable_progress_bar=enable_progress_bar,
-            #         init_scratch=init_scratch,
-            #     )
-            #     self._use_learner = True
-
-            # if self._problem_type == OBJECT_DETECTION:
-            #     self._label_column = "label"
-            #     if self._sample_data_path is not None:
-            #         self._classes = get_detection_classes(self._sample_data_path)
-            #         self._output_shape = len(self._classes)
-
-            # if self._problem_type is not None:
-            #     if self.problem_property.support_zero_shot:
-            #         # Load pretrained model via the provided hyperparameters and presets
-            #         # TODO: do not create pretrained model for HPO presets.
-            #         self._config, self._model, self._data_processors = init_pretrained(
-            #             problem_type=self._problem_type,
-            #             presets=self._presets,
-            #             hyperparameters=hyperparameters,
-            #             num_classes=self._output_shape,
-            #             classes=self._classes,
-            #             init_scratch=self._init_scratch,
-            #         )
-            #         self._validation_metric_name = self._config["optimization"]["val_metric"]
 
     def _get_learner(
         self,
@@ -683,11 +583,11 @@ class MultiModalPredictor(ExportMixin):
     #         return self._learner._config
     #     return self._config
 
-    # @property
-    # def _model(self):
-    #     if self._learner:
-    #         return self._learner._model
-    #     return self._model
+    @property
+    def _model(self):
+        if self._learner:
+            return self._learner._model
+        return self._model
 
     # @property
     # def _column_types(self):
@@ -3018,7 +2918,7 @@ class MultiModalPredictor(ExportMixin):
             assets = json.load(fp)
 
         if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
-            predictor = cls(label="dummy_label", use_learner=False)
+            predictor = cls()
             predictor._matcher = MultiModalMatcher.load(
                 path=path,
                 resume=resume,
@@ -3026,7 +2926,7 @@ class MultiModalPredictor(ExportMixin):
             )
             return predictor
 
-        if use_learner:
+        else:
             # learner = DefaultLearner.load(path=path, resume=resume, verbosity=verbosity)
             # TODO: Need to load problem type to determine which learner to load.
             problem_type = assets["problem_type"]
@@ -3037,9 +2937,7 @@ class MultiModalPredictor(ExportMixin):
             else:
                 learner = BaseLearner.load(path=path, resume=resume, verbosity=verbosity)
 
-            predictor = cls(
-                use_learner=True,
-            )  # TODO: temporary solution. self._label_column will be handled by learner only.
+            predictor = cls()
             predictor._learner = learner
             return predictor
 

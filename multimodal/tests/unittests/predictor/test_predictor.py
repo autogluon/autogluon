@@ -627,7 +627,7 @@ def test_modifying_duplicate_model_names():
     )
 
     teacher_predictor = modify_duplicate_model_names(
-        predictor=teacher_predictor,
+        predictor=teacher_predictor._learner,
         postfix="teacher",
         blacklist=student_predictor._learner._config.model.names,
     )
