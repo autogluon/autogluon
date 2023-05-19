@@ -34,7 +34,7 @@ def _get_autogluon_versions():
     """Retrieve version of all autogluon subpackages and its dependencies"""
     versions = dict()
     for pkg in list(pkgutil.iter_modules(autogluon.__path__, autogluon.__name__ + '.')):
-        if pkg.name == 'autogluon.version':  # autogluon.version will be recognized as a submodule by pkgutil. We don't need it
+        if pkg.name in ['autogluon.version', 'autogluon.setup', 'autogluon._internal_']:  # autogluon.version will be recognized as a submodule by pkgutil. We don't need it
             continue
         try:
             module = importlib.import_module(pkg.name)
