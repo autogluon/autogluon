@@ -32,12 +32,12 @@ from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_sta
 
 from . import version as ag_version
 from .constants import (
-    AUTOMM,
     AUTOMM_TUTORIAL_MODE,
     BBOX,
     BEST,
     BEST_K_MODELS_FILE,
     BINARY,
+    CLASSIFICATION,
     COLUMN_FEATURES,
     DEEPSPEED_MIN_PL_VERSION,
     DEEPSPEED_MODULE,
@@ -89,7 +89,8 @@ from .data.dataset_mmlab import MultiImageMixDataset
 from .data.infer_types import (
     infer_column_types,
     infer_label_column_type_by_problem_type,
-    infer_problem_type_output_shape,
+    infer_output_shape,
+    infer_problem_type,
     infer_rois_column_type,
     is_image_column,
 )
@@ -713,23 +714,30 @@ class MultiModalPredictor(ExportMixin):
             fit_called=fit_called,
         )
 
-        self._problem_type = self._infer_problem_type(train_data=train_data, column_types=column_types)
-
         if tuning_data is None:
             train_data, tuning_data = self._split_train_tuning(
                 data=train_data, holdout_frac=holdout_frac, random_state=seed
             )
 
-        column_types = self._infer_column_types(
-            train_data=train_data, tuning_data=tuning_data, column_types=column_types
+        self._problem_type = infer_problem_type(
+            train_data=train_data,
+            tuning_data=tuning_data,
+            provided_problem_type=self._problem_type,
+            label_column=self._label_column,
         )
 
-        # FIXME: separate infer problem_type with output_shape, should be logically distinct
-        _, output_shape = infer_problem_type_output_shape(
-            label_column=self._label_column,
-            column_types=column_types,
+        column_types = infer_column_types(
             data=train_data,
-            provided_problem_type=self._problem_type,
+            valid_data=tuning_data,
+            label_columns=self._label_column,
+            provided_column_types=column_types,
+            problem_type=self._problem_type,  # used to update the corresponding column type
+        )
+
+        output_shape = infer_output_shape(
+            label_column=self._label_column,
+            data=train_data,
+            problem_type=self._problem_type,
         )
 
         # Determine data scarcity mode, i.e. a few-shot scenario
@@ -841,42 +849,6 @@ class MultiModalPredictor(ExportMixin):
         logger.info(get_fit_complete_message(self._save_path))
 
         return self
-
-    # FIXME: Avoid having separate logic for inferring features and label column that is combined together
-    def _infer_column_types(
-        self, train_data: pd.DataFrame, tuning_data: pd.DataFrame = None, column_types: dict = None
-    ) -> dict:
-        column_types = infer_column_types(
-            data=train_data,
-            label_columns=self._label_column,
-            provided_column_types=column_types,
-            valid_data=tuning_data,
-            problem_type=self._problem_type,
-        )
-        column_types = infer_label_column_type_by_problem_type(
-            column_types=column_types,
-            label_columns=self._label_column,
-            problem_type=self._problem_type,
-            data=train_data,
-            valid_data=tuning_data,
-        )
-        return column_types
-
-    # FIXME: Align logic with Tabular,
-    #  don't combine output_shape and problem_type detection, make them separate
-    #  Use autogluon.core.utils.utils.infer_problem_type
-    def _infer_problem_type(self, train_data: pd.DataFrame, column_types: dict = None) -> str:
-        column_types_label = self._infer_column_types(
-            train_data=train_data[[self._label_column]], column_types=column_types
-        )
-
-        problem_type, _ = infer_problem_type_output_shape(
-            label_column=self._label_column,
-            column_types=column_types_label,
-            data=train_data,
-            provided_problem_type=self._problem_type,
-        )
-        return problem_type
 
     def _split_train_tuning(
         self, data: pd.DataFrame, holdout_frac: float = None, random_state: int = 0
