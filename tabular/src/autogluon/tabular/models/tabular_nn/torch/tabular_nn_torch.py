@@ -6,6 +6,7 @@ import time
 import warnings
 import numpy as np
 import pandas as pd
+import torch
 
 from typing import Dict, Union
 
@@ -562,9 +563,31 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         num_gpus = 0
         return num_cpus, num_gpus
 
+    def save(self, path: str = None, verbose=True) -> str:
+        # Save on CPU to ensure the model can be loaded on a box without GPU
+        self.model = self.model.to(torch.device("cpu"))
+        path = super().save(path, verbose)
+        # Put the model back to the device after the save
+        self.model.to(self.device)
+        return path
+
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
         model: TabularNeuralNetTorchModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+
+        original_device_type = model.device.type
+        if 'cuda' in original_device_type:
+            device = torch.device(original_device_type if torch.cuda.is_available() else 'cpu')
+        elif 'mps' in original_device_type:
+            device = torch.device(original_device_type if torch.backends.mps.is_available() else 'cpu')
+        else:
+            device = torch.device(original_device_type)
+        if original_device_type != device.type:
+            logger.log(15, f'Model is trained on {original_device_type}, but the device is not available - loading on {device.type}')
+        model.device = device
+        model.model = model.model.to(model.device)
+        model.model.device = model.device
+
         if hasattr(model, '_compiler') and model._compiler and model._compiler.name != 'native':
             model.model.eval()
             model.processor = model._compiler.load(path=model.path)
