@@ -25,6 +25,9 @@ def verify_matcher_save_load(matcher, df, verify_embedding=True, cls=MultiModalP
         matcher.save(root)
         predictions = matcher.predict(df, as_pandas=False)
         loaded_matcher = cls.load(root, use_learner=False)
+        # import ipdb
+
+        # ipdb.set_trace()
         predictions2 = loaded_matcher.predict(df, as_pandas=False)
         predictions2_df = loaded_matcher.predict(df, as_pandas=True)
         npt.assert_equal(predictions, predictions2)

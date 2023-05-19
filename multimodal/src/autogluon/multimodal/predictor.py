@@ -313,42 +313,7 @@ class MultiModalPredictor(ExportMixin):
         self._learner = None
         self._matcher = None
         # Handle the deprecated pipeline flag
-        if pipeline is not None:
-            pipeline = pipeline.lower()
-            warnings.warn(
-                f"pipeline argument has been deprecated and moved to problem_type. "
-                f"Use problem_type='{pipeline}' instead.",
-                DeprecationWarning,
-            )
-            if problem_type is not None:
-                assert pipeline == problem_type, (
-                    f"Mismatched pipeline and problem_type. "
-                    f"Received pipeline={pipeline}, problem_type={problem_type}. "
-                    f"Consider to revise the arguments."
-                )
-            problem_type = pipeline
-
-        # Sanity check of problem_type
-        if problem_type is not None:
-            problem_type = problem_type.lower()
-            if problem_type == DEPRECATED_ZERO_SHOT:
-                warnings.warn(
-                    f'problem_type="{DEPRECATED_ZERO_SHOT}" is deprecated. For inference with CLIP model, '
-                    f'use pipeline="{ZERO_SHOT_IMAGE_CLASSIFICATION}" instead.',
-                    DeprecationWarning,
-                )
-                problem_type = ZERO_SHOT_IMAGE_CLASSIFICATION
-            assert problem_type in PROBLEM_TYPES_REG, (
-                f"problem_type='{problem_type}' is not supported yet. You may pick a problem type from"
-                f" {PROBLEM_TYPES_REG.list_keys()}."
-            )
-            problem_prop = PROBLEM_TYPES_REG.get(problem_type)
-            if problem_prop.experimental:
-                warnings.warn(
-                    f"problem_type='{problem_type}' is currently experimental.",
-                    UserWarning,
-                )
-            problem_type = problem_prop.name
+        problem_type, pipeline = self._init_problem_type(problem_type, pipeline)
 
         check_if_packages_installed(problem_type=problem_type)
 
@@ -428,6 +393,46 @@ class MultiModalPredictor(ExportMixin):
                 init_scratch=init_scratch,
                 sample_data_path=sample_data_path,
             )
+
+    @staticmethod
+    def _init_problem_type(problem_type, pipeline):
+        if pipeline is not None:
+            pipeline = pipeline.lower()
+            warnings.warn(
+                f"pipeline argument has been deprecated and moved to problem_type. "
+                f"Use problem_type='{pipeline}' instead.",
+                DeprecationWarning,
+            )
+            if problem_type is not None:
+                assert pipeline == problem_type, (
+                    f"Mismatched pipeline and problem_type. "
+                    f"Received pipeline={pipeline}, problem_type={problem_type}. "
+                    f"Consider to revise the arguments."
+                )
+            problem_type = pipeline
+
+        # Sanity check of problem_type
+        if problem_type is not None:
+            problem_type = problem_type.lower()
+            if problem_type == DEPRECATED_ZERO_SHOT:
+                warnings.warn(
+                    f'problem_type="{DEPRECATED_ZERO_SHOT}" is deprecated. For inference with CLIP model, '
+                    f'use pipeline="{ZERO_SHOT_IMAGE_CLASSIFICATION}" instead.',
+                    DeprecationWarning,
+                )
+                problem_type = ZERO_SHOT_IMAGE_CLASSIFICATION
+            assert problem_type in PROBLEM_TYPES_REG, (
+                f"problem_type='{problem_type}' is not supported yet. You may pick a problem type from"
+                f" {PROBLEM_TYPES_REG.list_keys()}."
+            )
+            problem_prop = PROBLEM_TYPES_REG.get(problem_type)
+            if problem_prop.experimental:
+                warnings.warn(
+                    f"problem_type='{problem_type}' is currently experimental.",
+                    UserWarning,
+                )
+            problem_type = problem_prop.name
+        return problem_type, pipeline
 
     def _get_learner(
         self,
@@ -2923,8 +2928,15 @@ class MultiModalPredictor(ExportMixin):
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)
 
+        # import ipdb
+
+        # ipdb.set_trace()
+        problem_type = assets["problem_type"] if "problem_type" in assets else None
+        pipeline = assets["pipeline"] if "pipeline" in assets else None
+        predictor = cls()
+        predictor._learner = None
+        predictor._matcher = None
         if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
-            predictor = cls()
             predictor._matcher = MultiModalMatcher.load(
                 path=path,
                 resume=resume,
@@ -2934,8 +2946,6 @@ class MultiModalPredictor(ExportMixin):
 
         else:
             # learner = DefaultLearner.load(path=path, resume=resume, verbosity=verbosity)
-            # TODO: Need to load problem type to determine which learner to load.
-            problem_type = assets["problem_type"]
             if problem_type == OBJECT_DETECTION:
                 learner = ObjectDetectionLearner.load(path=path, resume=resume, verbosity=verbosity)
             elif problem_type == NER:
@@ -2943,7 +2953,6 @@ class MultiModalPredictor(ExportMixin):
             else:
                 learner = BaseLearner.load(path=path, resume=resume, verbosity=verbosity)
 
-            predictor = cls()
             predictor._learner = learner
             return predictor
 
