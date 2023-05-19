@@ -9,7 +9,6 @@ from typing import Any, Callable, Dict, List, Optional, Type
 
 import gluonts
 import numpy as np
-import pandas as pd
 import torch
 from gluonts.core.component import from_hyperparameters
 from gluonts.model.forecast import QuantileForecast
@@ -19,6 +18,9 @@ from gluonts.torch.model.forecast import DistributionForecast
 from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPredictor
 from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
 from gluonts.torch.model.tft import TemporalFusionTransformerEstimator
+from gluonts.torch.model.d_linear import DLinearEstimator
+from gluonts.torch.model.lag_tst import LagTSTEstimator
+from gluonts.torch.model.patch_tst import PatchTSTEstimator
 from pytorch_lightning.callbacks import Timer
 
 from autogluon.core.hpo.constants import CUSTOM_BACKEND
@@ -124,21 +126,17 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
     def _distribution_to_quantile_forecast(
         forecast: DistributionForecast, quantile_levels: List[float]
     ) -> QuantileForecast:
-        forecast_arrays = [forecast.mean]
-        forecast_keys = ["mean"]
-
-        for q in quantile_levels:
-            forecast_arrays.append(forecast.quantile(q))
-            forecast_keys.append(str(q))
+        quantiles = torch.tensor(quantile_levels, device=forecast.distribution.mean.device).reshape(-1, 1)
+        quantile_predictions = forecast.distribution.icdf(quantiles).cpu().detach().numpy()
+        forecast_arrays = np.vstack([forecast.mean, quantile_predictions])
+        forecast_keys = ["mean"] + [str(q) for q in quantile_levels]
 
         forecast_init_args = dict(
-            forecast_arrays=np.array(forecast_arrays),
+            forecast_arrays=forecast_arrays,
             start_date=forecast.start_date,
             forecast_keys=forecast_keys,
             item_id=str(forecast.item_id),
         )
-        if isinstance(forecast.start_date, pd.Timestamp):  # GluonTS version is <0.10
-            forecast_init_args.update({"freq": forecast.freq})
         return QuantileForecast(**forecast_init_args)
 
 
@@ -304,4 +302,31 @@ class TemporalFusionTransformerModel(AbstractGluonTSPyTorchModel):
             init_kwargs["static_dims"] = [self.num_feat_static_real]
         if len(self.feat_static_cat_cardinality):
             init_kwargs["static_cardinalities"] = self.feat_static_cat_cardinality
+        return init_kwargs
+
+
+class DLinearModel(AbstractGluonTSPyTorchModel):
+    gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DLinearEstimator
+
+    def _get_estimator_init_args(self) -> Dict[str, Any]:
+        init_kwargs = super()._get_estimator_init_args()
+        init_kwargs.setdefault("context_length", 10 * self.prediction_length)
+        return init_kwargs
+
+
+class LagTSTModel(AbstractGluonTSPyTorchModel):
+    gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = LagTSTEstimator
+
+    def _get_estimator_init_args(self) -> Dict[str, Any]:
+        init_kwargs = super()._get_estimator_init_args()
+        init_kwargs.setdefault("context_length", 10 * self.prediction_length)
+        return init_kwargs
+
+
+class PatchTSTModel(AbstractGluonTSPyTorchModel):
+    gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = PatchTSTEstimator
+
+    def _get_estimator_init_args(self) -> Dict[str, Any]:
+        init_kwargs = super()._get_estimator_init_args()
+        init_kwargs.setdefault("context_length", 10 * self.prediction_length)
         return init_kwargs

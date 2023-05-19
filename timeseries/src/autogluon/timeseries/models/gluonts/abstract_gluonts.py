@@ -17,7 +17,6 @@ from pandas.tseries.frequencies import to_offset
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.utils import warning_filter
-from autogluon.core.utils.savers import save_pkl
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
@@ -375,20 +374,16 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     @staticmethod
     def _sample_to_quantile_forecast(forecast: SampleForecast, quantile_levels: List[float]) -> QuantileForecast:
-        forecast_arrays = [forecast.mean]
-
-        quantile_keys = [str(q) for q in quantile_levels]
-        for q in quantile_keys:
-            forecast_arrays.append(forecast.quantile(q))
+        quantile_predictions = np.quantile(forecast.samples, q=quantile_levels, axis=0)
+        forecast_arrays = np.vstack([forecast.mean, quantile_predictions])
+        forecast_keys = ["mean"] + [str(q) for q in quantile_levels]
 
         forecast_init_args = dict(
             forecast_arrays=np.array(forecast_arrays),
             start_date=forecast.start_date,
-            forecast_keys=["mean"] + quantile_keys,
+            forecast_keys=forecast_keys,
             item_id=str(forecast.item_id),
         )
-        if isinstance(forecast.start_date, pd.Timestamp):  # GluonTS version is <0.10
-            forecast_init_args.update({"freq": forecast.freq})
         return QuantileForecast(**forecast_init_args)
 
     @staticmethod

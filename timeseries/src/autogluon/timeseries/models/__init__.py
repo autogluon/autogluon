@@ -1,5 +1,6 @@
 from .autogluon_tabular import DirectTabularModel, RecursiveTabularModel
-from .gluonts import DeepARModel, SimpleFeedForwardModel, TemporalFusionTransformerModel
+from .autogluon_tabular import AutoGluonTabularModel, RecursiveTabularModel
+from .gluonts import DeepARModel, DLinearModel, SimpleFeedForwardModel, TemporalFusionTransformerModel
 from .local import (
     ARIMAModel,
     AutoARIMAModel,
