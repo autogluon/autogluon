@@ -565,10 +565,12 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def save(self, path: str = None, verbose=True) -> str:
         import torch
         # Save on CPU to ensure the model can be loaded on a box without GPU
-        self.model = self.model.to(torch.device("cpu"))
+        if self.model is not None:
+            self.model = self.model.to(torch.device("cpu"))
         path = super().save(path, verbose)
         # Put the model back to the device after the save
-        self.model.to(self.device)
+        if self.model is not None:
+            self.model.to(self.device)
         return path
 
     @classmethod
@@ -577,18 +579,19 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         model: TabularNeuralNetTorchModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
 
-        original_device_type = model.device.type
-        if 'cuda' in original_device_type:
-            device = torch.device(original_device_type if torch.cuda.is_available() else 'cpu')
-        elif 'mps' in original_device_type:
-            device = torch.device(original_device_type if torch.backends.mps.is_available() else 'cpu')
-        else:
-            device = torch.device(original_device_type)
-        if original_device_type != device.type:
-            logger.log(15, f'Model is trained on {original_device_type}, but the device is not available - loading on {device.type}')
-        model.device = device
-        model.model = model.model.to(model.device)
-        model.model.device = model.device
+        if model.model is not None:
+            original_device_type = model.device.type
+            if 'cuda' in original_device_type:
+                device = torch.device(original_device_type if torch.cuda.is_available() else 'cpu')
+            elif 'mps' in original_device_type:
+                device = torch.device(original_device_type if torch.backends.mps.is_available() else 'cpu')
+            else:
+                device = torch.device(original_device_type)
+            if original_device_type != device.type:
+                logger.log(15, f'Model is trained on {original_device_type}, but the device is not available - loading on {device.type}')
+            model.device = device
+            model.model = model.model.to(model.device)
+            model.model.device = model.device
 
         if hasattr(model, '_compiler') and model._compiler and model._compiler.name != 'native':
             model.model.eval()
