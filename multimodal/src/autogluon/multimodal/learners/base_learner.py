@@ -3307,15 +3307,6 @@ class BaseLearner(ExportMixin, AbstractLearner):
         -------
         The loaded predictor object.
         """
-        # if use_learner:
-        #     learner = DefaultLearner.load(path=path, resume=resume, verbosity=verbosity)
-        #     predictor = cls(
-        #         label=learner._label_column,
-        #         use_learner=True,
-        #     )  # TODO: temporary solution. self._label_column will be handled by learner only.
-        #     predictor._learner = learner
-        #     return predictor
-
         path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         predictor = cls(label="dummy_label")

@@ -99,10 +99,3 @@ class AbstractLearner(ABC):
     @abstractclassmethod
     def load(cls, path: str, resume: Optional[bool] = False, verbosity: Optional[int] = 3, **kwargs):
         pass
-
-
-if __name__ == "__main__":
-    # obj = AbstractMMLearner()
-    import ipdb
-
-    ipdb.set_trace()

@@ -2948,7 +2948,6 @@ class MultiModalPredictor(ExportMixin):
             return predictor
 
         else:
-            # learner = DefaultLearner.load(path=path, resume=resume, verbosity=verbosity)
             if problem_type == OBJECT_DETECTION:
                 learner = ObjectDetectionLearner.load(path=path, resume=resume, verbosity=verbosity)
             elif problem_type == NER:
