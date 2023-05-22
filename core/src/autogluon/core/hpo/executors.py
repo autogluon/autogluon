@@ -336,13 +336,16 @@ class RayHpoExecutor(HpoExecutor):
     custom_to_ray_preset_map = {
         'auto': {'scheduler': 'FIFO', 'searcher': 'bayes'},
         'local_random': {'scheduler': 'FIFO', 'searcher': 'random'},
+        'distributed_random': {'scheduler': 'FIFO', 'searcher': 'random'},
         'random': {'scheduler': 'FIFO', 'searcher': 'random'},
     }
     custom_to_ray_scheduler_preset_map = {
         'local': 'FIFO',
+        'distributed': 'FIFO',
     }
     custom_to_ray_searcher_preset_map = {
         'local_random': 'random',
+        'distributed_random': 'random',
         'random': 'random',
         'auto': 'bayes',
     }
