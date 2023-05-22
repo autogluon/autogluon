@@ -42,7 +42,6 @@ class MatcherLitModule(pl.LightningModule):
         matches: Optional[List[DictConfig]] = None,
         optim_type: Optional[str] = None,
         lr_choice: Optional[str] = None,
-        freeze_backbone: Optional[str] = None,
         lr_schedule: Optional[str] = None,
         lr: Optional[float] = None,
         lr_decay: Optional[float] = None,
