@@ -88,7 +88,6 @@ from .data.datamodule import BaseDataModule
 from .data.dataset_mmlab import MultiImageMixDataset
 from .data.infer_types import (
     infer_column_types,
-    infer_label_column_type_by_problem_type,
     infer_output_shape,
     infer_problem_type,
     infer_rois_column_type,
@@ -720,10 +719,8 @@ class MultiModalPredictor(ExportMixin):
             )
 
         self._problem_type = infer_problem_type(
-            train_data=train_data,
-            tuning_data=tuning_data,
+            y_train_data=train_data[self._label_column],
             provided_problem_type=self._problem_type,
-            label_column=self._label_column,
         )
 
         column_types = infer_column_types(
@@ -1794,16 +1791,11 @@ class MultiModalPredictor(ExportMixin):
             allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
             column_types = infer_column_types(
                 data=data,
+                label_columns=self._label_column,
+                problem_type=self._problem_type,
                 allowable_column_types=allowable_dtypes,
                 fallback_column_type=fallback_dtype,
             )
-            if self._label_column and self._label_column in data.columns:
-                column_types = infer_label_column_type_by_problem_type(
-                    column_types=column_types,
-                    label_columns=self._label_column,
-                    problem_type=self._problem_type,
-                    data=data,
-                )
             if self._problem_type == OBJECT_DETECTION:
                 column_types = infer_rois_column_type(
                     column_types=column_types,

@@ -568,13 +568,14 @@ def infer_column_types(
     if problem_type == NER:
         column_types = infer_ner_column_type(column_types=column_types)
 
-    column_types = infer_label_column_type_by_problem_type(
-        column_types=column_types,
-        label_columns=label_columns,
-        problem_type=problem_type,
-        data=data,
-        valid_data=valid_data if is_training else None,
-    )
+    if problem_type and label_columns:
+        column_types = infer_label_column_type_by_problem_type(
+            column_types=column_types,
+            label_columns=label_columns,
+            problem_type=problem_type,
+            data=data,
+            valid_data=valid_data if is_training else None,
+        )
 
     return column_types
 
@@ -670,35 +671,26 @@ def infer_rois_column_type(
 
 
 def infer_problem_type(
-    train_data: Optional[pd.DataFrame] = None,
-    tuning_data: Optional[pd.DataFrame] = None,
+    y_train_data: Optional[pd.DataFrame] = None,
     provided_problem_type: Optional[str] = None,
-    label_column: Optional[str] = None,
 ) -> str:
     """
     Infer the basic (binary, multiclass, and regression) problem types if problem type is None or classification.
+    Only training data are used. Assume users provide valid validation data.
 
     Parameters
     ----------
-    train_data
-        Training data
-    tuning_data
-        Tuning data
+    y_train_data
+        The label column of training data.
     provided_problem_type
         Provided problem type
-    label_column
-        Label column name
 
     Returns
     -------
     Inferred problem type
     """
-    if provided_problem_type is None or CLASSIFICATION:
-        problem_type = infer_basic_problem_type(y=train_data[label_column])
-        # ensure training and tuning data have the same problem type
-        if tuning_data:
-            tuning_problem_type = infer_basic_problem_type(y=tuning_data[label_column])
-            assert problem_type == tuning_problem_type
+    if provided_problem_type in [None, CLASSIFICATION]:
+        problem_type = infer_basic_problem_type(y=y_train_data)
         # trust users' prior knowledge
         if provided_problem_type == CLASSIFICATION and problem_type == REGRESSION:
             problem_type = MULTICLASS
