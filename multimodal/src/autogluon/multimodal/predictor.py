@@ -68,6 +68,8 @@ from .constants import (
     OBJECT_DETECTION,
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
+    OPEN_VOCABULARY_OBJECT_DETECTION,
+    OVD_RET,
     OVERALL_F1,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
@@ -150,6 +152,7 @@ from .utils import (
     object_detection_data_to_df,
     predict,
     process_batch,
+    save_ovd_result_df,
     save_pretrained_model_configs,
     save_result_df,
     save_text_tokenizers,
@@ -215,6 +218,7 @@ class MultiModalPredictor(ExportMixin):
             In addition, we support advanced problems such as
 
             - 'object_detection': Object detection
+            - 'open_vocabulry_object_detection': Zero-shot object detection (only support inference for now, finetuning TBC)
             - 'ner' or 'named_entity_recognition': Named entity extraction
             - 'text_similarity': Text-text similarity problem
             - 'image_similarity': Image-image similarity problem
@@ -231,6 +235,7 @@ class MultiModalPredictor(ExportMixin):
             problem types:
 
             - 'object_detection'
+            - 'open_vocabulry_object_detection'
             - 'text_similarity'
             - 'image_similarity'
             - 'image_text_similarity'
@@ -687,8 +692,6 @@ class MultiModalPredictor(ExportMixin):
         if isinstance(tuning_data, str):
             tuning_data = load_pd.load(tuning_data)
 
-        pl.seed_everything(seed, workers=True)
-
         if self._presets is not None:
             # FIXME: Silently ignoring user input, there should be a warning
             presets = self._presets
@@ -804,6 +807,7 @@ class MultiModalPredictor(ExportMixin):
             ckpt_path=None if hpo_mode else self._ckpt_path,
             resume=False if hpo_mode else self._resume,
             enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
+            seed=seed,
             presets=presets,
             config=config,
             hyperparameters=hyperparameters,
@@ -1064,6 +1068,7 @@ class MultiModalPredictor(ExportMixin):
         ckpt_path: str,
         resume: bool,
         enable_progress_bar: bool,
+        seed: int,
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
@@ -1074,6 +1079,7 @@ class MultiModalPredictor(ExportMixin):
         clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
+        pl.seed_everything(seed, workers=True)
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
         logger.info(get_fit_start_message(save_path, validation_metric_name))
         config = get_config(
@@ -1984,6 +1990,8 @@ class MultiModalPredictor(ExportMixin):
 
         if self._problem_type == NER:
             ret_type = NER_RET
+        elif self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+            ret_type = OVD_RET
         else:
             ret_type = LOGITS
 
@@ -2147,7 +2155,7 @@ class MultiModalPredictor(ExportMixin):
             if self._label_column not in data:
                 self._label_column = None
 
-        if self._problem_type == OBJECT_DETECTION or self._problem_type == OCR_TEXT_DETECTION:
+        if self._problem_type in [OBJECT_DETECTION, OCR_TEXT_DETECTION]:
             ret_type = BBOX
         elif self._problem_type == OCR_TEXT_RECOGNITION:
             ret_type = [TEXT, SCORE]
@@ -2156,6 +2164,9 @@ class MultiModalPredictor(ExportMixin):
 
         if self._problem_type == NER:
             ret_type = NER_RET
+
+        if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+            ret_type = OVD_RET
 
         if candidate_data:
             pred = self._match_queries_and_candidates(
@@ -2224,6 +2235,14 @@ class MultiModalPredictor(ExportMixin):
                     pred=pred,
                     data=data,
                     detection_classes=self._model.model.CLASSES,
+                    result_path=None,
+                )
+            elif (
+                self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION
+            ):  # TODO: refactor and merge with OBJECT DETECTION
+                pred = save_ovd_result_df(
+                    pred=pred,
+                    data=data,
                     result_path=None,
                 )
             else:

@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 import autogluon.core as ag
+from autogluon.common import space
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
@@ -166,7 +167,7 @@ def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(temp_mod
 
 @pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
 def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_performed(temp_model_path, model_name):
-    hyperparameters = {model_name: {"epochs": ag.Int(1, 4)}}
+    hyperparameters = {model_name: {"epochs": space.Int(1, 4)}}
     # mock the default hps factory to prevent preset hyperparameter configurations from
     # creeping into the test case
     with mock.patch("autogluon.timeseries.models.presets.get_default_hps") as default_hps_mock:

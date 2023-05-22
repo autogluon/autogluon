@@ -25,6 +25,7 @@ from ..constants import (
     NULL,
     NUMERICAL,
     OBJECT_DETECTION,
+    OPEN_VOCABULARY_OBJECT_DETECTION,
     REGRESSION,
     ROIS,
     TEXT,
@@ -215,7 +216,6 @@ def is_image_column(
                 break
 
             success = True
-
         if not success:
             failure_count += 1
     failure_ratio = failure_count / sample_num
@@ -641,7 +641,7 @@ def infer_label_column_type_by_problem_type(
             column_types[col_name] = NUMERICAL
         elif problem_type == NER:
             column_types[col_name] = NER_ANNOTATION
-        elif problem_type == OBJECT_DETECTION:
+        elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
             column_types[col_name] = ROIS
 
         if column_types[col_name] not in allowable_label_types:
@@ -721,13 +721,15 @@ def infer_problem_type_output_shape(
             return provided_problem_type, None
         elif provided_problem_type == OBJECT_DETECTION:
             return provided_problem_type, None
+        elif provided_problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+            return provided_problem_type, None
         else:
             raise ValueError(
                 f"Problem type '{provided_problem_type}' doesn't have a valid output shape "
                 f"for training. The supported problem types are"
                 f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}',"
                 f" '{CLASSIFICATION}', '{NER}',"
-                f" '{OBJECT_DETECTION}'"
+                f" '{OBJECT_DETECTION}', '{OPEN_VOCABULARY_OBJECT_DETECTION}'"
             )
     else:
         if column_types[label_column] == CATEGORICAL:

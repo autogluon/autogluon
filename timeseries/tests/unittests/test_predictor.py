@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import autogluon.core as ag
+from autogluon.common import space
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
@@ -180,7 +180,7 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
     "hyperparameters",
     [
         {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
-        {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": ag.space.Int(1, 3)}},
+        {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": space.Int(1, 3)}},
     ],
 )
 def test_given_hp_spaces_and_custom_target_when_predictor_called_predictor_can_predict(
@@ -198,7 +198,7 @@ def test_given_hp_spaces_and_custom_target_when_predictor_called_predictor_can_p
         init_kwargs.update({"target": target_column})
 
     for hps in hyperparameters.values():
-        if any(isinstance(v, ag.Space) for v in hps.values()):
+        if any(isinstance(v, space.Space) for v in hps.values()):
             fit_kwargs.update(
                 {
                     "hyperparameter_tune_kwargs": {
@@ -465,7 +465,7 @@ def test_given_searchspace_and_no_hyperparameter_tune_kwargs_when_predictor_fits
     ):
         predictor.fit(
             train_data=DUMMY_TS_DATAFRAME,
-            hyperparameters={"SimpleFeedForward": {"epochs": ag.space.Categorical(1, 2)}},
+            hyperparameters={"SimpleFeedForward": {"epochs": space.Categorical(1, 2)}},
         )
 
 
@@ -475,7 +475,7 @@ def test_given_mixed_searchspace_and_hyperparameter_tune_kwargs_when_predictor_f
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"SimpleFeedForward": {"epochs": ag.space.Categorical(1, 2), "ETS": {}}},
+        hyperparameters={"SimpleFeedForward": {"epochs": space.Categorical(1, 2), "ETS": {}}},
         hyperparameter_tune_kwargs={
             "scheduler": "local",
             "searcher": "random",

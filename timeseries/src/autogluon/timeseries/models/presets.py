@@ -3,8 +3,9 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Type, Union
 
-import autogluon.core as ag
 import autogluon.timeseries as agts
+from autogluon.common import space
+from autogluon.core import constants
 
 from . import (
     ARIMAModel,
@@ -35,12 +36,12 @@ MODEL_TYPES = dict(
     ARIMA=ARIMAModel,
     Theta=ThetaModel,
     AutoGluonTabular=AutoGluonTabularModel,
+    RecursiveTabular=RecursiveTabularModel,
     Naive=NaiveModel,
     SeasonalNaive=SeasonalNaiveModel,
     AutoETS=AutoETSModel,
     AutoARIMA=AutoARIMAModel,
     DynamicOptimizedTheta=DynamicOptimizedThetaModel,
-    RecursiveTabular=RecursiveTabularModel,
 )
 if agts.MXNET_INSTALLED:
     from .gluonts.mx import (
@@ -69,12 +70,12 @@ DEFAULT_MODEL_PRIORITY = dict(
     SeasonalNaive=100,
     ETS=90,
     Theta=90,
-    ARIMA=80,
+    RecursiveTabular=80,
+    ARIMA=70,
     AutoGluonTabular=70,
     DeepAR=60,
     TemporalFusionTransformer=50,
     SimpleFeedForward=40,
-    TransformerMXNet=30,
     AutoARIMA=50,
     AutoETS=70,
     DynamicOptimizedTheta=60,
@@ -82,6 +83,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     DeepARMXNet=50,
     SimpleFeedForwardMXNet=30,
     TemporalFusionTransformerMXNet=50,
+    TransformerMXNet=30,
     MQCNNMXNet=10,
     MQRNNMXNet=10,
 )
@@ -102,6 +104,7 @@ def get_default_hps(key):
             "ARIMA": {},
             "ETS": {},
             "Theta": {},
+            "RecursiveTabular": {"max_num_samples": 100_000},
         },
         "medium_quality": {
             "Naive": {},
@@ -110,7 +113,7 @@ def get_default_hps(key):
             "ETS": {},
             "AutoETS": {},
             "Theta": {},
-            "AutoGluonTabular": {},
+            "RecursiveTabular": {},
             "DeepAR": {},
         },
         "high_quality": {
@@ -121,7 +124,7 @@ def get_default_hps(key):
             "AutoETS": {},
             "AutoARIMA": {},
             "Theta": {},
-            "AutoGluonTabular": {},
+            "RecursiveTabular": {},
             "DeepAR": {},
             "SimpleFeedForward": {},
             "TemporalFusionTransformer": {},
@@ -135,27 +138,22 @@ def get_default_hps(key):
             "AutoARIMA": {},
             "DynamicOptimizedTheta": {},
             "Theta": {},
-            "AutoGluonTabular": {},
+            "RecursiveTabular": {
+                "tabular_hyperparameters": {
+                    "NN_TORCH": {"proc.impute_strategy": "constant"},
+                    "GBM": [{}, {"extra_trees": True, "ag_args": {"name_suffix": "XT"}}],
+                },
+            },
             "DeepAR": {
-                "num_layers": ag.Int(1, 3, default=2),
-                "hidden_size": ag.Int(40, 80, default=40),
+                "num_layers": space.Int(1, 3, default=2),
+                "hidden_size": space.Int(40, 80, default=40),
             },
             "SimpleFeedForward": {
-                "hidden_dimensions": ag.Categorical([40], [40, 40], [120]),
+                "hidden_dimensions": space.Categorical([40], [40, 40], [120]),
             },
             "TemporalFusionTransformer": {},
         },
     }
-
-    # update with MXNet if installed
-    if agts.MXNET_INSTALLED:
-        mxnet_default_updates = {
-            "best_quality": {
-                "TransformerMXNet": {},
-            },
-        }
-        for k in default_model_hps:
-            default_model_hps[k] = dict(**default_model_hps[k], **mxnet_default_updates.get(k, {}))
 
     # For backwards compatibility
     default_model_hps["default"] = default_model_hps["medium_quality"]
@@ -223,7 +221,7 @@ def get_preset_models(
             model_hps_list = [model_hps_list]
 
         for model_hps in model_hps_list:
-            ag_args = model_hps.pop(ag.constants.AG_ARGS, {})
+            ag_args = model_hps.pop(constants.AG_ARGS, {})
             for key in ag_args:
                 if key not in VALID_AG_ARGS_KEYS:
                     raise ValueError(
@@ -272,7 +270,7 @@ def get_model_name(ag_args: Dict[str, Any], model_type: Type[AbstractTimeSeriesM
 
 def contains_searchspace(model_hyperparameters: Dict[str, Any]) -> bool:
     for hp_value in model_hyperparameters.values():
-        if isinstance(hp_value, ag.space.Space):
+        if isinstance(hp_value, space.Space):
             return True
     return False
 
