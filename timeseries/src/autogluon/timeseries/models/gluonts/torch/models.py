@@ -12,15 +12,14 @@ import numpy as np
 import torch
 from gluonts.core.component import from_hyperparameters
 from gluonts.model.forecast import QuantileForecast
+from gluonts.torch.model.d_linear import DLinearEstimator
 from gluonts.torch.model.deepar import DeepAREstimator
 from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
 from gluonts.torch.model.forecast import DistributionForecast
+from gluonts.torch.model.patch_tst import PatchTSTEstimator
 from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPredictor
 from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
 from gluonts.torch.model.tft import TemporalFusionTransformerEstimator
-from gluonts.torch.model.d_linear import DLinearEstimator
-from gluonts.torch.model.lag_tst import LagTSTEstimator
-from gluonts.torch.model.patch_tst import PatchTSTEstimator
 from pytorch_lightning.callbacks import Timer
 
 from autogluon.core.hpo.constants import CUSTOM_BACKEND
@@ -400,3 +399,8 @@ class PatchTSTModel(AbstractGluonTSPyTorchModel):
     @property
     def default_context_length(self) -> int:
         return 96
+
+    def _get_estimator_init_args(self) -> Dict[str, Any]:
+        init_kwargs = super()._get_estimator_init_args()
+        init_kwargs.setdefault("patch_len", 16)
+        return init_kwargs
