@@ -378,20 +378,24 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     @staticmethod
     def _sample_to_quantile_forecast(forecast: SampleForecast, quantile_levels: List[float]) -> QuantileForecast:
-        quantile_predictions = np.quantile(forecast.samples, q=quantile_levels, axis=0)
-        forecast_arrays = np.vstack([forecast.mean, quantile_predictions])
-        forecast_keys = ["mean"] + [str(q) for q in quantile_levels]
+        forecast_arrays = [forecast.mean]
+
+        quantile_keys = [str(q) for q in quantile_levels]
+        for q in quantile_keys:
+            forecast_arrays.append(forecast.quantile(q))
 
         forecast_init_args = dict(
-            forecast_arrays=forecast_arrays,
+            forecast_arrays=np.array(forecast_arrays),
             start_date=forecast.start_date,
-            forecast_keys=forecast_keys,
+            forecast_keys=["mean"] + quantile_keys,
             item_id=str(forecast.item_id),
         )
         return QuantileForecast(**forecast_init_args)
 
     @staticmethod
-    def _distribution_to_quantile_forecast(forecast: SampleForecast, quantile_levels: List[float]) -> QuantileForecast:
+    def _distribution_to_quantile_forecast(
+        forecast: DistributionForecast, quantile_levels: List[float]
+    ) -> QuantileForecast:
         raise NotImplementedError
 
     def _gluonts_forecasts_to_data_frame(
@@ -400,7 +404,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         quantile_levels: List[float],
         forecast_index: pd.MultiIndex,
     ) -> TimeSeriesDataFrame:
-        # if predictions are gluonts SampleForecasts, convert to quantile forecasts
+        # TODO: Concatenate all forecasts into a single tensor/object before converting?
+        # Especially for DistributionForecast this could result in massive speedups
         if isinstance(forecasts[0], SampleForecast):
             forecasts = [self._sample_to_quantile_forecast(f, quantile_levels) for f in forecasts]
         elif isinstance(forecasts[0], DistributionForecast):
