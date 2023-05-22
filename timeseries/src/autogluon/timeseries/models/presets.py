@@ -23,7 +23,7 @@ from . import (
     ThetaModel,
     ThetaStatsmodelsModel,
 )
-from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
+from .abstract import AbstractTimeSeriesModel
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
 
 logger = logging.getLogger(__name__)
@@ -167,15 +167,22 @@ def get_default_hps(key):
     return default_model_hps[key]
 
 
+def normalize_model_type_name(model_name: str) -> str:
+    if model_name.endswith("Model"):
+        model_name = model_name[: -len("Model")]
+    return model_name
+
+
 def get_preset_models(
     freq: str,
     prediction_length: int,
     path: str,
     eval_metric: str,
     eval_metric_seasonal_period: Optional[int],
-    hyperparameters: Union[str, Dict],
+    hyperparameters: Union[str, Dict, None],
     hyperparameter_tune: bool,
-    invalid_model_names: List[str],
+    all_assigned_names: List[str],
+    excluded_model_types: List[str],
     multi_window: bool = False,
     **kwargs,
 ):
@@ -196,30 +203,42 @@ def get_preset_models(
             f"hyperparameters must be a dict, a string or None (received {type(hyperparameters)}). "
             f"Please see the documentation for TimeSeriesPredictor.fit"
         )
+    # Handle model names ending with "Model", e.g., "DeepARModel" is mapped to "DeepAR"
+    hyperparameters_clean = {}
+    for model, model_hps_list in hyperparameters.items():
+        hyperparameters_clean[normalize_model_type_name(model)] = model_hps_list
+    hyperparameters = hyperparameters_clean
+
+    excluded_model_names = set()
+    if excluded_model_types is not None and len(excluded_model_types) > 0:
+        if not isinstance(excluded_model_types, list):
+            raise ValueError(f"`excluded_model_types` must be a list, received {type(excluded_model_types)}")
+        logger.info(f"Excluded model types: {excluded_model_types}")
+        for model in excluded_model_types:
+            excluded_model_names.add(normalize_model_type_name(model))
 
     if hyperparameter_tune:
         verify_contains_at_least_one_searchspace(hyperparameters)
     else:
         verify_contains_no_searchspaces(hyperparameters)
 
-    invalid_model_names = set(invalid_model_names)
-    all_assigned_names = set(invalid_model_names)
+    all_assigned_names = set(all_assigned_names)
 
     model_priority_list = sorted(hyperparameters.keys(), key=lambda x: DEFAULT_MODEL_PRIORITY.get(x, 0), reverse=True)
 
     for model in model_priority_list:
-        if isinstance(model, str):
-            if model not in MODEL_TYPES:
-                raise ValueError(f"Model {model} is not supported yet.")
-            model_type = MODEL_TYPES[model]
-        elif isinstance(model, AbstractTimeSeriesModelFactory):
-            model_type = model
-        elif not issubclass(model, AbstractTimeSeriesModel):
-            logger.warning(f"Customized model {model} does not inherit from {AbstractTimeSeriesModel}")
-            model_type = model
-        else:
-            logger.log(20, f"Custom Model Type Detected: {model}")
-            model_type = model
+        if not isinstance(model, str):
+            raise ValueError(f"Keys of the `hyperparameters` dictionary must be strings, received {type(model)}")
+        if model not in MODEL_TYPES:
+            raise ValueError(f"Model {model} is not supported yet.")
+        if model in excluded_model_names:
+            logger.info(
+                f"\tFound '{model}' model in hyperparameters, but '{model}' "
+                "is present in `excluded_model_types` and will be removed."
+            )
+            continue
+
+        model_type = MODEL_TYPES[model]
 
         model_hps_list = hyperparameters[model]
         if not isinstance(model_hps_list, list):
