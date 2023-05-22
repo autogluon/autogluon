@@ -29,6 +29,7 @@ class AbstractStatsForecastModel(AbstractLocalModel):
         model_type = self._get_model_type()
         model = model_type(**local_model_args)
 
+        # Code does conversion between confidence levels and quantiles
         levels = []
         quantile_to_key = {}
         for q in self.quantile_levels:

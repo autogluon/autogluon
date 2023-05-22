@@ -1,7 +1,7 @@
 import logging
 import time
 from multiprocessing import TimeoutError, cpu_count
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -128,11 +128,20 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         try:
             with statsmodels_joblib_warning_filter(), statsmodels_warning_filter():
-                predictions = executor(delayed(self._predict_wrapper)(ts, end_time=end_time) for ts in all_series)
+                predictions_with_flags = executor(
+                    delayed(self._predict_wrapper)(ts, end_time=end_time) for ts in all_series
+                )
         except TimeoutError:
             raise TimeLimitExceeded
 
-        predictions_df = pd.concat(predictions)
+        number_failed_models = sum(failed_flag for _, failed_flag in predictions_with_flags)
+        if number_failed_models > 0:
+            fraction_failed_models = number_failed_models / len(predictions_with_flags)
+            logger.warning(
+                f"\t{self.name} failed for {number_failed_models} time series ({100 * fraction_failed_models:.1f}%). "
+                "Fallback model SeasonalNaive was used for these time series."
+            )
+        predictions_df = pd.concat([pred for pred, _ in predictions_with_flags])
         predictions_df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
         return TimeSeriesDataFrame(predictions_df)
 
@@ -143,7 +152,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         # Remove time_limit for future predictions
         self.time_limit = None
 
-    def _predict_wrapper(self, time_series: pd.Series, end_time: Optional[float] = None) -> pd.DataFrame:
+    def _predict_wrapper(self, time_series: pd.Series, end_time: Optional[float] = None) -> Tuple[pd.DataFrame, bool]:
         if end_time is not None and time.time() >= end_time:
             raise TimeLimitExceeded
         try:
@@ -151,15 +160,16 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
                 time_series=time_series,
                 local_model_args=self._local_model_args.copy(),
             )
+            model_failed = False
         except Exception as e:
-            logger.debug(f"{self.name} failed with exception {e}, falling back to SeasonalNaive")
             result = seasonal_naive_forecast(
                 target=time_series.values.ravel(),
                 prediction_length=self.prediction_length,
                 quantile_levels=self.quantile_levels,
                 seasonal_period=self._seasonal_period,
             )
-        return result
+            model_failed = True
+        return result, model_failed
 
     def _predict_with_local_model(
         self,
