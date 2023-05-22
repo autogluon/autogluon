@@ -126,6 +126,7 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
     def _distribution_to_quantile_forecast(
         forecast: DistributionForecast, quantile_levels: List[float]
     ) -> QuantileForecast:
+        # Compute all quantiles in parallel instead of a for-loop
         quantiles = torch.tensor(quantile_levels, device=forecast.distribution.mean.device).reshape(-1, 1)
         quantile_predictions = forecast.distribution.icdf(quantiles).cpu().detach().numpy()
         forecast_arrays = np.vstack([forecast.mean, quantile_predictions])
@@ -158,9 +159,8 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
 
     Other Parameters
     ----------------
-    context_length : int, optional
+    context_length : int, default = max(10, 2 * prediction_length)
         Number of steps to unroll the RNN for before computing predictions
-        (default: None, in which case context_length = prediction_length)
     disable_static_features : bool, default = False
         If True, static features won't be used by the model even if they are present in the dataset.
         If False, static features will be used by the model if they are present in the dataset.
@@ -215,9 +215,8 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
 
     Other Parameters
     ----------------
-    context_length : int, optional
+    context_length : int, default = max(10, 2 * prediction_length)
         Number of time units that condition the predictions
-        (default: None, in which case context_length = prediction_length)
     hidden_dimensions: List[int], default = [20, 20]
         Size of hidden layers in the feedforward network
     distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
@@ -258,7 +257,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSPyTorchModel):
 
     Other Parameters
     ----------------
-    context_length : int, default = 64
+    context_length : int, default = max(64, 2 * prediction_length)
         Number of past values used for prediction.
     disable_static_features : bool, default = False
         If True, static features won't be used by the model even if they are present in the dataset.
@@ -291,9 +290,12 @@ class TemporalFusionTransformerModel(AbstractGluonTSPyTorchModel):
     supports_known_covariates = True
     supports_past_covariates = True
 
+    @property
+    def default_context_length(self) -> int:
+        return max(64, 2 * self.prediction_length)
+
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
-        init_kwargs["context_length"] = max(64, init_kwargs["context_length"])
         if self.num_feat_dynamic_real > 0:
             init_kwargs["dynamic_dims"] = [self.num_feat_dynamic_real]
         if self.num_past_feat_dynamic_real > 0:
@@ -306,27 +308,95 @@ class TemporalFusionTransformerModel(AbstractGluonTSPyTorchModel):
 
 
 class DLinearModel(AbstractGluonTSPyTorchModel):
+    """D-Linear model from GluonTS.
+
+    The model combines a moving window detrender with a multilayer perceptron (MLP) that predicts the distribution of
+    all the target value in the forecast horizon.
+
+    Based on `gluonts.torch.model.d_linear.DLinearEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.d_linear.html>`_.
+    See GluonTS documentation for additional hyperparameters.
+
+    References
+    ----------
+    .. [Zeng2023] Zeng, Ailing, et al.
+        "Are transformers effective for time series forecasting?"
+        AAAI Conference on Artificial Intelligence. 2023.
+
+    Other Parameters
+    ----------------
+    context_length : int, default = 96
+        Number of time units that condition the predictions
+    hidden_dimension: int, default = 20
+        Size of hidden layers in the feedforward network
+    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
+        Distribution to fit.
+    scaling : {"mean", "std", None}, default = "mean"
+        Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 64
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
+    weight_decay : float, default = 1e-8
+        Weight decay regularization parameter.
+    """
+
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DLinearEstimator
 
-    def _get_estimator_init_args(self) -> Dict[str, Any]:
-        init_kwargs = super()._get_estimator_init_args()
-        init_kwargs.setdefault("context_length", 10 * self.prediction_length)
-        return init_kwargs
-
-
-class LagTSTModel(AbstractGluonTSPyTorchModel):
-    gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = LagTSTEstimator
-
-    def _get_estimator_init_args(self) -> Dict[str, Any]:
-        init_kwargs = super()._get_estimator_init_args()
-        init_kwargs.setdefault("context_length", 10 * self.prediction_length)
-        return init_kwargs
+    @property
+    def default_context_length(self) -> int:
+        return 96
 
 
 class PatchTSTModel(AbstractGluonTSPyTorchModel):
+    """PatchTST model from GluonTS.
+
+    The model is based on a transformer that segments each time series into subseries-level patches.
+
+    Based on `gluonts.torch.model.d_linear.PatchTSTEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.patch_tst.html>`_.
+    See GluonTS documentation for additional hyperparameters.
+
+    References
+    ----------
+    .. [Nie2023] Nie, Yuqi, et al.
+        "A Time Series is Worth 64 Words: Long-term Forecasting with Transformers."
+        International Conference on Learning Representations. 2023.
+
+    Other Parameters
+    ----------------
+    context_length : int, default = 96
+        Number of time units that condition the predictions
+    patch_len : int, default = 16
+        Length of the patch.
+    stride : int, default = 8
+        Stride of the patch.
+    d_model : int, default = 32
+        Size of hidden layers in the Transformer encoder.
+    nhead : int, default = 4
+        Number of attention heads in the Transformer encoder which must divide d_model.
+    num_encoder_layers : int, default = 2
+        Number of layers in the Transformer encoder.
+    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
+        Distribution to fit.
+    scaling : {"mean", "std", None}, default = "mean"
+        Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 64
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
+    weight_decay : float, default = 1e-8
+        Weight decay regularization parameter.
+    """
+
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = PatchTSTEstimator
 
-    def _get_estimator_init_args(self) -> Dict[str, Any]:
-        init_kwargs = super()._get_estimator_init_args()
-        init_kwargs.setdefault("context_length", 10 * self.prediction_length)
-        return init_kwargs
+    @property
+    def default_context_length(self) -> int:
+        return 96

@@ -223,11 +223,15 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         if "callbacks" in kwargs:
             self.callbacks += kwargs["callbacks"]
 
+    @property
+    def default_context_length(self) -> int:
+        return max(10, 2 * self.prediction_length)
+
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""
         args = super()._get_model_params().copy()
         args.setdefault("batch_size", 64)
-        args.setdefault("context_length", max(10, 2 * self.prediction_length))
+        args.setdefault("context_length", self.default_context_length)
         args.update(
             dict(
                 freq=self.freq,
@@ -379,7 +383,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         forecast_keys = ["mean"] + [str(q) for q in quantile_levels]
 
         forecast_init_args = dict(
-            forecast_arrays=np.array(forecast_arrays),
+            forecast_arrays=forecast_arrays,
             start_date=forecast.start_date,
             forecast_keys=forecast_keys,
             item_id=str(forecast.item_id),

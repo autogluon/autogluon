@@ -17,6 +17,7 @@ from . import (
     DynamicOptimizedThetaModel,
     ETSModel,
     NaiveModel,
+    PatchTSTModel,
     RecursiveTabularModel,
     SeasonalNaiveModel,
     SimpleFeedForwardModel,
@@ -33,8 +34,9 @@ logger = logging.getLogger(__name__)
 MODEL_TYPES = dict(
     SimpleFeedForward=SimpleFeedForwardModel,
     DeepAR=DeepARModel,
-    TemporalFusionTransformer=TemporalFusionTransformerModel,
     DLinear=DLinearModel,
+    PatchTST=PatchTSTModel,
+    TemporalFusionTransformer=TemporalFusionTransformerModel,
     RecursiveTabular=RecursiveTabularModel,
     DirectTabular=DirectTabularModel,
     Naive=NaiveModel,
