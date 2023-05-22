@@ -6,7 +6,7 @@ import os
 import pprint
 import shutil
 import time
-from typing import Union, List, Tuple
+from typing import Union, List, Tuple, Optional
 import warnings
 
 import networkx as nx
@@ -16,7 +16,7 @@ import pandas as pd
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
-from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir, get_autogluon_metadata, compare_autogluon_metadata
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
@@ -100,6 +100,12 @@ class TabularPredictor:
             2: Standard logging
             3: Verbose logging (ex: log validation score every 50 iterations)
             4: Maximally verbose logging (ex: log validation score every iteration)
+    log_to_file: bool, default = True
+        Whether to save the logs into a file for later reference
+    log_file_path: str, default = "auto"
+        File path to save the logs.
+        If auto, logs will be saved under `predictor_path/logs/predictor_log.txt`.
+        Will be ignored if `log_to_file` is set to False
     sample_weight : str, default = None
         If specified, this column-name indicates which column of the data should be treated as sample weights. This column will NOT be considered as a predictive feature.
         Sample weights should be non-negative (and cannot be nan), with larger values indicating which rows are more important than others.
@@ -192,6 +198,7 @@ class TabularPredictor:
     predictor_file_name = 'predictor.pkl'
     _predictor_version_file_name = '__version__'
     _predictor_metadata_file_name = 'metadata.json'
+    _predictor_log_file_name = 'predictor_log.txt'
 
     def __init__(
             self,
@@ -200,6 +207,8 @@ class TabularPredictor:
             eval_metric=None,
             path=None,
             verbosity=2,
+            log_to_file=False,
+            log_file_path='auto',
             sample_weight=None,
             weight_evaluation=False,
             groups=None,
@@ -217,6 +226,12 @@ class TabularPredictor:
                 f"We do not recommend specifying weight_evaluation when sample_weight='{self.sample_weight}', instead specify appropriate eval_metric.")
         self._validate_init_kwargs(kwargs)
         path = setup_outputdir(path)
+        if log_to_file:
+            if log_file_path == "auto":
+                log_file_path = os.path.join(path, "logs", self._predictor_log_file_name)
+            log_file_path = os.path.abspath(os.path.normpath(log_file_path))
+            os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+            add_log_to_file(log_file_path)
 
         learner_type = kwargs.pop('learner_type', DefaultLearner)
         learner_kwargs = kwargs.pop('learner_kwargs', dict())
@@ -3221,6 +3236,35 @@ class TabularPredictor:
             predictor = cls._load(path=path)
 
         return predictor
+    
+    @classmethod
+    def load_log(cls, predictor_path: str = None, log_file_path: Optional[str] = None) -> List[str]:
+        """
+        Load log files of a predictor
+        
+        Parameters
+        ----------
+        predictor_path: Optional[str], default = None
+            Path to the predictor to load the log.
+            This can be used when the predictor was initialized with `log_file_path="auto"` to fetch the log file automatically
+        log_file_path: Optional[str], default = None
+            Path to the log file.
+            If you specified a `log_file_path` while initializing the predictor, you should use `log_file_path` to load the log file instead.
+            At least one of `predictor_path` or `log_file_path` must to be specified
+            
+        Return
+        ------
+        List[str]
+            A list containing lines of the log file
+        """
+        file_path = log_file_path
+        if file_path is None:
+            assert predictor_path is not None, "Please either provide `predictor_path` or `log_file_path` to load the log file"
+            file_path = os.path.join(predictor_path, "logs", cls._predictor_log_file_name)
+        assert os.path.isfile(file_path), f"Log file does not exist at {file_path}"
+        with open(file_path, "r") as f:
+            lines = f.readlines()
+        return lines
 
     @staticmethod
     def _validate_init_kwargs(kwargs):

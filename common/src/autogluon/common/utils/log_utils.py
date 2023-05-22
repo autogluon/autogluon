@@ -63,6 +63,13 @@ def set_logger_verbosity(verbosity: int, logger=None):
     elif verbosity > 4:
         verbosity = 4
     logger.setLevel(verbosity2loglevel(verbosity))
+    
+
+def add_log_to_file(file_path:str, logger: logging.Logger = None):
+    if logger is None:
+        logger = _logger_ag
+    fh = logging.FileHandler(file_path)
+    logger.addHandler(fh)
 
 
 def _check_if_kaggle() -> bool:

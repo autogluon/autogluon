@@ -27,6 +27,7 @@ from random import seed
 import numpy as np
 import pandas as pd
 import pytest
+import tempfile
 
 from autogluon.common import space
 from autogluon.core.utils import download, unzip
@@ -1049,3 +1050,36 @@ def test_tabular_raise_on_nonfinite_class_labels():
         with pytest.raises(ValueError) as ex_info:
             predictor.fit(train_data)
         assert str(ex_info.value).split()[-1] == str(idx)
+
+
+def test_tabular_log_to_file():
+    data_root = 'https://autogluon.s3.amazonaws.com/datasets/Inc/'
+    train_data = TabularDataset(data_root + 'train.csv')
+    train_data = train_data.sample(500)
+
+    predictor = TabularPredictor(label='class', log_to_file=True).fit(
+        train_data=train_data,
+        hyperparameters={
+            "GBM": {}
+        }
+    )
+    log = TabularPredictor.load_log(predictor_path=predictor.path)
+    assert "TabularPredictor saved." in log[-1]
+    
+    with tempfile.TemporaryDirectory() as tempdir:
+        log_file = os.path.join(tempdir, "temp.log")
+        predictor = TabularPredictor(
+            label='class',
+            log_to_file=True,
+            log_file_path=log_file
+        ).fit(
+            train_data=train_data,
+            hyperparameters={
+                "GBM": {}
+            }
+        )
+        log = TabularPredictor.load_log(log_file_path=log_file)
+        assert "TabularPredictor saved." in log[-1]
+    
+    with pytest.raises(AssertionError):
+        TabularPredictor.load_log()
