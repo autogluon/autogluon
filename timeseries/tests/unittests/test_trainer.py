@@ -342,7 +342,7 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
             "Naive": {},
             "ETS": {},
             "AutoETS": {"n_jobs": 1},
-            "AutoGluonTabular": {"tabular_hyperparameters": {"GBM": {}}},
+            "DirectTabular": {"tabular_hyperparameters": {"GBM": {}}},
             "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
         },
     )
@@ -433,7 +433,7 @@ def trained_and_refit_trainers():
                 "Naive": {},
                 "ETS": {"maxiter": 1},
                 "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
-                "AutoGluonTabular": {"tabular_hyperparameters": {"GBM": {}}},
+                "DirectTabular": {"tabular_hyperparameters": {"GBM": {}}},
                 "RecursiveTabular": {},
             },
         )

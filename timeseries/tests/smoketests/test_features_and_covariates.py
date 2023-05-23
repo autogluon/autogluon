@@ -71,7 +71,7 @@ def test_predictor_smoke_test(
         "SeasonalNaive": {},
         "ETS": DUMMY_MODEL_HPARAMS,
         "ARIMA": DUMMY_MODEL_HPARAMS,
-        "AutoGluonTabular": {},
+        "DirectTabular": {},
         "RecursiveTabular": {},
         "DeepAR": DUMMY_MODEL_HPARAMS,
         "SimpleFeedForward": DUMMY_MODEL_HPARAMS,
