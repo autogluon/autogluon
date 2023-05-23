@@ -168,6 +168,7 @@ def get_default_hps(key):
 
 
 def normalize_model_type_name(model_name: str) -> str:
+    """Remove 'Model' suffix from the end of the string, if it's present."""
     if model_name.endswith("Model"):
         model_name = model_name[: -len("Model")]
     return model_name
@@ -205,17 +206,21 @@ def get_preset_models(
         )
     # Handle model names ending with "Model", e.g., "DeepARModel" is mapped to "DeepAR"
     hyperparameters_clean = {}
-    for model, model_hps_list in hyperparameters.items():
-        hyperparameters_clean[normalize_model_type_name(model)] = model_hps_list
+    for key, value in hyperparameters.items():
+        if isinstance(key, str):
+            key = normalize_model_type_name(key)
+        hyperparameters_clean[key] = value
     hyperparameters = hyperparameters_clean
 
-    excluded_model_names = set()
+    excluded_models = set()
     if excluded_model_types is not None and len(excluded_model_types) > 0:
         if not isinstance(excluded_model_types, list):
             raise ValueError(f"`excluded_model_types` must be a list, received {type(excluded_model_types)}")
         logger.info(f"Excluded model types: {excluded_model_types}")
         for model in excluded_model_types:
-            excluded_model_names.add(normalize_model_type_name(model))
+            if not isinstance(model, str):
+                raise ValueError(f"Each entry in `excluded_model_types` must be a string, received {type(model)}")
+            excluded_models.add(normalize_model_type_name(model))
 
     if hyperparameter_tune:
         verify_contains_at_least_one_searchspace(hyperparameters)
@@ -227,18 +232,24 @@ def get_preset_models(
     model_priority_list = sorted(hyperparameters.keys(), key=lambda x: DEFAULT_MODEL_PRIORITY.get(x, 0), reverse=True)
 
     for model in model_priority_list:
-        if not isinstance(model, str):
-            raise ValueError(f"Keys of the `hyperparameters` dictionary must be strings, received {type(model)}")
-        if model not in MODEL_TYPES:
-            raise ValueError(f"Model {model} is not supported yet.")
-        if model in excluded_model_names:
-            logger.info(
-                f"\tFound '{model}' model in hyperparameters, but '{model}' "
-                "is present in `excluded_model_types` and will be removed."
+        if isinstance(model, str):
+            if model not in MODEL_TYPES:
+                raise ValueError(f"Model {model} is not supported yet.")
+            if model in excluded_models:
+                logger.info(
+                    f"\tFound '{model}' model in hyperparameters, but '{model}' "
+                    "is present in `excluded_model_types` and will be removed."
+                )
+                continue
+            model_type = MODEL_TYPES[model]
+        elif isinstance(model, type):
+            if not issubclass(model, AbstractTimeSeriesModel):
+                raise ValueError(f"Custom model type {model} must inherit from `AbstractTimeSeriesModel`.")
+            model_type = model
+        else:
+            raise ValueError(
+                f"Keys of the `hyperparameters` dictionary must be strings or types, received {type(model)}."
             )
-            continue
-
-        model_type = MODEL_TYPES[model]
 
         model_hps_list = hyperparameters[model]
         if not isinstance(model_hps_list, list):

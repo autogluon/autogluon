@@ -379,9 +379,9 @@ class TimeSeriesPredictor:
             If str is passed, will use a preset hyperparameter configuration defined in`
             `autogluon/timeseries/trainer/models/presets.py``.
 
-            If dict is provided, the keys are strings that indicate which models to train. Each value is itself a dict
-            containing hyperparameters for each of the trained models, or a list of such dicts. Any omitted
-            hyperparameters not specified here will be set to default. For example::
+            If dict is provided, the keys are strings or types that indicate which models to train. Each value is
+            itself a dict containing hyperparameters for each of the trained models, or a list of such dicts. Any
+            omitted hyperparameters not specified here will be set to default. For example::
 
                 predictor.fit(
                     ...
