@@ -122,7 +122,7 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
         ),
     ],
 )
-def test_matcher(
+def test_fit_matcher(
     dataset_name,
     query,
     response,
