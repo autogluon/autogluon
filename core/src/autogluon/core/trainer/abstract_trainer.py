@@ -234,6 +234,7 @@ class AbstractTrainer:
             self.set_model_attribute(model=model, attribute='path', val=path)
 
     def create_contexts(self, path_context: str) -> (str, dict):
+        self.path = PathConverter.to_current(self.path)
         path = path_context
         model_paths = self.get_models_attribute_dict(attribute='path')
         model_paths = {model: PathConverter.to_current(model_path) for model, model_path in model_paths.items()}
