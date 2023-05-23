@@ -458,6 +458,10 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.learner import load_learner
         model = super().load(path, reset_paths=reset_paths, verbose=verbose)
         if model._load_model:
+            import pathlib
+            import platform
+            plt = platform.system()
+            if plt == 'Linux': pathlib.WindowsPath = pathlib.PosixPath
             model.model = load_pkl.load_with_fn(f'{model.path}{model.model_internals_file_name}', lambda p: load_learner(p), verbose=verbose)
         model._load_model = None
         return model
