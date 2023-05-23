@@ -9,15 +9,16 @@ from typing import Any, Dict, List, Optional, Type, Union
 import pandas as pd
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.common.utils.utils import setup_outputdir
+from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_pkl
+from autogluon.core.utils.loaders import load_pkl, load_str
+from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 from autogluon.timeseries.utils.random import set_random_seed
+from autogluon.timeseries.version import __version__ as current_ag_version
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,7 @@ class TimeSeriesPredictor:
     """
 
     predictor_file_name = "predictor.pkl"
+    _predictor_version_file_name = "__version__"
 
     def __init__(
         self,
@@ -655,13 +657,24 @@ class TimeSeriesPredictor:
         return self.evaluate(data, **kwargs)
 
     @classmethod
-    def load(cls, path: str) -> "TimeSeriesPredictor":
+    def _load_version_file(cls, path: str) -> str:
+        version_file_path = path + cls._predictor_version_file_name
+        version = load_str.load(path=version_file_path)
+        return version
+
+    @classmethod
+    def load(cls, path: str, require_version_match: bool = True) -> "TimeSeriesPredictor":
         """Load an existing ``TimeSeriesPredictor`` from given ``path``.
 
         Parameters
         ----------
         path : str
             Path where the predictor was saved via :meth:`~autogluon.timeseries.TimeSeriesPredictor.save`.
+        require_version_match : bool, default = True
+            If True, will raise an AssertionError if the ``autogluon.timeseries`` version of the loaded predictor does
+            not match the installed version of ``autogluon.timeseries``.
+            If False, will allow loading of models trained on incompatible versions, but is NOT recommended. Users may
+            run into numerous issues if attempting this.
 
         Returns
         -------
@@ -671,12 +684,33 @@ class TimeSeriesPredictor:
             raise ValueError("`path` cannot be None or empty in load().")
         path = setup_outputdir(path, warn_if_exist=False)
 
+        try:
+            version_saved = cls._load_version_file(path=path)
+        except:
+            logger.warning(
+                f'WARNING: Could not find version file at "{path + cls._predictor_version_file_name}".\n'
+                f"This means that the predictor was fit in a version `<=0.7.0`."
+            )
+            version_saved = "Unknown (Likely <=0.7.0)"
+
+        check_saved_predictor_version(
+            version_current=current_ag_version,
+            version_saved=version_saved,
+            require_version_match=require_version_match,
+            logger=logger,
+        )
+
         logger.info(f"Loading predictor from path {path}")
         learner = AbstractLearner.load(path)
         predictor = load_pkl.load(path=learner.path + cls.predictor_file_name)
         predictor._learner = learner
         predictor.path = learner.path
         return predictor
+
+    def _save_version_file(self):
+        version_file_contents = str(current_ag_version)
+        version_file_path = self.path + self._predictor_version_file_name
+        save_str.save(path=version_file_path, data=version_file_contents, verbose=False)
 
     def save(self) -> None:
         """Save this predictor to file in directory specified by this Predictor's ``path``.
@@ -688,6 +722,7 @@ class TimeSeriesPredictor:
         self._learner = None
         save_pkl.save(path=tmp_learner.path + self.predictor_file_name, object=self)
         self._learner = tmp_learner
+        self._save_version_file()
 
     def info(self) -> Dict[str, Any]:
         """Returns a dictionary of objects each describing an attribute of the training process and trained models."""
