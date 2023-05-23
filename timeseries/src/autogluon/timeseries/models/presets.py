@@ -21,6 +21,7 @@ from . import (
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
     ThetaModel,
+    ThetaStatsmodelsModel,
 )
 from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
@@ -32,9 +33,6 @@ MODEL_TYPES = dict(
     SimpleFeedForward=SimpleFeedForwardModel,
     DeepAR=DeepARModel,
     TemporalFusionTransformer=TemporalFusionTransformerModel,
-    ETS=ETSModel,
-    ARIMA=ARIMAModel,
-    Theta=ThetaModel,
     AutoGluonTabular=AutoGluonTabularModel,
     RecursiveTabular=RecursiveTabularModel,
     Naive=NaiveModel,
@@ -42,6 +40,10 @@ MODEL_TYPES = dict(
     AutoETS=AutoETSModel,
     AutoARIMA=AutoARIMAModel,
     DynamicOptimizedTheta=DynamicOptimizedThetaModel,
+    Theta=ThetaModel,
+    ARIMA=ARIMAModel,
+    ETS=ETSModel,
+    ThetaStatsmodels=ThetaStatsmodelsModel,
 )
 if agts.MXNET_INSTALLED:
     from .gluonts.mx import (

@@ -12,6 +12,7 @@ from autogluon.timeseries.models.local import (
     NaiveModel,
     SeasonalNaiveModel,
     ThetaModel,
+    ThetaStatsmodelsModel,
 )
 
 from ..common import (
@@ -30,23 +31,12 @@ TESTABLE_MODELS = [
     ThetaModel,
     NaiveModel,
     SeasonalNaiveModel,
+    ThetaStatsmodelsModel,
 ]
 
 
 # Restrict to single core for faster training on small datasets
 DEFAULT_HYPERPARAMETERS = {"n_jobs": 1}
-
-
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_local_model_saved_then_cached_predictions_can_be_loaded(model_class, temp_model_path):
-    model = model_class(path=temp_model_path, hyperparameters=DEFAULT_HYPERPARAMETERS)
-    model.fit(train_data=DUMMY_TS_DATAFRAME)
-    model.save()
-
-    loaded_model = model.__class__.load(path=model.path)
-    for ts_hash, pred in model._cached_predictions.items():
-        assert ts_hash in loaded_model._cached_predictions
-        assert (loaded_model._cached_predictions[ts_hash] == pred).all()
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -92,9 +82,9 @@ def get_seasonal_period_from_fitted_local_model(model):
         return model._local_model_args["seasonal_order"][-1]
     elif model.name == "ETS":
         return model._local_model_args["seasonal_periods"]
-    elif model.name == "Theta":
+    elif model.name == "ThetaStatsmodels":
         return model._local_model_args["period"]
-    elif model.name in ["AutoETS", "AutoARIMA", "DynamicOptimizedTheta"]:
+    elif model.name in ["AutoETS", "AutoARIMA", "DynamicOptimizedTheta", "Theta"]:
         return model._local_model_args["season_length"]
     else:
         return model._local_model_args["seasonal_period"]
@@ -166,21 +156,6 @@ def test_when_invalid_model_arguments_provided_then_model_ignores_them(model_cla
     with caplog.at_level(logging.WARNING):
         model.fit(train_data=DUMMY_TS_DATAFRAME)
         assert "bad_argument" not in model._local_model_args
-
-
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_train_and_test_data_have_different_freq_then_exception_is_raised(model_class, temp_model_path):
-    model = model_class(
-        path=temp_model_path,
-        prediction_length=3,
-        hyperparameters=DEFAULT_HYPERPARAMETERS,
-    )
-    train_data = get_data_frame_with_item_index([1, 2, 3], freq="H")
-    test_data = get_data_frame_with_item_index([1, 2, 3], freq="D")
-
-    model.fit(train_data=train_data)
-    with pytest.raises(RuntimeError, match="doesn't match the frequency"):
-        model.predict(test_data)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)

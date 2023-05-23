@@ -9,15 +9,13 @@ from .local import (
     NaiveModel,
     SeasonalNaiveModel,
     ThetaModel,
+    ThetaStatsmodelsModel,
 )
 
 __all__ = [
     "DeepARModel",
     "SimpleFeedForwardModel",
     "TemporalFusionTransformerModel",
-    "ARIMAModel",
-    "ETSModel",
-    "ThetaModel",
     "AutoGluonTabularModel",
     "RecursiveTabularModel",
     "NaiveModel",
@@ -25,4 +23,8 @@ __all__ = [
     "AutoETSModel",
     "AutoARIMAModel",
     "DynamicOptimizedThetaModel",
+    "ThetaModel",
+    "ARIMAModel",
+    "ETSModel",
+    "ThetaStatsmodelsModel",
 ]
