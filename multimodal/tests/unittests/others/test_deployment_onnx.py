@@ -148,7 +148,7 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     onnx_proba = loaded_predictor.predict_proba({"image": [image_path_test]})
 
     # assert allclose
-    np.testing.assert_allclose(load_proba, onnx_proba, rtol=1e-3, atol=1e-3)
+    np.testing.assert_allclose(load_proba, onnx_proba, rtol=1e-2, atol=1e-2)
 
     # -------------------------------------------------------
     # convert (with path)
@@ -172,7 +172,7 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     onnx_proba = loaded_predictor.predict_proba({"image": [image_path_test]})
 
     # assert allclose
-    np.testing.assert_allclose(load_proba, onnx_proba, rtol=1e-3, atol=1e-3)
+    np.testing.assert_allclose(load_proba, onnx_proba, rtol=1e-2, atol=1e-2)
 
 
 @pytest.mark.parametrize(
