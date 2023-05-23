@@ -458,10 +458,13 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.learner import load_learner
         model = super().load(path, reset_paths=reset_paths, verbose=verbose)
         if model._load_model:
+            # Need the following logic to allow cross os loading of fastai model
+            # https://github.com/fastai/fastai/issues/1482
             import pathlib
             import platform
             plt = platform.system()
-            if plt == 'Linux': pathlib.WindowsPath = pathlib.PosixPath
+            if plt != 'Windows':
+                pathlib.WindowsPath = pathlib.PosixPath
             model.model = load_pkl.load_with_fn(f'{model.path}{model.model_internals_file_name}', lambda p: load_learner(p), verbose=verbose)
         model._load_model = None
         return model
