@@ -41,7 +41,7 @@ from ..constants import (
     XYWH,
     XYXY,
 )
-from .utils import lookup_mmdet_config, update_mmdet_config
+from .utils import freeze_model_layers, lookup_mmdet_config, update_mmdet_config
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         classes: Optional[list] = None,
         pretrained: Optional[bool] = True,
         output_bbox_format: Optional[str] = XYXY,
+        frozen_layers: Optional[list] = None,
     ):
         """
         Load a pretrained object detector from MMdetection.
@@ -82,6 +83,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.config_file = config_file
         self.classes = classes
+        self.frozen_layers = frozen_layers
 
         if output_bbox_format.lower() in BBOX_FORMATS:
             self.output_bbox_format = output_bbox_format.lower()
@@ -97,6 +99,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
         self._update_classes(classes)
         self._load_checkpoint(self.checkpoint_file)
+
+        freeze_model_layers(self.model, self.frozen_layers)
 
     def _reset_classes(self, classes: list):
         temp_ckpt_file = f"temp_ckpt_{int(time.time()*1000)}.pth"
@@ -142,7 +146,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id <= 0]
-        self.backbone_layer_names = self.get_backbone_layer_names()
 
     def save(self, save_path: str = "./", tokenizers: Optional[dict] = None):
 
@@ -390,16 +393,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             name_to_id = self.get_yolox_layer_ids()
 
         return name_to_id
-
-    def get_backbone_layer_names(self):
-        backbone_layer_names = []
-        backbone_layers_patterns = [
-            "backbone",
-        ]
-        for n, _ in self.named_parameters():
-            if any(pattern in n for pattern in backbone_layers_patterns):
-                backbone_layer_names.append(n)
-        return backbone_layer_names
 
     def get_yolox_layer_ids(self):
         # logic not straight forward, need to print out the model to understand

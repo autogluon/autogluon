@@ -1333,7 +1333,6 @@ class MultiModalPredictor(ExportMixin):
         elif self._problem_type == OBJECT_DETECTION:
             task = MMDetLitModule(
                 model=model,
-                freeze_backbone=config.optimization.freeze_backbone,  # TODO: add support for freeze backbone in other lit modules (currently mmdet only)
                 **metrics_kwargs,
                 **optimization_kwargs,
             )

@@ -21,12 +21,12 @@ except ImportError as e:
 from ..constants import AUTOMM, IMAGE, LABEL
 from ..utils import unpack_datacontainers
 from .utils import (
-    apply_freeze_backbone_lr,
     apply_layerwise_lr_decay,
     apply_single_lr,
     apply_two_stages_lr,
     get_lr_scheduler,
     get_optimizer,
+    remove_parameters_without_grad,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,6 @@ class MMDetLitModule(pl.LightningModule):
         model,
         optim_type: Optional[str] = None,
         lr_choice: Optional[str] = None,
-        freeze_backbone: Optional[str] = None,
         lr_schedule: Optional[str] = None,
         lr: Optional[float] = None,
         lr_decay: Optional[float] = None,
@@ -294,12 +293,7 @@ class MMDetLitModule(pl.LightningModule):
                 **kwargs,
             )
 
-        if "freeze_backbone" in self.hparams and self.hparams.freeze_backbone:
-            logger.debug("applying freeze backbone learning rate...")
-            grouped_parameters = apply_freeze_backbone_lr(
-                optimizer_grouped_parameters=grouped_parameters,
-                **kwargs,
-            )
+        grouped_parameters = remove_parameters_without_grad(grouped_parameters=grouped_parameters)
 
         optimizer = get_optimizer(
             optim_type=self.hparams.optim_type,

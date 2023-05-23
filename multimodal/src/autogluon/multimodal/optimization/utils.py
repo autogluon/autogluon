@@ -629,56 +629,29 @@ def get_trainable_params_efficient_finetune(
     return trainable_param_names
 
 
-def apply_freeze_backbone_lr(
-    model: nn.Module,
-    lr: float,
-    weight_decay: float,
-    optimizer_grouped_parameters: List,
-    return_params: Optional[bool] = True,
+def remove_parameters_without_grad(
+    grouped_parameters: List,
 ):
     """
-    Set up the pretrained backbone to be frozen.
-    Head layers use the normal learning rate (lr).
-    Layer normalization parameters and other layers' bias parameters don't use weight decay.
+    Remove layers
 
     Parameters
     ----------
-    model
-        A Pytorch model.
-    lr
-        The learning rate.
-    lr_mult
-        The multiplier (0, 1) to scale down the learning rate.
-    weight_decay
-        Weight decay.
-    return_params
-        return_params
-        Whether to return parameters or their names. If you want to double-check
-        whether the learning rate setup is as expected, you can set "return_params=False",
-        and print the layer names along with their learning rates through
-        "print("Param groups = %s" % json.dumps(optimizer_grouped_parameters, indent=2))".
+    grouped_parameters
+        The grouped parameters or their names output from lr_choice.
 
     Returns
     -------
-    The grouped parameters or their names.
+    The updated grouped parameters or their names.
     """
-    if hasattr(model, "backbone_layer_names"):
-        is_nonfrozen_layer = lambda n: not any(bb in n for bb in model.backbone_layer_names)
-    else:  # freeze all non-head layers if backbone layers are not specified
-        is_nonfrozen_layer = lambda n: any(bb in n for bb in model.head_layer_names)
-
-    for n, p in model.named_parameters():
-        if not is_nonfrozen_layer(n):
-            p.requires_grad = False
-
-    for group_idx, group_param in enumerate(optimizer_grouped_parameters):
+    for group_idx, group_param in enumerate(grouped_parameters):
         updated_params = []
         for p in group_param["params"]:
             if p.requires_grad:
                 updated_params.append(p)
-        optimizer_grouped_parameters[group_idx]["params"] = updated_params
+        grouped_parameters[group_idx]["params"] = updated_params
 
-    return optimizer_grouped_parameters
+    return grouped_parameters
 
 
 def apply_layerwise_lr_decay(

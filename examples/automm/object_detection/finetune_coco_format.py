@@ -154,8 +154,8 @@ def tutorial_script_for_finetune_yoloxo365_pothole_in_coco_format():
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": "yolox_l_objects365",
+            "model.mmdet_image.frozen_layers": ["backbone"],
             "env.num_gpus": num_gpus,
-            "optimization.freeze_backbone": True,
         },
         problem_type="object_detection",
         sample_data_path=train_path,

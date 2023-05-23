@@ -3,7 +3,6 @@ optimization:
   learning_rate: 1.0e-4
   weight_decay: 0.001
   lr_choice: "layerwise_decay"
-  freeze_backbone: False
   lr_decay: 0.9
   lr_schedule: "cosine_decay"
   max_epochs: 10

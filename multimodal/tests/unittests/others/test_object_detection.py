@@ -389,8 +389,8 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "model.mmdet_image.frozen_layers": ["backbone"],
             "env.num_gpus": 1,
-            "optimization.freeze_backbone": True,
         },
         problem_type="object_detection",
         sample_data_path=train_df,
