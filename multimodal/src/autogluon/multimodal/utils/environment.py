@@ -9,6 +9,8 @@ import torch
 from pytorch_lightning.accelerators import find_usable_cuda_devices
 from torch import nn
 
+from autogluon.common.utils.resource_utils import ResourceManager
+
 from ..constants import AUTOMM, OBJECT_DETECTION, OCR
 
 logger = logging.getLogger(__name__)
@@ -40,7 +42,7 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
     config_num_gpus = (
         math.floor(config_num_gpus) if isinstance(config_num_gpus, (int, float)) else len(config_num_gpus)
     )
-    detected_num_gpus = torch.cuda.device_count()
+    detected_num_gpus = ResourceManager.get_gpu_count_torch()
 
     if config_num_gpus < 0:  # In case config_num_gpus is -1, meaning using all gpus.
         num_gpus = detected_num_gpus

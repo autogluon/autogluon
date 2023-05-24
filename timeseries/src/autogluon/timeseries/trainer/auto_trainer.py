@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from ..models.presets import get_preset_models
 from .abstract_trainer import AbstractTimeSeriesTrainer, TimeSeriesDataFrame
@@ -23,9 +23,10 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune,
             quantiles=quantile_levels,
-            invalid_model_names=self._get_banned_model_names(),
+            all_assigned_names=self._get_banned_model_names(),
             target=self.target,
             metadata=self.metadata,
+            excluded_model_types=kwargs.get("excluded_model_types"),
             multi_window=multi_window,
         )
 
@@ -35,6 +36,7 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
         hyperparameters: Union[str, Dict[Any, Dict]],
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
+        excluded_model_types: Optional[List[str]] = None,
         time_limit: float = None,
     ):
         """
@@ -53,6 +55,8 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             Optional validation data set to report validation scores on.
         hyperparameter_tune_kwargs
             Args for hyperparameter tuning
+        excluded_model_types
+            Names of models that should not be trained, even if listed in `hyperparameters`.
         time_limit
             Time limit for training
         """
@@ -61,5 +65,6 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             val_data=val_data,
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            excluded_model_types=excluded_model_types,
             time_limit=time_limit,
         )

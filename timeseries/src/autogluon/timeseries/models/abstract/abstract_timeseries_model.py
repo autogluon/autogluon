@@ -462,10 +462,3 @@ class AbstractTimeSeriesModel(AbstractModel):
             return {}
         else:
             return self._user_params.copy()
-
-
-class AbstractTimeSeriesModelFactory:
-    """Factory class interface for callable objects that produce timeseries models"""
-
-    def __call__(self, *args, **kwargs) -> AbstractTimeSeriesModel:
-        raise NotImplementedError

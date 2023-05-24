@@ -37,9 +37,9 @@ def try_import_mxnet():
     mx_version = '1.6.0'
     try:
         import mxnet as mx
-        from distutils.version import LooseVersion
+        from packaging import version
 
-        if LooseVersion(mx.__version__) < LooseVersion(mx_version):
+        if version.parse(mx.__version__) < version.parse(mx_version):
             msg = (
                 "Legacy mxnet=={} detected, some new modules will not work properly. "
                 "mxnet>={} is required. You can use pip to upgrade mxnet "
@@ -65,9 +65,9 @@ def try_import_ray() -> ModuleType:
     ray_max_version = ray_max_version_os_map.get(current_os, RAY_MAX_VERSION)
     try:
         import ray
-        from distutils.version import LooseVersion
+        from packaging import version
 
-        if LooseVersion(ray.__version__) < LooseVersion(ray_min_version) or LooseVersion(ray.__version__) >= LooseVersion(ray_max_version):
+        if version.parse(ray.__version__) < version.parse(ray_min_version) or version.parse(ray.__version__) >= version.parse(ray_max_version):
             msg = (
                 f"ray=={ray.__version__} detected. "
                 f"{ray_min_version} <= ray < {ray_max_version} is required. You can use pip to install certain version of ray "
@@ -98,13 +98,13 @@ def try_import_ray_lightning():
         import pkg_resources
         import pytorch_lightning
         import ray_lightning
-        from distutils.version import LooseVersion
+        from packaging import version
         
         ray_lightning_version = pkg_resources.get_distribution('ray_lightning').version # ray_lightning doesn't have __version__...
         
-        if not (LooseVersion(supported_ray_lightning_min_version)
-                <= LooseVersion(ray_lightning_version)
-                < LooseVersion(supported_ray_lightning_max_version)):
+        if not (version.parse(supported_ray_lightning_min_version)
+                <= version.parse(ray_lightning_version)
+                < version.parse(supported_ray_lightning_max_version)):
             logger.log(
                 f"ray_lightning=={ray_lightning_version} detected. "
                 f"{supported_ray_lightning_min_version} <= ray_lighting < {supported_ray_lightning_max_version} is required."
@@ -117,13 +117,13 @@ def try_import_ray_lightning():
             ray_lightning_min_version, ray_lightning_max_version = ray_lightning_versions
             torch_lightning_min_version, torch_lightning_max_version = torch_lightning_versions
             if (
-                LooseVersion(ray_lightning_min_version)
-                <= LooseVersion(ray_lightning_version)
-                < LooseVersion(ray_lightning_max_version)
+                version.parse(ray_lightning_min_version)
+                <= version.parse(ray_lightning_version)
+                < version.parse(ray_lightning_max_version)
             ):
-                if not (LooseVersion(torch_lightning_min_version)
-                        <= LooseVersion(pytorch_lightning.__version__)
-                        < LooseVersion(torch_lightning_max_version)):
+                if not (version.parse(torch_lightning_min_version)
+                        <= version.parse(pytorch_lightning.__version__)
+                        < version.parse(torch_lightning_max_version)):
                     logger.log(
                         f"Found ray_lightning {ray_lightning_version} that's not compatible with pytorch_lightning."
                         f"The compatible version of pytorch_lightning is >= {torch_lightning_min_version} and < {torch_lightning_max_version}."

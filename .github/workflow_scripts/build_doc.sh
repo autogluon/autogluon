@@ -8,10 +8,12 @@ function build_doc {
 
     source $(dirname "$0")/write_to_s3.sh
     source $(dirname "$0")/setup_mmcv.sh
+    source $(dirname "$0")/setup_groundingdino.sh
 
     setup_build_contrib_env
     bash docs/build_pip_install.sh
     setup_mmcv
+    setup_groundingdino
 
     if [[ -n $PR_NUMBER ]]; then
         BUCKET="autogluon-ci"

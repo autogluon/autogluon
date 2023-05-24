@@ -5,7 +5,7 @@ import logging
 import os
 import platform
 import sys
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from ..version import __version__
 try:
@@ -137,3 +137,33 @@ def bytes_to_mega_bytes(memory_amount: int) -> int:
     """ Utility to convert a number of bytes (int) into a number of mega bytes (int)
     """
     return memory_amount >> 20
+
+
+def check_saved_predictor_version(
+    version_current: str,
+    version_saved: str,
+    require_version_match: bool = True,
+    logger: Optional[logging.Logger] = None,
+) -> None:
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
+    if version_saved != version_current:
+        logger.warning("")
+        logger.warning("############################## WARNING ##############################")
+        logger.warning(
+            "WARNING: AutoGluon version differs from the version used to create the predictor! "
+            "This may lead to instability and it is highly recommended the predictor be loaded "
+            "with the exact AutoGluon version it was created with."
+        )
+        logger.warning(f"\tPredictor Version: {version_saved}")
+        logger.warning(f"\tCurrent Version:   {version_current}")
+        logger.warning("############################## WARNING ##############################")
+        logger.warning("")
+
+        if require_version_match:
+            raise AssertionError(
+                f"Predictor was created on version {version_saved} but is being loaded with version {version_current}. "
+                f"Please ensure the versions match to avoid instability. While it is NOT recommended, "
+                f"this error can be bypassed by specifying `require_version_match=False`."
+            )
