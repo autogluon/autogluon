@@ -206,7 +206,6 @@ class TimeSeriesPredictor:
             df = df.get_reindexed_view(freq="S")
         # MultiIndex.is_monotonic_increasing checks if index is sorted by ["item_id", "timestamp"]
         if not df.index.is_monotonic_increasing:
-            logger.info("Provided data is not sorted by item_id & timestamp, sorting...")
             df = df.sort_index()
             df._cached_freq = None  # in case frequency was incorrectly cached as IRREGULAR_TIME_INDEX_FREQSTR
         if df.freq is None:
@@ -619,9 +618,11 @@ class TimeSeriesPredictor:
         """
         if random_seed is not None:
             set_random_seed(random_seed)
+        # Don't use data.item_ids in case data is not a TimeSeriesDataFrame
+        original_item_id_order = data.reset_index()[ITEMID].unique()
         data = self._check_and_prepare_data_frame(data)
         predictions = self._learner.predict(data, known_covariates=known_covariates, model=model)
-        return predictions.reindex(data.item_ids, level=ITEMID)  # make sure that item_id order is preserved
+        return predictions.reindex(original_item_id_order, level=ITEMID)
 
     def evaluate(self, data: Union[TimeSeriesDataFrame, pd.DataFrame], **kwargs):
         """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``
