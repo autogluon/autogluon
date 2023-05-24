@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import itertools
+import logging
 from collections.abc import Iterable
 from typing import Any, List, Optional, Tuple, Type
 
@@ -11,6 +12,8 @@ from joblib.parallel import Parallel, delayed
 from pandas.core.internals import ArrayManager, BlockManager
 
 from autogluon.common.loaders import load_pd
+
+logger = logging.getLogger(__name__)
 
 ITEMID = "item_id"
 TIMESTAMP = "timestamp"
@@ -325,17 +328,15 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if id_column is not None:
             assert id_column in df.columns, f"Column '{id_column}' not found!"
             if id_column != ITEMID and ITEMID in df.columns:
-                raise ValueError(
-                    f"Data contains column '{ITEMID}'. This name is used internally by AutoGluon. Please rename this column"
-                )
+                logger.warning(f"Renaming existing column '{ITEMID}' -> '__{ITEMID}' to avoid name collisions.")
+                df.rename(columns={ITEMID: "__" + ITEMID}, inplace=True)
             df.rename(columns={id_column: ITEMID}, inplace=True)
 
         if timestamp_column is not None:
             assert timestamp_column in df.columns, f"Column '{timestamp_column}' not found!"
             if timestamp_column != TIMESTAMP and TIMESTAMP in df.columns:
-                raise ValueError(
-                    f"Data contains column '{TIMESTAMP}'. This name is used internally by AutoGluon. Please rename this column"
-                )
+                logger.warning(f"Renaming existing column '{TIMESTAMP}' -> '__{TIMESTAMP}' to avoid name collisions.")
+                df.rename(columns={TIMESTAMP: "__" + TIMESTAMP}, inplace=True)
             df.rename(columns={timestamp_column: TIMESTAMP}, inplace=True)
 
         if TIMESTAMP in df.columns:

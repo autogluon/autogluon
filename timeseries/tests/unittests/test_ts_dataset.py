@@ -834,15 +834,15 @@ def test_when_dropna_called_then_missing_values_are_dropped():
     assert not df_dropped.isna().any().any()
 
 
-def test_when_data_contains_item_id_column_that_is_unused_then_exception_is_raised():
+def test_when_data_contains_item_id_column_that_is_unused_then_column_is_renamed():
     df = SAMPLE_DATAFRAME.copy()
     df["custom_id"] = df[ITEMID]
-    with pytest.raises(ValueError, match=f"Data contains column '{ITEMID}'"):
-        TimeSeriesDataFrame.from_data_frame(df, id_column="custom_id")
+    ts_df = TimeSeriesDataFrame.from_data_frame(df, id_column="custom_id")
+    assert f"__{ITEMID}" in ts_df.columns
 
 
-def test_when_data_contains_timestamp_column_that_is_unused_then_exception_is_raised():
+def test_when_data_contains_timestamp_column_that_is_unused_then_column_is_renamed():
     df = SAMPLE_DATAFRAME.copy()
     df["custom_timestamp"] = df[TIMESTAMP]
-    with pytest.raises(ValueError, match=f"Data contains column '{TIMESTAMP}'"):
-        TimeSeriesDataFrame.from_data_frame(df, timestamp_column="custom_timestamp")
+    ts_df = TimeSeriesDataFrame.from_data_frame(df, timestamp_column="custom_timestamp")
+    assert f"__{TIMESTAMP}" in ts_df.columns
