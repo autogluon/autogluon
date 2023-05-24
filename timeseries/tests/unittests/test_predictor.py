@@ -634,3 +634,17 @@ def test_when_refit_full_is_passed_to_fit_then_refit_full_is_skipped(temp_model_
             refit_method.assert_called()
         else:
             refit_method.assert_not_called()
+
+
+def test_when_excluded_model_names_provided_then_excluded_models_are_not_trained(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    predictor.fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters={
+            "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
+            "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
+        },
+        excluded_model_types=["DeepAR"],
+    )
+    leaderboard = predictor.leaderboard()
+    assert leaderboard["model"].values == ["SimpleFeedForward"]

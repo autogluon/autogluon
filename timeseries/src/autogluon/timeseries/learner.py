@@ -124,6 +124,7 @@ class TimeSeriesLearner(AbstractLearner):
             val_data=val_data,
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            excluded_model_types=kwargs.get("excluded_model_types"),
             time_limit=time_limit,
         )
         self.save_trainer(trainer=self.trainer)

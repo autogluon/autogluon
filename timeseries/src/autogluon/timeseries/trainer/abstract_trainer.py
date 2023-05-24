@@ -549,6 +549,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         models: Optional[List[AbstractTimeSeriesModel]] = None,
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
+        excluded_model_types: Optional[List[str]] = None,
         time_limit: Optional[float] = None,
     ) -> List[str]:
 
@@ -578,6 +579,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
                 freq=train_data.freq,
                 multi_window=self.num_val_windows > 0,
+                excluded_model_types=excluded_model_types,
             )
 
         logger.info(f"Models that will be trained: {list(m.name for m in models)}")

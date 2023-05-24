@@ -291,6 +291,7 @@ class TimeSeriesPredictor:
         presets: Optional[str] = None,
         hyperparameters: Dict[Union[str, Type], Any] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
+        excluded_model_types: Optional[List[str]] = None,
         num_val_windows: int = 1,
         refit_full: bool = False,
         enable_ensemble: bool = True,
@@ -378,7 +379,7 @@ class TimeSeriesPredictor:
             If str is passed, will use a preset hyperparameter configuration defined in`
             `autogluon/timeseries/trainer/models/presets.py``.
 
-            If dict is provided, the keys are strings or Types that indicate which models to train. Each value is
+            If dict is provided, the keys are strings or types that indicate which models to train. Each value is
             itself a dict containing hyperparameters for each of the trained models, or a list of such dicts. Any
             omitted hyperparameters not specified here will be set to default. For example::
 
@@ -446,7 +447,16 @@ class TimeSeriesPredictor:
                         "scheduler": "local",
                         "searcher": "auto",
                         "num_trials": 5,
-                    }
+                    },
+                )
+        excluded_model_types: List[str], optional
+            Banned subset of model types to avoid training during ``fit()``, even if present in ``hyperparameters``.
+            For example, the following code will train all models included in the ``high_quality`` presets except ``DeepAR``::
+
+                predictor.fit(
+                    ...,
+                    presets="high_quality",
+                    excluded_model_types=["DeepAR"],
                 )
         num_val_windows : int, default = 1
             Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
@@ -488,6 +498,7 @@ class TimeSeriesPredictor:
             evaluation_metric=self.eval_metric,
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            excluded_model_types=excluded_model_types,
             num_val_windows=num_val_windows,
             enable_ensemble=enable_ensemble,
             random_seed=random_seed,
@@ -525,6 +536,7 @@ class TimeSeriesPredictor:
             val_data=tuning_data,
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            excluded_model_types=excluded_model_types,
             time_limit=time_left,
             verbosity=verbosity,
             num_val_windows=num_val_windows,
