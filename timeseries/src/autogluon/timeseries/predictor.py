@@ -204,15 +204,10 @@ class TimeSeriesPredictor:
                 )
         if self.ignore_time_index:
             df = df.get_reindexed_view(freq="S")
-        timestamps = df.reset_index(level=TIMESTAMP)[TIMESTAMP]
-        is_sorted = timestamps.groupby(level=ITEMID, sort=False).apply(lambda x: x.is_monotonic_increasing).all()
-        if not is_sorted:
-            warnings.warn(
-                "Provided data contains timestamps that are not sorted chronologically. "
-                "This will lead to TimeSeriesPredictor not working as intended. "
-                "Please make sure that the timestamps are sorted in increasing order for all time series."
-            )
-        # TODO: Make sure that entries for each item_id are contiguous -> https://github.com/autogluon/autogluon/issues/3036
+        # MultiIndex.is_monotonic_increasing checks if index is sorted by ["item_id", "timestamp"]
+        if not df.index.is_monotonic_increasing:
+            logger.info("Provided data is not sorted by item_id & timestamp, sorting...")
+            df = df.sort_index()
         if df.freq is None:
             raise ValueError(
                 "Frequency not provided and cannot be inferred. This is often due to the "
