@@ -170,12 +170,6 @@ class MMDetLitModule(pl.LightningModule):
         pred = self._predict_step(batch)
 
         return pred
-        """
-        if "mmdet_image_label" in batch:
-            return {"bbox": pred, "label": batch[self.input_label_key]}
-        else:
-            return {"bbox": pred}
-        """
 
     def configure_optimizers(self):
         """
