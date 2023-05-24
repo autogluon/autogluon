@@ -1,9 +1,7 @@
 import logging
 import pprint
 import time
-import traceback
 import warnings
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, Union
 
 import pandas as pd
@@ -447,10 +445,17 @@ class TimeSeriesPredictor:
                         "scheduler": "local",
                         "searcher": "auto",
                         "num_trials": 5,
-                    }
+                    },
                 )
         excluded_model_types: List[str], optional
             Banned subset of model types to avoid training during ``fit()``, even if present in ``hyperparameters``.
+            For example, the following code will train all models included in the ``high_quality`` presets except ``DeepAR``::
+
+                predictor.fit(
+                    ...,
+                    presets="high_quality",
+                    excluded_model_types=["DeepAR"],
+                )
         num_val_windows : int, default = 1
             Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
             A separate copy of each model is trained for each validation window.
