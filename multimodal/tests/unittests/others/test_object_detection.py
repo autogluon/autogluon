@@ -370,4 +370,25 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
 
 
 if __name__ == "__main__":
-    test_mmdet_object_detection_fit_then_evaluate_coco("yolov3_mobilenetv2_320_300e_coco")
+    import os
+    import time
+    from autogluon.multimodal import MultiModalPredictor
+    from autogluon.core.utils.loaders import load_zip
+
+    zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/dataset/pothole.zip"
+    download_dir = "./pothole"
+
+    load_zip.unzip(zip_file, unzip_dir=download_dir)
+    data_dir = os.path.join(download_dir, "pothole")
+    train_path = os.path.join(data_dir, "Annotations", "usersplit_train_cocoformat.json")
+    val_path = os.path.join(data_dir, "Annotations", "usersplit_val_cocoformat.json")
+    test_path = os.path.join(data_dir, "Annotations", "usersplit_test_cocoformat.json")
+    zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection/checkpoints/pothole_AP50_718.zip"
+    download_dir = "./pothole_AP50_718"
+    load_zip.unzip(zip_file, unzip_dir=download_dir)
+    better_predictor = MultiModalPredictor.load("./pothole_AP50_718/AutogluonModels/ag-20221123_021130")
+    better_predictor.set_num_gpus(1)
+    better_predictor.evaluate(test_path)
+    import ipdb
+
+    ipdb.set_trace()
