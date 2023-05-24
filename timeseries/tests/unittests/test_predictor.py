@@ -585,6 +585,16 @@ def test_given_data_cannot_be_interpreted_as_tsdf_then_exception_raised(temp_mod
         predictor.fit(df, hyperparameters={"Naive": {}})
 
 
+def test_given_data_is_not_sorted_then_predictor_can_fit_and_predict(temp_model_path):
+    shuffled_df = pd.DataFrame(DUMMY_TS_DATAFRAME).sample(frac=1.0)
+    ts_df = TimeSeriesDataFrame(shuffled_df)
+
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=2)
+    predictor.fit(ts_df, hyperparameters={"Naive": {}})
+    predictions = predictor.predict(ts_df)
+    assert len(predictions) == predictor.prediction_length * ts_df.num_items
+
+
 def test_when_both_argument_aliases_are_passed_to_init_then_exception_is_raised(temp_model_path):
     with pytest.raises(ValueError, match="Please specify at most one of these arguments"):
         predictor = TimeSeriesPredictor(path=temp_model_path, target="custom_target", label="custom_target")

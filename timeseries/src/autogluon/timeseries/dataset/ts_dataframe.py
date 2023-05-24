@@ -323,11 +323,19 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         df = df.copy()
         if id_column is not None:
-            assert id_column in df.columns, f"Column {id_column} not found!"
+            assert id_column in df.columns, f"Column '{id_column}' not found!"
+            if id_column != ITEMID and ITEMID in df.columns:
+                raise ValueError(
+                    f"Data contains column '{ITEMID}'. This name is used internally by AutoGluon. Please rename this column"
+                )
             df.rename(columns={id_column: ITEMID}, inplace=True)
 
         if timestamp_column is not None:
-            assert timestamp_column in df.columns, f"Column {timestamp_column} not found!"
+            assert timestamp_column in df.columns, f"Column '{timestamp_column}' not found!"
+            if timestamp_column != TIMESTAMP and TIMESTAMP in df.columns:
+                raise ValueError(
+                    f"Data contains column '{TIMESTAMP}'. This name is used internally by AutoGluon. Please rename this column"
+                )
             df.rename(columns={timestamp_column: TIMESTAMP}, inplace=True)
 
         if TIMESTAMP in df.columns:

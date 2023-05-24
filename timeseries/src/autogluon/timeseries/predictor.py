@@ -208,6 +208,7 @@ class TimeSeriesPredictor:
         if not df.index.is_monotonic_increasing:
             logger.info("Provided data is not sorted by item_id & timestamp, sorting...")
             df = df.sort_index()
+            df._cached_freq = None  # in case frequency was incorrectly cached as IRREGULAR_TIME_INDEX_FREQSTR
         if df.freq is None:
             raise ValueError(
                 "Frequency not provided and cannot be inferred. This is often due to the "
