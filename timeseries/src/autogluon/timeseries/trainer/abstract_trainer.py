@@ -175,22 +175,6 @@ class SimpleAbstractTrainer:
     def construct_model_templates(self, hyperparameters: Union[str, Dict[str, Any]], **kwargs):
         raise NotImplementedError
 
-    # TODO: This is horribly inefficient beyond simple weighted ensembling.
-    #  Refactor to Tabular's implementation if doing stacking / multiple ensembles
-    def get_inputs_to_model(
-        self, model, X, model_pred_proba_dict=None, known_covariates: Optional[TimeSeriesDataFrame] = None
-    ):
-        if model_pred_proba_dict is None:
-            model_pred_proba_dict = {}
-        model_set = self.get_minimum_model_set(model, include_self=False)
-        if model_set:
-            for m in model_set:
-                if m not in model_pred_proba_dict:
-                    model_pred_proba_dict[m] = self.predict(model=m, data=X, known_covariates=known_covariates)
-            return model_pred_proba_dict
-        else:
-            return X
-
     # FIXME: Copy pasted from Tabular
     def get_minimum_model_set(self, model: Union[str, AbstractTimeSeriesModel], include_self: bool = True) -> list:
         """Gets the minimum set of models that the provided model depends on, including itself.
@@ -775,12 +759,16 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 "will be sorted according to test score (`score_test`)."
             )
             # TODO: Cache predictions for all models using `model_pred_proba_dict` as in Tabular
+            model_predictions, pred_time_dict = self.get_model_predictions(
+                data=past_data, known_covariates=known_covariates, model_names=model_names
+            )
+
             for model_name in model_names:
                 try:
-                    pred_start_time = time.time()
-                    predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model_name)
-                    model_info[model_name]["pred_time_test"] = time.time() - pred_start_time
-                    model_info[model_name]["score_test"] = self._score_with_predictions(data, predictions)
+                    model_info[model_name]["pred_time_test"] = pred_time_dict[model_name]
+                    model_info[model_name]["score_test"] = self._score_with_predictions(
+                        data, model_predictions[model_name]
+                    )
                 except Exception as e:  # noqa
                     logger.error(f"Cannot score with model {model_name}. An error occurred: {str(e)}")
                     logger.debug(traceback.format_exc())
@@ -887,6 +875,63 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             model = self.load_model(model)
         data = self.get_inputs_to_model(model=model, X=data, known_covariates=known_covariates)
         return model.predict(data, known_covariates=known_covariates, **kwargs)
+
+    def get_inputs_to_model(
+        self,
+        model: str,
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        model_pred_dict: Optional[Dict[str, TimeSeriesDataFrame]] = None,
+    ):
+        model_set = self.get_minimum_model_set(model, include_self=False)
+        if model_set:
+            return self.get_model_predictions(
+                data=data,
+                models=model_set,
+                model_pred_dict=model_pred_dict,
+                known_covariates=known_covariates,
+            )
+        else:
+            return data
+
+    def get_model_pred_dict(
+        self,
+        data: TimeSeriesDataFrame,
+        model_names: List[str],
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        model_pred_dict: Optional[Dict[str, TimeSeriesDataFrame]] = None,
+        record_pred_time: bool = False,
+    ) -> Union[Dict[str, TimeSeriesDataFrame], Tuple[Dict[str, TimeSeriesDataFrame], Dict[str, float]]]:
+        if record_pred_time and model_pred_dict is not None:
+            raise AssertionError("get_model_pred_dict cannot record prediction times if model_pred_dict is given")
+        if model_pred_dict is None:
+            model_pred_dict = {}
+        pred_time_dict = {}
+
+        model_set = set()
+        for model_name in model_names:
+            model_set.update(self.get_minimum_model_set(model_name))
+        model_to_level = self._get_model_levels()
+        models_sorted_by_level = sorted(model_set, key=model_to_level.get)
+
+        for model_name in models_sorted_by_level:
+            if model_name not in model_pred_dict:
+                model = self.load_model(model_name)
+                model_inputs = self.get_inputs_to_model(
+                    model_name,
+                    data=data,
+                    known_covariates=known_covariates,
+                    model_pred_dict=model_pred_dict,
+                )
+                predict_start_time = time.time()
+                model_pred_dict[model_name] = model.predict(data=model_inputs, known_covariates=known_covariates)
+                pred_time_dict[model_name] = time.time() - predict_start_time
+        final_model_pred_dict = {model: model_pred_dict[model_name] for model_name in model_names}
+        final_pred_time_dict = {model: pred_time_dict[model_name] for model_name in model_names}
+        if record_pred_time:
+            return final_model_pred_dict, final_pred_time_dict
+        else:
+            return final_model_pred_dict
 
     def _merge_refit_full_data(
         self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]
