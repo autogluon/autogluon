@@ -477,18 +477,20 @@ def test_when_refit_full_called_with_model_name_then_single_model_is_updated(tem
     assert list(model_full_dict.values()) == ["DeepAR_FULL"]
 
 
-def test_when_some_models_have_incorrect_suffix_then_correct_model_are_trained(temp_model_path):
-    hyperparameters = {
-        "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
-        "SimpleFeedForwardModel": {"epochs": 1, "num_batches_per_epoch": 1},
-    }
+@pytest.mark.parametrize(
+    "hyperparameters, expected_model_names",
+    [
+        ({"Naive": {}, "SeasonalNaiveModel": {}}, ["Naive", "SeasonalNaive"]),
+        ({"Naive": {}, "NaiveModel": {}}, ["Naive", "Naive_2"]),
+    ],
+)
+def test_when_some_models_have_incorrect_suffix_then_correct_model_are_trained(
+    temp_model_path, hyperparameters, expected_model_names
+):
     trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
-    trainer.fit(
-        DUMMY_TS_DATAFRAME,
-        hyperparameters=hyperparameters,
-    )
+    trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
     leaderboard = trainer.leaderboard()
-    assert sorted(leaderboard["model"].values) == ["DeepAR", "SimpleFeedForward"]
+    assert sorted(leaderboard["model"].values) == expected_model_names
 
 
 @pytest.mark.parametrize("excluded_model_types", [["DeepAR"], ["DeepARModel"]])
