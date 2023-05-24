@@ -737,14 +737,17 @@ def run_model(model: nn.Module, batch: dict, trt_model: Optional[nn.Module] = No
 
 def freeze_model_layers(model, frozen_layers):
     """
-    Get an MMOCR config and model based on a checkpoint name.
+    Freeze model layers with pattern in frozen_layers.
 
     Parameters
     ----------
     model
         The pytorch model.
     frozen_layers
-        A list of substrings of the names of the layers to be frozen.
+        A list of substrings of frozen layers' names.
+
+        e.g. if frozen_layers = ["backbone", "neck"],
+            all layers including "backbone" or "neck" in the name will be frozen.
     """
 
     if not frozen_layers:

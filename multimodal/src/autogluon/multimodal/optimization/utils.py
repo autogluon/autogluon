@@ -630,7 +630,7 @@ def get_trainable_params_efficient_finetune(
 
 
 def remove_parameters_without_grad(
-    grouped_parameters: List,
+    grouped_parameters: List[Dict],
 ):
     """
     Remove layers
