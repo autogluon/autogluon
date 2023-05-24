@@ -620,7 +620,8 @@ class TimeSeriesPredictor:
         if random_seed is not None:
             set_random_seed(random_seed)
         data = self._check_and_prepare_data_frame(data)
-        return self._learner.predict(data, known_covariates=known_covariates, model=model)
+        predictions = self._learner.predict(data, known_covariates=known_covariates, model=model)
+        return predictions.reindex(data.item_ids, level=ITEMID)  # make sure that item_id order is preserved
 
     def evaluate(self, data: Union[TimeSeriesDataFrame, pd.DataFrame], **kwargs):
         """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``
