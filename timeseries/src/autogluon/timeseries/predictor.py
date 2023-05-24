@@ -1,9 +1,7 @@
 import logging
 import pprint
 import time
-import traceback
 import warnings
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, Union
 
 import pandas as pd
@@ -13,12 +11,12 @@ from autogluon.common.utils.utils import check_saved_predictor_version, setup_ou
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
+from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 from autogluon.timeseries.utils.random import set_random_seed
-from autogluon.timeseries.version import __version__ as current_ag_version
 
 logger = logging.getLogger(__name__)
 
@@ -708,7 +706,7 @@ class TimeSeriesPredictor:
         return predictor
 
     def _save_version_file(self):
-        version_file_contents = str(current_ag_version)
+        version_file_contents = current_ag_version
         version_file_path = self.path + self._predictor_version_file_name
         save_str.save(path=version_file_path, data=version_file_contents, verbose=False)
 
