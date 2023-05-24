@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.models import AbstractModel
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
@@ -510,6 +511,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             self._log_scores_and_times(model.val_score, model.fit_time, model.predict_time)
 
             self.save_model(model=model)
+        except TimeLimitExceeded:
+            logger.error(f"\tTime limit exceeded... Skipping {model.name}.")
         except (Exception, MemoryError) as err:
             logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
             logger.error(f"\t{err}")

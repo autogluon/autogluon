@@ -11,8 +11,8 @@ from . import (
     ARIMAModel,
     AutoARIMAModel,
     AutoETSModel,
-    AutoGluonTabularModel,
     DeepARModel,
+    DirectTabularModel,
     DynamicOptimizedThetaModel,
     ETSModel,
     NaiveModel,
@@ -21,6 +21,7 @@ from . import (
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
     ThetaModel,
+    ThetaStatsmodelsModel,
 )
 from .abstract import AbstractTimeSeriesModel, AbstractTimeSeriesModelFactory
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
@@ -32,16 +33,17 @@ MODEL_TYPES = dict(
     SimpleFeedForward=SimpleFeedForwardModel,
     DeepAR=DeepARModel,
     TemporalFusionTransformer=TemporalFusionTransformerModel,
-    ETS=ETSModel,
-    ARIMA=ARIMAModel,
-    Theta=ThetaModel,
-    AutoGluonTabular=AutoGluonTabularModel,
     RecursiveTabular=RecursiveTabularModel,
+    DirectTabular=DirectTabularModel,
     Naive=NaiveModel,
     SeasonalNaive=SeasonalNaiveModel,
     AutoETS=AutoETSModel,
     AutoARIMA=AutoARIMAModel,
     DynamicOptimizedTheta=DynamicOptimizedThetaModel,
+    Theta=ThetaModel,
+    ARIMA=ARIMAModel,
+    ETS=ETSModel,
+    ThetaStatsmodels=ThetaStatsmodelsModel,
 )
 if agts.MXNET_INSTALLED:
     from .gluonts.mx import (
@@ -72,7 +74,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     Theta=90,
     RecursiveTabular=80,
     ARIMA=70,
-    AutoGluonTabular=70,
+    DirectTabular=70,
     DeepAR=60,
     TemporalFusionTransformer=50,
     SimpleFeedForward=40,
@@ -114,6 +116,7 @@ def get_default_hps(key):
             "AutoETS": {},
             "Theta": {},
             "RecursiveTabular": {},
+            "DirectTabular": {},
             "DeepAR": {},
         },
         "high_quality": {
@@ -125,6 +128,7 @@ def get_default_hps(key):
             "AutoARIMA": {},
             "Theta": {},
             "RecursiveTabular": {},
+            "DirectTabular": {},
             "DeepAR": {},
             "SimpleFeedForward": {},
             "TemporalFusionTransformer": {},
@@ -144,6 +148,7 @@ def get_default_hps(key):
                     "GBM": [{}, {"extra_trees": True, "ag_args": {"name_suffix": "XT"}}],
                 },
             },
+            "DirectTabular": {},
             "DeepAR": {
                 "num_layers": space.Int(1, 3, default=2),
                 "hidden_size": space.Int(40, 80, default=40),

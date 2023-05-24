@@ -26,6 +26,7 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
 from autogluon.core.utils.loaders import load_pd
 from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
@@ -998,7 +999,7 @@ class MultiModalPredictor(ExportMixin):
         if hpo_mode:
             # TODO: allow custom gpu
             assert self._resume is False, "You can not resume training with HPO"
-            resources = dict(num_gpus=torch.cuda.device_count())
+            resources = dict(num_gpus=ResourceManager.get_gpu_count_torch())
             if _fit_args["max_time"] is not None:
                 _fit_args["max_time"] *= 0.95  # give some buffer time to ray lightning trainer
             _fit_args["predictor"] = self

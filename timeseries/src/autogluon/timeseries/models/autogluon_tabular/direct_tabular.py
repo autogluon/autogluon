@@ -1,7 +1,7 @@
 import logging
 import time
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -14,36 +14,41 @@ import autogluon.core as ag
 from autogluon.tabular import TabularPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 
 logger = logging.getLogger(__name__)
 
 
-class AutoGluonTabularModel(AbstractTimeSeriesModel):
+class DirectTabularModel(AbstractTimeSeriesModel):
     """Predict future time series values using autogluon.tabular.TabularPredictor.
 
-    The forecasting is converted to a tabular problem using the following features:
+    A single predictor is used to forecast all future time series values using the following features:
 
     - lag features (observed time series values) based on ``freq`` of the data
     - time features (e.g., day of the week) based on the timestamp of the measurement
     - lagged known and past covariates (if available)
     - static features of each item (if available)
 
-    Quantiles are obtained by assuming that the residuals follow zero-mean normal distribution, scale of which is
-    estimated from the empirical distribution of the residuals.
+    Features not known during the forecast horizon (e.g., future target values) are replaced by NaNs.
+
+    If ``eval_metric=="mean_wQuantileLoss"``, the TabularPredictor will be trained with ``"quantile"`` problem type.
+    Otherwise, TabularPredictor will be trained with ``"regression"`` problem type, and dummy quantiles will be
+    obtained by assuming that the residuals follow zero-mean normal distribution.
 
 
     Other Parameters
     ----------------
-    max_train_size : int, default = 1_000_000
+    max_num_samples : int, default = 1_000_000
         Maximum number of rows in the training and validation sets. If the number of rows in train or validation data
-        exceeds ``max_train_size``, then ``max_train_size`` many rows are subsampled from the dataframe.
+        exceeds ``max_num_samples``, then ``max_num_samples`` many rows are subsampled from the dataframe.
     tabular_hyperparameters : Dict[Dict[str, Any]], optional
         Hyperparameters dictionary passed to `TabularPredictor.fit`. Contains the names of models that should be fit.
-        Defaults to ``{"CAT": {}, "GBM" :{}}``.
+        Defaults to ``{"GBM" :{}}``.
     """
 
+    # TODO: Implemented detrending/differencing to allow extrapolation.
+
     default_tabular_hyperparameters = {
-        "CAT": {},
         "GBM": {},
     }
 
@@ -53,7 +58,6 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         "MASE": "mean_absolute_error",
         "MAPE": "mean_absolute_percentage_error",
         "sMAPE": "mean_absolute_percentage_error",
-        "mean_wQuantileLoss": "mean_absolute_error",
         "MSE": "mean_squared_error",
         "RMSE": "root_mean_squared_error",
     }
@@ -81,10 +85,23 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         self._known_covariates_lag_indices: np.array = None
         self._past_covariates_lag_indices: np.array = None
         self._time_features: List[Callable] = None
-        self._available_features: pd.Index = None
-        self.quantile_adjustments: Dict[str, float] = {}
-
+        self.is_quantile_model = self.eval_metric == "mean_wQuantileLoss"
+        if 0.5 not in self.quantile_levels:
+            self.must_drop_median = True
+            self.quantile_levels = sorted(set([0.5] + self.quantile_levels))
+        else:
+            self.must_drop_median = False
+        self.residuals_std = 1.0
         self.tabular_predictor: TabularPredictor = None
+
+    def _normalize_targets(self, data: TimeSeriesDataFrame, min_scale=1e-5) -> Tuple[TimeSeriesDataFrame, pd.Series]:
+        """Normalize data such that each the average absolute value of each time series is equal to 1."""
+        # TODO: Implement other scalers (min/max)?
+        # TODO: Don't include validation data when computing the scale
+        scale_per_item = data.abs().groupby(level=ITEMID, sort=False)[self.target].mean().clip(lower=min_scale)
+        normalized_data = data.copy()
+        normalized_data[self.target] = normalized_data[self.target] / scale_per_item
+        return normalized_data, scale_per_item
 
     def _get_features_dataframe(
         self,
@@ -268,61 +285,52 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: int = None,
+        verbosity: int = 2,
         **kwargs,
     ) -> None:
         self._check_fit_params()
         start_time = time.time()
         if self.tabular_predictor is not None:
             raise AssertionError(f"{self.name} predictor has already been fit!")
-        verbosity = kwargs.get("verbosity", 2)
         self._target_lag_indices = np.array(get_lags_for_frequency(train_data.freq), dtype=np.int64)
         self._past_covariates_lag_indices = self._target_lag_indices
         self._known_covariates_lag_indices = np.concatenate([[0], self._target_lag_indices])
         self._time_features = time_features_from_frequency_str(train_data.freq)
 
         train_data, _ = self._normalize_targets(train_data)
-        train_df = self._get_features_dataframe(train_data)
-        # Remove features that are completely missing in the training set
-        train_df.dropna(axis=1, how="all", inplace=True)
-        self._available_features = train_df.columns
+        # Do not use external val_data as tuning_data to avoid overfitting
+        train_subset, val_subset = train_data.train_test_split(self.prediction_length)
+        train_df = self._get_features_dataframe(train_subset)
+        val_df = self._get_features_dataframe(val_subset, max_rows_per_item=self.prediction_length)
 
         model_params = self._get_model_params()
         tabular_hyperparameters = model_params.get("tabular_hyperparameters", self.default_tabular_hyperparameters)
-        max_train_size = model_params.get("max_train_size", 1_000_000)
+        max_num_samples = model_params.get("max_num_samples", 1_000_000)
 
-        if len(train_df) > max_train_size:
-            train_df = train_df.sample(max_train_size)
+        if len(train_df) > max_num_samples:
+            train_df = train_df.sample(max_num_samples)
         logger.debug(f"Generated training dataframe with shape {train_df.shape}")
-
-        if val_data is not None:
-            if val_data.freq != train_data.freq:
-                raise ValueError(
-                    f"train_data and val_data must have the same freq (received {train_data.freq} and {val_data.freq})"
-                )
-            val_data, _ = self._normalize_targets(val_data)
-            val_df = self._get_features_dataframe(val_data, max_rows_per_item=self.prediction_length)
-            val_df = val_df[self._available_features]
-
-            if len(val_df) > max_train_size:
-                val_df = val_df.sample(max_train_size)
-
-            logger.debug(f"Generated validation dataframe with shape {val_df.shape}")
-        else:
-            logger.warning(
-                f"No val_data was provided to {self.name}. "
-                "TabularPredictor will generate a validation set without respecting the temporal ordering."
-            )
-            val_df = None
 
         time_elapsed = time.time() - start_time
         autogluon_logger = logging.getLogger("autogluon")
         logging_level = autogluon_logger.level
 
+        if self.is_quantile_model:
+            predictor_init_kwargs = {
+                "problem_type": ag.constants.QUANTILE,
+                "eval_metric": "pinball_loss",
+                "quantile_levels": self.quantile_levels,
+            }
+        else:
+            predictor_init_kwargs = {
+                "problem_type": ag.constants.REGRESSION,
+                "eval_metric": self.TIMESERIES_METRIC_TO_TABULAR_METRIC.get(self.eval_metric),
+            }
+
         self.tabular_predictor = TabularPredictor(
             path=self.path,
             label=self.target,
-            problem_type=ag.constants.REGRESSION,
-            eval_metric=self.TIMESERIES_METRIC_TO_TABULAR_METRIC.get(self.eval_metric),
+            **predictor_init_kwargs,
         )
 
         with warnings.catch_warnings():
@@ -334,67 +342,56 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
                 hyperparameters=tabular_hyperparameters,
                 verbosity=verbosity - 2,
             )
-        residuals = (train_df[self.target] - self.tabular_predictor.predict(train_df)).values
-        for q in self.quantile_levels:
-            self.quantile_adjustments[q] = np.quantile(residuals, q)
+
+        if not self.is_quantile_model:
+            residuals = (train_df[self.target] - self.tabular_predictor.predict(train_df)).values
+            self.residuals_std = np.sqrt(np.mean(residuals**2))
+
         # Logger level is changed inside .fit(), restore to the initial value
         autogluon_logger.setLevel(logging_level)
 
-    def _extend_index(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
-        """Add self.prediction_length many time steps with dummy values to each timeseries in the dataset."""
+    def _postprocess_predictions(self, predictions: Union[pd.DataFrame, pd.Series]) -> pd.DataFrame:
+        """Convert output of TabularPredictor to a dataframe with 'mean' and quantile forecast columns."""
+        from scipy.stats import norm
 
-        def extend_single_time_series(group):
-            offset = pd.tseries.frequencies.to_offset(data.freq)
-            cutoff = group.index.get_level_values(TIMESTAMP)[-1]
-            new_index = pd.date_range(cutoff + offset, freq=offset, periods=self.prediction_length).rename(TIMESTAMP)
-            new_values = np.full([self.prediction_length], fill_value=np.nan)
-            new_df = pd.DataFrame(new_values, index=new_index, columns=[self.target])
-            return pd.concat([group.droplevel(ITEMID), new_df])
+        if self.is_quantile_model:
+            # Ensure that quantiles are monotonic
+            predictions.values.sort(axis=1)
+            predictions.columns = [str(q) for q in predictions.columns]
+            predictions["mean"] = predictions["0.5"]
+        else:
+            predictions = predictions.rename("mean").to_frame()
+            for q in self.quantile_levels:
+                predictions[str(q)] = predictions["mean"] + norm.ppf(q) * self.residuals_std
 
-        extended_data = data.groupby(level=ITEMID, sort=False).apply(extend_single_time_series)
-        extended_data.static_features = data.static_features
-        return extended_data
+        column_order = ["mean"] + [col for col in predictions.columns if col != "mean"]
+        return predictions[column_order]
 
-    def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
-        self._check_predict_inputs(data=data, quantile_levels=quantile_levels)
-        if quantile_levels is None:
-            quantile_levels = self.quantile_levels
-
+    def predict(
+        self, data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame] = None, **kwargs
+    ) -> TimeSeriesDataFrame:
         data, scale_per_item = self._normalize_targets(data)
-        data_extended = self._extend_index(data)
+        if known_covariates is not None:
+            data_future = known_covariates.copy()
+            data_future[self.target] = np.nan
+        else:
+            future_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
+            data_future = pd.DataFrame(columns=[self.target], index=future_index)
+        data_extended = pd.concat([data, data_future])
+        data_extended.static_features = data.static_features
+
         features = self._get_features_dataframe(data_extended, max_rows_per_item=self.prediction_length)
-        features = features[self._available_features]
 
         # Predict for batches (instead of using full dataset) to avoid high memory usage
         batches = features.groupby(np.arange(len(features)) // self.PREDICTION_BATCH_SIZE, sort=False)
         predictions = pd.concat([self.tabular_predictor.predict(batch) for _, batch in batches])
+        predictions.set_index(data_future.index, inplace=True)
 
-        predictions = predictions.rename("mean").to_frame()
-        preds_index = data_extended.slice_by_timestep(-self.prediction_length, None).index
-        predictions.set_index(preds_index, inplace=True)
+        predictions = self._postprocess_predictions(predictions)
 
-        for q in quantile_levels:
-            predictions[str(q)] = predictions["mean"] + self.quantile_adjustments[q]
-
-        predictions = self._rescale_targets(predictions, scale_per_item)
-        return TimeSeriesDataFrame(predictions).loc[data.item_ids]
-
-    def _normalize_targets(self, data: TimeSeriesDataFrame, min_scale=1e-5) -> Tuple[TimeSeriesDataFrame, pd.Series]:
-        """Normalize data such that each the average absolute value of each time series is equal to 1."""
-        # TODO: Implement other scalers (min/max)?
-        # TODO: Don't include validation data when computing the scale
-        scale_per_item = data.abs().groupby(level=ITEMID, sort=False)[self.target].mean().clip(lower=min_scale)
-        normalized_data = data.copy()
-        for col in normalized_data.columns:
-            normalized_data[col] = normalized_data[col] / scale_per_item
-        return normalized_data, scale_per_item
-
-    def _rescale_targets(self, normalized_data: TimeSeriesDataFrame, scale_per_item: pd.Series) -> TimeSeriesDataFrame:
-        """Scale all columns in the normalized dataframe back to original scale (inplace)."""
-        data = normalized_data
-        for col in data.columns:
-            data[col] = data[col] * scale_per_item
-        return data
+        for col in predictions.columns:
+            predictions[col] = predictions[col] * scale_per_item
+        return TimeSeriesDataFrame(predictions).reindex(data.item_ids, level=ITEMID)
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}

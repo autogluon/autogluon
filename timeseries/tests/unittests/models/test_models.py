@@ -19,7 +19,7 @@ from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
 from .gluonts.test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
-from .test_autogluon_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
+from .test_direct_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
 from .test_mlforecast import TESTABLE_MODELS as MLFORECAST_TESTABLE_MODELS
 from .test_multi_window_model import get_multi_window_deepar
@@ -35,7 +35,7 @@ TESTABLE_MODELS = (
 
 DUMMY_HYPERPARAMETERS = {"epochs": 1, "num_batches_per_epoch": 1, "maxiter": 1, "n_jobs": 1}
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
-MODELS_WITHOUT_HPO = ["AutoGluonTabular", "AutoETS", "AutoARIMA", "DynamicOptimizedTheta"]
+MODELS_WITHOUT_HPO = ["DirectTabular", "AutoETS", "AutoARIMA", "DynamicOptimizedTheta"]
 
 
 @pytest.fixture(scope="module")
