@@ -129,8 +129,8 @@ class MMDetLitModule(pl.LightningModule):
                     if logging:
                         self.log(f"step/{loss_key}_{loss_chanel_idx}", loss_val)
                     curr_loss += loss_val
-            else:  # is a shape 0 tensor
-                curr_loss += loss_values
+            else:  # is a tensor
+                curr_loss += loss_values.sum()
 
             if logging:
                 self.log(f"step/{loss_key}", curr_loss)
