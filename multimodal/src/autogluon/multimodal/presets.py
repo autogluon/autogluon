@@ -390,15 +390,6 @@ def object_detection(presets: str = DEFAULT):
     if presets == MEDIUM_QUALITY:
         hyperparameters.update(
             {
-                "optimization.max_epochs": 30,
-                "optimization.patience": 3,
-                "optimization.val_check_interval": 1.0,
-                "optimization.check_val_every_n_epoch": 3,
-            }
-        )
-    elif presets in [DEFAULT, HIGH_QUALITY]:
-        hyperparameters.update(
-            {
                 "model.mmdet_image.checkpoint_name": "yolox_l",
                 "env.per_gpu_batch_size": 2,  # Works on 8G GPU
                 "optimization.learning_rate": 5e-5,
@@ -406,6 +397,19 @@ def object_detection(presets: str = DEFAULT):
                 "optimization.max_epochs": 50,
                 "optimization.val_check_interval": 1.0,
                 "optimization.check_val_every_n_epoch": 3,
+            }
+        )
+    elif presets in [DEFAULT, HIGH_QUALITY]:
+        hyperparameters.update(
+            {
+                "model.mmdet_image.checkpoint_name": "dino-4scale_r50_8xb2-12e_coco.py",
+                "model.mmdet_image.frozen_layers": ["backbone","model.level_embed"],
+                "env.per_gpu_batch_size": 1,  # Works on 16G GPU
+                "optimization.learning_rate": 1e-4,
+                "optimization.patience": 20,
+                "optimization.max_epochs": 50,
+                "optimization.val_check_interval": 1.0,
+                "optimization.check_val_every_n_epoch": 1,
             }
         )
     elif presets == BEST_QUALITY:
@@ -419,7 +423,7 @@ def object_detection(presets: str = DEFAULT):
                 "optimization.max_epochs": 50,
                 "optimization.val_check_interval": 1.0,
                 "optimization.check_val_every_n_epoch": 1,
-                }
+            }
         )
     else:
         raise ValueError(f"Unknown preset type: {presets}")
