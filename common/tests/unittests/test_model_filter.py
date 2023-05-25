@@ -21,6 +21,7 @@ from autogluon.common.model_filter import ModelFilter
         ({"dummy": {}}, ["foo"], ["dummy"], {}),
         ({"dummy": {}, "foo": {}}, ["foo"], ["dummy"], {"foo": {}}),
         ({}, ["foo"], ["foo"], {}),
+        ({"dummy": {}}, None, None, {"dummy": {}}),
         (["dummy"], ["dummy"], None, ["dummy"]),
         (["dummy"], ["foo"], None, []),
         (["dummy", "foo"], ["foo"], None, ["foo"]),
@@ -29,6 +30,7 @@ from autogluon.common.model_filter import ModelFilter
         ([], None, ["foo"], []),
         (["dummy"], None, ["dummy"], []),
         (["dummy", "foo"], None, ["dummy"], ["foo"]),
+        (["dummy"], None, None, ["dummy"])
     ],
 )
 def test_filter_model(models, included_model_types, excluded_model_types, expected_answer):
