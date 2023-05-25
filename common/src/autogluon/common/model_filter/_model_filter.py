@@ -35,7 +35,7 @@ class ModelFilter:
             missing_models = set(included_model_types) - set(included_models)
         if len(missing_models) > 0:
             logger.warning(
-                f"The following models: {missing_models} are not present in model list specified by the user: {models.keys() if isinstance(models, dict) else models}. Will ignore."
+                f"The models types {missing_models} are not present in the model list specified by the user and will be ignored:"
             )
         return included_models
 

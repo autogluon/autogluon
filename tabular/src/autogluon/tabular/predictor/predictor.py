@@ -627,11 +627,11 @@ class TabularPredictor:
                 Identical to specifying `ag_args_ensemble` parameter for all models in `hyperparameters`.
                 If a key in `ag_args_ensemble` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
             included_model_types : list, default = None
-                To only include listed model for training during `fit()`.
+                To only include listed model types for training during `fit()`.
                 Models that are listed in `included_model_types` but not in `hyperparameters` will be ignored.
                 Reference `hyperparameters` documentation for what models correspond to each value.
-                Useful when a only a subsample of model needs to be trained and the `hyperparameters` dictionary is difficult or time-consuming.
-                    Example: To include both 'KNN' and 'custom' models, specify `included_model_types=['KNN', 'custom']`.
+                Useful when a only a subset of model needs to be trained and the `hyperparameters` dictionary is difficult or time-consuming.
+                    Example: To include both 'GBM' and 'FASTAI' models, specify `included_model_types=['GBM', 'FASTAI']`.
             excluded_model_types : list, default = None
                 Banned subset of model types to avoid training during `fit()`, even if present in `hyperparameters`.
                 Reference `hyperparameters` documentation for what models correspond to each value.
