@@ -199,7 +199,11 @@ def get_preset_models(
     if level_key not in hyperparameters.keys() and level_key == 'default':
         hyperparameters = {'default': hyperparameters}
     hp_level = hyperparameters[level_key]
-    hp_level = ModelFilter.filter_models(models=hp_level, included_model_types=included_model_types, excluded_model_types=excluded_model_types)
+    hp_level = ModelFilter.filter_models(
+        models=hp_level,
+        included_model_types=included_model_types,
+        excluded_model_types=excluded_model_types
+    )
     model_cfg_priority_dict = defaultdict(list)
     model_type_list = list(hp_level.keys())
     if 'NN' in model_type_list:
