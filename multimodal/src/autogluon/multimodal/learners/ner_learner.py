@@ -9,7 +9,6 @@ from torch import nn
 from autogluon.core.utils.loaders import load_pd
 
 from ..constants import NER
-from ..data.infer_types import infer_problem_type_output_shape
 from ..optimization.lit_ner import NerLitModule
 from ..utils.model import create_fusion_model, select_model
 from ..utils.object_detection import setup_detection_train_tuning_data
