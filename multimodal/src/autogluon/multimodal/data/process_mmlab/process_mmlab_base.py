@@ -23,7 +23,6 @@ try:
 
     # from mmdet.datasets.pipelines import Compose
 except ImportError as e:
-    print(e)
     mmdet = None
 
 try:

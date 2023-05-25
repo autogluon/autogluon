@@ -276,7 +276,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                     mimdownload(package="mmdet", configs=[checkpoint_name], dest_root=".")
                     config_file = checkpoint_name + ".py"
                 except Exception as e:
-                    print(e)
                     raise ValueError(f"Invalid checkpoint_name ({checkpoint_name}) or config_file ({config_file}): ")
 
         self.checkpoint_name = checkpoint_name
