@@ -35,7 +35,6 @@ from torchmetrics import Metric
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
 from autogluon.core.utils.loaders import load_pd
-from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from .. import version as ag_version
 from ..constants import (
@@ -94,7 +93,8 @@ from ..data.dataset_mmlab import MultiImageMixDataset
 from ..data.infer_types import (
     infer_column_types,
     infer_label_column_type_by_problem_type,
-    infer_problem_type_output_shape,
+    infer_output_shape,
+    infer_problem_type,
     infer_rois_column_type,
     is_image_column,
 )
@@ -563,11 +563,10 @@ class BaseLearner(ExportMixin, AbstractLearner):
         return train_data, tuning_data
 
     def _infer_output_shape(self, train_data):
-        _, output_shape = infer_problem_type_output_shape(
+        output_shape = infer_output_shape(
             label_column=self._label_column,
-            column_types=self._column_types,
             data=train_data,
-            provided_problem_type=self._problem_type,
+            problem_type=self._problem_type,
         )
 
         # TODO: Delete this check for object detection
@@ -942,8 +941,29 @@ class BaseLearner(ExportMixin, AbstractLearner):
             save_path=save_path,
             fit_called=fit_called,
         )
+
+        if self._label_column:
+            self._problem_type = infer_problem_type(
+                y_train_data=train_data[self._label_column],
+                provided_problem_type=self._problem_type,
+            )
+
+        # self._column_types = infer_column_types(
+        #     data=train_data,
+        #     valid_data=tuning_data,
+        #     label_columns=self._label_column,
+        #     provided_column_types=column_types,
+        #     problem_type=self._problem_type,  # used to update the corresponding column type
+        # )
+
+        # self._output_shape = infer_output_shape(
+        #     label_column=self._label_column,
+        #     data=train_data,
+        #     problem_type=self._problem_type,
+        # )
+
         # 7. setup problem types
-        self._problem_type = self._infer_problem_type(train_data=train_data, column_types=column_types)
+        # self._problem_type = self._infer_problem_type(train_data=train_data, column_types=column_types)
         # 8. infor column types
         self._column_types = self._infer_column_types(
             train_data=train_data, tuning_data=tuning_data, column_types=column_types
@@ -1112,17 +1132,10 @@ class BaseLearner(ExportMixin, AbstractLearner):
     ) -> dict:
         column_types = infer_column_types(
             data=train_data,
+            valid_data=tuning_data,
             label_columns=self._label_column,
             provided_column_types=column_types,
-            valid_data=tuning_data,
-            problem_type=self._problem_type,
-        )
-        column_types = infer_label_column_type_by_problem_type(
-            column_types=column_types,
-            label_columns=self._label_column,
-            problem_type=self._problem_type,
-            data=train_data,
-            valid_data=tuning_data,
+            problem_type=self._problem_type,  # used to update the corresponding column type
         )
         if self._column_types is not None and self._column_types != column_types:
             warnings.warn(
@@ -1133,22 +1146,6 @@ class BaseLearner(ExportMixin, AbstractLearner):
             # use previous column types to avoid inconsistency with previous numerical mlp and categorical mlp
             column_types = self._column_types
         return column_types
-
-    # FIXME: Align logic with Tabular,
-    #  don't combine output_shape and problem_type detection, make them separate
-    #  Use autogluon.core.utils.utils.infer_problem_type
-    def _infer_problem_type(self, train_data: pd.DataFrame, column_types: dict = None) -> str:
-        column_types_label = self._infer_column_types(
-            train_data=train_data[[self._label_column]], column_types=column_types
-        )
-
-        problem_type, _ = infer_problem_type_output_shape(
-            label_column=self._label_column,
-            column_types=column_types_label,
-            data=train_data,
-            provided_problem_type=self._problem_type,
-        )
-        return problem_type
 
     def _split_train_tuning(
         self, data: pd.DataFrame, holdout_frac: float = None, random_state: int = 0
