@@ -29,7 +29,6 @@ except ImportError as e:
     mmdet = None
 
 from ..constants import BBOX, BBOX_FORMATS, COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, XYXY
-
 from .utils import freeze_model_layers, lookup_mmdet_config, update_mmdet_config
 
 logger = logging.getLogger(__name__)
