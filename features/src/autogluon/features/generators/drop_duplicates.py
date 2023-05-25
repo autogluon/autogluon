@@ -2,6 +2,7 @@ import logging
 from typing import Union
 from collections import defaultdict
 
+import numpy as np
 from pandas import DataFrame
 
 from autogluon.common.features.types import R_INT, R_FLOAT, R_CATEGORY, R_BOOL
@@ -18,20 +19,20 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
 
     Parameters
     ----------
-    sample_size_init : int, default 1000
+    sample_size_init : int, default 500
         The number of rows to sample when doing an initial filter of duplicate feature candidates.
         Usually, the majority of features can be filtered out using this smaller amount of rows which greatly speeds up the computation of the final check.
         If None or greater than the number of rows, no initial filter will occur. This may increase the time to fit immensely for large datasets.
-    sample_size_final : int, default 20000
+    sample_size_final : int, default 2000
         The number of rows to sample when doing the final filter to determine duplicate features.
         This theoretically can lead to features that are very nearly duplicates but not exact duplicates being removed,
         but should be near impossible in practice.
         If None or greater than the number of rows, will perform exact duplicate detection (most expensive).
-        It is recommend to keep this value below 100000 to maintain reasonable fit times.
+        It is recommended to keep this value below 100000 to maintain reasonable fit times.
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
-    def __init__(self, sample_size_init=1000, sample_size_final=20000, **kwargs):
+    def __init__(self, sample_size_init=500, sample_size_final=2000, **kwargs):
         super().__init__(**kwargs)
         self.sample_size_init = sample_size_init
         self.sample_size_final = sample_size_final
@@ -128,7 +129,9 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
             mapping_features_val_dict_cur = {feature: mapping_features_val_dict[feature] for feature in features_to_check}
             # Converts ['a', 'd', 'f', 'a'] to [0, 1, 2, 0]
             # Converts [5, 'a', np.nan, 5] to [0, 1, 2, 0], these would be considered duplicates since they carry the same information.
-            X_cur = X[features_to_check].replace(mapping_features_val_dict_cur)
+
+            # Have to convert to object dtype because category dtype for unknown reasons will refuse to replace NaNs.
+            X_cur = X[features_to_check].astype('object').replace(mapping_features_val_dict_cur).astype(np.int64)
             features_to_remove += cls._drop_duplicate_features_numeric(X=X_cur, keep=keep)
 
         return features_to_remove

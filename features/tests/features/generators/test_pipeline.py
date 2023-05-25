@@ -48,30 +48,18 @@ def test_pipeline_feature_generator(generator_helper, data_helper):
             'text.symbol_ratio. '
         ],
         ('int', ('bool',)): ['int_bool'],
-        ('int', ('datetime_as_int',)): [
-            'datetime',
-            'datetime.year',
-            'datetime.month',
-            'datetime.day',
-            'datetime.dayofweek',
-            'datetime_as_object',
-            'datetime_as_object.year',
-            'datetime_as_object.month',
-            'datetime_as_object.day',
-            'datetime_as_object.dayofweek'
-        ],
-        ('int', ('text_ngram',)): [
-            '__nlp__.breaks',
-            '__nlp__.end',
-            '__nlp__.end of',
-            '__nlp__.end of the',
-            '__nlp__.of',
-            '__nlp__.sentence',
-            '__nlp__.sentence breaks',
-            '__nlp__.the',
-            '__nlp__.the end',
-            '__nlp__.world',
-            '__nlp__._total_']
+        ('int', ('datetime_as_int',)): ['datetime',
+                                        'datetime.year',
+                                        'datetime.month',
+                                        'datetime.day',
+                                        'datetime.dayofweek'],
+        ('int', ('text_ngram',)): ['__nlp__.breaks',
+                                   '__nlp__.end',
+                                   '__nlp__.end of',
+                                   '__nlp__.sentence',
+                                   '__nlp__.the',
+                                   '__nlp__.world',
+                                   '__nlp__._total_']
     }
 
     expected_output_data_feat_datetime = [
@@ -106,7 +94,6 @@ def test_pipeline_feature_generator(generator_helper, data_helper):
     assert list(output_data['cat'].values) == [0, np.nan, 0, 1, 1, 1, np.nan, np.nan, np.nan]
 
     # datetime checks.  There are further checks in test_datetime.py
-    assert list(output_data['datetime'].values) == list(output_data['datetime_as_object'].values)
     assert expected_output_data_feat_datetime == list(output_data['datetime'].values)
 
     # text_special checks
