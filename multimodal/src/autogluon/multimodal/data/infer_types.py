@@ -729,7 +729,7 @@ def infer_output_shape(
     if label_column is None:
         return None
 
-    if problem_type in [BINARY, MULTICLASS, REGRESSION]:
+    if problem_type in [BINARY, MULTICLASS, REGRESSION, CLASSIFICATION]:
         class_num = len(data[label_column].unique())
         err_msg = (
             f"Problem type is '{problem_type}' while the number of "
@@ -744,9 +744,11 @@ def infer_output_shape(
                 raise AssertionError(err_msg)
             return class_num
         elif problem_type == REGRESSION:
-            if class_num <= 1:  # in case users want to try toy datasets
+            if class_num < 1:
                 raise AssertionError(err_msg)
             return 1
+        else:
+            return class_num
     elif problem_type in [NER, OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
         return None
     else:
