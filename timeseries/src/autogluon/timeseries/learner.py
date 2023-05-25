@@ -32,6 +32,7 @@ class TimeSeriesLearner(AbstractLearner):
         eval_metric_seasonal_period: Optional[int] = None,
         prediction_length: int = 1,
         ignore_time_index: bool = False,
+        cache_predictions: bool = True,
         **kwargs,
     ):
         super().__init__(path_context=path_context)
@@ -46,6 +47,7 @@ class TimeSeriesLearner(AbstractLearner):
             kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
         self.ignore_time_index = ignore_time_index
+        self.cache_predictions = cache_predictions
 
         self.feature_generator = TimeSeriesFeatureGenerator(
             target=self.target, known_covariates_names=self.known_covariates_names
@@ -113,6 +115,7 @@ class TimeSeriesLearner(AbstractLearner):
                 enable_ensemble=kwargs.get("enable_ensemble", True),
                 metadata=self.feature_generator.covariate_metadata,
                 num_val_windows=num_val_windows,
+                cache_predictions=self.cache_predictions,
             )
         )
         self.trainer = self.trainer_type(**trainer_init_kwargs)

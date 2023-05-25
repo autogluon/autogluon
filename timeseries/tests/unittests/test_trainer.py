@@ -401,7 +401,9 @@ def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict
     df_future = df.slice_by_timestep(-prediction_length, None)
     known_covariates = df_future.drop("target", axis=1)
 
-    trainer = AutoTimeSeriesTrainer(path=temp_model_path, prediction_length=prediction_length, enable_ensemble=False)
+    trainer = AutoTimeSeriesTrainer(
+        path=temp_model_path, prediction_length=prediction_length, enable_ensemble=False, cache_predictions=False
+    )
     trainer.fit(df_train, hyperparameters={"ETS": {"maxiter": 1}, "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}})
 
     # Manually add ensemble to ensure that both models have non-zero weight
