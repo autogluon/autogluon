@@ -455,85 +455,85 @@ class MultiModalPredictor(ExportMixin):
         init_scratch: Optional[bool] = False,
         sample_data_path: Optional[str] = None,
     ):
-        # if problem_type == OBJECT_DETECTION:
-        #     learner = ObjectDetectionLearner(
-        #         label=label,
-        #         problem_type=problem_type,
-        #         query=query,
-        #         response=response,
-        #         match_label=match_label,
-        #         pipeline=pipeline,
-        #         presets=presets,
-        #         eval_metric=eval_metric,
-        #         hyperparameters=hyperparameters,
-        #         path=path,
-        #         verbosity=verbosity,
-        #         num_classes=num_classes,
-        #         classes=classes,
-        #         warn_if_exist=warn_if_exist,
-        #         enable_progress_bar=enable_progress_bar,
-        #         init_scratch=init_scratch,
-        #         sample_data_path=sample_data_path,
-        #     )
-        # elif problem_type == NER:
-        #     learner = NERLearner(
-        #         label=label,
-        #         problem_type=problem_type,
-        #         query=query,
-        #         response=response,
-        #         match_label=match_label,
-        #         pipeline=pipeline,
-        #         presets=presets,
-        #         eval_metric=eval_metric,
-        #         hyperparameters=hyperparameters,
-        #         path=path,
-        #         verbosity=verbosity,
-        #         num_classes=num_classes,
-        #         classes=classes,
-        #         warn_if_exist=warn_if_exist,
-        #         enable_progress_bar=enable_progress_bar,
-        #         init_scratch=init_scratch,
-        #         sample_data_path=sample_data_path,
-        #     )
-        # else:
-        #     learner = BaseLearner(
-        #         label=label,
-        #         problem_type=problem_type,
-        #         query=query,
-        #         response=response,
-        #         match_label=match_label,
-        #         pipeline=pipeline,
-        #         presets=presets,
-        #         eval_metric=eval_metric,
-        #         hyperparameters=hyperparameters,
-        #         path=path,
-        #         verbosity=verbosity,
-        #         num_classes=num_classes,
-        #         classes=classes,
-        #         warn_if_exist=warn_if_exist,
-        #         enable_progress_bar=enable_progress_bar,
-        #         init_scratch=init_scratch,
-        #         sample_data_path=sample_data_path,
-        #     )  # TODO: only object detection is using this
-        learner = BaseLearner(
-            label=label,
-            problem_type=problem_type,
-            query=query,
-            response=response,
-            match_label=match_label,
-            pipeline=pipeline,
-            presets=presets,
-            eval_metric=eval_metric,
-            hyperparameters=hyperparameters,
-            path=path,
-            verbosity=verbosity,
-            num_classes=num_classes,
-            classes=classes,
-            warn_if_exist=warn_if_exist,
-            enable_progress_bar=enable_progress_bar,
-            init_scratch=init_scratch,
-            sample_data_path=sample_data_path,
-        )  # TODO: only object detection is using this
+        if problem_type == OBJECT_DETECTION:
+            learner = ObjectDetectionLearner(
+                label=label,
+                problem_type=problem_type,
+                query=query,
+                response=response,
+                match_label=match_label,
+                pipeline=pipeline,
+                presets=presets,
+                eval_metric=eval_metric,
+                hyperparameters=hyperparameters,
+                path=path,
+                verbosity=verbosity,
+                num_classes=num_classes,
+                classes=classes,
+                warn_if_exist=warn_if_exist,
+                enable_progress_bar=enable_progress_bar,
+                init_scratch=init_scratch,
+                sample_data_path=sample_data_path,
+            )
+        elif problem_type == NER:
+            learner = NERLearner(
+                label=label,
+                problem_type=problem_type,
+                query=query,
+                response=response,
+                match_label=match_label,
+                pipeline=pipeline,
+                presets=presets,
+                eval_metric=eval_metric,
+                hyperparameters=hyperparameters,
+                path=path,
+                verbosity=verbosity,
+                num_classes=num_classes,
+                classes=classes,
+                warn_if_exist=warn_if_exist,
+                enable_progress_bar=enable_progress_bar,
+                init_scratch=init_scratch,
+                sample_data_path=sample_data_path,
+            )
+        else:
+            learner = BaseLearner(
+                label=label,
+                problem_type=problem_type,
+                query=query,
+                response=response,
+                match_label=match_label,
+                pipeline=pipeline,
+                presets=presets,
+                eval_metric=eval_metric,
+                hyperparameters=hyperparameters,
+                path=path,
+                verbosity=verbosity,
+                num_classes=num_classes,
+                classes=classes,
+                warn_if_exist=warn_if_exist,
+                enable_progress_bar=enable_progress_bar,
+                init_scratch=init_scratch,
+                sample_data_path=sample_data_path,
+            )  # TODO: only object detection is using this
+        # learner = BaseLearner(
+        #     label=label,
+        #     problem_type=problem_type,
+        #     query=query,
+        #     response=response,
+        #     match_label=match_label,
+        #     pipeline=pipeline,
+        #     presets=presets,
+        #     eval_metric=eval_metric,
+        #     hyperparameters=hyperparameters,
+        #     path=path,
+        #     verbosity=verbosity,
+        #     num_classes=num_classes,
+        #     classes=classes,
+        #     warn_if_exist=warn_if_exist,
+        #     enable_progress_bar=enable_progress_bar,
+        #     init_scratch=init_scratch,
+        #     sample_data_path=sample_data_path,
+        # )  # TODO: only object detection is using this
         return learner
 
     @property
@@ -2094,6 +2094,10 @@ class MultiModalPredictor(ExportMixin):
 
         return data, df_preprocessor, data_processors
 
+    def set_num_workers(self, num_workers: int, num_workers_evaluation: Optional[int] = None):
+        if self._learner:
+            self._learner.set_num_workers(num_workers=num_workers, num_workers_evaluation=num_workers_evaluation)
+
     def set_num_gpus(self, num_gpus):
         assert isinstance(num_gpus, int)
         if self._learner:
@@ -2968,14 +2972,13 @@ class MultiModalPredictor(ExportMixin):
             return predictor
 
         else:
-            # if problem_type == OBJECT_DETECTION:
-            #     # learner = ObjectDetectionLearner.load(path=path, resume=resume, verbosity=verbosity)
-            #     learner = ObjectDetectionLearner.load(path=path, resume=resume, verbosity=verbosity)
-            # elif problem_type == NER:
-            #     learner = NERLearner.load(path=path, resume=resume, verbosity=verbosity)
-            # else:
-            #     learner = BaseLearner.load(path=path, resume=resume, verbosity=verbosity)
-            learner = BaseLearner.load(path=path, resume=resume, verbosity=verbosity)
+            if problem_type == OBJECT_DETECTION:
+                learner = ObjectDetectionLearner.load(path=path, resume=resume, verbosity=verbosity)
+            elif problem_type == NER:
+                learner = NERLearner.load(path=path, resume=resume, verbosity=verbosity)
+            else:
+                learner = BaseLearner.load(path=path, resume=resume, verbosity=verbosity)
+            # learner = BaseLearner.load(path=path, resume=resume, verbosity=verbosity)
 
             predictor._learner = learner
             return predictor

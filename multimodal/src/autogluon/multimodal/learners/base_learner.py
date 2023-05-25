@@ -433,11 +433,11 @@ class BaseLearner(ExportMixin, AbstractLearner):
         #     )
         #     return
 
-        if self._problem_type == OBJECT_DETECTION:
-            self._label_column = "label"
-            if self._sample_data_path is not None:
-                self._classes = get_detection_classes(self._sample_data_path)
-                self._output_shape = len(self._classes)
+        # if self._problem_type == OBJECT_DETECTION:
+        #     self._label_column = "label"
+        #     if self._sample_data_path is not None:
+        #         self._classes = get_detection_classes(self._sample_data_path)
+        #         self._output_shape = len(self._classes)
 
         if self._problem_type is not None:
             if self.problem_property.support_zero_shot:
@@ -547,10 +547,10 @@ class BaseLearner(ExportMixin, AbstractLearner):
         max_num_tuning_data: Optional[int],
         **kwargs,
     ):
-        if self._problem_type == OBJECT_DETECTION:
-            train_data, tuning_data = setup_detection_train_tuning_data(
-                self, max_num_tuning_data, seed, train_data, tuning_data
-            )
+        # if self._problem_type == OBJECT_DETECTION:
+        #     train_data, tuning_data = setup_detection_train_tuning_data(
+        #         self, max_num_tuning_data, seed, train_data, tuning_data
+        #     )
         if isinstance(train_data, str):
             train_data = load_pd.load(train_data)
         if isinstance(tuning_data, str):
@@ -571,13 +571,13 @@ class BaseLearner(ExportMixin, AbstractLearner):
         )
 
         # TODO: Delete this check for object detection
-        if self._problem_type != OBJECT_DETECTION:
-            if self._output_shape is not None and output_shape is not None:
-                assert self._output_shape == output_shape, (
-                    f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
-                )
-        else:
-            self._output_shape = output_shape
+        # if self._problem_type != OBJECT_DETECTION:
+        if self._output_shape is not None and output_shape is not None:
+            assert self._output_shape == output_shape, (
+                f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
+            )
+        # else:
+        #     self._output_shape = output_shape
 
         return output_shape
 
@@ -1851,59 +1851,78 @@ class BaseLearner(ExportMixin, AbstractLearner):
         **kwargs,
     ):
         if not test_time:
-            if self._problem_type == NER:
-                task = NerLitModule(
-                    model=self._model,
-                    loss_func=loss_func,
-                    efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                    mixup_fn=mixup_fn,
-                    mixup_off_epoch=OmegaConf.select(self._config, "data.mixup.turn_off_epoch"),
-                    model_postprocess_fn=self._model_postprocess_fn,
-                    trainable_param_names=trainable_param_names,
-                    **metrics_kwargs,
-                    **optimization_kwargs,
-                )
-            elif self._problem_type == OBJECT_DETECTION:
-                task = MMDetLitModule(
-                    model=self._model,
-                    **metrics_kwargs,
-                    **optimization_kwargs,
-                )
-            else:
-                task = LitModule(
-                    model=self._model,
-                    loss_func=loss_func,
-                    efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                    mixup_fn=mixup_fn,
-                    mixup_off_epoch=OmegaConf.select(self._config, "data.mixup.turn_off_epoch"),
-                    model_postprocess_fn=self._model_postprocess_fn,
-                    trainable_param_names=trainable_param_names,
-                    skip_final_val=OmegaConf.select(self._config, "optimization.skip_final_val", default=False),
-                    **metrics_kwargs,
-                    **optimization_kwargs,
-                )
+            # if self._problem_type == NER:
+            #     task = NerLitModule(
+            #         model=self._model,
+            #         loss_func=loss_func,
+            #         efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+            #         mixup_fn=mixup_fn,
+            #         mixup_off_epoch=OmegaConf.select(self._config, "data.mixup.turn_off_epoch"),
+            #         model_postprocess_fn=self._model_postprocess_fn,
+            #         trainable_param_names=trainable_param_names,
+            #         **metrics_kwargs,
+            #         **optimization_kwargs,
+            #     )
+            # elif self._problem_type == OBJECT_DETECTION:
+            #     task = MMDetLitModule(
+            #         model=self._model,
+            #         **metrics_kwargs,
+            #         **optimization_kwargs,
+            #     )
+            # else:
+            #     task = LitModule(
+            #         model=self._model,
+            #         loss_func=loss_func,
+            #         efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+            #         mixup_fn=mixup_fn,
+            #         mixup_off_epoch=OmegaConf.select(self._config, "data.mixup.turn_off_epoch"),
+            #         model_postprocess_fn=self._model_postprocess_fn,
+            #         trainable_param_names=trainable_param_names,
+            #         skip_final_val=OmegaConf.select(self._config, "optimization.skip_final_val", default=False),
+            #         **metrics_kwargs,
+            #         **optimization_kwargs,
+            #     )
+            task = LitModule(
+                model=self._model,
+                loss_func=loss_func,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+                mixup_fn=mixup_fn,
+                mixup_off_epoch=OmegaConf.select(self._config, "data.mixup.turn_off_epoch"),
+                model_postprocess_fn=self._model_postprocess_fn,
+                trainable_param_names=trainable_param_names,
+                skip_final_val=OmegaConf.select(self._config, "optimization.skip_final_val", default=False),
+                **metrics_kwargs,
+                **optimization_kwargs,
+            )
         else:
-            if self._problem_type == NER:
-                task = NerLitModule(
-                    model=self._model,
-                    model_postprocess_fn=self._model_postprocess_fn,
-                    efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                    trainable_param_names=trainable_param_names,
-                    **optimization_kwargs,
-                )
-            elif self._problem_type == OBJECT_DETECTION:
-                task = MMDetLitModule(
-                    model=self._model,
-                    **optimization_kwargs,
-                )
-            else:
-                task = LitModule(
-                    model=self._model,
-                    model_postprocess_fn=self._model_postprocess_fn,
-                    efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                    trainable_param_names=trainable_param_names,
-                    **optimization_kwargs,
-                )
+            # if self._problem_type == NER:
+            #     task = NerLitModule(
+            #         model=self._model,
+            #         model_postprocess_fn=self._model_postprocess_fn,
+            #         efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+            #         trainable_param_names=trainable_param_names,
+            #         **optimization_kwargs,
+            #     )
+            # elif self._problem_type == OBJECT_DETECTION:
+            #     task = MMDetLitModule(
+            #         model=self._model,
+            #         **optimization_kwargs,
+            #     )
+            # else:
+            #     task = LitModule(
+            #         model=self._model,
+            #         model_postprocess_fn=self._model_postprocess_fn,
+            #         efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+            #         trainable_param_names=trainable_param_names,
+            #         **optimization_kwargs,
+            #     )
+            task = LitModule(
+                model=self._model,
+                model_postprocess_fn=self._model_postprocess_fn,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+                trainable_param_names=trainable_param_names,
+                **optimization_kwargs,
+            )
         return task
 
     def _get_distillation_lightning_module(
@@ -1950,38 +1969,47 @@ class BaseLearner(ExportMixin, AbstractLearner):
     def _get_data_module(
         self, train_df, val_df, df_preprocessor, data_processors, val_use_training_mode
     ) -> LightningDataModule:
-        if (
-            self._problem_type == OBJECT_DETECTION
-            and self._model.config is not None
-            and MULTI_IMAGE_MIX_DATASET in self._model.config
-        ):
-            train_dataset = MultiImageMixDataset(
-                data=train_df,
-                preprocessor=[df_preprocessor],
-                processors=[data_processors],
-                model_config=self._model.config,
-                id_mappings=None,
-                is_training=True,
-            )
-            train_dm = BaseDataModule(
-                df_preprocessor=df_preprocessor,
-                data_processors=data_processors,
-                per_gpu_batch_size=self._config.env.per_gpu_batch_size,
-                num_workers=self._config.env.num_workers,
-                train_dataset=train_dataset,
-                validate_data=val_df,
-                val_use_training_mode=val_use_training_mode,
-            )
-        else:
-            train_dm = BaseDataModule(
-                df_preprocessor=df_preprocessor,
-                data_processors=data_processors,
-                per_gpu_batch_size=self._config.env.per_gpu_batch_size,
-                num_workers=self._config.env.num_workers,
-                train_data=train_df,
-                validate_data=val_df,
-                val_use_training_mode=val_use_training_mode,
-            )
+        # if (
+        #     self._problem_type == OBJECT_DETECTION
+        #     and self._model.config is not None
+        #     and MULTI_IMAGE_MIX_DATASET in self._model.config
+        # ):
+        #     train_dataset = MultiImageMixDataset(
+        #         data=train_df,
+        #         preprocessor=[df_preprocessor],
+        #         processors=[data_processors],
+        #         model_config=self._model.config,
+        #         id_mappings=None,
+        #         is_training=True,
+        #     )
+        #     train_dm = BaseDataModule(
+        #         df_preprocessor=df_preprocessor,
+        #         data_processors=data_processors,
+        #         per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+        #         num_workers=self._config.env.num_workers,
+        #         train_dataset=train_dataset,
+        #         validate_data=val_df,
+        #         val_use_training_mode=val_use_training_mode,
+        #     )
+        # else:
+        #     train_dm = BaseDataModule(
+        #         df_preprocessor=df_preprocessor,
+        #         data_processors=data_processors,
+        #         per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+        #         num_workers=self._config.env.num_workers,
+        #         train_data=train_df,
+        #         validate_data=val_df,
+        #         val_use_training_mode=val_use_training_mode,
+        #     )
+        train_dm = BaseDataModule(
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+            num_workers=self._config.env.num_workers,
+            train_data=train_df,
+            validate_data=val_df,
+            val_use_training_mode=val_use_training_mode,
+        )
         return train_dm
 
     def _get_model_postprocess_fn(self, loss_func):
@@ -2044,8 +2072,8 @@ class BaseLearner(ExportMixin, AbstractLearner):
 
         # 4. if NER, update output shape. TODO: This can be refactored into the NER Learner
         # Update output_shape with label_generator.
-        if self._problem_type == NER:
-            self._output_shape = len(self._df_preprocessor.label_generator.unique_entity_groups)
+        # if self._problem_type == NER:
+        #     self._output_shape = len(self._df_preprocessor.label_generator.unique_entity_groups)
 
         # 5. get model
         if self._model is None:
@@ -2333,32 +2361,32 @@ class BaseLearner(ExportMixin, AbstractLearner):
                 pred_writer = DDPCacheWriter(pipeline=self._problem_type, write_interval="epoch")
                 callbacks = [pred_writer]
 
-        if self._problem_type == NER:
-            task = NerLitModule(
-                model=self._model,
-                model_postprocess_fn=self._model_postprocess_fn,
-                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                trainable_param_names=trainable_param_names,
-                **optimization_kwargs,
-            )
-        elif self._problem_type == OBJECT_DETECTION:
-            task = MMDetLitModule(
-                model=self._model,
-                **optimization_kwargs,
-            )
-        else:
-            task = LitModule(
-                model=self._model,
-                model_postprocess_fn=self._model_postprocess_fn,
-                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                trainable_param_names=trainable_param_names,
-                **optimization_kwargs,
-            )
-        # task = self._get_lightning_module(
-        #     trainable_param_names=trainable_param_names,
-        #     optimization_kwargs=optimization_kwargs,
-        #     test_time=True,
-        # )
+        # if self._problem_type == NER:
+        #     task = NerLitModule(
+        #         model=self._model,
+        #         model_postprocess_fn=self._model_postprocess_fn,
+        #         efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+        #         trainable_param_names=trainable_param_names,
+        #         **optimization_kwargs,
+        #     )
+        # elif self._problem_type == OBJECT_DETECTION:
+        #     task = MMDetLitModule(
+        #         model=self._model,
+        #         **optimization_kwargs,
+        #     )
+        # else:
+        #     task = LitModule(
+        #         model=self._model,
+        #         model_postprocess_fn=self._model_postprocess_fn,
+        #         efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+        #         trainable_param_names=trainable_param_names,
+        #         **optimization_kwargs,
+        #     )
+        task = self._get_lightning_module(
+            trainable_param_names=trainable_param_names,
+            optimization_kwargs=optimization_kwargs,
+            test_time=True,
+        )
 
         blacklist_msgs = []
         if self._verbosity <= 3:  # turn off logging in prediction
@@ -2511,6 +2539,12 @@ class BaseLearner(ExportMixin, AbstractLearner):
         assert isinstance(num_gpus, int)
         self._config.env.num_gpus = num_gpus
 
+    def set_num_workers(self, num_workers: int, num_workers_evaluation: Optional[int] = None):
+        assert isinstance(num_workers, int)
+        self._config.env.num_workers = num_workers
+        if num_workers_evaluation is not None:
+            self._config.env.num_workers_evaluation = num_workers_evaluation
+
     def get_num_gpus(self):
         try:
             return self._config.env.num_gpus
@@ -2589,28 +2623,28 @@ class BaseLearner(ExportMixin, AbstractLearner):
         #         return_pred=return_pred,
         #         realtime=realtime,
         #     )
-        if self._problem_type == OBJECT_DETECTION:
-            if realtime:
-                return NotImplementedError(
-                    f"Current problem type {self._problem_type} does not support realtime predict."
-                )
-            if isinstance(data, str):
-                return evaluate_coco(
-                    predictor=self,
-                    anno_file_or_df=data,
-                    metrics=metrics,
-                    return_pred=return_pred,
-                    eval_tool=eval_tool,
-                )
-            else:
-                data = object_detection_data_to_df(data)
-                return evaluate_coco(
-                    predictor=self,
-                    anno_file_or_df=data,
-                    metrics=metrics,
-                    return_pred=return_pred,
-                    eval_tool="torchmetrics",
-                )
+        # if self._problem_type == OBJECT_DETECTION:
+        #     if realtime:
+        #         return NotImplementedError(
+        #             f"Current problem type {self._problem_type} does not support realtime predict."
+        #         )
+        #     if isinstance(data, str):
+        #         return evaluate_coco(
+        #             predictor=self,
+        #             anno_file_or_df=data,
+        #             metrics=metrics,
+        #             return_pred=return_pred,
+        #             eval_tool=eval_tool,
+        #         )
+        #     else:
+        #         data = object_detection_data_to_df(data)
+        #         return evaluate_coco(
+        #             predictor=self,
+        #             anno_file_or_df=data,
+        #             metrics=metrics,
+        #             return_pred=return_pred,
+        #             eval_tool="torchmetrics",
+        #         )
 
         ret_type = self._get_pred_ret_type()
 
