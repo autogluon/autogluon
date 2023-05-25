@@ -13,16 +13,12 @@ try:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         import mmcv
-    from mmcv.ops import RoIPool
-
-    # from mmcv.runner import load_checkpoint  # mmdet 2
-    from mmcv.parallel import scatter  # not in mmdet3
 except ImportError as e:
     mmcv = None
 
 try:
     import mmengine
-    from mmengine.runner import load_checkpoint  # mmdet 3
+    from mmengine.runner import load_checkpoint
 except ImportError as e:
     mmengine = None
 
@@ -33,18 +29,12 @@ except ImportError as e:
     mmdet = None
 
 from ..constants import (
-    AUTOMM,
     BBOX,
     BBOX_FORMATS,
     COLUMN,
-    COLUMN_FEATURES,
-    FEATURES,
     IMAGE,
     IMAGE_VALID_NUM,
     LABEL,
-    LOGITS,
-    MASKS,
-    XYWH,
     XYXY,
 )
 from .utils import freeze_model_layers, lookup_mmdet_config, update_mmdet_config
