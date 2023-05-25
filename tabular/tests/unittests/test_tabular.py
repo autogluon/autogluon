@@ -1060,7 +1060,7 @@ def test_tabular_log_to_file():
     predictor = TabularPredictor(label='class', log_to_file=True).fit(
         train_data=train_data,
         hyperparameters={
-            "GBM": {}
+            "DUMMY": {}
         }
     )
     log = TabularPredictor.load_log(predictor_path=predictor.path)
@@ -1075,7 +1075,7 @@ def test_tabular_log_to_file():
         ).fit(
             train_data=train_data,
             hyperparameters={
-                "GBM": {}
+                "DUMMY": {}
             }
         )
         log = TabularPredictor.load_log(log_file_path=log_file)

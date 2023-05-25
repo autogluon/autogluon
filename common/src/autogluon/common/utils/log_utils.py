@@ -1,5 +1,7 @@
 import logging
 
+from typing import Optional
+
 _logger_ag = logging.getLogger('autogluon')  # return autogluon root logger
 
 
@@ -65,7 +67,18 @@ def set_logger_verbosity(verbosity: int, logger=None):
     logger.setLevel(verbosity2loglevel(verbosity))
     
 
-def add_log_to_file(file_path:str, logger: logging.Logger = None):
+def add_log_to_file(file_path: str, logger: Optional[logging.Logger] = None):
+    """
+    Add a FileHandler to the logger so that it can log to a file
+    
+    Parameters
+    ----------
+    file_path: str
+        File path to save the log
+    logger: Optional[logging.Logger], default = None
+        The log to add FileHandler.
+        If not provided, will add to the default AG logger, `logging.getLogger('autogluon')`
+    """
     if logger is None:
         logger = _logger_ag
     fh = logging.FileHandler(file_path)

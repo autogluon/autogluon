@@ -226,12 +226,11 @@ class TabularPredictor:
                 f"We do not recommend specifying weight_evaluation when sample_weight='{self.sample_weight}', instead specify appropriate eval_metric.")
         self._validate_init_kwargs(kwargs)
         path = setup_outputdir(path)
-        if log_to_file:
-            if log_file_path == "auto":
-                log_file_path = os.path.join(path, "logs", self._predictor_log_file_name)
-            log_file_path = os.path.abspath(os.path.normpath(log_file_path))
-            os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-            add_log_to_file(log_file_path)
+        self._setup_log_to_file(
+            path=path,
+            log_to_file=log_to_file,
+            log_file_path=log_file_path
+        )
 
         learner_type = kwargs.pop('learner_type', DefaultLearner)
         learner_kwargs = kwargs.pop('learner_kwargs', dict())
@@ -3265,6 +3264,14 @@ class TabularPredictor:
         with open(file_path, "r") as f:
             lines = f.readlines()
         return lines
+    
+    def _setup_log_to_file(self, path, log_to_file, log_file_path):
+        if log_to_file:
+            if log_file_path == "auto":
+                log_file_path = os.path.join(path, "logs", self._predictor_log_file_name)
+            log_file_path = os.path.abspath(os.path.normpath(log_file_path))
+            os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+            add_log_to_file(log_file_path)
 
     @staticmethod
     def _validate_init_kwargs(kwargs):
