@@ -268,6 +268,7 @@ def test_feature_generator():
         'AsTypeFeatureGenerator',
         'CategoryFeatureGenerator',
         'DatetimeFeatureGenerator',
+        'DropDuplicatesFeatureGenerator',
         'DropUniqueFeatureGenerator',
         'FillNaFeatureGenerator',
         'IdentityFeatureGenerator',
@@ -308,6 +309,7 @@ def test_feature_generator_2():
     assert text_gen is None
     assert sorted(list(set(generators_classes))) == [
         'AsTypeFeatureGenerator',
+        'DropDuplicatesFeatureGenerator',
         'DropUniqueFeatureGenerator',
         'FillNaFeatureGenerator'
     ]
