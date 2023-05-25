@@ -358,7 +358,7 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
