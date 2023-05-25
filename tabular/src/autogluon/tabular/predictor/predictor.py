@@ -626,6 +626,12 @@ class TabularPredictor:
                 See the `ag_args_ensemble` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
                 Identical to specifying `ag_args_ensemble` parameter for all models in `hyperparameters`.
                 If a key in `ag_args_ensemble` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
+            included_model_types : list, default = None
+                To only include listed model for training during `fit()`.
+                Models that are listed in `included_model_types` but not in `hyperparameters` will be ignored.
+                Reference `hyperparameters` documentation for what models correspond to each value.
+                Useful when a only a subsample of model needs to be trained and the `hyperparameters` dictionary is difficult or time-consuming.
+                    Example: To include both 'KNN' and 'custom' models, specify `included_model_types=['KNN', 'custom']`.
             excluded_model_types : list, default = None
                 Banned subset of model types to avoid training during `fit()`, even if present in `hyperparameters`.
                 Reference `hyperparameters` documentation for what models correspond to each value.
@@ -778,6 +784,7 @@ class TabularPredictor:
         ag_args = kwargs['ag_args']
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
+        included_model_types = kwargs['included_model_types']
         excluded_model_types = kwargs['excluded_model_types']
         use_bag_holdout = kwargs['use_bag_holdout']
 
@@ -856,6 +863,7 @@ class TabularPredictor:
             'ag_args': ag_args,
             'ag_args_ensemble': ag_args_ensemble,
             'ag_args_fit': ag_args_fit,
+            'included_model_types': included_model_types,
             'excluded_model_types': excluded_model_types,
             'feature_prune_kwargs': kwargs.get('feature_prune_kwargs', None)
         }
@@ -3279,6 +3287,7 @@ class TabularPredictor:
             ag_args=None,
             ag_args_fit=None,
             ag_args_ensemble=None,
+            included_model_types=None,
             excluded_model_types=None,
 
             # aux_kwargs -> +1 nest
@@ -3321,7 +3330,7 @@ class TabularPredictor:
         kwargs_sanitized.update(kwargs)
 
         # Deepcopy args to avoid altering outer context
-        deepcopy_args = ['ag_args', 'ag_args_fit', 'ag_args_ensemble', 'excluded_model_types']
+        deepcopy_args = ['ag_args', 'ag_args_fit', 'ag_args_ensemble', 'included_model_types', 'excluded_model_types']
         for deepcopy_arg in deepcopy_args:
             kwargs_sanitized[deepcopy_arg] = copy.deepcopy(kwargs_sanitized[deepcopy_arg])
 

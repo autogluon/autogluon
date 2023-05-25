@@ -3,6 +3,7 @@ import inspect
 import logging
 from collections import defaultdict
 
+from autogluon.common.model_filter import ModelFilter
 from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, AG_ARGS_ENSEMBLE, BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.models import AbstractModel, GreedyWeightedEnsembleModel, StackerEnsembleModel, SimpleWeightedEnsembleModel, DummyModel
 from autogluon.core.trainer.utils import process_hyperparameters
@@ -158,10 +159,26 @@ VALID_AG_ARGS_KEYS = {
 # DONE: Add banned_model_types arg
 # TODO: Add option to update hyperparameters with only added keys, so disabling CatBoost would just be {'CAT': []}, which keeps the other models as is.
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
-def get_preset_models(path, problem_type, eval_metric, hyperparameters,
-                      level: int = 1, ensemble_type=StackerEnsembleModel, ensemble_kwargs: dict = None, ag_args_fit=None, ag_args=None, ag_args_ensemble=None,
-                      name_suffix: str = None, default_priorities=None, invalid_model_names: list = None, excluded_model_types: list = None,
-                      hyperparameter_preprocess_func=None, hyperparameter_preprocess_kwargs=None, silent=True):
+def get_preset_models(
+    path,
+    problem_type,
+    eval_metric,
+    hyperparameters,
+    level: int = 1,
+    ensemble_type=StackerEnsembleModel,
+    ensemble_kwargs: dict = None,
+    ag_args_fit=None,
+    ag_args=None,
+    ag_args_ensemble=None,
+    name_suffix: str = None,
+    default_priorities=None,
+    invalid_model_names: list = None, 
+    included_model_types: list = None,
+    excluded_model_types: list = None,
+    hyperparameter_preprocess_func=None,
+    hyperparameter_preprocess_kwargs=None,
+    silent=True
+):
     hyperparameters = process_hyperparameters(hyperparameters)
     if hyperparameter_preprocess_func is not None:
         if hyperparameter_preprocess_kwargs is None:
@@ -172,10 +189,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
     invalid_name_set = set()
     if invalid_model_names is not None:
         invalid_name_set.update(invalid_model_names)
-    invalid_type_set = set()
-    if excluded_model_types is not None:
-        logger.log(20, f'Excluded Model Types: {excluded_model_types}')
-        invalid_type_set.update(excluded_model_types)
+
     if default_priorities is None:
         default_priorities = copy.deepcopy(DEFAULT_MODEL_PRIORITY)
         if problem_type in PROBLEM_TYPE_MODEL_PRIORITY:
@@ -185,6 +199,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
     if level_key not in hyperparameters.keys() and level_key == 'default':
         hyperparameters = {'default': hyperparameters}
     hp_level = hyperparameters[level_key]
+    hp_level = ModelFilter.filter_models(models=hp_level, included_model_types=included_model_types, excluded_model_types=excluded_model_types)
     model_cfg_priority_dict = defaultdict(list)
     model_type_list = list(hp_level.keys())
     if 'NN' in model_type_list:
@@ -208,9 +223,6 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
             # TODO: Remove in v0.6.0
             model_type = 'NN_MXNET'
         for model_cfg in models_of_type:
-            if model_type in invalid_type_set:
-                logger.log(20, f"\tFound '{model_type}' model in hyperparameters, but '{model_type}' is present in `excluded_model_types` and will be removed.")
-                continue  # Don't include excluded models
             if isinstance(model_cfg, str):
                 if model_type == 'AG_TEXT_NN' or model_type == 'AG_AUTOMM':
                     model_cfgs_to_process.append({})
