@@ -22,6 +22,7 @@ from autogluon.common.utils.utils import setup_outputdir, get_autogluon_metadata
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
+from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.trainer import AbstractTrainer
@@ -1378,11 +1379,10 @@ class TabularPredictor:
         data = self.__get_dataset(data)
         return self._learner.predict(X=data, model=model, as_pandas=as_pandas, transform_features=transform_features)
 
-    # TODO: v0.8: Error if called with self.problem_type='regression' or 'quantile'
     def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=True, transform_features=True):
         """
         Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
-        If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
+        If `predictor.problem_type` is regression or quantile, this will raise an AssertionError.
 
         Parameters
         ----------
@@ -1415,25 +1415,12 @@ class TabularPredictor:
         For binary classification problems, the output contains for each datapoint the predicted probabilities of the negative and positive classes, unless you specify `as_multiclass=False`.
         """
         self._assert_is_fit('predict_proba')
-        data = self.__get_dataset(data)
         if not self.can_predict_proba:
-            warnings.warn(
-                f'Calling `predictor.predict_proba` when problem_type={self.problem_type} will raise an AssertionError starting in AutoGluon v0.8. '
-                'Please call `predictor.predict` instead. You can check the value of `predictor.can_predict_proba` to tell if predict_proba is valid.',
-                category=FutureWarning
-            )
+            raise AssertionError(f'`predictor.predict_proba` is not supported when problem_type="{self.problem_type}". '
+                                 f'Please call `predictor.predict` instead. '
+                                 f'You can check the value of `predictor.can_predict_proba` to tell if predict_proba is valid.')
+        data = self.__get_dataset(data)
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass, transform_features=transform_features)
-
-    # TODO: Ensure this is correct as new problem_types are added.
-    #  Consider making problem_type a class object to be able to look this up easier.
-    @property
-    def _is_classification(self) -> bool:
-        """
-        Return True if problem_type is classification, otherwise return False.
-        Raises an AssertionError if `self.problem_type` is None.
-        """
-        assert self.problem_type is not None, "problem_type cannot be None when determining if the predictor is solving a classification problem"
-        return self.problem_type not in [REGRESSION, QUANTILE]
 
     @property
     def can_predict_proba(self) -> bool:
@@ -1442,7 +1429,7 @@ class TabularPredictor:
         Raises an AssertionError if called before fitting.
         """
         self._assert_is_fit('can_predict_proba')
-        return self._is_classification
+        return problem_type_info.can_predict_proba(problem_type=self.problem_type)
 
     def evaluate(self, data, model=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
         """
@@ -1704,6 +1691,10 @@ class TabularPredictor:
         Dictionary with model names as keys and model prediction probabilities as values.
         """
         self._assert_is_fit('predict_proba_multi')
+        if not self.can_predict_proba:
+            raise AssertionError(f'`predictor.predict_proba_multi` is not supported when problem_type="{self.problem_type}". '
+                                 f'Please call `predictor.predict_multi` instead. '
+                                 f'You can check the value of `predictor.can_predict_proba` to tell if predict_proba_multi is valid.')
         data = self.__get_dataset(data, allow_nan=True)
         return self._learner.predict_proba_multi(X=data,
                                                  models=models,

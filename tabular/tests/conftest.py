@@ -168,9 +168,14 @@ class FitHelper:
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)
         predictor.predict(test_data)
-        pred_proba = predictor.predict_proba(test_data)
         predictor.evaluate(test_data)
-        predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred_proba)
+
+        if predictor.can_predict_proba:
+            pred_proba = predictor.predict_proba(test_data)
+            predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred_proba)
+        else:
+            with pytest.raises(AssertionError):
+                predictor.predict_proba(test_data)
 
         model_names = predictor.get_model_names()
         model_name = model_names[0]
@@ -181,7 +186,8 @@ class FitHelper:
             refit_model_name = refit_model_names[model_name]
             assert '_FULL' in refit_model_name
             predictor.predict(test_data, model=refit_model_name)
-            predictor.predict_proba(test_data, model=refit_model_name)
+            if predictor.can_predict_proba:
+                predictor.predict_proba(test_data, model=refit_model_name)
         predictor.info()
         predictor.leaderboard(test_data, extra_info=True, extra_metrics=extra_metrics)
 
@@ -216,7 +222,7 @@ class FitHelper:
             shutil.rmtree(predictor.path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
 
     @staticmethod
-    def fit_dataset(train_data, init_args, fit_args, sample_size=None):
+    def fit_dataset(train_data, init_args, fit_args, sample_size=None) -> TabularPredictor:
         if sample_size is not None and sample_size < len(train_data):
             train_data = train_data.sample(n=sample_size, random_state=0)
         return TabularPredictor(**init_args).fit(train_data, **fit_args)
