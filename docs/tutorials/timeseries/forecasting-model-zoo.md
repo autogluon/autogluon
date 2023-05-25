@@ -133,6 +133,22 @@ are different from the original libraries.
 
 ```
 
+### {hidden}`DLinearModel`
+
+```{eval-rst}
+.. autoclass:: DLinearModel
+   :members: init
+
+```
+
+### {hidden}`PatchTSTModel`
+
+```{eval-rst}
+.. autoclass:: PatchTSTModel
+   :members: init
+
+```
+
 ### {hidden}`SimpleFeedForwardModel`
 
 ```{eval-rst}
