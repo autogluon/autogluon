@@ -1,6 +1,7 @@
 import json
 from collections import OrderedDict
 
+import numpy as np
 import pandas as pd
 import pytest
 from omegaconf import OmegaConf
@@ -12,18 +13,23 @@ from transformers import AutoTokenizer
 from autogluon.multimodal.constants import (
     BINARY,
     CATEGORICAL,
+    CLASSIFICATION,
     DATA,
     ENVIRONMENT,
     IMAGE_PATH,
     MODEL,
     MULTICLASS,
+    NER,
     NER_ANNOTATION,
     NUMERICAL,
+    OBJECT_DETECTION,
+    OPEN_VOCABULARY_OBJECT_DETECTION,
     OPTIMIZATION,
+    REGRESSION,
     TEXT,
     TEXT_NER,
 )
-from autogluon.multimodal.data.infer_types import infer_ner_column_type
+from autogluon.multimodal.data.infer_types import infer_ner_column_type, infer_problem_type
 from autogluon.multimodal.data.label_encoder import CustomLabelEncoder
 from autogluon.multimodal.data.utils import process_ner_annotations
 from autogluon.multimodal.utils import (
@@ -498,3 +504,24 @@ def test_infer_ner_column_type(column_types, gt_column_types):
     gt_column_types = OrderedDict(gt_column_types)
     column_types = infer_ner_column_type(column_types)
     assert column_types == gt_column_types
+
+
+@pytest.mark.parametrize(
+    "y_data,provided_problem_type,gt_problem_type",
+    [
+        (pd.Series([0, 1, 0, 1, 1, 0]), None, BINARY),
+        (pd.Series(["a", "b", "c"]), None, MULTICLASS),
+        (pd.Series(["a", "b", "c"]), CLASSIFICATION, MULTICLASS),
+        (pd.Series(np.linspace(0.0, 1.0, 100)), None, REGRESSION),
+        (pd.Series(["0", "1", "2", 3, 4, 5, 5, 5, 0]), None, MULTICLASS),
+        (None, NER, NER),
+        (None, OBJECT_DETECTION, OBJECT_DETECTION),
+        (None, OPEN_VOCABULARY_OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION),
+    ],
+)
+def test_infer_problem_type(y_data, provided_problem_type, gt_problem_type):
+    inferred_problem_type = infer_problem_type(
+        y_train_data=y_data,
+        provided_problem_type=provided_problem_type,
+    )
+    assert inferred_problem_type == gt_problem_type

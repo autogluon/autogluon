@@ -53,11 +53,7 @@ from .constants import (
     Y_TRUE,
 )
 from .data.datamodule import BaseDataModule
-from .data.infer_types import (
-    infer_column_types,
-    infer_label_column_type_by_problem_type,
-    infer_problem_type_output_shape,
-)
+from .data.infer_types import infer_column_types, infer_output_shape, infer_problem_type
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from .optimization.lit_matcher import MatcherLitModule
 from .optimization.utils import get_matcher_loss_func, get_matcher_miner_func, get_metric
@@ -394,25 +390,24 @@ class MultiModalMatcher:
             seed=seed,
         )
 
+        if self._label_column:
+            self._problem_type = infer_problem_type(
+                y_train_data=train_data[self._label_column],
+                provided_problem_type=self._problem_type,
+            )
+
         column_types = infer_column_types(
             data=train_data,
             valid_data=tuning_data,
             label_columns=self._label_column,
             provided_column_types=column_types,
-            id_mappings=id_mappings,
+            problem_type=self._problem_type,  # used to update the corresponding column type
         )
-        column_types = infer_label_column_type_by_problem_type(
-            column_types=column_types,
-            label_columns=self._label_column,
-            problem_type=self._problem_type,
-            data=train_data,
-            valid_data=tuning_data,
-        )
-        problem_type, output_shape = infer_problem_type_output_shape(
+
+        output_shape = infer_output_shape(
             label_column=self._label_column,
-            column_types=column_types,
             data=train_data,
-            provided_problem_type=self._problem_type,
+            problem_type=self._problem_type,
         )
 
         logger.debug(f"column_types: {column_types}")
@@ -427,14 +422,6 @@ class MultiModalMatcher:
             # use previous column types to avoid inconsistency with previous numerical mlp and categorical mlp
             column_types = self._column_types
 
-        if self._problem_type is not None:
-            if self._problem_type == CLASSIFICATION:
-                # Set the problem type to be inferred problem type
-                self._problem_type = problem_type
-            assert self._problem_type == problem_type, (
-                f"Inferred problem type {problem_type} is different from " f"the previous {self._problem_type}"
-            )
-
         if self._output_shape is not None:
             assert self._output_shape == output_shape, (
                 f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
@@ -442,7 +429,7 @@ class MultiModalMatcher:
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
-                problem_type=problem_type,
+                problem_type=self._problem_type,
                 is_matching=self._pipeline in matcher_presets.list_keys(),
                 eval_metric_name=self._eval_metric_name,
             )
@@ -460,7 +447,6 @@ class MultiModalMatcher:
             self._presets = presets
 
         # set attributes for saving and prediction
-        self._problem_type = problem_type  # In case problem type isn't provided in __init__().
         self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
         self._output_shape = output_shape
@@ -1110,17 +1096,12 @@ class MultiModalMatcher:
 
             column_types = infer_column_types(
                 data=data,
+                label_columns=self._label_column,
+                problem_type=self._problem_type,
                 allowable_column_types=allowable_dtypes,
                 fallback_column_type=fallback_dtype,
                 id_mappings=id_mappings,
             )
-            if self._label_column and self._label_column in data.columns:
-                column_types = infer_label_column_type_by_problem_type(
-                    column_types=column_types,
-                    label_columns=self._label_column,
-                    problem_type=self._problem_type,
-                    data=data,
-                )
         else:  # called .fit() or .load()
             column_types = self._column_types
 
