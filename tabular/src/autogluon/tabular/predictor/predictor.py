@@ -2859,7 +2859,7 @@ class TabularPredictor:
             Specifies which models to use as students and what hyperparameter-values to use for them.
             Same as `hyperparameters` argument of `fit()`.
             If = None, then student models will use the same hyperparameters from `fit()` used to produce this Predictor.
-            Note: distillation is currently only supported for ['GBM','NN_MXNET','NN_TORCH','RF','CAT'] student models, other models and their hyperparameters are ignored here.
+            Note: distillation is currently only supported for ['GBM','NN_TORCH','RF','CAT'] student models, other models and their hyperparameters are ignored here.
         holdout_frac : float
             Same as `holdout_frac` argument of :meth:`TabularPredictor.fit`.
         teacher_preds : str, default = 'soft'

@@ -9,7 +9,7 @@ from autogluon.core.trainer.utils import process_hyperparameters
 
 from .presets_custom import get_preset_custom
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
-    TabularNeuralNetMxnetModel, TabularNeuralNetTorchModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, \
+    TabularNeuralNetTorchModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, \
     ImagePredictorModel, VowpalWabbitModel, \
     RuleFitModel, GreedyTreeModel, HSTreeModel, FigsModel, BoostedRulesModel, MultiModalPredictorModel, FTTransformerModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
@@ -27,7 +27,6 @@ DEFAULT_MODEL_PRIORITY = dict(
     XGB=40,
     LR=30,
     NN_TORCH=25,
-    NN_MXNET=20,
     VW=10,
     FASTTEXT=0,
     AG_TEXT_NN=0,
@@ -53,7 +52,6 @@ PROBLEM_TYPE_MODEL_PRIORITY = {
 
 DEFAULT_SOFTCLASS_PRIORITY = dict(
     GBM=100,
-    NN_MXNET=90,
     RF=80,
     CAT=60,
     custom=0,
@@ -71,7 +69,6 @@ MODEL_TYPES = dict(
     GBM=LGBModel,
     CAT=CatBoostModel,
     XGB=XGBoostModel,
-    NN_MXNET=TabularNeuralNetMxnetModel,
     NN_TORCH=TabularNeuralNetTorchModel,
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
@@ -103,7 +100,6 @@ DEFAULT_MODEL_NAMES = {
     LGBModel: 'LightGBM',
     CatBoostModel: 'CatBoost',
     XGBoostModel: 'XGBoost',
-    TabularNeuralNetMxnetModel: 'NeuralNetMXNet',
     TabularNeuralNetTorchModel: 'NeuralNetTorch',
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'NeuralNetFastAI',
@@ -187,26 +183,11 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
     hp_level = hyperparameters[level_key]
     model_cfg_priority_dict = defaultdict(list)
     model_type_list = list(hp_level.keys())
-    if 'NN' in model_type_list:
-        # TODO: Remove in v0.7.0
-        logger.log(30, '\tWARNING: "NN" model has been deprecated in v0.4.0 and renamed to "NN_MXNET". '
-                       'Starting in v0.6.0, specifying "NN" or "NN_MXNET" will raise an exception. Consider instead specifying "NN_TORCH".')
     for model_type in model_type_list:
-        if problem_type == QUANTILE:
-            if model_type not in DEFAULT_QUANTILE_MODEL:
-                if model_type == 'NN_MXNET' and 'NN_TORCH' in DEFAULT_QUANTILE_MODEL and 'NN_TORCH' not in model_type_list:
-                    model_type = 'NN_TORCH'
-                    hp_level['NN_TORCH'] = hp_level.pop('NN_MXNET')
-                    logger.log(15, "Quantile regression must use NN_TORCH instead of NN_MXNET, switching NN_MXET -> NN_TORCH.")
-                else:
-                    continue
         models_of_type = hp_level[model_type]
         if not isinstance(models_of_type, list):
             models_of_type = [models_of_type]
         model_cfgs_to_process = []
-        if model_type == 'NN':
-            # TODO: Remove in v0.6.0
-            model_type = 'NN_MXNET'
         for model_cfg in models_of_type:
             if model_type in invalid_type_set:
                 logger.log(20, f"\tFound '{model_type}' model in hyperparameters, but '{model_type}' is present in `excluded_model_types` and will be removed.")
@@ -377,9 +358,8 @@ def model_factory(
 
 # TODO: v0.1 cleanup and avoid hardcoded logic with model names
 def get_preset_models_softclass(hyperparameters, invalid_model_names: list = None, **kwargs):
-    # TODO v0.1: This import depends on mxnet, consider refactoring to avoid mxnet
     from autogluon.core.metrics.softclass_metrics import soft_log_loss
-    model_types_standard = ['GBM', 'NN_MXNET', 'NN_TORCH', 'CAT', 'ENS_WEIGHTED']
+    model_types_standard = ['GBM', 'NN_TORCH', 'CAT', 'ENS_WEIGHTED']
     hyperparameters = copy.deepcopy(hyperparameters)
 
     hyperparameters_standard = {key: hyperparameters[key] for key in hyperparameters if key in model_types_standard}
@@ -397,7 +377,7 @@ def get_preset_models_softclass(hyperparameters, invalid_model_names: list = Non
                                                hyperparameters=hyperparameters_standard,
                                                default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names, **kwargs)
     if len(models) == 0:
-        raise ValueError("At least one of the following model-types must be present in hyperparameters: ['GBM','CAT','NN_MXNET','RF'], "
+        raise ValueError("At least one of the following model-types must be present in hyperparameters: ['GBM','CAT','RF'], "
                          "These are the only supported models for softclass prediction problems. "
                          "Softclass problems are also not yet supported for fit() with per-stack level hyperparameters.")
     for model in models:

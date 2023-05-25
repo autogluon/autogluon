@@ -2820,7 +2820,7 @@ class AbstractTrainer:
             name_suffix = name_suffix + "_" + models_name_suffix
 
         if hyperparameters is None:
-            hyperparameters = {'GBM': {}, 'CAT': {}, 'NN_MXNET': {},  'NN_TORCH': {}, 'RF': {}}
+            hyperparameters = {'GBM': {}, 'CAT': {}, 'NN_TORCH': {}, 'RF': {}}
         hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters)  # TODO: consider exposing ag_args_fit, excluded_model_types as distill() arguments.
         if teacher_preds is not None and teacher_preds != 'hard' and self.problem_type != REGRESSION:
             self._regress_preds_asprobas = True
