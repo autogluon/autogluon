@@ -47,7 +47,7 @@ from ..constants import (
     XYWH,
     XYXY,
 )
-from .utils import lookup_mmdet_config, update_mmdet_config
+from .utils import freeze_model_layers, lookup_mmdet_config, update_mmdet_config
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +66,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         classes: Optional[list] = None,
         pretrained: Optional[bool] = True,
         output_bbox_format: Optional[str] = XYXY,
+        frozen_layers: Optional[list] = None,
     ):
         """
         Load a pretrained object detector from MMdetection.
@@ -88,6 +89,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.config_file = config_file
         self.classes = classes
+        self.frozen_layers = frozen_layers
 
         self.device = None
 
@@ -105,6 +107,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
         self._update_classes(classes)
         self._load_checkpoint(self.checkpoint_file)
+
+        freeze_model_layers(self.model, self.frozen_layers)
 
     def _reset_classes(self, classes: list):
         temp_ckpt_file = f"temp_ckpt_{int(time.time()*1000)}.pth"

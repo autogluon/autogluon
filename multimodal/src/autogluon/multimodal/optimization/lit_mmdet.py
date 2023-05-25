@@ -1,9 +1,7 @@
 import logging
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Optional, Union
 
-import numpy as np
 import pytorch_lightning as pl
-import torch
 import torchmetrics
 from omegaconf import DictConfig
 from torch import nn
@@ -18,8 +16,15 @@ except ImportError as e:
 
     pass
 
-from ..constants import AUTOMM, BBOX, IMAGE, LABEL
-from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
+from ..constants import BBOX, IMAGE, LABEL
+from .utils import (
+    apply_layerwise_lr_decay,
+    apply_single_lr,
+    apply_two_stages_lr,
+    get_lr_scheduler,
+    get_optimizer,
+    remove_parameters_without_grad,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +78,7 @@ class MMDetLitModule(pl.LightningModule):
     def _loss_step(self, batch):
         return self._base_step(batch=batch, mode="loss")
 
-    def _get_map_input(self, pred_results, sample):
+    def _get_map_input(self, pred_results):
 
         preds = []
         target = []
@@ -111,7 +116,7 @@ class MMDetLitModule(pl.LightningModule):
         """
         pred_results = self._predict_step(sample)
 
-        preds, target = self._get_map_input(pred_results, sample)
+        preds, target = self._get_map_input(pred_results)
 
         # use MeanAveragePrecision, example code: https://github.com/Lightning-AI/metrics/blob/master/examples/detection_map.py
         self.validation_metric.update(preds, target)
@@ -182,7 +187,6 @@ class MMDetLitModule(pl.LightningModule):
         [sched]
             Learning rate scheduler.
         """
-        # TODO: add freeze layer and different lr for head and backbone.
         kwargs = dict(
             model=self.model,
             lr=self.hparams.lr,
@@ -206,6 +210,8 @@ class MMDetLitModule(pl.LightningModule):
             grouped_parameters = apply_single_lr(
                 **kwargs,
             )
+
+        grouped_parameters = remove_parameters_without_grad(grouped_parameters=grouped_parameters)
 
         optimizer = get_optimizer(
             optim_type=self.hparams.optim_type,
