@@ -342,7 +342,7 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
             "Naive": {},
             "ETS": {},
             "AutoETS": {"n_jobs": 1},
-            "AutoGluonTabular": {"tabular_hyperparameters": {"GBM": {}}},
+            "DirectTabular": {"tabular_hyperparameters": {"GBM": {}}},
             "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
         },
     )
@@ -433,7 +433,7 @@ def trained_and_refit_trainers():
                 "Naive": {},
                 "ETS": {"maxiter": 1},
                 "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
-                "AutoGluonTabular": {"tabular_hyperparameters": {"GBM": {}}},
+                "DirectTabular": {"tabular_hyperparameters": {"GBM": {}}},
                 "RecursiveTabular": {},
             },
         )
@@ -475,3 +475,36 @@ def test_when_refit_full_called_with_model_name_then_single_model_is_updated(tem
     )
     model_full_dict = trainer.refit_full("DeepAR")
     assert list(model_full_dict.values()) == ["DeepAR_FULL"]
+
+
+@pytest.mark.parametrize(
+    "hyperparameters, expected_model_names",
+    [
+        ({"Naive": {}, "SeasonalNaiveModel": {}}, ["Naive", "SeasonalNaive"]),
+        ({"Naive": {}, "NaiveModel": {}}, ["Naive", "Naive_2"]),
+    ],
+)
+def test_when_some_models_have_incorrect_suffix_then_correct_model_are_trained(
+    temp_model_path, hyperparameters, expected_model_names
+):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
+    trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
+    leaderboard = trainer.leaderboard()
+    assert sorted(leaderboard["model"].values) == expected_model_names
+
+
+@pytest.mark.parametrize("excluded_model_types", [["DeepAR"], ["DeepARModel"]])
+def test_when_excluded_model_names_provided_then_excluded_models_are_not_trained(
+    temp_model_path, excluded_model_types
+):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
+    trainer.fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters={
+            "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
+            "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
+        },
+        excluded_model_types=excluded_model_types,
+    )
+    leaderboard = trainer.leaderboard()
+    assert leaderboard["model"].values == ["SimpleFeedForward"]

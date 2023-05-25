@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.models import AbstractModel
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
@@ -510,6 +511,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             self._log_scores_and_times(model.val_score, model.fit_time, model.predict_time)
 
             self.save_model(model=model)
+        except TimeLimitExceeded:
+            logger.error(f"\tTime limit exceeded... Skipping {model.name}.")
         except (Exception, MemoryError) as err:
             logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
             logger.error(f"\t{err}")
@@ -546,6 +549,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         models: Optional[List[AbstractTimeSeriesModel]] = None,
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
+        excluded_model_types: Optional[List[str]] = None,
         time_limit: Optional[float] = None,
     ) -> List[str]:
 
@@ -575,6 +579,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
                 freq=train_data.freq,
                 multi_window=self.num_val_windows > 0,
+                excluded_model_types=excluded_model_types,
             )
 
         logger.info(f"Models that will be trained: {list(m.name for m in models)}")
