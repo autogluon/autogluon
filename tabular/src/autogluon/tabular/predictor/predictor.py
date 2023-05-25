@@ -1158,7 +1158,7 @@ class TabularPredictor:
             Maximum allowed number of iterations, where in each iteration, the data are pseudolabeled
             by the current predictor and the predictor is refit including the pseudolabled data in its training set.
         return_pred_proba: bool, default = False
-            Transductive learning setting, will return predictive probabiliteis of unlabeled_data
+            Transductive learning setting, will return predictive probabilities of unlabeled_data
         use_ensemble: bool, default = False
             If True will use ensemble pseudo labeling algorithm if False will use best model
             pseudo labeling method
@@ -1200,8 +1200,12 @@ class TabularPredictor:
                     test_pseudo_idxes_true, y_pred = filter_ensemble_pseudo(predictor=self, unlabeled_data=X_test)
                     y_pred_proba = y_pred.copy()
             else:
-                y_pred_proba = self.predict_proba(data=X_test, as_multiclass=True)
-                y_pred = get_pred_from_proba_df(y_pred_proba, problem_type=self.problem_type)
+                if self.can_predict_proba:
+                    y_pred_proba = self.predict_proba(data=X_test, as_multiclass=True)
+                    y_pred = get_pred_from_proba_df(y_pred_proba, problem_type=self.problem_type)
+                else:
+                    y_pred = self.predict(data=X_test)
+                    y_pred_proba = y_pred
                 test_pseudo_idxes_true = filter_pseudo(y_pred_proba_og=y_pred_proba, problem_type=self.problem_type)
 
             if return_pred_prob:
@@ -1246,7 +1250,10 @@ class TabularPredictor:
 
         if fit_ensemble and not fit_ensemble_every_iter:
             self._fit_weighted_ensemble_pseudo()
-            y_pred_proba_og = self.predict_proba(unlabeled_data)
+            if self.can_predict_proba:
+                y_pred_proba_og = self.predict_proba(unlabeled_data)
+            else:
+                y_pred_proba_og = self.predict(unlabeled_data)
 
         if return_pred_prob:
             return self, y_pred_proba_og
@@ -1339,7 +1346,7 @@ class TabularPredictor:
                 self.fit_weighted_ensemble()
 
             if return_pred_prob:
-                y_pred_proba = self.predict_proba(pseudo_data)
+                y_pred_proba = self.predict_proba(pseudo_data) if self.can_predict_proba else self.predict(pseudo_data)
                 return self, y_pred_proba
             else:
                 return self
