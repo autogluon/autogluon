@@ -27,7 +27,10 @@ This section is a reference for high-level composite components showcased in sec
     missing_values_analysis
     covariate_shift_detection
     analyze_interaction
-    analyze
+    partial_dependence_plots
+    explain_rows
+    detect_anomalies
+    analyze    
 ```
 
 ### {hidden}`dataset_overview`
@@ -58,13 +61,30 @@ This section is a reference for high-level composite components showcased in sec
 
 ```{eval-rst}
 .. autofunction:: covariate_shift_detection
-
 ```
 
 ### {hidden}`analyze_interaction`
 
 ```{eval-rst}
 .. autofunction:: analyze_interaction
+```
+### {hidden}`partial_dependence_plots`
+
+```{eval-rst}
+.. autofunction:: partial_dependence_plots
+```
+
+### {hidden}`explain_rows`
+
+```{eval-rst}
+.. autofunction:: explain_rows
+```
+
+
+### {hidden}`detect_anomalies`
+
+```{eval-rst}
+.. autofunction:: detect_anomalies
 ```
 
 ### {hidden}`analyze`

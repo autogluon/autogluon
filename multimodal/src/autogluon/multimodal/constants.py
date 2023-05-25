@@ -27,6 +27,7 @@ NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
 FEATURE_EXTRACTION = "feature_extraction"
 ZERO_SHOT_IMAGE_CLASSIFICATION = "zero_shot_image_classification"
 OBJECT_DETECTION = "object_detection"
+OPEN_VOCABULARY_OBJECT_DETECTION = "open_vocabulary_object_detection"
 OCR = "ocr"
 OCR_TEXT_DETECTION = f"{OCR}_text_detection"
 OCR_TEXT_RECOGNITION = f"{OCR}_text_recognition"
@@ -36,6 +37,7 @@ IMAGE_TEXT_SIMILARITY = "image_text_similarity"
 
 # Input keys
 IMAGE = "image"
+IMAGE_META = "image_meta"
 IMAGE_VALID_NUM = "image_valid_num"
 LABEL = "label"
 TEXT_TOKEN_IDS = "text_token_ids"
@@ -238,6 +240,7 @@ FUSION_NER = f"{FUSION}_{NER}"
 MMDET_IMAGE = "mmdet_image"
 MMOCR_TEXT_DET = "mmocr_text_detection"
 MMOCR_TEXT_RECOG = "mmocr_text_recognition"
+OVD = "ovd"
 NER_TEXT = "ner_text"
 DOCUMENT_TRANSFORMER = "document_transformer"
 HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT, DOCUMENT_TRANSFORMER)
@@ -285,9 +288,17 @@ XYWH = "xywh"
 XYXY = "xyxy"
 BBOX_FORMATS = [XYWH, XYXY]
 
+# open vocabulary detection
+PROMPT = "prompt"
+OVD_RET = "ovd_ret"
+
 # presets
 DEFAULT = "default"
 HIGH_QUALITY = "high_quality"
 MEDIUM_QUALITY = "medium_quality"
 BEST_QUALITY = "best_quality"
 ALL_MODEL_QUALITIES = [HIGH_QUALITY, MEDIUM_QUALITY, BEST_QUALITY, DEFAULT]
+
+# datasets
+DEFAULT_DATASET = "default_dataset"
+MULTI_IMAGE_MIX_DATASET = "multi_image_mix_dataset"

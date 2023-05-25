@@ -47,6 +47,12 @@ The section contains a reference for low-level components.
    Explainability APIs
 :::
 
+:::{grid-item-card} autogluon.eda.anomaly
+   :link: autogluon.eda.anomaly.html
+
+   Anomaly Detection APIs
+:::
+
 ::::
 
 ```{toctree}
@@ -60,4 +66,5 @@ model <autogluon.eda.model.md>
 shift <autogluon.eda.shift.md>
 transform <autogluon.eda.transform.md>
 explain <autogluon.eda.explain.md>
+anomaly <autogluon.eda.anomaly.md>
 ```

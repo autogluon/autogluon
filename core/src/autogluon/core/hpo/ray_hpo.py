@@ -2,7 +2,10 @@ import logging
 import os
 import shutil
 
-from ..utils.try_import import try_import_ray
+from autogluon.common import space as ag_space
+
+from autogluon.common.utils.distribute_utils import DistributedContext
+from autogluon.common.utils.try_import import try_import_ray
 try_import_ray()  # try import ray before importing the remaining contents so we can give proper error messages
 import ray
 
@@ -22,7 +25,6 @@ from .exceptions import EmptySearchSpace
 from .ray_tune_scheduler_factory import SchedulerFactory
 from .ray_tune_searcher_factory import SearcherFactory
 from .space_converter import RaySpaceConverterFactory
-from .. import Space
 from ..ray.resources_calculator import ResourceCalculatorFactory, ResourceCalculator
 
 from ray import tune
@@ -219,7 +221,7 @@ def run(
     num_samples = hyperparameter_tune_kwargs.get('num_trials', None)
     if num_samples is None:
         num_samples = 1 if time_budget_s is None else 1000  # if both num_samples and time_budget_s are None, we only run 1 trial
-    if not any(isinstance(search_space[hyperparam], (Space, Domain)) for hyperparam in search_space):
+    if not any(isinstance(search_space[hyperparam], (ag_space.Space, Domain)) for hyperparam in search_space):
         raise EmptySearchSpace
     search_space, default_hyperparameters = _convert_search_space(search_space)
 
@@ -236,12 +238,15 @@ def run(
     )
 
     if not ray.is_initialized():
-        ray.init(
-            log_to_driver=False,
-            runtime_env={"env_vars": {"PL_DISABLE_FORK": "1"}},  # https://github.com/ray-project/ray/issues/28197
-            logging_level=logging.ERROR,  # https://github.com/ray-project/ray/issues/29216
-            **total_resources
-        )
+        if DistributedContext.is_distributed_mode():
+            ray.init(address="auto")
+        else:
+            ray.init(
+                log_to_driver=False,
+                runtime_env={"env_vars": {"PL_DISABLE_FORK": "1"}},  # https://github.com/ray-project/ray/issues/28197
+                logging_level=logging.ERROR,  # https://github.com/ray-project/ray/issues/29216
+                **total_resources
+            )
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     resources_per_trial = ray_tune_adapter.get_resources_per_trial(
@@ -254,6 +259,7 @@ def run(
         wrap_resources_per_job_into_placement_group=trainable_is_parallel,
     )
     resources_per_trial = _validate_resources_per_trial(resources_per_trial)
+    logger.debug(f"resources_per_trial to be dispatched by ray tune: {resources_per_trial}")
     ray_tune_adapter.resources_per_trial = resources_per_trial
     trainable_args = ray_tune_adapter.trainable_args_update_method(trainable_args)
     
@@ -352,7 +358,7 @@ def _convert_search_space(search_space: dict):
     tune_search_space = search_space.copy()
     default_hyperparameters = dict()
     for hyperparameters, space in search_space.items():
-        if isinstance(space, Space):
+        if isinstance(space, ag_space.Space):
             tune_search_space[hyperparameters] = RaySpaceConverterFactory.get_space_converter(space.__class__.__name__).convert(space)
             default_hyperparameters[hyperparameters] = space.default
     default_hyperparameters = default_hyperparameters

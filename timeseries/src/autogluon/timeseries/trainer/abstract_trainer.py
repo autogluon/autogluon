@@ -6,7 +6,6 @@ import traceback
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
-from warnings import warn
 
 import networkx as nx
 import pandas as pd
@@ -14,12 +13,12 @@ from tqdm import tqdm
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.models import AbstractModel
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
-from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from autogluon.timeseries.models.presets import contains_searchspace
 from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.warning_filters import disable_tqdm
@@ -161,7 +160,7 @@ class SimpleAbstractTrainer:
         model_name: Union[str, AbstractModel],
         path: Optional[str] = None,
         model_type: Optional[Type[AbstractModel]] = None,
-    ):
+    ) -> AbstractTimeSeriesModel:
         if isinstance(model_name, AbstractModel):
             return model_name
         if model_name in self.models.keys():
@@ -277,6 +276,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         save_data: bool = True,
         enable_ensemble: bool = True,
         verbosity: int = 2,
+        num_val_windows: int = 1,
         **kwargs,
     ):
         super().__init__(path=path, save_data=save_data, low_memory=True, **kwargs)
@@ -296,13 +296,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         set_logger_verbosity(self.verbosity, logger=logger)
 
         # Dict of normal model -> FULL model. FULL models are produced by
-        # self.refit_single_full() and self.refit_ensemble_full().
+        # self.refit_single_full() and self.refit_full().
         self.model_full_dict = {}
 
-        # Dict of FULL model -> normal model validation score in case the normal model had been deleted.
-        self._model_full_dict_val_score = {}
         self.eval_metric = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
+        self.num_val_windows = num_val_windows
         self.hpo_results = {}
 
     def save_train_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
@@ -317,11 +316,14 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         path = self.path_data + "train.pkl"
         return load_pkl.load(path=path)
 
-    def load_val_data(self) -> TimeSeriesDataFrame:
+    def load_val_data(self) -> Optional[TimeSeriesDataFrame]:
         path = self.path_data + "val.pkl"
-        return load_pkl.load(path=path)
+        if os.path.exists(path):
+            return load_pkl.load(path=path)
+        else:
+            return None
 
-    def load_data(self) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
+    def load_data(self) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         train_data = self.load_train_data()
         val_data = self.load_val_data()
         return train_data, val_data
@@ -335,6 +337,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             model.save()
 
         self.models = models
+
+    def _get_model_oof_predictions(self, model_name: str) -> TimeSeriesDataFrame:
+        model_path = self.get_model_attribute(model=model_name, attribute="path")
+        model_type = self.get_model_attribute(model=model_name, attribute="type")
+        return model_type.load_oof_predictions(path=model_path)
 
     def _add_model(
         self,
@@ -412,6 +419,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             val_data=val_data,
             time_limit=time_limit,
             verbosity=self.verbosity,
+            num_val_windows=self.num_val_windows,
         )
         return model
 
@@ -437,6 +445,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 time_limit=time_limit,
                 default_num_trials=default_num_trials,
+                num_val_windows=self.num_val_windows,
             )
         total_tuning_time = time.time() - tuning_start_time
 
@@ -478,8 +487,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
     ) -> List[str]:
-        """Fit and save the given model on given training and validation data and save the
-        trained model.
+        """Fit and save the given model on given training and validation data and save the trained model.
 
         Returns
         -------
@@ -495,19 +503,16 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
             model = self._train_single(train_data, model, val_data=val_data, time_limit=time_limit)
             fit_end_time = time.time()
-
-            val_score = model.score(val_data) if val_data is not None else None
-            model.val_score = val_score
-
-            pred_end_time = time.time()
-
             model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
-            if model.predict_time is None:
-                model.predict_time = None if val_score is None else (pred_end_time - fit_end_time)
 
-            self._log_scores_and_times(val_score, model.fit_time, model.predict_time)
+            if val_data is not None:
+                model.score_and_cache_oof(val_data, store_val_score=True, store_predict_time=True)
+
+            self._log_scores_and_times(model.val_score, model.fit_time, model.predict_time)
 
             self.save_model(model=model)
+        except TimeLimitExceeded:
+            logger.error(f"\tTime limit exceeded... Skipping {model.name}.")
         except (Exception, MemoryError) as err:
             logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
             logger.error(f"\t{err}")
@@ -544,6 +549,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         models: Optional[List[AbstractTimeSeriesModel]] = None,
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
+        excluded_model_types: Optional[List[str]] = None,
         time_limit: Optional[float] = None,
     ) -> List[str]:
 
@@ -562,11 +568,18 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 self.save_val_data(val_data)
             self.is_data_saved = True
 
+        if self.num_val_windows > 0:
+            assert val_data is None, "val_data shouldn't be provided if num_val_windows > 0"
+        else:
+            assert val_data is not None, "val_data should be provided if num_val_windows > 0"
+
         if models is None:
             models = self.construct_model_templates(
                 hyperparameters=hyperparameters,
                 hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
                 freq=train_data.freq,
+                multi_window=self.num_val_windows > 0,
+                excluded_model_types=excluded_model_types,
             )
 
         logger.info(f"Models that will be trained: {list(m.name for m in models)}")
@@ -644,6 +657,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 )
             else:
                 try:
+                    if val_data is None:
+                        val_data = self._get_ensemble_oof_data(train_data)
                     model_names_trained.append(
                         self.fit_ensemble(
                             val_data=val_data,
@@ -669,6 +684,22 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         return model_names_trained
 
+    def _get_ensemble_oof_data(self, train_data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+        """Stack validation data for all windows into a single dataframe"""
+        split_per_window = []
+        for window_index in range(self.num_val_windows):
+            if window_index == 0:
+                end_index = None
+            else:
+                end_index = -self.prediction_length * window_index
+            _, val_fold = train_data.train_test_split(
+                self.prediction_length,
+                end_index=end_index,
+                suffix=f"_W{window_index}",
+            )
+            split_per_window.append(val_fold)
+        return pd.concat(split_per_window)
+
     def _get_ensemble_model_name(self) -> str:
         """Ensure we don't have name collisions in the ensemble model name"""
         ensemble_name = "WeightedEnsemble"
@@ -685,11 +716,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         model_preds = {}
         for model_name in model_names:
-            model: AbstractGluonTSModel = self.load_model(model_name=model_name)
-
-            # FIXME: This differs from predictions made to calc val_score for the models. Try to align.
-            #  Can either seed for deterministic results or cache the pred during val_score calc and reuse.
-            model_preds[model_name] = model.predict_for_scoring(data=val_data, quantile_levels=self.quantile_levels)
+            model_preds[model_name] = self._get_model_oof_predictions(model_name=model_name)
 
         time_start = time.time()
         ensemble = self.ensemble_model_type(
@@ -707,19 +734,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         time_end = time.time()
         ensemble.fit_time = time_end - time_start
 
-        evaluator = TimeSeriesEvaluator(
-            eval_metric=self.eval_metric,
-            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
-            prediction_length=self.prediction_length,
-            target_column=self.target,
-        )
-        forecasts = ensemble.predict({n: model_preds[n] for n in ensemble.model_names})
-        ensemble.val_score = evaluator(val_data, forecasts) * evaluator.coefficient
-
         predict_time = 0
         for m in ensemble.model_names:
             predict_time += self.get_model_attribute(model=m, attribute="predict_time")
         ensemble.predict_time = predict_time
+
+        predictions = ensemble.predict({n: model_preds[n] for n in ensemble.model_names})
+        ensemble.val_score = self._score_with_predictions(val_data, predictions)
 
         self._log_scores_and_times(
             val_score=ensemble.val_score,
@@ -746,21 +767,25 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             }
 
         if data is not None:
+            past_data, known_covariates = data.get_model_inputs_for_scoring(
+                prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+            )
             logger.info(
                 "Additional data provided, testing on additional data. Resulting leaderboard "
                 "will be sorted according to test score (`score_test`)."
             )
+            # TODO: Cache predictions for all models using `model_pred_proba_dict` as in Tabular
             for model_name in model_names:
                 try:
-                    # TODO: time only prediction and not score for pred_time_val and pred_time_test
-                    time_start_test_score = time.time()
-                    model_info[model_name]["score_test"] = self.score(data, model_name)
-                    model_info[model_name]["pred_time_test"] = time.time() - time_start_test_score
+                    pred_start_time = time.time()
+                    predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model_name)
+                    model_info[model_name]["pred_time_test"] = time.time() - pred_start_time
+                    model_info[model_name]["score_test"] = self._score_with_predictions(data, predictions)
                 except Exception as e:  # noqa
                     logger.error(f"Cannot score with model {model_name}. An error occurred: {str(e)}")
                     logger.debug(traceback.format_exc())
-                    model_info[model_name]["score_test"] = float("nan")
                     model_info[model_name]["pred_time_test"] = float("nan")
+                    model_info[model_name]["score_test"] = float("nan")
 
         df = pd.DataFrame(model_info.values())
 
@@ -823,38 +848,33 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 logger.info(f"\tYou can call predict(data, model) with one of other available models: {other_models}")
             return None
 
+    def _score_with_predictions(
+        self,
+        data: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        metric: Optional[str] = None,
+    ) -> float:
+        """Compute the score measuring how well the predictions align with the data."""
+        eval_metric = self.eval_metric if metric is None else metric
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=eval_metric,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
+        )
+        return evaluator(data, predictions) * evaluator.coefficient
+
     def score(
         self,
         data: TimeSeriesDataFrame,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         metric: Optional[str] = None,
     ) -> float:
-        model = self._get_model_for_prediction(model)
-        eval_metric = self.eval_metric if metric is None else metric
-
-        if isinstance(model, AbstractTimeSeriesEnsembleModel):
-            evaluator = TimeSeriesEvaluator(
-                eval_metric=eval_metric,
-                eval_metric_seasonal_period=self.eval_metric_seasonal_period,
-                prediction_length=self.prediction_length,
-                target_column=self.target,
-            )
-            model_preds = {}
-            base_models = self.get_minimum_model_set(model, include_self=False)
-            for base_model in base_models:
-                try:
-                    base_model_loaded = self._get_model_for_prediction(base_model)
-                    model_preds[base_model] = base_model_loaded.predict_for_scoring(
-                        data, quantile_levels=self.quantile_levels
-                    )
-                except Exception:
-                    model_preds[base_model] = None
-            forecasts = model.predict(model_preds)
-
-            model_score = evaluator(data, forecasts) * evaluator.coefficient
-            return model_score
-
-        return model.score(data, metric=eval_metric)
+        past_data, known_covariates = data.get_model_inputs_for_scoring(
+            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+        )
+        predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model)
+        return self._score_with_predictions(data=data, predictions=predictions, metric=metric)
 
     def _predict_model(
         self,
@@ -868,75 +888,96 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         data = self.get_inputs_to_model(model=model, X=data, known_covariates=known_covariates)
         return model.predict(data, known_covariates=known_covariates, **kwargs)
 
-    # TODO: experimental
-    def refit_single_full(self, train_data=None, val_data=None, models=None):
-        warn("Refitting logic is experimental for autogluon.timeseries.")
-        models_trained_full = []
-        model_full_dict = {}
+    def _merge_refit_full_data(
+        self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]
+    ) -> TimeSeriesDataFrame:
+        if val_data is None:
+            return train_data
+        else:
+            # TODO: Implement merging of arbitrary tuning_data with train_data
+            raise NotImplementedError("refit_full is not supported if custom val_data is provided.")
 
-        train_data = train_data or self.load_train_data()  # noqa
+    def refit_single_full(
+        self,
+        train_data: Optional[TimeSeriesDataFrame] = None,
+        val_data: Optional[TimeSeriesDataFrame] = None,
+        models: List[str] = None,
+    ) -> List[str]:
+
+        train_data = train_data or self.load_train_data()
         val_data = val_data or self.load_val_data()
-
-        # FIXME: implement the append operation below in datasets
-        # refit_full_data = train_data + val_data
-        # for now we assume validation data includes train data (as in GluonTS)
-        refit_full_data = val_data
+        refit_full_data = self._merge_refit_full_data(train_data, val_data)
 
         if models is None:
-            self.get_model_names()
+            models = self.get_model_names()
 
-        for model in models:
-            model: AbstractTimeSeriesModel = self.load_model(model)
+        model_to_level = self._get_model_levels()
+        models_sorted_by_level = sorted(models, key=model_to_level.get)
+
+        model_full_dict = {}
+        models_trained_full = []
+        for model in models_sorted_by_level:
+            model = self.load_model(model)
             model_name = model.name
-            model_full = model.convert_to_refit_full_template()  # FIXME: not available
-            models_trained = self._train_multi(
-                train_data=refit_full_data,
-                val_data=None,
-                hyperparameters=None,
-                hyperparameter_tune_kwargs=None,
-                models=[model_full],
-            )
+            if model._get_tags()["can_refit_full"]:
+                model_full = model.convert_to_refit_full_template()
+                logger.info(f"Fitting model: {model_full.name}")
+                models_trained = self._train_and_save(
+                    train_data=refit_full_data,
+                    val_data=None,
+                    model=model_full,
+                )
+            else:
+                model_full = model.convert_to_refit_full_via_copy()
+                logger.info(f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
+                models_trained = [model_full.name]
+                if isinstance(model_full, AbstractTimeSeriesEnsembleModel):
+                    model_full.remap_base_models(model_full_dict)
+                    self._add_model(model_full, base_models=model_full.model_names)
+                else:
+                    self._add_model(model_full)
+                self.save_model(model_full)
 
             if len(models_trained) == 1:
                 model_full_dict[model_name] = models_trained[0]
-            for model_trained in models_trained:
-                self._model_full_dict_val_score[model_trained] = self.get_model_attribute(model_name, "val_score")
             models_trained_full += models_trained
 
         self.model_full_dict.update(model_full_dict)
         self.save()
         return models_trained_full
 
-    # TODO: experimental
-    def refit_full(self, models="all"):
-        warn("Refitting logic is experimental for autogluon.timeseries.")
-        if isinstance(models, str):
-            if models == "all":
-                models = self.get_model_names()
-            elif models == "best":
-                models = [self.get_model_best()]
-            else:
-                models = self.load_model(models)
+    def refit_full(self, model: str = "all") -> Dict[str, str]:
+        time_start = time.time()
         existing_models = self.get_model_names()
+        if model == "all":
+            model_names = existing_models
+        elif model == "best":
+            model_names = self.get_minimum_model_set(self.get_model_best())
+        else:
+            model_names = self.get_minimum_model_set(model)
+
         valid_model_set = []
-        for model in models:
-            if model in self.model_full_dict and self.model_full_dict[model] in existing_models:
-                logger.log(
-                    20,
-                    f"Model '{model}' already has a refit _FULL model: "
+        for name in model_names:
+            if name in self.model_full_dict and self.model_full_dict[model] in existing_models:
+                logger.info(
+                    f"Model '{name}' already has a refit _FULL model: "
                     f"'{self.model_full_dict[model]}', skipping refit...",
                 )
             else:
-                valid_model_set.append(model)
+                valid_model_set.append(name)
 
         if valid_model_set:
-            self.refit_single_full(models=valid_model_set)
+            models_trained_full = self.refit_single_full(models=valid_model_set)
+        else:
+            models_trained_full = []
 
         self.save()
+        logger.info(f"Refit complete. Models trained: {models_trained_full}")
+        logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
         return copy.deepcopy(self.model_full_dict)
 
     def construct_model_templates(
-        self, hyperparameters: Union[str, Dict[str, Any]], **kwargs
+        self, hyperparameters: Union[str, Dict[str, Any]], multi_window: bool = False, **kwargs
     ) -> List[AbstractTimeSeriesModel]:
         """Constructs a list of unfit models based on the hyperparameters dict."""
         raise NotImplementedError
@@ -953,5 +994,3 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     # TODO: def _filter_base_models_via_infer_limit
 
     # TODO: persist and unpersist models
-
-    # TODO: generate weighted ensemble

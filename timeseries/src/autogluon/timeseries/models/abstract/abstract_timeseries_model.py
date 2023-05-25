@@ -1,10 +1,11 @@
-import copy
 import logging
 import os
+import re
 import time
 from typing import Any, Dict, List, Optional, Union
 
-import autogluon.core as ag
+from autogluon.common import space
+from autogluon.common.loaders import load_pkl
 from autogluon.common.savers import save_pkl
 from autogluon.core.hpo.exceptions import EmptySearchSpace
 from autogluon.core.hpo.executors import HpoExecutor
@@ -54,6 +55,8 @@ class AbstractTimeSeriesModel(AbstractModel):
         If None, model defaults are used. This is identical to passing an empty dictionary.
     """
 
+    _oof_filename = "oof.pkl"
+
     # TODO: refactor "pruned" methods after AbstractModel is refactored
     predict_proba = None
     score_with_y_pred_proba = None
@@ -81,9 +84,10 @@ class AbstractTimeSeriesModel(AbstractModel):
         metadata: Optional[CovariateMetadata] = None,
         eval_metric: Optional[str] = None,
         eval_metric_seasonal_period: Optional[int] = None,
-        hyperparameters: Dict[str, Union[int, float, str, ag.Space]] = None,
+        hyperparameters: Dict[str, Union[int, float, str, space.Space]] = None,
         **kwargs,
     ):
+        name = name or re.sub(r"Model$", "", self.__class__.__name__)
         super().__init__(
             path=path,
             name=name,
@@ -105,9 +109,43 @@ class AbstractTimeSeriesModel(AbstractModel):
             "quantile_levels",
             kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
+        self._oof_predictions: Optional[TimeSeriesDataFrame] = None
 
     def __repr__(self) -> str:
         return self.name
+
+    def save(self, path: str = None, verbose=True) -> str:
+        # Save self._oof_predictions as a separate file, not model attribute
+        if self._oof_predictions is not None:
+            save_pkl.save(
+                path=os.path.join(self.path + "utils", self._oof_filename),
+                object=self._oof_predictions,
+                verbose=verbose,
+            )
+        oof_predictions = self._oof_predictions
+        self._oof_predictions = None
+        save_path = super().save(path=path, verbose=verbose)
+        self._oof_predictions = oof_predictions
+        return save_path
+
+    @classmethod
+    def load(
+        cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
+    ) -> "AbstractTimeSeriesModel":
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        if load_oof and model._oof_predictions is None:
+            model._oof_predictions = cls.load_oof_predictions(path=path, verbose=verbose)
+        return model
+
+    @classmethod
+    def load_oof_predictions(cls, path: str, verbose: bool = True) -> TimeSeriesDataFrame:
+        """Load the cached OOF predictions from disk."""
+        return load_pkl.load(path=os.path.join(path + "utils", cls._oof_filename), verbose=verbose)
+
+    def get_oof_predictions(self):
+        if self._oof_predictions is None:
+            self._oof_predictions = self.load_oof_predictions(self.path)
+        return self._oof_predictions
 
     def _initialize(self, **kwargs) -> None:
         self._init_params_aux()
@@ -166,7 +204,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         train_data : TimeSeriesDataFrame
             The training data provided in the library's `autogluon.timeseries.dataset.TimeSeriesDataFrame`
             format.
-        val_data : TimeSeriesDataFrame
+        val_data : TimeSeriesDataFrame, optional
             The validation data set in the same format as training data.
         time_limit : float, default = None
             Time limit in seconds to adhere to when fitting model.
@@ -198,23 +236,24 @@ class AbstractTimeSeriesModel(AbstractModel):
 
     def _fit(
         self,
-        train_data,
-        val_data=None,
-        time_limit=None,
-        num_cpus=None,
-        num_gpus=None,
-        verbosity=2,
+        train_data: TimeSeriesDataFrame,
+        val_data: Optional[TimeSeriesDataFrame] = None,
+        time_limit: Optional[int] = None,
+        num_cpus: Optional[int] = None,
+        num_gpus: Optional[int] = None,
+        verbosity: int = 2,
         **kwargs,
     ) -> None:
         """Private method for `fit`. See `fit` for documentation of arguments. Apart from
         the model training logic, `fit` additionally implements other logic such as keeping
         track of the time limit, etc.
         """
+        # TODO: Make the models respect `num_cpus` and `num_gpus` parameters
         raise NotImplementedError
 
     def _check_fit_params(self):
         # gracefully handle hyperparameter specifications if they are provided to fit instead
-        if any(isinstance(v, ag.Space) for v in self.params.values()):
+        if any(isinstance(v, space.Space) for v in self.params.values()):
             raise ValueError(
                 "Hyperparameter spaces provided to `fit`. Please provide concrete values "
                 "as hyperparameters when initializing or use `hyperparameter_tune` instead."
@@ -273,39 +312,23 @@ class AbstractTimeSeriesModel(AbstractModel):
         """
         raise NotImplementedError
 
-    def predict_for_scoring(self, data: TimeSeriesDataFrame, **kwargs):
-        """Given a dataset, truncate the last `self.prediction_length` time steps and forecast these
-        steps with previous history. This method produces predictions for the *last* `self.prediction_length`
-        steps of the *given* time series, in order to be used for validation or scoring.
+    def _score_with_predictions(
+        self,
+        data: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        metric: Optional[str] = None,
+    ) -> float:
+        """Compute the score measuring how well the predictions align with the data."""
+        eval_metric = self.eval_metric if metric is None else metric
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=eval_metric,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
+        )
+        return evaluator(data, predictions) * evaluator.coefficient
 
-        Parameters
-        ----------
-        data: TimeSeriesDataFrame
-            The dataset where each time series is the "context" for predictions.
-
-        Other Parameters
-        ----------------
-        quantile_levels
-            Quantiles of probabilistic forecasts, if probabilistic forecasts are implemented by the
-            corresponding subclass. If None, `self.quantile_levels` will be used instead,
-            if provided during initialization.
-
-        Returns
-        -------
-        predictions: TimeSeriesDataFrame
-            pandas data frames with a timestamp index, where each input item from the input
-            data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
-            of input items.
-        """
-        past_data = data.slice_by_timestep(None, -self.prediction_length)
-        if len(self.metadata.known_covariates_real) > 0:
-            future_data = data.slice_by_timestep(-self.prediction_length, None)
-            known_covariates = future_data[self.metadata.known_covariates_real]
-        else:
-            known_covariates = None
-        return self.predict(past_data, known_covariates=known_covariates, **kwargs)
-
-    def score(self, data: TimeSeriesDataFrame, metric: str = None, **kwargs) -> float:
+    def score(self, data: TimeSeriesDataFrame, metric: Optional[str] = None) -> float:
         """Return the evaluation scores for given metric and dataset. The last
         `self.prediction_length` time steps of each time series in the input data set
         will be held out and used for computing the evaluation score. Time series
@@ -331,17 +354,35 @@ class AbstractTimeSeriesModel(AbstractModel):
             The computed forecast evaluation score on the last `self.prediction_length`
             time steps of each time series.
         """
-        metric = self.eval_metric if metric is None else metric
-        evaluator = TimeSeriesEvaluator(
-            eval_metric=metric,
-            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
-            prediction_length=self.prediction_length,
-            target_column=self.target,
+        past_data, known_covariates = data.get_model_inputs_for_scoring(
+            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
         )
-        predictions = self.predict_for_scoring(data)
-        metric_value = evaluator(data, predictions)
+        predictions = self.predict(past_data, known_covariates=known_covariates)
+        return self._score_with_predictions(data=data, predictions=predictions, metric=metric)
 
-        return metric_value * evaluator.coefficient
+    def score_and_cache_oof(
+        self,
+        val_data: TimeSeriesDataFrame,
+        store_val_score: bool = False,
+        store_predict_time: bool = False,
+    ) -> None:
+        """Compute val_score, predict_time and cache out-of-fold (OOF) predictions."""
+        past_data, known_covariates = val_data.get_model_inputs_for_scoring(
+            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+        )
+        predict_start_time = time.time()
+        self._oof_predictions = self.predict(past_data, known_covariates=known_covariates)
+        if store_predict_time:
+            self.predict_time = time.time() - predict_start_time
+        if store_val_score:
+            self.val_score = self._score_with_predictions(val_data, self._oof_predictions)
+
+    def _get_hpo_train_fn_kwargs(self, **train_fn_kwargs) -> dict:
+        """Update kwargs passed to model_trial depending on the model configuration.
+
+        These kwargs need to be updated, for example, by MultiWindowBacktestingModel.
+        """
+        return train_fn_kwargs
 
     def _hyperparameter_tune(
         self,
@@ -370,8 +411,10 @@ class AbstractTimeSeriesModel(AbstractModel):
         val_path = os.path.join(self.path, dataset_val_filename)
         save_pkl.save(path=val_path, object=val_data)
 
-        fit_kwargs = dict()
-        train_fn_kwargs = dict(
+        fit_kwargs = dict(
+            num_val_windows=kwargs.get("num_val_windows", 1),
+        )
+        train_fn_kwargs = self._get_hpo_train_fn_kwargs(
             model_cls=self.__class__,
             init_params=self.get_params(),
             time_start=time_start,
@@ -407,16 +450,11 @@ class AbstractTimeSeriesModel(AbstractModel):
     def get_memory_size(self, **kwargs) -> Optional[int]:
         return None
 
-    def convert_to_refit_full_template(self):
-        params = copy.deepcopy(self.get_params())
-
-        # TODO: Time series models currently do not support incremental training
-        params["hyperparameters"].update(self.params_trained)
-        params["name"] = params["name"] + ag.constants.REFIT_FULL_SUFFIX
-
-        template = self.__class__(**params)
-
-        return template
+    def convert_to_refit_full_via_copy(self) -> "AbstractTimeSeriesModel":
+        refit_model = super().convert_to_refit_full_via_copy()
+        refit_model.val_score = None
+        refit_model.predict_time = None
+        return refit_model
 
     def get_user_params(self) -> dict:
         """Used to access user-specified parameters for the model before initialization."""
@@ -424,10 +462,3 @@ class AbstractTimeSeriesModel(AbstractModel):
             return {}
         else:
             return self._user_params.copy()
-
-
-class AbstractTimeSeriesModelFactory:
-    """Factory class interface for callable objects that produce timeseries models"""
-
-    def __call__(self, *args, **kwargs) -> AbstractTimeSeriesModel:
-        raise NotImplementedError

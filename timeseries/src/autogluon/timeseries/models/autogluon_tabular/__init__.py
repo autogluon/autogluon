@@ -1,5 +1,7 @@
-from .tabular_model import AutoGluonTabularModel
+from .direct_tabular import DirectTabularModel
+from .mlforecast import RecursiveTabularModel
 
 __all__ = [
-    "AutoGluonTabularModel",
+    "DirectTabularModel",
+    "RecursiveTabularModel",
 ]

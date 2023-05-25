@@ -1,3 +1,4 @@
+import io
 import logging
 import os
 import warnings
@@ -86,13 +87,16 @@ class ExportMixin:
         """
         Export this predictor's model to ONNX file.
 
+        When `path` argument is not provided, the method would not save the model into disk.
+        Instead, it would export the onnx model into BytesIO and return its binary as bytes.
+
         Parameters
         ----------
         data
             Raw data used to trace and export the model.
             If this is None, will check if a processed batch is provided.
-        path
-            The export path of onnx model.
+        path : str, default=None
+            The export path of onnx model. If path is not provided, the method would export model to memory.
         batch_size
             The batch_size of export model's input.
             Normally the batch_size is a dynamic axis, so we could use a small value for faster export.
@@ -105,8 +109,9 @@ class ExportMixin:
 
         Returns
         -------
-        trt_module : OnnxModule
-            The onnx-based module that can be used to replace predictor._model for model inference.
+        onnx_path : str or bytes
+            A string that indicates location of the exported onnx model, if `path` argument is provided.
+            Otherwise, would return the onnx model as bytes.
         """
 
         import torch.jit
@@ -130,13 +135,14 @@ class ExportMixin:
         input_keys = self._model.input_keys
         input_vec = [batch[k] for k in input_keys]
 
-        # Infer default onnx path, and create parent directory if needed
-        if not path:
-            path = self.path
-        onnx_path = os.path.join(path, "model.onnx")
-        dirname = os.path.dirname(os.path.abspath(onnx_path))
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
+        # Write to BytesIO if path argument is not provided
+        if path is None:
+            onnx_path = io.BytesIO()
+        else:
+            onnx_path = os.path.join(path, "model.onnx")
+            dirname = os.path.dirname(os.path.abspath(onnx_path))
+            if not os.path.exists(dirname):
+                os.makedirs(dirname)
 
         # Infer dynamic dimensions
         dynamic_axes = onnx_get_dynamic_axes(input_keys)
@@ -150,6 +156,9 @@ class ExportMixin:
             input_names=input_keys,
             dynamic_axes=dynamic_axes,
         )
+
+        if isinstance(onnx_path, io.BytesIO):
+            onnx_path = onnx_path.getvalue()
 
         return onnx_path
 
@@ -193,7 +202,9 @@ class ExportMixin:
                 raise ValueError(f"unsupported column type: {col_type}")
         data = pd.DataFrame.from_dict(data_dict)
 
-        onnx_path = self.export_onnx(data=data, path=self.path, truncate_long_and_double=True)
+        onnx_module = None
+        onnx_path = self.export_onnx(data=data, truncate_long_and_double=True)
+
         onnx_module = OnnxModule(onnx_path, providers)
         onnx_module.input_keys = self._model.input_keys
         onnx_module.prefix = self._model.prefix

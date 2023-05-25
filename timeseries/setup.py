@@ -33,6 +33,7 @@ install_requires = [
     "pytorch-lightning>=1.7.4,<1.10.0",
     "networkx",  # version range defined in `core/_setup_utils.py`
     "statsforecast>=1.4.0,<1.5",
+    "mlforecast>=0.7.0,<0.8.0",
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "ujson>=5,<6",  # needed to silence GluonTS warning
     f"autogluon.core[raytune]=={version}",
@@ -49,13 +50,9 @@ extras_require = {
         "isort>=5.10",
         "black>=22.3,<23.0",
     ],
-    "sktime": ["sktime>=0.14,<0.16", "pmdarima>=1.8.2,<1.9", "tbats>=1.1,<2"],
 }
 
-all_requires = []
-for extra_package in ["sktime"]:
-    all_requires += extras_require[extra_package]
-extras_require["all"] = list(set(all_requires))
+extras_require["all"] = []
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 

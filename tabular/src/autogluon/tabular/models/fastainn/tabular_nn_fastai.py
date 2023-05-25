@@ -3,6 +3,7 @@ import logging
 import time
 from builtins import classmethod
 from pathlib import Path
+from typing import Dict, Union
 
 import numpy as np
 import pandas as pd
@@ -10,10 +11,10 @@ import sklearn
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.try_import import try_import_fastai
 from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.models import AbstractModel
-from autogluon.core.utils import try_import_fastai
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
@@ -529,6 +530,12 @@ class NNFastAiTabularModel(AbstractModel):
     def _get_hpo_backend(self):
         """Choose which backend(Ray or Custom) to use for hpo"""
         return RAY_BACKEND
+    
+    def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
+        # fastai model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
+        return {
+            "num_cpus": ResourceManager.get_cpu_count_psutil(logical=False)
+        }
 
     def get_minimum_resources(self, is_gpu_available=False):
         minimum_resources = {

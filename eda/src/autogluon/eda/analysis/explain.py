@@ -1,6 +1,8 @@
 import logging
+import warnings
 from typing import List, Optional
 
+import numpy as np
 import pandas as pd
 import shap
 
@@ -118,7 +120,11 @@ class ShapAnalysis(AbstractAnalysis):
                 predicted_class = args.model.predict(_row).iloc[0]
             ag_wrapper = _ShapAutoGluonWrapper(args.model, args.train_data.columns, predicted_class)
             explainer = shap.KernelExplainer(ag_wrapper.predict_proba, baseline)
-            ke_shap_values = explainer.shap_values(_row[args.train_data.columns], silent=True)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore")
+                # Suppress sklearn pipeline warnings
+                np.int = int  # type: ignore[attr-defined] # workaround to address shap's use of old numpy APIs
+                ke_shap_values = explainer.shap_values(_row[args.train_data.columns], silent=True)
             shap_data.append(
                 AnalysisState(
                     row=_row,

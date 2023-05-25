@@ -686,7 +686,7 @@ class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
         max_samples=None,
     ):
         super(RandomForestQuantileRegressor, self).__init__(
-            base_estimator=DecisionTreeQuantileRegressor(),
+            DecisionTreeQuantileRegressor(),
             n_estimators=n_estimators,
             estimator_params=(
                 "criterion",
@@ -838,7 +838,7 @@ class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
         max_samples=None,
     ):
         super(ExtraTreesQuantileRegressor, self).__init__(
-            base_estimator=ExtraTreeQuantileRegressor(),
+            ExtraTreeQuantileRegressor(),
             n_estimators=n_estimators,
             estimator_params=(
                 "criterion",

@@ -15,7 +15,7 @@ spec.loader.exec_module(ag)  # type: ignore
 ###########################
 
 version = ag.load_version_file()
-version = ag.update_version(version, use_file_if_exists=False, create_file=True)
+version = ag.update_version(version)
 
 submodule = 'eda'
 install_requires = [
@@ -31,6 +31,9 @@ install_requires = [
     'ipywidgets>=7.7.1,<9.0',  # min versions guidance: 7.7.1 collab/kaggle
     'shap>=0.41,<0.42',
     'yellowbrick>=1.5,<1.6',
+    'pyod>=1.0,<1.1',
+    'suod>=0.0.8,<0.1',
+    'ipython>7.16,<8.13',  # IPython 8.13+ supports Python 3.9 and above; Python 3.7 is supported with IPython >7.16
     f'autogluon.core=={version}',
     f'autogluon.common=={version}',
     f'autogluon.features=={version}',

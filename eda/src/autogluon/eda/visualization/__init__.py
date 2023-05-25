@@ -1,5 +1,6 @@
 from yellowbrick.style.rcmod import reset_orig
 
+from .anomaly import AnomalyScoresVisualization
 from .dataset import DatasetStatistics, DatasetTypeMismatch, LabelInsightsVisualization
 from .explain import ExplainForcePlot, ExplainWaterfallPlot
 from .interaction import (
@@ -7,6 +8,7 @@ from .interaction import (
     CorrelationVisualization,
     FeatureDistanceAnalysisVisualization,
     FeatureInteractionVisualization,
+    PDPInteractions,
 )
 from .layouts import (
     MarkdownSectionComponent,

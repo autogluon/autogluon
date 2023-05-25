@@ -329,7 +329,9 @@ class DistillerLitModule(pl.LightningModule):
         logits: torch.Tensor,
         label: torch.Tensor,
     ):
-        if isinstance(metric, (torchmetrics.AUROC, torchmetrics.AveragePrecision)):
+        if isinstance(
+            metric, (torchmetrics.classification.BinaryAUROC, torchmetrics.classification.BinaryAveragePrecision)
+        ):
             prob = F.softmax(logits.float(), dim=1)
             metric.update(preds=prob[:, 1], target=label)  # only for binary classification
         elif isinstance(metric, BaseAggregator):

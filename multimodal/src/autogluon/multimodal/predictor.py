@@ -26,7 +26,10 @@ from packaging import version
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
+from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
 from autogluon.core.utils.loaders import load_pd
+from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from . import version as ag_version
 from .constants import (
@@ -58,6 +61,7 @@ from .constants import (
     MAX,
     MIN,
     MODEL_CHECKPOINT,
+    MULTI_IMAGE_MIX_DATASET,
     MULTICLASS,
     NER,
     NER_RET,
@@ -65,6 +69,8 @@ from .constants import (
     OBJECT_DETECTION,
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
+    OPEN_VOCABULARY_OBJECT_DETECTION,
+    OVD_RET,
     OVERALL_F1,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
@@ -80,6 +86,7 @@ from .constants import (
     ZERO_SHOT_IMAGE_CLASSIFICATION,
 )
 from .data.datamodule import BaseDataModule
+from .data.dataset_mmlab import MultiImageMixDataset
 from .data.infer_types import (
     infer_column_types,
     infer_label_column_type_by_problem_type,
@@ -146,6 +153,7 @@ from .utils import (
     object_detection_data_to_df,
     predict,
     process_batch,
+    save_ovd_result_df,
     save_pretrained_model_configs,
     save_result_df,
     save_text_tokenizers,
@@ -153,9 +161,7 @@ from .utils import (
     setup_detection_train_tuning_data,
     setup_save_path,
     split_hyperparameters,
-    split_train_tuning_data,
     tensor_to_ndarray,
-    try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
     update_hyperparameters,
@@ -213,6 +219,7 @@ class MultiModalPredictor(ExportMixin):
             In addition, we support advanced problems such as
 
             - 'object_detection': Object detection
+            - 'open_vocabulry_object_detection': Zero-shot object detection (only support inference for now, finetuning TBC)
             - 'ner' or 'named_entity_recognition': Named entity extraction
             - 'text_similarity': Text-text similarity problem
             - 'image_similarity': Image-image similarity problem
@@ -229,6 +236,7 @@ class MultiModalPredictor(ExportMixin):
             problem types:
 
             - 'object_detection'
+            - 'open_vocabulry_object_detection'
             - 'text_similarity'
             - 'image_similarity'
             - 'image_text_similarity'
@@ -533,7 +541,7 @@ class MultiModalPredictor(ExportMixin):
         column_types: Optional[dict] = None,
         holdout_frac: Optional[float] = None,
         teacher_predictor: Union[str, MultiModalPredictor] = None,
-        seed: Optional[int] = 123,
+        seed: Optional[int] = 0,
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[dict] = None,
         clean_ckpts: Optional[bool] = True,
@@ -622,6 +630,7 @@ class MultiModalPredictor(ExportMixin):
             knowledge to a student predictor, i.e., the current predictor.
         seed
             The random seed to use for this training run.
+            Defaults to 0
         standalone
             Whether to save the enire model for offline deployment or only trained parameters of parameter-efficient fine-tuning strategy.
         hyperparameter_tune_kwargs
@@ -684,7 +693,15 @@ class MultiModalPredictor(ExportMixin):
         if isinstance(tuning_data, str):
             tuning_data = load_pd.load(tuning_data)
 
-        pl.seed_everything(seed, workers=True)
+        if self._presets is not None:
+            # FIXME: Silently ignoring user input, there should be a warning
+            presets = self._presets
+        else:
+            self._presets = presets
+
+        if self._config is not None:  # continuous training
+            # FIXME: Silently ignoring user input, there should be a warning
+            config = self._config
 
         self._save_path = setup_save_path(
             resume=self._resume,
@@ -695,47 +712,24 @@ class MultiModalPredictor(ExportMixin):
             fit_called=fit_called,
         )
 
-        train_data, tuning_data = split_train_tuning_data(
-            train_data=train_data,
-            tuning_data=tuning_data,
-            holdout_frac=holdout_frac,
-            is_classification=self.problem_property and self.problem_property.is_classification,
-            label_column=self._label_column,
-            seed=seed,
+        self._problem_type = self._infer_problem_type(train_data=train_data, column_types=column_types)
+
+        if tuning_data is None:
+            train_data, tuning_data = self._split_train_tuning(
+                data=train_data, holdout_frac=holdout_frac, random_state=seed
+            )
+
+        column_types = self._infer_column_types(
+            train_data=train_data, tuning_data=tuning_data, column_types=column_types
         )
 
-        column_types = infer_column_types(
-            data=train_data,
-            valid_data=tuning_data,
-            label_columns=self._label_column,
-            provided_column_types=column_types,
-            problem_type=self._problem_type,
-        )
-
-        column_types = infer_label_column_type_by_problem_type(
-            column_types=column_types,
-            label_columns=self._label_column,
-            problem_type=self._problem_type,
-            data=train_data,
-            valid_data=tuning_data,
-        )
-
-        if self._presets is not None:
-            presets = self._presets
-        else:
-            self._presets = presets
-
-        if self._config is not None:  # continuous training
-            config = self._config
-
-        problem_type, output_shape = infer_problem_type_output_shape(
+        # FIXME: separate infer problem_type with output_shape, should be logically distinct
+        _, output_shape = infer_problem_type_output_shape(
             label_column=self._label_column,
             column_types=column_types,
             data=train_data,
             provided_problem_type=self._problem_type,
         )
-        if problem_type is not None:
-            self._problem_type = problem_type  # In case problem type isn't provided in __init__().
 
         # Determine data scarcity mode, i.e. a few-shot scenario
         scarcity_mode = infer_scarcity_mode_by_data_size(
@@ -768,7 +762,7 @@ class MultiModalPredictor(ExportMixin):
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
-                problem_type=problem_type,
+                problem_type=self._problem_type,
                 eval_metric_name=self._eval_metric_name,
                 validation_metric_name=self._validation_metric_name,
             )
@@ -814,6 +808,7 @@ class MultiModalPredictor(ExportMixin):
             ckpt_path=None if hpo_mode else self._ckpt_path,
             resume=False if hpo_mode else self._resume,
             enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
+            seed=seed,
             presets=presets,
             config=config,
             hyperparameters=hyperparameters,
@@ -827,7 +822,7 @@ class MultiModalPredictor(ExportMixin):
         if hpo_mode:
             # TODO: allow custom gpu
             assert self._resume is False, "You can not resume training with HPO"
-            resources = dict(num_gpus=torch.cuda.device_count())
+            resources = dict(num_gpus=ResourceManager.get_gpu_count_torch())
             if _fit_args["max_time"] is not None:
                 _fit_args["max_time"] *= 0.95  # give some buffer time to ray lightning trainer
             _fit_args["predictor"] = self
@@ -846,6 +841,88 @@ class MultiModalPredictor(ExportMixin):
         logger.info(get_fit_complete_message(self._save_path))
 
         return self
+
+    # FIXME: Avoid having separate logic for inferring features and label column that is combined together
+    def _infer_column_types(
+        self, train_data: pd.DataFrame, tuning_data: pd.DataFrame = None, column_types: dict = None
+    ) -> dict:
+        column_types = infer_column_types(
+            data=train_data,
+            label_columns=self._label_column,
+            provided_column_types=column_types,
+            valid_data=tuning_data,
+            problem_type=self._problem_type,
+        )
+        column_types = infer_label_column_type_by_problem_type(
+            column_types=column_types,
+            label_columns=self._label_column,
+            problem_type=self._problem_type,
+            data=train_data,
+            valid_data=tuning_data,
+        )
+        return column_types
+
+    # FIXME: Align logic with Tabular,
+    #  don't combine output_shape and problem_type detection, make them separate
+    #  Use autogluon.core.utils.utils.infer_problem_type
+    def _infer_problem_type(self, train_data: pd.DataFrame, column_types: dict = None) -> str:
+        column_types_label = self._infer_column_types(
+            train_data=train_data[[self._label_column]], column_types=column_types
+        )
+
+        problem_type, _ = infer_problem_type_output_shape(
+            label_column=self._label_column,
+            column_types=column_types_label,
+            data=train_data,
+            provided_problem_type=self._problem_type,
+        )
+        return problem_type
+
+    def _split_train_tuning(
+        self, data: pd.DataFrame, holdout_frac: float = None, random_state: int = 0
+    ) -> (pd.DataFrame, pd.DataFrame):
+        """
+        Splits `data` into `train_data` and `tuning_data`.
+        If the problem_type is one of ['binary', 'multiclass']:
+            The split will be done with stratification on the label column.
+            Will guarantee at least 1 sample of every class in `data` will be present in `train_data`.
+                If only 1 sample of a class exists, it will always be put in `train_data` and not `tuning_data`.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The data to be split
+        holdout_frac : float, default = None
+            The ratio of data to use as validation.
+            If 0.2, 20% of the data will be used for validation, and 80% for training.
+            If None, the ratio is automatically determined,
+            ranging from 0.2 for small row count to 0.01 for large row count.
+        random_state : int, default = 0
+            The random state to use when splitting the data, to make the splitting process deterministic.
+            If None, a random value is used.
+
+        Returns
+        -------
+        Tuple of (train_data, tuning_data) of the split `data`
+        """
+        if holdout_frac is None:
+            holdout_frac = default_holdout_frac(num_train_rows=len(data), hyperparameter_tune=False)
+
+        # TODO: Hack since the recognized problem types are only binary, multiclass, and regression
+        #  Problem types used for purpose of stratification, so regression = no stratification
+        if self._problem_type in [BINARY, MULTICLASS]:
+            problem_type_for_split = self._problem_type
+        else:
+            problem_type_for_split = REGRESSION
+
+        train_data, tuning_data = generate_train_test_split_combined(
+            data=data,
+            label=self.label,
+            test_size=holdout_frac,
+            problem_type=problem_type_for_split,
+            random_state=random_state,
+        )
+        return train_data, tuning_data
 
     def _verify_inference_ready(self):
         if not self._fit_called:
@@ -992,6 +1069,7 @@ class MultiModalPredictor(ExportMixin):
         ckpt_path: str,
         resume: bool,
         enable_progress_bar: bool,
+        seed: int,
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
@@ -1002,6 +1080,7 @@ class MultiModalPredictor(ExportMixin):
         clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
+        pl.seed_everything(seed, workers=True)
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
         logger.info(get_fit_start_message(save_path, validation_metric_name))
         config = get_config(
@@ -1071,16 +1150,11 @@ class MultiModalPredictor(ExportMixin):
         data_processors_count = {k: len(v) for k, v in data_processors.items()}
         logger.debug(f"data_processors_count: {data_processors_count}")
 
-        pos_label = try_to_infer_pos_label(
-            data_config=config.data,
-            label_encoder=df_preprocessor.label_generator,
-            problem_type=self._problem_type,
-        )
         if validation_metric_name is not None:
             validation_metric, custom_metric_func = get_metric(
                 metric_name=validation_metric_name,
                 num_classes=self._output_shape,
-                pos_label=pos_label,
+                problem_type=self._problem_type,
             )
         else:
             validation_metric, custom_metric_func = (None, None)
@@ -1166,16 +1240,40 @@ class MultiModalPredictor(ExportMixin):
             data_processors = [data_processors, teacher_data_processors]
 
         val_use_training_mode = (self._problem_type == OBJECT_DETECTION) and (validation_metric_name != MAP)
+        train_dataset = None
+        if (
+            self._problem_type == OBJECT_DETECTION
+            and self._model.config is not None
+            and MULTI_IMAGE_MIX_DATASET in self._model.config
+        ):
+            train_dataset = MultiImageMixDataset(
+                data=train_df,
+                preprocessor=[df_preprocessor],
+                processors=[data_processors],
+                model_config=self._model.config,
+                id_mappings=None,
+                is_training=True,
+            )
+            train_dm = BaseDataModule(
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                per_gpu_batch_size=config.env.per_gpu_batch_size,
+                num_workers=config.env.num_workers,
+                train_dataset=train_dataset,
+                validate_data=val_df,
+                val_use_training_mode=val_use_training_mode,
+            )
+        else:
+            train_dm = BaseDataModule(
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                per_gpu_batch_size=config.env.per_gpu_batch_size,
+                num_workers=config.env.num_workers,
+                train_data=train_df,
+                validate_data=val_df,
+                val_use_training_mode=val_use_training_mode,
+            )
 
-        train_dm = BaseDataModule(
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-            per_gpu_batch_size=config.env.per_gpu_batch_size,
-            num_workers=config.env.num_workers,
-            train_data=train_df,
-            validate_data=val_df,
-            val_use_training_mode=val_use_training_mode,
-        )
         optimization_kwargs = dict(
             optim_type=config.optimization.optim_type,
             lr_choice=config.optimization.lr_choice,
@@ -1892,6 +1990,8 @@ class MultiModalPredictor(ExportMixin):
 
         if self._problem_type == NER:
             ret_type = NER_RET
+        elif self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+            ret_type = OVD_RET
         else:
             ret_type = LOGITS
 
@@ -1956,15 +2056,9 @@ class MultiModalPredictor(ExportMixin):
                     results = score  # If the results dict is empty, return all scores.
         else:
             for per_metric in metrics:
-                pos_label = try_to_infer_pos_label(
-                    data_config=self._config.data,
-                    label_encoder=self._df_preprocessor.label_generator,
-                    problem_type=self._problem_type,
-                )
                 score = compute_score(
                     metric_data=metric_data,
                     metric_name=per_metric.lower(),
-                    pos_label=pos_label,
                 )
                 results[per_metric] = score
 
@@ -2061,7 +2155,7 @@ class MultiModalPredictor(ExportMixin):
             if self._label_column not in data:
                 self._label_column = None
 
-        if self._problem_type == OBJECT_DETECTION or self._problem_type == OCR_TEXT_DETECTION:
+        if self._problem_type in [OBJECT_DETECTION, OCR_TEXT_DETECTION]:
             ret_type = BBOX
         elif self._problem_type == OCR_TEXT_RECOGNITION:
             ret_type = [TEXT, SCORE]
@@ -2070,6 +2164,9 @@ class MultiModalPredictor(ExportMixin):
 
         if self._problem_type == NER:
             ret_type = NER_RET
+
+        if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+            ret_type = OVD_RET
 
         if candidate_data:
             pred = self._match_queries_and_candidates(
@@ -2138,6 +2235,14 @@ class MultiModalPredictor(ExportMixin):
                     pred=pred,
                     data=data,
                     detection_classes=self._model.model.CLASSES,
+                    result_path=None,
+                )
+            elif (
+                self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION
+            ):  # TODO: refactor and merge with OBJECT DETECTION
+                pred = save_ovd_result_df(
+                    pred=pred,
+                    data=data,
                     result_path=None,
                 )
             else:
@@ -2224,12 +2329,7 @@ class MultiModalPredictor(ExportMixin):
 
         if not as_multiclass:
             if self._problem_type == BINARY:
-                pos_label = try_to_infer_pos_label(
-                    data_config=self._config.data,
-                    label_encoder=self._df_preprocessor.label_generator,
-                    problem_type=self._problem_type,
-                )
-                prob = prob[:, pos_label]
+                prob = prob[:, 1]
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             prob = self._as_pandas(data=data, to_be_converted=prob)
@@ -2401,7 +2501,7 @@ class MultiModalPredictor(ExportMixin):
         # Save text tokenizers before saving data processors
         data_processors = copy.deepcopy(self._data_processors)
 
-        for modality in [TEXT, TEXT_NER, NER]:
+        for modality in [TEXT, TEXT_NER, NER, DOCUMENT]:
             if modality in data_processors:
                 data_processors[modality] = save_text_tokenizers(
                     text_processors=data_processors[modality],

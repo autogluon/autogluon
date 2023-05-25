@@ -14,6 +14,7 @@ extensions = [
     'sphinx_design',                 # github.com/executablebooks/sphinx-design
     'sphinx_inline_tabs',            # sphinx-inline-tabs.readthedocs.io
     'sphinx_togglebutton',           # sphinx-togglebutton.readthedocs.io
+    'sphinxext.opengraph',           # sphinxext-opengraph.readthedocs.io/en/latest/
     'sphinx.ext.autodoc',            # www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
     'sphinx.ext.autosummary',        # www.sphinx-doc.org/en/master/usage/extensions/autosummary.html
     'sphinx.ext.napoleon',           # www.sphinx-doc.org/en/master/usage/extensions/napoleon.html
@@ -36,6 +37,8 @@ nb_merge_streams = True
 
 nb_execution_excludepatterns = ['jupyter_execute']
 
+# Sphinx creates a "tags" object from the arguments specified in the "-t" option of the "sphinx-build" cmd
+# This line allows AutoGluon's CI to execute a subset of our tutorial notebooks by setting the "nb_dirs_to_exec" variable
 nb_dirs_to_exec = [os.path.join('tutorials', tag) for tag in tags if os.path.isdir(os.path.join('tutorials', tag))]
 
 if len(nb_dirs_to_exec) > 0:
@@ -47,7 +50,7 @@ if len(nb_dirs_to_exec) > 0:
         nb_execution_excludepatterns.append(os.path.join(nb_dir, '*.ipynb'))
 
 templates_path = ['_templates']
-exclude_patterns = ['_build', '_templates', 'olds', 'README.md', 'ReleaseInstructions.md', 'jupyter_execute']
+exclude_patterns = ['_build', '_templates', 'README.md', 'ReleaseInstructions.md', 'jupyter_execute']
 master_doc = 'index'
 numfig = True
 numfig_secnum_depth = 2
@@ -62,7 +65,6 @@ html_theme_options = {
     'light_logo': 'autogluon.png',
     'dark_logo': 'autogluon-w.png',
     'globaltoc_collapse': False,
-    # 'google_analytics_account': 'UA-XXXXX', # set to enable google analytics
 }
 
 html_sidebars = {
@@ -83,3 +85,5 @@ html_static_path = ['_static']
 html_css_files = ['custom.css']
 html_js_files = ['custom.js']
 
+ogp_site_url = "https://auto.gluon.ai/"
+ogp_description_length = 300

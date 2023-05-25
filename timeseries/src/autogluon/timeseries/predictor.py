@@ -1,22 +1,20 @@
 import logging
 import pprint
 import time
-import traceback
 import warnings
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, Union
 
 import pandas as pd
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.common.utils.utils import setup_outputdir
+from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_pkl
+from autogluon.core.utils.loaders import load_pkl, load_str
+from autogluon.core.utils.savers import save_pkl, save_str
+from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
-from autogluon.timeseries.splitter import AbstractTimeSeriesSplitter, LastWindowSplitter, MultiWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 from autogluon.timeseries.utils.random import set_random_seed
 
@@ -94,31 +92,19 @@ class TimeSeriesPredictor:
         If True, the predictor will ignore the datetime indexes during both training and testing, and will replace
         the data indexes with dummy timestamps in second frequency. In this case, the forecast output time indexes will
         be arbitrary values, and seasonality will be turned off for local models.
-    validation_splitter : Union[str, AbstractTimeSeriesSplitter], default = "last_window"
-        Strategy for splitting ``train_data`` into training and validation parts during
-        :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`. If ``tuning_data`` is passed to
-        :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, validation_splitter is ignored. Possible choices:
-
-        - ``"last_window"``: use last ``prediction_length`` time steps of each time series for validation.
-        - ``"multi_window"``: use last 3 non-overlapping windows of length ``prediction_length`` of each time series for validation.
-        - object of type :class:`~autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` implementing a custom splitting strategy (for advanced users only).
-
-    Other Parameters
-    ----------------
     learner_type : AbstractLearner, default = TimeSeriesLearner
         A class which inherits from ``AbstractLearner``. The learner specifies the inner logic of the
         ``TimeSeriesPredictor``.
-    label : str
-        Alias for :attr:`target`.
     learner_kwargs : dict, optional
         Keyword arguments to send to the learner (for advanced users only). Options include ``trainer_type``, a
         class inheriting from ``AbstractTrainer`` which controls training of multiple models.
         If ``path`` and ``eval_metric`` are re-specified within ``learner_kwargs``, these are ignored.
-    quantiles : List[float]
-        Alias for :attr:`quantile_levels`.
+    label : str, optional
+        Alias for :attr:`target`.
     """
 
     predictor_file_name = "predictor.pkl"
+    _predictor_version_file_name = "__version__"
 
     def __init__(
         self,
@@ -131,17 +117,20 @@ class TimeSeriesPredictor:
         verbosity: int = 2,
         quantile_levels: Optional[List[float]] = None,
         ignore_time_index: bool = False,
-        validation_splitter: Union[str, AbstractTimeSeriesSplitter] = "last_window",
-        **kwargs,
+        learner_type: Type[AbstractLearner] = TimeSeriesLearner,
+        learner_kwargs: Optional[dict] = None,
+        label: Optional[str] = None,
+        quantiles: Optional[List[float]] = None,
+        validation_splitter: Optional[Any] = None,
     ):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
         self.path = setup_outputdir(path)
 
         self.ignore_time_index = ignore_time_index
-        if target is not None and kwargs.get("label") is not None:
+        if target is not None and label is not None:
             raise ValueError("Both `label` and `target` are specified. Please specify at most one of these arguments.")
-        self.target = target or kwargs.get("label", "target")
+        self.target = target or label or "target"
 
         if known_covariates_names is None:
             known_covariates_names = []
@@ -158,24 +147,23 @@ class TimeSeriesPredictor:
         self.prediction_length = prediction_length
         self.eval_metric = eval_metric
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
-        self.quantile_levels = quantile_levels or kwargs.get(
-            "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-        )
-        if validation_splitter == "last_window":
-            splitter = LastWindowSplitter()
-        elif validation_splitter == "multi_window":
-            splitter = MultiWindowSplitter()
-        elif isinstance(validation_splitter, AbstractTimeSeriesSplitter):
-            splitter = validation_splitter
-        else:
-            raise ValueError(
-                f"`validation_splitter` must be one of 'last_window', 'multi_window', or an object of type "
-                f"`autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` "
-                f"(received {validation_splitter} of type {type(validation_splitter)})."
+        if quantile_levels is None:
+            quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        self.quantile_levels = sorted(quantile_levels)
+
+        if validation_splitter is not None:
+            warnings.warn(
+                "`validation_splitter` argument has been deprecated as of v0.8.0. "
+                "Please use the `num_val_windows` argument of `TimeSeriesPredictor.fit` instead."
+            )
+        if quantiles is not None:
+            warnings.warn(
+                "`quantiles` argument has been deprecated as of v0.8.0. "
+                "Please use the `quantile_levels` argument instead."
             )
 
-        learner_type = kwargs.pop("learner_type", TimeSeriesLearner)
-        learner_kwargs = kwargs.pop("learner_kwargs", dict())
+        if learner_kwargs is None:
+            learner_kwargs = {}
         learner_kwargs = learner_kwargs.copy()
         learner_kwargs.update(
             dict(
@@ -186,7 +174,6 @@ class TimeSeriesPredictor:
                 known_covariates_names=self.known_covariates_names,
                 prediction_length=self.prediction_length,
                 quantile_levels=self.quantile_levels,
-                validation_splitter=splitter,
                 ignore_time_index=ignore_time_index,
             )
         )
@@ -196,10 +183,6 @@ class TimeSeriesPredictor:
     @property
     def _trainer(self) -> AbstractTimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
-
-    @property
-    def validation_splitter(self) -> AbstractTimeSeriesSplitter:
-        return self._learner.validation_splitter
 
     def _check_and_prepare_data_frame(self, df: Union[TimeSeriesDataFrame, pd.DataFrame]) -> TimeSeriesDataFrame:
         """Ensure that TimeSeriesDataFrame has a frequency, or replace its time index with a dummy if
@@ -229,6 +212,7 @@ class TimeSeriesPredictor:
                 "This will lead to TimeSeriesPredictor not working as intended. "
                 "Please make sure that the timestamps are sorted in increasing order for all time series."
             )
+        # TODO: Make sure that entries for each item_id are contiguous -> https://github.com/autogluon/autogluon/issues/3036
         if df.freq is None:
             raise ValueError(
                 "Frequency not provided and cannot be inferred. This is often due to the "
@@ -252,11 +236,51 @@ class TimeSeriesPredictor:
                 "Please make sure that the provided data contains no NaNs."
             )
         if (df.num_timesteps_per_item() <= 2).any():
-            warnings.warn(
-                "Detected time series with length <= 2 in data. "
-                "Please remove them from the dataset or TimeSeriesPredictor likely won't work as intended."
-            )
+            # Time series with length <= 2 make frequency inference impossible
+            raise ValueError("Detected time series with length <= 2 in data. Please remove them from the dataset.")
         return df
+
+    def _validate_num_val_windows(
+        self,
+        train_data: TimeSeriesDataFrame,
+        tuning_data: Optional[TimeSeriesDataFrame],
+        num_val_windows: int,
+    ) -> int:
+        """Check if given num_val_windows is suitable for given data and validate length of training time series.
+
+        Returns
+        -------
+        num_val_windows : int
+            Number of cross validation windows adjusted based on the length of training time series.
+        """
+        shortest_ts_length = train_data.num_timesteps_per_item().min()
+        if tuning_data is None:
+            recommended_ts_length = 2 * self.prediction_length + 1
+            recommended_ts_length_str = "2 * prediction_length + 1"
+        else:
+            recommended_ts_length = self.prediction_length + 1
+            recommended_ts_length_str = "prediction_length + 1"
+
+        if shortest_ts_length < recommended_ts_length:
+            logger.warning(
+                f"\nIt is recommended that all time series in train_data have length >= {recommended_ts_length_str} "
+                f"(at least {recommended_ts_length}). "
+                "Otherwise the predictor may not work as expected. "
+                "\nPlease reduce prediction_length or provide longer time series as train_data. "
+            )
+
+        # Ensure that after splitting off the last prediction_length timesteps all time series have length >= 1
+        max_possible_num_val_windows = int((shortest_ts_length - 1) / self.prediction_length)
+        if num_val_windows > max_possible_num_val_windows:
+            logger.warning(
+                f"\nTime series in train_data are too short for the given num_val_windows = {num_val_windows}. "
+                f"Setting num_val_windows = {max_possible_num_val_windows}"
+            )
+            num_val_windows = max_possible_num_val_windows
+        if num_val_windows == 0 and tuning_data is None:
+            raise ValueError("Training is impossible because num_val_windows = 0 and no tuning_data is provided")
+
+        return num_val_windows
 
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)
     def fit(
@@ -267,9 +291,12 @@ class TimeSeriesPredictor:
         presets: Optional[str] = None,
         hyperparameters: Dict[Union[str, Type], Any] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
+        excluded_model_types: Optional[List[str]] = None,
+        num_val_windows: int = 1,
+        refit_full: bool = False,
         enable_ensemble: bool = True,
         random_seed: Optional[int] = None,
-        **kwargs,
+        verbosity: Optional[int] = None,
     ) -> "TimeSeriesPredictor":
         """Fit probabilistic forecasting models to the given time series dataset.
 
@@ -303,13 +330,11 @@ class TimeSeriesPredictor:
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
             time series are used for computing the validation score.
 
+            If ``tuning_data`` is provided, multi-window backtesting on training data will be disabled, the
+            ``num_val_windows`` argument will be ignored, and ``refit_full`` will be set to ``False``.
+
             Leaving this argument empty and letting AutoGluon automatically generate the validation set from
             ``train_data`` is a good default.
-
-            If not provided, AutoGluon will split :attr:`train_data` into training and tuning subsets using
-            ``validation_splitter``. If ``tuning_data`` is provided, ``validation_splitter`` will be ignored.
-            See the description of ``validation_splitter`` in the docstring for
-            :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
 
             If ``known_covariates_names`` were specified when creating the predictor, ``tuning_data`` must also include
             the columns listed in ``known_covariates_names`` with the covariates values aligned with the target time
@@ -341,7 +366,7 @@ class TimeSeriesPredictor:
             Available presets:
 
             - ``"fast_training"``: fit simple "local" statistical models (``ETS``, ``ARIMA``, ``Theta``, ``Naive``, ``SeasonalNaive``). These models are fast to train, but cannot capture more complex patterns in the data.
-            - ``"medium_quality"``: all models mentioned above + tree-based model ``AutoGluonTabular`` + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
+            - ``"medium_quality"``: all models mentioned above + tree-based model ``DirectTabular`` + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
             - ``"high_quality"``: all models mentioned above + hyperparameter optimization for local statistical models + deep learning models ``TemporalFusionTransformerMXNet`` (if MXNet is available) and ``SimpleFeedForward``. Usually more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: all models mentioned above + deep learning model ``TransformerMXNet`` (if MXNet is available) + hyperparameter optimization for deep learning models. Usually better than ``high_quality``, but takes much longer to train.
 
@@ -354,22 +379,26 @@ class TimeSeriesPredictor:
             If str is passed, will use a preset hyperparameter configuration defined in`
             `autogluon/timeseries/trainer/models/presets.py``.
 
-            If dict is provided, the keys are strings or Types that indicate which models to train. Each value is
-            itself a dict containing hyperparameters for each of the trained models. Any omitted hyperparameters not
-            specified here will be set to default. For example::
+            If dict is provided, the keys are strings or types that indicate which models to train. Each value is
+            itself a dict containing hyperparameters for each of the trained models, or a list of such dicts. Any
+            omitted hyperparameters not specified here will be set to default. For example::
 
                 predictor.fit(
                     ...
                     hyperparameters={
                         "DeepAR": {},
-                        "ETS": {"seasonal_period": 7},
+                        "ETS": [
+                            {"seasonal": "add"},
+                            {"seasonal": None},
+                        ],
                     }
                 )
 
-            The above example will only train two models:
+            The above example will train three models:
 
-            * ``DeepAR`` (with default hyperparameters)
-            * ``ETS`` (with the given `seasonal_period`; all other parameters set to their defaults)
+            * ``DeepAR`` with default hyperparameters
+            * ``ETS`` with additive seasonality (all other parameters set to their defaults)
+            * ``ETS`` with seasonality disabled (all other parameters set to their defaults)
 
             Full list of available models and their hyperparameters is provided in :ref:`forecasting_zoo`.
 
@@ -377,14 +406,14 @@ class TimeSeriesPredictor:
             hyperparameter optimization is performed. A search space should only be provided when
             ``hyperparameter_tune_kwargs`` is given (i.e., hyperparameter-tuning is utilized). For example::
 
-                import autogluon.core as ag
+                from autogluon.common import space
 
                 predictor.fit(
                     ...
                     hyperparameters={
                         "DeepAR": {
-                            "hidden_size": ag.space.Int(20, 100),
-                            "dropout_rate": ag.space.Categorical(0.1, 0.3),
+                            "hidden_size": space.Int(20, 100),
+                            "dropout_rate": space.Categorical(0.1, 0.3),
                         },
                     },
                     hyperparameter_tune_kwargs="auto",
@@ -418,15 +447,34 @@ class TimeSeriesPredictor:
                         "scheduler": "local",
                         "searcher": "auto",
                         "num_trials": 5,
-                    }
+                    },
                 )
+        excluded_model_types: List[str], optional
+            Banned subset of model types to avoid training during ``fit()``, even if present in ``hyperparameters``.
+            For example, the following code will train all models included in the ``high_quality`` presets except ``DeepAR``::
 
+                predictor.fit(
+                    ...,
+                    presets="high_quality",
+                    excluded_model_types=["DeepAR"],
+                )
+        num_val_windows : int, default = 1
+            Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
+            A separate copy of each model is trained for each validation window.
+            When ``num_val_windows = k``, training time is increased roughly by a factor of ``k``.
+        refit_full : bool, default = False
+            If True, after training is complete, AutoGluon will attempt to re-train all models using all of training
+            data (including the data initially reserved for validation). This argument has no effect if ``tuning_data``
+            is provided.
         enable_ensemble : bool, default = True
             If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
             ``hyperparameters``.
         random_seed : int, optional
             If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
             results for most models (except those trained on GPU because of the non-determinism of GPU operations).
+        verbosity : int, optional
+            If provided, overrides the ``verbosity`` value used when creating the ``TimeSeriesPredictor``. See
+            documentation for :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
 
         """
         time_start = time.time()
@@ -439,14 +487,8 @@ class TimeSeriesPredictor:
         train_data = self._check_and_prepare_data_frame(train_data)
         tuning_data = self._check_and_prepare_data_frame(tuning_data)
 
-        if (train_data.num_timesteps_per_item() <= 2 * self.prediction_length).any():
-            warnings.warn(
-                "Detected short time series in train_data. "
-                "For best performance, all training time series should have length >= 2 * prediction_length + 1"
-                f"(at least {2 * self.prediction_length + 1})."
-            )
-
-        verbosity = kwargs.get("verbosity", self.verbosity)
+        if verbosity is None:
+            verbosity = self.verbosity
         set_logger_verbosity(verbosity)
 
         fit_args = dict(
@@ -456,9 +498,11 @@ class TimeSeriesPredictor:
             evaluation_metric=self.eval_metric,
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            excluded_model_types=excluded_model_types,
+            num_val_windows=num_val_windows,
             enable_ensemble=enable_ensemble,
             random_seed=random_seed,
-            **kwargs,
+            verbosity=verbosity,
         )
         logger.info("================ TimeSeriesPredictor ================")
         logger.info("TimeSeriesPredictor.fit() called")
@@ -468,14 +512,19 @@ class TimeSeriesPredictor:
         logger.info(f"{pprint.pformat(fit_args)}")
         logger.info(
             f"Provided training data set with {len(train_data)} rows, {train_data.num_items} items (item = single time series). "
-            f"Average time series length is {len(train_data) / train_data.num_items:.1f}."
+            f"Average time series length is {len(train_data) / train_data.num_items:.1f}. "
+            f"Data frequency is '{train_data.freq}'."
         )
         if tuning_data is not None:
             logger.info(
                 f"Provided tuning data set with {len(tuning_data)} rows, {tuning_data.num_items} items. "
                 f"Average time series length is {len(tuning_data) / tuning_data.num_items:.1f}."
             )
-        logger.info(f"Training artifacts will be saved to: {Path(self.path).resolve()}")
+            if num_val_windows > 0:
+                logger.warning("Multi-window backtesting is disabled (setting num_val_windows = 0)")
+                num_val_windows = 0
+        num_val_windows = self._validate_num_val_windows(train_data, tuning_data, num_val_windows)
+
         logger.info("=====================================================")
 
         if random_seed is not None:
@@ -487,10 +536,17 @@ class TimeSeriesPredictor:
             val_data=tuning_data,
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            excluded_model_types=excluded_model_types,
             time_limit=time_left,
             verbosity=verbosity,
+            num_val_windows=num_val_windows,
             enable_ensemble=enable_ensemble,
         )
+        if refit_full:
+            if tuning_data is None:
+                self.refit_full()
+            else:
+                logger.warning("Skipping `refit_full` because custom `tuning_data` was provided during `fit`.")
 
         self.save()
         return self
@@ -505,7 +561,6 @@ class TimeSeriesPredictor:
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[str] = None,
         random_seed: Optional[int] = 123,
-        **kwargs,
     ) -> TimeSeriesDataFrame:
         """Return quantile and mean forecasts for the given dataset, starting from the end of each time series.
 
@@ -559,25 +614,17 @@ class TimeSeriesPredictor:
         B       2020-03-04          0    5.0
                 2020-03-05          0    7.0
         >>> predictor.predict(data, known_covariates=future_known_covariates)
-                            target
+                              mean
         item_id timestamp
-        A       2020-01-08      30
-                2020-01-09      27
-        B       2020-03-04      17
-                2020-03-05       8
+        A       2020-01-08    30.2
+                2020-01-09    27.0
+        B       2020-03-04    17.1
+                2020-03-05     8.3
         """
-        if "quantile_levels" in kwargs:
-            warnings.warn(
-                "Passing `quantile_levels` as a keyword argument to `TimeSeriesPredictor.predict` is deprecated as of "
-                "v0.7. This argument is ignored. Please specify the desired quantile levels when creating the "
-                "predictor as `TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
-                category=DeprecationWarning,
-            )
-            kwargs.pop("quantile_levels")
         if random_seed is not None:
             set_random_seed(random_seed)
         data = self._check_and_prepare_data_frame(data)
-        return self._learner.predict(data, known_covariates=known_covariates, model=model, **kwargs)
+        return self._learner.predict(data, known_covariates=known_covariates, model=model)
 
     def evaluate(self, data: Union[TimeSeriesDataFrame, pd.DataFrame], **kwargs):
         """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``
@@ -620,13 +667,24 @@ class TimeSeriesPredictor:
         return self.evaluate(data, **kwargs)
 
     @classmethod
-    def load(cls, path: str) -> "TimeSeriesPredictor":
+    def _load_version_file(cls, path: str) -> str:
+        version_file_path = path + cls._predictor_version_file_name
+        version = load_str.load(path=version_file_path)
+        return version
+
+    @classmethod
+    def load(cls, path: str, require_version_match: bool = True) -> "TimeSeriesPredictor":
         """Load an existing ``TimeSeriesPredictor`` from given ``path``.
 
         Parameters
         ----------
         path : str
             Path where the predictor was saved via :meth:`~autogluon.timeseries.TimeSeriesPredictor.save`.
+        require_version_match : bool, default = True
+            If True, will raise an AssertionError if the ``autogluon.timeseries`` version of the loaded predictor does
+            not match the installed version of ``autogluon.timeseries``.
+            If False, will allow loading of models trained on incompatible versions, but is NOT recommended. Users may
+            run into numerous issues if attempting this.
 
         Returns
         -------
@@ -636,11 +694,33 @@ class TimeSeriesPredictor:
             raise ValueError("`path` cannot be None or empty in load().")
         path = setup_outputdir(path, warn_if_exist=False)
 
+        try:
+            version_saved = cls._load_version_file(path=path)
+        except:
+            logger.warning(
+                f'WARNING: Could not find version file at "{path + cls._predictor_version_file_name}".\n'
+                f"This means that the predictor was fit in a version `<=0.7.0`."
+            )
+            version_saved = "Unknown (Likely <=0.7.0)"
+
+        check_saved_predictor_version(
+            version_current=current_ag_version,
+            version_saved=version_saved,
+            require_version_match=require_version_match,
+            logger=logger,
+        )
+
         logger.info(f"Loading predictor from path {path}")
         learner = AbstractLearner.load(path)
         predictor = load_pkl.load(path=learner.path + cls.predictor_file_name)
         predictor._learner = learner
+        predictor.path = learner.path
         return predictor
+
+    def _save_version_file(self):
+        version_file_contents = current_ag_version
+        version_file_path = self.path + self._predictor_version_file_name
+        save_str.save(path=version_file_path, data=version_file_contents, verbose=False)
 
     def save(self) -> None:
         """Save this predictor to file in directory specified by this Predictor's ``path``.
@@ -652,6 +732,7 @@ class TimeSeriesPredictor:
         self._learner = None
         save_pkl.save(path=tmp_learner.path + self.predictor_file_name, object=self)
         self._learner = tmp_learner
+        self._save_version_file()
 
     def info(self) -> Dict[str, Any]:
         """Returns a dictionary of objects each describing an attribute of the training process and trained models."""
@@ -659,6 +740,10 @@ class TimeSeriesPredictor:
 
     def get_model_best(self) -> str:
         """Returns the name of the best model from trainer."""
+        if self._trainer.model_best is not None:
+            models = self._trainer.get_model_names()
+            if self._trainer.model_best in models:
+                return self._trainer.model_best
         return self._trainer.get_model_best()
 
     def leaderboard(
@@ -762,6 +847,64 @@ class TimeSeriesPredictor:
             print("****************** End of fit() summary ******************")
         return results
 
-    # TODO
-    def refit_full(self, models="all"):
-        raise NotImplementedError("Refitting logic not yet implemented in autogluon.timeseries")
+    def refit_full(self, model: str = "all", set_best_to_refit_full: bool = True) -> Dict[str, str]:
+        """Retrain model on all of the data (training + validation).
+
+        This method can only be used if no ``tuning_data`` was passed to :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`.
+
+        .. warning::
+            This is experimental functionality, many time series models do not yet support ``refit_full`` and will
+            simply be copied.
+
+
+        Parameters
+        ----------
+        model : str, default = "all"
+            Name of the model to refit.
+            All ancestor models will also be refit in the case that the selected model is a weighted ensemble.
+            Valid models are listed in this ``predictor`` by calling :meth:`~autogluon.timeseries.TimeSeriesPredictor.get_model_names`.
+
+            * If "all" then all models are refitted.
+            * If "best" then the model with the highest validation score is refit.
+
+        set_best_to_refit_full : bool, default = True
+            If True, sets best model to the refit_full version of the prior best model. This means the model used when
+            ``predictor.predict(data)`` is called will be the refit_full version instead of the original version of the
+            model. Has no effect if ``model`` is not the best model.
+        """
+        logger.warning(
+            "\tWARNING: refit_full functionality for TimeSeriesPredictor is experimental "
+            "and is not yet supported by all models."
+        )
+
+        logger.info(
+            "Refitting models via `refit_full` using all of the data (combined train and validation)...\n"
+            "\tModels trained in this way will have the suffix '_FULL' and have NaN validation score.\n"
+            "\tThis process is not bound by time_limit, but should take less time than the original `fit` call."
+        )
+        model_best = self.get_model_best()
+        refit_full_dict = self._learner.refit_full(model=model)
+
+        if set_best_to_refit_full:
+            if model_best in refit_full_dict:
+                self._trainer.model_best = refit_full_dict[model_best]
+                self._trainer.save()
+                logger.info(
+                    f"Updated best model to '{self._trainer.model_best}' (Previously '{model_best}'). "
+                    f"AutoGluon will default to using '{self._trainer.model_best}' for predict()."
+                )
+            elif model_best in refit_full_dict.values():
+                # Model best is already a refit full model
+                prev_best = self._trainer.model_best
+                self._trainer.model_best = model_best
+                self._trainer.save()
+                logger.info(
+                    f"Updated best model to '{self._trainer.model_best}' (Previously '{prev_best}'). "
+                    f"AutoGluon will default to using '{self._trainer.model_best}' for predict()."
+                )
+            else:
+                logger.warning(
+                    f"Best model ('{model_best}') is not present in refit_full dictionary. "
+                    f"Training may have failed on the refit model. AutoGluon will default to using '{model_best}' for predict()."
+                )
+        return refit_full_dict

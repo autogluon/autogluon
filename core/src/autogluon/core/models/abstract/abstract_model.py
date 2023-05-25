@@ -5,7 +5,6 @@ import logging
 import math
 import os
 import pickle
-from autogluon.core.utils import try_import
 import sys
 import time
 from typing import Any, Dict, Optional, Union
@@ -14,16 +13,20 @@ import numpy as np
 import pandas as pd
 import scipy
 
+from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
-from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.resource_utils import ResourceManager, RayResourceManager
+from autogluon.common.utils.resource_utils import get_resource_manager
+from autogluon.common.utils.distribute_utils import DistributedContext
 
 from .model_trial import model_trial, skip_hpo
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
-from ... import metrics, Space
+from ... import metrics
 from ...constants import AG_ARG_PREFIX, AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...hpo.exceptions import EmptySearchSpace
@@ -37,7 +40,6 @@ from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMem
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
-from ...utils.try_import import try_import_ray
 
 
 logger = logging.getLogger(__name__)
@@ -321,7 +323,7 @@ class AbstractModel:
     def _get_default_searchspace(self) -> dict:
         """
         Get the default hyperparameter searchspace of the model.
-        See `autogluon.core.space` for available space classes.
+        See `autogluon.common.space` for available space classes.
         Returns
         -------
         dict of hyperparameter search spaces.
@@ -549,23 +551,24 @@ class AbstractModel:
             if user_specified_model_level_resource is not None:
                 user_specified_lower_level_resource = min(user_specified_model_level_resource * k_fold, system_resource, user_specified_total_resource)
         return user_specified_lower_level_resource
-
-    def _preprocess_fit_resources(self, silent=False, total_resources=None, parallel_hpo=False, **kwargs):
+    
+    def _calculate_total_resources(
+        self,
+        silent: bool = False,
+        total_resources: Optional[Dict[str, Union[int, float]]] = None,
+        parallel_hpo: bool = False,
+        **kwargs
+    ) -> Dict[str, Any]:
         """
-        This function should be called to process user-specified total resources.
+        Process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
         When user-specified resources are not defined, will instead look at model's default resource requirements.
+        
+        Will set the calculated total resources in kwargs and return it
         """
-        if 'num_cpus' in kwargs and 'num_gpus' in kwargs:
-            # This value will only be passed by autogluon through previous layers(i.e. bagged model to model base).
-            # We respect this value with highest priority
-            # They should always be set to valid values
-            enforced_num_cpus = kwargs.get('num_cpus', None)
-            enforced_num_gpus = kwargs.get('num_gpus', None)
-            assert enforced_num_cpus is not None and enforced_num_cpus != 'auto' and enforced_num_gpus is not None and enforced_num_gpus != 'auto'
-            return kwargs
-        system_num_cpus = ResourceManager.get_cpu_count()
-        system_num_gpus = ResourceManager.get_gpu_count_all()
+        resource_manager = get_resource_manager()
+        system_num_cpus = resource_manager.get_cpu_count()
+        system_num_gpus = resource_manager.get_gpu_count_all()
         if total_resources is None:
             total_resources = {}
         num_cpus = total_resources.get('num_cpus', 'auto')
@@ -656,7 +659,54 @@ class AbstractModel:
         kwargs['num_gpus'] = num_gpus
         if not silent:
             logger.log(15, f"\tFitting {self.name} with 'num_gpus': {kwargs['num_gpus']}, 'num_cpus': {kwargs['num_cpus']}")
+        
         return kwargs
+
+    def _preprocess_fit_resources(
+        self,
+        silent: bool = False,
+        total_resources: Optional[Dict[str, Union[int, float]]] = None,
+        parallel_hpo: bool = False,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        This function should be called to process user-specified total resources.
+        Sanity checks will be done to user-specified total resources to make sure it's legit.
+        When user-specified resources are not defined, will instead look at model's default resource requirements.
+        
+        When kwargs contains `num_cpus` and `num_gpus` means this total resources has been calculated by previous layers(i.e. bagged model to model base).
+        Will respect this value and check if there's specific maximum resource requirements and enforce those
+        
+        Will set the calculated resources in kwargs and return it
+        """
+        if 'num_cpus' in kwargs and 'num_gpus' in kwargs:
+            # This value will only be passed by autogluon through previous layers(i.e. bagged model to model base).
+            # We respect this value with highest priority
+            # They should always be set to valid values
+            enforced_num_cpus = kwargs.get('num_cpus', None)
+            enforced_num_gpus = kwargs.get('num_gpus', None)
+            assert enforced_num_cpus is not None and enforced_num_cpus != 'auto' and enforced_num_gpus is not None and enforced_num_gpus != 'auto'
+            # The logic below is needed because ray cluster is running some process in the backend even when it's ready to be used
+            # Trying to use all cores on the machine could lead to resource contention situation
+            # TODO: remove this logic if ray team can identify what's going on underneath and how to workaround
+            max_resources = self._get_maximum_resources()
+            max_num_cpus = max_resources.get("num_cpus", None)
+            max_num_gpus = max_resources.get("num_gpus", None)
+            if max_num_gpus is not None:
+                enforced_num_gpus = min(max_num_gpus, enforced_num_gpus)
+            if DistributedContext.is_distributed_mode():
+                minimum_model_resources = self.get_minimum_resources(
+                    is_gpu_available=(enforced_num_gpus > 0)
+                )
+                minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
+                enforced_num_cpus = max(minimum_model_num_cpus, enforced_num_cpus - 2)  # leave some cpu resources for process running by cluster nodes
+            if max_num_cpus is not None:
+                enforced_num_cpus = min(max_num_cpus, enforced_num_cpus)
+            kwargs["num_cpus"] = enforced_num_cpus
+            kwargs["num_gpus"] = enforced_num_gpus
+            return kwargs
+        
+        return self._calculate_total_resources(silent=silent, total_resources=total_resources, parallel_hpo=parallel_hpo, **kwargs)
 
     def _register_fit_metadata(self, **kwargs):
         """
@@ -1327,15 +1377,13 @@ class AbstractModel:
 
         # Use absolute path here because ray tune will change the working directory
         self.set_contexts(os.path.abspath(self.path) + os.path.sep)
-        directory = self.path  # also create model directory if it doesn't exist
-        # TODO: This will break on S3. Use tabular/utils/savers for datasets, add new function
-        dataset_train_filename = 'dataset_train.pkl'
-        train_path = os.path.join(directory, dataset_train_filename)
-        save_pkl.save(path=train_path, object=(X, y))
 
-        dataset_val_filename = 'dataset_val.pkl'
-        val_path = os.path.join(directory, dataset_val_filename)
-        save_pkl.save(path=val_path, object=(X_val, y_val))
+        directory = self.path
+        os.makedirs(directory, exist_ok=True)
+        data_path = directory
+        if DistributedContext.is_distributed_mode():
+            data_path = DistributedContext.get_util_path()
+        train_path, val_path = hpo_executor.prepare_data(X=X, y=y, X_val=X_val, y_val=y_val, path_prefix=data_path)
 
         model_cls = self.__class__
         init_params = self.get_params()
@@ -1392,6 +1440,8 @@ class AbstractModel:
     
     def _get_hpo_backend(self):
         """Choose which backend(Ray or Custom) to use for hpo"""
+        if DistributedContext.is_distributed_mode():
+            return RAY_BACKEND
         return CUSTOM_BACKEND
 
     def _get_default_hpo_executor(self) -> HpoExecutor:
@@ -1471,7 +1521,7 @@ class AbstractModel:
             if resources[resource_name] > resource_value:
                 raise AssertionError(f'Specified {resources[resource_name]} {resource_name} to fit, but only {resource_value} are available in total.')
 
-    def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:
+    def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, Union[int, float]]:
         """
         Parameters
         ----------
@@ -1644,6 +1694,21 @@ class AbstractModel:
         json_path = self.path + self.model_info_json_name
         save_json.save(path=json_path, obj=info)
         return info
+    
+    def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
+        """
+        Get the maximum resources allowed to use for this model.
+        This can be useful when model not scale well with resources, i.e. cpu cores.
+        Return empty dict if no maximum resources needed
+        
+        Return
+        ------
+        Dict[str, Union[int, float]]
+            key, name of the resource, i.e. `num_cpus`, `num_gpus`
+            value, maximum amount of resources
+        """
+        return {}
+        
 
     def _get_default_resources(self):
         """

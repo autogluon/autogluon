@@ -10,23 +10,32 @@ import pandas as pd
 import pytest
 from flaky import flaky
 
-import autogluon.core as ag
+from autogluon.common import space
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
 from .gluonts.test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
-from .test_autogluon_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
+from .test_direct_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
-from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
+from .test_mlforecast import TESTABLE_MODELS as MLFORECAST_TESTABLE_MODELS
+from .test_multi_window_model import get_multi_window_deepar
 
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
-TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS + TABULAR_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS
+TESTABLE_MODELS = (
+    GLUONTS_TESTABLE_MODELS
+    + TABULAR_TESTABLE_MODELS
+    + LOCAL_TESTABLE_MODELS
+    + MLFORECAST_TESTABLE_MODELS
+    + [get_multi_window_deepar]
+)
+
 DUMMY_HYPERPARAMETERS = {"epochs": 1, "num_batches_per_epoch": 1, "maxiter": 1, "n_jobs": 1}
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
-MODELS_WITHOUT_HPO = ["AutoGluonTabular", "AutoETS", "AutoARIMA", "DynamicOptimizedTheta"]
+MODELS_WITHOUT_HPO = ["DirectTabular", "AutoETS", "AutoARIMA", "DynamicOptimizedTheta"]
 
 
 @pytest.fixture(scope="module")
@@ -43,6 +52,7 @@ def trained_models():
         )
 
         model.fit(train_data=DUMMY_TS_DATAFRAME)
+        model.score_and_cache_oof(DUMMY_TS_DATAFRAME, store_val_score=True, store_predict_time=True)
         models[(prediction_length, repr(model_class))] = model
         model_paths.append(temp_model_path)
 
@@ -72,13 +82,38 @@ def test_when_fit_called_then_models_train_and_all_scores_can_be_computed(
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("prediction_length", [1, 5])
-def test_when_predict_for_scoring_called_then_model_receives_truncated_data(
+def test_when_score_and_cache_oof_called_then_attributes_are_saved(model_class, prediction_length, trained_models):
+    model = trained_models[(prediction_length, repr(model_class))]
+    assert isinstance(model.val_score, float)
+    assert isinstance(model.predict_time, float)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 5])
+def test_when_score_and_cache_oof_called_then_oof_predictions_are_saved(
     model_class, prediction_length, trained_models
 ):
     model = trained_models[(prediction_length, repr(model_class))]
+    if isinstance(model, MultiWindowBacktestingModel):
+        pytest.skip()
+
+    oof_predictions = model.get_oof_predictions()
+    assert isinstance(oof_predictions, TimeSeriesDataFrame)
+    oof_score = model._score_with_predictions(DUMMY_TS_DATAFRAME, oof_predictions)
+    assert isinstance(oof_score, float)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 5])
+def test_when_score_called_then_model_receives_truncated_data(model_class, prediction_length, trained_models):
+    model = trained_models[(prediction_length, repr(model_class))]
 
     with mock.patch.object(model, "predict") as patch_method:
-        _ = model.predict_for_scoring(DUMMY_TS_DATAFRAME)
+        # Mock breaks the internals of the `score` method
+        try:
+            _ = model.score(DUMMY_TS_DATAFRAME)
+        except AttributeError:
+            pass
 
         (call_df,) = patch_method.call_args[0]
 
@@ -98,6 +133,7 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, trained_models, 
     assert dict_equal_primitive(model.params, loaded_model.params)
     assert dict_equal_primitive(model.params_aux, loaded_model.params_aux)
     assert model.metadata == loaded_model.metadata
+    assert model.get_oof_predictions().equals(loaded_model.get_oof_predictions())
 
 
 @flaky
@@ -108,13 +144,17 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         freq="H",
         quantile_levels=[0.1, 0.9],
         hyperparameters={
-            "epochs": ag.Int(1, 3),
+            "epochs": space.Int(1, 3),
             "num_batches_per_epoch": 1,
             "maxiter": 1,
         },
     )
     if model.name in MODELS_WITHOUT_HPO:
         pytest.skip(f"{model.name} doesn't support HPO")
+    if isinstance(model, MultiWindowBacktestingModel):
+        val_data = None
+    else:
+        val_data = DUMMY_TS_DATAFRAME
 
     num_trials = 2
 
@@ -122,22 +162,11 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         hyperparameter_tune_kwargs={"num_trials": num_trials, "scheduler": "local", "searcher": "random"},
         time_limit=300,
         train_data=DUMMY_TS_DATAFRAME,
-        val_data=DUMMY_TS_DATAFRAME,
+        val_data=val_data,
     )
     assert len(hpo_results) == num_trials
     for result in hpo_results.values():
         assert 1 <= result["hyperparameters"]["epochs"] <= 3
-
-
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_given_no_freq_argument_when_fit_called_with_freq_then_model_does_not_raise_error(
-    model_class, temp_model_path
-):
-    model = model_class(path=temp_model_path, hyperparameters=DUMMY_HYPERPARAMETERS)
-    try:
-        model.fit(train_data=DUMMY_TS_DATAFRAME, freq="H")
-    except ValueError:
-        pytest.fail("unexpected ValueError raised in fit")
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -147,7 +176,7 @@ def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raise
         freq="H",
         quantile_levels=[0.1, 0.9],
         hyperparameters={
-            "epochs": ag.Int(3, 4),
+            "epochs": space.Int(3, 4),
         },
     )
     with pytest.raises(ValueError, match=".*hyperparameter_tune.*"):

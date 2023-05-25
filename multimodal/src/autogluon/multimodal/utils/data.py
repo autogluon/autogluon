@@ -9,7 +9,6 @@ import pandas as pd
 import PIL
 from omegaconf import DictConfig, OmegaConf
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
 from autogluon.core.utils.loaders import load_pd
@@ -30,6 +29,7 @@ from ..constants import (
     NER_ANNOTATION,
     NER_TEXT,
     NUMERICAL,
+    OVD,
     ROIS,
     TEXT,
     TEXT_NER,
@@ -46,6 +46,7 @@ from ..data import (
     NerLabelEncoder,
     NerProcessor,
     NumericalProcessor,
+    OVDProcessor,
     TextProcessor,
 )
 from ..data.infer_types import is_image_column
@@ -180,6 +181,12 @@ def create_data_processor(
             max_img_num_per_col=model_config.max_img_num_per_col,
             missing_value_strategy=config.data.image.missing_value_strategy,
         )
+    elif data_type == OVD:
+        data_processor = OVDProcessor(
+            model=model,
+            max_img_num_per_col=model_config.max_img_num_per_col,
+            missing_value_strategy=config.data.image.missing_value_strategy,
+        )
     elif data_type == DOCUMENT:
         train_transforms, val_transforms = get_image_transforms(
             model_config=model_config,
@@ -238,6 +245,7 @@ def create_fusion_data_processors(
         ROIS: [],
         TEXT_NER: [],
         DOCUMENT: [],
+        OVD: [],
     }
 
     model_dict = {model.prefix: model}
@@ -278,6 +286,17 @@ def create_fusion_data_processors(
             )
             if data_types is not None and IMAGE in data_types:
                 data_types.remove(IMAGE)
+        elif per_name == OVD:
+            # create a multimodal processor for OVD.
+            data_processors[OVD].append(
+                create_data_processor(
+                    data_type=OVD,
+                    config=config,
+                    model=per_model,
+                )
+            )
+            if data_types is not None and IMAGE in data_types:
+                data_types.remove(IMAGE)
 
         if requires_label:
             # each model has its own label processor
@@ -288,7 +307,7 @@ def create_fusion_data_processors(
             )
             data_processors[LABEL].append(label_processor)
 
-        if requires_data and data_types:
+        if requires_data and data_types and per_name != OVD:  # currently OVD does not require additional processors
             for data_type in data_types:
                 per_data_processor = create_data_processor(
                     data_type=data_type,
@@ -367,43 +386,6 @@ def turn_on_off_feature_column_info(
             # label processor doesn't have requires_column_info.
             if hasattr(per_model_processor, "requires_column_info"):
                 per_model_processor.requires_column_info = flag
-
-
-def try_to_infer_pos_label(
-    data_config: DictConfig,
-    label_encoder: LabelEncoder,
-    problem_type: str,
-):
-    """
-    Try to infer positive label for binary classification, which is used in computing some metrics, e.g., roc_auc.
-    If positive class is not provided, then use pos_label=1 by default.
-    If the problem type is not binary classification, then return None.
-
-    Parameters
-    ----------
-    data_config
-        A DictConfig object containing only the data configurations.
-    label_encoder
-        The label encoder of classification tasks.
-    problem_type
-        Type of problem.
-
-    Returns
-    -------
-
-    """
-    if problem_type != BINARY:
-        return None
-
-    pos_label = OmegaConf.select(data_config, "pos_label", default=None)
-    if pos_label is not None:
-        logger.debug(f"pos_label: {pos_label}\n")
-        pos_label = label_encoder.transform([pos_label]).item()
-    else:
-        pos_label = 1
-
-    logger.debug(f"pos_label: {pos_label}")
-    return pos_label
 
 
 def get_mixup(

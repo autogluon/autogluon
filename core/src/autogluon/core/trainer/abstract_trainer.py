@@ -15,6 +15,7 @@ from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
 from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.try_import import try_import_torch
 
 from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
@@ -29,7 +30,6 @@ from ..utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidF
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
 from ..utils.feature_selection import FeatureSelector
-from ..utils.try_import import try_import_torch
 
 logger = logging.getLogger(__name__)
 
@@ -1487,6 +1487,10 @@ class AbstractTrainer:
                     time_left_total = time_limit
                 fit_log_message += f' Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.'
             logger.log(20, fit_log_message)
+
+            if isinstance(model, BaggedEnsembleModel) and not compute_score:
+                # Do not perform OOF predictions when we don't compute a score.
+                model_fit_kwargs['_skip_oof'] = True
 
             # If model is not bagged model and not stacked then pseudolabeled data needs to be incorporated at this level
             # Bagged model does validation on the fit level where as single models do it separately. Hence this if statement

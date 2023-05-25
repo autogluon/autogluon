@@ -24,23 +24,6 @@ except ImportError:
     pass
 
 
-SKTIME_INSTALLED = False
-try:
-    import pmdarima
-    import sktime
-    import tbats
-
-    if parse("0.16") > parse(sktime.__version__) >= parse("0.14"):
-        SKTIME_INSTALLED = True
-    else:
-        warnings.warn(
-            "autogluon.timeseries depends on sktime version >=0.13.1 and <0.14, although "
-            f"{sktime.__version__} was found. sktime features will be disabled."
-        )
-except ImportError:
-    pass
-
-
 from .dataset import TimeSeriesDataFrame
 from .evaluator import TimeSeriesEvaluator
 from .predictor import TimeSeriesPredictor

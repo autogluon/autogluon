@@ -7,11 +7,13 @@ import warnings
 import numpy as np
 import pandas as pd
 
+from typing import Dict, Union
+
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.try_import import try_import_torch
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.hpo.constants import RAY_BACKEND
-from autogluon.core.utils import try_import_torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 
@@ -547,6 +549,12 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
     def _get_default_stopping_metric(self):
         return self.eval_metric
+    
+    def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
+        # torch model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
+        return {
+            "num_cpus": ResourceManager.get_cpu_count_psutil(logical=False)
+        }
 
     def _get_default_resources(self):
         # logical=False is faster in training
@@ -554,9 +562,67 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         num_gpus = 0
         return num_cpus, num_gpus
 
+    def save(self, path: str = None, verbose=True) -> str:
+        import torch
+        # Save on CPU to ensure the model can be loaded on a box without GPU
+        if self.model is not None:
+            self.model = self.model.to(torch.device("cpu"))
+        path = super().save(path, verbose)
+        # Put the model back to the device after the save
+        if self.model is not None:
+            self.model.to(self.device)
+        return path
+
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
+        """
+        Loads the model from disk to memory.
+        The loaded model will be on the same device it was trained on (cuda/mps);
+        if the device is it's not available (trained on GPU, deployed on CPU),
+        then `cpu` will be used.
+
+        Parameters
+        ----------
+        path : str
+            Path to the saved model, minus the file name.
+            This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
+            The model file is typically located in path + cls.model_file_name.
+        reset_paths : bool, default True
+            Whether to reset the self.path value of the loaded model to be equal to path.
+            It is highly recommended to keep this value as True unless accessing the original self.path value is important.
+            If False, the actual valid path and self.path may differ, leading to strange behaviour and potential exceptions if the model needs to load any other files at a later time.
+        verbose : bool, default True
+            Whether to log the location of the loaded file.
+
+        Returns
+        -------
+        model : cls
+            Loaded model object.
+        """
+        import torch
+
         model: TabularNeuralNetTorchModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+
+        # Put the model on the same device it was train on (GPU/MPS) if it is available; otherwise use CPU
+        if model.model is not None:
+            original_device_type = model.device.type
+            if 'cuda' in original_device_type:
+                # cuda: nvidia GPU
+                device = torch.device(original_device_type if torch.cuda.is_available() else 'cpu')
+            elif 'mps' in original_device_type:
+                # mps: Apple Silicon
+                device = torch.device(original_device_type if torch.backends.mps.is_available() else 'cpu')
+            else:
+                device = torch.device(original_device_type)
+
+            if verbose and (original_device_type != device.type):
+                logger.log(15, f'Model is trained on {original_device_type}, but the device is not available - loading on {device.type}')
+
+            model.device = device
+            model.model = model.model.to(model.device)
+            model.model.device = model.device
+
+        # Compiled models handling
         if hasattr(model, '_compiler') and model._compiler and model._compiler.name != 'native':
             model.model.eval()
             model.processor = model._compiler.load(path=model.path)

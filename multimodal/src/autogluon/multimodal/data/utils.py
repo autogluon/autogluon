@@ -3,10 +3,12 @@ import codecs
 import copy
 import re
 import warnings
+from io import BytesIO
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
+import PIL
 from omegaconf import ListConfig
 from text_unidecode import unidecode
 from timm.data.constants import (
@@ -18,7 +20,16 @@ from timm.data.constants import (
 from tokenizers import pre_tokenizers
 from torchvision import transforms
 
-from ..constants import CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, IDENTIFIER, IMAGE, MMLAB_MODELS
+from ..constants import (
+    CLIP_IMAGE_MEAN,
+    CLIP_IMAGE_STD,
+    IDENTIFIER,
+    IMAGE,
+    IMAGE_BYTEARRAY,
+    IMAGE_PATH,
+    MMDET_IMAGE,
+    MMLAB_MODELS,
+)
 from .collator import DictCollator
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 
@@ -150,7 +161,11 @@ def apply_df_preprocessor(
 
 
 def apply_data_processor(
-    per_sample_features: Dict, data_processors: Dict, feature_modalities: Dict, is_training: bool
+    per_sample_features: Dict,
+    data_processors: Dict,
+    feature_modalities: Dict,
+    is_training: bool,
+    load_only=False,
 ):
     """
     Process one sample's features.
@@ -163,6 +178,8 @@ def apply_data_processor(
         A dict of data processors.
     is_training
         Whether is training.
+    load_only
+        Whether to only load the data. Other processing steps may happen in dataset.__getitem__.
 
     Returns
     -------
@@ -174,7 +191,16 @@ def apply_data_processor(
             if per_modality in per_sample_features and per_sample_features[per_modality]:
                 sample_features.update(
                     per_model_processor(
-                        per_sample_features[per_modality], feature_modalities[per_modality], is_training=is_training
+                        per_sample_features[per_modality],
+                        feature_modalities[per_modality],
+                        is_training=is_training,
+                        load_only=load_only,
+                    )
+                    if per_model_processor.prefix.lower().startswith(MMDET_IMAGE)
+                    else per_model_processor(
+                        per_sample_features[per_modality],
+                        feature_modalities[per_modality],
+                        is_training=is_training,
                     )
                 )
 

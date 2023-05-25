@@ -9,8 +9,8 @@ class JupyterMixin:
     def display_obj(obj):
         display(obj)
 
-    def render_header_if_needed(self, state, header_text):
-        sample_size = state.get("sample_size", None)
+    def render_header_if_needed(self, state, header_text, ds=""):
+        sample_size = state.get("sample_size", {}).get(ds, None)
         if self.headers:
             sample_info = "" if sample_size is None else f" (sample size: {sample_size})"
             header = f"**{header_text}{sample_info}**"

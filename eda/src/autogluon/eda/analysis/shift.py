@@ -21,6 +21,25 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
     if your training set is not representative of your test set distribution.  This is done with a Classifier 2
     Sample Test.
 
+    State attributes
+
+    - `xshift_results.detection_status`:
+        bool, True if detected
+    - `xshift_results.test_statistic`: float
+        Classifier Two-Sample Test (C2ST) statistic. It is a measure how well a classifier distinguishes between the samples from the training and test sets.
+        If the classifier can accurately separate the samples, it suggests that the input distributions differ significantly, indicating the presence of
+        covariate shift. A C2ST value close to 0.5 implies that the classifier struggles to differentiate between the sets, indicating minimal covariate shift.
+        In contrast, a value significantly different from 0.5 suggests the presence of covariate shift, warranting further investigation and potential
+        adjustments to the model or data preprocessing.
+    - `xshift_results.pvalue`: float
+        p-value using permutation test
+    - `xshift_results.pvalue_threshold`: float,
+        decision boundary of p-value threshold
+    - `xshift_results.feature_importance`: DataFrame,
+        the feature importance dataframe, if computed
+    - `xshift_results.shift_features`
+        list of features whose contribution is statistically significant; only present if `xshift_results.detection_status = True`
+
     Parameters
     ----------
     classifier_class : an AutoGluon predictor, such as autogluon.tabular.TabularPredictor (default)
@@ -31,7 +50,7 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
         The threshold for the pvalue
     eval_metric : str, default = 'balanced_accuracy'
         The metric used for the C2ST, it must be one of the binary metrics from autogluon.core.metrics
-    sample_label : str, default = 'i2vkyc0p64'
+    sample_label : str, default = '__label__'
         The label internally used for the classifier 2 sample test, the only reason to change it is in the off chance
         that the default value is a column in the data.
     classifier_kwargs : dict, default = {}
@@ -43,15 +62,6 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
     test_size_2st: float, default = 0.3
         The size of the test set in the training test split in 2ST
 
-    State attributes
-    ----------------
-    state.xshift_results: outputs the results of XShift detection,
-        dict of
-            - 'detection_status': bool, True if detected
-            - 'test_statistic': float, the C2ST statistic
-            - 'pvalue': float, the p-value using permutation test
-            - 'pvalue_threshold': float, the decision p-value threshold
-            - 'feature_importance': DataFrame, the feature importance dataframe, if computed
     """
 
     def __init__(
@@ -60,7 +70,7 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
         compute_fi: bool = True,
         pvalue_thresh: float = 0.01,
         eval_metric: str = "roc_auc",
-        sample_label: str = "i2vkyc0p64",
+        sample_label: str = "__label__",
         classifier_kwargs: Optional[dict] = None,
         classifier_fit_kwargs: Optional[dict] = None,
         num_permutations: int = 1000,
@@ -124,14 +134,22 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
         else:
             fi_scores = None
         pvalue = self.C2ST.pvalue(num_permutations=self.num_permutations)
+
+        detection_status = bool(pvalue <= self.pvalue_thresh)  # numpy.bool_ -> bool
+
         state.xshift_results = {
-            "detection_status": bool(pvalue <= self.pvalue_thresh),  # numpy.bool_ -> bool
+            "detection_status": detection_status,
             "test_statistic": self.C2ST.test_stat,
             "pvalue": pvalue,
             "pvalue_threshold": self.pvalue_thresh,
             "eval_metric": self.eval_metric.name,
             "feature_importance": fi_scores,
         }
+
+        if detection_status:
+            fi_scores = fi_scores[fi_scores.p_value <= self.pvalue_thresh]
+            shift_features = fi_scores.index.tolist()
+            state.xshift_results["shift_features"] = shift_features
 
 
 def post_fit(func):

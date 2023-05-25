@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import copy
 import itertools
-import warnings
 from collections.abc import Iterable
-from typing import Any, Optional, Tuple, Type
+from typing import Any, List, Optional, Tuple, Type
 
 import numpy as np
 import pandas as pd
@@ -158,6 +157,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 value = value.loc[self.item_ids]
             # Avoid modifying static features inplace
             value = value.copy()
+            # TODO: If item_id is a column, set this column as index
             if value.index.name != ITEMID:
                 value.index.rename(ITEMID, inplace=True)
 
@@ -788,3 +788,71 @@ class TimeSeriesDataFrame(pd.DataFrame):
         # (used inside dropna) is not supported for TimeSeriesDataFrame
         dropped_df = pd.DataFrame(self).dropna(how=how)
         return TimeSeriesDataFrame(dropped_df, static_features=self.static_features)
+
+    def get_model_inputs_for_scoring(
+        self, prediction_length: int, known_covariates_names: Optional[List[str]] = None
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        """Prepare model inputs necessary to predict the last ``prediction_length`` time steps of each time series in the dataset.
+
+        Parameters
+        ----------
+        prediction_length : int
+            The forecast horizon, i.e., How many time steps into the future must be predicted.
+        known_covariates_names : List[str], optional
+            Names of the dataframe columns that contain covariates known in the future.
+            See :attr:`known_covariates_names` of :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
+
+        Returns
+        -------
+        past_data : TimeSeriesDataFrame
+            Data, where the last ``prediction_length`` time steps have been removed from the end of each time series.
+        known_covariates : TimeSeriesDataFrame or None
+            If ``known_covariates_names`` was provided, dataframe with the values of the known covariates during the
+            forecast horizon. Otherwise, ``None``.
+        """
+        past_data = self.slice_by_timestep(None, -prediction_length)
+        if known_covariates_names is not None and len(known_covariates_names) > 0:
+            future_data = self.slice_by_timestep(-prediction_length, None)
+            known_covariates = future_data[known_covariates_names]
+        else:
+            known_covariates = None
+        return past_data, known_covariates
+
+    def train_test_split(
+        self,
+        prediction_length: int,
+        end_index: Optional[int] = None,
+        suffix: Optional[str] = None,
+    ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
+        """Generate a train/test split from the given dataset.
+        This method can be used to generate splits for multi-window backtesting.
+
+        Parameters
+        ----------
+        prediction_length : int
+            Number of time steps in a single evaluation window.
+        end_index : int, optional
+            If given, all time series will be shortened up to ``end_idx`` before the train/test splitting. In other
+            words, test data will include the slice ``[:end_index]`` of each time series, and train data will include
+            the slice ``[:end_index - prediction_length]``.
+        suffix : str, optional
+            Suffix appended to all entries in the ``item_id`` index level.
+
+        Returns
+        -------
+        train_data : TimeSeriesDataFrame
+            Train portion of the data. Contains the slice ``[:-prediction_length]`` of each time series in ``test_data``.
+        test_data : TimeSeriesDataFrame
+            Test portion of the data. Contains the slice ``[:end_idx]`` of each time series in the original dataset.
+        """
+        test_data = self.slice_by_timestep(None, end_index)
+        train_data = test_data.slice_by_timestep(None, -prediction_length)
+
+        if suffix is not None:
+            for data in [train_data, test_data]:
+                new_item_id = data.index.levels[0].astype(str) + suffix
+                data.index = data.index.set_levels(levels=new_item_id, level=0)
+                if data.static_features is not None:
+                    data.static_features.index = data.static_features.index.astype(str)
+                    data.static_features.index += suffix
+        return train_data, test_data

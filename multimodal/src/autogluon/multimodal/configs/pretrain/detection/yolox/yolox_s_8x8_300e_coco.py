@@ -21,9 +21,37 @@ model = dict(
 data_root = "data/coco/"
 dataset_type = "CocoDataset"
 
-train_pipeline = [
+loading_pipeline = [
     dict(type="LoadImageFromFile"),
     dict(type="LoadAnnotations", with_bbox=True),
+]
+
+multi_image_mix_dataset = dict(
+    mosaic=dict(
+        img_scale=(640, 640),
+        center_ratio_range=(0.5, 1.5),
+        min_bbox_size=0,
+        bbox_clip_border=True,
+        skip_filter=True,
+        pad_val=114,
+        prob=0.5,
+    ),
+    mixup=dict(
+        img_scale=(640, 640),
+        ratio_range=(0.8, 1.6),
+        flip_ratio=0.5,
+        pad_val=114,
+        max_iters=15,
+        min_bbox_size=5,
+        min_area_ratio=0.2,
+        max_aspect_ratio=20,
+        bbox_clip_border=True,
+        skip_filter=True,
+        prob=0.5,
+    ),
+)
+
+train_pipeline = [
     dict(type="YOLOXHSVRandomAug"),
     dict(type="RandomFlip", flip_ratio=0.5),
     # According to the official implementation, multi-scale

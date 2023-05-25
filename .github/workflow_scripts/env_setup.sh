@@ -18,7 +18,6 @@ function setup_build_contrib_env {
 function setup_torch_gpu {
     # Security-patched torch.
     python3 -m pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
-    python3 -m pip install tensorrt==8.5.3.1 --timeout 60
 }
 
 function setup_torch_cpu {
@@ -48,12 +47,15 @@ function install_local_packages {
 }
 
 function install_multimodal {
+    source $(dirname "$0")/setup_mmcv.sh
+    source $(dirname "$0")/setup_groundingdino.sh
+    
     # launch different process for each test to make sure memory is released
     python3 -m pip install --upgrade pytest-xdist
     install_local_packages "multimodal/$1"
-    mim install mmcv-full --timeout 60
-    python3 -m pip install --upgrade mmdet
-    python3 -m pip install --upgrade mmocr
+    setup_mmcv
+    python3 -m pip install --upgrade "mmocr<1.0"
+    setup_groundingdino
 }
 
 function install_all {

@@ -7,7 +7,6 @@ from autogluon.timeseries import MXNET_INSTALLED
 if not MXNET_INSTALLED:
     pytest.skip(allow_module_level=True)
 from gluonts.mx.model.seq2seq import MQRNNEstimator
-from gluonts.mx.model.transformer import TransformerEstimator
 
 from autogluon.timeseries.models.gluonts.mx import (
     DeepARMXNetModel,
@@ -16,7 +15,6 @@ from autogluon.timeseries.models.gluonts.mx import (
     SimpleFeedForwardMXNetModel,
     TemporalFusionTransformerMXNetModel,
 )
-from autogluon.timeseries.models.gluonts.mx.models import GenericGluonTSMXNetModelFactory
 
 from ....common import DUMMY_TS_DATAFRAME
 
@@ -27,7 +25,6 @@ TESTABLE_MX_MODELS = [
     SimpleFeedForwardMXNetModel,
     # TransformerModel,
     partial(GenericGluonTSMXNetModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
-    GenericGluonTSMXNetModelFactory(TransformerEstimator),
     TemporalFusionTransformerMXNetModel,
 ]
 TESTABLE_MX_MODELS_WITH_STATIC_FEATURES = [

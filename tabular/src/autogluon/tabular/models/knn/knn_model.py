@@ -4,6 +4,8 @@ import numpy as np
 import math
 import time
 
+from typing import Dict, Union
+
 from autogluon.common.features.types import R_INT, R_FLOAT, S_BOOL
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
@@ -242,10 +244,16 @@ class KNNModel(AbstractModel):
             idx = set(idx)
             self._X_unused_index = [i for i in range(num_rows_max) if i not in idx]
         return self.model
+    
+    def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
+        # use at most 32 cpus to avoid OpenBLAS error: https://github.com/autogluon/autogluon/issues/1020
+        return {
+            "num_cpus": 32
+        }
 
     def _get_default_resources(self):
         # use at most 32 cpus to avoid OpenBLAS error: https://github.com/autogluon/autogluon/issues/1020
-        num_cpus = min(32, ResourceManager.get_cpu_count())
+        num_cpus = ResourceManager.get_cpu_count()
         num_gpus = 0
         return num_cpus, num_gpus
 

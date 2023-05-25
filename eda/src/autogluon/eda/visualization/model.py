@@ -182,20 +182,30 @@ class RegressionEvaluation(AbstractVisualization, JupyterMixin):
 
     def _render(self, state: AnalysisState) -> None:
         self.render_header_if_needed(state, "Prediction vs Target")
-        ev = state.model_evaluation
         res_plot_kwargs = self._get_plot_mode()
         fig, ax = plt.subplots(**self.fig_args)
+        y_pred_train, y_true_train, y_pred_test, y_true_test = RegressionEvaluation._repack_parameters(
+            state.model_evaluation
+        )
         residuals_plot(
             _YellowbrickAutoGluonWrapper(state.model),
-            ev.y_pred_train,
-            ev.y_true_train,
-            ev.y_pred,
-            ev.y_true,
+            y_pred_train,
+            y_true_train,
+            y_pred_test,
+            y_true_test,
             show=False,
             ax=ax,
             **res_plot_kwargs,
         )
         plt.show(fig)
+
+    @staticmethod
+    def _repack_parameters(ev):
+        y_pred_train = ev.y_pred_train if "y_pred_train" in ev else ev.y_pred_val
+        y_true_train = ev.y_true_train if "y_pred_train" in ev else ev.y_true_val
+        y_pred_test = ev.y_pred_test if "y_true_test" in ev else (ev.y_pred_val if "y_pred_train" in ev else None)
+        y_true_test = ev.y_true_test if "y_true_test" in ev else (ev.y_true_val if "y_pred_train" in ev else None)
+        return y_pred_train, y_true_train, y_pred_test, y_true_test
 
 
 class FeatureImportance(AbstractVisualization, JupyterMixin):

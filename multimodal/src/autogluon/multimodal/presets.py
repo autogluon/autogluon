@@ -293,6 +293,54 @@ def zero_shot_image_classification(presets: str = DEFAULT):
 
 
 @automm_presets.register()
+def open_vocabulary_object_detection(presets: str = DEFAULT):
+    """
+    Register the presets for open_vocabulary_object_detection.
+
+    Parameters
+    ----------
+    presets
+        The preset name.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
+    hyperparameters = {
+        "model.names": ["ovd"],  # TODO: update with more preset hps
+        "env.num_gpus": 1,  # TODO: add multi gpu support and remove this
+        "env.eval_batch_size_ratio": 1,
+    }
+    hyperparameter_tune_kwargs = {}
+
+    if presets in [DEFAULT, BEST_QUALITY]:
+        hyperparameters.update(
+            {
+                "model.ovd.checkpoint_name": "GroundingDINO_SwinB",
+            }
+        )
+    elif presets == HIGH_QUALITY:
+        hyperparameters.update(
+            {
+                "model.ovd.checkpoint_name": "GroundingDINO_SwinT_OGC",
+            }
+        )
+    elif presets == MEDIUM_QUALITY:
+        hyperparameters.update(
+            {
+                "model.ovd.checkpoint_name": "GroundingDINO_SwinT_OGC",
+            }
+        )
+    else:
+        raise ValueError(f"Unknown preset type: {presets}")
+
+    return hyperparameters, hyperparameter_tune_kwargs
+
+
+@automm_presets.register()
 def object_detection(presets: str = DEFAULT):
     """
     Register the presets for object_detection.
@@ -320,7 +368,7 @@ def object_detection(presets: str = DEFAULT):
         "env.per_gpu_batch_size": 8,  # Works on 8G GPU
         "env.num_workers": 2,
         "optimization.learning_rate": 1e-4,
-        "optimization.lr_decay": 0.90,
+        "optimization.lr_decay": 0.9,
         "optimization.lr_mult": 100,
         "optimization.lr_choice": "two_stages",
         "optimization.top_k": 1,
@@ -343,7 +391,6 @@ def object_detection(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "optimization.max_epochs": 30,
-                "optimization.lr_decay": 0.95,
                 "optimization.patience": 3,
                 "optimization.val_check_interval": 1.0,
                 "optimization.check_val_every_n_epoch": 3,
@@ -355,7 +402,6 @@ def object_detection(presets: str = DEFAULT):
                 "model.mmdet_image.checkpoint_name": "yolox_l_8x8_300e_coco",
                 "env.per_gpu_batch_size": 2,  # Works on 8G GPU
                 "optimization.learning_rate": 5e-5,
-                "optimization.lr_decay": 0.95,
                 "optimization.patience": 3,
                 "optimization.max_epochs": 50,
                 "optimization.val_check_interval": 1.0,
@@ -368,7 +414,6 @@ def object_detection(presets: str = DEFAULT):
                 "model.mmdet_image.checkpoint_name": "yolox_x_8x8_300e_coco",
                 "env.per_gpu_batch_size": 1,  # Works on 8G GPU
                 "optimization.learning_rate": 1e-5,
-                "optimization.lr_decay": 0.95,
                 "optimization.patience": 20,
                 "optimization.max_epochs": 50,
             }

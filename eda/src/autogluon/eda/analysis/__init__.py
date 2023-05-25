@@ -1,3 +1,4 @@
+from .anomaly import AnomalyDetector, AnomalyDetectorAnalysis
 from .base import Namespace
 from .dataset import (
     LabelInsightsAnalysis,

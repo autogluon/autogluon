@@ -18,6 +18,7 @@ def model_trial(
     val_path,
     time_start,
     hpo_executor,
+    is_bagged_model=False,
     reporter=None,  # reporter only used by custom strategy, hence optional
     time_limit=None,
     fit_kwargs=None,
@@ -26,7 +27,9 @@ def model_trial(
     `core.models.abstract.model_trial.model_trial` for timeseries models.
     """
     try:
-        model = init_model(args, model_cls, init_params, backend=hpo_executor.executor_type)
+        model = init_model(
+            args, model_cls, init_params, backend=hpo_executor.executor_type, is_bagged_model=is_bagged_model
+        )
         model.set_contexts(path_context=model.path_root + model.name + os.path.sep)
 
         train_data = load_pkl.load(train_path)
@@ -73,14 +76,11 @@ def fit_and_save_model(model, fit_kwargs, train_data, val_data, eval_metric, tim
 
     time_fit_start = time.time()
     model.fit(train_data=train_data, val_data=val_data, time_limit=time_left, **fit_kwargs)
-    time_fit_end = time.time()
-    model.val_score = model.score(val_data, eval_metric)
-    time_pred_end = time.time()
+    model.fit_time = time.time() - time_fit_start
+    model.score_and_cache_oof(val_data, store_val_score=True, store_predict_time=True)
 
     logger.debug(f"\tHyperparameter tune run: {model.name}")
     logger.debug(f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({eval_metric})")
-    model.fit_time = time_fit_end - time_fit_start
-    model.predict_time = time_pred_end - time_fit_end
     logger.debug(f"\t\t{model.fit_time:<7.3f} s".ljust(15) + "= Training runtime")
     logger.debug(f"\t\t{model.predict_time:<7.3f} s".ljust(15) + "= Training runtime")
     model.save()
