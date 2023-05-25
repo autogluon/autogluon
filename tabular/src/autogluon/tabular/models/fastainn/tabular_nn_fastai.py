@@ -463,9 +463,13 @@ class NNFastAiTabularModel(AbstractModel):
             import pathlib
             import platform
             plt = platform.system()
+            og_windows_path = None
             if plt != 'Windows':
+                og_windows_path = pathlib.WindowsPath
                 pathlib.WindowsPath = pathlib.PosixPath
             model.model = load_pkl.load_with_fn(f'{model.path}{model.model_internals_file_name}', lambda p: load_learner(p), verbose=verbose)
+            if og_windows_path is not None:
+                pathlib.WindowsPath = og_windows_path
         model._load_model = None
         return model
 
