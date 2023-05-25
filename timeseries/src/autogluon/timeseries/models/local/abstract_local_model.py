@@ -104,8 +104,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         self._local_model_args = self._update_local_model_args(local_model_args=local_model_args)
         self.time_limit = time_limit
-
-        logger.debug(f"{self.name} is a local model, so the model will be fit at prediction time.")
         return self
 
     def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
