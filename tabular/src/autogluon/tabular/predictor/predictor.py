@@ -18,7 +18,7 @@ from autogluon.common.savers import save_json
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.utils import setup_outputdir, get_autogluon_metadata, compare_autogluon_metadata
+from autogluon.common.utils.utils import setup_outputdir, get_autogluon_metadata, compare_autogluon_metadata, check_saved_predictor_version
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
@@ -250,7 +250,7 @@ class TabularPredictor:
     @property
     def eval_metric(self):
         return self._learner.eval_metric
-    
+
     @property
     def original_features(self) -> List[str]:
         """Original features user passed in to fit before processing"""
@@ -2082,9 +2082,9 @@ class TabularPredictor:
             If True, returned DataFrame will include two additional columns specifying confidence interval for the true underlying importance value of each feature.
             Increasing `subsample_size` and `num_shuffle_sets` will tighten the confidence interval.
         confidence_level: float, default = 0.99
-            This argument is only considered when `include_confidence_band` is True, and can be used to specify the confidence level used for constructing confidence intervals.  
+            This argument is only considered when `include_confidence_band` is True, and can be used to specify the confidence level used for constructing confidence intervals.
             For example, if `confidence_level` is set to 0.99, then the returned DataFrame will include columns 'p99_high' and 'p99_low' which indicates that the true feature importance will be between 'p99_high' and 'p99_low' 99% of the time (99% confidence interval).
-            More generally, if `confidence_level` = 0.XX, then the columns containing the XX% confidence interval will be named 'pXX_high' and 'pXX_low'. 
+            More generally, if `confidence_level` = 0.XX, then the columns containing the XX% confidence interval will be named 'pXX_high' and 'pXX_low'.
         silent : bool, default = False
             Whether to suppress logging output.
 
@@ -3157,43 +3157,35 @@ class TabularPredictor:
 
         try:
             from ..version import __version__
-            version_load = __version__
+            version_current = __version__
         except:
-            version_load = None
+            version_current = None
 
         path = setup_outputdir(path, warn_if_exist=False)  # replace ~ with absolute path if it exists
         try:
-            version_init = cls._load_version_file(path=path)
+            version_saved = cls._load_version_file(path=path)
         except:
             logger.warning(f'WARNING: Could not find version file at "{path + cls._predictor_version_file_name}".\n'
                            f'This means that the predictor was fit in a version `<=0.3.1`.')
-            version_init = None
+            version_saved = None
 
-        if version_init is None:
+        if version_saved is None:
             predictor = cls._load(path=path)
             try:
-                version_init = predictor._learner.version
+                version_saved = predictor._learner.version
             except:
-                version_init = None
+                version_saved = None
         else:
             predictor = None
-        if version_init is None:
-            version_init = 'Unknown (Likely <=0.0.11)'
-        if version_load != version_init:
-            logger.warning('')
-            logger.warning('############################## WARNING ##############################')
-            logger.warning('WARNING: AutoGluon version differs from the version used to create the predictor! '
-                           'This may lead to instability and it is highly recommended the predictor be loaded '
-                           'with the exact AutoGluon version it was created with.')
-            logger.warning(f'\tPredictor Version: {version_init}')
-            logger.warning(f'\tCurrent Version:   {version_load}')
-            logger.warning('############################## WARNING ##############################')
-            logger.warning('')
-            if require_version_match:
-                raise AssertionError(
-                    f'Predictor was created on version {version_init} but is being loaded with version {version_load}. '
-                    f'Please ensure the versions match to avoid instability. While it is NOT recommended, '
-                    f'this error can be bypassed by specifying `require_version_match=False`.')
+        if version_saved is None:
+            version_saved = 'Unknown (Likely <=0.0.11)'
+
+        check_saved_predictor_version(
+            version_current=version_current,
+            version_saved=version_saved,
+            require_version_match=require_version_match,
+            logger=logger,
+        )
 
         try:
             metadata_init = cls._load_metadata_file(path=path)

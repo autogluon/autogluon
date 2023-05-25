@@ -7,7 +7,6 @@ import mxnet as mx
 
 from autogluon.core.utils import warning_filter
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
-from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
 with warning_filter():
@@ -475,19 +474,3 @@ class GenericGluonTSMXNetModel(AbstractGluonTSMXNetModel):
         if get_mxnet_context() != mx.context.cpu():
             init_kwargs["hybridize"] = False
         return init_kwargs
-
-
-class GenericGluonTSMXNetModelFactory(AbstractTimeSeriesModelFactory):
-    """Factory class for GenericGluonTSModel for convenience of use"""
-
-    def __init__(self, gluonts_estimator_class: Type[GluonTSEstimator], **kwargs):
-        self.gluonts_estimator_class = gluonts_estimator_class
-        self.init_kwargs = kwargs
-
-    def __call__(self, **kwargs):
-        model_init_kwargs = self.init_kwargs.copy()
-        model_init_kwargs.update(kwargs)
-        return GenericGluonTSMXNetModel(
-            gluonts_estimator_class=self.gluonts_estimator_class,
-            **model_init_kwargs,
-        )

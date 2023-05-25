@@ -1,7 +1,7 @@
 import functools
 import inspect
 import warnings
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from packaging import version
 
@@ -38,7 +38,7 @@ def Deprecated(
     new: Optional[str] = None,
     custom_warning_msg: Optional[str] = None,
     version_to_remove: Optional[str] = None,
-    _mock_version: Optional[str] = None
+    _ag_version: Optional[str] = None,
 ):
     """
     Decorator to add deprecation warnings or raise an error to the decorated object.
@@ -95,8 +95,8 @@ def Deprecated(
     def _decorator(obj):
         error = False
         ag_version = __version__
-        if _mock_version is not None:
-            ag_version = _mock_version
+        if _ag_version is not None:
+            ag_version = _ag_version
         if version.parse(ag_version) < version.parse(min_version_to_warn):
             return obj
         if version.parse(ag_version) >= version.parse(min_version_to_error):
@@ -149,6 +149,7 @@ def _rename_kwargs(
                     f"{func_name} received both {old_name} and {new_name} as arguments."
                     f"{old_name} is deprecated, please use {new_name} instead."
                 )
+            print(error)
             _deprecation_warning(
                 old=old_name,
                 new=new_name,
@@ -166,7 +167,7 @@ def Deprecated_args(
     min_version_to_error: str,
     custom_warning_msg: Optional[str] = None,
     version_to_remove: Optional[str] = None,
-    _mock_version: Optional[str] = None,
+    _ag_version: Optional[str] = None,
     **kwargs_mapping,
 ):
     """
@@ -214,8 +215,8 @@ def Deprecated_args(
     def _decorator(obj):
         error = False
         ag_version = __version__
-        if _mock_version is not None:
-            ag_version = _mock_version
+        if _ag_version is not None:
+            ag_version = _ag_version
         if version.parse(ag_version) < version.parse(min_version_to_warn):
             return obj
         if version.parse(ag_version) >= version.parse(min_version_to_error):
@@ -234,5 +235,21 @@ def Deprecated_args(
             return obj(*args, **kwargs)
 
         return patched_obj_with_warning_msg
+
+    return _decorator
+
+
+def construct_deprecated_wrapper(ag_version) -> Callable:
+    """Return Deprecated decorator with ag_version as the local AG version for checking"""
+    def _decorator(*args, **kwargs):
+        return Deprecated(*args, _ag_version=ag_version, **kwargs)
+
+    return _decorator
+
+
+def construct_deprecated_args_wrapper(ag_version) -> Callable:
+    """Return Deprecated_args decorator with ag_version as the local AG version for checking"""
+    def _decorator(*args, **kwargs):
+        return Deprecated_args(*args, _ag_version=ag_version, **kwargs)
 
     return _decorator
