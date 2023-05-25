@@ -204,15 +204,10 @@ class TimeSeriesPredictor:
                 )
         if self.ignore_time_index:
             df = df.get_reindexed_view(freq="S")
-        timestamps = df.reset_index(level=TIMESTAMP)[TIMESTAMP]
-        is_sorted = timestamps.groupby(level=ITEMID, sort=False).apply(lambda x: x.is_monotonic_increasing).all()
-        if not is_sorted:
-            warnings.warn(
-                "Provided data contains timestamps that are not sorted chronologically. "
-                "This will lead to TimeSeriesPredictor not working as intended. "
-                "Please make sure that the timestamps are sorted in increasing order for all time series."
-            )
-        # TODO: Make sure that entries for each item_id are contiguous -> https://github.com/autogluon/autogluon/issues/3036
+        # MultiIndex.is_monotonic_increasing checks if index is sorted by ["item_id", "timestamp"]
+        if not df.index.is_monotonic_increasing:
+            df = df.sort_index()
+            df._cached_freq = None  # in case frequency was incorrectly cached as IRREGULAR_TIME_INDEX_FREQSTR
         if df.freq is None:
             raise ValueError(
                 "Frequency not provided and cannot be inferred. This is often due to the "
@@ -623,8 +618,11 @@ class TimeSeriesPredictor:
         """
         if random_seed is not None:
             set_random_seed(random_seed)
+        # Don't use data.item_ids in case data is not a TimeSeriesDataFrame
+        original_item_id_order = data.reset_index()[ITEMID].unique()
         data = self._check_and_prepare_data_frame(data)
-        return self._learner.predict(data, known_covariates=known_covariates, model=model)
+        predictions = self._learner.predict(data, known_covariates=known_covariates, model=model)
+        return predictions.reindex(original_item_id_order, level=ITEMID)
 
     def evaluate(self, data: Union[TimeSeriesDataFrame, pd.DataFrame], **kwargs):
         """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``

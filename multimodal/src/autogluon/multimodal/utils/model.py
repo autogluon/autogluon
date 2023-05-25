@@ -314,6 +314,7 @@ def create_model(
             classes=classes,
             pretrained=pretrained,
             output_bbox_format=OmegaConf.select(model_config, "output_bbox_format", default=XYXY),
+            frozen_layers=OmegaConf.select(model_config, "frozen_layers", default=None),
         )
     elif model_name.lower().startswith(OVD):
         model = OVDModel(

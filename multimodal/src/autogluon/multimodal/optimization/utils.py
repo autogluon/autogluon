@@ -629,6 +629,31 @@ def get_trainable_params_efficient_finetune(
     return trainable_param_names
 
 
+def remove_parameters_without_grad(
+    grouped_parameters: List[Dict],
+):
+    """
+    Remove layers
+
+    Parameters
+    ----------
+    grouped_parameters
+        The grouped parameters or their names output from lr_choice.
+
+    Returns
+    -------
+    The updated grouped parameters or their names.
+    """
+    for group_idx, group_param in enumerate(grouped_parameters):
+        updated_params = []
+        for p in group_param["params"]:
+            if p.requires_grad:
+                updated_params.append(p)
+        grouped_parameters[group_idx]["params"] = updated_params
+
+    return grouped_parameters
+
+
 def apply_layerwise_lr_decay(
     model: nn.Module,
     lr: float,

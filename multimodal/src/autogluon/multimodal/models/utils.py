@@ -733,3 +733,28 @@ def run_model(model: nn.Module, batch: dict, trt_model: Optional[nn.Module] = No
     else:
         output = model(batch)
     return output
+
+
+def freeze_model_layers(model, frozen_layers):
+    """
+    Freeze model layers with pattern in frozen_layers.
+
+    Parameters
+    ----------
+    model
+        The pytorch model.
+    frozen_layers
+        A list of substrings of frozen layers' names.
+
+        e.g. if frozen_layers = ["backbone", "neck"],
+            all layers including "backbone" or "neck" in the name will be frozen.
+    """
+
+    if not frozen_layers:
+        return
+
+    is_frozen_layer = lambda n: any(bb in n for bb in frozen_layers)
+
+    for n, p in model.named_parameters():
+        if is_frozen_layer(n):
+            p.requires_grad = False

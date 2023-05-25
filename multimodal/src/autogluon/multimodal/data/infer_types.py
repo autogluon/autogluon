@@ -9,6 +9,8 @@ import pandas as pd
 import PIL
 import pytesseract
 
+from autogluon.core.utils import infer_problem_type as infer_basic_problem_type
+
 from ..constants import (
     BINARY,
     CATEGORICAL,
@@ -566,6 +568,15 @@ def infer_column_types(
     if problem_type == NER:
         column_types = infer_ner_column_type(column_types=column_types)
 
+    if problem_type and label_columns:
+        column_types = infer_label_column_type_by_problem_type(
+            column_types=column_types,
+            label_columns=label_columns,
+            problem_type=problem_type,
+            data=data,
+            valid_data=valid_data if is_training else None,
+        )
+
     return column_types
 
 
@@ -623,10 +634,9 @@ def infer_label_column_type_by_problem_type(
         label_columns = [label_columns]
 
     for col_name in label_columns:
-        # Make sure the provided label columns are in the dataframe.
-        assert (
-            col_name in column_types
-        ), f"Column {col_name} is not in {column_types.keys()}. Make sure calling `infer_column_types()` first."
+        # For zero-shot inference, label column is unnecessary
+        if col_name not in column_types:
+            continue
         if data is not None:
             check_missing_values(data=data, column_name=col_name, split="training")
         if valid_data is not None:
@@ -660,27 +670,54 @@ def infer_rois_column_type(
     return column_types
 
 
-def infer_problem_type_output_shape(
-    label_column: str,
-    column_types: Optional[Dict] = None,
-    data: Optional[pd.DataFrame] = None,
+def infer_problem_type(
+    y_train_data: Optional[pd.DataFrame] = None,
     provided_problem_type: Optional[str] = None,
-) -> Tuple[str, int]:
+) -> str:
     """
-    Infer the problem type and output shape based on the label column type and training data.
+    Infer the basic (binary, multiclass, and regression) problem types if problem type is None or classification.
+    Only training data are used. Assume users provide valid validation data.
+
+    Parameters
+    ----------
+    y_train_data
+        The label column of training data.
+    provided_problem_type
+        Provided problem type
+
+    Returns
+    -------
+    Inferred problem type
+    """
+    if provided_problem_type in [None, CLASSIFICATION]:
+        problem_type = infer_basic_problem_type(y=y_train_data)
+        # trust users' prior knowledge
+        if provided_problem_type == CLASSIFICATION and problem_type == REGRESSION:
+            problem_type = MULTICLASS
+    else:
+        problem_type = provided_problem_type
+
+    return problem_type
+
+
+def infer_output_shape(
+    label_column: str,
+    problem_type: str,
+    data: pd.DataFrame,
+) -> int:
+    """
+    Infer the output shape based on the label column type, training data, and problem type.
     Binary classification should have class number 2, while multi-class classification's class
     number should be larger than 2. For regression, the output is restricted to 1 scalar.
 
     Parameters
     ----------
-    column_types
-        Types of columns in a multimodal pd.DataFrame.
     label_column
         The label column in a multimodal pd.DataFrame.
     data
         The multimodal pd.DataFrame for training.
-    provided_problem_type
-        The provided problem type.
+    problem_type
+        Problem type which can be inferred or provided.
 
     Returns
     -------
@@ -690,61 +727,38 @@ def infer_problem_type_output_shape(
         Shape of output.
     """
     if label_column is None:
-        return provided_problem_type, None
+        return None
 
-    if provided_problem_type is not None:
-        if provided_problem_type == MULTICLASS or provided_problem_type == BINARY:
-            class_num = len(data[label_column].unique())
-            err_msg = (
-                f"Provided problem type is '{provided_problem_type}' while the number of "
-                f"unique values in the label column is {class_num}."
-            )
-            if provided_problem_type == BINARY and class_num != 2:
+    if problem_type in [BINARY, MULTICLASS, REGRESSION, CLASSIFICATION]:
+        class_num = len(data[label_column].unique())
+        err_msg = (
+            f"Problem type is '{problem_type}' while the number of "
+            f"unique values in the label column is {class_num}."
+        )
+        if problem_type == BINARY:
+            if class_num != 2:
                 raise AssertionError(err_msg)
-            elif provided_problem_type == MULTICLASS and class_num <= 2:
+            return 2
+        elif problem_type == MULTICLASS:
+            if class_num <= 2:
                 raise AssertionError(err_msg)
-            return provided_problem_type, class_num
-        if provided_problem_type == BINARY:
-            return BINARY, 2
-        elif provided_problem_type == MULTICLASS:
-            class_num = len(data[label_column].value_counts())
-            return MULTICLASS, class_num
-        elif provided_problem_type == CLASSIFICATION:
-            class_num = len(data[label_column].value_counts())
-            if class_num == 2:
-                return BINARY, 2
-            else:
-                return MULTICLASS, class_num
-        elif provided_problem_type == REGRESSION:
-            return provided_problem_type, 1
-        elif provided_problem_type == NER:
-            return provided_problem_type, None
-        elif provided_problem_type == OBJECT_DETECTION:
-            return provided_problem_type, None
-        elif provided_problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
-            return provided_problem_type, None
+            return class_num
+        elif problem_type == REGRESSION:
+            if class_num < 1:
+                raise AssertionError(err_msg)
+            return 1
         else:
-            raise ValueError(
-                f"Problem type '{provided_problem_type}' doesn't have a valid output shape "
-                f"for training. The supported problem types are"
-                f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}',"
-                f" '{CLASSIFICATION}', '{NER}',"
-                f" '{OBJECT_DETECTION}', '{OPEN_VOCABULARY_OBJECT_DETECTION}'"
-            )
+            return class_num
+    elif problem_type in [NER, OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
+        return None
     else:
-        if column_types[label_column] == CATEGORICAL:
-            class_num = len(data[label_column].unique())
-            if class_num == 2:
-                return BINARY, 2
-            else:
-                return MULTICLASS, class_num
-        elif column_types[label_column] == NUMERICAL:
-            return REGRESSION, 1
-        else:
-            raise ValueError(
-                f"The label column '{label_column}' has type"
-                f" '{column_types[label_column]}', which is not supported yet."
-            )
+        raise ValueError(
+            f"Problem type '{problem_type}' doesn't have a valid output shape "
+            f"for training. The supported problem types are"
+            f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}',"
+            f" '{CLASSIFICATION}', '{NER}',"
+            f" '{OBJECT_DETECTION}', '{OPEN_VOCABULARY_OBJECT_DETECTION}'"
+        )
 
 
 def set_fallback_column_type(column_types: Dict, allowable_column_types: List[str], fallback_column_type: str) -> Dict:
