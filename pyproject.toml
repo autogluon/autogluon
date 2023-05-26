@@ -6,6 +6,7 @@ target-version = ['py38', 'py39', 'py310']
 known_first_party = "autogluon"
 known_third_party = [
     "gluonts",
+    "mxnet",
     "networkx",
     "numpy",
     "pandas",
