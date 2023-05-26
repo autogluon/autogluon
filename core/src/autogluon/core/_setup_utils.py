@@ -93,7 +93,7 @@ def create_version_file(*, version, submodule):
 
 
 def default_setup_args(*, version, submodule):
-    from setuptools import find_packages
+    from setuptools import find_namespace_packages
     long_description = open(os.path.join(AUTOGLUON_ROOT_PATH, 'README.md')).read()
     if submodule is None:
         name = PACKAGE_NAME
@@ -111,7 +111,7 @@ def default_setup_args(*, version, submodule):
         license_files=('../LICENSE', '../NOTICE'),
 
         # Package info
-        packages=find_packages('src'),
+        packages=find_namespace_packages('src', include=['autogluon.*']),
         package_dir={'': 'src'},
         namespace_packages=[AUTOGLUON],
         zip_safe=True,

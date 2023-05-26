@@ -71,8 +71,7 @@ def test_predictor_smoke_test(
         "SeasonalNaive": {},
         "ETS": DUMMY_MODEL_HPARAMS,
         "ARIMA": DUMMY_MODEL_HPARAMS,
-        "Theta": DUMMY_MODEL_HPARAMS,
-        "AutoGluonTabular": {},
+        "DirectTabular": {},
         "RecursiveTabular": {},
         "DeepAR": DUMMY_MODEL_HPARAMS,
         "SimpleFeedForward": DUMMY_MODEL_HPARAMS,
@@ -106,7 +105,9 @@ def test_predictor_smoke_test(
 
     known_covariates = test_data.slice_by_timestep(-prediction_length, None)[known_covariates_names]
     predictions = predictor.predict(train_data, known_covariates=known_covariates)
-    # Handle the case when ignore_time_index=True
-    future_test_data = predictor._check_and_prepare_data_frame(test_data).slice_by_timestep(-prediction_length, None)
+
+    if ignore_time_index:
+        test_data = test_data.get_reindexed_view(freq="S")
+    future_test_data = test_data.slice_by_timestep(-prediction_length, None)
 
     assert predictions.index.equals(future_test_data.index)

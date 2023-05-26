@@ -4,6 +4,8 @@ import shutil
 
 import yaml
 
+from autogluon.common.utils.context import set_torch_num_threads
+
 from ..constants import AUTOMM, BEST_K_MODELS_FILE, RAY_TUNE_CHECKPOINT
 from .matcher import create_siamese_model
 from .model import create_fusion_model
@@ -28,6 +30,9 @@ def hpo_trial(sampled_hyperparameters, predictor, checkpoint_dir=None, **_fit_ar
     """
     from ray import tune
 
+    resources = tune.get_trial_resources().required_resources
+    num_cpus = int(resources.get("CPU"))
+
     _fit_args[
         "hyperparameters"
     ] = sampled_hyperparameters  # The original hyperparameters is the search space, replace it with the hyperparameters sampled
@@ -36,7 +41,8 @@ def hpo_trial(sampled_hyperparameters, predictor, checkpoint_dir=None, **_fit_ar
     if checkpoint_dir is not None:
         _fit_args["resume"] = True
         _fit_args["ckpt_path"] = os.path.join(checkpoint_dir, RAY_TUNE_CHECKPOINT)
-    predictor._fit(**_fit_args)
+    with set_torch_num_threads(num_cpus=num_cpus):
+        predictor._fit(**_fit_args)
 
 
 def build_final_predictor(

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import autogluon.core as ag
+from autogluon.common import space
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
@@ -180,7 +180,7 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
     "hyperparameters",
     [
         {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
-        {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": ag.space.Int(1, 3)}},
+        {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": space.Int(1, 3)}},
     ],
 )
 def test_given_hp_spaces_and_custom_target_when_predictor_called_predictor_can_predict(
@@ -198,7 +198,7 @@ def test_given_hp_spaces_and_custom_target_when_predictor_called_predictor_can_p
         init_kwargs.update({"target": target_column})
 
     for hps in hyperparameters.values():
-        if any(isinstance(v, ag.Space) for v in hps.values()):
+        if any(isinstance(v, space.Space) for v in hps.values()):
             fit_kwargs.update(
                 {
                     "hyperparameter_tune_kwargs": {
@@ -465,7 +465,7 @@ def test_given_searchspace_and_no_hyperparameter_tune_kwargs_when_predictor_fits
     ):
         predictor.fit(
             train_data=DUMMY_TS_DATAFRAME,
-            hyperparameters={"SimpleFeedForward": {"epochs": ag.space.Categorical(1, 2)}},
+            hyperparameters={"SimpleFeedForward": {"epochs": space.Categorical(1, 2)}},
         )
 
 
@@ -475,7 +475,7 @@ def test_given_mixed_searchspace_and_hyperparameter_tune_kwargs_when_predictor_f
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"SimpleFeedForward": {"epochs": ag.space.Categorical(1, 2), "ETS": {}}},
+        hyperparameters={"SimpleFeedForward": {"epochs": space.Categorical(1, 2), "ETS": {}}},
         hyperparameter_tune_kwargs={
             "scheduler": "local",
             "searcher": "random",
@@ -585,6 +585,16 @@ def test_given_data_cannot_be_interpreted_as_tsdf_then_exception_raised(temp_mod
         predictor.fit(df, hyperparameters={"Naive": {}})
 
 
+def test_given_data_is_not_sorted_then_predictor_can_fit_and_predict(temp_model_path):
+    shuffled_df = pd.DataFrame(DUMMY_TS_DATAFRAME).sample(frac=1.0)
+    ts_df = TimeSeriesDataFrame(shuffled_df)
+
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=2)
+    predictor.fit(ts_df, hyperparameters={"Naive": {}})
+    predictions = predictor.predict(ts_df)
+    assert len(predictions) == predictor.prediction_length * ts_df.num_items
+
+
 def test_when_both_argument_aliases_are_passed_to_init_then_exception_is_raised(temp_model_path):
     with pytest.raises(ValueError, match="Please specify at most one of these arguments"):
         predictor = TimeSeriesPredictor(path=temp_model_path, target="custom_target", label="custom_target")
@@ -634,3 +644,17 @@ def test_when_refit_full_is_passed_to_fit_then_refit_full_is_skipped(temp_model_
             refit_method.assert_called()
         else:
             refit_method.assert_not_called()
+
+
+def test_when_excluded_model_names_provided_then_excluded_models_are_not_trained(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    predictor.fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters={
+            "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
+            "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
+        },
+        excluded_model_types=["DeepAR"],
+    )
+    leaderboard = predictor.leaderboard()
+    assert leaderboard["model"].values == ["SimpleFeedForward"]

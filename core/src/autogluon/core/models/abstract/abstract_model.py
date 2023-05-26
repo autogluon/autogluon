@@ -26,7 +26,7 @@ from autogluon.common.utils.distribute_utils import DistributedContext
 
 from .model_trial import model_trial, skip_hpo
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
-from ... import metrics, Space
+from ... import metrics
 from ...constants import AG_ARG_PREFIX, AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...hpo.exceptions import EmptySearchSpace
@@ -323,7 +323,7 @@ class AbstractModel:
     def _get_default_searchspace(self) -> dict:
         """
         Get the default hyperparameter searchspace of the model.
-        See `autogluon.core.space` for available space classes.
+        See `autogluon.common.space` for available space classes.
         Returns
         -------
         dict of hyperparameter search spaces.

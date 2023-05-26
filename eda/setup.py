@@ -15,7 +15,7 @@ spec.loader.exec_module(ag)  # type: ignore
 ###########################
 
 version = ag.load_version_file()
-version = ag.update_version(version, use_file_if_exists=False, create_file=True)
+version = ag.update_version(version)
 
 submodule = 'eda'
 install_requires = [

@@ -50,6 +50,7 @@ from ..constants import (
     NER_TOKEN_F1,
     NORM_FIT,
     OBJECT_DETECTION,
+    OPEN_VOCABULARY_OBJECT_DETECTION,
     OVERALL_ACCURACY,
     PAIR_MARGIN_MINER,
     PEARSONR,
@@ -120,7 +121,7 @@ def get_loss_func(
             loss_func = nn.MSELoss()
     elif problem_type == NER:
         loss_func = nn.CrossEntropyLoss(ignore_index=0)
-    elif problem_type == OBJECT_DETECTION:
+    elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
         return None
     elif problem_type is None:
         return None
@@ -626,6 +627,31 @@ def get_trainable_params_efficient_finetune(
         )
 
     return trainable_param_names
+
+
+def remove_parameters_without_grad(
+    grouped_parameters: List[Dict],
+):
+    """
+    Remove layers
+
+    Parameters
+    ----------
+    grouped_parameters
+        The grouped parameters or their names output from lr_choice.
+
+    Returns
+    -------
+    The updated grouped parameters or their names.
+    """
+    for group_idx, group_param in enumerate(grouped_parameters):
+        updated_params = []
+        for p in group_param["params"]:
+            if p.requires_grad:
+                updated_params.append(p)
+        grouped_parameters[group_idx]["params"] = updated_params
+
+    return grouped_parameters
 
 
 def apply_layerwise_lr_decay(

@@ -17,7 +17,6 @@ from pandas.tseries.frequencies import to_offset
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.utils import warning_filter
-from autogluon.core.utils.savers import save_pkl
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
@@ -224,11 +223,15 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         if "callbacks" in kwargs:
             self.callbacks += kwargs["callbacks"]
 
+    @property
+    def default_context_length(self) -> int:
+        return max(10, 2 * self.prediction_length)
+
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""
         args = super()._get_model_params().copy()
         args.setdefault("batch_size", 64)
-        args.setdefault("context_length", max(10, 2 * self.prediction_length))
+        args.setdefault("context_length", self.default_context_length)
         args.update(
             dict(
                 freq=self.freq,
@@ -387,12 +390,12 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             forecast_keys=["mean"] + quantile_keys,
             item_id=str(forecast.item_id),
         )
-        if isinstance(forecast.start_date, pd.Timestamp):  # GluonTS version is <0.10
-            forecast_init_args.update({"freq": forecast.freq})
         return QuantileForecast(**forecast_init_args)
 
     @staticmethod
-    def _distribution_to_quantile_forecast(forecast: SampleForecast, quantile_levels: List[float]) -> QuantileForecast:
+    def _distribution_to_quantile_forecast(
+        forecast: DistributionForecast, quantile_levels: List[float]
+    ) -> QuantileForecast:
         raise NotImplementedError
 
     def _gluonts_forecasts_to_data_frame(
@@ -401,7 +404,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         quantile_levels: List[float],
         forecast_index: pd.MultiIndex,
     ) -> TimeSeriesDataFrame:
-        # if predictions are gluonts SampleForecasts, convert to quantile forecasts
+        # TODO: Concatenate all forecasts into a single tensor/object before converting?
+        # Especially for DistributionForecast this could result in massive speedups
         if isinstance(forecasts[0], SampleForecast):
             forecasts = [self._sample_to_quantile_forecast(f, quantile_levels) for f in forecasts]
         elif isinstance(forecasts[0], DistributionForecast):

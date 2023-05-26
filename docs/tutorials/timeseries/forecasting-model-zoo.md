@@ -51,7 +51,7 @@ are different from the original libraries.
    AutoETSModel
    AutoARIMAModel
    DynamicOptimizedThetaModel
-   AutoGluonTabularModel
+   DirectTabularModel
    DeepARModel
    SimpleFeedForwardModel
    TemporalFusionTransformerModel
@@ -117,10 +117,10 @@ are different from the original libraries.
    :members: init
 ```
 
-### {hidden}`AutoGluonTabularModel`
+### {hidden}`DirectTabularModel`
 
 ```{eval-rst}
-.. autoclass:: AutoGluonTabularModel
+.. autoclass:: DirectTabularModel
    :members: init
 
 ```
@@ -129,6 +129,22 @@ are different from the original libraries.
 
 ```{eval-rst}
 .. autoclass:: DeepARModel
+   :members: init
+
+```
+
+### {hidden}`DLinearModel`
+
+```{eval-rst}
+.. autoclass:: DLinearModel
+   :members: init
+
+```
+
+### {hidden}`PatchTSTModel`
+
+```{eval-rst}
+.. autoclass:: PatchTSTModel
    :members: init
 
 ```
@@ -192,7 +208,7 @@ Models not included in this table currently do not support any additional featur
      - Static features (categorical)
      - Known covariates (continuous)
      - Past covariates (continuous)
-   * - :class:`~autogluon.timeseries.models.AutoGluonTabularModel`
+   * - :class:`~autogluon.timeseries.models.DirectTabularModel`
      - ✓
      - ✓
      - ✓

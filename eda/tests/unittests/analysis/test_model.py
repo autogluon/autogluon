@@ -42,7 +42,7 @@ def test_AutoGluonModelEvaluator_regression():
     assert state.model_evaluation.problem_type == REGRESSION
     assert len(state.model_evaluation.y_true_val) == len(df_val)
     assert len(state.model_evaluation.y_pred_val) == len(df_val)
-    expected = [c for c in df_train.columns if c not in ["Street", "Utilities", "SalePrice"]]
+    expected = [c for c in df_train.columns if c not in ["Street", "Utilities", "SalePrice", "PoolQC"]]
     assert sorted(state.model_evaluation.importance.index.to_list()) == sorted(expected)
     _assert_importance_is_present(state)
     assert state.model_evaluation.confusion_matrix is None
@@ -76,7 +76,7 @@ def test_AutoGluonModelEvaluator_regression__with_test_data():
     assert len(state.model_evaluation.y_pred_test) == len(df_test)
     assert len(state.model_evaluation.y_true_val) == len(df_val)
     assert len(state.model_evaluation.y_pred_val) == len(df_val)
-    expected = [c for c in df_train.columns if c not in ["Street", "Utilities", "SalePrice"]]
+    expected = [c for c in df_train.columns if c not in ["Street", "Utilities", "SalePrice", "PoolQC"]]
     assert sorted(state.model_evaluation.importance.index.to_list()) == sorted(expected)
     _assert_importance_is_present(state)
     assert state.model_evaluation.confusion_matrix is None

@@ -1,11 +1,30 @@
-from autogluon.common.utils.log_utils import _add_stream_handler 
+from  typing import Any
+from autogluon.common.utils.log_utils import _add_stream_handler
 
 from .dataset import TabularDataset
-from .space import Space, Categorical, Real, Int, Bool
 from . import metrics
 from . import constants
+from .space import Space, Categorical, Real, Int, Bool, spaces
+from .version import __version__
+
+
+import warnings
+
+# TODO: Remove deprecation warning for v1.0
+class DeprecatedSpacesWrapper:
+    def __getattr__(self, attr: str) -> Any:
+        from autogluon.common import space
+
+        if attr in spaces:
+            warnings.warn(
+                "Accessing search spaces as `autogluon.core.space` is deprecated as of v0.8 and won't be supported "
+                "in the next release. Please use `autogluon.common.space` instead.",
+                category=DeprecationWarning,
+            )
+            return getattr(space, attr)
+        else:
+            raise AttributeError
 
 
 _add_stream_handler()
-
-from .version import __version__
+space = DeprecatedSpacesWrapper()

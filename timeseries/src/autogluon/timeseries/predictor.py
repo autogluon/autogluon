@@ -1,18 +1,17 @@
 import logging
 import pprint
 import time
-import traceback
 import warnings
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, Union
 
 import pandas as pd
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.common.utils.utils import setup_outputdir
+from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_pkl
+from autogluon.core.utils.loaders import load_pkl, load_str
+from autogluon.core.utils.savers import save_pkl, save_str
+from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
@@ -105,6 +104,7 @@ class TimeSeriesPredictor:
     """
 
     predictor_file_name = "predictor.pkl"
+    _predictor_version_file_name = "__version__"
 
     def __init__(
         self,
@@ -149,7 +149,7 @@ class TimeSeriesPredictor:
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
         if quantile_levels is None:
             quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-        self.quantile_levels = quantile_levels
+        self.quantile_levels = sorted(quantile_levels)
 
         if validation_splitter is not None:
             warnings.warn(
@@ -204,15 +204,10 @@ class TimeSeriesPredictor:
                 )
         if self.ignore_time_index:
             df = df.get_reindexed_view(freq="S")
-        timestamps = df.reset_index(level=TIMESTAMP)[TIMESTAMP]
-        is_sorted = timestamps.groupby(level=ITEMID, sort=False).apply(lambda x: x.is_monotonic_increasing).all()
-        if not is_sorted:
-            warnings.warn(
-                "Provided data contains timestamps that are not sorted chronologically. "
-                "This will lead to TimeSeriesPredictor not working as intended. "
-                "Please make sure that the timestamps are sorted in increasing order for all time series."
-            )
-        # TODO: Make sure that entries for each item_id are contiguous -> https://github.com/autogluon/autogluon/issues/3036
+        # MultiIndex.is_monotonic_increasing checks if index is sorted by ["item_id", "timestamp"]
+        if not df.index.is_monotonic_increasing:
+            df = df.sort_index()
+            df._cached_freq = None  # in case frequency was incorrectly cached as IRREGULAR_TIME_INDEX_FREQSTR
         if df.freq is None:
             raise ValueError(
                 "Frequency not provided and cannot be inferred. This is often due to the "
@@ -291,6 +286,7 @@ class TimeSeriesPredictor:
         presets: Optional[str] = None,
         hyperparameters: Dict[Union[str, Type], Any] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
+        excluded_model_types: Optional[List[str]] = None,
         num_val_windows: int = 1,
         refit_full: bool = False,
         enable_ensemble: bool = True,
@@ -365,7 +361,7 @@ class TimeSeriesPredictor:
             Available presets:
 
             - ``"fast_training"``: fit simple "local" statistical models (``ETS``, ``ARIMA``, ``Theta``, ``Naive``, ``SeasonalNaive``). These models are fast to train, but cannot capture more complex patterns in the data.
-            - ``"medium_quality"``: all models mentioned above + tree-based model ``AutoGluonTabular`` + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
+            - ``"medium_quality"``: all models mentioned above + tree-based model ``DirectTabular`` + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
             - ``"high_quality"``: all models mentioned above + hyperparameter optimization for local statistical models + deep learning models ``TemporalFusionTransformerMXNet`` (if MXNet is available) and ``SimpleFeedForward``. Usually more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: all models mentioned above + deep learning model ``TransformerMXNet`` (if MXNet is available) + hyperparameter optimization for deep learning models. Usually better than ``high_quality``, but takes much longer to train.
 
@@ -378,7 +374,7 @@ class TimeSeriesPredictor:
             If str is passed, will use a preset hyperparameter configuration defined in`
             `autogluon/timeseries/trainer/models/presets.py``.
 
-            If dict is provided, the keys are strings or Types that indicate which models to train. Each value is
+            If dict is provided, the keys are strings or types that indicate which models to train. Each value is
             itself a dict containing hyperparameters for each of the trained models, or a list of such dicts. Any
             omitted hyperparameters not specified here will be set to default. For example::
 
@@ -405,14 +401,14 @@ class TimeSeriesPredictor:
             hyperparameter optimization is performed. A search space should only be provided when
             ``hyperparameter_tune_kwargs`` is given (i.e., hyperparameter-tuning is utilized). For example::
 
-                import autogluon.core as ag
+                from autogluon.common import space
 
                 predictor.fit(
                     ...
                     hyperparameters={
                         "DeepAR": {
-                            "hidden_size": ag.space.Int(20, 100),
-                            "dropout_rate": ag.space.Categorical(0.1, 0.3),
+                            "hidden_size": space.Int(20, 100),
+                            "dropout_rate": space.Categorical(0.1, 0.3),
                         },
                     },
                     hyperparameter_tune_kwargs="auto",
@@ -446,7 +442,16 @@ class TimeSeriesPredictor:
                         "scheduler": "local",
                         "searcher": "auto",
                         "num_trials": 5,
-                    }
+                    },
+                )
+        excluded_model_types: List[str], optional
+            Banned subset of model types to avoid training during ``fit()``, even if present in ``hyperparameters``.
+            For example, the following code will train all models included in the ``high_quality`` presets except ``DeepAR``::
+
+                predictor.fit(
+                    ...,
+                    presets="high_quality",
+                    excluded_model_types=["DeepAR"],
                 )
         num_val_windows : int, default = 1
             Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
@@ -488,6 +493,7 @@ class TimeSeriesPredictor:
             evaluation_metric=self.eval_metric,
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            excluded_model_types=excluded_model_types,
             num_val_windows=num_val_windows,
             enable_ensemble=enable_ensemble,
             random_seed=random_seed,
@@ -525,6 +531,7 @@ class TimeSeriesPredictor:
             val_data=tuning_data,
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            excluded_model_types=excluded_model_types,
             time_limit=time_left,
             verbosity=verbosity,
             num_val_windows=num_val_windows,
@@ -549,7 +556,6 @@ class TimeSeriesPredictor:
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[str] = None,
         random_seed: Optional[int] = 123,
-        **kwargs,
     ) -> TimeSeriesDataFrame:
         """Return quantile and mean forecasts for the given dataset, starting from the end of each time series.
 
@@ -603,25 +609,20 @@ class TimeSeriesPredictor:
         B       2020-03-04          0    5.0
                 2020-03-05          0    7.0
         >>> predictor.predict(data, known_covariates=future_known_covariates)
-                            target
+                              mean
         item_id timestamp
-        A       2020-01-08      30
-                2020-01-09      27
-        B       2020-03-04      17
-                2020-03-05       8
+        A       2020-01-08    30.2
+                2020-01-09    27.0
+        B       2020-03-04    17.1
+                2020-03-05     8.3
         """
-        if "quantile_levels" in kwargs:
-            warnings.warn(
-                "Passing `quantile_levels` as a keyword argument to `TimeSeriesPredictor.predict` is deprecated as of "
-                "v0.7. This argument is ignored. Please specify the desired quantile levels when creating the "
-                "predictor as `TimeSeriesPredictor(..., quantile_levels=quantile_levels)`.",
-                category=DeprecationWarning,
-            )
-            kwargs.pop("quantile_levels")
         if random_seed is not None:
             set_random_seed(random_seed)
+        # Don't use data.item_ids in case data is not a TimeSeriesDataFrame
+        original_item_id_order = data.reset_index()[ITEMID].unique()
         data = self._check_and_prepare_data_frame(data)
-        return self._learner.predict(data, known_covariates=known_covariates, model=model, **kwargs)
+        predictions = self._learner.predict(data, known_covariates=known_covariates, model=model)
+        return predictions.reindex(original_item_id_order, level=ITEMID)
 
     def evaluate(self, data: Union[TimeSeriesDataFrame, pd.DataFrame], **kwargs):
         """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``
@@ -664,13 +665,24 @@ class TimeSeriesPredictor:
         return self.evaluate(data, **kwargs)
 
     @classmethod
-    def load(cls, path: str) -> "TimeSeriesPredictor":
+    def _load_version_file(cls, path: str) -> str:
+        version_file_path = path + cls._predictor_version_file_name
+        version = load_str.load(path=version_file_path)
+        return version
+
+    @classmethod
+    def load(cls, path: str, require_version_match: bool = True) -> "TimeSeriesPredictor":
         """Load an existing ``TimeSeriesPredictor`` from given ``path``.
 
         Parameters
         ----------
         path : str
             Path where the predictor was saved via :meth:`~autogluon.timeseries.TimeSeriesPredictor.save`.
+        require_version_match : bool, default = True
+            If True, will raise an AssertionError if the ``autogluon.timeseries`` version of the loaded predictor does
+            not match the installed version of ``autogluon.timeseries``.
+            If False, will allow loading of models trained on incompatible versions, but is NOT recommended. Users may
+            run into numerous issues if attempting this.
 
         Returns
         -------
@@ -680,12 +692,33 @@ class TimeSeriesPredictor:
             raise ValueError("`path` cannot be None or empty in load().")
         path = setup_outputdir(path, warn_if_exist=False)
 
+        try:
+            version_saved = cls._load_version_file(path=path)
+        except:
+            logger.warning(
+                f'WARNING: Could not find version file at "{path + cls._predictor_version_file_name}".\n'
+                f"This means that the predictor was fit in a version `<=0.7.0`."
+            )
+            version_saved = "Unknown (Likely <=0.7.0)"
+
+        check_saved_predictor_version(
+            version_current=current_ag_version,
+            version_saved=version_saved,
+            require_version_match=require_version_match,
+            logger=logger,
+        )
+
         logger.info(f"Loading predictor from path {path}")
         learner = AbstractLearner.load(path)
         predictor = load_pkl.load(path=learner.path + cls.predictor_file_name)
         predictor._learner = learner
         predictor.path = learner.path
         return predictor
+
+    def _save_version_file(self):
+        version_file_contents = current_ag_version
+        version_file_path = self.path + self._predictor_version_file_name
+        save_str.save(path=version_file_path, data=version_file_contents, verbose=False)
 
     def save(self) -> None:
         """Save this predictor to file in directory specified by this Predictor's ``path``.
@@ -697,6 +730,7 @@ class TimeSeriesPredictor:
         self._learner = None
         save_pkl.save(path=tmp_learner.path + self.predictor_file_name, object=self)
         self._learner = tmp_learner
+        self._save_version_file()
 
     def info(self) -> Dict[str, Any]:
         """Returns a dictionary of objects each describing an attribute of the training process and trained models."""

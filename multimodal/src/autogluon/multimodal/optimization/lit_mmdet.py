@@ -20,7 +20,14 @@ except ImportError as e:
 
 from ..constants import AUTOMM, IMAGE, LABEL
 from ..utils import unpack_datacontainers
-from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
+from .utils import (
+    apply_layerwise_lr_decay,
+    apply_single_lr,
+    apply_two_stages_lr,
+    get_lr_scheduler,
+    get_optimizer,
+    remove_parameters_without_grad,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -263,7 +270,6 @@ class MMDetLitModule(pl.LightningModule):
         [sched]
             Learning rate scheduler.
         """
-        # TODO: add freeze layer and different lr for head and backbone.
         kwargs = dict(
             model=self.model,
             lr=self.hparams.lr,
@@ -287,6 +293,8 @@ class MMDetLitModule(pl.LightningModule):
             grouped_parameters = apply_single_lr(
                 **kwargs,
             )
+
+        grouped_parameters = remove_parameters_without_grad(grouped_parameters=grouped_parameters)
 
         optimizer = get_optimizer(
             optim_type=self.hparams.optim_type,

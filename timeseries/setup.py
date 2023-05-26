@@ -28,7 +28,7 @@ install_requires = [
     "scipy",  # version range defined in `core/_setup_utils.py`
     "pandas",  # version range defined in `core/_setup_utils.py`
     "statsmodels>=0.13.0,<0.14",
-    "gluonts>=0.12.4,<0.13",
+    "gluonts>=0.13.1,<0.14",
     "torch>=1.11,<2.1",
     "pytorch-lightning>=2.0.0,<2.1",
     "networkx",  # version range defined in `core/_setup_utils.py`

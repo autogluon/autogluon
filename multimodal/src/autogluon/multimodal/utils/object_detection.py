@@ -26,6 +26,7 @@ from ..constants import (
     MAR_SMALL,
     MEAN_AVERAGE_PRECISION,
     OBJECT_DETECTION,
+    OPEN_VOCABULARY_OBJECT_DETECTION,
 )
 from .download import download, is_url
 from .inference import predict
@@ -479,6 +480,85 @@ def bbox_xywh_to_xyxy(xywh: Optional[Union[list, tuple, np.ndarray]]):
             raise IndexError("Bounding boxes must have n * 4 elements, given {}".format(xywh.shape))
         xyxy = np.hstack((xywh[:, :2], xywh[:, :2] + np.maximum(0, xywh[:, 2:4] - 1)))
         return xyxy
+    else:
+        raise TypeError("Expect input xywh a list, tuple or numpy.ndarray, given {}".format(type(xywh)))
+
+
+def bbox_ratio_xywh_to_index_xyxy(
+    xywh: Optional[Union[list, tuple, np.ndarray]], image_wh: Optional[Union[list, tuple, np.ndarray]]
+):
+    """
+    Convert bounding boxes from format (x_center_ratio, y_center_ratio, w_ratio, h_ratio) to (xmin, ymin, xmax, ymax) in pixel index.
+
+    Parameters
+    ----------
+    xywh
+        The bbox in format (x_center_ratio, y_center_ratio, w_ratio, h_ratio).
+        If numpy.ndarray is provided, we expect multiple bounding boxes with
+        shape `(N, 4)`.
+
+    Returns
+    -------
+    A tuple or numpy.ndarray.
+    The converted bboxes in format (xmin, ymin, xmax, ymax).
+    If input is numpy.ndarray, return is numpy.ndarray correspondingly.
+    """
+    if isinstance(xywh, (tuple, list)):
+        assert isinstance(
+            image_wh, (tuple, list)
+        ), f"image_wh (type: {type(image_wh)} should have the same type with xywh (type: {type(xywh)})"
+
+        if not len(xywh) == 4:
+            raise IndexError("Bounding boxes must have 4 elements, given {}".format(len(xywh)))
+        if not len(image_wh) == 2:
+            raise IndexError("Image Width and Height must have 2 elements, given {}".format(len(image_wh)))
+
+        x, y = xywh[:2]
+        w, h = np.maximum(xywh[2] - 1, 0), np.maximum(xywh[3] - 1, 0)
+        W, H = np.maximum(image_wh[0] - 1, 0), np.maximum(image_wh[1] - 1, 0)
+
+        # ratio to index
+        x *= W
+        y *= H
+        W *= W
+        H *= H
+
+        # mid to upper left corner
+        x -= W / 2
+        y -= H / 2
+
+        return x, y, x + w, y + h  # xywh to xyxy
+    elif isinstance(xywh, np.ndarray):
+        if isinstance(image_wh, np.ndarray):
+
+            if not xywh.size % 4 == 0:
+                raise IndexError("Bounding boxes must have n * 4 elements, given {}".format(xywh.shape))
+            if not image_wh.size % 2 == 0:
+                raise IndexError("Image Width and Height must have n * 2 elements, given {}".format(image_wh.shape))
+
+            xywh = xywh * np.concat([image_wh, image_wh], axis=1)  # ratio to index
+
+            # mid to upper left corner
+            xywh[:, :2] -= xywh[:, 2:] / 2
+
+            # xywh to xyxy
+            xyxy = np.hstack((xywh[:, :2], xywh[:, :2] + np.maximum(0, xywh[:, 2:] - 1)))
+            return xyxy
+        elif isinstance(image_wh, (tuple, list)):
+
+            if not xywh.size % 4 == 0:
+                raise IndexError("Bounding boxes must have n * 4 elements, given {}".format(xywh.shape))
+
+            W, H = np.maximum(image_wh[0] - 1, 0), np.maximum(image_wh[1] - 1, 0)
+
+            xywh = xywh * np.array([[W, H, W, H]])  # ratio to index
+
+            # mid to upper left corner
+            xywh[:, :2] -= xywh[:, 2:] / 2
+
+            # xywh to xyxy
+            xyxy = np.hstack((xywh[:, :2], xywh[:, :2] + np.maximum(0, xywh[:, 2:] - 1)))
+            return xyxy
     else:
         raise TypeError("Expect input xywh a list, tuple or numpy.ndarray, given {}".format(type(xywh)))
 
@@ -1499,8 +1579,10 @@ def evaluate_coco(
     eval_tool
         The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
     """
-    assert predictor._problem_type == OBJECT_DETECTION, (
-        f"predictor.evaluate_coco() is only supported when problem_type is {OBJECT_DETECTION}. "
+    assert (
+        predictor._problem_type == OBJECT_DETECTION or predictor._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION
+    ), (
+        f"predictor.evaluate_coco() is only supported when problem_type is {OBJECT_DETECTION} or {OPEN_VOCABULARY_OBJECT_DETECTION}. "
         f"Received problem_type={predictor._problem_type}."
     )
     if isinstance(anno_file_or_df, str):

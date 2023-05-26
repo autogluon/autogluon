@@ -371,3 +371,36 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
     test_df = from_coco_or_voc(test_path)
     preds = predictor.predict(data=test_df)
     results = predictor.evaluate(data=test_df)
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "yolov3_mobilenetv2_320_300e_coco",
+    ],
+)
+def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
+    data_dir = download_sample_dataset()
+
+    train_path = os.path.join(data_dir, "Annotations", "trainval_cocoformat.json")
+    test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
+    # Init predictor
+    train_df = from_coco_or_voc(train_path)
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "model.mmdet_image.frozen_layers": ["backbone"],
+            "env.num_gpus": 1,
+        },
+        problem_type="object_detection",
+        sample_data_path=train_df,
+    )
+
+    predictor.fit(
+        train_df,
+        hyperparameters={
+            "optimization.learning_rate": 2e-4,
+            "env.per_gpu_batch_size": 2,
+        },
+        time_limit=30,
+    )
