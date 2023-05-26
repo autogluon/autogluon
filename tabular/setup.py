@@ -34,6 +34,8 @@ extras_require = {
         'lightgbm>=3.3,<3.4',
     ],
     'catboost': [
+        # https://github.com/autogluon/autogluon/pull/3190#issuecomment-1540599280
+        'catboost>=1.1,<1.2 ; python_version <= "3.8" and sys_platform == "darwin"',
         'catboost>=1.1,<1.3',
     ],
     # FIXME: Debug why xgboost 1.6 has 4x+ slower inference on multiclass datasets compared to 1.4
