@@ -12,7 +12,6 @@ from autogluon.core.utils.loaders import load_pd
 from ..constants import BBOX, MULTI_IMAGE_MIX_DATASET, OBJECT_DETECTION, XYWH
 from ..data.datamodule import BaseDataModule
 from ..data.dataset_mmlab import MultiImageMixDataset
-from ..data.infer_types import infer_problem_type_output_shape
 from ..optimization.lit_mmdet import MMDetLitModule
 from ..utils.object_detection import (
     convert_pred_to_xywh,
