@@ -771,6 +771,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             for model_name in model_names:
                 model_preds = model_predictions[model_name]
                 if model_preds is None:
+                    # Model failed at prediction time
                     model_info[model_name]["score_test"] = float("nan")
                     model_info[model_name]["pred_time_test"] = float("nan")
                 else:
@@ -947,9 +948,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     pred_time_dict_marginal[model_name] = time.time() - predict_start_time
                 except Exception as e:
                     if raise_exception_if_failed:
-                        raise e from None
+                        raise RuntimeError(f"Model {model_name} failed to predict")
                     else:
-                        logger.error(f"Model {model_name} failed to predict with following exception:")
+                        logger.error(f"Model {model_name} failed to predict with the following exception:")
                         logger.error(traceback.format_exc())
                         model_pred_dict[model_name] = None
                         pred_time_dict_marginal[model_name] = None

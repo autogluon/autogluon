@@ -194,10 +194,7 @@ class TimeSeriesLearner(AbstractLearner):
         data = self.feature_generator.transform(data)
         known_covariates = self.feature_generator.transform_future_known_covariates(known_covariates)
         known_covariates = self._align_covariates_with_forecast_index(known_covariates=known_covariates, data=data)
-        prediction = self.load_trainer().predict(data=data, known_covariates=known_covariates, model=model, **kwargs)
-        if prediction is None:
-            raise RuntimeError("Prediction failed, please provide a different model to the `predict` method.")
-        return prediction
+        return self.load_trainer().predict(data=data, known_covariates=known_covariates, model=model, **kwargs)
 
     def score(
         self, data: TimeSeriesDataFrame, model: AbstractTimeSeriesModel = None, metric: Optional[str] = None
