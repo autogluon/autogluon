@@ -17,7 +17,7 @@ This section provides an overview on how AutoGluon can be trained and deployed o
   A tutorial on using AutoGluon Cloud module to train/deploy AutoGluon backed models on SageMaker.
 :::
 
-:::{grid-item-card} Cloud Training and Deployments with Amazon SageMaker
+:::{grid-item-card} Cloud Training and Deployment with Amazon SageMaker
   :link: cloud-aws-sagemaker-train-deploy.html
 
   A tutorial on fitting an AutoGluon model using AWS SageMaker.
@@ -40,6 +40,6 @@ hidden: true
 AutoGluon Cloud <autogluon-cloud>
 AutoGluon Tabular on SageMaker AutoPilot <autopilot-autogluon>
 Deploy AutoGluon Models on Severless Templates <cloud-aws-lambda-deployment>
-Cloud Training and Deployments with Amazon SageMaker <cloud-aws-sagemaker-train-deploy>
+Cloud Training and Deployment with Amazon SageMaker <cloud-aws-sagemaker-train-deploy>
 ```
 
