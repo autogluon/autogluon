@@ -12,11 +12,11 @@ Yes!
 
 ## Can I use GPUs for model training?
 
-Yes! Most of the models used by AutoGluon support GPU training, including LightGBM, CatBoost, XGBoost, MXNet Neural Network, and FastAI Neural Network.
+Yes! Most of the models used by AutoGluon support GPU training, including LightGBM, CatBoost, XGBoost and FastAI Neural Network.
 
 To enable GPU training, specify in [predictor.fit](../../api/autogluon.tabular.TabularPredictor.fit.rst) the argument `num_gpus=SOME_VALUE`. This will enable GPU training for all models that support it. Multi-GPU training is still experimental.
 
-For most of these models, CUDA will have to be installed and some models may need special installations such as LightGBM and MXNet to be compatible with GPU training. Refer to [installation instructions](../../install.md) for more details.
+For most of these models, CUDA will have to be installed and some models may need special installations such as LightGBM to be compatible with GPU training. Refer to [installation instructions](../../install.md) for more details.
 
 
 ## What machine is best for running AutoGluon Tabular?

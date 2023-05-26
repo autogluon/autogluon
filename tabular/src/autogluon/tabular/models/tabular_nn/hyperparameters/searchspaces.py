@@ -24,7 +24,7 @@ def get_default_searchspace(problem_type, framework, num_classes=None):
         'hidden_size': space.Categorical(128, 256, 512),
         'activation': space.Categorical('relu', 'elu'),
     }
-    params = merge_framework_params(framework=framework, shared_params=params, mxnet_params=mxnet_params, pytorch_params=pytorch_params)
+    params = merge_framework_params(framework=framework, shared_params=params, pytorch_params=pytorch_params)
     if problem_type == QUANTILE:
         problem_params =  get_searchspace_quantile(framework)
     elif problem_type == BINARY:
