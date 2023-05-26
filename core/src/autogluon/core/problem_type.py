@@ -5,8 +5,23 @@ from .constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 __all__ = ['problem_type_info']
 
 
+# Note to developers: This is a free-form class. If you need additional parameters, add them.
 class ProblemType:
-    """Simple class that holds information on what a problem type is capable of doing"""
+    """
+    Simple class that holds information on what a problem type is capable of doing.
+
+    Parameters
+    ----------
+    can_predict : bool
+        Whether models for this problem type have the ability to predict via `model.predict(...)`.
+    can_predict_proba : bool
+        Whether models for this problem type have the ability to predict probabilities via `model.predict_proba(...)`.
+    is_classification : bool
+        Whether this is considered a classification problem type.
+        For example:
+            `binary`, `multiclass`, and `softclass` are considered classification problem types.
+            `regression` and `quantile` are not considered classification problem types.
+    """
     def __init__(self,
                  can_predict: bool,
                  can_predict_proba: bool,
