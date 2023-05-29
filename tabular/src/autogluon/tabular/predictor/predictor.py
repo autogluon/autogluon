@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import inspect
 import logging
@@ -22,6 +24,7 @@ from autogluon.common.utils.utils import setup_outputdir, get_autogluon_metadata
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
+from autogluon.core.metrics import Scorer
 from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
@@ -1431,12 +1434,12 @@ class TabularPredictor:
                                             **fit_extra_kwargs)
 
     def predict(self,
-                data,
-                model=None,
-                as_pandas=True,
-                transform_features=True,
+                data: str | TabularDataset | pd.DataFrame,
+                model: str | None = None,
+                as_pandas: bool = True,
+                transform_features: bool = True,
                 *,
-                decision_threshold: float = None):
+                decision_threshold: float | None = None):
         """
         Use trained models to produce predictions of `label` column values for new data.
 
@@ -1474,7 +1477,12 @@ class TabularPredictor:
             decision_threshold = self.decision_threshold
         return self._learner.predict(X=data, model=model, as_pandas=as_pandas, transform_features=transform_features, decision_threshold=decision_threshold)
 
-    def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=True, transform_features=True):
+    def predict_proba(self,
+                      data: str | TabularDataset | pd.DataFrame,
+                      model: str | None = None,
+                      as_pandas: bool = True,
+                      as_multiclass: bool = True,
+                      transform_features: bool = True):
         """
         Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
         If `predictor.problem_type` is regression or quantile, this will raise an AssertionError.
@@ -1518,8 +1526,8 @@ class TabularPredictor:
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass, transform_features=transform_features)
 
     def get_pred_from_proba(self,
-                            y_pred_proba: Union[pd.DataFrame, np.ndarray],
-                            decision_threshold: float = None) -> Union[pd.Series, np.array]:
+                            y_pred_proba: pd.DataFrame | np.ndarray,
+                            decision_threshold: float | None = None) -> pd.Series | np.array:
         """
         Given prediction probabilities, convert to predictions.
 
@@ -1654,10 +1662,10 @@ class TabularPredictor:
                                                   auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
     def leaderboard(self,
-                    data=None,
+                    data: str | TabularDataset | pd.DataFrame | None = None,
                     extra_info: bool = False,
-                    extra_metrics: list = None,
-                    decision_threshold: float = None,
+                    extra_metrics: list | None = None,
+                    decision_threshold: float | None = None,
                     only_pareto_frontier: bool = False,
                     skip_score: bool = False,
                     silent: bool = False) -> pd.DataFrame:
@@ -2644,10 +2652,10 @@ class TabularPredictor:
         return models
 
     def calibrate_decision_threshold(self,
-                                     data: Union[str, pd.DataFrame] = None,
-                                     metric=None,
+                                     data: str | TabularDataset | pd.DataFrame | None = None,
+                                     metric: str | Scorer | None = None,
                                      model: str = 'best',
-                                     decision_thresholds: Union[int, List[float]] = 50,
+                                     decision_thresholds: int | List[float] = 50,
                                      verbose: bool = True) -> float:
         """
         Calibrate the decision threshold in binary classification to optimize a given metric.

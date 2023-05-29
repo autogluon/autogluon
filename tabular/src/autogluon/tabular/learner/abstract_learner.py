@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import json
 import logging
@@ -13,7 +15,7 @@ from sklearn.metrics import classification_report
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
 from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from autogluon.core.learner import AbstractLearner
-from autogluon.core.metrics import confusion_matrix, get_metric
+from autogluon.core.metrics import confusion_matrix, get_metric, Scorer
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes, extract_column, compute_weighted_metric
 from autogluon.core.utils import get_pred_from_proba, get_pred_from_proba_df, infer_problem_type
@@ -132,7 +134,13 @@ class AbstractTabularLearner(AbstractLearner):
              feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2):
         raise NotImplementedError
 
-    def predict_proba(self, X: DataFrame, model=None, as_pandas=True, as_multiclass=True, inverse_transform=True, transform_features=True):
+    def predict_proba(self,
+                      X: DataFrame,
+                      model: str | None = None,
+                      as_pandas: bool = True,
+                      as_multiclass: bool = True,
+                      inverse_transform: bool = True,
+                      transform_features: bool = True):
         X_index = copy.deepcopy(X.index) if as_pandas else None
         if X.empty:
             y_pred_proba = np.array([])
@@ -149,12 +157,12 @@ class AbstractTabularLearner(AbstractLearner):
 
     def predict(self,
                 X: DataFrame,
-                model=None,
-                as_pandas=True,
-                inverse_transform=True,
-                transform_features=True,
+                model: str | None = None,
+                as_pandas: bool = True,
+                inverse_transform: bool = True,
+                transform_features: bool = True,
                 *,
-                decision_threshold: float = None,
+                decision_threshold: float | None = None,
                 ):
         if decision_threshold is None:
             decision_threshold = 0.5
@@ -323,9 +331,9 @@ class AbstractTabularLearner(AbstractLearner):
         return predict_dict
 
     def get_pred_from_proba(self,
-                            y_pred_proba: Union[np.ndarray, pd.DataFrame],
-                            decision_threshold: float = None,
-                            inverse_transform: bool = True) -> Union[np.array, pd.Series]:
+                            y_pred_proba: np.ndarray | pd.DataFrame,
+                            decision_threshold: float | None = None,
+                            inverse_transform: bool = True) -> np.array | pd.Series:
         if isinstance(y_pred_proba, pd.DataFrame):
             y_pred = get_pred_from_proba_df(y_pred_proba,
                                             problem_type=self.problem_type,
@@ -944,10 +952,10 @@ class AbstractTabularLearner(AbstractLearner):
         return y_transformed
 
     def calibrate_decision_threshold(self,
-                                     data=None,
-                                     metric=None,
+                                     data: pd.DataFrame | None = None,
+                                     metric: str | Scorer | None = None,
                                      model: str = 'best',
-                                     decision_thresholds: Union[int, List[float]] = 50,
+                                     decision_thresholds: int | List[float] = 50,
                                      verbose: bool = True) -> float:
         # TODO: docstring
         if metric is None:

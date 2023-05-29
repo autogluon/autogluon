@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from typing import Callable, List, Union
 
@@ -15,9 +17,9 @@ logger = logging.getLogger(__name__)
 def calibrate_decision_threshold(y: np.array,
                                  y_pred_proba: np.array,
                                  metric: Union[Callable, Scorer],
-                                 metric_kwargs: dict = None,
+                                 metric_kwargs: dict | None = None,
                                  decision_thresholds: Union[int, List[float]] = 50,
-                                 metric_name: str = None,
+                                 metric_name: str | None = None,
                                  verbose: bool = True) -> float:
     problem_type = BINARY
     assert len(y_pred_proba.shape) == 1

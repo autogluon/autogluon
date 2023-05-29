@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import logging
 import os
@@ -3063,12 +3065,12 @@ class AbstractTrainer:
                 model.save()
 
     def calibrate_decision_threshold(self,
-                                     X: pd.DataFrame = None,
-                                     y: np.array = None,
-                                     metric: Union[str, Scorer] = None,
+                                     X: pd.DataFrame | None = None,
+                                     y: np.array | None = None,
+                                     metric: str | Scorer | None = None,
                                      model: str = 'best',
                                      weights=None,
-                                     decision_thresholds: Union[int, List[float]] = 50,
+                                     decision_thresholds: int | List[float] = 50,
                                      verbose: bool = True) -> float:
         # TODO: Docstring
         assert self.problem_type == BINARY, f'calibrate_decision_threshold is only available for `problem_type="{BINARY}"`'
@@ -3098,14 +3100,14 @@ class AbstractTrainer:
                 X = self.load_X_val()
                 if self.weight_evaluation:
                     X, weights = extract_column(X=X, col_name=self.sample_weight)
-                y = self.load_y_val()
+                y: np.array = self.load_y_val()
                 y_pred_proba = self.predict_proba(X=X, model=model)
             else:
                 # Use out-of-fold data
                 if self.weight_evaluation:
                     X = self.load_X()
                     X, weights = extract_column(X=X, col_name=self.sample_weight)
-                y = self.load_y()
+                y: np.array = self.load_y()
                 y_pred_proba = self.get_model_oof(model=model)
         else:
             y_pred_proba = self.predict_proba(X=X, model=model)
