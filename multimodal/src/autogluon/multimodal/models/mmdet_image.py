@@ -8,7 +8,7 @@ import torch
 from torch import nn
 
 from ..constants import BBOX, BBOX_FORMATS, COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, XYXY
-from ..utils import try_import_mmlabs
+from ..utils import get_mmlab_error_msgs, try_import_mmlabs
 from .utils import freeze_model_layers, lookup_mmdet_config, update_mmdet_config
 
 try_import_mmlabs()
@@ -110,7 +110,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
     def _load_checkpoint(self, checkpoint_file):
         # build model and load pretrained weights
-        assert mmdet is not None, 'Please install MMDetection by: pip install "mmdet>=3.0.0".'
+        assert mmdet is not None, get_mmlab_error_msgs("mmdet")
         from mmdet.utils import register_all_modules
 
         register_all_modules()  # https://github.com/open-mmlab/mmdetection/issues/9719

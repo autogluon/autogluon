@@ -16,7 +16,7 @@ except ImportError:
 
 from ...constants import AUTOMM, COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
 from ..collator import StackCollator
-from ..utils import is_rois_input, try_import_mmlabs
+from ..utils import check_if_packages_installed, get_mmlab_error_msgs, is_rois_input, try_import_mmlabs
 
 try_import_mmlabs()
 
@@ -90,7 +90,7 @@ class MMLabProcessor:
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
         if self.prefix.lower().startswith(MMDET_IMAGE):
-            assert mmdet is not None, 'Please install MMDetection by: pip install "mmdet>=3.0.0".'
+            assert mmdet is not None, get_mmlab_error_msgs("mmdet")
         else:
             assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
         self.cfg = model.model.cfg
@@ -126,7 +126,7 @@ class MMLabProcessor:
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = StackCollator()
 
-        assert mmcv is not None, "Please install mmcv by: mim install mmcv."
+        check_if_packages_installed(problem_type=None)
 
         fn.update(
             {

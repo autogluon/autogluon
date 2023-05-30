@@ -7,7 +7,8 @@ from torch import nn
 from torch.nn.modules.loss import _Loss
 from transformers import AutoConfig, AutoModel
 
-from ..constants import AUTOMM, COLUMN_FEATURES, FEATURES, LOGITS, MASKS, REGRESSION
+from ..constants import AUTOMM, COLUMN_FEATURES, FEATURES, LOGITS, MASKS, OCR, REGRESSION
+from ..utils import check_if_packages_installed
 from .adaptation_layers import IA3Linear, IA3LoRALinear, LoRALinear
 
 logger = logging.getLogger(__name__)
@@ -642,14 +643,12 @@ def get_mmocr_config_and_model(checkpoint_name: str):
     checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
 
     # read config files
-    assert mmcv is not None, "Please install mmcv by: mim install mmcv."
+    check_if_packages_installed(problem_type=OCR)
     config_file = checkpoint_name + ".py"
     if isinstance(config_file, str):
         config = mmcv.Config.fromfile(config_file)
 
     # build model and load pretrained weights
-    assert mmocr is not None, 'Please install MMOCR by: pip install "mmocr<1.0".'
-
     checkpoint = checkpoints[0]
     model = build_detector(config.model, test_cfg=config.get("test_cfg"))
     if checkpoint is not None:

@@ -260,14 +260,12 @@ def check_if_packages_installed(problem_type: str):
                 warnings.simplefilter("ignore")
                 import mmcv
         except ImportError as e:
-            raise ValueError(f"Encountered error while importing mmcv: {e}. Try to install mmcv: mim install mmcv.")
+            raise ValueError(f"Encountered error while importing mmcv: {e}. {get_mmlab_error_msgs('mmcv')}")
 
         try:
             import mmdet
         except ImportError as e:
-            raise ValueError(
-                f'Encountered error while importing mmdet: {e}. Try to install mmdet: pip install "mmdet>=3.0.0".'
-            )
+            raise ValueError(f"Encountered error while importing mmdet: {e}. {get_mmlab_error_msgs('mmdet')}")
 
         if OCR in problem_type:
             try:
@@ -330,3 +328,14 @@ def try_import_mmlabs():
         from mmengine.runner import load_checkpoint
     except ImportError as e:
         warnings.warn(e)
+
+
+def get_mmlab_error_msgs(package_name):
+    if package_name == "mmdet":
+        err_msg = 'Please install MMDetection by: pip install "mmdet>=3.0.0".'
+    elif package_name == "mmcv":
+        err_msg = "Please install MMCV by: mim install mmcv"
+    else:
+        raise ValueError("Available package_name are: mmdet, mmcv.")
+
+    return err_msg
