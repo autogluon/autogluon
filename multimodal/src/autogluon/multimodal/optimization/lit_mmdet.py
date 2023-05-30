@@ -9,7 +9,6 @@ from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
 from ..constants import BBOX, IMAGE, LABEL
-from ..utils import try_import_mmlabs
 from .utils import (
     apply_layerwise_lr_decay,
     apply_single_lr,

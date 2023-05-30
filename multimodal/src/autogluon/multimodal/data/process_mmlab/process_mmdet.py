@@ -13,7 +13,8 @@ try:
 except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
-from ..utils import is_rois_input, try_import_mmlabs
+from ...utils import try_import_mmlabs
+from ..utils import is_rois_input
 from .process_mmlab_base import MMLabProcessor
 
 try_import_mmlabs()

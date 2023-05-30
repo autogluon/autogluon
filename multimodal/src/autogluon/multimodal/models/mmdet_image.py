@@ -8,10 +8,7 @@ import torch
 from torch import nn
 
 from ..constants import BBOX, BBOX_FORMATS, COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, XYXY
-from ..utils import get_mmlab_error_msgs, try_import_mmlabs
 from .utils import freeze_model_layers, lookup_mmdet_config, update_mmdet_config
-
-try_import_mmlabs()
 
 try:
     with warnings.catch_warnings():
@@ -109,6 +106,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         return
 
     def _load_checkpoint(self, checkpoint_file):
+        from ..utils import get_mmlab_error_msgs
+
         # build model and load pretrained weights
         assert mmdet is not None, get_mmlab_error_msgs("mmdet")
         from mmdet.utils import register_all_modules
