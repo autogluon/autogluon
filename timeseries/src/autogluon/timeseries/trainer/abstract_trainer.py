@@ -12,6 +12,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.utils import hash_pandas_df
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
@@ -995,21 +996,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame] = None
     ) -> str:
         """Compute a unique string that identifies the time series dataset."""
-        from hashlib import md5
-
-        def hash_df(df: Optional[pd.DataFrame]) -> str:
-            if df is not None:
-                df = pd.DataFrame(data)
-                df.sort_index(inplace=True, axis=0)
-                df.reset_index(inplace=True)
-                df.sort_index(inplace=True, axis=1)
-                hashable_object = pd.util.hash_pandas_object(df).values
-            else:
-                hashable_object = "0".encode("utf-8")
-            return md5(hashable_object).hexdigest()
-
-        combined_hash = hash_df(data) + hash_df(known_covariates) + hash_df(data.static_features)
-        return md5(combined_hash.encode("utf-8")).hexdigest()
+        combined_hash = hash_pandas_df(data) + hash_pandas_df(known_covariates) + hash_pandas_df(data.static_features)
+        return combined_hash
 
     def _get_cached_pred_dicts(self, dataset_hash: str) -> Tuple[Dict[str, TimeSeriesDataFrame], Dict[str, float]]:
         """Load cached predictions for given dataset_hash from disk, if possible. Otherwise returns empty dicts."""
