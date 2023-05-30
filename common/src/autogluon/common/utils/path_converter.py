@@ -8,13 +8,23 @@ class PathConverter:
     @staticmethod
     def _is_windows():
         return platform.system() == "Windows"
+    
+    @staticmethod
+    def _is_absolute(path: str) -> bool:
+        return PureWindowsPath(path).is_absolute() or PurePosixPath(path).is_absolute()
+    
+    @staticmethod
+    def _validate_path(path: str):
+        assert not PathConverter._is_absolute(path), "It is ambiguous on how to convert an absolute path. Please provide a relative path instead"
 
     @staticmethod
     def to_windows(path: str) -> str:
+        PathConverter._validate_path(path)
         return str(PureWindowsPath(PurePosixPath(path)))
 
     @staticmethod
     def to_posix(path: str) -> str:
+        PathConverter._validate_path(path)
         return str(PurePosixPath(PureWindowsPath(path)))
 
     @staticmethod
