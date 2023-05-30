@@ -15,8 +15,9 @@ except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
 from ...constants import AUTOMM, COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
+from ...utils import check_if_packages_installed, get_mmlab_error_msgs
 from ..collator import StackCollator
-from ..utils import check_if_packages_installed, get_mmlab_error_msgs, is_rois_input, try_import_mmlabs
+from ..utils import is_rois_input, try_import_mmlabs
 
 try_import_mmlabs()
 
