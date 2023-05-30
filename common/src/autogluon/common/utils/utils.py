@@ -174,7 +174,8 @@ def check_saved_predictor_version(
 def hash_pandas_df(df: Optional[pd.DataFrame]) -> str:
     """Compute a hash string for a pandas DataFrame."""
     if df is not None:
-        df = pd.DataFrame(df)
+        # Convert in case TimeSeriesDataFrame object is passed
+        df = pd.DataFrame(df, copy=True)
         df.reset_index(inplace=True)
         df.sort_index(inplace=True, axis=1)
         hashable_object = pd.util.hash_pandas_object(df).values
