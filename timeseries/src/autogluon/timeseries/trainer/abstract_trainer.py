@@ -251,6 +251,8 @@ class SimpleAbstractTrainer:
 
 
 class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
+    _cached_predictions_filename = "cached_predictions.pkl"
+
     def __init__(
         self,
         path: str,
@@ -738,7 +740,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.save_model(model=ensemble)
         return ensemble.name
 
-    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
+    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, use_cache: bool = True) -> pd.DataFrame:
         logger.debug("Generating leaderboard for all models trained")
 
         model_names = self.get_model_names()
@@ -766,6 +768,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 known_covariates=known_covariates,
                 record_pred_time=True,
                 raise_exception_if_failed=False,
+                use_cache=use_cache,
             )
 
             for model_name in model_names:
@@ -824,11 +827,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        use_cache: bool = True,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         model_name = self._get_model_for_prediction(model)
         model_pred_dict = self.get_model_pred_dict(
-            model_names=[model_name], data=data, known_covariates=known_covariates
+            model_names=[model_name], data=data, known_covariates=known_covariates, use_cache=use_cache
         )
         return model_pred_dict[model_name]
 
@@ -853,11 +857,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         data: TimeSeriesDataFrame,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         metric: Optional[str] = None,
+        use_cache: bool = True,
     ) -> float:
         past_data, known_covariates = data.get_model_inputs_for_scoring(
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
         )
-        predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model)
+        predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model, use_cache=use_cache)
         return self._score_with_predictions(data=data, predictions=predictions, metric=metric)
 
     def _predict_model(
@@ -902,6 +907,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         record_pred_time: bool = False,
         raise_exception_if_failed: bool = True,
+        use_cache: bool = True,
     ) -> Union[Dict[str, TimeSeriesDataFrame], Tuple[Dict[str, TimeSeriesDataFrame], Dict[str, float]]]:
         """Return a dictionary with predictions of all models for the given dataset.
 
@@ -919,8 +925,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         raise_exception_if_failed
             If True, the method will raise an exception if any model crashes during prediction.
             If False, error will be logged and predictions for failed models will contain None.
+        use_cache
+            If False, will ignore the cache even if it's available.
         """
-        if self.cache_predictions:
+        # TODO: Unify design of the method with Tabular
+        if self.cache_predictions and use_cache:
             dataset_hash = self._compute_dataset_hash(data=data, known_covariates=known_covariates)
             model_pred_dict, pred_time_dict_marginal = self._get_cached_pred_dicts(dataset_hash)
         else:
@@ -935,6 +944,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             model_set = sorted(model_set, key=model_to_level.get)
         logger.debug(f"Prediction order: {model_set}")
 
+        failed_models = []
         for model_name in model_set:
             if model_name not in model_pred_dict:
                 try:
@@ -947,14 +957,15 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     )
                     pred_time_dict_marginal[model_name] = time.time() - predict_start_time
                 except Exception as e:
-                    if raise_exception_if_failed:
-                        raise RuntimeError(f"Model {model_name} failed to predict")
-                    else:
-                        logger.error(f"Model {model_name} failed to predict with the following exception:")
-                        logger.error(traceback.format_exc())
-                        model_pred_dict[model_name] = None
-                        pred_time_dict_marginal[model_name] = None
-        if self.cache_predictions:
+                    failed_models.append(model_name)
+                    logger.error(f"Model {model_name} failed to predict with the following exception:")
+                    logger.error(traceback.format_exc())
+                    model_pred_dict[model_name] = None
+                    pred_time_dict_marginal[model_name] = None
+
+        if len(failed_models) > 0 and raise_exception_if_failed:
+            raise RuntimeError(f"Following models failed to predict: {failed_models}")
+        if self.cache_predictions and use_cache:
             self._save_cached_pred_dicts(
                 dataset_hash, model_pred_dict=model_pred_dict, pred_time_dict=pred_time_dict_marginal
             )
@@ -976,8 +987,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         return dict(pred_time_dict_total)
 
     @property
-    def _cached_predictions_filename(self) -> Path:
-        return Path(self.path) / "cached_predictions.pkl"
+    def _cached_predictions_path(self) -> Path:
+        return Path(self.path) / self._cached_predictions_filename
 
     @staticmethod
     def _compute_dataset_hash(
@@ -1002,8 +1013,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
     def _get_cached_pred_dicts(self, dataset_hash: str) -> Tuple[Dict[str, TimeSeriesDataFrame], Dict[str, float]]:
         """Load cached predictions for given dataset_hash from disk, if possible. Otherwise returns empty dicts."""
-        if self._cached_predictions_filename.exists():
-            cached_predictions = load_pkl.load(str(self._cached_predictions_filename))
+        if self._cached_predictions_path.exists():
+            cached_predictions = load_pkl.load(str(self._cached_predictions_path))
             if dataset_hash in cached_predictions:
                 model_pred_dict = cached_predictions[dataset_hash]["model_pred_dict"]
                 pred_time_dict = cached_predictions[dataset_hash]["pred_time_dict"]
@@ -1011,16 +1022,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     logger.debug(f"Loaded cached predictions for models {list(model_pred_dict.keys())}")
                     return model_pred_dict, pred_time_dict
                 else:
-                    logger.warning(f"Found corrupted cached predictions in {self._cached_predictions_filename}")
+                    logger.warning(f"Found corrupted cached predictions in {self._cached_predictions_path}")
         logger.debug(f"Found no cached predictions")
         return {}, {}
 
     def _save_cached_pred_dicts(
         self, dataset_hash: str, model_pred_dict: Dict[str, TimeSeriesDataFrame], pred_time_dict: Dict[str, float]
     ) -> None:
-        if self._cached_predictions_filename.exists():
+        # TODO: Save separate file for each dataset if _cached_predictions file grows large?
+        if self._cached_predictions_path.exists():
             logger.debug(f"Extending existing cached predictions")
-            cached_predictions = load_pkl.load(str(self._cached_predictions_filename))
+            cached_predictions = load_pkl.load(str(self._cached_predictions_path))
         else:
             cached_predictions = {}
         # Do not save results for models that failed
@@ -1028,8 +1040,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             "model_pred_dict": {k: v for k, v in model_pred_dict.items() if v is not None},
             "pred_time_dict": {k: v for k, v in pred_time_dict.items() if v is not None},
         }
-        save_pkl.save(str(self._cached_predictions_filename), object=cached_predictions)
-        logger.debug(f"Cached predictions saved to {self._cached_predictions_filename}")
+        save_pkl.save(str(self._cached_predictions_path), object=cached_predictions)
+        logger.debug(f"Cached predictions saved to {self._cached_predictions_path}")
 
     def _merge_refit_full_data(
         self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]

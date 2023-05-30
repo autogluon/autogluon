@@ -506,7 +506,7 @@ def test_given_dfs_are_identical_then_identical_hash_is_computed(temp_model_path
 def test_given_cache_predictions_is_true_when_calling_get_model_pred_dict_then_predictions_are_cached(temp_model_path):
     trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
-    assert not trainer._cached_predictions_filename.exists()
+    assert not trainer._cached_predictions_path.exists()
     trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME, record_pred_time=True)
 
     dataset_hash = trainer._compute_dataset_hash(DUMMY_TS_DATAFRAME)
@@ -554,6 +554,6 @@ def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_
 ):
     trainer = AutoTimeSeriesTrainer(path=temp_model_path, cache_predictions=False)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS)
-    assert not trainer._cached_predictions_filename.exists()
+    assert not trainer._cached_predictions_path.exists()
     trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME)
-    assert not trainer._cached_predictions_filename.exists()
+    assert not trainer._cached_predictions_path.exists()

@@ -1,5 +1,6 @@
 """Unit tests for predictors"""
 import copy
+import re
 from unittest import mock
 
 import numpy as np
@@ -434,7 +435,7 @@ def test_given_model_fails_when_predictor_predicts_then_exception_is_raised(temp
     predictor.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"ARIMA": {"maxiter": 1}, "Naive": {}})
     with mock.patch("autogluon.timeseries.models.local.statsmodels.ARIMAModel.predict") as arima_predict:
         arima_predict.side_effect = RuntimeError("Numerical error")
-        with pytest.raises(RuntimeError, match="Model ARIMA failed to predict"):
+        with pytest.raises(RuntimeError, match=re.escape("Following models failed to predict: ['ARIMA']")):
             predictor.predict(DUMMY_TS_DATAFRAME)
 
 
@@ -443,7 +444,7 @@ def test_given_model_fails_when_predictor_scores_then_exception_is_raised(temp_m
     predictor.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"ARIMA": {"maxiter": 1}, "Naive": {}})
     with mock.patch("autogluon.timeseries.models.local.statsmodels.ARIMAModel.predict") as arima_predict:
         arima_predict.side_effect = RuntimeError("Numerical error")
-        with pytest.raises(RuntimeError, match="Model ARIMA failed to predict"):
+        with pytest.raises(RuntimeError, match=re.escape("Following models failed to predict: ['ARIMA']")):
             predictor.score(DUMMY_TS_DATAFRAME)
 
 
@@ -661,3 +662,23 @@ def test_when_excluded_model_names_provided_then_excluded_models_are_not_trained
     )
     leaderboard = predictor.leaderboard()
     assert leaderboard["model"].values == ["SimpleFeedForward"]
+
+
+@pytest.mark.parametrize("method_name", ["leaderboard", "predict", "score", "evaluate"])
+@pytest.mark.parametrize("use_cache", [True, False])
+def test_when_use_cache_is_set_to_false_then_cached_predictions_are_ignored(temp_model_path, use_cache, method_name):
+    predictor = TimeSeriesPredictor(path=temp_model_path, cache_predictions=True).fit(
+        DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}}
+    )
+    # Cache predictions
+    predictor.predict(DUMMY_TS_DATAFRAME)
+
+    with mock.patch(
+        "autogluon.timeseries.trainer.abstract_trainer.AbstractTimeSeriesTrainer._get_cached_pred_dicts"
+    ) as mock_get_cached_pred_dicts:
+        mock_get_cached_pred_dicts.return_value = {}, {}
+        getattr(predictor, method_name)(DUMMY_TS_DATAFRAME, use_cache=use_cache)
+        if use_cache:
+            mock_get_cached_pred_dicts.assert_called()
+        else:
+            mock_get_cached_pred_dicts.assert_not_called()

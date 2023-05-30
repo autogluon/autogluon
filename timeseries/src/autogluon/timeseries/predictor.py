@@ -557,6 +557,7 @@ class TimeSeriesPredictor:
         data: Union[TimeSeriesDataFrame, pd.DataFrame],
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[str] = None,
+        use_cache: bool = True,
         random_seed: Optional[int] = 123,
     ) -> TimeSeriesDataFrame:
         """Return quantile and mean forecasts for the given dataset, starting from the end of each time series.
@@ -589,6 +590,9 @@ class TimeSeriesPredictor:
         random_seed : int or None, default = 123
             If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
             results for most models (except those trained on GPU because of the non-determinism of GPU operations).
+        use_cache : bool, default = True
+            If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
+            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
 
 
         Examples
@@ -623,7 +627,7 @@ class TimeSeriesPredictor:
         # Don't use data.item_ids in case data is not a TimeSeriesDataFrame
         original_item_id_order = data.reset_index()[ITEMID].unique()
         data = self._check_and_prepare_data_frame(data)
-        predictions = self._learner.predict(data, known_covariates=known_covariates, model=model)
+        predictions = self._learner.predict(data, known_covariates=known_covariates, model=model, use_cache=use_cache)
         return predictions.reindex(original_item_id_order, level=ITEMID)
 
     def evaluate(self, data: Union[TimeSeriesDataFrame, pd.DataFrame], **kwargs):
@@ -652,6 +656,9 @@ class TimeSeriesPredictor:
             (with highest validation score) will be used.
         metric : str, optional
             Name of the evaluation metric to compute scores with. Defaults to ``self.eval_metric``
+        use_cache : bool, default = True
+            If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
+            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
 
         Returns
         -------
@@ -747,7 +754,10 @@ class TimeSeriesPredictor:
         return self._trainer.get_model_best()
 
     def leaderboard(
-        self, data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame]] = None, silent=False
+        self,
+        data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame]] = None,
+        silent: bool = False,
+        use_cache: bool = True,
     ) -> pd.DataFrame:
         """Return a leaderboard showing the performance of every trained model, the output is a
         pandas data frame with columns:
@@ -783,6 +793,9 @@ class TimeSeriesPredictor:
 
         silent : bool, default = False
             If False, the leaderboard DataFrame will be printed.
+        use_cache : bool, default = True
+            If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
+            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
 
         Returns
         -------
@@ -791,7 +804,7 @@ class TimeSeriesPredictor:
             test performance.
         """
         data = self._check_and_prepare_data_frame(data)
-        leaderboard = self._learner.leaderboard(data)
+        leaderboard = self._learner.leaderboard(data, use_cache=use_cache)
         if not silent:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)

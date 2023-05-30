@@ -189,23 +189,30 @@ class TimeSeriesLearner(AbstractLearner):
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        use_cache: bool = True,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         data = self.feature_generator.transform(data)
         known_covariates = self.feature_generator.transform_future_known_covariates(known_covariates)
         known_covariates = self._align_covariates_with_forecast_index(known_covariates=known_covariates, data=data)
-        return self.load_trainer().predict(data=data, known_covariates=known_covariates, model=model, **kwargs)
+        return self.load_trainer().predict(
+            data=data, known_covariates=known_covariates, model=model, use_cache=use_cache, **kwargs
+        )
 
     def score(
-        self, data: TimeSeriesDataFrame, model: AbstractTimeSeriesModel = None, metric: Optional[str] = None
+        self,
+        data: TimeSeriesDataFrame,
+        model: AbstractTimeSeriesModel = None,
+        metric: Optional[str] = None,
+        use_cache: bool = True,
     ) -> float:
         data = self.feature_generator.transform(data)
-        return self.load_trainer().score(data=data, model=model, metric=metric)
+        return self.load_trainer().score(data=data, model=model, metric=metric, use_cache=use_cache)
 
-    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
+    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, use_cache: bool = True) -> pd.DataFrame:
         if data is not None:
             data = self.feature_generator.transform(data)
-        return self.load_trainer().leaderboard(data)
+        return self.load_trainer().leaderboard(data, use_cache=use_cache)
 
     def get_info(self, include_model_info: bool = False, **kwargs) -> Dict[str, Any]:
         learner_info = super().get_info(include_model_info=include_model_info)
