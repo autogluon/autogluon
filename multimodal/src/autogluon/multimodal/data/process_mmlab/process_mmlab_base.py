@@ -15,11 +15,8 @@ except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
 from ...constants import AUTOMM, COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
-from ...utils import check_if_packages_installed, get_mmlab_error_msgs
 from ..collator import StackCollator
-from ..utils import is_rois_input, try_import_mmlabs
-
-try_import_mmlabs()
+from ..utils import is_rois_input
 
 try:
     with warnings.catch_warnings():
@@ -77,6 +74,9 @@ class MMLabProcessor:
         requires_column_info
             Whether to require feature column information in dataloader.
         """
+        from ...utils import get_mmlab_error_msgs, try_import_mmlabs
+
+        try_import_mmlabs()
 
         self.prefix = model.prefix
         self.missing_value_strategy = missing_value_strategy
@@ -121,6 +121,8 @@ class MMLabProcessor:
         -------
         A dictionary containing one model's collator function for image data.
         """
+        from ...utils import check_if_packages_installed
+
         fn = {}
         if self.requires_column_info:
             assert image_column_names, "Empty image column names."

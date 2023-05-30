@@ -8,7 +8,6 @@ from torch.nn.modules.loss import _Loss
 from transformers import AutoConfig, AutoModel
 
 from ..constants import AUTOMM, COLUMN_FEATURES, FEATURES, LOGITS, MASKS, OCR, REGRESSION
-from ..utils import check_if_packages_installed
 from .adaptation_layers import IA3Linear, IA3LoRALinear, LoRALinear
 
 logger = logging.getLogger(__name__)
@@ -623,6 +622,8 @@ def get_mmocr_config_and_model(checkpoint_name: str):
     -------
     An MMOCR config and model.
     """
+    from ..utils import check_if_packages_installed
+
     try:
         import warnings
 
