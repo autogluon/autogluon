@@ -17,10 +17,10 @@ try:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         import mmcv
-    import mmengine
     import mmdet
-    from mmengine.runner import load_checkpoint
+    import mmengine
     from mmdet.registry import MODELS
+    from mmengine.runner import load_checkpoint
 except ImportError as e:
     mmcv = None
     mmdet = None
