@@ -3,6 +3,11 @@ from typing import Callable
 
 import torch
 
+try:
+    from mmengine.dataset import pseudo_collate as collate
+except ImportError as e:
+    collate = None
+
 
 def assert_tensor_type(func: Callable) -> Callable:
     @functools.wraps(func)
@@ -14,15 +19,6 @@ def assert_tensor_type(func: Callable) -> Callable:
         return func(*args, **kwargs)
 
     return wrapper
-
-
-try:
-    import mmengine
-
-    # from mmengine.dataset import default_collate as collate
-    from mmengine.dataset import pseudo_collate as collate
-except ImportError as e:
-    mmengine = None
 
 
 class CollateMMDet:

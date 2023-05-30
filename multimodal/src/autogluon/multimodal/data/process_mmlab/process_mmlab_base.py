@@ -8,29 +8,6 @@ from PIL import ImageFile
 from torch import nn
 
 try:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        import mmcv
-    from mmcv.transforms import Compose
-
-    # from mmcv.parallel import collate
-except ImportError as e:
-    mmcv = None
-
-try:
-    import mmdet
-    from mmdet.datasets.transforms import ImageToTensor
-
-    # from mmdet.datasets.pipelines import Compose
-except ImportError as e:
-    mmdet = None
-
-try:
-    import mmocr
-except ImportError:
-    mmocr = None
-
-try:
     from torchvision.transforms import InterpolationMode
 
     BICUBIC = InterpolationMode.BICUBIC
@@ -39,7 +16,29 @@ except ImportError:
 
 from ...constants import AUTOMM, COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
 from ..collator import StackCollator
-from ..utils import is_rois_input
+from ..utils import is_rois_input, try_import_mmlabs
+
+try_import_mmlabs()
+
+try:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        import mmcv
+    from mmcv.transforms import Compose
+except ImportError as e:
+    mmcv = None
+
+try:
+    import mmdet
+    from mmdet.datasets.transforms import ImageToTensor
+except ImportError as e:
+    mmdet = None
+
+try:
+    import mmocr
+except ImportError:
+    mmocr = None
+
 
 logger = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True

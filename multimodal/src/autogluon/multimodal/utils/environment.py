@@ -304,3 +304,29 @@ def get_available_devices(num_gpus: int, auto_select_gpus: bool, use_ray_lightni
         devices = None
 
     return devices
+
+
+def try_import_mmlabs():
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            import mmcv
+        from mmcv import ConfigDict
+        from mmcv.runner import load_checkpoint
+        from mmcv.transforms import Compose
+    except ImportError as e:
+        warnings.warn(e)
+
+    try:
+        import mmdet
+        from mmdet.datasets.transforms import ImageToTensor
+        from mmdet.registry import MODELS
+    except ImportError as e:
+        warnings.warn(e)
+
+    try:
+        import mmengine
+        from mmengine.dataset import pseudo_collate as collate
+        from mmengine.runner import load_checkpoint
+    except ImportError as e:
+        warnings.warn(e)

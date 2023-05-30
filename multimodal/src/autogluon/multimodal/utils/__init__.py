@@ -40,6 +40,7 @@ from .environment import (
     infer_precision,
     is_interactive,
     move_to_device,
+    try_import_mmlabs,
 )
 from .export import ExportMixin
 from .hpo import hyperparameter_tune

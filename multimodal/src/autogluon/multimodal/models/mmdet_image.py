@@ -7,29 +7,25 @@ from typing import Optional
 import torch
 from torch import nn
 
-try:
-    import warnings
+from ..constants import BBOX, BBOX_FORMATS, COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, XYXY
+from ..utils import try_import_mmlabs
+from .utils import freeze_model_layers, lookup_mmdet_config, update_mmdet_config
 
+try_import_mmlabs()
+
+try:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         import mmcv
-except ImportError as e:
-    mmcv = None
-
-try:
     import mmengine
-    from mmengine.runner import load_checkpoint
-except ImportError as e:
-    mmengine = None
-
-try:
     import mmdet
+    from mmengine.runner import load_checkpoint
     from mmdet.registry import MODELS
 except ImportError as e:
+    mmcv = None
     mmdet = None
+    mmengine = None
 
-from ..constants import BBOX, BBOX_FORMATS, COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, XYXY
-from .utils import freeze_model_layers, lookup_mmdet_config, update_mmdet_config
 
 logger = logging.getLogger(__name__)
 
