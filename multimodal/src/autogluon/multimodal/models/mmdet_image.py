@@ -57,6 +57,10 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         pretrained
             Whether using the pretrained mmdet models. If pretrained=True, download the pretrained model.
         """
+        from ..utils import check_if_packages_installed
+
+        check_if_packages_installed(["mmcv", "mmengine", "mmdet"])
+
         super().__init__()
         self.prefix = prefix
         self.pretrained = pretrained
@@ -106,10 +110,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         return
 
     def _load_checkpoint(self, checkpoint_file):
-        from ..utils import get_mmlab_error_msgs
 
         # build model and load pretrained weights
-        assert mmdet is not None, get_mmlab_error_msgs("mmdet")
         from mmdet.utils import register_all_modules
 
         register_all_modules()  # https://github.com/open-mmlab/mmdetection/issues/9719
@@ -261,7 +263,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
     def _load_config(self):
         # read config files
-        assert mmengine is not None, "Please install mmengine by: pip install mmengine."
         if isinstance(self.config_file, str):
             self.config = mmengine.Config.fromfile(self.config_file)
         else:

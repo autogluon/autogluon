@@ -36,7 +36,6 @@ from .environment import (
     compute_inference_batch_size,
     compute_num_gpus,
     get_available_devices,
-    get_mmlab_error_msgs,
     get_precision_context,
     infer_precision,
     is_interactive,

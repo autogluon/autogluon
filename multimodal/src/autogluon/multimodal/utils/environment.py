@@ -258,12 +258,16 @@ def check_if_packages_installed(problem_type: str = None, package_names: List[st
                     warnings.simplefilter("ignore")
                     import mmcv
             except ImportError as e:
-                raise ValueError(f"Encountered error while importing mmcv: {e}. {get_mmlab_error_msgs('mmcv')}")
+                raise ValueError(
+                    f"Encountered error while importing mmcv: {e}. {_get_mmlab_installation_guide('mmcv')}"
+                )
 
             try:
                 import mmdet
             except ImportError as e:
-                raise ValueError(f"Encountered error while importing mmdet: {e}. {get_mmlab_error_msgs('mmdet')}")
+                raise ValueError(
+                    f"Encountered error while importing mmdet: {e}. {_get_mmlab_installation_guide('mmdet')}"
+                )
 
             if OCR in problem_type:
                 try:
@@ -284,14 +288,14 @@ def check_if_packages_installed(problem_type: str = None, package_names: List[st
                     from mmcv.runner import load_checkpoint
                     from mmcv.transforms import Compose
                 except ImportError as e:
-                    f"Encountered error while importing {package_name}: {e}. {get_mmlab_error_msgs(package_name)}"
+                    f"Encountered error while importing {package_name}: {e}. {_get_mmlab_installation_guide(package_name)}"
             elif package_name == "mmdet":
                 try:
                     import mmdet
                     from mmdet.datasets.transforms import ImageToTensor
                     from mmdet.registry import MODELS
                 except ImportError as e:
-                    f"Encountered error while importing {package_name}: {e}. {get_mmlab_error_msgs(package_name)}"
+                    f"Encountered error while importing {package_name}: {e}. {_get_mmlab_installation_guide(package_name)}"
             elif package_name == "mmengine":
                 try:
                     import mmengine
@@ -300,7 +304,7 @@ def check_if_packages_installed(problem_type: str = None, package_names: List[st
                 except ImportError as e:
                     warnings.warn(e)
                     raise ValueError(
-                        f"Encountered error while importing {package_name}: {e}. {get_mmlab_error_msgs(package_name)}"
+                        f"Encountered error while importing {package_name}: {e}. {_get_mmlab_installation_guide(package_name)}"
                     )
             else:
                 raise ValueError(f"package_name {package_name} is not required.")
@@ -334,33 +338,7 @@ def get_available_devices(num_gpus: int, auto_select_gpus: bool, use_ray_lightni
     return devices
 
 
-def check_if_mmlabs_installed():
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            import mmcv
-        from mmcv import ConfigDict
-        from mmcv.runner import load_checkpoint
-        from mmcv.transforms import Compose
-    except ImportError as e:
-        warnings.warn(e)
-
-    try:
-        import mmdet
-        from mmdet.datasets.transforms import ImageToTensor
-        from mmdet.registry import MODELS
-    except ImportError as e:
-        warnings.warn(e)
-
-    try:
-        import mmengine
-        from mmengine.dataset import pseudo_collate as collate
-        from mmengine.runner import load_checkpoint
-    except ImportError as e:
-        warnings.warn(e)
-
-
-def get_mmlab_error_msgs(package_name):
+def _get_mmlab_installation_guide(package_name):
     if package_name == "mmdet":
         err_msg = 'Please install MMDetection by: pip install "mmdet>=3.0.0".'
     elif package_name == "mmcv":
