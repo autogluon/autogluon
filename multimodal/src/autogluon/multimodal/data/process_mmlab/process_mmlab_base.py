@@ -76,7 +76,7 @@ class MMLabProcessor:
         """
         from ...utils import check_if_packages_installed
 
-        check_if_packages_installed(["mmcv"])
+        check_if_packages_installed(package_names=["mmcv"])
 
         self.prefix = model.prefix
         self.missing_value_strategy = missing_value_strategy
@@ -91,7 +91,7 @@ class MMLabProcessor:
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
         if self.prefix.lower().startswith(MMDET_IMAGE):
-            check_if_packages_installed(["mmdet"])
+            check_if_packages_installed(package_names=["mmdet"])
         else:
             assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
         self.cfg = model.model.cfg

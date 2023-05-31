@@ -59,7 +59,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         """
         from ..utils import check_if_packages_installed
 
-        check_if_packages_installed(["mmcv", "mmengine", "mmdet"])
+        check_if_packages_installed(package_names=["mmcv", "mmengine", "mmdet"])
 
         super().__init__()
         self.prefix = prefix

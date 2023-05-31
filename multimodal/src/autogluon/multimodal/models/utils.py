@@ -624,7 +624,7 @@ def get_mmocr_config_and_model(checkpoint_name: str):
     """
     from ..utils import check_if_packages_installed
 
-    check_if_packages_installed(["mmcv"])
+    check_if_packages_installed(package_names=["mmcv"])
     try:
         import mmocr
         from mmocr.models import build_detector
