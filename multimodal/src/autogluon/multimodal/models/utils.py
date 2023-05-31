@@ -624,16 +624,7 @@ def get_mmocr_config_and_model(checkpoint_name: str):
     """
     from ..utils import check_if_packages_installed
 
-    try:
-        import warnings
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            import mmcv
-        from mmcv.runner import load_checkpoint
-    except ImportError as e:
-        warnings.warn(f"Encountered error while import mmcv: {e}")
-        mmcv = None
+    check_if_packages_installed(["mmcv"])
     try:
         import mmocr
         from mmocr.models import build_detector
