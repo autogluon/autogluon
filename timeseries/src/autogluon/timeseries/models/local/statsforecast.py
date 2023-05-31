@@ -244,6 +244,8 @@ class ThetaModel(AbstractStatsForecastModel):
         When set to -1, all CPU cores are used.
     """
 
+    max_ts_length = 3000
+
     allowed_local_model_args = [
         "decomposition_type",
         "seasonal_period",

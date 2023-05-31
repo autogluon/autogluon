@@ -143,7 +143,7 @@ class ETSModel(AbstractLocalModel):
 
         results = [predictions.predicted_mean.rename("mean")]
         coverage_fn = lambda alpha: predictions.pred_int(alpha=alpha)
-        results += get_quantiles_from_statsmodels(coverage_fn=coverage_fn, quantile_levels=quantile_levels)
+        results += get_quantiles_from_statsmodels(coverage_fn=coverage_fn, quantile_levels=self.quantile_levels)
         return pd.concat(results, axis=1)
 
 
