@@ -74,7 +74,7 @@ class MMLabProcessor:
         requires_column_info
             Whether to require feature column information in dataloader.
         """
-        from ...utils import get_mmlab_error_msgs, check_if_packages_installed
+        from ...utils import check_if_packages_installed, get_mmlab_error_msgs
 
         check_if_packages_installed(["mmcv"])
 
