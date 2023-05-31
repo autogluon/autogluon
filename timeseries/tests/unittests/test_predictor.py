@@ -434,7 +434,7 @@ def test_given_model_fails_when_predictor_predicts_then_exception_is_raised(temp
     predictor.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"ARIMA": {"maxiter": 1}, "Naive": {}})
     with mock.patch("autogluon.timeseries.models.local.statsmodels.ARIMAModel.predict") as arima_predict:
         arima_predict.side_effect = RuntimeError("Numerical error")
-        with pytest.raises(RuntimeError, match="Following models failed to predict: \\['ARIMA'\\]"):
+        with pytest.raises(RuntimeError, match="Following models failed to predict: \\['ARIMA', 'WeightedEnsemble'\\]"):
             predictor.predict(DUMMY_TS_DATAFRAME)
 
 
@@ -443,7 +443,7 @@ def test_given_model_fails_when_predictor_scores_then_exception_is_raised(temp_m
     predictor.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"ARIMA": {"maxiter": 1}, "Naive": {}})
     with mock.patch("autogluon.timeseries.models.local.statsmodels.ARIMAModel.predict") as arima_predict:
         arima_predict.side_effect = RuntimeError("Numerical error")
-        with pytest.raises(RuntimeError, match="Following models failed to predict: \\['ARIMA'\\]"):
+        with pytest.raises(RuntimeError, match="Following models failed to predict: \\['ARIMA', 'WeightedEnsemble'\\]"):
             predictor.score(DUMMY_TS_DATAFRAME)
 
 
