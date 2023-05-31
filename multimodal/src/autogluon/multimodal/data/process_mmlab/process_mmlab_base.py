@@ -74,9 +74,9 @@ class MMLabProcessor:
         requires_column_info
             Whether to require feature column information in dataloader.
         """
-        from ...utils import get_mmlab_error_msgs, try_import_mmlabs
+        from ...utils import get_mmlab_error_msgs, check_if_packages_installed
 
-        try_import_mmlabs()
+        check_if_packages_installed(["mmcv"])
 
         self.prefix = model.prefix
         self.missing_value_strategy = missing_value_strategy
@@ -121,15 +121,12 @@ class MMLabProcessor:
         -------
         A dictionary containing one model's collator function for image data.
         """
-        from ...utils import check_if_packages_installed
 
         fn = {}
         if self.requires_column_info:
             assert image_column_names, "Empty image column names."
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = StackCollator()
-
-        check_if_packages_installed(problem_type=None)
 
         fn.update(
             {

@@ -53,7 +53,9 @@ class MMDetProcessor(MMLabProcessor):
         requires_column_info
             Whether to require feature column information in dataloader.
         """
-        from ...utils import CollateMMDet
+        from ...utils import CollateMMDet, check_if_packages_installed
+
+        check_if_packages_installed(["mmcv", "mmengine", "mmdet"])
 
         super().__init__(
             model=model,
