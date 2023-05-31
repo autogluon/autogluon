@@ -28,8 +28,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
     ----------
     allowed_local_model_args : List[str]
         Argument that can be passed to the underlying local model.
-    max_ts_length : int, optional
-        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
     default_n_jobs : Union[int, float]
         Default number of CPU cores used to train models. If float, this fraction of CPU cores will be used.
     init_time_in_seconds : int
@@ -38,7 +36,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
     """
 
     allowed_local_model_args: List[str] = []
-    max_ts_length: Optional[int] = None
     default_n_jobs: Union[int, float] = 0.5
     init_time_in_seconds: int = 0
 
@@ -71,6 +68,10 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             self.n_jobs = n_jobs
         else:
             raise ValueError(f"n_jobs must be a float between 0 and 1 or an integer (received n_jobs = {n_jobs})")
+        # Default values, potentially overridden inside _fit()
+        self.use_fallback_model = True
+        self.max_ts_length = 2500
+
         self._local_model_args: Dict[str, Any] = None
         self._seasonal_period: Optional[int] = None
         self.time_limit: Optional[float] = None
@@ -83,6 +84,9 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         # Initialize parameters passed to each local model
         raw_local_model_args = self._get_model_params().copy()
         raw_local_model_args.pop("n_jobs", None)
+
+        self.use_fallback_model = raw_local_model_args.pop("use_fallback_model", self.use_fallback_model)
+        self.max_ts_length = raw_local_model_args.pop("max_ts_length", self.max_ts_length)
 
         unused_local_model_args = []
         local_model_args = {}
@@ -104,8 +108,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         self._local_model_args = self._update_local_model_args(local_model_args=local_model_args)
         self.time_limit = time_limit
-
-        logger.debug(f"{self.name} is a local model, so the model will be fit at prediction time.")
         return self
 
     def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
@@ -138,8 +140,8 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         if number_failed_models > 0:
             fraction_failed_models = number_failed_models / len(predictions_with_flags)
             logger.warning(
-                f"\t{self.name} failed for {number_failed_models} time series ({100 * fraction_failed_models:.1f}%). "
-                "Fallback model SeasonalNaive was used for these time series."
+                f"\tWarning: {self.name} failed for {number_failed_models} time series "
+                f"({100 * fraction_failed_models:.1f}%). Fallback model SeasonalNaive was used for these time series."
             )
         predictions_df = pd.concat([pred for pred, _ in predictions_with_flags])
         predictions_df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
@@ -161,14 +163,17 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
                 local_model_args=self._local_model_args.copy(),
             )
             model_failed = False
-        except Exception as e:
-            result = seasonal_naive_forecast(
-                target=time_series.values.ravel(),
-                prediction_length=self.prediction_length,
-                quantile_levels=self.quantile_levels,
-                seasonal_period=self._seasonal_period,
-            )
-            model_failed = True
+        except:
+            if self.use_fallback_model:
+                result = seasonal_naive_forecast(
+                    target=time_series.values.ravel(),
+                    prediction_length=self.prediction_length,
+                    quantile_levels=self.quantile_levels,
+                    seasonal_period=self._seasonal_period,
+                )
+                model_failed = True
+            else:
+                raise
         return result, model_failed
 
     def _predict_with_local_model(
