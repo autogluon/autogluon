@@ -42,7 +42,7 @@ DEFAULT_HYPERPARAMETERS = {"n_jobs": 1, "use_fallback_model": False}
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_local_model_is_saved_and_loaded_then_model_can_predict(model_class, temp_model_path):
-    model = model_class(path=temp_model_path, hyperparameters=DEFAULT_HYPERPARAMETERS)
+    model = model_class(path=temp_model_path, hyperparameters=DEFAULT_HYPERPARAMETERS, freq=DUMMY_TS_DATAFRAME.freq)
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model.save()
     loaded_model = model.__class__.load(path=model.path)
@@ -67,7 +67,10 @@ def test_when_local_model_saved_then_local_model_args_are_saved(model_class, hyp
 def test_when_local_model_predicts_then_time_index_is_correct(model_class, prediction_length, temp_model_path):
     data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
     model = model_class(
-        path=temp_model_path, prediction_length=prediction_length, hyperparameters=DEFAULT_HYPERPARAMETERS
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        hyperparameters=DEFAULT_HYPERPARAMETERS,
+        freq=data.freq,
     )
     model.fit(train_data=data)
     predictions = model.predict(data=data)
