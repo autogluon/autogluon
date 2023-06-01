@@ -26,6 +26,10 @@ def model_trial(
     try:
         if fit_kwargs is None:
             fit_kwargs = dict()
+            
+        previous_working_dir = "."
+        cur_working_dir = os.path.curdir
+        relative_working_dir = os.path.relpath(cur_working_dir, previous_working_dir) 
 
         model = init_model(
             args=args,
@@ -115,6 +119,7 @@ def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, t
 
     model.fit_time = time_fit_end - time_fit_start
     model.predict_time = time_pred_end - time_fit_end
+    # model.save(path=".")
     model.save()
     return model
 

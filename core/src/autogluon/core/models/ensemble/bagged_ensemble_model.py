@@ -1137,8 +1137,6 @@ class BaggedEnsembleModel(AbstractModel):
         except EmptySearchSpace:
             return skip_hpo(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
 
-        # Use absolute path here because ray tune will change the working directory
-        self.set_contexts(os.path.abspath(self.path) + os.path.sep)
         directory = self.path
         os.makedirs(directory, exist_ok=True)
         data_path = directory
