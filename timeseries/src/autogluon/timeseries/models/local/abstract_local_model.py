@@ -28,8 +28,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
     ----------
     allowed_local_model_args : List[str]
         Argument that can be passed to the underlying local model.
-    max_ts_length : int, optional
-        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
     default_n_jobs : Union[int, float]
         Default number of CPU cores used to train models. If float, this fraction of CPU cores will be used.
     init_time_in_seconds : int
@@ -38,7 +36,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
     """
 
     allowed_local_model_args: List[str] = []
-    max_ts_length: Optional[int] = None
     default_n_jobs: Union[int, float] = 0.5
     init_time_in_seconds: int = 0
 
@@ -52,6 +49,20 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         hyperparameters: Dict[str, Any] = None,
         **kwargs,  # noqa
     ):
+        if hyperparameters is None:
+            hyperparameters = {}
+        # TODO: Replace with 'num_cpus' argument passed to fit (after predictor API is changed)
+        n_jobs = hyperparameters.pop("n_jobs", self.default_n_jobs)
+        if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
+            self.n_jobs = max(int(cpu_count() * n_jobs), 1)
+        elif isinstance(n_jobs, int):
+            self.n_jobs = n_jobs
+        else:
+            raise ValueError(f"n_jobs must be a float between 0 and 1 or an integer (received n_jobs = {n_jobs})")
+        # Default values, potentially overridden inside _fit()
+        self.use_fallback_model = hyperparameters.pop("use_fallback_model", True)
+        self.max_ts_length = hyperparameters.pop("max_ts_length", 2500)
+
         super().__init__(
             path=path,
             freq=freq,
@@ -61,16 +72,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             hyperparameters=hyperparameters,
             **kwargs,
         )
-        if hyperparameters is None:
-            hyperparameters = {}
-        # TODO: Replace with 'num_cpus' argument passed to fit (after predictor API is changed)
-        n_jobs = hyperparameters.get("n_jobs", self.default_n_jobs)
-        if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
-            self.n_jobs = max(int(cpu_count() * n_jobs), 1)
-        elif isinstance(n_jobs, int):
-            self.n_jobs = n_jobs
-        else:
-            raise ValueError(f"n_jobs must be a float between 0 and 1 or an integer (received n_jobs = {n_jobs})")
+
         self._local_model_args: Dict[str, Any] = None
         self._seasonal_period: Optional[int] = None
         self.time_limit: Optional[float] = None
@@ -82,7 +84,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         # Initialize parameters passed to each local model
         raw_local_model_args = self._get_model_params().copy()
-        raw_local_model_args.pop("n_jobs", None)
 
         unused_local_model_args = []
         local_model_args = {}
@@ -136,8 +137,8 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         if number_failed_models > 0:
             fraction_failed_models = number_failed_models / len(predictions_with_flags)
             logger.warning(
-                f"\t{self.name} failed for {number_failed_models} time series ({100 * fraction_failed_models:.1f}%). "
-                "Fallback model SeasonalNaive was used for these time series."
+                f"\tWarning: {self.name} failed for {number_failed_models} time series "
+                f"({fraction_failed_models:.1%}). Fallback model SeasonalNaive was used for these time series."
             )
         predictions_df = pd.concat([pred for pred, _ in predictions_with_flags])
         predictions_df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
@@ -159,14 +160,17 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
                 local_model_args=self._local_model_args.copy(),
             )
             model_failed = False
-        except Exception as e:
-            result = seasonal_naive_forecast(
-                target=time_series.values.ravel(),
-                prediction_length=self.prediction_length,
-                quantile_levels=self.quantile_levels,
-                seasonal_period=self._seasonal_period,
-            )
-            model_failed = True
+        except:
+            if self.use_fallback_model:
+                result = seasonal_naive_forecast(
+                    target=time_series.values.ravel(),
+                    prediction_length=self.prediction_length,
+                    quantile_levels=self.quantile_levels,
+                    seasonal_period=self._seasonal_period,
+                )
+                model_failed = True
+            else:
+                raise
         return result, model_failed
 
     def _predict_with_local_model(

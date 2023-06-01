@@ -95,11 +95,14 @@ class AutoARIMAModel(AbstractStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
-    n_jobs : int or float, default = -1
+    n_jobs : int or float, default = 0.5
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
         When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
     allowed_local_model_args = [
@@ -122,7 +125,6 @@ class AutoARIMAModel(AbstractStatsForecastModel):
         "allowmean",
         "seasonal_period",
     ]
-    MAX_TS_LENGTH = 3000
 
     def _update_local_model_args(self, local_model_args: dict) -> dict:
         local_model_args = super()._update_local_model_args(local_model_args)
@@ -155,11 +157,14 @@ class AutoETSModel(AbstractStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
-    n_jobs : int or float, default = -1
+    n_jobs : int or float, default = 0.5
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
         When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
     allowed_local_model_args = [
@@ -196,11 +201,14 @@ class DynamicOptimizedThetaModel(AbstractStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
-    n_jobs : int or float, default = -1
+    n_jobs : int or float, default = 0.5
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
         When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
     allowed_local_model_args = [
@@ -237,11 +245,14 @@ class ThetaModel(AbstractStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
-    n_jobs : int or float, default = -1
+    n_jobs : int or float, default = 0.5
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
         When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
     max_ts_length = 3000
