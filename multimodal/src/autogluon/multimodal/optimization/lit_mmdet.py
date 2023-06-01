@@ -1,25 +1,14 @@
 import logging
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Optional, Union
 
-import numpy as np
 import pytorch_lightning as pl
-import torch
 import torchmetrics
 from omegaconf import DictConfig
 from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
-try:
-    import mmdet
-    from mmcv import ConfigDict
-except ImportError as e:
-    import warnings
-
-    pass
-
-from ..constants import AUTOMM, IMAGE, LABEL
-from ..utils import unpack_datacontainers
+from ..constants import BBOX, IMAGE, LABEL
 from .utils import (
     apply_layerwise_lr_decay,
     apply_single_lr,
@@ -28,6 +17,13 @@ from .utils import (
     get_optimizer,
     remove_parameters_without_grad,
 )
+
+try:
+    import mmdet
+    from mmcv import ConfigDict
+except ImportError as e:
+    mmdet = None
+    ConfigDict = None
 
 logger = logging.getLogger(__name__)
 
@@ -70,66 +66,43 @@ class MMDetLitModule(pl.LightningModule):
         self.input_data_key = self.model.prefix + "_" + IMAGE
         self.input_label_key = self.model.prefix + "_" + LABEL
 
-    def _predict_step(self, batch, batch_idx=0, return_loss=False):
-        pred_results = self.model.model(
-            return_loss=False,
-            rescale=True,
-            img=batch[self.input_data_key]["imgs"],
-            img_metas=batch[self.input_data_key]["img_metas"],
-        )
+    def _base_step(self, batch, mode):
+        ret = self.model(batch=batch[self.input_data_key], mode=mode)
 
-        return pred_results
+        return ret
 
-    def _loss_step(self, img, img_metas, gt_bboxes, gt_labels):
-        loss, log_vars = self.compute_loss(
-            img=img,
-            img_metas=img_metas,
-            gt_bboxes=gt_bboxes,
-            gt_labels=gt_labels,
-        )
+    def _predict_step(self, batch):
+        return self._base_step(batch=batch, mode="predict")
 
-        return loss, log_vars
+    def _loss_step(self, batch):
+        return self._base_step(batch=batch, mode="loss")
 
-    def _get_map_input(self, pred_results, sample):
+    def _get_map_input(self, pred_results):
+
         preds = []
-        for img_idx, img_result in enumerate(pred_results):
-            img_result = img_result
-            boxes = []
-            scores = []
-            labels = []
-            if isinstance(img_result[0], list):
+        target = []
+
+        batch_size = len(pred_results)
+
+        for i in range(batch_size):
+            if hasattr(pred_results[i][BBOX], "masks"):
                 # has one additional dimension with 2 outputs: img_result=img_result[0], mask_result=img_result[1]
                 raise NotImplementedError(
                     "Do not support training for models with masks like mask r-cnn, "
                     "because most custom datasets do not have a ground truth mask."
                     " However, you can still inference with this model."
                 )
-            for category_idx, category_result in enumerate(img_result):
-                for item_idx, item_result in enumerate(category_result):
-                    boxes.append(item_result[:4])
-                    scores.append(float(item_result[4]))
-                    labels.append(category_idx)
             preds.append(
                 dict(
-                    boxes=torch.tensor(np.array(boxes).astype(float)).float().to(self.device),
-                    scores=torch.tensor(scores).float().to(self.device),
-                    labels=torch.tensor(labels).long().to(self.device),
+                    boxes=pred_results[i][BBOX].bboxes,  # .float().to(self.device)?
+                    scores=pred_results[i][BBOX].scores,  # .float().to(self.device)?
+                    labels=pred_results[i][BBOX].labels,  # .long().to(self.device)?
                 )
             )
-
-        target = []
-
-        batch_size = len(preds)
-        batch = unpack_datacontainers(sample)
-        gt = batch[self.input_label_key]  # batch_size, (n, 5)
-        for i in range(batch_size):
-            img_gt = np.array(gt[i])
-            boxes = img_gt[:, :4]
-            labels = img_gt[:, 4]
             target.append(
                 dict(
-                    boxes=torch.tensor(boxes).float().to(self.device),
-                    labels=torch.tensor(labels).long().to(self.device),
+                    boxes=pred_results[i][LABEL].bboxes,
+                    labels=pred_results[i][LABEL].labels,
                 )
             )
 
@@ -142,98 +115,44 @@ class MMDetLitModule(pl.LightningModule):
         """
         pred_results = self._predict_step(sample)
 
-        preds, target = self._get_map_input(pred_results, sample)
+        preds, target = self._get_map_input(pred_results)
 
         # use MeanAveragePrecision, example code: https://github.com/Lightning-AI/metrics/blob/master/examples/detection_map.py
         self.validation_metric.update(preds, target)
 
         return pred_results
 
-    def compute_loss(self, img, img_metas, gt_bboxes, gt_labels, *args, **kwargs):
-        """
-        Equivalent to `val_step` and `train_step` of `self.model`.
-        https://github.com/open-mmlab/mmdetection/blob/56e42e72cdf516bebb676e586f408b98f854d84c/mmdet/models/detectors/base.py#L221
-        https://github.com/open-mmlab/mmdetection/blob/56e42e72cdf516bebb676e586f408b98f854d84c/mmdet/models/detectors/base.py#L256
-        Parameters
-        ----------
-        img
-            Image Tensor
-            torch.Tensor, Size: [batch_size, C, W, H]
-        img_metas
-            List of image metadata dict
-            [
-                {
-                    'filename': 'data/VOCdevkit/VOC2007/JPEGImages/000001.jpg',
-                    'ori_filename': 'JPEGImages/000001.jpg',
-                    'ori_shape': (500, 353, 3),
-                    ...
-                },
-                ...(batch size times)
-            ]
-        gt_bboxes
-            List of ground-truth bounding boxes position tensors
-            [
-                torch.Tensor, Size: [# objects in image, 4],
-                ...(batch size times)
-            ]
-        gt_labels
-            List of ground-truth bounding boxes label tensors
-            [
-                torch.Tensor, Size: [# objects in image],
-                ...(batch size times)
-            ]
-        """
-        losses = self.model.forward_train(
-            img=img,
-            img_metas=img_metas,
-            gt_bboxes=gt_bboxes,
-            gt_labels=gt_labels,
-            *args,
-            **kwargs,
-        )
-        return self.parse_losses(losses)
+    def sum_and_log_step_results(self, losses, logging=True):
+        # losses is a dict of several type of losses, e.g. ['loss_cls', 'loss_conf', 'loss_xy', 'loss_wh']
+        # each type of losses may have multiple channels due to multiple resolution settings
+        total_loss = 0.0
+        for loss_key, loss_values in losses.items():
+            curr_loss = 0.0
+            if isinstance(loss_values, list) or isinstance(loss_values, tuple):  # is a collection of shape 0 tensors
+                for loss_chanel_idx, loss_val in enumerate(loss_values):
+                    if logging:
+                        self.log(f"step/{loss_key}_{loss_chanel_idx}", loss_val)
+                    curr_loss += loss_val
+            else:  # is a tensor
+                curr_loss += loss_values.sum()
 
-    def parse_losses(self, losses):
-        # `_parse_losses`: https://github.com/open-mmlab/mmdetection/blob/
-        # 56e42e72cdf516bebb676e586f408b98f854d84c/mmdet/models/detectors/base.py#L176
-        loss, log_vars = self.model._parse_losses(losses)
-        return loss, log_vars
+            if logging:
+                self.log(f"step/{loss_key}", curr_loss)
+            total_loss += curr_loss
 
-    def log_step_results(self, losses):
-        map_loss_names = {
-            "loss": "total_loss",
-            "acc": "classification-accuracy",
-            "loss_rpn_cls": "loss/rpn_cls",
-            "loss_rpn_bbox": "loss/rpn_bbox",
-            "loss_bbox": "loss/bbox_reg",
-            "loss_cls": "loss/classification",
-        }
-        for key in losses:
-            # map metric names same name with epoch-wise metrics defined in:
-            # `configs/vision/object-detection/mmdet/mmdet-base.yaml`
-            loss_name = map_loss_names.get(key, key)
-            self.log(f"step/{loss_name}", losses[key])
+        return total_loss
 
     def training_step(self, batch, batch_idx):
-        loss, log_vars = self._loss_step(
-            img=batch[self.input_data_key]["img"],
-            img_metas=batch[self.input_data_key]["img_metas"],
-            gt_bboxes=batch[self.input_data_key]["gt_bboxes"],
-            gt_labels=batch[self.input_data_key]["gt_labels"],
-        )
-        # log step losses
-        self.log_step_results(log_vars)
-        return loss
+        losses = self._loss_step(batch=batch)
+        # sum and log step losses
+        total_loss = self.sum_and_log_step_results(losses)
+        return total_loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         if self.use_loss:
-            val_loss, log_vars = self._loss_step(
-                img=batch[self.input_data_key]["img"],
-                img_metas=batch[self.input_data_key]["img_metas"],
-                gt_bboxes=batch[self.input_data_key]["gt_bboxes"],
-                gt_labels=batch[self.input_data_key]["gt_labels"],
-            )
-            self.validation_metric.update(val_loss)
+            losses = self._loss_step(batch=batch)
+            total_loss = self.sum_and_log_step_results(losses, logging=False)
+            self.validation_metric.update(total_loss)
         else:
             self.evaluate(batch, "val")
 
@@ -252,11 +171,9 @@ class MMDetLitModule(pl.LightningModule):
         raise NotImplementedError("test with lit_mmdet is not implemented yet.")
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        pred = self._predict_step(batch, batch_idx)
-        if "mmdet_image_label" in batch:
-            return {"bbox": pred, "label": batch[self.input_label_key]}
-        else:
-            return {"bbox": pred}
+        pred = self._predict_step(batch)
+
+        return pred
 
     def configure_optimizers(self):
         """

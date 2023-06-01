@@ -8,26 +8,6 @@ from PIL import ImageFile
 from torch import nn
 
 try:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        import mmcv
-    from mmcv.parallel import collate
-except ImportError as e:
-    mmcv = None
-
-try:
-    import mmdet
-    from mmdet.datasets import replace_ImageToTensor
-    from mmdet.datasets.pipelines import Compose
-except ImportError as e:
-    mmdet = None
-
-try:
-    import mmocr
-except ImportError:
-    mmocr = None
-
-try:
     from torchvision.transforms import InterpolationMode
 
     BICUBIC = InterpolationMode.BICUBIC
@@ -37,6 +17,26 @@ except ImportError:
 from ...constants import AUTOMM, COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
 from ..collator import StackCollator
 from ..utils import is_rois_input
+
+try:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        import mmcv
+    from mmcv.transforms import Compose
+except ImportError as e:
+    mmcv = None
+
+try:
+    import mmdet
+    from mmdet.datasets.transforms import ImageToTensor
+except ImportError as e:
+    mmdet = None
+
+try:
+    import mmocr
+except ImportError:
+    mmocr = None
+
 
 logger = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -74,6 +74,9 @@ class MMLabProcessor:
         requires_column_info
             Whether to require feature column information in dataloader.
         """
+        from ...utils import check_if_packages_installed
+
+        check_if_packages_installed(package_names=["mmcv"])
 
         self.prefix = model.prefix
         self.missing_value_strategy = missing_value_strategy
@@ -88,17 +91,12 @@ class MMLabProcessor:
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
         if self.prefix.lower().startswith(MMDET_IMAGE):
-            assert mmdet is not None, 'Please install MMDetection by: pip install "mmdet>=2.28, <3.0.0".'
+            check_if_packages_installed(package_names=["mmdet"])
         else:
             assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
         self.cfg = model.model.cfg
-        # TODO: remove hardcode here
-        try:  # yolov3
-            training_pipeline = self.cfg.data.train.dataset.pipeline
-        except:  # faster_rcnn
-            training_pipeline = self.cfg.data.train.pipeline
-        self.val_processor = Compose(replace_ImageToTensor(self.cfg.data.val.pipeline))
-        self.train_processor = Compose(replace_ImageToTensor(training_pipeline))
+        self.val_processor = Compose(self.cfg.test_pipeline)
+        self.train_processor = Compose(self.cfg.train_pipeline)
 
     @property
     def image_key(self):
@@ -123,13 +121,12 @@ class MMLabProcessor:
         -------
         A dictionary containing one model's collator function for image data.
         """
+
         fn = {}
         if self.requires_column_info:
             assert image_column_names, "Empty image column names."
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = StackCollator()
-
-        assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
 
         fn.update(
             {

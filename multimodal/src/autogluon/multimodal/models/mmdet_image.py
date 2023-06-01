@@ -7,41 +7,22 @@ from typing import Optional
 import torch
 from torch import nn
 
-try:
-    import warnings
+from ..constants import BBOX, BBOX_FORMATS, COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, XYXY
+from .utils import freeze_model_layers, lookup_mmdet_config, update_mmdet_config
 
+try:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         import mmcv
-    from mmcv.ops import RoIPool
-    from mmcv.parallel import scatter
-    from mmcv.runner import load_checkpoint
+    import mmdet
+    import mmengine
+    from mmdet.registry import MODELS
+    from mmengine.runner import load_checkpoint
 except ImportError as e:
     mmcv = None
-
-try:
-    import mmdet
-    from mmdet.core import get_classes
-    from mmdet.models import build_detector
-except ImportError as e:
     mmdet = None
+    mmengine = None
 
-from ..constants import (
-    AUTOMM,
-    BBOX,
-    BBOX_FORMATS,
-    COLUMN,
-    COLUMN_FEATURES,
-    FEATURES,
-    IMAGE,
-    IMAGE_VALID_NUM,
-    LABEL,
-    LOGITS,
-    MASKS,
-    XYWH,
-    XYXY,
-)
-from .utils import freeze_model_layers, lookup_mmdet_config, update_mmdet_config
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +57,10 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         pretrained
             Whether using the pretrained mmdet models. If pretrained=True, download the pretrained model.
         """
+        from ..utils import check_if_packages_installed
+
+        check_if_packages_installed(package_names=["mmcv", "mmengine", "mmdet"])
+
         super().__init__()
         self.prefix = prefix
         self.pretrained = pretrained
@@ -84,6 +69,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.config_file = config_file
         self.classes = classes
         self.frozen_layers = frozen_layers
+
+        self.device = None
 
         if output_bbox_format.lower() in BBOX_FORMATS:
             self.output_bbox_format = output_bbox_format.lower()
@@ -123,9 +110,19 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         return
 
     def _load_checkpoint(self, checkpoint_file):
+
         # build model and load pretrained weights
-        assert mmdet is not None, 'Please install MMDetection by: pip install "mmdet>=2.28, <3.0.0".'
-        self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
+        from mmdet.utils import register_all_modules
+
+        register_all_modules()  # https://github.com/open-mmlab/mmdetection/issues/9719
+
+        self.model = MODELS.build(self.config.model)
+        # yolox use self.config.model.data_preprocessor, yolov3 use self.config.data_preprocessor
+        self.data_preprocessor = MODELS.build(
+            self.config.data_preprocessor
+            if "data_preprocessor" in self.config
+            else self.config.model.data_preprocessor
+        )
 
         if self.pretrained and checkpoint_file is not None:  # TODO: enable training from scratch
             self.checkpoint = load_checkpoint(self.model, checkpoint_file, map_location="cpu")
@@ -146,6 +143,12 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id <= 0]
+
+    def set_data_preprocessor_device(self):
+        if not self.device:
+            self.device = next(self.model.parameters()).device
+        if self.device != self.data_preprocessor.device:
+            self.data_preprocessor.to(self.device)
 
     def save(self, save_path: str = "./", tokenizers: Optional[dict] = None):
 
@@ -188,35 +191,35 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 "url": "https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn_1x_voc0712_20220320_192712-54bef0f3.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "voc", "faster_rcnn_r50_fpn_1x_voc0712.py"),
             },
-            "yolox_nano_8x8_300e_coco": {
+            "yolox_nano": {
                 "url": "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_nano.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_nano_8x8_300e_coco.py"),
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_nano_8xb8-300e_coco.py"),
                 "source": "MegVii",
             },
-            "yolox_tiny_8x8_300e_coco": {
+            "yolox_tiny": {
                 "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_tiny_8x8_300e_coco/yolox_tiny_8x8_300e_coco_20211124_171234-b4047906.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_tiny_8x8_300e_coco.py"),
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_tiny_8xb8-300e_coco.py"),
             },
-            "yolox_s_8x8_300e_coco": {
+            "yolox_s": {
                 "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_s_8x8_300e_coco/yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_s_8x8_300e_coco.py"),
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_s_8xb8-300e_coco.py"),
             },
-            "yolox_m_8x8_300e_coco": {
+            "yolox_m": {
                 "url": "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_m.pth",  # Megvii weight, need more verifications
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_m_8x8_300e_coco.py"),
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_m_8xb8-300e_coco.py"),
                 "source": "MegVii",
             },
-            "yolox_l_8x8_300e_coco": {
+            "yolox_l": {
                 "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_l_8x8_300e_coco/yolox_l_8x8_300e_coco_20211126_140236-d3bd2b23.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py"),
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8xb8-300e_coco.py"),
             },
             "yolox_l_objects365": {  # TODO: update with better pretrained weights
                 "url": "https://automl-mm-bench.s3.amazonaws.com/object_detection/checkpoints/yolox/yolox_l_objects365_temp.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8x8_300e_coco.py"),
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_l_8xb8-300e_coco.py"),
             },
-            "yolox_x_8x8_300e_coco": {
+            "yolox_x": {
                 "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_x_8x8_300e_coco/yolox_x_8x8_300e_coco_20211126_140254-1ef88d67.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_x_8x8_300e_coco.py"),
+                "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_x_8xb8-300e_coco.py"),
             },
         }
 
@@ -252,7 +255,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                     mimdownload(package="mmdet", configs=[checkpoint_name], dest_root=".")
                     config_file = checkpoint_name + ".py"
                 except Exception as e:
-                    print(e)
                     raise ValueError(f"Invalid checkpoint_name ({checkpoint_name}) or config_file ({config_file}): ")
 
         self.checkpoint_name = checkpoint_name
@@ -261,9 +263,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
     def _load_config(self):
         # read config files
-        assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
         if isinstance(self.config_file, str):
-            self.config = mmcv.Config.fromfile(self.config_file)
+            self.config = mmengine.Config.fromfile(self.config_file)
         else:
             if not isinstance(self.config_file, dict):
                 raise ValueError(
@@ -293,7 +294,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
     def forward(
         self,
-        batch: dict,
+        batch,
+        mode,
     ):
         """
         Parameters
@@ -301,37 +303,30 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         batch
             A dictionary containing the input mini-batch data.
             We need to use the keys with the model prefix to index required data.
+        mode
+            "loss" or "predict". TODO: support "tensor"
+            https://github.com/open-mmlab/mmdetection/blob/main/mmdet/models/detectors/base.py#L58C1
 
         Returns
         -------
             A dictionary with bounding boxes.
         """
-        # TODO: refactor this to work like forward() in MMDet, and support realtime predict
-        logger.warning("MMDetAutoModelForObjectDetection.forward() is deprecated since it does not support multi gpu.")
 
-        data = batch[self.image_key]
+        self.set_data_preprocessor_device()
+        data = self.data_preprocessor(batch)
+        rets = self.model(
+            inputs=data["inputs"],
+            data_samples=data["data_samples"],
+            mode=mode,
+        )
 
-        data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
-        data["img"] = [img.data[0] for img in data["img"]]
-
-        device = next(self.model.parameters()).device  # model device
-        if next(self.model.parameters()).is_cuda:
-            # scatter to specified GPU
-            data = scatter(data, [device])[0]
+        if mode == "loss":
+            return rets
+        elif mode == "predict":
+            # for detailed data structure, see https://github.com/open-mmlab/mmdetection/blob/main/mmdet/structures/det_data_sample.py
+            return [{BBOX: ret.pred_instances, LABEL: ret.gt_instances} for ret in rets]
         else:
-            for m in self.model.modules():
-                assert not isinstance(m, RoIPool), "CPU inference with RoIPool is not supported currently."
-
-        results = self.model(return_loss=False, rescale=True, **data)
-
-        ret = {BBOX: results}
-        return {self.prefix: ret}
-
-    def forward_test(self, imgs, img_metas, rescale=True):
-        return self.model.forward_test(imgs=imgs, img_metas=img_metas, rescale=rescale)
-
-    def forward_train(self, img, img_metas, gt_bboxes, gt_labels):
-        return self.model.forward_train(img=img, img_metas=img_metas, gt_bboxes=gt_bboxes, gt_labels=gt_labels)
+            raise ValueError(f"{mode} mode is not supported.")
 
     def _parse_losses(self, losses):
         return self.model._parse_losses(losses)

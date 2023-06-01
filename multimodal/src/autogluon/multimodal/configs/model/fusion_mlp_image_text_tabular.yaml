@@ -143,7 +143,7 @@ model:
     max_img_num_per_col: 2
 
   mmdet_image:
-    checkpoint_name: "yolov3_mobilenetv2_320_300e_coco"
+    checkpoint_name: "yolov3_mobilenetv2_8xb24-320-300e_coco"
     config_file: ""
     data_types:
       - "image"
