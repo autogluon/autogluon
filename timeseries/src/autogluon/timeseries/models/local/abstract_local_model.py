@@ -49,6 +49,20 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         hyperparameters: Dict[str, Any] = None,
         **kwargs,  # noqa
     ):
+        if hyperparameters is None:
+            hyperparameters = {}
+        # TODO: Replace with 'num_cpus' argument passed to fit (after predictor API is changed)
+        n_jobs = hyperparameters.pop("n_jobs", self.default_n_jobs)
+        if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
+            self.n_jobs = max(int(cpu_count() * n_jobs), 1)
+        elif isinstance(n_jobs, int):
+            self.n_jobs = n_jobs
+        else:
+            raise ValueError(f"n_jobs must be a float between 0 and 1 or an integer (received n_jobs = {n_jobs})")
+        # Default values, potentially overridden inside _fit()
+        self.use_fallback_model = hyperparameters.pop("use_fallback_model", True)
+        self.max_ts_length = hyperparameters.pop("max_ts_length", 2500)
+
         super().__init__(
             path=path,
             freq=freq,
@@ -58,19 +72,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             hyperparameters=hyperparameters,
             **kwargs,
         )
-        if hyperparameters is None:
-            hyperparameters = {}
-        # TODO: Replace with 'num_cpus' argument passed to fit (after predictor API is changed)
-        n_jobs = hyperparameters.get("n_jobs", self.default_n_jobs)
-        if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
-            self.n_jobs = max(int(cpu_count() * n_jobs), 1)
-        elif isinstance(n_jobs, int):
-            self.n_jobs = n_jobs
-        else:
-            raise ValueError(f"n_jobs must be a float between 0 and 1 or an integer (received n_jobs = {n_jobs})")
-        # Default values, potentially overridden inside _fit()
-        self.use_fallback_model = True
-        self.max_ts_length = 2500
 
         self._local_model_args: Dict[str, Any] = None
         self._seasonal_period: Optional[int] = None
@@ -83,10 +84,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         # Initialize parameters passed to each local model
         raw_local_model_args = self._get_model_params().copy()
-        raw_local_model_args.pop("n_jobs", None)
-
-        self.use_fallback_model = raw_local_model_args.pop("use_fallback_model", self.use_fallback_model)
-        self.max_ts_length = raw_local_model_args.pop("max_ts_length", self.max_ts_length)
 
         unused_local_model_args = []
         local_model_args = {}
