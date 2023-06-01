@@ -54,7 +54,7 @@ function install_multimodal {
     python3 -m pip install --upgrade pytest-xdist
     install_local_packages "multimodal/$1"
     setup_mmcv
-    python3 -m pip install --upgrade "mmocr<1.0"
+    # python3 -m pip install --upgrade "mmocr<1.0"  # not compatible with mmcv 2.0
     setup_groundingdino
 }
 
