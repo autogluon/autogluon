@@ -2982,6 +2982,12 @@ class TabularPredictor:
         best_model_node = self.get_model_best()
 
         A = nx.nx_agraph.to_agraph(G)
+        
+        for node in A.iternodes():
+            # Remove unnecessary attributes
+            label = f"{node.name}\nVal score: {float(node.attr['val_score']):.4f}"
+            node.attr.clear()
+            node.attr['label'] = label
 
         A.graph_attr.update(rankdir='BT')
         A.node_attr.update(fontsize=10)
