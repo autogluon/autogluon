@@ -138,7 +138,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             fraction_failed_models = number_failed_models / len(predictions_with_flags)
             logger.warning(
                 f"\tWarning: {self.name} failed for {number_failed_models} time series "
-                f"({fraction_failed_models:.1%}%). Fallback model SeasonalNaive was used for these time series."
+                f"({fraction_failed_models:.1%}). Fallback model SeasonalNaive was used for these time series."
             )
         predictions_df = pd.concat([pred for pred, _ in predictions_with_flags])
         predictions_df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
