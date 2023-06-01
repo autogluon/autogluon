@@ -132,8 +132,10 @@ from .utils import (
     get_available_devices,
     get_config,
     get_detection_classes,
+    get_dir_ckpt_paths,
     get_fit_complete_message,
     get_fit_start_message,
+    get_load_ckpt_paths,
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_mixup,
@@ -152,7 +154,6 @@ from .utils import (
     modify_duplicate_model_names,
     object_detection_data_to_df,
     predict,
-    process_batch,
     save_ovd_result_df,
     save_pretrained_model_configs,
     save_result_df,
@@ -2618,6 +2619,7 @@ class MultiModalPredictor(ExportMixin):
         can be completely or partially trained by .fit(). If a previous training has completed,
         it will load the checkpoint `model.ckpt`. Otherwise if a previous training accidentally
         collapses in the middle, it can load the `last.ckpt` checkpoint by setting `resume=True`.
+        It also supports loading one specific checkpoint given its path.
 
         Parameters
         ----------
@@ -2634,11 +2636,12 @@ class MultiModalPredictor(ExportMixin):
         -------
         The loaded predictor object.
         """
-        path = os.path.abspath(os.path.expanduser(path))
-        assert os.path.isdir(path), f"'{path}' must be an existing directory."
+        dir_path, ckpt_path = get_dir_ckpt_paths(path=path)
+
+        assert os.path.isdir(dir_path), f"'{dir_path}' must be an existing directory."
         predictor = cls(label="dummy_label")
 
-        with open(os.path.join(path, "assets.json"), "r") as fp:
+        with open(os.path.join(dir_path, "assets.json"), "r") as fp:
             assets = json.load(fp)
         if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
             predictor._matcher = MultiModalMatcher.load(
@@ -2648,7 +2651,7 @@ class MultiModalPredictor(ExportMixin):
             )
             return predictor
 
-        predictor = cls._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)
+        predictor = cls._load_metadata(predictor=predictor, path=dir_path, resume=resume, verbosity=verbosity)
 
         efficient_finetune = OmegaConf.select(predictor._config, "optimization.efficient_finetune")
 
@@ -2669,42 +2672,11 @@ class MultiModalPredictor(ExportMixin):
                 model=model,
             )
 
-        resume_ckpt_path = os.path.join(path, LAST_CHECKPOINT)
-        final_ckpt_path = os.path.join(path, MODEL_CHECKPOINT)
-        if resume:  # resume training which crashed before
-            if not os.path.isfile(resume_ckpt_path):
-                if os.path.isfile(final_ckpt_path):
-                    raise ValueError(
-                        f"Resuming checkpoint '{resume_ckpt_path}' doesn't exist, but "
-                        f"final checkpoint '{final_ckpt_path}' exists, which means training "
-                        f"is already completed."
-                    )
-                else:
-                    raise ValueError(
-                        f"Resuming checkpoint '{resume_ckpt_path}' and "
-                        f"final checkpoint '{final_ckpt_path}' both don't exist. "
-                        f"Consider starting training from scratch."
-                    )
-            load_path = resume_ckpt_path
-            logger.info(f"Resume training from checkpoint: '{resume_ckpt_path}'")
-            ckpt_path = resume_ckpt_path
-        else:  # load a model checkpoint for prediction, evaluation, or continuing training on new data
-            if not os.path.isfile(final_ckpt_path):
-                if os.path.isfile(resume_ckpt_path):
-                    raise ValueError(
-                        f"Final checkpoint '{final_ckpt_path}' doesn't exist, but "
-                        f"resuming checkpoint '{resume_ckpt_path}' exists, which means training "
-                        f"is not done yet. Consider resume training from '{resume_ckpt_path}'."
-                    )
-                else:
-                    raise ValueError(
-                        f"Resuming checkpoint '{resume_ckpt_path}' and "
-                        f"final checkpoint '{final_ckpt_path}' both don't exist. "
-                        f"Consider starting training from scratch."
-                    )
-            load_path = final_ckpt_path
-            logger.info(f"Load pretrained checkpoint: {os.path.join(path, MODEL_CHECKPOINT)}")
-            ckpt_path = None  # must set None since we do not resume training
+        load_path, ckpt_path = get_load_ckpt_paths(
+            ckpt_path=ckpt_path,
+            dir_path=dir_path,
+            resume=resume,
+        )
 
         model = cls._load_state_dict(
             model=model,

@@ -34,7 +34,7 @@ distilled_model_names = predictor.distill(time_limit=time_limit, augment_args={'
 # Other distillation variants demonstrating different usage options:
 predictor.distill(time_limit=time_limit, teacher_preds='soft', augment_method='spunge', augment_args={'size_factor': 1}, verbosity=3, models_name_suffix='spunge')
 
-predictor.distill(time_limit=time_limit, hyperparameters={'GBM': {}, 'NN_MXNET': {}}, teacher_preds='soft', augment_method='munge', augment_args={'size_factor': 1, 'max_size': 100}, models_name_suffix='munge')
+predictor.distill(time_limit=time_limit, hyperparameters={'GBM': {}}, teacher_preds='soft', augment_method='munge', augment_args={'size_factor': 1, 'max_size': 100}, models_name_suffix='munge')
 
 predictor.distill(augmentation_data=aug_data, time_limit=time_limit, teacher_preds='soft', models_name_suffix='extra')  # augmentation with "extra" unlabeled data.
 

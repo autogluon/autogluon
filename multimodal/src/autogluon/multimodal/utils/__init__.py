@@ -44,7 +44,7 @@ from .environment import (
 from .export import ExportMixin
 from .hpo import hyperparameter_tune
 from .inference import extract_from_output, infer_batch, predict, process_batch, use_realtime
-from .load import CustomUnpickler, load_text_tokenizers
+from .load import CustomUnpickler, get_dir_ckpt_paths, get_load_ckpt_paths, load_text_tokenizers
 from .log import LogFilter, apply_log_filter, get_fit_complete_message, get_fit_start_message, make_exp_dir
 from .map import MeanAveragePrecision
 from .matcher import compute_semantic_similarity, convert_data_for_ranking, create_siamese_model, semantic_search

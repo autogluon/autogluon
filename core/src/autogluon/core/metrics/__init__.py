@@ -632,7 +632,6 @@ def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
         if metric == 'soft_log_loss':
             if problem_type == QUANTILE:
                 raise ValueError(f"{metric_type}={metric} can not be used for quantile problems")
-            # Requires mxnet
             from .softclass_metrics import soft_log_loss
             return soft_log_loss
         if problem_type is not None:

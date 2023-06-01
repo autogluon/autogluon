@@ -31,21 +31,7 @@ class ResourceManager:
     def get_gpu_count_all():
         num_gpus = ResourceManager._get_gpu_count_cuda()
         if num_gpus == 0:
-            # Get num gpus from mxnet first because of https://github.com/autogluon/autogluon/issues/2042
-            # TODO: stop using mxnet to determine num gpus once mxnet is removed from AG
-            num_gpus = ResourceManager.get_gpu_count_mxnet()
-            if num_gpus == 0:
-                num_gpus = ResourceManager.get_gpu_count_torch()
-        return num_gpus
-
-    @staticmethod
-    def get_gpu_count_mxnet():
-        # TODO: Remove this once AG get rid off mxnet
-        try:
-            import mxnet
-            num_gpus = mxnet.context.num_gpus()
-        except Exception:
-            num_gpus = 0
+            num_gpus = ResourceManager.get_gpu_count_torch()
         return num_gpus
 
     @staticmethod
@@ -123,7 +109,7 @@ class ResourceManager:
     @staticmethod
     def _get_gpu_count_cuda():
         # FIXME: Sometimes doesn't detect GPU on Windows
-        # FIXME: Doesn't ensure the GPUs are actually usable by the model (MXNet, PyTorch, etc.)
+        # FIXME: Doesn't ensure the GPUs are actually usable by the model (PyTorch, etc.)
         from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
         if not cudaInit(): return 0
         gpu_count = cudaDeviceGetCount()

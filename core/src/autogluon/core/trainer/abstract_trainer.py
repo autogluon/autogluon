@@ -437,11 +437,30 @@ class AbstractTrainer:
                                                   infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, **aux_kwargs)
         return core_models, aux_models
 
-    def stack_new_level_core(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None,
-                             level=1, base_model_names: List[str] = None, stack_name='core',
-                             ag_args=None, ag_args_fit=None, ag_args_ensemble=None, excluded_model_types=None, ensemble_type=StackerEnsembleModel,
-                             name_suffix: str = None, get_models_func=None, refit_full=False,
-                             infer_limit=None, infer_limit_batch_size=None, **kwargs) -> List[str]:
+    def stack_new_level_core(
+        self,
+        X,
+        y,
+        models: Union[List[AbstractModel], dict],
+        X_val=None,
+        y_val=None,
+        X_unlabeled=None,
+        level=1,
+        base_model_names: List[str] = None,
+        stack_name='core',
+        ag_args=None,
+        ag_args_fit=None,
+        ag_args_ensemble=None,
+        included_model_types=None,
+        excluded_model_types=None,
+        ensemble_type=StackerEnsembleModel,
+        name_suffix: str = None,
+        get_models_func=None,
+        refit_full=False,
+        infer_limit=None,
+        infer_limit_batch_size=None,
+        **kwargs
+    ) -> List[str]:
         """
         Trains all models using the data provided.
         If level > 1, then the models will use base model predictions as additional features.
@@ -469,6 +488,7 @@ class AbstractTrainer:
                 name_suffix=name_suffix,
                 ag_args=ag_args,
                 ag_args_fit=ag_args_fit,
+                included_model_types=included_model_types,
                 excluded_model_types=excluded_model_types,
             )
 
@@ -2820,7 +2840,7 @@ class AbstractTrainer:
             name_suffix = name_suffix + "_" + models_name_suffix
 
         if hyperparameters is None:
-            hyperparameters = {'GBM': {}, 'CAT': {}, 'NN_MXNET': {},  'NN_TORCH': {}, 'RF': {}}
+            hyperparameters = {'GBM': {}, 'CAT': {}, 'NN_TORCH': {}, 'RF': {}}
         hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters)  # TODO: consider exposing ag_args_fit, excluded_model_types as distill() arguments.
         if teacher_preds is not None and teacher_preds != 'hard' and self.problem_type != REGRESSION:
             self._regress_preds_asprobas = True
