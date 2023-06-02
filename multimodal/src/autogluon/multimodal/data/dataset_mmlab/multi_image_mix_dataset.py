@@ -17,15 +17,12 @@ logger = logging.getLogger(__name__)
 
 try:
     import mmcv
-
     from mmcv.transforms import BaseTransform
     from mmcv.transforms.utils import cache_randomness
-
+    from mmdet.structures.bbox import autocast_box_type
+    from mmdet.utils import log_img_scale
     from mmengine.dataset import BaseDataset
     from mmengine.config import Config as MMConfig
-
-    from mmdet.structures.bbox import autocast_box_type
-    from mmdet.utils import log_img_scale  # inline import to avoid mmdet uninstall error for other tasks
 
     class MultiImageMixDataset(torch.utils.data.Dataset):
         """
