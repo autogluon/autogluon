@@ -202,6 +202,8 @@ class MultiModalPredictor(ExportMixin):
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
+        pretrained: Optional[bool] = True,
+        validation_metric: Optional[str] = None,
         sample_data_path: Optional[str] = None,
     ):
         """
@@ -306,6 +308,8 @@ class MultiModalPredictor(ExportMixin):
         init_scratch
             Whether to init model from scratch. It's useful when we want to load a checkpoints
             without its weights.
+        pretrained
+            Whether to init model with pretrained weights. If False, it creates a model with random initialization.
         sample_data_path
             This is used for automatically inference num_classes, classes, or label.
 
@@ -387,12 +391,12 @@ class MultiModalPredictor(ExportMixin):
         self._label_column = label
         self._problem_type = problem_type
         self._presets = presets.lower() if presets else None
-        self._eval_metric_name = eval_metric
-        self._validation_metric_name = None
+        self._eval_metric_name = eval_metric.lower() if eval_metric else None
+        self._validation_metric_name = validation_metric.lower() if validation_metric else None
         self._output_shape = num_classes
         self._classes = classes
         self._ckpt_path = None
-        self._pretrained_path = None
+        self._pretrained = pretrained
         self._config = None
         self._df_preprocessor = None
         self._column_types = None
@@ -403,11 +407,11 @@ class MultiModalPredictor(ExportMixin):
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
-        self._init_scratch = init_scratch
         self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._matcher = None
         self._save_path = path
+        self._hyperparameters = hyperparameters
 
         # Summary statistics used in fit summary. TODO: wrap it in a class.
         self._total_train_time = None
@@ -435,22 +439,6 @@ class MultiModalPredictor(ExportMixin):
             if self._sample_data_path is not None:
                 self._classes = get_detection_classes(self._sample_data_path)
                 self._output_shape = len(self._classes)
-
-        if self._problem_type is not None:
-            if self.problem_property.support_zero_shot:
-                # Load pretrained model via the provided hyperparameters and presets
-                # TODO: do not create pretrained model for HPO presets.
-                self._config, self._model, self._data_processors = init_pretrained(
-                    problem_type=self._problem_type,
-                    presets=self._presets,
-                    hyperparameters=hyperparameters,
-                    num_classes=self._output_shape,
-                    classes=self._classes,
-                    init_scratch=self._init_scratch,
-                )
-                self._validation_metric_name = self._config["optimization"][
-                    "val_metric"
-                ]  # TODO: only object detection is using this
 
     @property
     def path(self):
@@ -786,10 +774,15 @@ class MultiModalPredictor(ExportMixin):
         self._validation_metric_name = validation_metric_name
         self._column_types = column_types
 
+        if self._hyperparameters and hyperparameters:
+                self._hyperparameters.update(hyperparameters)
+        elif hyperparameters:
+            self._hyperparameters = hyperparameters
+
         hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
             problem_type=self._problem_type,
             presets=presets,
-            provided_hyperparameters=hyperparameters,
+            provided_hyperparameters=self._hyperparameters,
             provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             teacher_predictor=teacher_predictor,
         )
@@ -895,14 +888,31 @@ class MultiModalPredictor(ExportMixin):
         )
         return train_data, tuning_data
 
-    def _verify_inference_ready(self):
+    def _init_pretrained(self):
+        if self._config is None:
+            self._config = get_config(problem_type=self._problem_type, presets=self._presets, overrides=self._hyperparameters)
+        if self._model is None:
+            assert (
+                    len(self._config.model.names) == 1
+            ), f"Zero shot mode only supports using one model, but detects multiple models {self._config.model.names}"
+            self._model = create_fusion_model(config=self._config, pretrained=self._pretrained, num_classes=self._output_shape,
+                                              classes=self._classes)
+        if self._data_processors is None:
+            self._data_processors = create_fusion_data_processors(
+                config=self._config,
+                model=self._model,
+            )
+
+    def _ensure_inference_ready(self):
         if not self._fit_called:
-            if self._problem_type and not self.problem_property.support_zero_shot:
+            if not self.problem_property.support_zero_shot:  # problem_type=None also doesn't support zero-shot inference
                 raise RuntimeError(
                     f"problem_type='{self._problem_type}' does not support running inference directly. "
                     f"You need to call `predictor.fit()`, or load a predictor first before "
                     f"running `predictor.predict()`, `predictor.evaluate()` or `predictor.extract_embedding()`."
                 )
+            else:
+                self._init_pretrained()
 
     def _setup_distillation(
         self,
@@ -1477,7 +1487,7 @@ class MultiModalPredictor(ExportMixin):
 
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
-            # We only averaging the checkpoint of the best trial in the end in the master process
+            # We only average the checkpoint of the best trial at the end in the master process.
             if not hpo_mode:
                 self._top_k_average(
                     model=model,
@@ -1916,7 +1926,7 @@ class MultiModalPredictor(ExportMixin):
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        self._verify_inference_ready()
+        self._ensure_inference_ready()
         if self._matcher:
             return self._matcher.evaluate(
                 data=data,
@@ -2106,7 +2116,7 @@ class MultiModalPredictor(ExportMixin):
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        self._verify_inference_ready()
+        self._ensure_inference_ready()
 
         if self._matcher:
             return self._matcher.predict(
@@ -2255,7 +2265,7 @@ class MultiModalPredictor(ExportMixin):
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-        self._verify_inference_ready()
+        self._ensure_inference_ready()
         if self._matcher:
             return self._matcher.predict_proba(
                 data=data,
@@ -2343,7 +2353,7 @@ class MultiModalPredictor(ExportMixin):
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
-        self._verify_inference_ready()
+        self._ensure_inference_ready()
         if self._matcher:
             return self._matcher.extract_embedding(
                 data=data,
@@ -2496,7 +2506,6 @@ class MultiModalPredictor(ExportMixin):
                     "output_shape": self._output_shape,
                     "classes": self._classes,
                     "save_path": self._save_path,
-                    "pretrained_path": self._pretrained_path,
                     "fit_called": self._fit_called,
                     "best_score": self._best_score,
                     "total_train_time": self._total_train_time,

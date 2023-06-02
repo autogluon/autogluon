@@ -47,8 +47,6 @@ class PetFinderDataset:
             self._test_df[img_col] = self._test_df[img_col].apply(
                 lambda ele: expander(ele, base_folder=os.path.join(self._path, "images"))
             )
-            print(self._train_df[img_col][0])
-            print(self._test_df[img_col][0])
 
         _, self._train_df = train_test_split(
             self._train_df,
@@ -155,8 +153,6 @@ class HatefulMeMesDataset:
             self._test_df[img_col] = self._test_df[img_col].apply(
                 lambda ele: expander(ele, base_folder=os.path.join(self._path, "images"))
             )
-            print(self._train_df[img_col][0])
-            print(self._test_df[img_col][0])
         self._train_df.reset_index(drop=True, inplace=True)
         self._test_df.reset_index(drop=True, inplace=True)
 
