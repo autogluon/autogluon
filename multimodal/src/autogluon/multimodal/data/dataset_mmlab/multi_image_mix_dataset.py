@@ -25,6 +25,7 @@ try:
     from mmcv.transforms import BaseTransform
     from mmcv.transforms.utils import cache_randomness
 except:
+    BaseTransform = None
     pass
 
 try:
