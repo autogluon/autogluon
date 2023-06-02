@@ -1,5 +1,4 @@
 """ Default (fixed) hyperparameter search spaces used in Tabular Neural Network models.
-    MXNet vs Torch backend frameworks use slightly different hyperparameters.
 """
 from autogluon.common import space
 
@@ -19,20 +18,13 @@ def get_default_searchspace(problem_type, framework, num_classes=None):
         'proc.max_category_levels': space.Categorical(100, 10, 20, 200, 300, 400, 500, 1000, 10000),
         'proc.skew_threshold': space.Categorical(0.99, 0.2, 0.3, 0.5, 0.8, 0.9, 0.999, 1.0, 10.0, 100.0),
     }
-    mxnet_params = {
-        'use_batchnorm': space.Categorical(True, False),
-        'layers': space.Categorical(None, [200, 100], [256], [100, 50], [200, 100, 50], [1024], [32], [300, 150]),
-        'network_type': space.Categorical('widedeep', 'feedforward'),
-        'activation': space.Categorical('relu', 'softrelu'),
-        'batch_size': space.Categorical(512, 1024, 2056, 128),
-    }
     pytorch_params = {
         'use_batchnorm': space.Categorical(False, True),
         'num_layers': space.Categorical(2, 3, 4),
         'hidden_size': space.Categorical(128, 256, 512),
         'activation': space.Categorical('relu', 'elu'),
     }
-    params = merge_framework_params(framework=framework, shared_params=params, mxnet_params=mxnet_params, pytorch_params=pytorch_params)
+    params = merge_framework_params(framework=framework, shared_params=params, pytorch_params=pytorch_params)
     if problem_type == QUANTILE:
         problem_params =  get_searchspace_quantile(framework)
     elif problem_type == BINARY:
@@ -57,13 +49,10 @@ def get_searchspace_regression(framework):
     params = {
         'weight_decay': space.Real(1e-12, 1.0, default=1e-6, log=True),
     }
-    mxnet_params = {
-        'activation': space.Categorical('relu', 'softrelu', 'tanh'),
-    }
     pytorch_params = {
         'activation': space.Categorical('relu', 'elu', 'tanh'),
     }
-    return merge_framework_params(framework=framework, shared_params=params, mxnet_params=mxnet_params, pytorch_params=pytorch_params)
+    return merge_framework_params(framework=framework, shared_params=params, pytorch_params=pytorch_params)
 
 
 def get_searchspace_quantile(framework):

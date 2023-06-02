@@ -1,5 +1,4 @@
 """ Default (fixed) hyperparameter values used in Tabular Neural Network models.
-    MXNet vs Torch backend frameworks use slightly different hyperparameters.
     A value of None typically indicates an adaptive value for the hyperparameter will be chosen based on the data.
 """
 
@@ -11,18 +10,11 @@ def get_fixed_params(framework):
     fixed_params = {
         # 'seed_value': 0,  # random seed for reproducibility (set = None to ignore)
     }
-    mxnet_fixed_params = {
-        'num_epochs': 500,  # maximum number of epochs (passes over full dataset) for training NN
-        'epochs_wo_improve': 20,  # we terminate training if validation performance hasn't improved in the last 'epochs_wo_improve' # of epochs
-        # TODO: Epochs could take a very long time, we may want smarter logic than simply # of epochs without improvement (slope, difference in score, etc.)
-        'max_layer_width': 2056,  # maximum number of hidden units in network layer (integer > 0)
-        # Does not need to be searched by default
-    }
     pytorch_fixed_params = {
         'num_epochs': 500,  # maximum number of epochs (passes over full dataset) for training NN
         'epochs_wo_improve': 20,  # we terminate training if validation performance hasn't improved in the last 'epochs_wo_improve' # of epochs
     }
-    return merge_framework_params(framework=framework, shared_params=fixed_params, mxnet_params=mxnet_fixed_params, pytorch_params=pytorch_fixed_params)
+    return merge_framework_params(framework=framework, shared_params=fixed_params, pytorch_params=pytorch_fixed_params)
 
 
 def get_hyper_params(framework):
@@ -30,7 +22,7 @@ def get_hyper_params(framework):
     hyper_params = {
         ## Hyperparameters for neural net architecture:
         'activation': 'relu',  # Activation function
-        # Options for mxnet: ['relu', 'softrelu', 'tanh', 'softsign'], options for pytorch: ['relu', 'elu', 'tanh']
+        # Options: ['relu', 'softrelu', 'tanh', 'softsign'], options for pytorch: ['relu', 'elu', 'tanh']
         'embedding_size_factor': 1.0,  # scaling factor to adjust size of embedding layers (float > 0)
         # Options: range[0.01 - 100] on log-scale
         'embed_exponent': 0.56,  # exponent used to determine size of embedding layers based on # categories.
@@ -58,29 +50,6 @@ def get_hyper_params(framework):
         'use_ngram_features': False,  # If False, will drop automatically generated ngram features from language features. This results in worse model quality but far faster inference and training times.
         # Options: [True, False]
     }
-    mxnet_hyper_params = {
-        'layers': None,  # List of widths (num_units) for each hidden layer (Note: only specifies hidden layers. These numbers are not absolute, they will also be scaled based on number of training examples and problem type)
-        # Options: List of lists that are manually created
-        'network_type': 'widedeep',  # Type of neural net used to produce predictions
-        # Options: ['widedeep', 'feedforward']
-        'numeric_embed_dim': None,  # Size of joint embedding for all numeric+one-hot features.
-        # Options: integer values between 10-10000
-        'batch_size': 512,  # batch-size used for NN training
-        # Options: [32, 64, 128, 256, 512, 1024, 2048]
-        'use_batchnorm': True,  # whether or not to utilize batch normalization
-        # Options: [True, False]
-        'clip_gradient': 100.0,  # gradient clipping threshold (float > 0)
-        # Options: [1, 10, 100, 1000]
-        'momentum': 0.9,  # momentum which is only used for SGD optimizer
-        'loss_function': None,  # MXNet loss function minimized during training
-        'lr_scheduler': None,  # If not None, string specifying what type of learning rate scheduler to use (may override learning_rate).
-        # Options: [None, 'cosine', 'step', 'poly', 'constant']
-        # Below are hyperparameters specific to the LR scheduler (only used if lr_scheduler != None). For more info, see: https://gluon-cv.mxnet.io/api/utils.html#gluoncv.utils.LRScheduler
-        'base_lr': 3e-5,  # smallest LR (float > 0)
-        'target_lr': 1.0,  # largest LR (float > 0)
-        'lr_decay': 0.1,  # step factor used to decay LR (float in (0,1))
-        'warmup_epochs': 10,  # number of epochs at beginning of training in which LR is linearly ramped up (float > 1).
-    }
     pytorch_hyper_params = {
         'num_layers': 4,  # number of layers
         # Options: [2, 3, 4, 5]
@@ -92,7 +61,7 @@ def get_hyper_params(framework):
         'loss_function': 'auto',  # Pytorch loss function minimized during training
         # Example options for regression: nn.MSELoss(), nn.L1Loss()
     }
-    return merge_framework_params(framework=framework, shared_params=hyper_params, mxnet_params=mxnet_hyper_params, pytorch_params=pytorch_hyper_params)
+    return merge_framework_params(framework=framework, shared_params=hyper_params, pytorch_params=pytorch_hyper_params)
 
 
 def get_quantile_hyper_params(framework):
@@ -143,11 +112,9 @@ def get_param_quantile(framework):
     return params
 
 
-def merge_framework_params(framework, shared_params, mxnet_params, pytorch_params):
-    if framework == 'mxnet':
-        shared_params.update(mxnet_params)
-    elif framework == 'pytorch':
+def merge_framework_params(framework, shared_params, pytorch_params):
+    if framework == 'pytorch':
         shared_params.update(pytorch_params)
     else:
-        raise ValueError("framework must be 'pytorch' or 'mxnet'")
+        raise ValueError("framework must be 'pytorch'")
     return shared_params

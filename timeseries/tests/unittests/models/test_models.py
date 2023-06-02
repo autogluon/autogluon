@@ -33,9 +33,15 @@ TESTABLE_MODELS = (
     + [get_multi_window_deepar]
 )
 
-DUMMY_HYPERPARAMETERS = {"epochs": 1, "num_batches_per_epoch": 1, "maxiter": 1, "n_jobs": 1}
+DUMMY_HYPERPARAMETERS = {
+    "epochs": 1,
+    "num_batches_per_epoch": 1,
+    "maxiter": 1,
+    "n_jobs": 1,
+    "use_fallback_model": False,
+}
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
-MODELS_WITHOUT_HPO = ["DirectTabular", "AutoETS", "AutoARIMA", "DynamicOptimizedTheta"]
+MODELS_WITHOUT_HPO = ["DirectTabular"]
 
 
 @pytest.fixture(scope="module")

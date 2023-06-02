@@ -25,13 +25,14 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
         Reference AutoMLPipelineFeatureGenerator for an example of extending PipelineFeatureGenerator.
     It is not recommended that PipelineFeatureGenerator be used as a generator within any other generator's pre or post generators.
     """
-    def __init__(self, pre_generators=None, post_generators=None, pre_drop_useless=True, pre_enforce_types=True, reset_index=True, verbosity=3, **kwargs):
+    def __init__(self, pre_generators=None, post_generators=None, pre_drop_useless=True, pre_enforce_types=True, reset_index=True, post_drop_duplicates=True, verbosity=3, **kwargs):
         if pre_generators is None:
             pre_generators = [FillNaFeatureGenerator(inplace=True)]
         if post_generators is None:
             post_generators = [DropUniqueFeatureGenerator()]
 
-        super().__init__(pre_generators=pre_generators, post_generators=post_generators, pre_drop_useless=pre_drop_useless, pre_enforce_types=pre_enforce_types,
+        super().__init__(pre_generators=pre_generators, post_generators=post_generators,
+                         post_drop_duplicates=post_drop_duplicates, pre_drop_useless=pre_drop_useless, pre_enforce_types=pre_enforce_types,
                          reset_index=reset_index, verbosity=verbosity, **kwargs)
 
         # FeatureMetadata object based on the original input features real dtypes

@@ -110,27 +110,14 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
             raise ValueError(
                 f"Set of models given for prediction in {self.name} differ from those provided during initialization."
             )
-        failed_models = [model_name for (model_name, model_pred) in data.items() if model_pred is None]
-        if len(failed_models) == len(data):
-            raise RuntimeError(f"All input models failed during prediction, {self.name} cannot predict.")
-        if len(failed_models) > 0:
-            logger.warning(
-                f"Following models failed during prediction: {failed_models}. "
-                f"{self.name} will set the weight of these models to zero and re-normalize the weights when predicting."
-            )
+        for model_name, model_pred in data.items():
+            if model_pred is None:
+                raise RuntimeError(f"{self.name} cannot predict because base model {model_name} failed.")
 
         # Make sure that all predictions have same shape
-        assert len(set(pred.shape for pred in data.values() if pred is not None)) == 1
+        assert len(set(pred.shape for pred in data.values())) == 1
 
-        model_preds = [data[model_name] for model_name in self.model_names]
-        weights = self.model_weights
-
-        for idx, pred in enumerate(model_preds):
-            if pred is None:
-                weights[idx] = 0
-        weights = weights / np.sum(weights)
-
-        return sum(pred * w for pred, w in zip(model_preds, weights) if pred is not None)
+        return sum(data[model_name] * weight for model_name, weight in self.model_to_weight.items())
 
     def get_info(self) -> dict:
         info = super().get_info()

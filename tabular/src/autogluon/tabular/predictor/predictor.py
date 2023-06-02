@@ -6,7 +6,7 @@ import os
 import pprint
 import shutil
 import time
-from typing import Union, List, Tuple
+from typing import Union, List, Tuple, Optional
 import warnings
 
 import networkx as nx
@@ -16,12 +16,13 @@ import pandas as pd
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
-from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir, get_autogluon_metadata, compare_autogluon_metadata, check_saved_predictor_version
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
+from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.trainer import AbstractTrainer
@@ -100,6 +101,12 @@ class TabularPredictor:
             2: Standard logging
             3: Verbose logging (ex: log validation score every 50 iterations)
             4: Maximally verbose logging (ex: log validation score every iteration)
+    log_to_file: bool, default = True
+        Whether to save the logs into a file for later reference
+    log_file_path: str, default = "auto"
+        File path to save the logs.
+        If auto, logs will be saved under `predictor_path/logs/predictor_log.txt`.
+        Will be ignored if `log_to_file` is set to False
     sample_weight : str, default = None
         If specified, this column-name indicates which column of the data should be treated as sample weights. This column will NOT be considered as a predictive feature.
         Sample weights should be non-negative (and cannot be nan), with larger values indicating which rows are more important than others.
@@ -192,6 +199,7 @@ class TabularPredictor:
     predictor_file_name = 'predictor.pkl'
     _predictor_version_file_name = '__version__'
     _predictor_metadata_file_name = 'metadata.json'
+    _predictor_log_file_name = 'predictor_log.txt'
 
     def __init__(
             self,
@@ -200,6 +208,8 @@ class TabularPredictor:
             eval_metric=None,
             path=None,
             verbosity=2,
+            log_to_file=False,
+            log_file_path='auto',
             sample_weight=None,
             weight_evaluation=False,
             groups=None,
@@ -217,6 +227,11 @@ class TabularPredictor:
                 f"We do not recommend specifying weight_evaluation when sample_weight='{self.sample_weight}', instead specify appropriate eval_metric.")
         self._validate_init_kwargs(kwargs)
         path = setup_outputdir(path)
+        self._setup_log_to_file(
+            path=path,
+            log_to_file=log_to_file,
+            log_file_path=log_file_path
+        )
 
         learner_type = kwargs.pop('learner_type', DefaultLearner)
         learner_kwargs = kwargs.pop('learner_kwargs', dict())
@@ -388,7 +403,7 @@ class TabularPredictor:
                     'light': Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
                     'very_light': Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
                     'toy': Results in extremely small models. Only use this when prototyping, as the model quality will be severely reduced.
-                    'multimodal': [EXPERIMENTAL] Trains a multimodal transformer model alongside tabular models. Requires that some text columns appear in the data, a GPU, and CUDA-enabled MXNet.
+                    'multimodal': [EXPERIMENTAL] Trains a multimodal transformer model alongside tabular models. Requires that some text columns appear in the data and GPU.
                         When combined with 'best_quality' `presets` option, this can achieve extremely strong results in multimodal data tables that contain columns with text in addition to numeric/categorical columns.
                 Reference `autogluon/tabular/configs/hyperparameter_configs.py` for information on the hyperparameters associated with each preset.
             Keys are strings that indicate which model types to train.
@@ -626,6 +641,12 @@ class TabularPredictor:
                 See the `ag_args_ensemble` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
                 Identical to specifying `ag_args_ensemble` parameter for all models in `hyperparameters`.
                 If a key in `ag_args_ensemble` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
+            included_model_types : list, default = None
+                To only include listed model types for training during `fit()`.
+                Models that are listed in `included_model_types` but not in `hyperparameters` will be ignored.
+                Reference `hyperparameters` documentation for what models correspond to each value.
+                Useful when a only a subset of model needs to be trained and the `hyperparameters` dictionary is difficult or time-consuming.
+                    Example: To include both 'GBM' and 'FASTAI' models, specify `included_model_types=['GBM', 'FASTAI']`.
             excluded_model_types : list, default = None
                 Banned subset of model types to avoid training during `fit()`, even if present in `hyperparameters`.
                 Reference `hyperparameters` documentation for what models correspond to each value.
@@ -778,6 +799,7 @@ class TabularPredictor:
         ag_args = kwargs['ag_args']
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
+        included_model_types = kwargs['included_model_types']
         excluded_model_types = kwargs['excluded_model_types']
         use_bag_holdout = kwargs['use_bag_holdout']
 
@@ -856,6 +878,7 @@ class TabularPredictor:
             'ag_args': ag_args,
             'ag_args_ensemble': ag_args_ensemble,
             'ag_args_fit': ag_args_fit,
+            'included_model_types': included_model_types,
             'excluded_model_types': excluded_model_types,
             'feature_prune_kwargs': kwargs.get('feature_prune_kwargs', None)
         }
@@ -1157,7 +1180,7 @@ class TabularPredictor:
             Maximum allowed number of iterations, where in each iteration, the data are pseudolabeled
             by the current predictor and the predictor is refit including the pseudolabled data in its training set.
         return_pred_proba: bool, default = False
-            Transductive learning setting, will return predictive probabiliteis of unlabeled_data
+            Transductive learning setting, will return predictive probabilities of unlabeled_data
         use_ensemble: bool, default = False
             If True will use ensemble pseudo labeling algorithm if False will use best model
             pseudo labeling method
@@ -1199,8 +1222,12 @@ class TabularPredictor:
                     test_pseudo_idxes_true, y_pred = filter_ensemble_pseudo(predictor=self, unlabeled_data=X_test)
                     y_pred_proba = y_pred.copy()
             else:
-                y_pred_proba = self.predict_proba(data=X_test, as_multiclass=True)
-                y_pred = get_pred_from_proba_df(y_pred_proba, problem_type=self.problem_type)
+                if self.can_predict_proba:
+                    y_pred_proba = self.predict_proba(data=X_test, as_multiclass=True)
+                    y_pred = get_pred_from_proba_df(y_pred_proba, problem_type=self.problem_type)
+                else:
+                    y_pred = self.predict(data=X_test)
+                    y_pred_proba = y_pred
                 test_pseudo_idxes_true = filter_pseudo(y_pred_proba_og=y_pred_proba, problem_type=self.problem_type)
 
             if return_pred_prob:
@@ -1245,7 +1272,10 @@ class TabularPredictor:
 
         if fit_ensemble and not fit_ensemble_every_iter:
             self._fit_weighted_ensemble_pseudo()
-            y_pred_proba_og = self.predict_proba(unlabeled_data)
+            if self.can_predict_proba:
+                y_pred_proba_og = self.predict_proba(unlabeled_data)
+            else:
+                y_pred_proba_og = self.predict(unlabeled_data)
 
         if return_pred_prob:
             return self, y_pred_proba_og
@@ -1338,7 +1368,7 @@ class TabularPredictor:
                 self.fit_weighted_ensemble()
 
             if return_pred_prob:
-                y_pred_proba = self.predict_proba(pseudo_data)
+                y_pred_proba = self.predict_proba(pseudo_data) if self.can_predict_proba else self.predict(pseudo_data)
                 return self, y_pred_proba
             else:
                 return self
@@ -1378,11 +1408,10 @@ class TabularPredictor:
         data = self.__get_dataset(data)
         return self._learner.predict(X=data, model=model, as_pandas=as_pandas, transform_features=transform_features)
 
-    # TODO: v0.8: Error if called with self.problem_type='regression' or 'quantile'
     def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=True, transform_features=True):
         """
         Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
-        If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
+        If `predictor.problem_type` is regression or quantile, this will raise an AssertionError.
 
         Parameters
         ----------
@@ -1415,25 +1444,12 @@ class TabularPredictor:
         For binary classification problems, the output contains for each datapoint the predicted probabilities of the negative and positive classes, unless you specify `as_multiclass=False`.
         """
         self._assert_is_fit('predict_proba')
-        data = self.__get_dataset(data)
         if not self.can_predict_proba:
-            warnings.warn(
-                f'Calling `predictor.predict_proba` when problem_type={self.problem_type} will raise an AssertionError starting in AutoGluon v0.8. '
-                'Please call `predictor.predict` instead. You can check the value of `predictor.can_predict_proba` to tell if predict_proba is valid.',
-                category=FutureWarning
-            )
+            raise AssertionError(f'`predictor.predict_proba` is not supported when problem_type="{self.problem_type}". '
+                                 f'Please call `predictor.predict` instead. '
+                                 f'You can check the value of `predictor.can_predict_proba` to tell if predict_proba is valid.')
+        data = self.__get_dataset(data)
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass, transform_features=transform_features)
-
-    # TODO: Ensure this is correct as new problem_types are added.
-    #  Consider making problem_type a class object to be able to look this up easier.
-    @property
-    def _is_classification(self) -> bool:
-        """
-        Return True if problem_type is classification, otherwise return False.
-        Raises an AssertionError if `self.problem_type` is None.
-        """
-        assert self.problem_type is not None, "problem_type cannot be None when determining if the predictor is solving a classification problem"
-        return self.problem_type not in [REGRESSION, QUANTILE]
 
     @property
     def can_predict_proba(self) -> bool:
@@ -1442,7 +1458,7 @@ class TabularPredictor:
         Raises an AssertionError if called before fitting.
         """
         self._assert_is_fit('can_predict_proba')
-        return self._is_classification
+        return problem_type_info.can_predict_proba(problem_type=self.problem_type)
 
     def evaluate(self, data, model=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
         """
@@ -1704,6 +1720,10 @@ class TabularPredictor:
         Dictionary with model names as keys and model prediction probabilities as values.
         """
         self._assert_is_fit('predict_proba_multi')
+        if not self.can_predict_proba:
+            raise AssertionError(f'`predictor.predict_proba_multi` is not supported when problem_type="{self.problem_type}". '
+                                 f'Please call `predictor.predict_multi` instead. '
+                                 f'You can check the value of `predictor.can_predict_proba` to tell if predict_proba_multi is valid.')
         data = self.__get_dataset(data, allow_nan=True)
         return self._learner.predict_proba_multi(X=data,
                                                  models=models,
@@ -2859,7 +2879,7 @@ class TabularPredictor:
             Specifies which models to use as students and what hyperparameter-values to use for them.
             Same as `hyperparameters` argument of `fit()`.
             If = None, then student models will use the same hyperparameters from `fit()` used to produce this Predictor.
-            Note: distillation is currently only supported for ['GBM','NN_MXNET','NN_TORCH','RF','CAT'] student models, other models and their hyperparameters are ignored here.
+            Note: distillation is currently only supported for ['GBM','NN_TORCH','RF','CAT'] student models, other models and their hyperparameters are ignored here.
         holdout_frac : float
             Same as `holdout_frac` argument of :meth:`TabularPredictor.fit`.
         teacher_preds : str, default = 'soft'
@@ -3213,6 +3233,43 @@ class TabularPredictor:
             predictor = cls._load(path=path)
 
         return predictor
+    
+    @classmethod
+    def load_log(cls, predictor_path: str = None, log_file_path: Optional[str] = None) -> List[str]:
+        """
+        Load log files of a predictor
+        
+        Parameters
+        ----------
+        predictor_path: Optional[str], default = None
+            Path to the predictor to load the log.
+            This can be used when the predictor was initialized with `log_file_path="auto"` to fetch the log file automatically
+        log_file_path: Optional[str], default = None
+            Path to the log file.
+            If you specified a `log_file_path` while initializing the predictor, you should use `log_file_path` to load the log file instead.
+            At least one of `predictor_path` or `log_file_path` must to be specified
+            
+        Return
+        ------
+        List[str]
+            A list containing lines of the log file
+        """
+        file_path = log_file_path
+        if file_path is None:
+            assert predictor_path is not None, "Please either provide `predictor_path` or `log_file_path` to load the log file"
+            file_path = os.path.join(predictor_path, "logs", cls._predictor_log_file_name)
+        assert os.path.isfile(file_path), f"Log file does not exist at {file_path}"
+        with open(file_path, "r") as f:
+            lines = f.readlines()
+        return lines
+    
+    def _setup_log_to_file(self, path, log_to_file, log_file_path):
+        if log_to_file:
+            if log_file_path == "auto":
+                log_file_path = os.path.join(path, "logs", self._predictor_log_file_name)
+            log_file_path = os.path.abspath(os.path.normpath(log_file_path))
+            os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+            add_log_to_file(log_file_path)
 
     @staticmethod
     def _validate_init_kwargs(kwargs):
@@ -3279,6 +3336,7 @@ class TabularPredictor:
             ag_args=None,
             ag_args_fit=None,
             ag_args_ensemble=None,
+            included_model_types=None,
             excluded_model_types=None,
 
             # aux_kwargs -> +1 nest
@@ -3321,7 +3379,7 @@ class TabularPredictor:
         kwargs_sanitized.update(kwargs)
 
         # Deepcopy args to avoid altering outer context
-        deepcopy_args = ['ag_args', 'ag_args_fit', 'ag_args_ensemble', 'excluded_model_types']
+        deepcopy_args = ['ag_args', 'ag_args_fit', 'ag_args_ensemble', 'included_model_types', 'excluded_model_types']
         for deepcopy_arg in deepcopy_args:
             kwargs_sanitized[deepcopy_arg] = copy.deepcopy(kwargs_sanitized[deepcopy_arg])
 

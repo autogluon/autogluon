@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class TabularTorchDataset(torch.utils.data.IterableDataset):
     """
-        This class follows the structure of TabularNNDataset in tabular_nn_dataset.py (using Pytorch DataLoader instead of MXNet DataLoader),
+        This class follows the structure of TabularNNDataset in tabular_nn_dataset.py,
 
         Class for preprocessing & storing/feeding data batches used by pytorch neural networks for tabular data.
         Assumes entire dataset can be loaded into numpy arrays.

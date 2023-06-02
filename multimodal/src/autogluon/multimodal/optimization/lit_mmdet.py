@@ -8,14 +8,6 @@ from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
-try:
-    import mmdet
-    from mmcv import ConfigDict
-except ImportError as e:
-    import warnings
-
-    pass
-
 from ..constants import BBOX, IMAGE, LABEL
 from .utils import (
     apply_layerwise_lr_decay,
@@ -25,6 +17,13 @@ from .utils import (
     get_optimizer,
     remove_parameters_without_grad,
 )
+
+try:
+    import mmdet
+    from mmcv import ConfigDict
+except ImportError as e:
+    mmdet = None
+    ConfigDict = None
 
 logger = logging.getLogger(__name__)
 

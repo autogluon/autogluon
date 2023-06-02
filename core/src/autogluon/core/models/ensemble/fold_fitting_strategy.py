@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 TEXT_MODEL = 'TextPredictorModel'
 IMAGE_MODEL = 'ImagePredictorModel'
-TABULAR_MXNET_MODEL = 'TabularNeuralNetModel'
+TABULAR_TORCH_MODEL = 'TabularNeuralNetModel'
 TABULAR_FASTAI_MODEL = 'NNFastAiTabularModel'
 
 
@@ -781,7 +781,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                             gpus and try again'
                 logger.warning(error_msg)
             # FIXME: Avoid hardcoding model names.
-            elif self.model_base.__class__.__name__ in [TABULAR_MXNET_MODEL, TABULAR_FASTAI_MODEL]:
+            elif self.model_base.__class__.__name__ in [TABULAR_TORCH_MODEL, TABULAR_FASTAI_MODEL]:
                 error_msg = f'Out of CUDA memory while training \
                             {self.model_base.__class__.__name__}. \
                             Consider decrease batch size in hyperparameter and try again.\n\

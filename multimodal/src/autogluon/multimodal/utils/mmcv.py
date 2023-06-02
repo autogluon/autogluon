@@ -1,9 +1,12 @@
 import functools
-from collections import OrderedDict
-from typing import Callable, Type, Union
+from typing import Callable
 
-import numpy as np
 import torch
+
+try:
+    from mmengine.dataset import pseudo_collate as collate
+except ImportError as e:
+    collate = None
 
 
 def assert_tensor_type(func: Callable) -> Callable:
@@ -18,40 +21,12 @@ def assert_tensor_type(func: Callable) -> Callable:
     return wrapper
 
 
-try:
-    import mmengine
-
-    # from mmengine.dataset import default_collate as collate
-    from mmengine.dataset import pseudo_collate as collate
-except ImportError as e:
-    mmengine = None
-
-
 class CollateMMDet:
     def __init__(self, samples_per_gpu):
         self.samples_per_gpu = samples_per_gpu
 
     def __call__(self, x):
-        ret = collate(x)
-
-        return ret
-
-        if isinstance(ret["inputs"], list):
-            img_metas = ret["img_metas"][0]
-            imgs = [ret["inputs"][0][0].float()]
-            return dict(imgs=imgs, img_metas=img_metas)
-        else:
-            raise NotImplementedError
-            img_metas = ret["img_metas"][0]
-            img = ret["img"][0].float()
-            batch_size = img.shape[0]
-            gt_bboxes = []
-            gt_labels = []
-            for i in range(batch_size):
-                gt_bboxes.append(ret["gt_bboxes"][0][i].float())
-                gt_labels.append(ret["gt_labels"][0][i].long())
-
-            return dict(img=img, img_metas=img_metas, gt_bboxes=gt_bboxes, gt_labels=gt_labels)
+        return collate(x)
 
         return ret
 

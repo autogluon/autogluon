@@ -70,7 +70,6 @@ def tutorial_script_for_finetune_fast_pothole_in_coco_format():
     val_path = os.path.join(data_dir, "Annotations", "usersplit_val_cocoformat.json")
     test_path = os.path.join(data_dir, "Annotations", "usersplit_test_cocoformat.json")
 
-    # checkpoint_name = "yolov3_mobilenetv2_320_300e_coco"  # mmdet2
     checkpoint_name = "yolov3_mobilenetv2_8xb24-320-300e_coco"  # mmdet3
     num_gpus = 1
 

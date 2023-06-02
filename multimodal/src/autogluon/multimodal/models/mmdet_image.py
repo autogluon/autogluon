@@ -7,47 +7,22 @@ from typing import Optional
 import torch
 from torch import nn
 
-try:
-    import warnings
+from ..constants import BBOX, BBOX_FORMATS, COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, XYXY
+from .utils import freeze_model_layers, lookup_mmdet_config, update_mmdet_config
 
+try:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         import mmcv
-    from mmcv.ops import RoIPool
-
-    # from mmcv.runner import load_checkpoint  # mmdet 2
-    from mmcv.parallel import scatter  # not in mmdet3
+    import mmdet
+    import mmengine
+    from mmdet.registry import MODELS
+    from mmengine.runner import load_checkpoint
 except ImportError as e:
     mmcv = None
-
-try:
-    import mmengine
-    from mmengine.runner import load_checkpoint  # mmdet 3
-except ImportError as e:
+    mmdet = None
     mmengine = None
 
-try:
-    import mmdet
-    from mmdet.registry import MODELS
-except ImportError as e:
-    mmdet = None
-
-from ..constants import (
-    AUTOMM,
-    BBOX,
-    BBOX_FORMATS,
-    COLUMN,
-    COLUMN_FEATURES,
-    FEATURES,
-    IMAGE,
-    IMAGE_VALID_NUM,
-    LABEL,
-    LOGITS,
-    MASKS,
-    XYWH,
-    XYXY,
-)
-from .utils import freeze_model_layers, lookup_mmdet_config, update_mmdet_config
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +57,10 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         pretrained
             Whether using the pretrained mmdet models. If pretrained=True, download the pretrained model.
         """
+        from ..utils import check_if_packages_installed
+
+        check_if_packages_installed(package_names=["mmcv", "mmengine", "mmdet"])
+
         super().__init__()
         self.prefix = prefix
         self.pretrained = pretrained
@@ -131,8 +110,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         return
 
     def _load_checkpoint(self, checkpoint_file):
+
         # build model and load pretrained weights
-        assert mmdet is not None, 'Please install MMDetection by: pip install "mmdet>=3.0.0".'
         from mmdet.utils import register_all_modules
 
         register_all_modules()  # https://github.com/open-mmlab/mmdetection/issues/9719
@@ -276,7 +255,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                     mimdownload(package="mmdet", configs=[checkpoint_name], dest_root=".")
                     config_file = checkpoint_name + ".py"
                 except Exception as e:
-                    print(e)
                     raise ValueError(f"Invalid checkpoint_name ({checkpoint_name}) or config_file ({config_file}): ")
 
         self.checkpoint_name = checkpoint_name
@@ -285,7 +263,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
     def _load_config(self):
         # read config files
-        assert mmengine is not None, "Please install mmengine by: pip install mmengine."
         if isinstance(self.config_file, str):
             self.config = mmengine.Config.fromfile(self.config_file)
         else:
