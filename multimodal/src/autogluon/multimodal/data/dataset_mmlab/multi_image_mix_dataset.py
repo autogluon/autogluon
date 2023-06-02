@@ -21,8 +21,8 @@ try:
     from mmcv.transforms.utils import cache_randomness
     from mmdet.structures.bbox import autocast_box_type
     from mmdet.utils import log_img_scale
-    from mmengine.dataset import BaseDataset
     from mmengine.config import Config as MMConfig
+    from mmengine.dataset import BaseDataset
 
     class MultiImageMixDataset(torch.utils.data.Dataset):
         """
