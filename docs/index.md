@@ -150,8 +150,8 @@ similarity = utils.compute_semantic_similarity(q_embedding, doc_embedding)
 :::{tab} Object Detection
 ```ipython
 # Install mmcv-related dependencies
-!mim install mmcv-full
-!pip install "mmdet>=2.28, <3.0.0"
+!mim install mmcv
+!pip install "mmdet>=3.0.0"
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.core.utils.loaders import load_zip

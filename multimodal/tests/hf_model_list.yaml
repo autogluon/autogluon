@@ -5,8 +5,8 @@ docs:
 - sentence-transformers/all-MiniLM-L6-v2
 - google/bert_uncased_L-6_H-768_A-12
 - microsoft/layoutlm-base-uncased
-- yolox_s_8x8_300e_coco
-- yolox_l_8x8_300e_coco
+- yolox_s
+- yolox_l
 others:
 - bert-base-chinese
 - bert-base-uncased
@@ -28,8 +28,8 @@ others:
 - sentence-transformers/all-mpnet-base-v2
 - sentence-transformers/msmarco-MiniLM-L-12-v3
 - xlm-roberta-base
-- yolov3_mobilenetv2_320_300e_coco
-- yolox_s_8x8_300e_coco
+- yolov3_mobilenetv2_8xb24-320-300e_coco
+- yolox_s
 others_2:
 - google/electra-small-discriminator
 - google/flan-t5-small

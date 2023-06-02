@@ -1,8 +1,10 @@
+from hashlib import md5
 from pathlib import Path
 from datetime import datetime
 
 import logging
 import os
+import pandas as pd
 import platform
 import sys
 from typing import Dict, Any, Optional
@@ -167,3 +169,16 @@ def check_saved_predictor_version(
                 f"Please ensure the versions match to avoid instability. While it is NOT recommended, "
                 f"this error can be bypassed by specifying `require_version_match=False`."
             )
+
+
+def hash_pandas_df(df: Optional[pd.DataFrame]) -> str:
+    """Compute a hash string for a pandas DataFrame."""
+    if df is not None:
+        # Convert in case TimeSeriesDataFrame object is passed
+        df = pd.DataFrame(df, copy=True)
+        df.reset_index(inplace=True)
+        df.sort_index(inplace=True, axis=1)
+        hashable_object = pd.util.hash_pandas_object(df).values
+    else:
+        hashable_object = "0".encode("utf-8")
+    return md5(hashable_object).hexdigest()

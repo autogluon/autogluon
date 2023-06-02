@@ -359,7 +359,7 @@ def object_detection(presets: str = DEFAULT):
     """
     hyperparameters = {
         "model.names": ["mmdet_image"],
-        "model.mmdet_image.checkpoint_name": "yolox_s_8x8_300e_coco",
+        "model.mmdet_image.checkpoint_name": "yolox_s",
         "env.eval_batch_size_ratio": 1,
         "env.precision": 32,
         "env.strategy": "ddp",
@@ -399,7 +399,7 @@ def object_detection(presets: str = DEFAULT):
     elif presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "yolox_l_8x8_300e_coco",
+                "model.mmdet_image.checkpoint_name": "yolox_l",
                 "env.per_gpu_batch_size": 2,  # Works on 8G GPU
                 "optimization.learning_rate": 5e-5,
                 "optimization.patience": 3,
@@ -411,7 +411,7 @@ def object_detection(presets: str = DEFAULT):
     elif presets == BEST_QUALITY:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "yolox_x_8x8_300e_coco",
+                "model.mmdet_image.checkpoint_name": "yolox_x",
                 "env.per_gpu_batch_size": 1,  # Works on 8G GPU
                 "optimization.learning_rate": 1e-5,
                 "optimization.patience": 20,

@@ -1,6 +1,6 @@
 # How to perform a new release
 
-Refer to `docs/ReleaseInstructions.md`
+Refer to `release_instructions/ReleaseInstructions.md`
 
 # How to locally build AutoGluon docs
 

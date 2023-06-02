@@ -87,6 +87,9 @@ class ETSModel(AbstractLocalModel):
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
         When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
     allowed_local_model_args = [
@@ -143,7 +146,7 @@ class ETSModel(AbstractLocalModel):
 
         results = [predictions.predicted_mean.rename("mean")]
         coverage_fn = lambda alpha: predictions.pred_int(alpha=alpha)
-        results += get_quantiles_from_statsmodels(coverage_fn=coverage_fn, quantile_levels=quantile_levels)
+        results += get_quantiles_from_statsmodels(coverage_fn=coverage_fn, quantile_levels=self.quantile_levels)
         return pd.concat(results, axis=1)
 
 
@@ -184,6 +187,9 @@ class ARIMAModel(AbstractLocalModel):
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
         When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
     allowed_local_model_args = [
@@ -195,7 +201,6 @@ class ARIMAModel(AbstractLocalModel):
         "enforce_invertibility",
         "maxiter",
     ]
-    MAX_TS_LENGTH = 3000
 
     def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
         local_model_args.setdefault("trend", "c")
@@ -288,6 +293,9 @@ class ThetaStatsmodelsModel(AbstractLocalModel):
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
         When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
     allowed_local_model_args = [
