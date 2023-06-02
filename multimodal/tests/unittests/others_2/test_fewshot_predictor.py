@@ -1,3 +1,5 @@
+import numpy as np
+
 from autogluon.multimodal.utils.few_shot_learning import FewShotSVMPredictor
 from autogluon.multimodal.utils.misc import shopee_dataset
 
@@ -35,6 +37,18 @@ def test_fewshot_fit_predict():
 
     results = predictor.evaluate(test_data)
 
+    proba = predictor.predict_proba(test_data)
+    assert len(proba) == len(test_data)
+    assert (proba.argmax(axis=1) == preds).all()
+
+    pandas_pred = predictor.predict(test_data, as_pandas=True)
+    pandas_proba = predictor.predict_proba(test_data, as_pandas=True)
+    pandas_proba_as_multiclass = predictor.predict_proba(test_data, as_pandas=True, as_multiclass=True)
+    pandas_proba_no_multiclass = predictor.predict_proba(test_data, as_pandas=True, as_multiclass=False)
+
+    proba_as_multiclass = predictor.predict_proba(test_data, as_pandas=False, as_multiclass=True)
+    proba_as_multiclass = predictor.predict_proba(test_data, as_pandas=False, as_multiclass=True)
+
 
 def test_fewshot_save_load():
     download_dir = "./ag_automm_tutorial_imgcls"
@@ -70,4 +84,4 @@ def test_fewshot_save_load():
 
 if __name__ == "__main__":
     test_fewshot_fit_predict()
-    test_fewshot_save_load()
+    # test_fewshot_save_load()

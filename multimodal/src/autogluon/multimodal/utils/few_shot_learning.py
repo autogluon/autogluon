@@ -91,9 +91,29 @@ class FewShotSVMPredictor:
         features = self.extract_embedding(data)
 
         preds = self.clf.predict(features)
+        # import ipdb
+
+        # ipdb.set_trace()
         if as_pandas:
             preds = self._automm_predictor._as_pandas(data=data, to_be_converted=preds)
         return preds
+
+    def predict_proba(self, data, as_pandas: Optional[bool] = False, as_multiclass: Optional[bool] = True):
+        if not self._fit_called and not self._model_loaded:
+            warnings.warn(
+                "Neither .fit() nor .load() is not invoked. Unexpected predictions may occur. Please consider calling .fit() or .load() before .predict()"
+            )
+
+        features = self.extract_embedding(data)
+        preds = self.clf.decision_function(features)
+        probs = np.exp(preds) / np.sum(np.exp(preds + 1e-8), axis=1, keepdims=True)
+
+        if not as_multiclass:
+            probs = probs.max(axis=1)
+
+        if as_pandas:
+            probs = self._automm_predictor._as_pandas(data=data, to_be_converted=probs)
+        return probs
 
     def extract_embedding(self, data: pd.DataFrame):
         if self._label in data.columns:
