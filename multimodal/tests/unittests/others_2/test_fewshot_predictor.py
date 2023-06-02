@@ -10,7 +10,7 @@ def test_fewshot_fit_predict():
         "model.names": ["clip"],
         "model.clip.max_text_len": 0,
         "env.num_workers": 2,
-        "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+        "model.clip.checkpoint_name": "swin_tiny_patch4_window7_224",
         "env.eval_batch_size_ratio": 1,
     }
 
