@@ -839,6 +839,4 @@ try:
             return translation_matrix
 
 except Exception as e:
-    print(e)
-    exit()
     MultiImageMixDataset = None
