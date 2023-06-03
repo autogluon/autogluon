@@ -30,7 +30,6 @@ try:
     import mmdet
     from mmdet.datasets.transforms import ImageToTensor
 except ImportError as e:
-    print(e)
     mmdet = None
 
 try:

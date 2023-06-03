@@ -28,8 +28,6 @@ class CollateMMDet:
     def __call__(self, x):
         return collate(x)
 
-        return ret
-
 
 class CollateMMOcr:
     def __init__(self, samples_per_gpu):

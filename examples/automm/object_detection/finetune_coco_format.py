@@ -96,10 +96,7 @@ def tutorial_script_for_finetune_fast_pothole_in_coco_format():
 
     print("This finetuning takes %.2f seconds." % (end - start))
 
-    predictor.evaluate(
-        test_path,
-        # eval_tool="torchmetrics",
-    )
+    predictor.evaluate(test_path)
 
 
 def tutorial_script_for_finetune_yolox_pothole_in_coco_format():
@@ -152,13 +149,12 @@ def tutorial_script_for_finetune_yoloxo365_pothole_in_coco_format():
     val_path = os.path.join(data_dir, "Annotations", "usersplit_val_cocoformat.json")
     test_path = os.path.join(data_dir, "Annotations", "usersplit_test_cocoformat.json")
 
-    num_gpus = 1
+    num_gpus = -1
 
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": "yolox_l_objects365",
             "env.num_gpus": num_gpus,
-            "optimization.val_metric": "map",
         },
         problem_type="object_detection",
         sample_data_path=train_path,
