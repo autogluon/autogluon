@@ -26,7 +26,7 @@ def download_pothole_dataset():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-p", "--preset", default=None, type=str)
+    parser.add_argument("-p", "--presets", default=None, type=str)
     parser.add_argument("-c", "--checkpoint_name", default=None, type=str)
     parser.add_argument("-n", "--num_gpus", default=None, type=int)
     parser.add_argument("-v", "--val_metric", default=None, type=str)
@@ -41,7 +41,7 @@ def main():
         train_path=train_path,
         val_path=val_path,
         test_path=test_path,
-        preset=args.preset,
+        presets=args.presets,
         checkpoint_name=args.checkpoint_name,
         lr=args.lr,
         epochs=args.epochs,

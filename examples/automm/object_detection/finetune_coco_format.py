@@ -12,7 +12,7 @@ def finetune_coco_format(
     train_path,
     val_path=None,
     test_path=None,
-    preset=None,
+    presets=None,
     checkpoint_name=None,
     num_gpus=None,
     val_metric=None,
@@ -40,7 +40,7 @@ def finetune_coco_format(
         hyperparameters=hyperparameters,
         problem_type="object_detection",
         sample_data_path=train_path,
-        preset=preset,
+        presets=presets,
     )
     predictor.fit(train_path, tuning_data=val_path)
     print("time usage for fit: %.2f" % (predictor._total_train_time))
@@ -54,7 +54,7 @@ def main():
     parser.add_argument("--train_path", default=None, type=str)
     parser.add_argument("--val_path", default=None, type=str)
     parser.add_argument("--test_path", default=None, type=str)
-    parser.add_argument("-p", "--preset", default=None, type=str)
+    parser.add_argument("-p", "--presets", default=None, type=str)
     parser.add_argument("-c", "--checkpoint_name", default=None, type=str)
     parser.add_argument("-n", "--num_gpus", default=None, type=int)
     parser.add_argument("-v", "--val_metric", default=None, type=str)
@@ -67,7 +67,7 @@ def main():
         train_path=args.train_path,
         val_path=args.val_path,
         test_path=args.test_path,
-        preset=args.preset,
+        presets=args.presets,
         checkpoint_name=args.checkpoint_name,
         lr=args.lr,
         epochs=args.epochs,
