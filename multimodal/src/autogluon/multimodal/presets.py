@@ -403,7 +403,7 @@ def object_detection(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "dino-4scale_r50_8xb2-12e_coco.py",
-                "model.mmdet_image.frozen_layers": ["backbone","model.level_embed"],
+                "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
                 "env.per_gpu_batch_size": 1,  # Works on 16G GPU
                 "optimization.learning_rate": 1e-4,
                 "optimization.patience": 20,
@@ -416,7 +416,7 @@ def object_detection(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "dino-5scale_swin-l_8xb2-36e_coco.py",
-                "model.mmdet_image.frozen_layers": ["backbone","model.level_embed"],
+                "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
                 "env.per_gpu_batch_size": 1,  # Works on 24G GPU
                 "optimization.learning_rate": 1e-4,
                 "optimization.patience": 20,
