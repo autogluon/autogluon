@@ -42,6 +42,17 @@ def symmetric_mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Serie
     return (2 * (y_true - y_pred).abs() / (y_true.abs() + y_pred.abs())).groupby(level=ITEMID, sort=False).mean()
 
 
+def quantile_loss_per_item(*, y_true: pd.Series, predictions: pd.DataFrame) -> pd.Series:
+    """Compute quantile loss for each item (time series), summed over quantile levels, averaged over timesteps."""
+    quantile_pred_columns = [col for col in predictions.columns if col != "mean"]
+    quantile_levels = np.array([float(q) for q in quantile_pred_columns], dtype=float)
+    quantile_preds = pd.DataFrame(predictions[quantile_pred_columns])
+
+    values_true = y_true.values[:, None]  # shape [N, 1]
+    ql = ((quantile_preds - values_true) * ((values_true <= quantile_preds) - quantile_levels)).mean(1).abs()
+    return 2 * ql.groupby(level="item_id", sort=False).mean()
+
+
 class TimeSeriesEvaluator:
     """Contains functions for computing forecast accuracy metrics.
 
@@ -74,6 +85,7 @@ class TimeSeriesEvaluator:
          by the total absolute values of the time series. See https://docs.aws.amazon.com/forecast/latest/dg/metrics.html#metrics-wQL
         * ``MSE``: mean squared error
         * ``RMSE``: root mean squared error
+        * ``SPL``: scaled pinball loss
 
     prediction_length : int
         Length of the forecast horizon
@@ -96,9 +108,17 @@ class TimeSeriesEvaluator:
         :meth:``~autogluon.timeseries.TimeSeriesEvaluator.check_get_evaluation_metric``.
     """
 
-    AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE"]
-    METRIC_COEFFICIENTS = {"MASE": -1, "MAPE": -1, "sMAPE": -1, "mean_wQuantileLoss": -1, "MSE": -1, "RMSE": -1}
-    DEFAULT_METRIC = "mean_wQuantileLoss"
+    AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE", "SPL"]
+    METRIC_COEFFICIENTS = {
+        "MASE": -1,
+        "MAPE": -1,
+        "sMAPE": -1,
+        "mean_wQuantileLoss": -1,
+        "MSE": -1,
+        "RMSE": -1,
+        "SPL": -1,
+    }
+    DEFAULT_METRIC = "SPL"
 
     def __init__(
         self,
@@ -149,15 +169,13 @@ class TimeSeriesEvaluator:
         return self._safemean(symmetric_mape_per_item(y_true=y_true, y_pred=y_pred))
 
     def _mean_wquantileloss(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
-        values_true = y_true.values[:, None]  # shape [N, 1]
-        quantile_pred_columns = [col for col in predictions.columns if col != "mean"]
-        values_pred = predictions[quantile_pred_columns].values  # shape [N, len(quantile_levels)]
-        quantile_levels = np.array([float(q) for q in quantile_pred_columns], dtype=float)
+        ql_per_item = quantile_loss_per_item(y_true=y_true, predictions=predictions)
+        # multiply by prediction_length to go from mean per item -> sum per item
+        return ql_per_item.sum() * self.prediction_length / y_true.abs().sum()
 
-        return 2 * np.mean(
-            np.abs((values_true - values_pred) * ((values_true <= values_pred) - quantile_levels)).sum(axis=0)
-            / np.abs(values_true).sum()
-        )
+    def _spl(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
+        ql_per_item = quantile_loss_per_item(y_true=y_true, predictions=predictions)
+        return self._safemean(ql_per_item / self._past_naive_error)
 
     def _get_median_forecast(self, predictions: TimeSeriesDataFrame) -> pd.Series:
         # TODO: Median forecast doesn't actually minimize the MAPE / sMAPE losses

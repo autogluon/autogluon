@@ -46,11 +46,12 @@ class TimeSeriesPredictor:
         The forecast horizon, i.e., How many time steps into the future the models should be trained to predict.
         For example, if time series contain daily observations, setting ``prediction_length = 3`` will train
         models that predict up to 3 days into the future from the most recent observation.
-    eval_metric : str, default = "mean_wQuantileLoss"
+    eval_metric : str, default = "SPL"
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
         metric. Available options:
 
+        - ``"SPL"``: scaled pinball loss, defined as average of quantile losses for the specified ``quantile_levels`` normalized by the scale of each time series
         - ``"mean_wQuantileLoss"``: mean weighted quantile loss, defined as average of quantile losses for the specified ``quantile_levels`` scaled by the total value of the time series
         - ``"MAPE"``: mean absolute percentage error
         - ``"sMAPE"``: "symmetric" mean absolute percentage error

@@ -31,9 +31,9 @@ class DirectTabularModel(AbstractTimeSeriesModel):
 
     Features not known during the forecast horizon (e.g., future target values) are replaced by NaNs.
 
-    If ``eval_metric=="mean_wQuantileLoss"``, the TabularPredictor will be trained with ``"quantile"`` problem type.
-    Otherwise, TabularPredictor will be trained with ``"regression"`` problem type, and dummy quantiles will be
-    obtained by assuming that the residuals follow zero-mean normal distribution.
+    If ``eval_metric`` is either ``"SPL"`` or ``"mean_wQuantileLoss"``, the TabularPredictor will be trained with
+    ``"quantile"`` problem type. Otherwise, TabularPredictor will be trained with ``"regression"`` problem type, and
+    dummy quantiles will by obtained by assuming that the residuals follow zero-mean normal distribution.
 
 
     Other Parameters
@@ -85,7 +85,7 @@ class DirectTabularModel(AbstractTimeSeriesModel):
         self._known_covariates_lag_indices: np.array = None
         self._past_covariates_lag_indices: np.array = None
         self._time_features: List[Callable] = None
-        self.is_quantile_model = self.eval_metric == "mean_wQuantileLoss"
+        self.is_quantile_model = self.eval_metric in ["mean_wQuantileLoss", "SPL"]
         if 0.5 not in self.quantile_levels:
             self.must_drop_median = True
             self.quantile_levels = sorted(set([0.5] + self.quantile_levels))

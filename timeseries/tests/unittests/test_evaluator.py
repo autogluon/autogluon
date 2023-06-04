@@ -204,3 +204,17 @@ def test_when_eval_metric_seasonal_period_is_longer_than_ts_then_scale_is_set_to
         y_past=DUMMY_TS_DATAFRAME["target"], seasonal_period=seasonal_period
     )
     assert (naive_error_per_item == 1.0).all()
+
+
+@pytest.mark.parametrize("seasonal_period", [None, 1, 7])
+def test_given_only_median_quantile_predicted_then_spl_equals_mase(deepar_trained, seasonal_period):
+    model = deepar_trained
+    train, test = DUMMY_TS_DATAFRAME.train_test_split(model.prediction_length)
+    predictions = model.predict(train)[["mean", "0.5"]]
+    evaluator_spl = TimeSeriesEvaluator(
+        eval_metric="SPL", prediction_length=model.prediction_length, eval_metric_seasonal_period=seasonal_period
+    )
+    evaluator_mase = TimeSeriesEvaluator(
+        eval_metric="MASE", prediction_length=model.prediction_length, eval_metric_seasonal_period=seasonal_period
+    )
+    assert np.allclose(evaluator_spl(test, predictions), evaluator_mase(test, predictions))
