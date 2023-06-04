@@ -64,6 +64,9 @@ Models
    TabularNeuralNetTorchModel
    NNFastAiTabularModel
    VowpalWabbitModel
+   MultiModalPredictorModel
+   TextPredictorModel
+   ImagePredictorModel
 
 :hidden:`AbstractModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -137,6 +140,24 @@ Models
 .. autoclass:: VowpalWabbitModel
    :members: init
 
+:hidden:`MultiModalPredictorModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: MultiModalPredictorModel
+   :members: init
+
+:hidden:`TextPredictorModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TextPredictorModel
+   :members: init
+
+:hidden:`ImagePredictorModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: ImagePredictorModel
+   :members: init
+
 Ensemble Models
 ---------------
 
@@ -177,24 +198,24 @@ Experimental Models
 .. autosummary::
    :nosignatures:
 
+   FTTransformerModel
+   TabPFNModel
    FastTextModel
-   TextPredictorModel
-   ImagePredictorModel
+
+:hidden:`FTTransformerModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: FTTransformerModel
+   :members: init
+
+:hidden:`TabPFNModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabPFNModel
+   :members: init
 
 :hidden:`FastTextModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: FastTextModel
-   :members: init
-
-:hidden:`TextPredictorModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: TextPredictorModel
-   :members: init
-
-:hidden:`ImagePredictorModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: ImagePredictorModel
    :members: init

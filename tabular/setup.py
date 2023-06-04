@@ -77,6 +77,7 @@ extras_require = {
     ]
 }
 
+# TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
 all_requires = []
 # TODO: Consider adding 'skex' to 'all'
 for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai', 'ray']:
