@@ -2994,7 +2994,6 @@ class TabularPredictor:
         A.node_attr.update(shape='rectangle')
 
         for node in A.iternodes():
-            node.attr['label'] = f"{node.name}\nVal score: {float(node.attr['val_score']):.4f}"
 
             if node.name == best_model_node:
                 node.attr['style'] = 'filled'
