@@ -1,13 +1,12 @@
 import logging
 import math
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Tuple
 from dataclasses import dataclass
-import math
-import psutil
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+import psutil
 from scipy.stats import norm
 from sklearn.base import BaseEstimator
 
