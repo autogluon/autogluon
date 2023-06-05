@@ -135,7 +135,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
 
         lags = model_params.get("lags")
         if lags is None:
-            lags = get_lags_for_frequency(self.freq, lag_ub=200)
+            lags = get_lags_for_frequency(self.freq)
 
         date_features = model_params.get("date_features")
         if date_features is None:
