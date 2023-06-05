@@ -105,7 +105,9 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             self.num_classes = lookup_mmdet_config(key="num_classes", config=self.config)
             if not self.num_classes:
                 self.num_classes = 1
-                warnings.warn(f"num_classes is not provided and is set to default value {self.num_classes} and this may cause error. Please provide sample_data_path in predictor's initialization.")
+                warnings.warn(
+                    f"num_classes is not provided and is set to default value {self.num_classes} and this may cause error. Please provide sample_data_path in predictor's initialization."
+                )
             self.classes = None
         self.id2label = dict(zip(range(self.num_classes), range(self.num_classes)))
 
@@ -139,7 +141,9 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 )
                 self.model.CLASSES = self.checkpoint["meta"]["CLASSES"]
             else:
-                warnings.warn(f"CLASSES is not provided and this may cause error. Please provide sample_data_path in predictor's initialization.")
+                warnings.warn(
+                    f"CLASSES is not provided and this may cause error. Please provide sample_data_path in predictor's initialization."
+                )
 
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id <= 0]
