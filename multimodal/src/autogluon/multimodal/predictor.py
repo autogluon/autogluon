@@ -264,7 +264,7 @@ class MultiModalPredictor(ExportMixin):
             Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
-            Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
+            Defaults to 'accuracy' for multiclass classification, `roc_auc` for binary classification, and 'root_mean_squared_error' for regression.
         hyperparameters
             This is to override some default configurations.
             For example, changing the text and image backbones can be done by formatting:
@@ -304,11 +304,11 @@ class MultiModalPredictor(ExportMixin):
         enable_progress_bar
             Whether to show progress bar. It will be True by default and will also be
             disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
-        init_scratch
-            Whether to init model from scratch. It's useful when we want to load a checkpoints
-            without its weights.
         pretrained
             Whether to init model with pretrained weights. If False, it creates a model with random initialization.
+        validation_metric
+            Validation metric name. If `validation_metric = None`, it is automatically chosen based on `problem_type`.
+            Defaults to 'accuracy' for multiclass classification, `roc_auc` for binary classification, and 'root_mean_squared_error' for regression.
         sample_data_path
             This is used for automatically inference num_classes, classes, or label.
 
@@ -386,6 +386,10 @@ class MultiModalPredictor(ExportMixin):
 
         if verbosity is not None:
             set_logger_verbosity(verbosity)
+
+        if init_scratch:
+            warnings.warn("init_scratch is deprecated. Try pretrained=False instead.", UserWarning)
+            pretrained = False
 
         self._label_column = label
         self._problem_type = problem_type
