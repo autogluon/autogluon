@@ -47,7 +47,7 @@ function install_local_packages {
 }
 
 function install_tabular {
-    python3 -m pip instsall --upgrade pygraphviz
+    python3 -m pip install --upgrade pygraphviz
     install_local_packages "tabular/$1"
 }
 
