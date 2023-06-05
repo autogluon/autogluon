@@ -395,7 +395,7 @@ def test_detector_hyperparameters_consistency():
     train_df = from_coco_or_voc(train_path)
 
     hyperparameters = {
-        "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
+        "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_8xb24-320-300e_coco",
         "env.num_gpus": 1,
     }
 
@@ -418,8 +418,3 @@ def test_detector_hyperparameters_consistency():
         time_limit=10,
     )
     assert predictor._config == predictor_2._config
-
-
-if __name__ == "__main__":
-    # test_detector_hyperparameters_consistency()
-    test_mmdet_object_detection_fit_with_freeze_backbone("yolov3_mobilenetv2_320_300e_coco")

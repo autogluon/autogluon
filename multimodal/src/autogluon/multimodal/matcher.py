@@ -90,13 +90,13 @@ from .utils import (
     infer_metrics,
     infer_precision,
     init_df_preprocessor,
-    init_pretrained_matcher,
     load_text_tokenizers,
     predict,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
     setup_save_path,
+    split_hyperparameters,
     split_train_tuning_data,
     update_hyperparameters,
     upgrade_config,
@@ -203,6 +203,7 @@ class MultiModalMatcher:
         self._presets = presets.lower() if presets else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
+        self._hyperparameters = hyperparameters
         self._output_shape = None
         self._save_path = path
         self._ckpt_path = None
@@ -224,19 +225,6 @@ class MultiModalMatcher:
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
-
-        if self._pipeline is not None:  # TODO: do not create pretrained model for HPO presets.
-            (
-                self._config,
-                self._query_config,
-                self._response_config,
-                self._query_model,
-                self._response_model,
-                self._query_processors,
-                self._response_processors,
-            ) = init_pretrained_matcher(
-                pipeline=self._pipeline, presets=self._presets, hyperparameters=hyperparameters
-            )
 
     @property
     def query(self):
@@ -284,6 +272,65 @@ class MultiModalMatcher:
         """
         self._verbosity = verbosity
         set_logger_verbosity(verbosity, logger=logger)
+
+    def _init_pretrained(self):
+
+        if self._config is None:
+            # split out the hyperparameters whose values are complex objects
+            hyperparameters, advanced_hyperparameters = split_hyperparameters(self._hyperparameters)
+            self._config = get_config(
+                problem_type=self._pipeline,
+                presets=self._presets,
+                overrides=hyperparameters,
+                extra=["matcher"],
+            )
+        else:
+            advanced_hyperparameters = None
+
+        assert (
+            len(self._config.model.names) == 1
+        ), f"Zero shot mode only supports using one model, but detects multiple models {self._config.model.names}"
+
+        if self._query_config is None:
+            self._query_config = copy.deepcopy(self._config)
+            # customize config model names to make them consistent with model prefixes.
+            self._query_config.model, query_advanced_hyperparameters = customize_model_names(
+                config=self._query_config.model,
+                customized_names=[f"{n}_{QUERY}" for n in self._query_config.model.names],
+                advanced_hyperparameters=advanced_hyperparameters,
+            )
+        else:
+            query_advanced_hyperparameters = (None,)
+
+        if self._response_config is None:
+            self._response_config = copy.deepcopy(self._config)
+            # customize config model names to make them consistent with model prefixes.
+            self._response_config.model, response_advanced_hyperparameters = customize_model_names(
+                config=self._response_config.model,
+                customized_names=[f"{n}_{RESPONSE}" for n in self._response_config.model.names],
+                advanced_hyperparameters=advanced_hyperparameters,
+            )
+        else:
+            response_advanced_hyperparameters = None
+
+        if self._query_model is None or self._response_model is None:
+            self._query_model, self._response_model = create_siamese_model(
+                query_config=self._query_config,
+                response_config=self._response_config,
+            )
+
+        self._query_processors, self._response_processors, self._label_processors = self._get_matcher_data_processors(
+            query_model=self._query_model,
+            query_config=self._query_config,
+            response_model=self._response_model,
+            response_config=self._response_config,
+            query_advanced_hyperparameters=query_advanced_hyperparameters,
+            response_advanced_hyperparameters=response_advanced_hyperparameters,
+        )
+
+    def _ensure_inference_ready(self):
+        if not self._fit_called:
+            self._init_pretrained()
 
     def fit(
         self,
@@ -454,12 +501,20 @@ class MultiModalMatcher:
         self._output_shape = output_shape
         self._column_types = column_types
 
+        if self._hyperparameters and hyperparameters:
+            self._hyperparameters.update(hyperparameters)
+        elif hyperparameters:
+            self._hyperparameters = hyperparameters
+
         hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
             problem_type=self._pipeline,
             presets=presets,
-            provided_hyperparameters=hyperparameters,
+            provided_hyperparameters=self._hyperparameters,
             provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         )
+        # split out the hyperparameters whose values are complex objects
+        hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
+
         hpo_mode = True if hyperparameter_tune_kwargs else False
         if hpo_mode:
             hyperparameters = filter_hyperparameters(
@@ -482,6 +537,7 @@ class MultiModalMatcher:
             enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
             presets=presets,
             hyperparameters=hyperparameters,
+            advanced_hyperparameters=advanced_hyperparameters,
             hpo_mode=hpo_mode,  # skip average checkpoint if in hpo mode
         )
 
@@ -561,6 +617,8 @@ class MultiModalMatcher:
         query_config: Optional[DictConfig] = None,
         response_model: Optional[nn.Module] = None,
         response_config: Optional[DictConfig] = None,
+        query_advanced_hyperparameters: Optional[Dict] = None,
+        response_advanced_hyperparameters: Optional[Dict] = None,
     ):
         if query_model is None:
             query_processors = None
@@ -570,6 +628,7 @@ class MultiModalMatcher:
                 config=query_config,
                 requires_label=False,
                 requires_data=True,
+                advanced_hyperparameters=query_advanced_hyperparameters,
             )
         else:  # continuing training
             query_processors = self._query_processors
@@ -582,6 +641,7 @@ class MultiModalMatcher:
                 config=response_config,
                 requires_label=False,
                 requires_data=True,
+                advanced_hyperparameters=response_advanced_hyperparameters,
             )
         else:  # continuing training
             response_processors = self._response_processors
@@ -617,6 +677,7 @@ class MultiModalMatcher:
         enable_progress_bar: bool,
         presets: Optional[str] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+        advanced_hyperparameters: Optional[Dict] = None,
         hpo_mode: bool = False,
         **hpo_kwargs,
     ):
@@ -634,21 +695,26 @@ class MultiModalMatcher:
         if self._query_config is None:
             query_config = copy.deepcopy(config)
             # customize config model names to make them consistent with model prefixes.
-            query_config.model, _ = customize_model_names(
-                config=query_config.model, customized_names=[f"{n}_{QUERY}" for n in query_config.model.names]
+            query_config.model, query_advanced_hyperparameters = customize_model_names(
+                config=query_config.model,
+                customized_names=[f"{n}_{QUERY}" for n in query_config.model.names],
+                advanced_hyperparameters=advanced_hyperparameters,
             )
         else:
             query_config = self._query_config
+            query_advanced_hyperparameters = None
 
         if self._response_config is None:
             response_config = copy.deepcopy(config)
             # customize config model names to make them consistent with model prefixes.
-            response_config.model, _ = customize_model_names(
+            response_config.model, response_advanced_hyperparameters = customize_model_names(
                 config=response_config.model,
                 customized_names=[f"{n}_{RESPONSE}" for n in response_config.model.names],
+                advanced_hyperparameters=advanced_hyperparameters,
             )
         else:
             response_config = self._response_config
+            response_advanced_hyperparameters = None
 
         query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._get_matcher_df_preprocessor(
             data=train_df,
@@ -676,6 +742,8 @@ class MultiModalMatcher:
             query_config=query_config,
             response_model=response_model,
             response_config=response_config,
+            query_advanced_hyperparameters=query_advanced_hyperparameters,
+            response_advanced_hyperparameters=response_advanced_hyperparameters,
         )
 
         query_processors_count = {k: len(v) for k, v in query_processors.items()}
@@ -1447,6 +1515,7 @@ class MultiModalMatcher:
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
+        self._ensure_inference_ready()
         if all(v is not None for v in [data, query_data, response_data]):
             if isinstance(query_data, list):
                 assert (
@@ -1519,6 +1588,7 @@ class MultiModalMatcher:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
+        self._ensure_inference_ready()
         outputs = predict(
             predictor=self,
             data=data,
@@ -1580,6 +1650,7 @@ class MultiModalMatcher:
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
+        self._ensure_inference_ready()
         outputs = predict(
             predictor=self,
             data=data,
@@ -1636,6 +1707,7 @@ class MultiModalMatcher:
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
+        self._ensure_inference_ready()
         if signature is None:
             if self._query or self._response:
                 if isinstance(data, list):

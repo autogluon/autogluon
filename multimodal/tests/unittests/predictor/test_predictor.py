@@ -31,9 +31,8 @@ from autogluon.multimodal.constants import (
 from autogluon.multimodal.utils import modify_duplicate_model_names
 from autogluon.multimodal.utils.misc import shopee_dataset
 
-# from ..utils.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
-# from ..utils.utils import get_home_dir
-from unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
+from ..utils.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
+from ..utils.utils import get_home_dir
 
 ALL_DATASETS = {
     "petfinder": PetFinderDataset(),
@@ -773,10 +772,3 @@ def test_hyperparameters_consistency(hyperparameters):
         time_limit=10,
     )
     assert predictor._config == predictor_2._config
-
-
-if __name__ == "__main__":
-    test_hyperparameters_consistency({
-            "model.names": ["timm_image"],
-            "model.timm_image.checkpoint_name": "mobilenetv3_small_100",
-        })

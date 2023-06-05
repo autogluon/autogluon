@@ -146,7 +146,6 @@ from .utils import (
     infer_precision,
     infer_scarcity_mode_by_data_size,
     init_df_preprocessor,
-    init_pretrained,
     list_timm_models,
     load_text_tokenizers,
     logits_to_prob,
@@ -775,7 +774,7 @@ class MultiModalPredictor(ExportMixin):
         self._column_types = column_types
 
         if self._hyperparameters and hyperparameters:
-                self._hyperparameters.update(hyperparameters)
+            self._hyperparameters.update(hyperparameters)
         elif hyperparameters:
             self._hyperparameters = hyperparameters
 
@@ -889,23 +888,32 @@ class MultiModalPredictor(ExportMixin):
         return train_data, tuning_data
 
     def _init_pretrained(self):
+        # split out the hyperparameters whose values are complex objects
+        hyperparameters, advanced_hyperparameters = split_hyperparameters(self._hyperparameters)
+
         if self._config is None:
-            self._config = get_config(problem_type=self._problem_type, presets=self._presets, overrides=self._hyperparameters)
+            self._config = get_config(
+                problem_type=self._problem_type, presets=self._presets, overrides=hyperparameters
+            )
         if self._model is None:
             assert (
-                    len(self._config.model.names) == 1
+                len(self._config.model.names) == 1
             ), f"Zero shot mode only supports using one model, but detects multiple models {self._config.model.names}"
-            self._model = create_fusion_model(config=self._config, pretrained=self._pretrained, num_classes=self._output_shape,
-                                              classes=self._classes)
+            self._model = create_fusion_model(
+                config=self._config, pretrained=self._pretrained, num_classes=self._output_shape, classes=self._classes
+            )
         if self._data_processors is None:
             self._data_processors = create_fusion_data_processors(
                 config=self._config,
                 model=self._model,
+                advanced_hyperparameters=advanced_hyperparameters,
             )
 
     def _ensure_inference_ready(self):
         if not self._fit_called:
-            if not self.problem_property.support_zero_shot:  # problem_type=None also doesn't support zero-shot inference
+            if (
+                not self.problem_property.support_zero_shot
+            ):  # problem_type=None also doesn't support zero-shot inference
                 raise RuntimeError(
                     f"problem_type='{self._problem_type}' does not support running inference directly. "
                     f"You need to call `predictor.fit()`, or load a predictor first before "

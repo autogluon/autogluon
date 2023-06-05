@@ -352,3 +352,44 @@ def test_image_text_semantic_search():
         for per_hit, per_hit_2 in zip(per_query_hits, per_query_hits_2):
             assert per_hit["response_id"] == per_hit_2["response_id"]
             npt.assert_almost_equal(per_hit["score"], per_hit_2["score"])
+
+
+@pytest.mark.parametrize(
+    "hyperparameters",
+    [
+        {
+            "model.names": ["timm_image"],
+            "model.timm_image.checkpoint_name": "mobilenetv3_small_100",
+        },
+    ],
+)
+def test_matcher_hyperparameters_consistency(hyperparameters):
+    dataset = IDChangeDetectionDataset()
+
+    # pass hyperparameters to init()
+    predictor = MultiModalPredictor(
+        query="Previous Image",
+        response="Current Image",
+        problem_type="image_similarity",
+        label=dataset.label_columns[0] if dataset.label_columns else None,
+        match_label=dataset.match_label,
+        eval_metric=dataset.metric,
+        hyperparameters=hyperparameters,
+    )
+    predictor.fit(dataset.train_df, time_limit=10)
+
+    # pass hyperparameters to fit()
+    predictor_2 = MultiModalPredictor(
+        query="Previous Image",
+        response="Current Image",
+        problem_type="image_similarity",
+        label=dataset.label_columns[0] if dataset.label_columns else None,
+        match_label=dataset.match_label,
+        eval_metric=dataset.metric,
+    )
+    predictor_2.fit(
+        dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=10,
+    )
+    assert predictor._matcher._config == predictor_2._matcher._config
