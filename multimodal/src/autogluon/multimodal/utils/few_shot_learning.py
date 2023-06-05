@@ -57,7 +57,7 @@ class FewShotSVMPredictor:
 
         """
         self._automm_predictor = MultiModalPredictor(
-            label=label,
+            label=None,
             hyperparameters=hyperparameters,
             problem_type=FEATURE_EXTRACTION,
             eval_metric=eval_metric,
@@ -77,7 +77,7 @@ class FewShotSVMPredictor:
 
     def fit(self, train_data: pd.DataFrame):
         features = self.extract_embedding(data=train_data)
-        labels = np.array(train_data[self._automm_predictor._label_column])
+        labels = np.array(train_data[self._label])
         self.clf.fit(features, labels)
         self._fit_called = True
         # Automatically save the model after .fit()
@@ -96,6 +96,8 @@ class FewShotSVMPredictor:
         return preds
 
     def extract_embedding(self, data: pd.DataFrame):
+        if self._label in data.columns:
+            data = data.drop(columns=[self._label], axis=1)
         features = self._automm_predictor.extract_embedding(data)
         assert len(features.keys()) == 1, "Currently SVM only supports single column feature input"
         features_key = list(features.keys())[0]
@@ -109,9 +111,12 @@ class FewShotSVMPredictor:
             warnings.warn(
                 "Neither .fit() nor .load() is not invoked. Unexpected predictions may occur. Please consider calling .fit() or .load() before .evaluate()"
             )
+        assert (
+            self._label in data.columns
+        ), f"Label {self._label} is not in the data. Cannot perform evaluation without ground truth labels."
         features = self.extract_embedding(data)
         preds = self.clf.predict(features)
-        labels = np.array(data[self._automm_predictor._label_column])
+        labels = np.array(data[self._label])
 
         metric_data = {}
         # TODO: Support BINARY vs. MULTICLASS
@@ -181,7 +186,7 @@ class FewShotSVMPredictor:
         with open(os.path.join(path, "fewshot_svm_assets.json"), "r") as fp:
             assets = json.load(fp)
             predictor = MultiModalPredictor(
-                label=assets["label"],
+                label=None,
                 hyperparameters=assets["hyperparameters"],
                 problem_type=FEATURE_EXTRACTION,
                 eval_metric=assets["eval_metric"],
