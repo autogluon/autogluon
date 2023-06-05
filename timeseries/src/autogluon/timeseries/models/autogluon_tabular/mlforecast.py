@@ -1,9 +1,10 @@
 import logging
 import math
-import os
-import re
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+import math
+import psutil
 
 import numpy as np
 import pandas as pd
@@ -101,7 +102,6 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         hyperparameters: Dict[str, Any] = None,
         **kwargs,  # noqa
     ):
-        name = name or re.sub(r"Model$", "", self.__class__.__name__)  # TODO: look name up from presets
         super().__init__(
             path=path,
             freq=freq,
@@ -135,7 +135,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
 
         lags = model_params.get("lags")
         if lags is None:
-            lags = get_lags_for_frequency(self.freq)
+            lags = get_lags_for_frequency(self.freq, lag_ub=200)
 
         date_features = model_params.get("date_features")
         if date_features is None:
@@ -164,6 +164,8 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         if model_params.get("standardize", True):
             self.scaler = StandardScaler()
             target_transforms.append(self.scaler)
+
+        print(f"# features = {len(lags) + len(date_features)}")
 
         return {
             "lags": lags,
@@ -243,6 +245,9 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         mlforecast_init_args = self._get_mlforecast_init_args(train_data, model_params)
         self.mlf = MLForecast(models={}, freq=self.freq, **mlforecast_init_args)
 
+        train_data = MLFMemoryUsage().subset_data_to_limit_mem_usage(
+            train_data, num_features=len(self.mlf.ts.lags) + len(self.mlf.ts.date_features)
+        )
         # Do not use external val_data as tuning_data to avoid overfitting
         train_subset, val_subset = train_data.train_test_split(self.prediction_length)
         max_num_samples = model_params.get("max_num_samples", 1_000_000)
@@ -252,26 +257,26 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             val_subset, last_k_values=min(self.prediction_length, max_rows_per_item)
         )
 
-        estimator = TabularEstimator(
-            predictor_init_kwargs={
-                "path": self.path + os.sep + "point_predictor",
-                "problem_type": ag.constants.REGRESSION,
-                "eval_metric": self.TIMESERIES_METRIC_TO_TABULAR_METRIC[self.eval_metric],
-                "verbosity": verbosity - 2,
-            },
-            predictor_fit_kwargs={
-                "tuning_data": pd.concat([X_val, y_val], axis=1),
-                "time_limit": time_limit,
-                "hyperparameters": model_params.get("tabular_hyperparameters", {"GBM": {}}),
-                **model_params.get("tabular_fit_kwargs", {}),
-            },
-        )
-        self.mlf.models = {"mean": estimator}
+        # estimator = TabularEstimator(
+        #     predictor_init_kwargs={
+        #         "path": self.path + os.sep + "point_predictor",
+        #         "problem_type": ag.constants.REGRESSION,
+        #         "eval_metric": self.TIMESERIES_METRIC_TO_TABULAR_METRIC[self.eval_metric],
+        #         "verbosity": verbosity - 2,
+        #     },
+        #     predictor_fit_kwargs={
+        #         "tuning_data": pd.concat([X_val, y_val], axis=1),
+        #         "time_limit": time_limit,
+        #         "hyperparameters": model_params.get("tabular_hyperparameters", {"GBM": {}}),
+        #         **model_params.get("tabular_fit_kwargs", {}),
+        #     },
+        # )
+        # self.mlf.models = {"mean": estimator}
 
-        with statsmodels_warning_filter():
-            self.mlf.fit_models(X_train, y_train)
+        # with statsmodels_warning_filter():
+        #     self.mlf.fit_models(X_train, y_train)
 
-        self.residuals_std = (self.mlf.models_["mean"].predict(X_train) - y_train).std()
+        # self.residuals_std = (self.mlf.models_["mean"].predict(X_train) - y_train).std()
 
     def _predict_with_mlforecast(
         self,
@@ -330,3 +335,37 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}
+
+
+@dataclass(frozen=True)
+class MLFMemoryUsage:
+    """Estimated peak memory usage of MLForecast.preprocess (in MB) using the following linear model:
+
+    peak_mem_usage = a * num_rows * num_features + b * num_rows * c
+    """
+
+    a = 3.16e-5
+    b = 1.4e-4
+    c = 661
+
+    def _estimate_memory_usage(self, num_rows: int, num_features: int) -> float:
+        return self.a * num_rows * num_features + self.b * num_rows + self.c
+
+    def subset_data_to_limit_mem_usage(
+        self, data: TimeSeriesDataFrame, num_features: int, max_mem_util_frac: float = 0.8
+    ) -> TimeSeriesDataFrame:
+        """Randomly select a subset of time series to ensure that peak memory usage stays below threshold."""
+        memory_available = psutil.virtual_memory().available / 1e6
+        max_memory_util = memory_available * max_mem_util_frac
+        if self._estimate_memory_usage(num_rows=len(data), num_features=num_features) > max_memory_util:
+            item_ids = data.item_ids
+            avg_ts_length = len(data) / len(item_ids)
+            num_items_to_keep = math.ceil(
+                (max_memory_util - self.c) / avg_ts_length / (self.a * num_features + self.b)
+            )
+            items_to_keep = np.random.choice(item_ids, num_items_to_keep, replace=False)
+            logger.debug(
+                f"Randomly selected {num_items_to_keep} ({num_items_to_keep / len(item_ids):1%}) time series to limit peak memory usage"
+            )
+            data = data.query("item_id in @items_to_keep")
+        return data
