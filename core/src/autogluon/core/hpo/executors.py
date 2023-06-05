@@ -399,6 +399,8 @@ class RayHpoExecutor(HpoExecutor):
             model_estimate_memory_usage: float,
             adapter_type: str,
             trainable_is_parallel: bool = False,
+            tune_config_kwargs: Optional[Dict[str, Any]] = None,
+            run_config_kwargs: Optional[Dict[str, Any]] = None
         ):
         """
         Execute ray hpo experiment
@@ -425,6 +427,10 @@ class RayHpoExecutor(HpoExecutor):
             Valid values are ['tabular', 'timeseries', 'automm', 'automm_ray_lightning']
         trainable_is_parallel
             Whether the trainable itself will use ray to run parallel job or not.
+        tune_config_kwargs
+            Additional args being passed to tune.TuneConfig https://docs.ray.io/en/latest/ray-air/package-ref.html#ray.tune.tune_config.TuneConfig
+        run_config_kwargs
+            Additional args being passed to air.RunConfig https://docs.ray.io/en/latest/ray-air/package-ref.html#ray.air.config.RunConfig
         """
         from .ray_hpo import (
             run,
@@ -449,6 +455,8 @@ class RayHpoExecutor(HpoExecutor):
             model_estimate_memory_usage=model_estimate_memory_usage,
             time_budget_s=self.time_limit,
             verbose=0,
+            tune_config_kwargs=tune_config_kwargs,
+            run_config_kwargs=run_config_kwargs
         )
         os.environ.pop('TUNE_DISABLE_AUTO_CALLBACK_LOGGERS', None)
         self.analysis = analysis

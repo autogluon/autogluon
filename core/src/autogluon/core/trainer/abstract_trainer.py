@@ -14,6 +14,7 @@ from pathlib import Path
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
+from autogluon.common.utils.path_converter import PathConverter
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
 
@@ -233,8 +234,10 @@ class AbstractTrainer:
             self.set_model_attribute(model=model, attribute='path', val=path)
 
     def create_contexts(self, path_context: str) -> (str, dict):
+        self.path = PathConverter.to_current(self.path)
         path = path_context
         model_paths = self.get_models_attribute_dict(attribute='path')
+        model_paths = {model: PathConverter.to_current(model_path) for model, model_path in model_paths.items()}
         for model, prev_path in model_paths.items():
             prev_path = os.path.abspath(prev_path) + os.path.sep
             abs_path = os.path.abspath(self.path) + os.path.sep

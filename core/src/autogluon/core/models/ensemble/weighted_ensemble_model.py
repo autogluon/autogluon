@@ -72,3 +72,11 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
+
+    def _more_tags(self):
+        """
+        This model can generate out-of-fold (oof) predictions by predicting directly on the training data.
+        This will make the result slightly overfit, but the weighted ensemble has limited degrees of freedom intentionally, making the overfitting negligible.
+        """
+        tags = {'can_get_oof_from_train': True}
+        return tags
