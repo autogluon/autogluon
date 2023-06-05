@@ -165,8 +165,6 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             self.scaler = StandardScaler()
             target_transforms.append(self.scaler)
 
-        print(f"# features = {len(lags) + len(date_features)}")
-
         return {
             "lags": lags,
             "date_features": date_features,
@@ -257,26 +255,26 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             val_subset, last_k_values=min(self.prediction_length, max_rows_per_item)
         )
 
-        # estimator = TabularEstimator(
-        #     predictor_init_kwargs={
-        #         "path": self.path + os.sep + "point_predictor",
-        #         "problem_type": ag.constants.REGRESSION,
-        #         "eval_metric": self.TIMESERIES_METRIC_TO_TABULAR_METRIC[self.eval_metric],
-        #         "verbosity": verbosity - 2,
-        #     },
-        #     predictor_fit_kwargs={
-        #         "tuning_data": pd.concat([X_val, y_val], axis=1),
-        #         "time_limit": time_limit,
-        #         "hyperparameters": model_params.get("tabular_hyperparameters", {"GBM": {}}),
-        #         **model_params.get("tabular_fit_kwargs", {}),
-        #     },
-        # )
-        # self.mlf.models = {"mean": estimator}
+        estimator = TabularEstimator(
+            predictor_init_kwargs={
+                "path": self.path + os.sep + "point_predictor",
+                "problem_type": ag.constants.REGRESSION,
+                "eval_metric": self.TIMESERIES_METRIC_TO_TABULAR_METRIC[self.eval_metric],
+                "verbosity": verbosity - 2,
+            },
+            predictor_fit_kwargs={
+                "tuning_data": pd.concat([X_val, y_val], axis=1),
+                "time_limit": time_limit,
+                "hyperparameters": model_params.get("tabular_hyperparameters", {"GBM": {}}),
+                **model_params.get("tabular_fit_kwargs", {}),
+            },
+        )
+        self.mlf.models = {"mean": estimator}
 
-        # with statsmodels_warning_filter():
-        #     self.mlf.fit_models(X_train, y_train)
+        with statsmodels_warning_filter():
+            self.mlf.fit_models(X_train, y_train)
 
-        # self.residuals_std = (self.mlf.models_["mean"].predict(X_train) - y_train).std()
+        self.residuals_std = (self.mlf.models_["mean"].predict(X_train) - y_train).std()
 
     def _predict_with_mlforecast(
         self,
@@ -365,7 +363,8 @@ class MLFMemoryUsage:
             )
             items_to_keep = np.random.choice(item_ids, num_items_to_keep, replace=False)
             logger.debug(
-                f"Randomly selected {num_items_to_keep} ({num_items_to_keep / len(item_ids):1%}) time series to limit peak memory usage"
+                f"Randomly selected {num_items_to_keep} ({num_items_to_keep / len(item_ids):.1%}) time series "
+                "to limit peak memory usage"
             )
             data = data.query("item_id in @items_to_keep")
         return data
