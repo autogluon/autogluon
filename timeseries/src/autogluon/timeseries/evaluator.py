@@ -92,9 +92,9 @@ class TimeSeriesEvaluator:
     target_column : str, default = "target"
         Name of the target column to be forecasting.
     eval_metric_seasonal_period : int, optional
-        Seasonal period used to compute the mean absolute scaled error (MASE) evaluation metric. This parameter is only
-        used if ``eval_metric="MASE"`. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for more details.
-        Defaults to ``None``, in which case the seasonal period is computed based on the data frequency.
+        Seasonal period used to compute the MASE ans SPL evaluation metrics. This parameter is only used if
+        ``eval_metric`` is one of ``{"MASE", "SPL"}`. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for
+        more details. Defaults to ``None``, in which case the seasonal period is computed based on the data frequency.
 
     Class Attributes
     ----------------

@@ -11,7 +11,7 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
     def construct_model_templates(self, hyperparameters, multi_window: bool = False, **kwargs):
         path = kwargs.pop("path", self.path)
         eval_metric = kwargs.pop("eval_metric", self.eval_metric)
-        eval_metric_seasonal_period = kwargs.pop("eval_metric", self.eval_metric_seasonal_period)
+        eval_metric_seasonal_period = kwargs.pop("eval_metric_seasonal_period", self.eval_metric_seasonal_period)
         quantile_levels = kwargs.pop("quantile_levels", self.quantile_levels)
         hyperparameter_tune = kwargs.get("hyperparameter_tune", False)
         return get_preset_models(

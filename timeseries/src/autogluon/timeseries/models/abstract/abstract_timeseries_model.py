@@ -47,9 +47,9 @@ class AbstractTimeSeriesModel(AbstractModel):
         detailed documentation can be found in `gluonts.evaluation.Evaluator`. By default, `mean_wQuantileLoss`
         will be used.
     eval_metric_seasonal_period : int, optional
-        Seasonal period used to compute the mean absolute scaled error (MASE) evaluation metric. This parameter is only
-        used if ``eval_metric="MASE"`. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for more details.
-        Defaults to ``None``, in which case the seasonal period is computed based on the data frequency.
+        Seasonal period used to compute the MASE ans SPL evaluation metrics. This parameter is only used if
+        ``eval_metric`` is one of ``{"MASE", "SPL"}`. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for
+        more details. Defaults to ``None``, in which case the seasonal period is computed based on the data frequency.
     hyperparameters : dict, default = None
         Hyperparameters that will be used by the model (can be search spaces instead of fixed values).
         If None, model defaults are used. This is identical to passing an empty dictionary.
