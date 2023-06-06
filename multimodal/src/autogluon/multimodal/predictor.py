@@ -399,6 +399,7 @@ class MultiModalPredictor(ExportMixin):
         self._output_shape = num_classes
         self._classes = classes
         self._ckpt_path = None
+        self._pretrained_path = None
         self._pretrained = pretrained
         self._config = None
         self._df_preprocessor = None
@@ -434,6 +435,8 @@ class MultiModalPredictor(ExportMixin):
                 verbosity=verbosity,
                 warn_if_exist=warn_if_exist,
                 enable_progress_bar=enable_progress_bar,
+                pretrained=pretrained,
+                validation_metric=validation_metric,
             )
             return
 
@@ -2512,6 +2515,8 @@ class MultiModalPredictor(ExportMixin):
                     "output_shape": self._output_shape,
                     "classes": self._classes,
                     "save_path": self._save_path,
+                    "pretrained": self._pretrained,
+                    "pretrained_path": self._pretrained_path,
                     "fit_called": self._fit_called,
                     "best_score": self._best_score,
                     "total_train_time": self._total_train_time,
@@ -2611,7 +2616,9 @@ class MultiModalPredictor(ExportMixin):
         predictor._verbosity = verbosity
         predictor._resume = resume
         predictor._save_path = path  # in case the original exp dir is copied to somewhere else
-        predictor._pretrain_path = path
+        predictor._pretrained_path = path
+        if "pretrained" in assets:
+            predictor._pretrained = assets["pretrained"]
         if "fit_called" in assets:
             predictor._fit_called = assets["fit_called"]
         else:

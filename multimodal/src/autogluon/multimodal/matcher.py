@@ -126,6 +126,8 @@ class MultiModalMatcher:
         verbosity: Optional[int] = 3,
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
+        pretrained: Optional[bool] = True,
+        validation_metric: Optional[str] = None,
     ):
         """
         Parameters
@@ -153,7 +155,7 @@ class MultiModalMatcher:
             Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
-            Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
+            Defaults to 'roc_auc' for binary classification and 'spearmanr' for multiclass classification and regression.
         path
             Path to directory where models and intermediate outputs should be saved.
             If unspecified, a time-stamped folder called "AutogluonAutoMM/ag-[TIMESTAMP]"
@@ -172,6 +174,9 @@ class MultiModalMatcher:
         enable_progress_bar
             Whether to show progress bar. It will be True by default and will also be
             disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
+        validation_metric
+            Validation metric name. If `validation_metric = None`, it is automatically chosen based on `problem_type`.
+            Defaults to 'roc_auc' for binary classification and 'spearmanr' for multiclass classification and regression.
         """
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
@@ -201,13 +206,14 @@ class MultiModalMatcher:
         self._problem_type = None  # always infer problem type for matching.
         self._pipeline = problem_type.lower() if problem_type is not None else None
         self._presets = presets.lower() if presets else None
-        self._eval_metric_name = eval_metric
-        self._validation_metric_name = None
+        self._eval_metric_name = eval_metric.lower() if eval_metric else None
+        self._validation_metric_name = validation_metric.lower() if validation_metric else None
         self._hyperparameters = hyperparameters
         self._output_shape = None
         self._save_path = path
         self._ckpt_path = None
         self._pretrained_path = None
+        self._pretrained = pretrained
         self._config = None
         self._query_config = None
         self._response_config = None
@@ -317,6 +323,7 @@ class MultiModalMatcher:
             self._query_model, self._response_model = create_siamese_model(
                 query_config=self._query_config,
                 response_config=self._response_config,
+                pretrained=self._pretrained,
             )
 
         self._query_processors, self._response_processors, self._label_processors = self._get_matcher_data_processors(
@@ -732,6 +739,7 @@ class MultiModalMatcher:
             query_model, response_model = create_siamese_model(
                 query_config=query_config,
                 response_config=response_config,
+                pretrained=self._pretrained,
             )
         else:  # continuing training
             query_model = self._query_model
@@ -1864,6 +1872,7 @@ class MultiModalMatcher:
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
                     "save_path": self._save_path,
+                    "pretrained": self._pretrained,
                     "pretrained_path": self._pretrained_path,
                     "fit_called": self._fit_called,
                     "version": ag_version.__version__,
@@ -1967,7 +1976,9 @@ class MultiModalMatcher:
         matcher._verbosity = verbosity
         matcher._resume = resume
         matcher._save_path = path  # in case the original exp dir is copied to somewhere else
-        matcher._pretrain_path = path
+        matcher._pretrained_path = path
+        if "pretrained" in assets:
+            matcher._pretrained = assets["pretrained"]
         if "fit_called" in assets:
             matcher._fit_called = assets["fit_called"]
         else:
