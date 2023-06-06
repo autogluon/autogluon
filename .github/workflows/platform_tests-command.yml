@@ -234,7 +234,4 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
-          # test_install.sh script will install mxnet, which doesn't work on Windows.
-          source .github/workflow_scripts/env_setup.sh
-          setup_build_env
-          install_all
+          chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh

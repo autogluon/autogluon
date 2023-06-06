@@ -20,7 +20,7 @@ def _get_pandas_df(num_rows=20):
 def test_when_df_saved_and_loaded_from_disk_then_hash_is_unchanged():
     df = _get_pandas_df()
     with TemporaryFile() as temp_file:
-        save_pkl.save(str(temp_file), df)
+        save_pkl.save(temp_file.name, df)
         loaded_df = load_pkl.load(str(temp_file))
     assert hash_pandas_df(df) == hash_pandas_df(loaded_df)
 
