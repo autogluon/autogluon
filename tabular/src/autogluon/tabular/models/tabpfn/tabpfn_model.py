@@ -129,6 +129,17 @@ class TabPFNModel(AbstractModel):
         )
         return default_auxiliary_params
 
+    # TODO: Consider not setting `max_sets=1`, and only setting it in the preset hyperparameter definition.
+    @classmethod
+    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
+        """
+        Set max_sets to 1 when bagging, otherwise inference time could become extremely slow.
+        """
+        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
+        extra_ag_args_ensemble = {'max_sets': 1}
+        default_ag_args_ensemble.update(extra_ag_args_ensemble)
+        return default_ag_args_ensemble
+
     def _ag_params(self) -> set:
         return {'sample_rows', 'max_features', 'max_classes'}
 
