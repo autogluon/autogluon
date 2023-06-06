@@ -60,7 +60,7 @@ AutoGluon requires Python version 3.8, 3.9, or 3.10 and is available on Linux, M
     ```{include} install-mac-libomp.md
     ```
 
-    ```{include} install-cpu-pip.md 
+    ```{include} install-mac-cpu.md 
     ``` 
     ::::
   
