@@ -232,6 +232,12 @@ jobs:
           auto-update-conda: true
           python-version: ${{ matrix.python }}
       - name: unit-test
+        if: matrix.os != 'windows-latest'
         shell: bash -l {0}
         run: |
           chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
+      - name: unit-test on Windows
+        if: matrix.os == 'windows-latest'
+        shell: bash -l {0}
+        run: |
+          chmod +x ./.github/workflow_scripts/test_install_windows.sh && ./.github/workflow_scripts/test_install_windows.sh
