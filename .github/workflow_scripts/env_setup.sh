@@ -5,6 +5,7 @@ function setup_build_env {
     python3 -m pip install "black>=22.3,<23.0"
     python3 -m pip install isort>=5.10
     python3 -m pip install bandit
+    python3 -m pip install packaging
 }
 
 function setup_build_contrib_env {
