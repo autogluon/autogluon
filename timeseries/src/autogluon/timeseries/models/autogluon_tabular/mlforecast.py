@@ -342,9 +342,9 @@ class MLFMemoryUsage:
     peak_mem_usage = a * num_rows * num_features + b * num_rows * c
     """
 
-    a = 3.16e-5
-    b = 1.4e-4
-    c = 661
+    a = 3.33e-05
+    b = 1.18e-04
+    c = 703.4
 
     def _estimate_memory_usage(self, num_rows: int, num_features: int) -> float:
         return self.a * num_rows * num_features + self.b * num_rows + self.c
@@ -355,12 +355,10 @@ class MLFMemoryUsage:
         """Randomly select a subset of time series to ensure that peak memory usage stays below threshold."""
         memory_available = psutil.virtual_memory().available / 1e6
         max_memory_util = memory_available * max_mem_util_frac
-        if self._estimate_memory_usage(num_rows=len(data), num_features=num_features) > max_memory_util:
+        estimated_mem_usage = self._estimate_memory_usage(num_rows=len(data), num_features=num_features)
+        if estimated_mem_usage > max_memory_util:
             item_ids = data.item_ids
-            avg_ts_length = len(data) / len(item_ids)
-            num_items_to_keep = math.ceil(
-                (max_memory_util - self.c) / avg_ts_length / (self.a * num_features + self.b)
-            )
+            num_items_to_keep = math.ceil(max_memory_util / estimated_mem_usage)
             items_to_keep = np.random.choice(item_ids, num_items_to_keep, replace=False)
             logger.debug(
                 f"Randomly selected {num_items_to_keep} ({num_items_to_keep / len(item_ids):.1%}) time series "

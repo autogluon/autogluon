@@ -49,6 +49,7 @@ extras_require = {
         "pytest-timeout>=2.1,<3",
         "isort>=5.10",
         "black>=22.3,<23.0",
+        "memory_profiler",
     ],
 }
 
