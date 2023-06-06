@@ -921,9 +921,7 @@ class MultiModalPredictor(ExportMixin):
 
     def _ensure_inference_ready(self):
         if not self._fit_called:
-            if (
-                not self.problem_property.support_zero_shot
-            ):  # problem_type=None also doesn't support zero-shot inference
+            if not self._problem_type or not self.problem_property.support_zero_shot:
                 raise RuntimeError(
                     f"problem_type='{self._problem_type}' does not support running inference directly. "
                     f"You need to call `predictor.fit()`, or load a predictor first before "
