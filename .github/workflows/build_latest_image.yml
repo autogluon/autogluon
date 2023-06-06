@@ -20,6 +20,13 @@ jobs:
         role-to-assume: arn:aws:iam::369469875935:role/CloudCIECRRole
         role-duration-seconds: 3600
         aws-region: us-east-1
+    - name: free disk space
+      run: |
+        sudo swapoff -a
+        sudo rm -f /swapfile
+        sudo apt clean
+        docker rmi $(docker image ls -aq)
+        df -h
     - name: Build the Docker image
       run: |
         cd CI/docker
@@ -37,6 +44,13 @@ jobs:
         role-to-assume: arn:aws:iam::369469875935:role/CloudCIECRRole
         role-duration-seconds: 3600
         aws-region: us-east-1
+    - name: free disk space
+      run: |
+        sudo swapoff -a
+        sudo rm -f /swapfile
+        sudo apt clean
+        docker rmi $(docker image ls -aq)
+        df -h
     - name: Build the Docker image
       run: |
         cd CI/docker
@@ -54,6 +68,13 @@ jobs:
         role-to-assume: arn:aws:iam::369469875935:role/CloudCIECRRole
         role-duration-seconds: 3600
         aws-region: us-east-1
+    - name: free disk space
+      run: |
+        sudo swapoff -a
+        sudo rm -f /swapfile
+        sudo apt clean
+        docker rmi $(docker image ls -aq)
+        df -h
     - name: Build the Docker image
       run: |
         cd CI/docker
@@ -71,6 +92,13 @@ jobs:
         role-to-assume: arn:aws:iam::369469875935:role/CloudCIECRRole
         role-duration-seconds: 3600
         aws-region: us-east-1
+    - name: free disk space
+      run: |
+        sudo swapoff -a
+        sudo rm -f /swapfile
+        sudo apt clean
+        docker rmi $(docker image ls -aq)
+        df -h
     - name: Build the Docker image
       run: |
         cd CI/docker
