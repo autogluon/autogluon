@@ -68,12 +68,10 @@ class TabPFNModel(AbstractModel):
         )
         return X, y
 
-    # TODO: Should we fillna 0? what about -1 or mean? Does TabPFN automatically fill missing values?
-    #  Currently filling to 0, might not be a good idea though.
     def _preprocess(self, X: pd.DataFrame, **kwargs) -> np.ndarray:
         """
         Converts categorical to label encoded integers
-        Fills missing values to 0
+        Keeps missing values, as TabPFN automatically handles missing values internally.
         """
         X = super()._preprocess(X, **kwargs)
         if self._feature_generator is None:
@@ -82,7 +80,7 @@ class TabPFNModel(AbstractModel):
         if self._feature_generator.features_in:
             X = X.copy()
             X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
-        X = X.fillna(0).to_numpy(dtype=np.float32)
+        X = X.to_numpy(dtype=np.float32)
         return X
 
     def _set_default_params(self):
