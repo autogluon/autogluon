@@ -1,10 +1,9 @@
 import numpy as np
 import pandas as pd
 import pytest
-
 from memory_profiler import memory_usage
 
-from autogluon.timeseries.models.autogluon_tabular.mlforecast import RecursiveTabularModel, MLFMemoryUsage
+from autogluon.timeseries.models.autogluon_tabular.mlforecast import MLFMemoryUsage, RecursiveTabularModel
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
 from ..common import get_data_frame_with_variable_lengths
