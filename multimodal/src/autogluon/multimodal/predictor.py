@@ -486,14 +486,17 @@ class MultiModalPredictor(ExportMixin):
 
     @property
     def problem_type(self):
-        return self._problem_type
+        if self._matcher:
+            return self._matcher._pipeline
+        else:
+            return self._problem_type
 
     @property
     def problem_property(self):
-        if self._problem_type is None:
+        if self.problem_type is None:
             return None
         else:
-            return PROBLEM_TYPES_REG.get(self._problem_type)
+            return PROBLEM_TYPES_REG.get(self.problem_type)
 
     @property
     def column_types(self):
@@ -1933,7 +1936,6 @@ class MultiModalPredictor(ExportMixin):
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        self._ensure_inference_ready()
         if self._matcher:
             return self._matcher.evaluate(
                 data=data,
@@ -1948,6 +1950,8 @@ class MultiModalPredictor(ExportMixin):
                 return_pred=return_pred,
                 realtime=realtime,
             )
+
+        self._ensure_inference_ready()
         if self._problem_type == OBJECT_DETECTION:
             if realtime:
                 return NotImplementedError(
@@ -2123,8 +2127,6 @@ class MultiModalPredictor(ExportMixin):
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        self._ensure_inference_ready()
-
         if self._matcher:
             return self._matcher.predict(
                 data=data,
@@ -2132,6 +2134,8 @@ class MultiModalPredictor(ExportMixin):
                 as_pandas=as_pandas,
                 realtime=realtime,
             )
+
+        self._ensure_inference_ready()
         if self._problem_type == OBJECT_DETECTION:
             data = object_detection_data_to_df(data)
 
@@ -2274,7 +2278,7 @@ class MultiModalPredictor(ExportMixin):
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-        self._ensure_inference_ready()
+
         if self._matcher:
             return self._matcher.predict_proba(
                 data=data,
@@ -2284,6 +2288,7 @@ class MultiModalPredictor(ExportMixin):
                 realtime=realtime,
             )
 
+        self._ensure_inference_ready()
         assert self._problem_type not in [
             REGRESSION,
         ], f"Problem {self._problem_type} has no probability output."
@@ -2362,7 +2367,6 @@ class MultiModalPredictor(ExportMixin):
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
-        self._ensure_inference_ready()
         if self._matcher:
             return self._matcher.extract_embedding(
                 data=data,
@@ -2373,6 +2377,7 @@ class MultiModalPredictor(ExportMixin):
                 realtime=realtime,
             )
 
+        self._ensure_inference_ready()
         turn_on_off_feature_column_info(
             data_processors=self._data_processors,
             flag=True,
