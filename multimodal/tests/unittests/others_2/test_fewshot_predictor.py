@@ -98,8 +98,3 @@ def test_fewshot_save_load():
     preds2 = predictor.predict(test_data.drop(columns=["label"], axis=1))
     assert results == results2
     assert (preds == preds2).all()
-
-
-if __name__ == "__main__":
-    test_fewshot_fit_predict()
-    # test_fewshot_save_load()
