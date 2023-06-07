@@ -129,16 +129,30 @@ class TabPFNModel(AbstractModel):
         )
         return default_auxiliary_params
 
+    # FIXME: Enabling parallel bagging TabPFN creates a lot of warnings / potential failures from Ray
     # TODO: Consider not setting `max_sets=1`, and only setting it in the preset hyperparameter definition.
     @classmethod
     def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
         """
         Set max_sets to 1 when bagging, otherwise inference time could become extremely slow.
+        Set fold_fitting_strategy to sequential_local, as parallel folding causing many warnings / potential errors from Ray.
         """
         default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {'max_sets': 1}
+        extra_ag_args_ensemble = {
+            'max_sets': 1,
+            'fold_fitting_strategy': 'sequential_local',
+        }
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
+
+    # FIXME: Enable parallel bagging once AutoMM supports being run within Ray without hanging
+    @classmethod
+    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
+        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
+        extra_ag_args_ensemble = {'fold_fitting_strategy': 'sequential_local'}
+        default_ag_args_ensemble.update(extra_ag_args_ensemble)
+        return default_ag_args_ensemble
+
 
     def _ag_params(self) -> set:
         return {'sample_rows', 'max_features', 'max_classes'}
