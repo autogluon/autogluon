@@ -47,6 +47,11 @@ function install_local_packages {
     done
 }
 
+function install_tabular {
+    python3 -m pip install --upgrade pygraphviz
+    install_local_packages "tabular/$1"
+}
+
 function install_multimodal_no_groundingdino {
     # groundingdino has issue when installing on Windows
     # https://github.com/IDEA-Research/GroundingDINO/issues/57
