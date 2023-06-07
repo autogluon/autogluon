@@ -362,10 +362,10 @@ class TimeSeriesPredictor:
 
             Available presets:
 
-            - ``"fast_training"``: fit simple "local" statistical models (``ETS``, ``ARIMA``, ``Theta``, ``Naive``, ``SeasonalNaive``). These models are fast to train, but cannot capture more complex patterns in the data.
-            - ``"medium_quality"``: all models mentioned above + tree-based model ``DirectTabular`` + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
-            - ``"high_quality"``: all models mentioned above + hyperparameter optimization for local statistical models + deep learning models ``TemporalFusionTransformerMXNet`` (if MXNet is available) and ``SimpleFeedForward``. Usually more accurate than ``medium_quality``, but takes longer to train.
-            - ``"best_quality"``: all models mentioned above + deep learning model ``TransformerMXNet`` (if MXNet is available) + hyperparameter optimization for deep learning models. Usually better than ``high_quality``, but takes much longer to train.
+            - ``"fast_training"``: fit simple statistical models (``ETS``, ``Theta``, ``Naive``, ``SeasonalNaive``) + fast tree-based model ``RecursiveTabular``. These models are fast to train but may not be very accurate.
+            - ``"medium_quality"``: all models mentioned above + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
+            - ``"high_quality"``: all models mentioned above + automatically tuned statistical models (``AutoETS``, ``AutoARIMA``) + tree-based model ``DirectTabular`` + deep learning models ``TemporalFusionTransformer`` and ``PatchTST`` . Much more accurate than ``medium_quality``, but takes longer to train.
+            - ``"best_quality"``: all models mentioned above + more tabular models + training multiple copies of ``DeepAR``. Usually better than ``high_quality``, but takes even longer to train.
 
             Details for these presets can be found in ``autogluon/timeseries/configs/presets_configs.py``. If not
             provided, user-provided values for ``hyperparameters`` and ``hyperparameter_tune_kwargs`` will be used
