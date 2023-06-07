@@ -5,8 +5,9 @@ from contextlib import contextmanager
 from typing import Dict, List, Optional, Tuple, Union
 
 import pytz
+import torch
 
-from ..constants import AUTOMM
+from .. import version as ag_version
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +142,11 @@ def apply_log_filter(log_filter):
 def get_fit_start_message(save_path, validation_metric_name):
     return f"""\
 AutoMM starts to create your model. ✨
+- AutoGluon version is {ag_version.__version__}
+
+- Pytorch version is {torch.__version__}
+
+- CUDA version is {torch.version.cuda}
 
 - Model will be saved to "{save_path}".
 
@@ -151,7 +157,6 @@ AutoMM starts to create your model. ✨
     # Assume you have installed tensorboard
     tensorboard --logdir {save_path}
     ```
-
 Enjoy your coffee, and let AutoMM do the job ☕☕☕ Learn more at https://auto.gluon.ai
 """
 
