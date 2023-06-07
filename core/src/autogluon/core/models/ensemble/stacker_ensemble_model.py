@@ -56,7 +56,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
         # FIXME: DO NOT DO THIS, FIX ASAP
         self.base_model_paths_dict = {
-            k: os.path.relpath(v) for k, v in self.base_model_paths_dict.items()
+            k: PathConverter.to_relative(v) for k, v in self.base_model_paths_dict.items()
         }
 
         self.base_model_types_dict = base_model_types_dict
