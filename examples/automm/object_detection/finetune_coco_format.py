@@ -15,7 +15,6 @@ def finetune_coco_format(
     presets=None,
     checkpoint_name=None,
     num_gpus=None,
-    val_metric=None,
     lr=None,
     epochs=None,
     per_gpu_batch_size=None,
@@ -27,8 +26,6 @@ def finetune_coco_format(
         hyperparameters["model.mmdet_image.checkpoint_name"] = checkpoint_name
     if num_gpus is not None:
         hyperparameters["env.num_gpus"] = num_gpus
-    if val_metric is not None:
-        hyperparameters["optimization.val_metric"] = val_metric
     if lr is not None:
         hyperparameters["optimization.learning_rate"] = lr
     if epochs is not None:
@@ -57,7 +54,6 @@ def main():
     parser.add_argument("-p", "--presets", default=None, type=str)
     parser.add_argument("-c", "--checkpoint_name", default=None, type=str)
     parser.add_argument("-n", "--num_gpus", default=None, type=int)
-    parser.add_argument("-v", "--val_metric", default=None, type=str)
     parser.add_argument("-l", "--lr", default=None, type=float)
     parser.add_argument("-e", "--epochs", default=None, type=int)
     parser.add_argument("-b", "--per_gpu_batch_size", default=None, type=int)
@@ -72,7 +68,6 @@ def main():
         lr=args.lr,
         epochs=args.epochs,
         num_gpus=args.num_gpus,
-        val_metric=args.val_metric,  # "mAP" or "direct_loss" or None (use default: "direct_loss")
         per_gpu_batch_size=args.per_gpu_batch_size,
     )
 

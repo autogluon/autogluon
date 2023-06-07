@@ -29,7 +29,6 @@ def main():
     parser.add_argument("-p", "--presets", default=None, type=str)
     parser.add_argument("-c", "--checkpoint_name", default=None, type=str)
     parser.add_argument("-n", "--num_gpus", default=None, type=int)
-    parser.add_argument("-v", "--val_metric", default=None, type=str)
     parser.add_argument("-l", "--lr", default=None, type=float)
     parser.add_argument("-e", "--epochs", default=None, type=int)
     parser.add_argument("-b", "--per_gpu_batch_size", default=None, type=int)
@@ -46,7 +45,6 @@ def main():
         lr=args.lr,
         epochs=args.epochs,
         num_gpus=args.num_gpus,
-        val_metric=args.val_metric,  # "mAP" or "direct_loss" or None (use default: "direct_loss")
         per_gpu_batch_size=args.per_gpu_batch_size,
     )
 
