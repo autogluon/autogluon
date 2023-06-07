@@ -14,8 +14,9 @@ from sklearn.svm import SVC
 
 from autogluon.multimodal.predictor import MultiModalPredictor
 
-from ..constants import AUTOMM, FEATURE_EXTRACTION, Y_PRED, Y_TRUE
-from ..utils import CustomUnpickler, compute_score, setup_save_path
+from ..constants import AUTOMM, BINARY, FEATURE_EXTRACTION, Y_PRED, Y_TRUE
+from ..data.infer_types import infer_problem_type
+from ..utils import CustomUnpickler, compute_score, logits_to_prob, setup_save_path
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class FewShotSVMPredictor:
         presets: Optional[str] = None,
         eval_metric: Optional[str] = None,
         path: Optional[str] = None,
+        problem_type: Optional[str] = None,
     ):
         """
         Parameters
@@ -54,7 +56,8 @@ class FewShotSVMPredictor:
             Note: To call `fit()` twice and save all results of each fit,
             you must specify different `path` locations or don't specify `path` at all.
             Otherwise files from first `fit()` will be overwritten by second `fit()`.
-
+        problem_type
+            The problem type specified by user. Currently the SVM predictor only supports classification types
         """
         self._automm_predictor = MultiModalPredictor(
             label=None,
@@ -74,9 +77,14 @@ class FewShotSVMPredictor:
         self._hyperparameters = hyperparameters
         self._presets = presets
         self._eval_metric = eval_metric
+        self._problem_type = problem_type
 
     def fit(self, train_data: pd.DataFrame):
         features = self.extract_embedding(data=train_data)
+        self._problem_type = infer_problem_type(
+            y_train_data=train_data[self._label],
+            provided_problem_type=self._problem_type,
+        )
         labels = np.array(train_data[self._label])
         self.clf.fit(features, labels)
         self._fit_called = True
@@ -85,15 +93,12 @@ class FewShotSVMPredictor:
 
     def predict(self, data, as_pandas: Optional[bool] = False):
         if not self._fit_called and not self._model_loaded:
-            warnings.warn(
-                "Neither .fit() nor .load() is not invoked. Unexpected predictions may occur. Please consider calling .fit() or .load() before .predict()"
+            raise RuntimeError(
+                "Neither .fit() nor .load() is not invoked. Please consider calling .fit() or .load() before .predict()"
             )
         features = self.extract_embedding(data)
 
         preds = self.clf.predict(features)
-        # import ipdb
-
-        # ipdb.set_trace()
         if as_pandas:
             preds = self._automm_predictor._as_pandas(data=data, to_be_converted=preds)
         return preds
@@ -106,12 +111,14 @@ class FewShotSVMPredictor:
 
         features = self.extract_embedding(data)
         preds = self.clf.decision_function(features)
-        probs = np.exp(preds) / np.sum(np.exp(preds + 1e-8), axis=1, keepdims=True)
+        probs = logits_to_prob(preds)
+        # probs = np.exp(preds) / np.sum(np.exp(preds + 1e-8), axis=1, keepdims=True)
 
         if not as_multiclass:
-            probs = probs.max(axis=1)
+            if self._problem_type == BINARY:
+                prob = prob[:, 1]
 
-        if as_pandas:
+        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             probs = self._automm_predictor._as_pandas(data=data, to_be_converted=probs)
         return probs
 
@@ -198,6 +205,7 @@ class FewShotSVMPredictor:
                     "hyperparameters": self._hyperparameters,
                     "presets": self._presets,
                     "eval_metric": self._eval_metric,
+                    "problem_type": self._problem_type,
                 },
                 fp,
             )
@@ -224,6 +232,7 @@ class FewShotSVMPredictor:
         predictor._hyperparameters = assets["hyperparameters"]
         predictor._eval_metric = assets["eval_metric"]
         predictor._presets = assets["presets"]
+        predictor._problem_type = assets["problem_type"]
         predictor.load_svm(path)
         return predictor
 
