@@ -27,13 +27,13 @@ install_requires = [
     "numpy",  # version range defined in `core/_setup_utils.py`
     "scipy",  # version range defined in `core/_setup_utils.py`
     "pandas",  # version range defined in `core/_setup_utils.py`
-    "statsmodels>=0.13.0,<0.14",
+    "statsmodels>=0.13.0,<0.15",
     "gluonts>=0.13.1,<0.14",
     "torch>=1.9,<1.14",
     "pytorch-lightning>=1.7.4,<1.10.0",
     "networkx",  # version range defined in `core/_setup_utils.py`
-    "statsforecast>=1.4.0,<1.5",
-    "mlforecast>=0.7.0,<0.8.0",
+    "statsforecast>=1.5.0,<1.6",
+    "mlforecast>=0.7.0,<0.7.4",
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "ujson>=5,<6",  # needed to silence GluonTS warning
     f"autogluon.core[raytune]=={version}",

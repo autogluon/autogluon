@@ -19,6 +19,10 @@ from autogluon.timeseries.utils.warning_filters import statsmodels_joblib_warnin
 logger = logging.getLogger(__name__)
 
 
+# We use the same default n_jobs across AG-TS to ensure that Joblib reuses the process pool
+AG_DEFAULT_N_JOBS = max(int(cpu_count() * 0.5), 1)
+
+
 class AbstractLocalModel(AbstractTimeSeriesModel):
     """Abstract class for local forecasting models that are trained separately for each time series.
 
@@ -36,7 +40,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
     """
 
     allowed_local_model_args: List[str] = []
-    default_n_jobs: Union[int, float] = 0.5
+    default_n_jobs: Union[int, float] = AG_DEFAULT_N_JOBS
     init_time_in_seconds: int = 0
 
     def __init__(
