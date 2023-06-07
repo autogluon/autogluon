@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import re
 import warnings
@@ -197,7 +198,6 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         self,
         data: TimeSeriesDataFrame,
         last_k_values: Optional[int] = None,
-        max_num_samples: Optional[int] = None,
     ) -> Tuple[pd.DataFrame, pd.Series]:
         """Construct feature matrix containing lags, covariates, and target time series values.
 
@@ -209,8 +209,6 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             Time series data that needs to be converted.
         last_k_values : int, optional
             If given, only last `last_k_values` rows will be kept for each time series.
-        max_num_samples : int, optional
-            If given, the output will contain at most this many rows.
         """
         item_ids_to_exclude = data.item_ids[data.num_timesteps_per_item() < self.required_ts_length]
         if len(item_ids_to_exclude) > 0:
@@ -222,14 +220,26 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             dropna=False,
             static_features=None,  # we handle static features in `_to_mlforecast_df`, without relying on MLForecast
         )
+        del self.mlf.ts.features_
         if last_k_values is not None:
             features = features.groupby("unique_id", sort=False).tail(last_k_values)
         features.dropna(subset=self.mlf.ts.target_col, inplace=True)
-        if max_num_samples is not None and len(features) > max_num_samples:
-            rows_per_item = int(max_num_samples / data.num_items) + 1
-            features = features.groupby("unique_id", sort=False).tail(rows_per_item)
         features = features.reset_index(drop=True)
         return features[self.mlf.ts.features_order_], features[self.mlf.ts.target_col]
+
+    @staticmethod
+    def _subsample_data_to_avoid_oom(data: TimeSeriesDataFrame, max_num_rows: int = 30_000_000) -> TimeSeriesDataFrame:
+        """Subsample time series from the dataset to avoid out of memory errors inside MLForecast.preprocess."""
+        if len(data) > max_num_rows:
+            item_ids = data.item_ids
+            num_items_to_keep = math.ceil(len(item_ids) * max_num_rows / len(data))
+            items_to_keep = np.random.choice(item_ids, num_items_to_keep, replace=False)
+            logger.debug(
+                f"\tRandomly selected {num_items_to_keep} ({num_items_to_keep / len(item_ids):.1%}) time series "
+                "to limit peak memory usage"
+            )
+            data = data.query("item_id in @items_to_keep")
+        return data
 
     def _fit(
         self,
@@ -247,12 +257,17 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         mlforecast_init_args = self._get_mlforecast_init_args(train_data, model_params)
         self.mlf = MLForecast(models={}, freq=self.freq, **mlforecast_init_args)
 
+        # TODO: Find a better way to ensure that the model does not run out of memory that check available RAM
+        train_data = self._subsample_data_to_avoid_oom(train_data)
+
         # Do not use external val_data as tuning_data to avoid overfitting
-        max_num_samples = model_params.get("max_num_samples", 1_000_000)
         train_subset, val_subset = train_data.train_test_split(self.prediction_length)
-        X_train, y_train = self._get_features_dataframe(train_subset, max_num_samples=max_num_samples)
+
+        max_num_samples = model_params.get("max_num_samples", 1_000_000)
+        max_rows_per_item = math.ceil(max_num_samples / train_data.num_items)
+        X_train, y_train = self._get_features_dataframe(train_subset, last_k_values=max_rows_per_item)
         X_val, y_val = self._get_features_dataframe(
-            val_subset, last_k_values=self.prediction_length, max_num_samples=max_num_samples
+            val_subset, last_k_values=min(self.prediction_length, max_rows_per_item)
         )
 
         estimator = TabularEstimator(
