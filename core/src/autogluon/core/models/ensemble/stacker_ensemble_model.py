@@ -53,6 +53,12 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.base_model_names = base_model_names
         self.base_models_dict: Dict[str, AbstractModel] = base_models_dict  # String name -> Model objects
         self.base_model_paths_dict = base_model_paths_dict
+
+        # FIXME: DO NOT DO THIS, FIX ASAP
+        self.base_model_paths_dict = {
+            k: os.path.relpath(v) for k, v in self.base_model_paths_dict.items()
+        }
+
         self.base_model_types_dict = base_model_types_dict
 
         # TODO: Consider deleting these variables after initialization

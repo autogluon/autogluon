@@ -112,6 +112,7 @@ class AbstractModel:
             path_cur = setup_outputdir(path=None, create_dir=True, path_suffix=path_suffix)
             self.path_root = path_cur.rsplit(self.path_suffix, 1)[0]
             logger.log(20, f'Warning: No path was specified for model, defaulting to: {self.path_root}')
+        self.path_root = os.path.relpath(self.path_root)  # FIXME: DO NOT DO THIS, FIX ASAP
         self.path = self.create_contexts(self.path_root + self.path_suffix)  # TODO: Make this path a function for consistency.
 
         self.num_classes = None
