@@ -230,6 +230,8 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
     @staticmethod
     def _subsample_data_to_avoid_oom(data: TimeSeriesDataFrame, max_num_rows: int = 30_000_000) -> TimeSeriesDataFrame:
         """Subsample time series from the dataset to avoid out of memory errors inside MLForecast.preprocess."""
+        # TODO: Find a better way to ensure that the model does not run out of memory. E.g., by estimating the expected
+        # memory usage & comparing it to currently available RAM
         if len(data) > max_num_rows:
             item_ids = data.item_ids
             num_items_to_keep = math.ceil(len(item_ids) * max_num_rows / len(data))
@@ -257,7 +259,6 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         mlforecast_init_args = self._get_mlforecast_init_args(train_data, model_params)
         self.mlf = MLForecast(models={}, freq=self.freq, **mlforecast_init_args)
 
-        # TODO: Find a better way to ensure that the model does not run out of memory that check available RAM
         train_data = self._subsample_data_to_avoid_oom(train_data)
 
         # Do not use external val_data as tuning_data to avoid overfitting
