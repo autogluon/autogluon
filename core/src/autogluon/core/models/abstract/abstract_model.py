@@ -989,7 +989,7 @@ class AbstractModel:
         """
         if path is None:
             path = self.path
-        file_path = path + self.model_file_name
+        file_path = os.path.join(path, self.model_file_name)
         _model = self.model
         if self.model is not None:
             if self._compiler is None:
@@ -1375,9 +1375,6 @@ class AbstractModel:
         except EmptySearchSpace:
             return skip_hpo(self, X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
 
-        # Use absolute path here because ray tune will change the working directory
-        self.set_contexts(os.path.abspath(self.path) + os.path.sep)
-
         directory = self.path
         os.makedirs(directory, exist_ok=True)
         data_path = directory
@@ -1421,6 +1418,7 @@ class AbstractModel:
             minimum_gpu_per_trial=minimum_resources.get('num_gpus', 0),
             model_estimate_memory_usage=model_estimate_memory_usage,
             adapter_type='tabular',
+            tune_config_kwargs={'chdir_to_trial_dir': False}
         )
 
         hpo_results = hpo_executor.get_hpo_results(

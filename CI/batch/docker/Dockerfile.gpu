@@ -7,6 +7,8 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends \
     pandoc \
     python3.8-venv \
+    graphviz \
+    graphviz-dev \
  && apt-get autoremove -y \
  && apt-get clean
 

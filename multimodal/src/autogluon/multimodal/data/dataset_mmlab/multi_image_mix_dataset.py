@@ -4,9 +4,16 @@ import logging
 import math
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
+import mmcv
 import numpy as np
 import pandas as pd
 import torch
+from mmcv.transforms import BaseTransform
+from mmcv.transforms.utils import cache_randomness
+from mmdet.structures.bbox import autocast_box_type
+from mmdet.utils import log_img_scale
+from mmengine.config import Config as MMConfig
+from mmengine.dataset import BaseDataset
 from numpy import random
 
 from ...constants import GET_ITEM_ERROR_RETRY, MULTI_IMAGE_MIX_DATASET, ROIS
@@ -14,29 +21,6 @@ from ..preprocess_dataframe import MultiModalFeaturePreprocessor
 from ..utils import apply_data_processor, apply_df_preprocessor, get_per_sample_features
 
 logger = logging.getLogger(__name__)
-
-try:
-    import mmcv
-    from mmcv.utils import Config as MMCVConfig
-except:
-    MMCVConfig = None
-
-try:
-    from mmcv.transforms import BaseTransform
-    from mmcv.transforms.utils import cache_randomness
-except:
-    pass
-
-try:
-    from mmengine.dataset import BaseDataset
-except:
-    pass
-
-try:
-    from mmdet.structures.bbox import autocast_box_type
-    from mmdet.utils import log_img_scale  # inline import to avoid mmdet uninstall error for other tasks
-except:
-    pass
 
 
 class MultiImageMixDataset(torch.utils.data.Dataset):
@@ -52,7 +36,7 @@ class MultiImageMixDataset(torch.utils.data.Dataset):
         data: pd.DataFrame,
         preprocessor: List[MultiModalFeaturePreprocessor],
         processors: List[dict],
-        model_config: MMCVConfig,
+        model_config: MMConfig,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         is_training: bool = False,
     ):
@@ -66,8 +50,8 @@ class MultiImageMixDataset(torch.utils.data.Dataset):
         processors
             Data processors customizing data for each modality per model.
         id_mappings
-             Id-to-content mappings. The contents can be text, image, etc.
-             This is used when the dataframe contains the query/response indexes instead of their contents.
+            Id-to-content mappings. The contents can be text, image, etc.
+            This is used when the dataframe contains the query/response indexes instead of their contents.
         is_training
             Whether in training mode. Some data processing may be different between training
             and validation/testing/prediction, e.g., image data augmentation is used only in
@@ -243,7 +227,7 @@ class Mosaic(BaseTransform):
     .. code:: text
 
                         mosaic transform
-                           center_x
+                        center_x
                 +------------------------------+
                 |       pad        |  pad      |
                 |      +-----------+           |
@@ -251,20 +235,20 @@ class Mosaic(BaseTransform):
                 |      |  image1   |--------+  |
                 |      |           |        |  |
                 |      |           | image2 |  |
-     center_y   |----+-------------+-----------|
+    center_y   |----+-------------+-----------|
                 |    |   cropped   |           |
                 |pad |   image3    |  image4   |
                 |    |             |           |
                 +----|-------------+-----------+
-                     |             |
-                     +-------------+
+                    |             |
+                    +-------------+
 
-     The mosaic transform steps are as follows:
+    The mosaic transform steps are as follows:
 
-         1. Choose the mosaic center as the intersections of 4 images
-         2. Get the left top image according to the index, and randomly
+        1. Choose the mosaic center as the intersections of 4 images
+        2. Get the left top image according to the index, and randomly
             sample another 3 images from the custom dataset.
-         3. Sub image will be cropped if image is larger than mosaic patch
+        3. Sub image will be cropped if image is larger than mosaic patch
 
     Required Keys:
 
@@ -348,7 +332,9 @@ class Mosaic(BaseTransform):
         mosaic_ignore_flags = []
         if len(results["img"].shape) == 3:
             mosaic_img = np.full(
-                (int(self.img_scale[1] * 2), int(self.img_scale[0] * 2), 3), self.pad_val, dtype=results["img"].dtype
+                (int(self.img_scale[1] * 2), int(self.img_scale[0] * 2), 3),
+                self.pad_val,
+                dtype=results["img"].dtype,
             )
         else:
             mosaic_img = np.full(
@@ -421,7 +407,7 @@ class Mosaic(BaseTransform):
 
         Args:
             loc (str): Index for the sub-image, loc in ('top_left',
-              'top_right', 'bottom_left', 'bottom_right').
+            'top_right', 'bottom_left', 'bottom_right').
             center_position_xy (Sequence[float]): Mixing center for 4 images,
                 (x, y).
             img_shape_wh (Sequence[int]): Width and height of sub-image
@@ -490,7 +476,7 @@ class MixUp(BaseTransform):
 
     .. code:: text
 
-                         mixup transform
+                        mixup transform
                 +------------------------------+
                 | mixup image   |              |
                 |      +--------|--------+     |
@@ -504,12 +490,12 @@ class MixUp(BaseTransform):
                 |             pad              |
                 +------------------------------+
 
-     The mixup transform steps are as follows:
+    The mixup transform steps are as follows:
 
         1. Another random image is picked by dataset and embedded in
-           the top left patch(after padding and resizing)
+        the top left patch(after padding and resizing)
         2. The target of mixup transform is the weighted average of mixup
-           image and origin image.
+        image and origin image.
 
     Required Keys:
 

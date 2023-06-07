@@ -95,6 +95,14 @@ class AutoTrainer(AbstractTrainer):
                                      'specify the following:\n'
                                      '\tpredictor.fit(..., tuning_data=tuning_data, use_bag_holdout=True)')
 
+        # Log the hyperparameters dictionary so it easy to edit if the user wants.
+        log_str = f'User-specified model hyperparameters to be fit:\n' \
+                  '{\n'
+        for k in hyperparameters.keys():
+            log_str += f"\t'{k}': {hyperparameters[k]},\n"
+        log_str += '}'
+        logger.log(20, log_str)
+
         self._train_multi_and_ensemble(X=X,
                                        y=y,
                                        X_val=X_val,

@@ -1142,8 +1142,6 @@ class BaggedEnsembleModel(AbstractModel):
         except EmptySearchSpace:
             return skip_hpo(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
 
-        # Use absolute path here because ray tune will change the working directory
-        self.set_contexts(os.path.abspath(self.path) + os.path.sep)
         directory = self.path
         os.makedirs(directory, exist_ok=True)
         data_path = directory
@@ -1204,6 +1202,7 @@ class BaggedEnsembleModel(AbstractModel):
             model_estimate_memory_usage=None,  # Not needed as we've already calculated it above
             adapter_type='tabular',
             trainable_is_parallel=True,
+            tune_config_kwargs={'chdir_to_trial_dir': False}
         )
 
         hpo_results = hpo_executor.get_hpo_results(

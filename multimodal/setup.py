@@ -32,7 +32,7 @@ install_requires = [
     "seqeval>=1.2.2,<1.3.0",
     "evaluate>=0.2.2,<0.4.0",
     "accelerate>=0.9,<0.17",
-    "timm>=0.6.12,<0.7.0",
+    "timm>=0.9.2,<0.10.0",
     "torch>=1.9,<1.14",
     "torchvision<0.15.0",
     "fairscale>=0.4.5,<0.4.14",
