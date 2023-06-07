@@ -521,13 +521,10 @@ class MultiModalPredictor(ExportMixin):
 
     @property
     def model_size(self) -> float:
-        precision_to_bits = {64: 64, 32: 32, 16: 16, "bf16": 16}
-        if self._config is not None:
-            precision = precision_to_bits.get(self._config.env.precision, 16)
-        else:
-            precision = 16  # following the default config.
-        precision_megabytes = (precision / 8.0) * 1e-6
-        return self.total_parameters * precision_megabytes
+        model_size = sum(
+            p.numel() * p.element_size() if not is_lazy_weight_tensor(p) else 0 for p in self._model.parameters()
+        )
+        return model_size * 1e-6  # convert to megabytes
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
