@@ -57,11 +57,10 @@ class XGBoostModel(AbstractModel):
 
         if is_train:
             if self._ohe:
-                if self._ohe_generator is None:
-                    self._ohe_generator = xgboost_utils.OheFeatureGenerator(max_levels=max_category_levels)
+                self._ohe_generator = xgboost_utils.OheFeatureGenerator(max_levels=max_category_levels)
                 self._ohe_generator.fit(X)
 
-        if self._ohe_generator is not None:
+        if self._ohe:
             X = self._ohe_generator.transform(X)
 
         return X
