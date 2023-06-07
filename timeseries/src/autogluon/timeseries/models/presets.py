@@ -133,7 +133,6 @@ def get_default_hps(key):
             "RecursiveTabular": {},
             "DirectTabular": {},
             "DeepAR": {},
-            "SimpleFeedForward": {},
             "TemporalFusionTransformer": {},
             "PatchTST": {},
         },
