@@ -228,7 +228,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         return features[self.mlf.ts.features_order_], features[self.mlf.ts.target_col]
 
     @staticmethod
-    def _subsample_data_to_avoid_oom(data: TimeSeriesDataFrame, max_num_rows: int = 30_000_000) -> TimeSeriesDataFrame:
+    def _subsample_data_to_avoid_oom(data: TimeSeriesDataFrame, max_num_rows: int = 20_000_000) -> TimeSeriesDataFrame:
         """Subsample time series from the dataset to avoid out of memory errors inside MLForecast.preprocess."""
         # TODO: Find a better way to ensure that the model does not run out of memory. E.g., by estimating the expected
         # memory usage & comparing it to currently available RAM
