@@ -147,6 +147,7 @@ from .utils import (
     infer_scarcity_mode_by_data_size,
     init_df_preprocessor,
     init_pretrained,
+    is_lazy_weight_tensor,
     list_timm_models,
     load_text_tokenizers,
     logits_to_prob,
@@ -507,6 +508,26 @@ class MultiModalPredictor(ExportMixin):
             return self._matcher.column_types
         else:
             return self._column_types
+
+    @property
+    def total_parameters(self) -> int:
+        return sum(p.numel() if not is_lazy_weight_tensor(p) else 0 for p in self._model.parameters())
+
+    @property
+    def trainable_parameters(self) -> int:
+        return sum(
+            p.numel() if not is_lazy_weight_tensor(p) else 0 for p in self._model.parameters() if p.requires_grad
+        )
+
+    @property
+    def model_size(self) -> float:
+        precision_to_bits = {64: 64, 32: 32, 16: 16, "bf16": 16}
+        if self._config is not None:
+            precision = precision_to_bits.get(self._config.env.precision, 16)
+        else:
+            precision = 16  # following the default config.
+        precision_megabytes = (precision / 8.0) * 1e-6
+        return self.total_parameters * precision_megabytes
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
