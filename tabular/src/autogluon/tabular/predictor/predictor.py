@@ -2937,71 +2937,127 @@ class TabularPredictor:
                                      augmentation_data=augmentation_data, augment_method=augment_method,
                                      augment_args=augment_args)
 
-    def plot_ensemble_model(self, prune_unused_nodes=True) -> str:
+    # TODO: v1.0 Move core logic to `trainer` level.
+    # TODO: v1.0 Make it use leaderboard directly, allow to specify columns to include in the plot.
+    # TODO: See if we can incorporate into tutorials (without causing crashes for users who try them)
+    #  Might require using a different tool than pygraphviz to avoid the apt-get commands
+    # TODO: v1.0 Rename to `plot_model_graph`
+    # TODO: v1.0 Maybe add ensemble weights to the edges.
+    def plot_ensemble_model(self,
+                            model: str = 'best',
+                            *,
+                            prune_unused_nodes: bool = True,
+                            filename: str = 'ensemble_model.png') -> str:
         """
         Output the visualized stack ensemble architecture of a model trained by `fit()`.
-        The plot is stored to a file, `ensemble_model.png` in folder `predictor.path`
+        The plot is stored to a file, `ensemble_model.png` in folder `predictor.path` (or by the name specified in `filename`)
 
         This function requires `graphviz` and `pygraphviz` to be installed because this visualization depends on those package.
         Unless this function will raise `ImportError` without being able to generate the visual of the ensemble model.
 
         To install the required package, run the below commands (for Ubuntu linux):
 
-        $ sudo apt-get install graphviz
-        $ pip install graphviz
+        $ sudo apt-get install graphviz graphviz-dev
+        $ pip install pygraphviz
 
         For other platforms, refer to https://graphviz.org/ for Graphviz install, and https://pygraphviz.github.io/documentation.html for PyGraphviz.
 
-
         Parameters
         ----------
+        model : str, default 'best'
+            The model to highlight in golden orange, with all component models highlighted in yellow.
+            If 'best', will default to the best model returned from `self.get_model_best()`
+        prune_unused_nodes : bool, default True
+            If True, only plot the models that are components of the specified `model`.
+            If False, will plot all models.
+        filename : str, default 'ensemble_model.png'
+            The filename to save the plot as. Will be located under the `self.path` folder.
 
         Returns
         -------
-        The file name with the full path to the saved graphic
+        The file name with the full path to the saved graphic on disk.
+
+        Examples
+        --------
+        >>> from autogluon.tabular import TabularDataset, TabularPredictor
+        >>> train_data = TabularDataset('train.csv')
+        >>> predictor = TabularPredictor(label='class').fit(train_data)
+        >>> path_to_png = predictor.plot_ensemble_model()
+        >>>
+        >>> # To view the plot inside a Jupyter Notebook, use the below code:
+        >>> from IPython.display import Image, display
+        >>> display(Image(filename=path_to_png))
+
         """
         self._assert_is_fit('plot_ensemble_model')
         try:
             import pygraphviz
         except:
-            raise ImportError('Visualizing ensemble network architecture requires pygraphviz library')
+            raise ImportError('Visualizing ensemble network architecture requires the `pygraphviz` library. '
+                              'Try `sudo apt-get install graphviz graphviz-dev` followed by `pip install pygraphviz` to install on Linux, '
+                              'or refer to the method docstring for detailed installation instructions for other operating systems.')
 
         G = self._trainer.model_graph.copy()
 
+        primary_model = model
+        if primary_model == 'best':
+            primary_model = self.get_model_best()
+        all_models = self.get_model_names()
+        assert primary_model in all_models, f'Unknown model "{primary_model}"! Valid models: {all_models}'
         if prune_unused_nodes == True:
-            nodes_without_outedge = [node for node, degree in dict(G.degree()).items() if degree < 1]
-        else:
-            nodes_without_outedge = []
+            models_to_keep = self._trainer.get_minimum_model_set(model=primary_model)
+            G = nx.subgraph(G, models_to_keep)
 
-        nodes_no_val_score = [node for node in G if G.nodes[node]['val_score'] == None]
-
-        G.remove_nodes_from(nodes_without_outedge)
-        G.remove_nodes_from(nodes_no_val_score)
-
-        root_node = [n for n, d in G.out_degree() if d == 0]
-        best_model_node = self.get_model_best()
+        models = list(G.nodes)
+        fit_times = self._trainer.get_models_attribute_full(models=models, attribute='fit_time')
+        predict_times = self._trainer.get_models_attribute_full(models=models, attribute='predict_time')
 
         A = nx.nx_agraph.to_agraph(G)
+
+        for node in A.iternodes():
+            node_name = node.name
+            fit_time = fit_times[node_name]
+            predict_time = predict_times[node_name]
+            if fit_time is None:
+                fit_time_str = 'NaN'
+            else:
+                fit_time_str = f"{fit_time:.1f}s"
+            if predict_time is None:
+                predict_time_str = 'NaN'
+            else:
+                predict_time_str = f"{predict_time:.2f}s"
+
+            node_val_score = node.attr['val_score']
+            if node_val_score is None or (isinstance(node_val_score, str) and node_val_score == 'None'):
+                node_val_score_str = 'NaN'
+            else:
+                node_val_score_str = f"{float(node.attr['val_score']):.4f}"
+            label = f"{node.name}" \
+                    f"\nscore_val: {node_val_score_str}" \
+                    f"\nfit_time: {fit_time_str}" \
+                    f"\npred_time_val: {predict_time_str}"
+            # Remove unnecessary attributes
+            node.attr.clear()
+            node.attr['label'] = label
 
         A.graph_attr.update(rankdir='BT')
         A.node_attr.update(fontsize=10)
         A.node_attr.update(shape='rectangle')
 
         for node in A.iternodes():
-            node.attr['label'] = f"{node.name}\nVal score: {float(node.attr['val_score']):.4f}"
-
-            if node.name == best_model_node:
+            if node.name == primary_model:
+                # Golden Orange
                 node.attr['style'] = 'filled'
                 node.attr['fillcolor'] = '#ff9900'
                 node.attr['shape'] = 'box3d'
-            elif nx.has_path(G, node.name, best_model_node):
+            elif nx.has_path(G, node.name, primary_model):
+                # Yellow
                 node.attr['style'] = 'filled'
                 node.attr['fillcolor'] = '#ffcc00'
+            # Else: White
 
-        model_image_fname = os.path.join(self.path, 'ensemble_model.png')
-
+        model_image_fname = os.path.join(self.path, filename)
         A.draw(model_image_fname, format='png', prog='dot')
-
         return model_image_fname
 
     @staticmethod
