@@ -4,7 +4,8 @@ import os
 from typing import Dict, List, Optional
 
 import torch
-from timm import create_model, models
+from timm import create_model
+from timm.layers.linear import Linear
 from torch import nn
 
 from ..constants import AUTOMM, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
@@ -67,13 +68,13 @@ class TimmAutoModelForImagePrediction(nn.Module):
                     self.model = create_model(self.checkpoint_name, checkpoint_path=checkpoint_path, num_classes=0)
                     # create a head with new num_classes
                     self.head = (
-                        models.layers.linear.Linear(in_features=self.config["num_features"], out_features=num_classes)
+                        Linear(in_features=self.config["num_features"], out_features=num_classes)
                         if num_classes > 0
                         else nn.Identity()
                     )
                     self.num_classes = num_classes if num_classes is not None else 0
             except:
-                ValueError(f"Timm model path {checkpoint_name} does not exist or model is invalid.")
+                raise ValueError(f"Timm model path {checkpoint_name} does not exist or model is invalid.")
         else:
             self.checkpoint_name = checkpoint_name
             self.model = create_model(checkpoint_name, pretrained=pretrained, num_classes=num_classes)
