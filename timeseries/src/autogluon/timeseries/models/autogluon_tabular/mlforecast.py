@@ -52,7 +52,7 @@ class TabularEstimator(BaseEstimator):
 class RecursiveTabularModel(AbstractTimeSeriesModel):
     """Predict time series values one by one using TabularPredictor.
 
-    Based on the `mlforecast`<https://github.com/Nixtla/mlforecast>_ library.
+    Based on the `mlforecast <https://github.com/Nixtla/mlforecast>`_ library.
 
 
     Other Parameters
