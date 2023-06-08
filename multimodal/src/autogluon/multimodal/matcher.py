@@ -174,6 +174,8 @@ class MultiModalMatcher:
         enable_progress_bar
             Whether to show progress bar. It will be True by default and will also be
             disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
+        pretrained
+            Whether to init model with pretrained weights. If False, it creates a model with random initialization.
         validation_metric
             Validation metric name. If `validation_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'roc_auc' for binary classification and 'spearmanr' for multiclass classification and regression.
