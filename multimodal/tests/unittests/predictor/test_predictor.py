@@ -726,3 +726,49 @@ def test_load_ckpt():
     predictions_prob = predictor.predict_proba(test_data, as_pandas=False)
     predictions2_prob = loaded_predictor.predict_proba(test_data, as_pandas=False)
     npt.assert_equal(predictions_prob, predictions2_prob)
+
+
+@pytest.mark.parametrize(
+    "hyperparameters",
+    [
+        {
+            "model.names": ["timm_image"],
+            "model.timm_image.checkpoint_name": "mobilenetv3_small_100",
+        },
+        {
+            "model.names": ["hf_text"],
+            "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
+        },
+        {
+            "model.names": ["timm_image_haha", "hf_text_hello", "numerical_mlp_456", "fusion_mlp"],
+            "model.timm_image_haha.checkpoint_name": "swin_tiny_patch4_window7_224",
+            "model.hf_text_hello.checkpoint_name": "nlpaueb/legal-bert-small-uncased",
+            "data.numerical.convert_to_text": False,
+        },
+    ],
+)
+def test_hyperparameters_consistency(hyperparameters):
+    dataset = ALL_DATASETS["petfinder"]
+    metric_name = dataset.metric
+
+    # pass hyperparameters to init()
+    predictor = MultiModalPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+        hyperparameters=hyperparameters,
+    )
+    predictor.fit(dataset.train_df, time_limit=10)
+
+    # pass hyperparameters to fit()
+    predictor_2 = MultiModalPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    predictor_2.fit(
+        dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=10,
+    )
+    assert predictor._config == predictor_2._config

@@ -375,7 +375,6 @@ def object_detection(presets: str = DEFAULT):
         "optimization.top_k_average_method": "best",
         "optimization.warmup_steps": 0.0,
         "optimization.patience": 10,
-        "optimization.val_metric": "map",
         "optimization.val_check_interval": 0.5,
         "optimization.check_val_every_n_epoch": 1,
     }
