@@ -3,7 +3,7 @@
 :::{note}
 This documentation is intended for advanced users and may not be comprehensive.
 
-For a stable public API, refer to TimeSeriesPredictor.
+For a stable public API, refer to the [documentation for `TimeSeriesPredictor`](https://auto.gluon.ai/stable/api/autogluon.timeseries.TimeSeriesPredictor.html).
 :::
 
 This page contains the list of time series forecasting models available in AutoGluon.
@@ -46,17 +46,17 @@ Note that some of the models' hyperparameters have names and default values that
 
    NaiveModel
    SeasonalNaiveModel
-   AutoETSModel
-   AutoARIMAModel
    ARIMAModel
    ETSModel
+   AutoARIMAModel
+   AutoETSModel
    ThetaModel
    DynamicOptimizedThetaModel
    DirectTabularModel
    RecursiveTabularModel
    DeepARModel
-   DLinear
-   PatchTST
+   DLinearModel
+   PatchTSTModel
    SimpleFeedForwardModel
    TemporalFusionTransformerModel
 
@@ -77,20 +77,6 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`AutoETSModel`
-
-```{eval-rst}
-.. autoclass:: AutoETSModel
-   :members: init
-```
-
-### {hidden}`AutoARIMAModel`
-
-```{eval-rst}
-.. autoclass:: AutoARIMAModel
-   :members: init
-```
-
 ### {hidden}`ARIMAModel`
 
 ```{eval-rst}
@@ -105,6 +91,20 @@ Note that some of the models' hyperparameters have names and default values that
 .. autoclass:: ETSModel
    :members: init
 
+```
+
+### {hidden}`AutoARIMAModel`
+
+```{eval-rst}
+.. autoclass:: AutoARIMAModel
+   :members: init
+```
+
+### {hidden}`AutoETSModel`
+
+```{eval-rst}
+.. autoclass:: AutoETSModel
+   :members: init
 ```
 
 ### {hidden}`ThetaModel`
