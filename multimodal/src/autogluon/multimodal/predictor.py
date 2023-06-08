@@ -135,6 +135,7 @@ from .utils import (
     get_dir_ckpt_paths,
     get_fit_complete_message,
     get_fit_start_message,
+    get_gpu_message,
     get_load_ckpt_paths,
     get_local_pretrained_config_paths,
     get_minmax_mode,
@@ -1395,6 +1396,7 @@ class MultiModalPredictor(ExportMixin):
         )
 
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
+        logger.info(get_gpu_message(detected_num_gpus=ResourceManager.get_gpu_count_torch(), used_num_gpus=num_gpus))
 
         precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
 
