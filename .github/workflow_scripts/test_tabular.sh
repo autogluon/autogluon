@@ -18,7 +18,14 @@ else
 fi
 
 install_local_packages "common/[tests]" "core/[all,tests]" "features/"
-install_tabular "[all,tests]"
+
+if [ "$IS_PLATFORM_TEST" = "true" ]
+then
+    install_tabular_platforms
+else
+    install_tabular "[all,tests]"
+fi
+
 install_multimodal "[tests]"
 
 cd tabular/

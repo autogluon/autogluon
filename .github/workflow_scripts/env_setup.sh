@@ -52,6 +52,11 @@ function install_tabular {
     install_local_packages "tabular/$1"
 }
 
+function install_tabular_platforms {
+    # pygraphviz will be installed with conda in platform tests
+    install_local_packages "tabular/$1"
+}
+
 function install_multimodal_no_groundingdino {
     # groundingdino has issue when installing on Windows
     # https://github.com/IDEA-Research/GroundingDINO/issues/57
