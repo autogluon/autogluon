@@ -12,7 +12,7 @@ class ModelFilter:
         models: Union[Dict[str, Any], List[str]], included_model_types: List[str]
     ) -> Union[Dict[str, Any], List[str]]:
         """
-        Only include models specifeid in `included_model_types`, other models will be removed
+        Only include models specified in `included_model_types`, other models will be removed
         If model specified in `included_model_types` doesn't present in `models`, will warn users and ignore
 
         Parameters
@@ -33,9 +33,11 @@ class ModelFilter:
         elif isinstance(models, list):
             included_models = [model for model in models if model in included_model_types]
             missing_models = set(included_model_types) - set(included_models)
+        if included_model_types is not None:
+            logger.log(20, f"Included models: {list(included_model_types)} (Specified by `included_model_types`, all other model types will be skipped)")
         if len(missing_models) > 0:
             logger.warning(
-                f"The models types {missing_models} are not present in the model list specified by the user and will be ignored:"
+                f"\tThe models types {list(missing_models)} are not present in the model list specified by the user and will be ignored:"
             )
         return included_models
 
@@ -67,7 +69,7 @@ class ModelFilter:
             models_after_exclusion = [model for model in models if model not in excluded_model_types]
             excluded_models = set(models) - set(models_after_exclusion)
         if excluded_models is not None:
-            logger.log(20, f"Excluded models: {excluded_models}")
+            logger.log(20, f"Excluded models: {list(excluded_models)} (Specified by `excluded_model_types`)")
         return models_after_exclusion
 
     @staticmethod

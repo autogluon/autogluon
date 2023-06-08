@@ -18,4 +18,4 @@ from .text_ngram import TextNgramFeatureGenerator
 from .text_special import TextSpecialFeatureGenerator
 
 from .pipeline import PipelineFeatureGenerator
-from .auto_ml_pipeline import AutoMLPipelineFeatureGenerator
+from .auto_ml_pipeline import AutoMLPipelineFeatureGenerator, AutoMLInterpretablePipelineFeatureGenerator

@@ -7,6 +7,7 @@ from .category import CategoryFeatureGenerator
 from .datetime import DatetimeFeatureGenerator
 from .identity import IdentityFeatureGenerator
 from .isnan import IsNanFeatureGenerator
+from .one_hot_encoder import OneHotEncoderFeatureGenerator
 from .text_ngram import TextNgramFeatureGenerator
 from .text_special import TextSpecialFeatureGenerator
 
@@ -116,7 +117,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
             generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(
                 required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY]), name_suffix='_raw_text'))
         if self.enable_categorical_features:
-            generator_group.append(CategoryFeatureGenerator())
+            generator_group.append(self._get_category_feature_generator())
         if self.enable_datetime_features:
             generator_group.append(DatetimeFeatureGenerator())
         if self.enable_text_special_features:
@@ -132,3 +133,15 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
             )))
         generators = [generator_group]
         return generators
+
+    def _get_category_feature_generator(self):
+        return CategoryFeatureGenerator()
+
+
+class AutoMLInterpretablePipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
+    def _get_category_feature_generator(self):
+        return CategoryFeatureGenerator(
+            minimize_memory=False,
+            maximum_num_cat=10,
+            post_generators=[OneHotEncoderFeatureGenerator()]
+        )

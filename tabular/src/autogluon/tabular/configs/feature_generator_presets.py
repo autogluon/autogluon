@@ -1,7 +1,7 @@
 
 import copy
 
-from autogluon.features.generators import AutoMLPipelineFeatureGenerator, IdentityFeatureGenerator
+from autogluon.features.generators import AutoMLPipelineFeatureGenerator, AutoMLInterpretablePipelineFeatureGenerator, IdentityFeatureGenerator
 
 
 def get_default_feature_generator(feature_generator, feature_metadata=None, init_kwargs=None):
@@ -12,8 +12,10 @@ def get_default_feature_generator(feature_generator, feature_metadata=None, init
     elif isinstance(feature_generator, str):
         if feature_generator == 'auto':
             feature_generator = AutoMLPipelineFeatureGenerator(**init_kwargs)
+        elif feature_generator == 'interpretable':
+            feature_generator = AutoMLInterpretablePipelineFeatureGenerator(**init_kwargs)
         else:
-            raise ValueError(f"Unknown feature_generator preset: '{feature_generator}', valid presets: {['auto']}")
+            raise ValueError(f"Unknown feature_generator preset: '{feature_generator}', valid presets: {['auto', 'interpretable']}")
     if feature_metadata is not None:
         if feature_generator.feature_metadata_in is None and not feature_generator.is_fit():
             feature_generator.feature_metadata_in = copy.deepcopy(feature_metadata)

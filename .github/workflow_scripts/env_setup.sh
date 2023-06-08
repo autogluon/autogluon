@@ -46,6 +46,11 @@ function install_local_packages {
     done
 }
 
+function install_tabular {
+    python3 -m pip install --upgrade pygraphviz
+    install_local_packages "tabular/$1"
+}
+
 function install_multimodal {
     source $(dirname "$0")/setup_mmcv.sh
     source $(dirname "$0")/setup_groundingdino.sh

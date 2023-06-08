@@ -34,7 +34,10 @@ extras_require = {
         'lightgbm>=3.3,<3.4',
     ],
     'catboost': [
-        'catboost>=1.1,<1.2',
+        # CatBoost wheel build is not working correctly on darwin for CatBoost 1.2, so use old version in this case.
+        # https://github.com/autogluon/autogluon/pull/3190#issuecomment-1540599280
+        'catboost>=1.1,<1.2 ; sys_platform == "darwin"',
+        'catboost>=1.1,<1.3',
     ],
     # FIXME: Debug why xgboost 1.6 has 4x+ slower inference on multiclass datasets compared to 1.4
     #  It is possibly only present on MacOS, haven't tested linux.

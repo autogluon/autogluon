@@ -1405,7 +1405,7 @@ class TabularPredictor:
         Array of predictions, one corresponding to each row in given dataset. Either :class:`np.ndarray` or :class:`pd.Series` depending on `as_pandas` argument.
         """
         self._assert_is_fit('predict')
-        data = self.__get_dataset(data)
+        data = self._get_dataset(data)
         return self._learner.predict(X=data, model=model, as_pandas=as_pandas, transform_features=transform_features)
 
     def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=True, transform_features=True):
@@ -1448,7 +1448,7 @@ class TabularPredictor:
             raise AssertionError(f'`predictor.predict_proba` is not supported when problem_type="{self.problem_type}". '
                                  f'Please call `predictor.predict` instead. '
                                  f'You can check the value of `predictor.can_predict_proba` to tell if predict_proba is valid.')
-        data = self.__get_dataset(data)
+        data = self._get_dataset(data)
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass, transform_features=transform_features)
 
     @property
@@ -1488,7 +1488,7 @@ class TabularPredictor:
         This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
         """
         self._assert_is_fit('evaluate')
-        data = self.__get_dataset(data)
+        data = self._get_dataset(data)
         if self.can_predict_proba:
             y_pred = self.predict_proba(data=data, model=model)
         else:
@@ -1662,7 +1662,7 @@ class TabularPredictor:
         :class:`pd.DataFrame` of model performance summary information.
         """
         self._assert_is_fit('leaderboard')
-        data = self.__get_dataset(data, allow_nan=True)
+        data = self._get_dataset(data, allow_nan=True)
         return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
                                          only_pareto_frontier=only_pareto_frontier, skip_score=skip_score, silent=silent)
 
@@ -1724,7 +1724,7 @@ class TabularPredictor:
             raise AssertionError(f'`predictor.predict_proba_multi` is not supported when problem_type="{self.problem_type}". '
                                  f'Please call `predictor.predict_multi` instead. '
                                  f'You can check the value of `predictor.can_predict_proba` to tell if predict_proba_multi is valid.')
-        data = self.__get_dataset(data, allow_nan=True)
+        data = self._get_dataset(data, allow_nan=True)
         return self._learner.predict_proba_multi(X=data,
                                                  models=models,
                                                  as_pandas=as_pandas,
@@ -1779,7 +1779,7 @@ class TabularPredictor:
         Dictionary with model names as keys and model predictions as values.
         """
         self._assert_is_fit('predict_multi')
-        data = self.__get_dataset(data, allow_nan=True)
+        data = self._get_dataset(data, allow_nan=True)
         return self._learner.predict_multi(X=data,
                                            models=models,
                                            as_pandas=as_pandas,
@@ -1983,7 +1983,7 @@ class TabularPredictor:
 
         """
         self._assert_is_fit('transform_features')
-        data = self.__get_dataset(data, allow_nan=True)
+        data = self._get_dataset(data, allow_nan=True)
         return self._learner.get_inputs_to_stacker(dataset=data, model=model, base_models=base_models,
                                                    use_orig_features=return_original_features)
 
@@ -2123,7 +2123,7 @@ class TabularPredictor:
             'pXX_low': Lower end of XX% confidence interval for true feature importance score.
         """
         self._assert_is_fit('feature_importance')
-        data = self.__get_dataset(data, allow_nan=True)
+        data = self._get_dataset(data, allow_nan=True)
         if (data is None) and (not self._trainer.is_data_saved):
             raise AssertionError(
                 'No data was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPredictor` init `learner_kwargs` argument call to enable this functionality when data is not specified.')
@@ -2937,71 +2937,127 @@ class TabularPredictor:
                                      augmentation_data=augmentation_data, augment_method=augment_method,
                                      augment_args=augment_args)
 
-    def plot_ensemble_model(self, prune_unused_nodes=True) -> str:
+    # TODO: v1.0 Move core logic to `trainer` level.
+    # TODO: v1.0 Make it use leaderboard directly, allow to specify columns to include in the plot.
+    # TODO: See if we can incorporate into tutorials (without causing crashes for users who try them)
+    #  Might require using a different tool than pygraphviz to avoid the apt-get commands
+    # TODO: v1.0 Rename to `plot_model_graph`
+    # TODO: v1.0 Maybe add ensemble weights to the edges.
+    def plot_ensemble_model(self,
+                            model: str = 'best',
+                            *,
+                            prune_unused_nodes: bool = True,
+                            filename: str = 'ensemble_model.png') -> str:
         """
         Output the visualized stack ensemble architecture of a model trained by `fit()`.
-        The plot is stored to a file, `ensemble_model.png` in folder `predictor.path`
+        The plot is stored to a file, `ensemble_model.png` in folder `predictor.path` (or by the name specified in `filename`)
 
         This function requires `graphviz` and `pygraphviz` to be installed because this visualization depends on those package.
         Unless this function will raise `ImportError` without being able to generate the visual of the ensemble model.
 
         To install the required package, run the below commands (for Ubuntu linux):
 
-        $ sudo apt-get install graphviz
-        $ pip install graphviz
+        $ sudo apt-get install graphviz graphviz-dev
+        $ pip install pygraphviz
 
         For other platforms, refer to https://graphviz.org/ for Graphviz install, and https://pygraphviz.github.io/documentation.html for PyGraphviz.
 
-
         Parameters
         ----------
+        model : str, default 'best'
+            The model to highlight in golden orange, with all component models highlighted in yellow.
+            If 'best', will default to the best model returned from `self.get_model_best()`
+        prune_unused_nodes : bool, default True
+            If True, only plot the models that are components of the specified `model`.
+            If False, will plot all models.
+        filename : str, default 'ensemble_model.png'
+            The filename to save the plot as. Will be located under the `self.path` folder.
 
         Returns
         -------
-        The file name with the full path to the saved graphic
+        The file name with the full path to the saved graphic on disk.
+
+        Examples
+        --------
+        >>> from autogluon.tabular import TabularDataset, TabularPredictor
+        >>> train_data = TabularDataset('train.csv')
+        >>> predictor = TabularPredictor(label='class').fit(train_data)
+        >>> path_to_png = predictor.plot_ensemble_model()
+        >>>
+        >>> # To view the plot inside a Jupyter Notebook, use the below code:
+        >>> from IPython.display import Image, display
+        >>> display(Image(filename=path_to_png))
+
         """
         self._assert_is_fit('plot_ensemble_model')
         try:
             import pygraphviz
         except:
-            raise ImportError('Visualizing ensemble network architecture requires pygraphviz library')
+            raise ImportError('Visualizing ensemble network architecture requires the `pygraphviz` library. '
+                              'Try `sudo apt-get install graphviz graphviz-dev` followed by `pip install pygraphviz` to install on Linux, '
+                              'or refer to the method docstring for detailed installation instructions for other operating systems.')
 
         G = self._trainer.model_graph.copy()
 
+        primary_model = model
+        if primary_model == 'best':
+            primary_model = self.get_model_best()
+        all_models = self.get_model_names()
+        assert primary_model in all_models, f'Unknown model "{primary_model}"! Valid models: {all_models}'
         if prune_unused_nodes == True:
-            nodes_without_outedge = [node for node, degree in dict(G.degree()).items() if degree < 1]
-        else:
-            nodes_without_outedge = []
+            models_to_keep = self._trainer.get_minimum_model_set(model=primary_model)
+            G = nx.subgraph(G, models_to_keep)
 
-        nodes_no_val_score = [node for node in G if G.nodes[node]['val_score'] == None]
-
-        G.remove_nodes_from(nodes_without_outedge)
-        G.remove_nodes_from(nodes_no_val_score)
-
-        root_node = [n for n, d in G.out_degree() if d == 0]
-        best_model_node = self.get_model_best()
+        models = list(G.nodes)
+        fit_times = self._trainer.get_models_attribute_full(models=models, attribute='fit_time')
+        predict_times = self._trainer.get_models_attribute_full(models=models, attribute='predict_time')
 
         A = nx.nx_agraph.to_agraph(G)
+
+        for node in A.iternodes():
+            node_name = node.name
+            fit_time = fit_times[node_name]
+            predict_time = predict_times[node_name]
+            if fit_time is None:
+                fit_time_str = 'NaN'
+            else:
+                fit_time_str = f"{fit_time:.1f}s"
+            if predict_time is None:
+                predict_time_str = 'NaN'
+            else:
+                predict_time_str = f"{predict_time:.2f}s"
+
+            node_val_score = node.attr['val_score']
+            if node_val_score is None or (isinstance(node_val_score, str) and node_val_score == 'None'):
+                node_val_score_str = 'NaN'
+            else:
+                node_val_score_str = f"{float(node.attr['val_score']):.4f}"
+            label = f"{node.name}" \
+                    f"\nscore_val: {node_val_score_str}" \
+                    f"\nfit_time: {fit_time_str}" \
+                    f"\npred_time_val: {predict_time_str}"
+            # Remove unnecessary attributes
+            node.attr.clear()
+            node.attr['label'] = label
 
         A.graph_attr.update(rankdir='BT')
         A.node_attr.update(fontsize=10)
         A.node_attr.update(shape='rectangle')
 
         for node in A.iternodes():
-            node.attr['label'] = f"{node.name}\nVal score: {float(node.attr['val_score']):.4f}"
-
-            if node.name == best_model_node:
+            if node.name == primary_model:
+                # Golden Orange
                 node.attr['style'] = 'filled'
                 node.attr['fillcolor'] = '#ff9900'
                 node.attr['shape'] = 'box3d'
-            elif nx.has_path(G, node.name, best_model_node):
+            elif nx.has_path(G, node.name, primary_model):
+                # Yellow
                 node.attr['style'] = 'filled'
                 node.attr['fillcolor'] = '#ffcc00'
+            # Else: White
 
-        model_image_fname = os.path.join(self.path, 'ensemble_model.png')
-
+        model_image_fname = os.path.join(self.path, filename)
         A.draw(model_image_fname, format='png', prog='dot')
-
         return model_image_fname
 
     @staticmethod
@@ -3010,7 +3066,7 @@ class TabularPredictor:
             print(msg + ": " + str(results[key]))
 
     @staticmethod
-    def __get_dataset(data, allow_nan: bool = False):
+    def _get_dataset(data, allow_nan: bool = False):
         if data is None:
             if allow_nan:
                 return data
@@ -3233,12 +3289,12 @@ class TabularPredictor:
             predictor = cls._load(path=path)
 
         return predictor
-    
+
     @classmethod
     def load_log(cls, predictor_path: str = None, log_file_path: Optional[str] = None) -> List[str]:
         """
         Load log files of a predictor
-        
+
         Parameters
         ----------
         predictor_path: Optional[str], default = None
@@ -3248,7 +3304,7 @@ class TabularPredictor:
             Path to the log file.
             If you specified a `log_file_path` while initializing the predictor, you should use `log_file_path` to load the log file instead.
             At least one of `predictor_path` or `log_file_path` must to be specified
-            
+
         Return
         ------
         List[str]
@@ -3262,7 +3318,7 @@ class TabularPredictor:
         with open(file_path, "r") as f:
             lines = f.readlines()
         return lines
-    
+
     def _setup_log_to_file(self, path, log_to_file, log_file_path):
         if log_to_file:
             if log_file_path == "auto":
@@ -3558,70 +3614,6 @@ class TabularPredictor:
         if not isinstance(num_bag_sets, int):
             raise ValueError(f'num_bag_sets must be an integer. (num_bag_sets={num_bag_sets})')
         return num_bag_folds, num_bag_sets, num_stack_levels
-
-    def interpretable_models_summary(self, verbosity=0):
-        '''Summary of fitted interpretable models along with their corresponding complexities
-        '''
-        d = self.fit_summary(verbosity=verbosity)
-        summaries = pd.DataFrame.from_dict(d)
-
-        complexities = []
-        info = self.info()
-        for i in range(summaries.shape[0]):
-            model_name = summaries.index.values[i]
-            complexities.append(info['model_info'][model_name].get('complexity', np.nan))
-        summaries.insert(2, 'complexity', complexities)
-        summaries = summaries[~pd.isna(summaries.complexity)]  # remove non-interpretable models
-        return summaries.sort_values(by=['model_performance', 'complexity'], ascending=[False, True])
-
-    def print_interpretable_rules(self, complexity_threshold: int = 10, model_name: str = None):
-        """
-        Print the rules of the highest performing model below the complexity threshold.
-
-        Parameters
-        ----------
-        complexity_threshold : int, default=10
-            Threshold for complexity (number of rules) of fitted models to show.
-            If not model complexity is below this threshold, prints the model with the lowest complexity.
-        model_name : str,  default=None
-            Optionally print rules for a particular model, ignoring the complexity threshold.
-        """
-        if model_name is None:
-            summaries = self.interpretable_models_summary()
-            summaries_filtered = summaries[summaries.complexity <= complexity_threshold]
-            if summaries_filtered.shape[0] == 0:
-                summaries_filtered = summaries
-            model_name = summaries_filtered.index.values[0]  # best model is at top
-        agmodel = self._trainer.load_model(model_name)
-        imodel = agmodel.model
-        print(imodel)
-
-    def explain_classification_errors(self, data, model = None, print_rules: bool = True):
-        """Explain classification errors by fitting a rule-based model to them
-
-        Parameters
-        ----------
-        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
-            The data to make predictions for. Should contain same column names as training Dataset and follow same format
-            (may contain extra columns that won't be used by Predictor, including the label-column itself).
-            If str is passed, `data` will be loaded using the str value as the file path.
-        model : str (optional)
-            The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
-        print_rules : bool, optional
-            Whether to print the learned rules
-
-        Returns
-        -------
-        cls : imodels.classifier
-            Interpretable rule-based classifier with fit/predict methods
-        """
-        import imodels
-        data = self.__get_dataset(data)
-        predictions = self._learner.predict(X=data, model=model, as_pandas=True)
-        labels = data[self.label]
-        cls, columns = imodels.explain_classification_errors(data, predictions, labels, print_rules=print_rules)
-        return cls
 
     # TODO: Add .delete() method to easily clean-up clones?
     #  Would need to be careful that user doesn't delete important things accidentally.

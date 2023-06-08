@@ -25,6 +25,7 @@ class XGBoostModel(AbstractModel):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._ohe: bool = True
         self._ohe_generator = None
         self._xgb_model_type = None
 
@@ -54,13 +55,13 @@ class XGBoostModel(AbstractModel):
     def _preprocess(self, X, is_train=False, max_category_levels=None, **kwargs):
         X = super()._preprocess(X=X, **kwargs)
 
-        if self._ohe_generator is None:
-            self._ohe_generator = xgboost_utils.OheFeatureGenerator(max_levels=max_category_levels)
-
         if is_train:
-            self._ohe_generator.fit(X)
+            if self._ohe:
+                self._ohe_generator = xgboost_utils.OheFeatureGenerator(max_levels=max_category_levels)
+                self._ohe_generator.fit(X)
 
-        X = self._ohe_generator.transform(X)
+        if self._ohe:
+            X = self._ohe_generator.transform(X)
 
         return X
 
@@ -83,6 +84,13 @@ class XGBoostModel(AbstractModel):
         if num_cpus:
             params['n_jobs'] = num_cpus
         max_category_levels = params.pop('proc.max_category_levels', 100)
+        enable_categorical = params.get('enable_categorical', False)
+        if enable_categorical:
+            """Skip one-hot-encoding and pass categoricals directly to XGBoost"""
+            self._ohe = False
+        else:
+            """One-hot-encode categorical features"""
+            self._ohe = True
 
         if verbosity <= 2:
             verbose = False
