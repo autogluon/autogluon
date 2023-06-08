@@ -65,9 +65,6 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
         )
         num_gpus = 1
 
-    logger.info(f"{detected_num_gpus} GPUs are detected, and {num_gpus} GPUs will be used.")
-    memory_summary = ""
-
     return num_gpus
 
 

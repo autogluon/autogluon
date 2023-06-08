@@ -142,11 +142,10 @@ def apply_log_filter(log_filter):
 def get_fit_start_message(save_path, validation_metric_name):
     return f"""\
 AutoMM starts to create your model. ✨
-- AutoGluon version is {ag_version.__version__}
 
-- Pytorch version is {torch.__version__}
+- AutoGluon version is {ag_version.__version__}.
 
-- CUDA version is {torch.version.cuda}
+- Pytorch version is {torch.__version__}.
 
 - Model will be saved to "{save_path}".
 
@@ -182,3 +181,15 @@ adjust the hyperparameters (https://auto.gluon.ai/stable/tutorials/multimodal/ad
 or post issues on GitHub: https://github.com/autogluon/autogluon
 
 """
+
+
+def get_gpu_message(detected_num_gpus: int, used_num_gpus: int):
+    gpu_message = ""
+    gpu_message += f"{detected_num_gpus} GPUs are detected, and {used_num_gpus} GPUs will be used.\n"
+    for i in range(detected_num_gpus):
+        free_memory, total_memory = torch.cuda.mem_get_info(i)
+        gpu_message += f"   - GPU {i} name: {torch.cuda.get_device_name(i)}\n"
+        gpu_message += f"   - GPU {i} memory: {free_memory * 1e-9:.2f}GB/{total_memory * 1e-9:.2f}GB (Free/Total)\n"
+    gpu_message += f"CUDA version is {torch.version.cuda}.\n"
+
+    return gpu_message
