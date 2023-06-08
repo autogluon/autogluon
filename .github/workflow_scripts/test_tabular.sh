@@ -21,7 +21,7 @@ install_local_packages "common/[tests]" "core/[all,tests]" "features/"
 
 if [ "$IS_PLATFORM_TEST" = "true" ]
 then
-    install_tabular_platforms
+    install_tabular_platforms "[all,tests]"
 else
     install_tabular "[all,tests]"
 fi
