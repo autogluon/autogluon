@@ -2697,6 +2697,7 @@ class MultiModalPredictor(ExportMixin):
                 resume=resume,
                 verbosity=verbosity,
             )
+            predictor._problem_type = predictor._matcher._pipeline
             return predictor
 
         predictor = cls._load_metadata(predictor=predictor, path=dir_path, resume=resume, verbosity=verbosity)
