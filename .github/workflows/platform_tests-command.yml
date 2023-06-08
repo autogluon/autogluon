@@ -202,6 +202,7 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
+          conda install --channel conda-forge pygraphviz
           chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh "-m not gpu" "true"
 
   install:
@@ -232,9 +233,12 @@ jobs:
           auto-update-conda: true
           python-version: ${{ matrix.python }}
       - name: unit-test
+        if: matrix.os != 'windows-latest'
         shell: bash -l {0}
         run: |
-          # test_install.sh script will install mxnet, which doesn't work on Windows.
-          source .github/workflow_scripts/env_setup.sh
-          setup_build_env
-          install_all
+          chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
+      - name: unit-test on Windows
+        if: matrix.os == 'windows-latest'
+        shell: bash -l {0}
+        run: |
+          chmod +x ./.github/workflow_scripts/test_install_windows.sh && ./.github/workflow_scripts/test_install_windows.sh

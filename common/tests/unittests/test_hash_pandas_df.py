@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
-from tempfile import TemporaryFile
+import tempfile
+
+from pathlib import Path
 
 from autogluon.common.loaders import load_pkl
 from autogluon.common.savers import save_pkl
@@ -19,9 +21,10 @@ def _get_pandas_df(num_rows=20):
 
 def test_when_df_saved_and_loaded_from_disk_then_hash_is_unchanged():
     df = _get_pandas_df()
-    with TemporaryFile() as temp_file:
-        save_pkl.save(str(temp_file), df)
-        loaded_df = load_pkl.load(str(temp_file))
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_file = str(Path(temp_dir) / "temp_file.pkl")
+        save_pkl.save(temp_file, df)
+        loaded_df = load_pkl.load(temp_file)
     assert hash_pandas_df(df) == hash_pandas_df(loaded_df)
 
 
