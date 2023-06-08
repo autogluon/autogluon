@@ -9,10 +9,10 @@ TIMESERIES_PRESETS_CONFIGS = dict(
         "hyperparameter_tune_kwargs": {
             "scheduler": "local",
             "searcher": "auto",
-            "num_trials": 10,
+            "num_trials": 3,
         },
     },
     high_quality={"hyperparameters": "high_quality"},
     medium_quality={"hyperparameters": "medium_quality"},
-    fast_training={"hyperparameters": "local_only"},
+    fast_training={"hyperparameters": "fast_training"},
 )
