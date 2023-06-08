@@ -50,7 +50,7 @@ class TabularEstimator(BaseEstimator):
 
 
 class RecursiveTabularModel(AbstractTimeSeriesModel):
-    """Predict time series values one by one using TabularPredictor.
+    """Predict future time series values one by one using TabularPredictor from AutoGluon-Tabular.
 
     Based on the `mlforecast <https://github.com/Nixtla/mlforecast>`_ library.
 
@@ -76,6 +76,10 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
     max_num_samples : int, default = 1_000_000
         If given, training and validation datasets will contain at most this many rows (starting from the end of each
         series).
+    subsampling_strategy : {"items", "timesteps", None}, default = "items"
+        Strategy used to limit memory consumption of the model if the dataset is too large. Use "items" if the dataset
+        contains many time series, "timesteps" if the dataset contains a few very long time series, or None to disable
+        subsampling. Only applies to datasets with > 20_000_000 rows.
 
     """
 
@@ -228,19 +232,30 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         return features[self.mlf.ts.features_order_], features[self.mlf.ts.target_col]
 
     @staticmethod
-    def _subsample_data_to_avoid_oom(data: TimeSeriesDataFrame, max_num_rows: int = 20_000_000) -> TimeSeriesDataFrame:
+    def _subsample_data_to_avoid_oom(
+        data: TimeSeriesDataFrame,
+        strategy: Optional[str] = "items",
+        max_num_rows: int = 20_000_000,
+    ) -> TimeSeriesDataFrame:
         """Subsample time series from the dataset to avoid out of memory errors inside MLForecast.preprocess."""
         # TODO: Find a better way to ensure that the model does not run out of memory. E.g., by estimating the expected
         # memory usage & comparing it to currently available RAM
         if len(data) > max_num_rows:
-            item_ids = data.item_ids
-            num_items_to_keep = math.ceil(len(item_ids) * max_num_rows / len(data))
-            items_to_keep = np.random.choice(item_ids, num_items_to_keep, replace=False)
-            logger.debug(
-                f"\tRandomly selected {num_items_to_keep} ({num_items_to_keep / len(item_ids):.1%}) time series "
-                "to limit peak memory usage"
-            )
-            data = data.query("item_id in @items_to_keep")
+            if strategy == "items":
+                item_ids = data.item_ids
+                num_items_to_keep = math.ceil(len(item_ids) * max_num_rows / len(data))
+                items_to_keep = np.random.choice(item_ids, num_items_to_keep, replace=False)
+                logger.debug(
+                    f"\tRandomly selected {num_items_to_keep} ({num_items_to_keep / len(item_ids):.1%}) time series "
+                    "to limit peak memory usage"
+                )
+                data = data.query("item_id in @items_to_keep")
+            elif strategy == "timesteps":
+                num_timesteps_to_remove = math.floor((len(data) - max_num_rows) / data.num_items)
+                logger.debug(
+                    f"\tRemoving {num_timesteps_to_remove} from the start of each time series to limit peak memory usage"
+                )
+                data = data.slice_by_timestep(num_timesteps_to_remove, None)
         return data
 
     def _fit(
@@ -256,10 +271,12 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
 
         # TabularEstimator is passed to MLForecast later to include tuning_data
         model_params = self._get_model_params().copy()
+
+        subsampling_strategy = model_params.pop("subsampling_strategy", "items")
+        train_data = self._subsample_data_to_avoid_oom(train_data, strategy=subsampling_strategy)
+
         mlforecast_init_args = self._get_mlforecast_init_args(train_data, model_params)
         self.mlf = MLForecast(models={}, freq=self.freq, **mlforecast_init_args)
-
-        train_data = self._subsample_data_to_avoid_oom(train_data)
 
         # Do not use external val_data as tuning_data to avoid overfitting
         train_subset, val_subset = train_data.train_test_split(self.prediction_length)
