@@ -90,7 +90,8 @@ def test_predictor_skip_final_val():
     download_dir = "./"
     save_path = "petfinder_checkpoint"
     train_df, tune_df = shopee_dataset(download_dir=download_dir)
-
+    if os.path.isdir(save_path):
+        shutil.rmtree(save_path)
     predictor = MultiModalPredictor(label="label", path=save_path)
     hyperparameters = {
         "model.names": ["timm_image"],
@@ -105,7 +106,7 @@ def test_predictor_skip_final_val():
         train_data=train_df,
         tuning_data=tune_df,
         hyperparameters=hyperparameters,
-        time_limit=2,
+        time_limit=5,
     )
     predictor_new = MultiModalPredictor.load(path=save_path)
     assert isinstance(predictor_new._model, TimmAutoModelForImagePrediction)
