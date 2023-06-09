@@ -1,5 +1,3 @@
-from unittest import mock
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -15,7 +13,6 @@ TESTABLE_MODELS = [
 
 
 @pytest.mark.parametrize("known_covariates_names", [["known_1", "known_2"], []])
-# @pytest.mark.parametrize("past_covariates_names", [["past_1", "past_2", "past_3"], []])
 @pytest.mark.parametrize("static_features_names", [["cat_1"], []])
 @pytest.mark.parametrize("differences", [[2, 3], []])
 @pytest.mark.parametrize("lags", [[1, 2, 5], [4]])
