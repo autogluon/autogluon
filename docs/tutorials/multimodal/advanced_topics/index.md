@@ -52,6 +52,12 @@
   How to use TensorRT in accelerating AutoMM model inference.
 :::
 
+:::{grid-item-card} Continuous Training with AutoMM
+  :link: tensorrt.html
+
+  Different use cases for continuous training with AutoMM.
+:::
+
 ::::
 
 ```{toctree}
@@ -61,6 +67,7 @@ hidden: true
 ---
 
 hyperparameter_optimization
+continuous_training
 customization
 model_distillation
 efficient_finetuning_basic

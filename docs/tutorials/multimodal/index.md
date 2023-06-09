@@ -256,6 +256,12 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
 :::
 
 :::{grid-item-card} Customize AutoMM
+  :link: advanced_topics/continuous_training.html
+
+  How to continue training in AutoMM.
+:::
+
+:::{grid-item-card} Customize AutoMM
   :link: advanced_topics/customization.html
 
   How to customize AutoMM configurations.
