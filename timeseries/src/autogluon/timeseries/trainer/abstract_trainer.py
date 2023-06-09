@@ -12,6 +12,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.path_converter import PathConverter
 from autogluon.common.utils.utils import hash_pandas_df
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -38,6 +39,7 @@ class SimpleAbstractTrainer:
 
     def __init__(self, path: str, low_memory: bool, save_data: bool, *args, **kwargs):
         self.path = path
+        self.path = PathConverter.to_relative(self.path)
         self.reset_paths = False
 
         self.low_memory = low_memory
@@ -541,7 +543,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         excluded_model_types: Optional[List[str]] = None,
         time_limit: Optional[float] = None,
     ) -> List[str]:
-
         logger.info(f"\nStarting training. Start time is {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
         time_start = time.time()
@@ -1046,7 +1047,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         models: List[str] = None,
     ) -> List[str]:
-
         train_data = train_data or self.load_train_data()
         val_data = val_data or self.load_val_data()
         refit_full_data = self._merge_refit_full_data(train_data, val_data)
